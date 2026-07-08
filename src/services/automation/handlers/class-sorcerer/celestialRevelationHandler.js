@@ -116,7 +116,7 @@ export async function confirmCelestialRevelation(playerStats, chosenOption, camp
     // Set up duration expiration (1 minute = 10 rounds)
     addExpiration(playerStats.name, playerStats.name, [
         { type: 'remove_active_buff', buffName: chosenOption }
-    ], campaignName, 10);
+    ], campaignName);
 
     // Apply the chosen transformation's buff with the correct effect type
     const effectConfig = TRANSFORMATION_EFFECTS[chosenOption] || { buffEffect: chosenOption, description: '' };

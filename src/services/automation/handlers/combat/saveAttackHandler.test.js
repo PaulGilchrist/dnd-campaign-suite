@@ -461,7 +461,6 @@ describe('saveAttackHandler', () => {
         'TestCaster',
         [{ type: 'remove_active_buff', buffName: 'Breath Weapon' }],
         campaignName,
-        10,
       );
     });
 

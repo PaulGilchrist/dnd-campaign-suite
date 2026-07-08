@@ -816,7 +816,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       expect(expirations.addExpiration).toHaveBeenCalledWith(
         'TestWizard', 'Target',
         expect.arrayContaining([expect.objectContaining({ type: 'remove_regenerate_buff' })]),
-        'testCampaign', 600
+        'testCampaign'
       )
     })
   })

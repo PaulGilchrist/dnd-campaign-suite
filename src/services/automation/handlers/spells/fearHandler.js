@@ -80,7 +80,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
             addExpiration(casterName, targetName, [
                 { type: 'condition', condition: 'frightened' },
-            ], campaignName, 10);
+            ], campaignName);
 
             // Track Fear-specific effect: affected creature can re-save if it ends its turn
             // without line of sight to the caster

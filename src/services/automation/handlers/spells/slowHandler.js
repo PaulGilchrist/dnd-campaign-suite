@@ -186,7 +186,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             // Add expiration for concentration (up to 10 rounds = 1 minute)
             addExpiration(casterName, targetName, [
                 { type: 'condition', condition: 'slow' },
-            ], campaignName, 10);
+            ], campaignName);
 
             // Store target effects for the slow debuffs
             const targetEffects = getRuntimeValue(campaignName, 'targetEffects', campaignName) || [];

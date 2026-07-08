@@ -116,7 +116,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
             addExpiration(playerStats.name, targetName, [
                 { type: 'condition', condition: appliedCondition }
-            ], campaignName, 10);
+            ], campaignName);
 
         }
         window.removeEventListener('save-result', handleSaveResult);

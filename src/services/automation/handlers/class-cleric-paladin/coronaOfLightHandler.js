@@ -23,7 +23,7 @@ export async function activateCoronaOfLight(action, playerStats, campaignName, s
     // Set up expiration for 1 minute (10 rounds)
     addExpiration(playerName, playerName, [
         { type: 'remove_active_buff', buffName: action.name }
-    ], campaignName, 10);
+    ], campaignName);
 
     // Log the ability use
     await addEntry(campaignName, {

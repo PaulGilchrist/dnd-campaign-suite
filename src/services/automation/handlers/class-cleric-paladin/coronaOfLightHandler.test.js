@@ -77,7 +77,6 @@ describe('coronaOfLightHandler.activateCoronaOfLight', () => {
                 'TestCleric',
                 [{ type: 'remove_active_buff', buffName: 'Corona of Light' }],
                 campaignName,
-                10,
             );
 
             expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
@@ -108,7 +107,6 @@ describe('coronaOfLightHandler.activateCoronaOfLight', () => {
                 'TestCleric',
                 [{ type: 'remove_active_buff', buffName: 'Custom Corona Name' }],
                 campaignName,
-                10,
             );
 
             expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({

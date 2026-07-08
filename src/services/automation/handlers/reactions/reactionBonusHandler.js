@@ -8,6 +8,7 @@ import { spendSorceryPoints, getCurrentSorceryPoints } from '../../../../hooks/c
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getClassFeatures } from '../../../../services/character/classFeatures.js';
 import { executeHandler } from '../../index.js';
+import { parseDurationRounds } from '../../../rules/effects/durationParser.js';
 
 export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
@@ -484,7 +485,7 @@ export async function applyInspiringMovement(action, playerStats, campaignName, 
     setRuntimeValue(playerStats.name, 'inspiringMovementNoOA', true, campaignName);
     addExpiration(playerStats.name, playerStats.name, [
         { type: 'inspiring_movement_no_oa' }
-    ], campaignName, 1);
+    ], campaignName, undefined, playerStats.name);
 
     if (allyName) {
         setRuntimeValue(allyName, 'inspiringMovementGranted', true, campaignName);
@@ -492,11 +493,11 @@ export async function applyInspiringMovement(action, playerStats, campaignName, 
             setRuntimeValue(allyName, 'inspiringMovementNoOA', true, campaignName);
             addExpiration(playerStats.name, allyName, [
                 { type: 'inspiring_movement_no_oa' }
-            ], campaignName, 1);
+            ], campaignName, undefined, playerStats.name);
         }
         addExpiration(playerStats.name, allyName, [
             { type: 'inspiring_movement_granted' }
-        ], campaignName, 1);
+        ], campaignName, undefined, playerStats.name);
     }
 
     let description = `${playerStats.name} used ${action.name} (Dance). `;
@@ -560,11 +561,4 @@ function evaluateUses(expression, playerStats) {
     return 0;
 }
 
-function parseDurationRounds(duration) {
-    if (!duration) return undefined;
-    const lower = duration.toLowerCase();
-    if (lower.startsWith('1_minute')) return 10;
-    const match = lower.match(/(\d+)_round/);
-    if (match) return parseInt(match[1], 10);
-    return undefined;
-}
+

@@ -83,7 +83,8 @@ describe('viciousMockeryHandler', () => {
                 }),
             ]),
             'TestCampaign',
-            1,
+            undefined,
+            'TestBard',
         );
     });
 });

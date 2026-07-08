@@ -139,7 +139,7 @@ async function resolveFrightfulAura(action, playerStats, campaignName) {
                 addExpiration(playerName, creature.name, [
                     { type: 'frightened', condition: 'frightened' },
                     { type: 'avenging_angel_aura' },
-                ], campaignName, 10);
+                ], campaignName);
             }
 
             npcResults.push({ targetName: creature.name, success, roll: roll1, total, saveBonus });

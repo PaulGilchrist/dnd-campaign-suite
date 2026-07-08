@@ -233,7 +233,7 @@ export async function confirmMantleOfInspiration(action, playerStats, campaignNa
         setRuntimeValue(targetName, 'inspiringMovementNoOA', true, campaignName);
         addExpiration(playerName, targetName, [
             { type: 'inspiring_movement_no_oa' }
-        ], campaignName, 1);
+        ], campaignName, undefined, playerName);
     }
 
     const targetList = finalTargets.length > 0 ? finalTargets.join(', ') : 'no targets selected';

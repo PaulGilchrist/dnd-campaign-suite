@@ -438,7 +438,6 @@ describe('beguilingTwistHandler.handle', () => {
         'Ally1',
         [{ type: 'condition', condition: 'charmed' }],
         campaignName,
-        60,
       );
     });
   });

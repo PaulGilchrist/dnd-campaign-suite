@@ -215,7 +215,7 @@ describe('applyInspiringMovement', () => {
       'Bard', 'inspiringMovementNoOA', true, campaignName
     );
     expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Bard', 'Bard', [{ type: 'inspiring_movement_no_oa' }], campaignName, 1
+      'Bard', 'Bard', [{ type: 'inspiring_movement_no_oa' }], campaignName, undefined, 'Bard'
     );
   });
 
@@ -232,10 +232,10 @@ describe('applyInspiringMovement', () => {
       'Fighter', 'inspiringMovementNoOA', true, campaignName
     );
     expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Bard', 'Fighter', [{ type: 'inspiring_movement_no_oa' }], campaignName, 1
+      'Bard', 'Fighter', [{ type: 'inspiring_movement_no_oa' }], campaignName, undefined, 'Bard'
     );
     expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Bard', 'Fighter', [{ type: 'inspiring_movement_granted' }], campaignName, 1
+      'Bard', 'Fighter', [{ type: 'inspiring_movement_granted' }], campaignName, undefined, 'Bard'
     );
   });
 

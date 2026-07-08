@@ -604,52 +604,52 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 }
 
-   export function addExpiration(attackerName, targetName, effects, campaignName, rounds, nextCreatureName) {
-       let list = getRuntimeValue(attackerName, KEY);
-       if (!Array.isArray(list)) {
-           console.warn('expirations: pendingExpirations not initialized for', attackerName, '— initializing empty array');
-           list = [];
-           setRuntimeValue(attackerName, KEY, list, campaignName);
+   export function addExpiration(attackerName, targetName, effects, campaignName, rounds, expireOnCreatureName) {
+        let list = getRuntimeValue(attackerName, KEY);
+        if (!Array.isArray(list)) {
+            console.warn('expirations: pendingExpirations not initialized for', attackerName, '— initializing empty array');
+            list = [];
+            setRuntimeValue(attackerName, KEY, list, campaignName);
+        }
+        const currentRound = getCurrentCombatRound(campaignName);
+        setRuntimeValue(attackerName, KEY, [
+             ...list,
+              { target: targetName, effects, appliedRound: currentRound, expiryRounds: rounds ?? Infinity, expireOnCreatureName: expireOnCreatureName ?? null }
+          ], campaignName);
+    }
+
+   /**
+    * Process a single expiration list: remove expired entries, keep the rest.
+    * Expired = currentRound >= appliedRound + expiryRounds.
+    * Also expires when expireOnCreatureName is set and the active creature matches.
+    * Returns { processed, expiredCount, changed }.
+    */
+   function processExpirationList(list, currentRound, targetOwner, campaignName, activeName) {
+       if (!Array.isArray(list) || !list.length) return { processed: [], expiredCount: 0, changed: false };
+
+       let newEntries = [];
+       let expiredCount = 0;
+       let changed = false;
+
+        for (const item of list) {
+            const rounds = item.expiryRounds ?? Infinity;
+            const expirationRound = item.appliedRound + rounds;
+            const isRoundExpired = currentRound >= expirationRound;
+            const isCreatureExpired = item.expireOnCreatureName && activeName &&
+                utils.getName(item.expireOnCreatureName) === utils.getName(activeName) &&
+                currentRound > item.appliedRound;
+            const isExpired = isRoundExpired || isCreatureExpired;
+            if (isExpired) {
+                clearExpirationEffects(item.effects, item.target, targetOwner, campaignName);
+                expiredCount++;
+                changed = true;
+            } else {
+               newEntries.push(item);
+           }
        }
-       const currentRound = getCurrentCombatRound(campaignName);
-       setRuntimeValue(attackerName, KEY, [
-            ...list,
-             { target: targetName, effects, appliedRound: currentRound, expiryRounds: rounds ?? Infinity, nextCreatureName: nextCreatureName ?? null }
-         ], campaignName);
-   }
 
-  /**
-   * Process a single expiration list: remove expired entries, keep the rest.
-   * Expired = currentRound >= appliedRound + expiryRounds.
-   * Also expires when nextCreatureName is set and the active creature matches.
-   * Returns { processed, expiredCount, changed }.
-   */
-  function processExpirationList(list, currentRound, targetOwner, campaignName, activeName) {
-      if (!Array.isArray(list) || !list.length) return { processed: [], expiredCount: 0, changed: false };
-
-      let newEntries = [];
-      let expiredCount = 0;
-      let changed = false;
-
-       for (const item of list) {
-           const rounds = item.expiryRounds ?? Infinity;
-           const expirationRound = item.appliedRound + rounds;
-           const isRoundExpired = currentRound >= expirationRound;
-           const isCreatureExpired = item.nextCreatureName && activeName &&
-               utils.getName(item.nextCreatureName) === utils.getName(activeName) &&
-               currentRound > item.appliedRound;
-           const isExpired = isRoundExpired || isCreatureExpired;
-           if (isExpired) {
-               clearExpirationEffects(item.effects, item.target, targetOwner, campaignName);
-               expiredCount++;
-               changed = true;
-           } else {
-              newEntries.push(item);
-          }
-      }
-
-     return { processed: newEntries, expiredCount, changed };
- }
+      return { processed: newEntries, expiredCount, changed };
+  }
 
  /**
   * Expire stale pendingExpirations for a single creature's store.

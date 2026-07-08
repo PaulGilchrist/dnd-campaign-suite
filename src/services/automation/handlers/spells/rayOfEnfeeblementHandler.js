@@ -60,7 +60,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
         addExpiration(playerStats.name, targetName, [
             { type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: playerStats.name },
-        ], campaignName, 1);
+        ], campaignName, undefined, playerStats.name);
 
         addEntry(campaignName, {
             type: 'automation_info',
@@ -108,7 +108,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // Apply expiration (concentration handles duration; 1 minute = 10 rounds default)
     addExpiration(playerStats.name, targetName, [
         { type: 'remove_target_effect', effectKey: 'ray_of_enfeeble_debuff', source: playerStats.name },
-    ], campaignName, 10);
+    ], campaignName);
 
     addEntry(campaignName, {
         type: 'condition',

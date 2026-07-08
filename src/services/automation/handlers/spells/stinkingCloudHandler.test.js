@@ -251,7 +251,6 @@ describe('stinkingCloudHandler', () => {
           'EnemyGoblin',
           [{ type: 'poisoned', condition: 'poisoned' }],
           campaignName,
-          10,
         );
       });
 

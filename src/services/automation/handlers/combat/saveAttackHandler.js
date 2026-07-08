@@ -6,6 +6,7 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { resolveUses } from '../../../combat/automation/automationExpressions.js';
+import { parseDurationRounds } from '../../../rules/effects/durationParser.js';
 
 const AREA_SHAPES = new Set(['emanation', 'cone', 'line', 'sphere', 'cube', 'cylinder', 'square', 'circle', 'wall', 'cage', 'floor', 'area']);
 
@@ -27,14 +28,6 @@ function getEmanationRange(auto, playerStats, playerName, campaignName) {
     return fallback;
 }
 
-function parseDurationRounds(duration) {
-    if (!duration) return undefined;
-    const lower = duration.toLowerCase();
-    if (lower.startsWith('1_minute')) return 10;
-    const match = lower.match(/(\d+)_round/);
-    if (match) return parseInt(match[1], 10);
-    return undefined;
-}
 
 export function isExhausted(action, playerStats, campaignName) {
     const auto = action.automation;
@@ -170,10 +163,17 @@ export async function handle(action, playerStats, campaignName, mapName) {
         // Set up duration expiration for area effects
         if (auto.duration && isAreaShape(resolvedShape)) {
             const durationRounds = parseDurationRounds(auto.duration);
-            if (durationRounds) {
-                addExpiration(playerStats.name, playerStats.name, [
-                    { type: 'remove_active_buff', buffName: action.name }
-                ], campaignName, durationRounds);
+            if (durationRounds !== undefined) {
+                const rounds = durationRounds === 0 ? undefined : durationRounds;
+                if (rounds !== undefined) {
+                    addExpiration(playerStats.name, playerStats.name, [
+                        { type: 'remove_active_buff', buffName: action.name }
+                    ], campaignName, rounds);
+                } else {
+                    addExpiration(playerStats.name, playerStats.name, [
+                        { type: 'remove_active_buff', buffName: action.name }
+                    ], campaignName);
+                }
             }
         }
     } else {

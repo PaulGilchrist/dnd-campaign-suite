@@ -111,7 +111,7 @@ export async function applyBardicInspiration(action, playerStats, campaignName, 
 
     addExpiration(playerStats.name, targetName, [
         { type: 'remove_bardic_inspiration' }
-    ], campaignName, 100);
+    ], campaignName);
 
     addEntry(campaignName, {
         type: 'ability_use',

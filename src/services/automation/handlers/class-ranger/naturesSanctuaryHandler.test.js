@@ -123,7 +123,6 @@ describe("Nature's Sanctuary Handler", () => {
         'Druid',
         [{ type: 'remove_natures_sanctuary' }],
         campaignName,
-        10,
       );
       expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'ability_use',

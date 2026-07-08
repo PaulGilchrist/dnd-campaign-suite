@@ -178,7 +178,8 @@ describe('bulwarkOfForceHandler', () => {
                 'Test Fighter',
                 [{ type: 'remove_bulwark_of_force' }],
                 campaignName,
-                1
+                undefined,
+                'Test Fighter'
             );
         });
 

@@ -378,7 +378,6 @@ describe('sleepHandler.handle', () => {
         'Goblin',
         expect.arrayContaining([{ type: 'incapacitated', condition: 'incapacitated' }]),
         campaignName,
-        10,
       );
     });
 

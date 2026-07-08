@@ -377,14 +377,16 @@ describe('confirmMantleOfInspiration', () => {
       'Ally1',
       [{ type: 'inspiring_movement_no_oa' }],
       campaignName,
-      1
+      undefined,
+      'Bard1'
     );
     expect(expirations.addExpiration).toHaveBeenCalledWith(
       'Bard1',
       'Ally2',
       [{ type: 'inspiring_movement_no_oa' }],
       campaignName,
-      1
+      undefined,
+      'Bard1'
     );
   });
 

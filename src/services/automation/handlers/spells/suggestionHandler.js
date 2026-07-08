@@ -69,10 +69,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const filtered = conditions.filter(c => String(c).toLowerCase() !== 'charmed');
     setRuntimeValue(targetName, 'activeConditions', [...filtered, 'charmed'], campaignName);
 
-    const durationHours = auto.duration ? 8 : 24;
     addExpiration(casterName, targetName, [
         { type: 'charmed', condition: 'charmed' },
-    ], campaignName, durationHours);
+    ], campaignName);
 
     addEntry(campaignName, {
         type: 'condition',

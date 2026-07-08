@@ -274,7 +274,6 @@ describe('celestialRevelationHandler', () => {
                 playerName,
                 [{ type: 'remove_active_buff', buffName: 'Necrotic Shroud' }],
                 campaignName,
-                10
             );
         });
 
@@ -415,7 +414,6 @@ describe('celestialRevelationHandler', () => {
                 'CustomSorcerer',
                 expect.any(Array),
                 campaignName,
-                10
             );
             expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
                 'CustomSorcerer',

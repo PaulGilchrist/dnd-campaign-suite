@@ -40,21 +40,19 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // Set _activeInvisibility_ key so endInvisibilityOnHostileAction works
     await setRuntimeValue(campaignName, `_activeInvisibility_${playerName}`, playerStats.name, campaignName);
 
-    // Set expiration: Invisible lasts until the creature after this one in initiative order
-    // is active on the next round. Use addExpiration with rounds=2 so it expires when
-    // appliedRound + 2 <= currentRound (i.e. 2 full rounds later).
+    // Set expiration: Invisible lasts until end of the player's next turn (creature after player in init order becomes active)
     const combatSummary = getCombatSummary(campaignName);
-    let nextCreatureName = null;
+    let expireOnCreatureName = null;
     if (combatSummary?.creatures) {
         const currentIndex = combatSummary.creatures.findIndex(c => c.name === playerName);
         if (currentIndex >= 0) {
             const nextIndex = (currentIndex + 1) % combatSummary.creatures.length;
-            nextCreatureName = combatSummary.creatures[nextIndex].name;
+            expireOnCreatureName = combatSummary.creatures[nextIndex].name;
         }
     }
     addExpiration(playerName, playerName, [
         { type: 'condition', condition: 'invisible' }
-    ], campaignName, 2, nextCreatureName);
+    ], campaignName, undefined, expireOnCreatureName);
 
     // Log the ability use
     await addEntry(campaignName, {

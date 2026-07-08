@@ -123,7 +123,7 @@ export async function processOttoDanceSuccessSave(casterName, targetName, spellN
 
     addExpiration(casterName, targetName, [
         { type: 'speed_zero', condition: 'speed_zero' },
-    ], campaignName, 1);
+    ], campaignName, undefined, casterName);
 
     addEntry(campaignName, {
         type: 'condition',
@@ -220,7 +220,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     addExpiration(casterName, targetName, [
         { type: 'charmed', condition: 'charmed' },
         { type: 'speed_zero', condition: 'speed_zero' },
-    ], campaignName, 10);
+    ], campaignName);
 
     // Store target effect for repeat saves
     const targetEffects = getRuntimeValue(campaignName, 'targetEffects', campaignName) || [];

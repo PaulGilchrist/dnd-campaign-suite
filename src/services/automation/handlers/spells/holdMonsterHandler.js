@@ -199,7 +199,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     addExpiration(casterName, targetName, [
         { type: 'condition', condition: 'paralyzed' },
-    ], campaignName, 10);
+    ], campaignName);
 
     // Store target effect for end-of-turn repeated saves
     const targetEffects = getRuntimeValue(campaignName, 'targetEffects', campaignName) || [];

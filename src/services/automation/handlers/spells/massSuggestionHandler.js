@@ -84,7 +84,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
             addExpiration(casterName, targetName, [
                 { type: 'charmed', condition: 'charmed' },
-            ], campaignName, 24);
+            ], campaignName);
 
             results.push(`${targetName} is Charmed by Mass Suggestion.`);
         }

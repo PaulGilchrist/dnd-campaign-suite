@@ -88,7 +88,8 @@ describe('shieldHandler', () => {
                 'TestCharacter',
                 [{ type: 'remove_active_buff', buffName: 'Shield' }],
                 mockCampaignName,
-                1
+                undefined,
+                'TestCharacter'
             );
             expect(damageUtils.getCombatContext).toHaveBeenCalled();
             expect(damageRollback.findAttackRollAgainstTarget).not.toHaveBeenCalled();

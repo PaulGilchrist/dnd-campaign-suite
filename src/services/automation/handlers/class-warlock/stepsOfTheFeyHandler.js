@@ -87,10 +87,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                     description: `${targetName} failed WIS save. ${targetName} has Disadvantage on attack rolls against creatures other than ${playerName} until start of ${playerName}'s next turn.`,
                 }).catch((e) => { console.error("[stepsOfTheFey] Error:", e); });
 
-                // Duration: roughly 1 round (until start of taunter's next turn)
+                // Duration: until start of taunter's next turn
                 addExpiration(playerName, targetName, [
                     { type: 'condition', condition: conditionKey }
-                ], campaignName, 1);
+                ], campaignName, undefined, playerName);
             } else {
                 addEntry(campaignName, {
                     type: 'save_result',

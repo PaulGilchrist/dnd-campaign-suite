@@ -70,7 +70,7 @@ export async function handle(action, playerStats, campaignName) {
 
     addExpiration(playerName, playerName, [
         { type: 'remove_cosmic_omen' }
-    ], campaignName, 100);
+    ], campaignName);
 
     return {
         type: 'popup',

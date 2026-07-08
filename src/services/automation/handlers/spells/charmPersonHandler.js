@@ -139,7 +139,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     addExpiration(casterName, targetName, [
         { type: 'charmed', condition: 'charmed' },
-    ], campaignName, 1);
+    ], campaignName, undefined, casterName);
 
     addEntry(campaignName, {
         type: 'condition',

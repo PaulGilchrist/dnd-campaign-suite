@@ -76,7 +76,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // Set up expiration for 1 minute (10 rounds)
     addExpiration(playerName, playerName, [
         { type: 'remove_natures_sanctuary' }
-    ], campaignName, 10);
+    ], campaignName);
 
     // Log the ability use
     addEntry(campaignName, {

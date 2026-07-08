@@ -223,7 +223,8 @@ describe('stepsOfTheFeyHandler.handle', () => {
           expect.objectContaining({ type: 'condition' }),
         ]),
         campaignName,
-        1,
+        undefined,
+        'TestCleric',
       );
     });
 

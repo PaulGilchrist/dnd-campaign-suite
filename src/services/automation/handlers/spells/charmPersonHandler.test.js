@@ -271,7 +271,8 @@ describe('charmPersonHandler.handle', () => {
         'Goblin',
         expect.arrayContaining([{ type: 'charmed', condition: 'charmed' }]),
         campaignName,
-        1,
+        undefined,
+        'TestCaster',
       );
     });
 

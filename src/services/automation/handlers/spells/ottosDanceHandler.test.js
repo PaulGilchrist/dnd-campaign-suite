@@ -191,7 +191,8 @@ describe('ottosDanceHandler.handle', () => {
         'Goblin',
         expect.arrayContaining([{ type: 'speed_zero', condition: 'speed_zero' }]),
         campaignName,
-        1,
+        undefined,
+        'TestCaster',
       );
     });
 
@@ -263,7 +264,6 @@ describe('ottosDanceHandler.handle', () => {
         'Goblin',
         expect.any(Array),
         campaignName,
-        10,
       );
     });
 
@@ -652,7 +652,8 @@ describe('ottosDanceHandler.processOttoDanceSuccessSave', () => {
       'Goblin',
       expect.arrayContaining([{ type: 'speed_zero', condition: 'speed_zero' }]),
       campaignName,
-      1,
+      undefined,
+      'TestCaster',
     );
   });
 

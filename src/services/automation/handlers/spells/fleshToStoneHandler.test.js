@@ -365,7 +365,8 @@ describe('fleshToStoneHandler.handle', () => {
         targetName,
         expect.arrayContaining([{ type: 'speed_zero' }]),
         campaignName,
-        1,
+        undefined,
+        casterName,
       );
     });
 
@@ -468,7 +469,6 @@ describe('fleshToStoneHandler.handle', () => {
           { type: 'condition', condition: 'restrained' },
         ]),
         campaignName,
-        10,
       );
     });
 
@@ -578,7 +578,8 @@ describe('fleshToStoneHandler.handle', () => {
         targetName,
         expect.arrayContaining([{ type: 'speed_zero' }]),
         campaignName,
-        1,
+        undefined,
+        casterName,
       );
     });
 

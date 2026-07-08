@@ -1242,7 +1242,7 @@ async function applyRegenerateSpell(spell, target, caster, campaignName) {
     // Add expiration for combat: remove regenerate buff after 1 hour (3600 seconds / 6 = 600 rounds)
     addExpiration(casterName, targetName, [
         { type: 'remove_regenerate_buff' }
-    ], campaignName, 600);
+    ], campaignName);
 
     addEntry(campaignName, {
         type: 'ability_use',

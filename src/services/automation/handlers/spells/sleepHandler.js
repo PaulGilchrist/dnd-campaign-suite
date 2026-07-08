@@ -221,7 +221,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             // Add expiration for concentration
             addExpiration(casterName, targetName, [
                 { type: 'incapacitated', condition: 'incapacitated' },
-            ], campaignName, 10);
+            ], campaignName);
 
             // Store target effect for end-of-turn repeated saves
             const targetEffects = getRuntimeValue(campaignName, 'targetEffects', campaignName) || [];

@@ -152,7 +152,7 @@ describe('naturesVeilHandler', () => {
                 'RangerGirl',
                 [{ type: 'condition', condition: 'invisible' }],
                 'test-campaign',
-                2,
+                undefined,
                 null
             );
         });

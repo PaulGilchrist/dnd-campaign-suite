@@ -230,7 +230,6 @@ describe('avengingAngelHandler.handle', () => {
         'Goblin',
         expect.any(Array),
         campaignName,
-        10,
       );
     });
 

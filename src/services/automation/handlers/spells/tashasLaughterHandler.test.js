@@ -241,7 +241,6 @@ describe('tashasLaughterHandler.handle', () => {
           { type: 'tashas_laughter_expiration' },
         ]),
         campaignName,
-        60,
       );
     });
 

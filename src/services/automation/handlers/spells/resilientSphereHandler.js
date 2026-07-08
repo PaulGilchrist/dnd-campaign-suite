@@ -88,7 +88,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     if (!wasActive) {
         addExpiration(casterName, targetName, [
             { type: 'remove_active_buff', buffName: action.name, effect: 'resilient_sphere' }
-        ], campaignName, 10);
+        ], campaignName);
     }
 
     addEntry(campaignName, {

@@ -486,7 +486,6 @@ describe('spellCastHandler', () => {
           expect.objectContaining({ type: 'remove_active_buff', buffName: 'Mantle of Majesty' }),
         ]),
         campaignName,
-        10
       );
 
       expect(combatData.getCombatSummary).toHaveBeenCalledWith(campaignName);

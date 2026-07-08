@@ -184,7 +184,7 @@ describe('hypnoticPatternHandler.handle', () => {
           { type: 'incapacitated', condition: 'incapacitated' },
           { type: 'speed_zero', condition: 'speed_zero' },
         ]),
-        campaignName, 10,
+        campaignName,
       );
     });
   });

@@ -28,7 +28,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // Set up expiration for start of next turn
     addExpiration(playerName, playerName, [
         { type: 'remove_smite_of_protection' }
-    ], campaignName, 1);
+    ], campaignName, undefined, playerName);
 
     // Log the ability use
     await addEntry(campaignName, {

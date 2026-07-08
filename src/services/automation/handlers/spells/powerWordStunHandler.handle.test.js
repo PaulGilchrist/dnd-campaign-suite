@@ -281,7 +281,8 @@ describe('powerWordStunHandler.handle - target with more than 150 HP', () => {
         expect.objectContaining({ type: 'speed_zero', condition: 'speed_zero' }),
       ]),
       campaignName,
-      1,
+      undefined,
+      casterName,
     );
   });
 

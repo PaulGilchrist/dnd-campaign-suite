@@ -198,7 +198,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 { type: 'condition', condition: 'prone' },
                 { type: 'condition', condition: 'incapacitated' },
                 { type: 'tashas_laughter_expiration' },
-            ], campaignName, 60);
+            ], campaignName);
 
             // Store target effect for end-of-turn repeated saves
             const targetEffects = getRuntimeValue(campaignName, 'targetEffects', campaignName) || [];

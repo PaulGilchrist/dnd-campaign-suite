@@ -204,7 +204,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         // Set expiration: speed_zero ends at start of caster's next turn
         addExpiration(casterName, targetName, [
             { type: 'speed_zero', condition: 'speed_zero' },
-        ], campaignName, 1);
+        ], campaignName, undefined, casterName);
 
         addEntry(campaignName, {
             type: 'condition',

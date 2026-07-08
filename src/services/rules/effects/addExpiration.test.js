@@ -86,7 +86,7 @@ describe('addExpiration', () => {
             effects: [{ type: 'stunned' }],
             appliedRound: 5,
             expiryRounds: 3,
-            nextCreatureName: null,
+            expireOnCreatureName: null,
           },
         ],
         'MyCampaign',

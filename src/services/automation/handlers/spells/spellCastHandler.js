@@ -40,7 +40,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         await setRuntimeValue(playerStats.name, 'activeBuffs', newBuffs, campaignName);
         addExpiration(playerStats.name, playerStats.name, [
             { type: 'remove_active_buff', buffName: 'Mantle of Majesty' }
-        ], campaignName, 10);
+        ], campaignName);
 
         // Set concentration on combat summary so initiative tracker shows it
         const combatSummary = getCombatSummary(campaignName);

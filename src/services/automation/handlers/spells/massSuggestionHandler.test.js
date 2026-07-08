@@ -183,7 +183,6 @@ describe('massSuggestionHandler.handle', () => {
         'Goblin',
         [{ type: 'charmed', condition: 'charmed' }],
         campaignName,
-        24,
       );
       expect(addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'condition',

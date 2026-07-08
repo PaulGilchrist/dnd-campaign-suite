@@ -76,7 +76,8 @@ describe('smiteOfProtectionHandler.handle', () => {
                 playerName,
                 [{ type: 'remove_smite_of_protection' }],
                 campaignName,
-                1,
+                undefined,
+                playerName,
             );
             expect(addEntry).toHaveBeenCalledWith(campaignName, {
                 type: 'ability_use',

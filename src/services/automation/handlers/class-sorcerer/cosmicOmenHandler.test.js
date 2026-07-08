@@ -272,7 +272,6 @@ describe('cosmicOmenHandler', () => {
                 'TestSorcerer',
                 [{ type: 'remove_cosmic_omen' }],
                 'test-campaign',
-                100
             );
         });
     });

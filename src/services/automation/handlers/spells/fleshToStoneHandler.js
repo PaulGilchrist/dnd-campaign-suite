@@ -247,7 +247,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
         addExpiration(casterName, targetName, [
             { type: 'speed_zero' },
-        ], campaignName, 1);
+        ], campaignName, undefined, casterName);
 
         return {
             type: 'popup',
@@ -285,7 +285,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
         addExpiration(casterName, targetName, [
             { type: 'speed_zero' },
-        ], campaignName, 1);
+        ], campaignName, undefined, casterName);
 
         addEntry(campaignName, {
             type: 'save_result',
@@ -329,7 +329,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     addExpiration(casterName, targetName, [
         { type: 'condition', condition: 'restrained' },
-    ], campaignName, 10);
+    ], campaignName);
 
     // Store target effect for end-of-turn repeated saves
     const targetEffects = getRuntimeValue(campaignName, 'targetEffects', campaignName) || [];

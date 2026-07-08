@@ -86,7 +86,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 { type: 'charmed', condition: 'charmed' },
                 { type: 'incapacitated', condition: 'incapacitated' },
                 { type: 'speed_zero', condition: 'speed_zero' },
-            ], campaignName, 10);
+            ], campaignName);
 
             results.push(`${targetName} is Charmed, Incapacitated, and has Speed 0.`);
         }

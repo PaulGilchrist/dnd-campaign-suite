@@ -866,7 +866,7 @@ export async function executeBonusActionManeuver(action, playerStats, campaignNa
         await setRuntimeValue(playerStats.name, 'baitAndSwitchSource', maneuver.name, campaignName);
         await addExpiration(playerStats.name, playerStats.name, [
             { type: 'bait_and_switch_clear' }
-        ], campaignName, 1);
+        ], campaignName, undefined, playerStats.name);
     }
 
     if (maneuver.effect === 'advantage_and_damage') {
@@ -1872,7 +1872,7 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
         await setRuntimeValue(playerStats.name, 'baitAndSwitchSource', maneuver.name, campaignName);
         await addExpiration(playerStats.name, playerStats.name, [
             { type: 'bait_and_switch_clear' }
-        ], campaignName, 1);
+        ], campaignName, undefined, playerStats.name);
     }
 
     if (maneuver.effect === 'advantage_and_damage') {
@@ -2071,7 +2071,7 @@ export async function executeBaitAndSwitchChoice(action, playerStats, campaignNa
     await setRuntimeValue(chosenName, 'baitAndSwitchSource', maneuverName, campaignName);
     await addExpiration(playerStats.name, chosenName, [
         { type: 'bait_and_switch_clear' }
-    ], campaignName, 1);
+    ], campaignName, undefined, playerStats.name);
 
     const description = `${maneuverName}: ${chosenName} gains +${dieValue} AC until the start of ${playerStats.name}'s next turn.`;
 
@@ -2151,7 +2151,7 @@ export async function executeRallyChoice(action, playerStats, campaignName, chos
 
     await addExpiration(playerStats.name, chosenName, [
         { type: 'rally_clear' }
-    ], campaignName, 1);
+    ], campaignName, undefined, playerStats.name);
 
     const logEntry = {
         type: 'ability_use',

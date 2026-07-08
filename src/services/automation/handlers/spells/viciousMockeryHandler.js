@@ -34,7 +34,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     addExpiration(playerStats.name, targetName, [
         { type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: playerStats.name },
-    ], campaignName, 1);
+    ], campaignName, undefined, playerStats.name);
 
     addEntry(campaignName, {
         type: 'condition',

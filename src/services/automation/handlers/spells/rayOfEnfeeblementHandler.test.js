@@ -193,7 +193,6 @@ describe('rayOfEnfeeblementHandler', () => {
                     },
                 ],
                 'test-campaign',
-                10
             );
         });
 
@@ -313,7 +312,8 @@ describe('rayOfEnfeeblementHandler', () => {
                     },
                 ],
                 'test-campaign',
-                1
+                undefined,
+                'Test Wizard'
             );
         });
 

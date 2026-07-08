@@ -232,7 +232,6 @@ describe('suggestionHandler.handle', () => {
         'Goblin',
         expect.arrayContaining([{ type: 'charmed', condition: 'charmed' }]),
         campaignName,
-        24,
       );
     });
 
@@ -247,7 +246,6 @@ describe('suggestionHandler.handle', () => {
         'Goblin',
         expect.arrayContaining([{ type: 'charmed', condition: 'charmed' }]),
         campaignName,
-        8,
       );
     });
 

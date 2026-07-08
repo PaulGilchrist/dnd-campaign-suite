@@ -349,7 +349,6 @@ describe('fearHandler.handle', () => {
         casterName, 'Goblin',
         expect.arrayContaining([expect.objectContaining({ condition: 'frightened' })]),
         campaignName,
-        10,
       );
     });
 

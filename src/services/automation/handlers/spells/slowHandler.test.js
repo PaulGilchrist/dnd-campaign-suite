@@ -463,7 +463,6 @@ describe('slowHandler.handle', () => {
         targetName,
         expect.arrayContaining([expect.objectContaining({ type: 'condition', condition: 'slow' })]),
         campaignName,
-        10,
       );
     });
 

@@ -206,7 +206,6 @@ describe('postCastRiderHandler.handle', () => {
             'Enemy',
             [{ type: 'condition', condition: 'frightened' }],
             campaignName,
-            10,
         );
 
         expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({

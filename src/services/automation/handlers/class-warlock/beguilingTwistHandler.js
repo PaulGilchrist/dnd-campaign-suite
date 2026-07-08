@@ -158,7 +158,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
             addExpiration(playerName, targetName, [
                 { type: 'condition', condition: condKey }
-            ], campaignName, 60);
+            ], campaignName);
         } else {
             addEntry(campaignName, {
                 type: 'save_result',

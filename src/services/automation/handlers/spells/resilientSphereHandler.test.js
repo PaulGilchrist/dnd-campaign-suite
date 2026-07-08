@@ -259,7 +259,6 @@ describe('resilientSphereHandler', () => {
           targetName,
           [{ type: 'remove_active_buff', buffName: 'Resilient Sphere', effect: 'resilient_sphere' }],
           campaignName,
-          10,
         );
       });
 
