@@ -191,6 +191,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     let narrowSpaceActive = false;
     let glisteningFlightHover = false;
     let dragonWingsHover = false;
+    let tremorsenseActive = false;
     const thirdEyeBuff = Array.isArray(activeBuffs) ? (activeBuffs.find(b => b.name === 'The Third Eye') || null) : null;
     const thirdEyeEffect = thirdEyeBuff?.effect || null;
     activeBuffs.forEach(buff => {
@@ -209,6 +210,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         if (buff.effect === 'see_the_invisible') seeInvisibleRange = 60;
         if (buff.effect === 'see_invisibility') seeInvisibleRange = 120;
         if (buff.effect === 'wormhole_movement') narrowSpaceActive = true;
+        if (buff.effect === 'tremorsense_60ft') tremorsenseActive = true;
     });
     const hasteActive = activeBuffs.some(b => b.effect === 'haste');
     if (hasteActive) {
@@ -346,6 +348,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                     {thirdEyeEffect === 'darkvision_120' && <span className="automation-badge">Darkvision 120 ft</span>}
                     {thirdEyeEffect === 'greater_comprehension' && <span className="automation-badge">Greater Comprehension (read any language)</span>}
                     {narrowSpaceActive && <span className="automation-badge">Narrow Space</span>}
+                    {tremorsenseActive && <span className="automation-badge">Tremorsense 60 ft.</span>}
                 </div>
                 <div>
                       <CharClassFeatures playerStats={playerStats} campaignName={campaignName} />

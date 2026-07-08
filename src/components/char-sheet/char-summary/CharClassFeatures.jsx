@@ -637,6 +637,7 @@ const CLASS_COMPONENTS = {
 function CharClassFeatures({ playerStats, campaignName }) {
     const Cmp = CLASS_COMPONENTS[playerStats?.class?.name];
     const hasAdrenalineRush = (playerStats?.automation?.specialActions ?? []).some(a => a.effect === 'bonus_action_dash');
+    const hasStonecunning = (playerStats?.race?.traits || []).some(t => t.name === 'Stonecunning' && t.automation);
     const [modalState, setModalState] = React.useState({});
 
     const handleWeaponMasteryClick = () => {
@@ -654,6 +655,9 @@ function CharClassFeatures({ playerStats, campaignName }) {
         <>
             {hasAdrenalineRush && (
                 <TrackedResourceInput label="Adrenaline Rush" resourceKey="adrenalineRushUses" playerName={playerStats.name} getMax={() => playerStats.proficiency || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+            )}
+            {hasStonecunning && (
+                <TrackedResourceInput label="Stonecunning" resourceKey="stonecunningUses" playerName={playerStats.name} getMax={() => playerStats.proficiency || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
             )}
             {Cmp && <Cmp playerStats={playerStats} campaignName={campaignName} onWeaponMasteryClick={handleWeaponMasteryClick} />}
             {modalState.weaponKindMasteryModal && (

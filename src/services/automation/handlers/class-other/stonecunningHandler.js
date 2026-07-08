@@ -1,7 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { toggleBuff } from '../../common/buffToggle.js';
 import { addEntry } from '../../../ui/logService.js';
-
 const STONECANNING_USES_KEY = 'stonecunningUses';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
@@ -9,7 +8,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const playerName = playerStats.name;
     const featureName = action.name || 'Stonecunning';
 
-    const usesKey = `${playerName.toLowerCase().replace(/\s+/g, '')}_${STONECANNING_USES_KEY}`;
+    const usesKey = STONECANNING_USES_KEY;
 
     let usesMax;
     if (auto.uses === 'proficiency_bonus') {
@@ -42,20 +41,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const { wasActive } = toggleBuff(playerName, featureName, auto, campaignName, playerName);
 
     if (wasActive) {
-        await addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerName,
-            abilityName: featureName,
-            description: `${featureName} deactivated.`,
-        }).catch((e) => { console.error("[stonecunning] Error:", e); });
-
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: featureName,
                 automationType: auto.type,
-                description: `${featureName} toggled OFF`,
+                description: `${featureName} is already active. It lasts ${auto.duration || '10 minutes'}.`,
                 automation: auto,
             },
         };
@@ -84,7 +76,5 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 }
 
 export function restoreUses(playerName, campaignName) {
-    const usesKey = `${playerName.toLowerCase().replace(/\s+/g, '')}_${STONECANNING_USES_KEY}`;
-
-    setRuntimeValue(playerName, usesKey, null, campaignName);
+    setRuntimeValue(playerName, STONECANNING_USES_KEY, null, campaignName);
 }

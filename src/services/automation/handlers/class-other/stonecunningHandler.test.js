@@ -114,7 +114,7 @@ describe('stonecunningHandler', () => {
         it('uses stored uses when available and blocks when zero', async () => {
             // Stored uses = 2
             getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'dwarfboy_stonecunningUses') return 2;
+                if (key === 'stonecunningUses') return 2;
                 return null;
             });
             toggleBuff.mockReturnValue({ wasActive: false });
@@ -127,7 +127,7 @@ describe('stonecunningHandler', () => {
 
         it('treats stored non-numeric value as no uses remaining', async () => {
             getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'dwarfboy_stonecunningUses') return 'abc';
+                if (key === 'stonecunningUses') return 'abc';
                 return null;
             });
 
@@ -138,9 +138,9 @@ describe('stonecunningHandler', () => {
     });
 
     describe('toggle behavior', () => {
-        it('deactivates when the buff is already active', async () => {
+        it('returns already active popup when the buff is already active', async () => {
             getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'dwarfboy_stonecunningUses') return 1;
+                if (key === 'stonecunningUses') return 1;
                 return null;
             });
             toggleBuff.mockReturnValue({ wasActive: true });
@@ -149,13 +149,14 @@ describe('stonecunningHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('toggled OFF');
+            expect(result.payload.description).toContain('already active');
+            expect(result.payload.description).toContain('lasts');
         });
 
-        it('decrements uses on activation but not on deactivation', async () => {
+        it('decrements uses on activation but not when already active', async () => {
             // Activation: uses = 3 -> 2
             getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'dwarfboy_stonecunningUses') return 3;
+                if (key === 'stonecunningUses') return 3;
                 return null;
             });
             toggleBuff.mockReturnValue({ wasActive: false });
@@ -163,23 +164,25 @@ describe('stonecunningHandler', () => {
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'DwarfBoy', 'dwarfboy_stonecunningUses', 2, 'test-campaign'
+                'DwarfBoy', 'stonecunningUses', 2, 'test-campaign'
             );
 
-            // Deactivation: uses stays at 3
+            // Already active: uses stays at 3
             vi.clearAllMocks();
             toggleBuff.mockReturnValue({ wasActive: true });
+            getRuntimeValue.mockImplementation((_name, key) => {
+                if (key === 'stonecunningUses') return 3;
+                return null;
+            });
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(
-                'DwarfBoy', 'dwarfboy_stonecunningUses', expect.anything(), 'test-campaign'
-            );
+            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
         it('calls toggleBuff with correct parameters', async () => {
             getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'dwarfboy_stonecunningUses') return 1;
+                if (key === 'stonecunningUses') return 1;
                 return null;
             });
             toggleBuff.mockReturnValue({ wasActive: false });
@@ -198,10 +201,10 @@ describe('stonecunningHandler', () => {
             );
         });
 
-        it('logs ability use on activation and deactivation', async () => {
+        it('logs ability use on activation but not when already active', async () => {
             toggleBuff.mockReturnValue({ wasActive: false });
             getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'dwarfboy_stonecunningUses') return 1;
+                if (key === 'stonecunningUses') return 1;
                 return null;
             });
 
@@ -215,15 +218,14 @@ describe('stonecunningHandler', () => {
 
             vi.clearAllMocks();
             toggleBuff.mockReturnValue({ wasActive: true });
+            getRuntimeValue.mockImplementation((_name, key) => {
+                if (key === 'stonecunningUses') return 1;
+                return null;
+            });
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                type: 'ability_use',
-                characterName: 'DwarfBoy',
-                abilityName: 'Stonecunning',
-                description: 'Stonecunning deactivated.',
-            }));
+            expect(addEntry).not.toHaveBeenCalled();
         });
     });
 
@@ -233,7 +235,7 @@ describe('stonecunningHandler', () => {
 
             // 2 -> 1 remaining (singular)
             getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'dwarfboy_stonecunningUses') return 2;
+                if (key === 'stonecunningUses') return 2;
                 return null;
             });
             let result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
@@ -243,7 +245,7 @@ describe('stonecunningHandler', () => {
             vi.clearAllMocks();
             toggleBuff.mockReturnValue({ wasActive: false });
             getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'dwarfboy_stonecunningUses') return 5;
+                if (key === 'stonecunningUses') return 5;
                 return null;
             });
             result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
@@ -253,7 +255,7 @@ describe('stonecunningHandler', () => {
         it('includes custom duration when provided, default otherwise', async () => {
             toggleBuff.mockReturnValue({ wasActive: false });
             getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'dwarfboy_stonecunningUses') return 1;
+                if (key === 'stonecunningUses') return 1;
                 return null;
             });
 
@@ -279,10 +281,10 @@ describe('stonecunningHandler', () => {
     });
 
     describe('player name handling', () => {
-        it('builds usesKey from player name with spaces replaced', async () => {
+        it('uses simple key regardless of player name spaces', async () => {
             const stats = makePlayerStats({ name: 'Dwarf Boy' });
             getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'dwarfboy_stonecunningUses') return 1;
+                if (key === 'stonecunningUses') return 1;
                 return null;
             });
             toggleBuff.mockReturnValue({ wasActive: false });
@@ -290,13 +292,13 @@ describe('stonecunningHandler', () => {
             await handle(makeAction(), stats, 'test-campaign', null);
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Dwarf Boy', 'dwarfboy_stonecunningUses', 0, 'test-campaign'
+                'Dwarf Boy', 'stonecunningUses', 0, 'test-campaign'
             );
         });
 
         it('uses action.name for featureName when provided', async () => {
             getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'dwarfboy_stonecunningUses') return 1;
+                if (key === 'stonecunningUses') return 1;
                 return null;
             });
             toggleBuff.mockReturnValue({ wasActive: false });
@@ -313,13 +315,13 @@ describe('stonecunningHandler', () => {
         it('clears uses key by setting to null for names with and without spaces', () => {
             restoreUses('DwarfBoy', 'test-campaign');
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'DwarfBoy', 'dwarfboy_stonecunningUses', null, 'test-campaign'
+                'DwarfBoy', 'stonecunningUses', null, 'test-campaign'
             );
 
             vi.clearAllMocks();
             restoreUses('Dwarf Boy', 'test-campaign');
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Dwarf Boy', 'dwarfboy_stonecunningUses', null, 'test-campaign'
+                'Dwarf Boy', 'stonecunningUses', null, 'test-campaign'
             );
         });
     });
