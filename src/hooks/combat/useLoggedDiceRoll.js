@@ -36,6 +36,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
     const handler = (e) => {
       if (autoDamageRollRef.current && e.detail?.autoDamage) {
         if (e.detail.autoDamage.source !== autoDamageSourceRef.current) return;
+        if (e.detail.hit === false) return;
         autoDamageRollRef.current(e.detail.autoDamage, e.detail.isCrit);
       }
     };

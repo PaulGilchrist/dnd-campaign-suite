@@ -3,9 +3,6 @@ import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import { normalizeSaveType } from '../../services/rules/combat/applyDamage.js';
-import { normalizeAutoDamage, resolveAttackDamageStandalone } from '../char-sheet/useAttackDamageResolution.js';
-import Popup from '../common/popup.jsx';
-import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
 import { extractDamageTypes, formatDamageTypes, getTargetFromAttacker, getResistanceNotice } from '../../services/rules/combat/damageUtils.js';
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import { findCreatureByName } from '../../services/rules/combat/damageUtils.js';
@@ -14,6 +11,7 @@ import { computeConditionEffects, combineAttackModes, CONDITIONS_THAT_CANNOT_ACT
 import { computeRangeEffect, getDistanceFeet, getNearestPlacedItem, rangeToFeet } from '../../services/rules/combat/rangeValidation.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import { useRuntimeValue, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import AttackResultPopup from '../common/AttackResultPopup.jsx';
 import { EFFECT_DESCRIPTIONS } from '../../services/combat/conditions/effectDescriptions.js';
 import './MonsterCardModal.css';
 
@@ -85,11 +83,41 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     monsterName,
     campaignName,
     {
-       autoDamageSource: monsterName,
-       autoDamageRoll: async (autoDamage, isCrit) => {
-         const { attack, ctx: ctxOverrides } = normalizeAutoDamage(autoDamage, isCrit, monsterCharacter?.computedStats);
-         await resolveAttackDamageStandalone(attack, ctxOverrides, { playerStats: monsterCharacter?.computedStats, campaignName, setPopupHtml, rollDamage, setModalState: () => {} });
-       },
+        autoDamageSource: monsterName,
+        autoDamageRoll: async (autoDamage, isCrit) => {
+          if (!autoDamage) {
+            setPopupHtml(null);
+            return;
+          }
+          const target = getTarget();
+          const wasCrit = isCrit || autoDamage.isAutoCrit;
+          const result = wasCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
+          if (result) {
+            const context = {
+              damageType: autoDamage.damageType,
+              targetName: target?.name,
+              attackerName: autoDamage.attackerName || monsterName,
+              isAutoCrit: wasCrit,
+            };
+            if (autoDamage.saveDc != null) {
+              context.saveDc = autoDamage.saveDc;
+              context.saveType = autoDamage.saveType;
+              context.dcSuccess = autoDamage.dcSuccess;
+            }
+            if (autoDamage.secondaryFormula) {
+              context.autoDamageSecondaryFormula = autoDamage.secondaryFormula;
+              context.autoDamageSecondaryName = autoDamage.secondaryName || autoDamage.name;
+              context.autoDamageSecondaryDamageType = autoDamage.secondaryDamageType;
+            }
+            if (autoDamage.overchannelActive) {
+              context.overchannelActive = autoDamage.overchannelActive;
+              context.overchannelUseCount = autoDamage.overchannelUseCount;
+              context.overchannelSpellLevel = autoDamage.overchannelSpellLevel;
+            }
+            rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, context);
+          }
+          setPopupHtml(null);
+        },
        characters,
      }
   );
@@ -718,11 +746,14 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       {content}
       {popupHtml && (
         <div onClick={(e) => e.stopPropagation()}>
-          <Popup onClickOrKeyDown={() => setPopupHtml(null)}>
-            {typeof popupHtml === 'string'
-              ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }} />
-              : <DiceRollResult {...popupHtml} onQuickRoll={popupHtml.waitingForPlayerSave ? () => handleQuickRollWithEvasion(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined} />}
-          </Popup>
+          <AttackResultPopup
+            popupHtml={popupHtml}
+            onClose={() => setPopupHtml(null)}
+            campaignName={campaignName}
+            attackerName={monsterName}
+            setPopupHtml={setPopupHtml}
+            onQuickRoll={popupHtml.waitingForPlayerSave ? () => handleQuickRollWithEvasion(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined}
+          />
         </div>
       )}
     </div>

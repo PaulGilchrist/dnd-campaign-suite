@@ -84,11 +84,15 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
         const dieSize = bardicInspirationDefenseDieSize || 6;
         const dieValue = Math.floor(Math.random() * dieSize) + 1;
         const newAc = (targetAc || 0) + dieValue;
-        const attackTotal = (autoDamage?.source ? null : (rolls?.[0] || 0) + bonus);
+        const attackTotal = finalTotal;
         const willMiss = attackTotal < newAc;
         setBardicInspirationDefenseResult({ dieValue, dieSize, newAc, willMiss, attackTotal });
         setBardicInspirationDefenseUsed(true);
-        if (onBardicInspirationDefense) await onBardicInspirationDefense(dieValue, dieSize, newAc, willMiss);
+        if (onBardicInspirationDefense) {
+            await onBardicInspirationDefense(dieValue, dieSize, newAc, willMiss);
+        } else {
+            console.error('[BI Defense] onBardicInspirationDefense is falsy!');
+        }
     };
 
     const handleBardicInspirationOffense = async () => {

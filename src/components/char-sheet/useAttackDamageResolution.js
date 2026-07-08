@@ -92,8 +92,8 @@ export function normalizeAutoDamage(autoDamage, isCrit, playerStats) {
   };
 
   // Compute Empowered Evocation modifier
-  const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(playerStats).length > 0;
-  const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
+  const hasEmpoweredEvoc = playerStats ? getEmpoweredEvocationFeatures(playerStats).length > 0 : false;
+  const empEvocIntMod = (hasEmpoweredEvoc && playerStats) ? getEmpoweredEvocationIntModifier(playerStats) : 0;
   const spellSchool = (autoDamage.autoDamageSchool || '').toLowerCase();
   const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && spellSchool === 'evocation' && empEvocIntMod > 0;
 

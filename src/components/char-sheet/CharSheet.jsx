@@ -5,7 +5,7 @@ import { applyShieldOfFaith } from '../../services/automation/handlers/shieldOfF
 import rulesFactory from '../../services/rules/rulesFactory.js'
 import useSharedPopup from '../../hooks/combat/useSharedPopup.js'
 import Popup from '../common/popup.jsx'
-import DiceRollResult from './DiceRollResult.jsx'
+import AttackResultPopup from '../common/AttackResultPopup.jsx'
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx'
 import { sanitizeHtml } from '../../services/ui/sanitize.js'
 import CharAbilities from './CharAbilities.jsx'
@@ -509,13 +509,8 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         setRuntimeValue(playerName, 'bardicInspirationGrantedBy', null, campaignName);
     }, [playerStats, campaignName, popupHtml]);
 
-    const handleBardicInspirationDefense = React.useCallback(async (dieValue, dieSize, newAc, willMiss) => {
+    const handleBiDefenseCombatSummary = React.useCallback(async ({ dieValue, newAc, willMiss }) => {
         if (!playerStats) return;
-        const playerName = playerStats.name;
-        const currentUses = Number(getRuntimeValue(playerName, 'bardicInspirationUses', campaignName) ?? 0);
-        if (currentUses > 0) {
-            await setRuntimeValue(playerName, 'bardicInspirationUses', currentUses - 1, campaignName);
-        }
         const cs = await loadCombatSummary(campaignName);
         const la = cs?.lastAttack;
         if (la) {
@@ -527,20 +522,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             }
             storageService.default.set('combatSummary', cs, campaignName);
         }
-        const attackerName = popupHtml?.targetName || 'unknown attacker';
-        const attackTotal = popupHtml?.rolls?.[0] + (popupHtml?.bonus || 0);
-        await addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerName,
-            abilityName: 'Combat Inspiration - Defense',
-            description: willMiss ? `${attackerName}'s attack missed! ${playerName} used Combat Inspiration - Defense, rolling ${dieValue} to boost AC to ${newAc}. Attack total (${attackTotal}) < new AC (${newAc}).` : `${playerName} used Combat Inspiration - Defense, rolling ${dieValue} to boost AC to ${newAc}, but the attack still hits (${attackTotal} >= ${newAc}).`,
-            biDieRoll: dieValue,
-            timestamp: Date.now(),
-        });
-        setRuntimeValue(playerName, 'bardicInspirationDie', null, campaignName);
-        setRuntimeValue(playerName, 'bardicInspirationCombatOptions', null, campaignName);
-        setRuntimeValue(playerName, 'bardicInspirationGrantedBy', null, campaignName);
-    }, [playerStats, campaignName, popupHtml]);
+    }, [playerStats, campaignName]);
 
     const handleBardicInspirationOffense = React.useCallback(async (dieValue, dieSize) => {
         if (!playerStats) return;
@@ -693,6 +675,12 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         }
     }, [isRaging, playerStats, campaignName]);
 
+    React.useEffect(() => {
+        if (popupHtml) {
+            console.log('[BI Defense] popupHtml present, keys:', Object.keys(popupHtml), 'bardicInspirationDefense:', popupHtml.bardicInspirationDefense, 'truthy:', !!popupHtml.bardicInspirationDefense);
+        }
+    }, [popupHtml]);
+
     const [auraComboEffects, setAuraComboEffects] = React.useState(null);
     React.useEffect(() => {
         if (!playerStats || !characters?.length) { setAuraComboEffects(null); return; }
@@ -760,13 +748,19 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                 <div className='no-print'><CharCharacterAdvancement playerStats={playerStats} campaignName={campaignName}></CharCharacterAdvancement></div>
             </div>}
         </React.Fragment>
-                {popupHtml && (
-            <Popup onClickOrKeyDown={() => setPopupHtml(null)}>
-                {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> :
-                    popupHtml.html ? <div className="dice-roll-result"><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.html) }}></div><div className="dice-roll-hint">click to dismiss</div></div> :
-                    popupHtml.type === 'shield_of_faith_target_selection' ? null :
-                    popupHtml.type === 'automation_info' ? <div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div><div className="dice-roll-hint">click to dismiss</div></div> :
-                        popupHtml.type === 'empowered_spell' ?
+                {popupHtml && (() => {
+                    if (typeof popupHtml === 'string') {
+                        return <Popup onClickOrKeyDown={() => setPopupHtml(null)}><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div></Popup>;
+                    }
+                    if (popupHtml.html) {
+                        return <Popup onClickOrKeyDown={() => setPopupHtml(null)}><div className="dice-roll-result"><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.html) }}></div><div className="dice-roll-hint">click to dismiss</div></div></Popup>;
+                    }
+                    if (popupHtml.type === 'shield_of_faith_target_selection') return null;
+                    if (popupHtml.type === 'automation_info') {
+                        return <Popup onClickOrKeyDown={() => setPopupHtml(null)}><div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div><div className="dice-roll-hint">click to dismiss</div></div></Popup>;
+                    }
+                    if (popupHtml.type === 'empowered_spell') {
+                        return <Popup onClickOrKeyDown={() => setPopupHtml(null)}>
                             <div className="dice-roll-result">
                                 <div className="dice-roll-header">
                                     <i className="fa-solid fa-wand-magic-sparkles"></i>{popupHtml.name}
@@ -796,11 +790,23 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                                     </div>
                                 ) : null}
                                 <div className="dice-roll-hint">click to dismiss</div>
-                            </div> :
-                            <DiceRollResult {...popupHtml} onSuperiorityManeuver={popupHtml?.availableSuperiorityManeuvers ? handleSuperiorityManeuver : undefined} onTacticalMind={popupHtml?.tacticalMind ? handleTacticalMind : undefined} onPsiBolsteredKnack={popupHtml?.psiBolsteredKnack ? handlePsiBolsteredKnack : undefined} onBardicInspiration={popupHtml?.bardicInspiration ? handleBardicInspiration : undefined} onBardicInspirationDefense={popupHtml?.bardicInspirationDefense ? handleBardicInspirationDefense : undefined} onBardicInspirationOffense={popupHtml?.bardicInspirationOffense ? handleBardicInspirationOffense : undefined} onDone={popupHtml?.autoDamage && popupHtml?.hit ? () => { window.dispatchEvent(new CustomEvent('dice-roll-done', { detail: { autoDamage: popupHtml.autoDamage, isCrit: popupHtml.isCrit } })); } : undefined} />
-                }
-            </Popup>
-        )}
+                            </div>
+                        </Popup>;
+                    }
+                    return <AttackResultPopup
+                        popupHtml={popupHtml}
+                        onClose={() => setPopupHtml(null)}
+                        campaignName={campaignName}
+                        attackerName={playerStats?.name}
+                        setPopupHtml={setPopupHtml}
+                        onSuperiorityManeuver={popupHtml?.availableSuperiorityManeuvers ? handleSuperiorityManeuver : undefined}
+                        onTacticalMind={popupHtml?.tacticalMind ? handleTacticalMind : undefined}
+                        onPsiBolsteredKnack={popupHtml?.psiBolsteredKnack ? handlePsiBolsteredKnack : undefined}
+                        onBardicInspiration={popupHtml?.bardicInspiration ? handleBardicInspiration : undefined}
+                        onBardicInspirationOffense={popupHtml?.bardicInspirationOffense ? handleBardicInspirationOffense : undefined}
+                        onAfterBiDefense={handleBiDefenseCombatSummary}
+                    />;
+                })()}
                 {popupHtml?.type === 'shield_of_faith_target_selection' && (
                     <ShieldOfFaithTargetSelectionModal popupHtml={popupHtml} setPopupHtml={setPopupHtml} playerStats={playerStats} campaignName={campaignName} />
                 )}

@@ -211,14 +211,10 @@ export function createLogAndShow(deps) {
             const targetName = target.name;
             const targetPlayerStats = (characters || []).find(c => c.name === targetName);
             const computedTarget = targetPlayerStats?.computedStats;
-            if (!computedTarget) {
-                console.error('[BI Defense] computedStats not found for target:', targetName, '— characters array has', (characters || []).length, 'entries');
-            }
             const hasDefense = hasBardicInspirationDefense(targetName, campaignName, computedTarget);
             const dieSize = getBardicInspirationDieSize(targetName, campaignName) || getBardicInspirationDieSizeFromClass(computedTarget);
             const biUsesRaw = getRuntimeValue(targetName, 'bardicInspirationUses', campaignName);
             const biUsesNum = (typeof biUsesRaw === 'object' && biUsesRaw !== null) ? biUsesRaw.current : (biUsesRaw != null ? Number(biUsesRaw) : (computedTarget?._trackedResources?.bardicInspirationUses?.current ?? 0));
-            console.log('[BI Defense]', { targetName, computedTargetName: computedTarget?.name, classLevels: computedTarget?.class?.class_levels?.length, hasDefense, dieSize, biUsesNum, hasClassLevels: !!computedTarget?.class?.class_levels });
             context.bardicInspirationDefense = hasDefense && dieSize && biUsesNum > 0;
             context.bardicInspirationDefenseDieSize = dieSize;
             context.bardicInspirationDefenseTargetName = targetName;
