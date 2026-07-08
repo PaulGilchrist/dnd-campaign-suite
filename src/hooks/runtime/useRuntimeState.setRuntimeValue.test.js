@@ -13,11 +13,11 @@ function clearAll() {
 describe('useRuntimeState — setRuntimeValue', () => {
   beforeEach(() => {
     clearAll();
-    vi.spyOn(global, 'fetch').mockResolvedValue(undefined);
+    global.fetch = vi.fn().mockResolvedValue(undefined);
   });
 
   function getFetchCall(n = 0) {
-    return vi.spyOn(global, 'fetch').mock.calls[n];
+    return global.fetch.mock.calls[n];
   }
 
   it('sets a value in the store and sends a POST request', () => {
@@ -58,7 +58,7 @@ describe('useRuntimeState — setRuntimeValue', () => {
     setRuntimeValue('test-char', 'hp', 15, 'test-campaign');
     setRuntimeValue('test-char', 'hp', 15, 'test-campaign');
     expect(listener).toHaveBeenCalledTimes(1);
-    expect(vi.spyOn(global, 'fetch').mock.calls.length).toBe(1);
+    expect(global.fetch.mock.calls.length).toBe(1);
   });
 
   it('handles all value types (string, boolean, array, object, null, 0, negative)', () => {

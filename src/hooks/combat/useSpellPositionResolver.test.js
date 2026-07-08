@@ -130,10 +130,10 @@ describe('useSpellPositionResolver', () => {
     it('loads map data and resolves positions when attacker is a player with a target', async () => {
       const csData = makeCombatSummary();
       const mapData = makeMapData();
-      mockLoadMapData.mockResolvedValue(mapData);
-      mockGetCombatContext.mockImplementation(async () => csData);
-      mockGetTargetFromAttacker.mockImplementation(() => ({ name: 'Goblin' }));
-      mockGetNearestPlacedItem.mockImplementation(() => ({ name: 'Goblin', gridX: 3, gridY: 3 }));
+      mockLoadMapData.mockResolvedValue([mapData]);
+      mockGetCombatContext.mockResolvedValue(csData);
+      mockGetTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+      mockGetNearestPlacedItem.mockReturnValue({ name: 'Goblin', gridX: 3, gridY: 3 });
 
       const { result } = renderHook(() =>
         useSpellPositionResolver('TestCampaign', 'TestMap', 'Wizard')
@@ -157,9 +157,9 @@ describe('useSpellPositionResolver', () => {
     });
 
     it('resolves position when target is found on the map as a player', async () => {
-      mockLoadMapData.mockResolvedValue(makeMapData());
-      mockGetCombatContext.mockImplementation(async () => makeCombatSummary());
-      mockGetTargetFromAttacker.mockImplementation(() => ({ name: 'Rogue' }));
+      mockLoadMapData.mockResolvedValue([makeMapData()]);
+      mockGetCombatContext.mockResolvedValue(makeCombatSummary());
+      mockGetTargetFromAttacker.mockReturnValue({ name: 'Rogue' });
 
       const { result } = renderHook(() =>
         useSpellPositionResolver('TestCampaign', 'TestMap', 'Wizard')
@@ -183,10 +183,10 @@ describe('useSpellPositionResolver', () => {
           { name: 'Goblin 2', gridX: 8, gridY: 8 },
         ],
       });
-      mockLoadMapData.mockResolvedValue(mapData);
-      mockGetCombatContext.mockImplementation(async () => makeCombatSummary());
-      mockGetTargetFromAttacker.mockImplementation(() => ({ name: 'Goblin' }));
-      mockGetNearestPlacedItem.mockImplementation(() => ({ name: 'Goblin', gridX: 3, gridY: 3 }));
+      mockLoadMapData.mockResolvedValue([mapData]);
+      mockGetCombatContext.mockResolvedValue(makeCombatSummary());
+      mockGetTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+      mockGetNearestPlacedItem.mockReturnValue({ name: 'Goblin', gridX: 3, gridY: 3 });
 
       const { result } = renderHook(() =>
         useSpellPositionResolver('TestCampaign', 'TestMap', 'Wizard')
@@ -216,10 +216,10 @@ describe('useSpellPositionResolver', () => {
           { name: 'Goblin 2', gridX: 8, gridY: 8 },
         ],
       });
-      mockLoadMapData.mockResolvedValue(mapData);
-      mockGetCombatContext.mockImplementation(async () => makeCombatSummary());
-      mockGetTargetFromAttacker.mockImplementation(() => ({ name: 'Goblin' }));
-      mockGetNearestPlacedItem.mockImplementation(() => ({ name: 'Goblin', gridX: 3, gridY: 3 }));
+      mockLoadMapData.mockResolvedValue([mapData]);
+      mockGetCombatContext.mockResolvedValue(makeCombatSummary());
+      mockGetTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+      mockGetNearestPlacedItem.mockReturnValue({ name: 'Goblin', gridX: 3, gridY: 3 });
 
       const { result } = renderHook(() =>
         useSpellPositionResolver('TestCampaign', 'TestMap', 'Wizard')
@@ -246,10 +246,10 @@ describe('useSpellPositionResolver', () => {
           { name: 'Goblin', gridX: 99, gridY: 99 },
         ],
       });
-      mockLoadMapData.mockResolvedValue(mapData);
-      mockGetCombatContext.mockImplementation(async () => makeCombatSummary());
-      mockGetTargetFromAttacker.mockImplementation(() => ({ name: 'Goblin' }));
-      mockGetNearestPlacedItem.mockImplementation(() => ({ name: 'Goblin', gridX: 99, gridY: 99 }));
+      mockLoadMapData.mockResolvedValue([mapData]);
+      mockGetCombatContext.mockResolvedValue(makeCombatSummary());
+      mockGetTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+      mockGetNearestPlacedItem.mockReturnValue({ name: 'Goblin', gridX: 99, gridY: 99 });
 
       const { result } = renderHook(() =>
         useSpellPositionResolver('TestCampaign', 'TestMap', 'Wizard')
@@ -270,8 +270,8 @@ describe('useSpellPositionResolver', () => {
 
   describe('no combat context', () => {
     it('does not cache positions when getCombatContext returns null', async () => {
-      mockLoadMapData.mockResolvedValue(makeMapData());
-      mockGetCombatContext.mockImplementation(async () => null);
+      mockLoadMapData.mockResolvedValue([makeMapData()]);
+      mockGetCombatContext.mockResolvedValue(null);
 
       const { result } = renderHook(() =>
         useSpellPositionResolver('TestCampaign', 'TestMap', 'Wizard')
@@ -285,8 +285,8 @@ describe('useSpellPositionResolver', () => {
     });
 
     it('does not cache positions when getCombatContext returns undefined', async () => {
-      mockLoadMapData.mockResolvedValue(makeMapData());
-      mockGetCombatContext.mockImplementation(async () => undefined);
+      mockLoadMapData.mockResolvedValue([makeMapData()]);
+      mockGetCombatContext.mockResolvedValue(undefined);
 
       const { result } = renderHook(() =>
         useSpellPositionResolver('TestCampaign', 'TestMap', 'Wizard')
@@ -304,9 +304,9 @@ describe('useSpellPositionResolver', () => {
 
   describe('no target from attacker', () => {
     it('does not cache positions when getTargetFromAttacker returns null', async () => {
-      mockLoadMapData.mockResolvedValue(makeMapData());
-      mockGetCombatContext.mockImplementation(async () => makeCombatSummary());
-      mockGetTargetFromAttacker.mockImplementation(() => null);
+      mockLoadMapData.mockResolvedValue([makeMapData()]);
+      mockGetCombatContext.mockResolvedValue(makeCombatSummary());
+      mockGetTargetFromAttacker.mockReturnValue(null);
 
       const { result } = renderHook(() =>
         useSpellPositionResolver('TestCampaign', 'TestMap', 'Wizard')
@@ -320,9 +320,9 @@ describe('useSpellPositionResolver', () => {
     });
 
     it('does not call getNearestPlacedItem when there is no target', async () => {
-      mockLoadMapData.mockResolvedValue(makeMapData());
-      mockGetCombatContext.mockImplementation(async () => makeCombatSummary());
-      mockGetTargetFromAttacker.mockImplementation(() => null);
+      mockLoadMapData.mockResolvedValue([makeMapData()]);
+      mockGetCombatContext.mockResolvedValue(makeCombatSummary());
+      mockGetTargetFromAttacker.mockReturnValue(null);
 
       const { result } = renderHook(() =>
         useSpellPositionResolver('TestCampaign', 'TestMap', 'Wizard')
@@ -343,8 +343,8 @@ describe('useSpellPositionResolver', () => {
       mockLoadMapData.mockResolvedValue(makeMapData({
         players: [{ name: 'Rogue', gridX: 10, gridY: 10 }],
       }));
-      mockGetCombatContext.mockImplementation(async () => makeCombatSummary());
-      mockGetTargetFromAttacker.mockImplementation(() => ({ name: 'Goblin' }));
+      mockGetCombatContext.mockResolvedValue(makeCombatSummary());
+      mockGetTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
 
       const { result } = renderHook(() =>
         useSpellPositionResolver('TestCampaign', 'TestMap', 'Wizard')
@@ -367,8 +367,8 @@ describe('useSpellPositionResolver', () => {
         placedItems: [],
       });
       mockLoadMapData.mockResolvedValue(mapData);
-      mockGetCombatContext.mockImplementation(async () => makeCombatSummary());
-      mockGetTargetFromAttacker.mockImplementation(() => ({ name: 'Mystery Creature' }));
+      mockGetCombatContext.mockResolvedValue(makeCombatSummary());
+      mockGetTargetFromAttacker.mockReturnValue({ name: 'Mystery Creature' });
 
       const { result } = renderHook(() =>
         useSpellPositionResolver('TestCampaign', 'TestMap', 'Wizard')
@@ -384,10 +384,10 @@ describe('useSpellPositionResolver', () => {
 
     it('does not cache positions when target is not a player and getNearestPlacedItem returns null', async () => {
       const mapData = makeMapData();
-      mockLoadMapData.mockResolvedValue(mapData);
-      mockGetCombatContext.mockImplementation(async () => makeCombatSummary());
-      mockGetTargetFromAttacker.mockImplementation(() => ({ name: 'Mystery Creature' }));
-      mockGetNearestPlacedItem.mockImplementation(() => null);
+      mockLoadMapData.mockResolvedValue([mapData]);
+      mockGetCombatContext.mockResolvedValue(makeCombatSummary());
+      mockGetTargetFromAttacker.mockReturnValue({ name: 'Mystery Creature' });
+      mockGetNearestPlacedItem.mockReturnValue(null);
 
       const { result } = renderHook(() =>
         useSpellPositionResolver('TestCampaign', 'TestMap', 'Wizard')
@@ -420,7 +420,7 @@ describe('useSpellPositionResolver', () => {
     });
 
     it('catches errors and does not cache positions when getCombatContext fails', async () => {
-      mockLoadMapData.mockResolvedValue(makeMapData());
+      mockLoadMapData.mockResolvedValue([makeMapData()]);
       mockGetCombatContext.mockRejectedValue(new Error('Context error'));
 
       const { result } = renderHook(() =>

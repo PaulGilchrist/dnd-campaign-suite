@@ -275,10 +275,10 @@ describe('rules.getPlayerStats - 2024 senses', () => {
   beforeEach(() => { vi.clearAllMocks(); setup2024Defaults(); });
 
   it('should set senses from raceRules.getSenses in 2024 mode', async () => {
-    setup2024Defaults({ senses: [{ name: 'Darkvision', value: '60 ft.' }] });
+    raceRules2024.getSenses.mockReturnValue([{ name: 'Darkvision', value: '120 ft.' }]);
     const playerSummary = makePlayerSummary({ rules: '2024' });
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.senses).toContainEqual({ name: 'Darkvision', value: '60 ft.' });
+    expect(result.senses).toContainEqual({ name: 'Darkvision', value: '120 ft.' });
   });
 
   it('should apply Umbral Sight darkvision for Gloom Stalker in 2024', async () => {

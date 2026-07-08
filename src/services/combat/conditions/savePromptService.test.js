@@ -58,6 +58,10 @@ function expectPostToCampaign(fetchSpy, campaignName, key, bodyValue) {
 // ── Tests ────────────────────────────────────────────────────────
 
 describe('savePromptService', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   describe('sendSavePrompt', () => {
     it('posts save prompt data to the correct endpoint', () => {
       mockFetchResolved();

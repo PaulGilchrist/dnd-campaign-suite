@@ -256,6 +256,7 @@ describe('useMapLoader', () => {
 
   describe('re-render behavior', () => {
     it('should not reload when mapName is the same', async () => {
+      loadMapDataSpy.mockClear();
       loadMapDataSpy.mockResolvedValue({
         players: [],
         walls: [],
@@ -286,6 +287,7 @@ describe('useMapLoader', () => {
     });
 
     it('should reload when mapName changes', async () => {
+      loadMapDataSpy.mockClear();
       loadMapDataSpy.mockResolvedValue({
         players: [],
         walls: [],

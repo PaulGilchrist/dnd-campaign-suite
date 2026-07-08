@@ -37,6 +37,10 @@ vi.mock('./rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(() => 30),
 }));
 
+vi.mock('../../ui/logService.js', () => ({
+  addEntry: vi.fn(),
+}));
+
 function makeCombatSummary(creatures) {
   return { round: 1, creatures };
 }

@@ -13,7 +13,7 @@ function clearAll() {
 describe('useRuntimeState — setRuntimeObject', () => {
   beforeEach(() => {
     clearAll();
-    vi.spyOn(global, 'fetch').mockResolvedValue(undefined);
+    global.fetch = vi.fn().mockResolvedValue(undefined);
   });
 
   it('sets multiple properties at once', () => {
@@ -27,7 +27,7 @@ describe('useRuntimeState — setRuntimeObject', () => {
   it('POSTs the full store body when values change', () => {
     setRuntimeObject('test-char', { hp: 15 }, 'test-campaign');
     setRuntimeObject('test-char', { sp: 10 }, 'test-campaign');
-    const callArgs = vi.spyOn(global, 'fetch').mock.calls[1];
+    const callArgs = global.fetch.mock.calls[1];
     const body = JSON.parse(callArgs[1].body);
     expect(body.value).toHaveProperty('hp', 15);
     expect(body.value).toHaveProperty('sp', 10);
@@ -35,14 +35,14 @@ describe('useRuntimeState — setRuntimeObject', () => {
 
   it('does not POST when skipSync is true', () => {
     setRuntimeObject('test-char', { hp: 15 }, 'test-campaign', true);
-    expect(vi.spyOn(global, 'fetch').mock.calls.length).toBe(0);
+    expect(global.fetch.mock.calls.length).toBe(0);
     expect(getRuntimeValue('test-char', 'hp')).toBe(15);
   });
 
   it('does not POST when no values changed', () => {
     setRuntimeObject('test-char', { hp: 15 }, 'test-campaign');
     setRuntimeObject('test-char', { hp: 15 }, 'test-campaign');
-    expect(vi.spyOn(global, 'fetch').mock.calls.length).toBe(1);
+    expect(global.fetch.mock.calls.length).toBe(1);
   });
 
   it('does not trigger listeners when no values changed', () => {
@@ -73,7 +73,7 @@ describe('useRuntimeState — setRuntimeObject', () => {
     setRuntimeObject('test-char', {}, 'test-campaign');
     setRuntimeObject('test-char', {}, 'test-campaign');
     expect(listener).toHaveBeenCalledTimes(0);
-    expect(vi.spyOn(global, 'fetch').mock.calls.length).toBe(0);
+    expect(global.fetch.mock.calls.length).toBe(0);
   });
 
   it('handles object with null values', () => {
@@ -85,11 +85,11 @@ describe('useRuntimeState — setRuntimeObject', () => {
   it('does not POST when number-string equality matches', () => {
     setRuntimeObject('test-char', { hp: 15 }, 'test-campaign');
     setRuntimeObject('test-char', { hp: '15' }, 'test-campaign');
-    expect(vi.spyOn(global, 'fetch').mock.calls.length).toBe(1);
+    expect(global.fetch.mock.calls.length).toBe(1);
   });
 
   it('does not throw when fetch rejects but skipSync is true', () => {
-    vi.spyOn(global, 'fetch').mockRejectedValue(new Error('network error'));
+    global.fetch.mockRejectedValue(new Error('network error'));
     expect(() => {
       setRuntimeObject('test-char', { hp: 15 }, 'test-campaign', true);
     }).not.toThrow();

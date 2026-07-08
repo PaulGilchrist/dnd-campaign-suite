@@ -129,6 +129,7 @@ describe('vowOfEnmityHandler.handle', () => {
         // null combat context
         mockRuntimeValues({});
         vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue(null);
+        vi.spyOn(damageUtils, 'getTargetFromAttacker').mockReturnValue(null);
         let result = await handle(makeAction(), makePlayerStats(), campaignName);
         expect(result.type).toBe('modal');
         expect(result.modalName).toBe('vowOfEnmityTarget');
@@ -138,6 +139,7 @@ describe('vowOfEnmityHandler.handle', () => {
 
         // empty creatures list
         vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({ creatures: [] });
+        vi.spyOn(damageUtils, 'getTargetFromAttacker').mockReturnValue(null);
         result = await handle(makeAction(), makePlayerStats(), campaignName);
         expect(result.type).toBe('modal');
         expect(result.modalName).toBe('vowOfEnmityTarget');
