@@ -135,6 +135,9 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
             setRuntimeValue(playerStats.name, 'stalkersFlurryChosenTarget', selectedTargetName, campaignName);
             if (isSuddenStrike) {
                 setRuntimeValue(playerStats.name, 'pendingSuddenStrikeTarget', selectedTargetName, campaignName);
+                setRuntimeValue(playerStats.name, 'pendingSuddenStrike', true, campaignName);
+                onClose();
+                return;
             } else {
                 const targetEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
                 const massFearIndex = targetEffects.findIndex(te => te.effect === 'mass_fear');

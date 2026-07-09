@@ -270,25 +270,21 @@ export default function CharActionModals({
                     {...modalState.attackRiderModal}
                     onClose={async () => {
                         const modalAction = modalState.attackRiderModal?.action;
-                        const isStalkersFlurry = modalAction?.name === "Stalker's Flurry";
-                        console.log('[CharActionModals] attackRiderModal onClose — isStalkersFlurry:', isStalkersFlurry);
+                        const modalPlayerStats = modalState.attackRiderModal?.playerStats;
+                        const modalCampaignName = modalState.attackRiderModal?.campaignName;
                         setModalState({ attackRiderModal: null });
                         window.dispatchEvent(new CustomEvent('target-effects-updated'));
-                        if (isStalkersFlurry) {
+                        if (modalAction?.name === "Stalker's Flurry") {
                             const optKey = `_${modalAction.name.replace(/\s+/g, '_')}_option`;
-                            const chosen = getRuntimeValue(modalAction.playerStats.name, optKey, modalAction.campaignName);
-                            console.log('[CharActionModals] Stalker\'s Flurry — chosen after close:', chosen);
+                            const chosen = getRuntimeValue(modalPlayerStats.name, optKey, modalCampaignName);
                             if (!chosen) {
                                 const skipKey = `_${modalAction.name.replace(/\s+/g, '_')}_skippedRound`;
-                                await setSkipFlag(skipKey, modalAction.playerStats, modalAction.campaignName);
-                                console.log('[CharActionModals] Setting skip flag for round');
-                            } else {
-                                console.log('[CharActionModals] Option was chosen — pipeline should have applied it');
+                                await setSkipFlag(skipKey, modalPlayerStats, modalCampaignName);
                             }
                         }
-                        const isCunningStrikeVariant = ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].includes(modalState.attackRiderModal?.action?.name);
+                        const isCunningStrikeVariant = ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].includes(modalAction?.name);
                         if (isCunningStrikeVariant) {
-                            const costUsed = getRuntimeValue(modalState.attackRiderModal.playerStats.name, '_cunningStrikeCostUsed', modalState.attackRiderModal.campaignName);
+                            const costUsed = getRuntimeValue(modalPlayerStats.name, '_cunningStrikeCostUsed', modalCampaignName);
                             if (!costUsed || costUsed === 0) {
                                 if (autoDamageContext?.current) {
                                     const ctx = autoDamageContext.current;
@@ -312,7 +308,7 @@ export default function CharActionModals({
                             } else if (autoDamageContext) {
                                 const ctx = autoDamageContext.current;
                                 if (ctx) {
-                                    const cunningStrikeCost = Number(getRuntimeValue(modalState.attackRiderModal.playerStats.name, '_cunningStrikeCostUsed', modalState.attackRiderModal.campaignName) ?? 0);
+                                    const cunningStrikeCost = Number(getRuntimeValue(modalPlayerStats.name, '_cunningStrikeCostUsed', modalCampaignName) ?? 0);
                                     const effectiveSneakDice = Math.max(0, ctx.sneakAttackDice - cunningStrikeCost);
                                     let formula = ctx.formula;
                                     let total = ctx.total;

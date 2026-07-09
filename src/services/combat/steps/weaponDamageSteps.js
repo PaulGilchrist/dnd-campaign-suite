@@ -767,11 +767,41 @@ export function buildDamageSteps() {
     },
 
     // =========================================================
+    // Step: stalkersFlurryPostDamage — Sudden Strike secondary attack
+    // =========================================================
+    {
+      name: 'stalkersFlurryPostDamage',
+      subscribe: 'damage:applied',
+      emit: 'cleave:check',
+      condition: (ctx) => !!ctx.playerStats.automation?.passives,
+      handler: async (ctx) => {
+        const secondaryTarget = getRuntimeValue(ctx.playerStats.name, 'pendingSuddenStrikeTarget', ctx.campaignName);
+        const pending = getRuntimeValue(ctx.playerStats.name, 'pendingSuddenStrike', ctx.campaignName);
+        if (pending && secondaryTarget && ctx.total > 0) {
+          ctx.setPopupHtml?.(null);
+          ctx.setAttackRiderModal?.(null);
+          const cs = await getCombatContext(ctx.campaignName);
+          const characters = getRuntimeValue('characters', 'characters', ctx.campaignName) || [];
+          applyDamageToTarget(cs, secondaryTarget, ctx.total, [ctx.attack.damageType], ctx.campaignName, characters, false, ctx.playerStats.name, false, { isAutoCrit: ctx.isCrit });
+          await addEntry(ctx.campaignName, {
+            type: 'ability_use',
+            characterName: ctx.playerStats.name,
+            abilityName: "Stalker's Flurry - Sudden Strike",
+            description: `Sudden Strike: ${ctx.total} damage to ${secondaryTarget} (same as primary attack).`,
+          }).catch(() => {});
+          setRuntimeValue(ctx.playerStats.name, 'pendingSuddenStrike', null, ctx.campaignName);
+          setRuntimeValue(ctx.playerStats.name, 'pendingSuddenStrikeTarget', null, ctx.campaignName);
+        }
+        return { data: {} };
+      },
+    },
+
+    // =========================================================
     // Step: cleaveMastery — Secondary target selection for Cleave
     // =========================================================
     {
       name: 'cleaveMastery',
-      subscribe: 'damage:applied',
+      subscribe: 'cleave:check',
       emit: 'cleave:done',
       condition: (ctx) => !!ctx.setSecondaryTargetModal && ctx.attack?.name && ctx.playerStats?.automation,
       handler: async (ctx) => {

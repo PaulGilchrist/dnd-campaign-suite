@@ -162,8 +162,8 @@ describe('buildDamageSteps', () => {
       expect(steps.length).toBeGreaterThan(0);
     });
 
-    it('has 22 steps', () => {
-      expect(steps).toHaveLength(22);
+    it('has 23 steps', () => {
+      expect(steps).toHaveLength(23);
     });
 
     it('has steps with correct names in order', () => {
@@ -187,6 +187,7 @@ describe('buildDamageSteps', () => {
         'damageTypeModifiers',
         'overchannel',
         'proceedToDamage',
+        'stalkersFlurryPostDamage',
         'cleaveMastery',
         'tacticalMaster',
         'toppleMastery',

@@ -35,7 +35,6 @@ export const stalkersFlurry = {
     const secondaryTarget = getRuntimeValue(ctx.playerStats.name, 'stalkersFlurryChosenTarget', ctx.campaignName);
     const effectTarget = secondaryTarget || t.name;
     if (!chosen) {
-      console.log('[stalkersFlurry] Showing modal');
       ctx.setAttackRiderModal?.({ action: sf, playerStats: ctx.playerStats, campaignName: ctx.campaignName, targetName: t.name });
       return {
         modal: { type: 'stalkersFlurry', props: { action: sf, playerStats: ctx.playerStats, campaignName: ctx.campaignName, targetName: t.name } },

@@ -193,6 +193,9 @@ export default function useAttackDamageResolution({
             ...ctxOverrides,
         };
 
+        // Add resolveAttackDamage to context for nested attacks (e.g., Stalker's Flurry)
+        ctx.resolveAttackDamage = resolveAttackDamage;
+
         const pipeline = buildPipelineForAction(attack, playerStats);
         await pipeline.run('housekeeping:do', ctx, resumeRef);
     };
