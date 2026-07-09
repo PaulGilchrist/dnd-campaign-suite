@@ -8148,7 +8148,7 @@
                 "features": [
                     {
                         "name": "Dread Ambush",
-                        "description": "Ambusher's Leap: at start of first turn of each combat, Speed +10 until end of that turn. Dreadful Strike: when you hit with a weapon, deal extra 2d6 Psychic damage (uses = Wisdom modifier, minimum once, regain on Long Rest). Initiative Bonus: add Wisdom modifier to Initiative roll.",
+                        "description": "<ul><li><b>Ambusher's Leap:</b> at start of first turn of each combat, Speed +10 until end of that turn.</li><li><b>Dreadful Strike:</b> when you hit with a weapon, deal extra 2d6 Psychic damage (uses = Wisdom modifier, minimum once, regain on Long Rest).</li><li><b>Initiative Bonus:</b> add Wisdom modifier to Initiative roll.</li></ul>",
                         "level": 3,
                         "automation": [
                             {
@@ -8158,8 +8158,8 @@
                                 "bonusExpression": "10"
                             },
                             {
-                                "type": "damage_bonus",
-                                "trigger": "weapon_attack_hit",
+                                "type": "dread_ambush_damage",
+                                "trigger": "after_own_attack_hit",
                                 "damageExpression": "2d6",
                                 "damageType": "Psychic",
                                 "oncePerTurn": true,
@@ -8168,7 +8168,7 @@
                                 "scaling": {
                                     "11": "2d8"
                                 },
-                                "casting_time": "passive"
+                                "casting_time": "1 reaction"
                             },
                             {
                                 "type": "passive_rule",

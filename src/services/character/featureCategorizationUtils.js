@@ -54,11 +54,17 @@ export const categorizeFeatures = (items, categories, options = {}) => {
 
     // Categorize by casting_time for features that have automations with casting_time
     let castingTime = item.automation?.casting_time;
+    let hasReaction = false;
     if (!castingTime && Array.isArray(item.automation) && item.automation.length > 0) {
       const firstAuto = item.automation.find(a => a?.casting_time);
       if (firstAuto) {
         castingTime = firstAuto.casting_time;
       }
+      // Check if any automation entry is a reaction
+      hasReaction = item.automation.some(a => {
+        const ct = (a?.casting_time || '').toLowerCase().trim();
+        return ct === '1 reaction' || ct === 'reaction';
+      });
     }
     if (castingTime) {
       const ct = castingTime.toLowerCase().trim();
@@ -67,6 +73,8 @@ export const categorizeFeatures = (items, categories, options = {}) => {
       } else if ((ct === '1 bonus action' || ct === 'bonus action') && !categorized.bonusActions.some(f => f.name === item.name)) {
         categorized.bonusActions.push(itemSummary);
       } else if ((ct === '1 reaction' || ct === 'reaction') && !categorized.reactions.some(f => f.name === item.name)) {
+        categorized.reactions.push(itemSummary);
+      } else if (hasReaction && !categorized.reactions.some(f => f.name === item.name)) {
         categorized.reactions.push(itemSummary);
       } else if (ct === 'passive' && characterAdvancement.includes(item.name) && !categorized.characterAdvancement.some(f => f.name === item.name)) {
         categorized.characterAdvancement.push(itemSummary);

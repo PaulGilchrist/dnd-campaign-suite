@@ -276,5 +276,37 @@ export const reactionHandlers = {
             casting_time: auto.casting_time || '1 reaction',
             hasAutomation: true
         }
+    },
+
+    'dread_ambush_damage': (feature, playerStats) => {
+        const auto = feature.automation
+        let resolvedExpr = auto.damageExpression || '2d6'
+        if (auto.scaling) {
+            const entries = Object.entries(auto.scaling)
+                .map(([k, v]) => ({ level: parseInt(k, 10), expr: String(v) }))
+                .filter(e => !isNaN(e.level))
+                .sort((a, b) => a.level - b.level)
+            for (const entry of entries) {
+                if (playerStats.level >= entry.level) {
+                    resolvedExpr = entry.expr
+                }
+            }
+        }
+        const usesMax = auto.uses_expression
+            ? evaluateAutoExpression(auto.uses_expression, playerStats)
+            : 1
+        return {
+            type: 'dread_ambush_damage',
+            name: feature.name,
+            trigger: auto.trigger || '',
+            damageExpression: resolvedExpr,
+            damageType: auto.damageType || 'Psychic',
+            oncePerTurn: !!auto.oncePerTurn,
+            uses_expression: auto.uses_expression || '',
+            usesMax,
+            recharge: auto.recharge || 'long_rest',
+            casting_time: auto.casting_time || '1 reaction',
+            hasAutomation: true
+        }
     }
 }

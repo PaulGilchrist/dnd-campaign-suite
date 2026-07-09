@@ -133,7 +133,8 @@ export const LONG_REST_RESOURCES = [
   'stonecunningUses',
   'naturesVeilUses',
   'favoredEnemyUses',
-  'tirelessUses'
+  'tirelessUses',
+  'dreadambushUses'
 ]
 
 export function getLongRestResources() {

@@ -103,6 +103,7 @@ import { handle as handleHunterPrey } from './handlers/class-ranger/hunterPreyHa
 import { handle as handleDefensiveTactics } from './handlers/class-ranger/defensiveTacticsHandler.js';
 import { handle as handleSuperiorHunterPrey } from './handlers/class-ranger/superiorHunterPreyHandler.js';
 import { handle as handleSuperiorHunterDefense } from './handlers/class-ranger/superiorHunterDefenseHandler.js';
+import { handle as handleDreadAmbushDamage } from './handlers/class-ranger/dreadAmbushHandler.js';
 import { handle as handleNaturesVeil } from './handlers/class-ranger/naturesVeilHandler.js';
 import { handle as handleTireless } from './handlers/class-ranger/tirelessHandler.js';
 import { handle as handleBonusActionChoice } from './handlers/combat/bonusActionChoiceHandler.js';
@@ -347,6 +348,7 @@ const HANDLER_MAP = {
         defensive_tactics: handleDefensiveTactics,
         superior_hunter_prey: handleSuperiorHunterPrey,
         superior_hunter_defense: handleSuperiorHunterDefense,
+        dread_ambush_damage: handleDreadAmbushDamage,
         natures_veil: handleNaturesVeil,
         tireless: handleTireless,
         bonus_action_choice: handleBonusActionChoice,
