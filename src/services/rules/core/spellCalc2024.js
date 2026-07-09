@@ -1,3 +1,4 @@
+import { cloneDeep } from 'lodash';
 import classRules from '../../character/classRules2024.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import {
@@ -44,7 +45,11 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
         spellAbilities = spellAbilities || {};
         spellAbilities.spells = spellAbilities.spells || [];
         if (playerStats.spells) {
-            spellAbilities.spells = [...new Set([...spellAbilities.spells, ...['Mage Hand']])];
+            const mageHandObj = { name: 'Mage Hand', prepared: '' };
+            const existing = spellAbilities.spells.find(s => s.name === 'Mage Hand');
+            if (!existing) {
+                spellAbilities.spells.push(mageHandObj);
+            }
             spellAbilities.cantrips_known += 3;
         }
     }
@@ -387,9 +392,11 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
             spellAbilities.spells = spellAbilities.spells.map(spell => {
                 let spellDetail = allSpells.find((spellDetail) => spellDetail.name === spell.name);
                 if (spellDetail) {
-                    return { ...spellDetail, prepared: spellDetail.level === 0 ? 'Always' : spell.prepared };
+                    const copy = cloneDeep(spellDetail);
+                    copy.prepared = spellDetail.level === 0 ? 'Always' : spell.prepared;
+                    return copy;
                 }
-                return { ...spell };
+                return cloneDeep(spell);
             });
 
             spellAbilities.spells.sort((a, b) => {

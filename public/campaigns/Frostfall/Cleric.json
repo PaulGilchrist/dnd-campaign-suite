@@ -1,18 +1,18 @@
 {
-  "name": "Seren",
+  "name": "Cleric",
   "level": 3,
-  "alignment": "True Neutral",
+  "alignment": "Neutral Good",
   "abilities": [
     {
       "name": "Strength",
-      "baseScore": 8,
+      "baseScore": 15,
       "featIncrease": 0,
       "backgroundIncrease": 0,
       "miscIncrease": 0
     },
     {
       "name": "Dexterity",
-      "baseScore": 15,
+      "baseScore": 8,
       "featIncrease": 0,
       "backgroundIncrease": 0,
       "miscIncrease": 0
@@ -26,14 +26,14 @@
     },
     {
       "name": "Intelligence",
-      "baseScore": 15,
+      "baseScore": 8,
       "featIncrease": 0,
       "backgroundIncrease": 0,
       "miscIncrease": 0
     },
     {
       "name": "Wisdom",
-      "baseScore": 8,
+      "baseScore": 15,
       "featIncrease": 0,
       "backgroundIncrease": 0,
       "miscIncrease": 0
@@ -48,92 +48,59 @@
   ],
   "background": "",
   "class": {
-    "name": "Rogue",
+    "name": "Cleric",
     "subclass": {
-      "name": "Arcane Trickster",
+      "name": "Life",
       "type": ""
     },
     "divineOrder": "",
     "primalOrder": ""
   },
-  "expertSkills": [
-    "Survival",
-    "Stealth"
-  ],
+  "expertSkills": [],
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Human",
+    "name": "Elf",
     "subrace": {
-      "name": ""
+      "name": "High Elf",
+      "description": ""
     }
   },
   "immunities": [],
   "inventory": {
-    "backpack": [
-      "Rope",
-      "Silk",
-      "Ration*5",
-      "Blanket",
-      "Caltrops",
-      "Case",
-      "Clothes",
-      "traveler's",
-      "Crossbow bolt*20",
-      "Crowbar",
-      "Dice Set",
-      "Disguise Kit",
-      "Thieves' Tools",
-      "Forgery Kit",
-      "Climber's Kit",
-      "Fishing tackle",
-      "Grappling hook",
-      "Tinderbox",
-      "Waterskin"
-    ],
-    "equipped": [
-      "Studded Leather",
-      "Scimitar",
-      "Scimitar",
-      "Crossbow",
-      "hand",
-      "Crossbow",
-      "hand"
-    ],
+    "backpack": [],
+    "equipped": [],
     "gold": 10,
     "magicItems": []
   },
   "languages": [
     "Common",
-    "Thieves' Cant",
-    "Dwarvish",
     "Elvish",
-    "Abyssal",
-    "Orc",
-    "Giant"
+    "Celestial",
+    "Dwarvish"
   ],
   "resistances": [],
   "skillProficiencies": [
-    "Stealth",
-    "Survival"
+    "Medicine",
+    "Nature"
   ],
   "specialActions": [],
   "spells": [
-    "Acid Splash",
-    "Fire Bolt",
-    "Chill Touch",
-    "Charm Person",
-    "Disguise Self",
-    "Feather Fall",
-    "Shield",
-    "Sleep",
-    "Invisibility",
-    "Misty Step"
+    "Guidance",
+    "Sacred Flame",
+    "Spare the Dying",
+    "Bane",
+    "Bless",
+    "Cure Wounds",
+    "Guiding Bolt",
+    "Healing Word",
+    "Aid",
+    "Prayer of Healing"
   ],
   "rules": "5e",
   "xp": 0,
   "xpMode": "milestone",
-  "imagePath": "campaigns/Frostfall/images/Seren.png",
-  "_fileName": "Seren.json",
-  "originalFileName": "Seren.json"
+  "imagePath": "campaigns/Frostfall/images/Cleric.png",
+  "_fileName": "Cleric.json",
+  "originalFileName": "Cleric.json"
 }

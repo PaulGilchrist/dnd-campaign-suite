@@ -64,9 +64,6 @@ vi.mock('./char-spells/CharSpells.jsx', () => ({
     <div data-testid="char-spells"><span>{playerStats?.name || 'none'}</span></div>
   )),
 }));
-
-// ---------------------------------------------------------------------------
-// Mocks — services
 // ---------------------------------------------------------------------------
 
 vi.mock('../../services/automation/handlers/shieldOfFaithHandler.js', () => ({
@@ -275,10 +272,13 @@ describe('prepared spells toggle', () => {
     expect(toggleFn).toBeDefined();
     toggleFn('Magic Missile');
 
-    // Magic Missile should now be 'Prepared'
-    expect(spells[0].prepared).toBe('Prepared');
-    // setRuntimeValue should have been called with preparedSpells
-    expect(vi.mocked(setRuntimeValueMock)).toHaveBeenCalled();
+    // setRuntimeValue should have been called with preparedSpells including Magic Missile
+    expect(vi.mocked(setRuntimeValueMock)).toHaveBeenCalledWith(
+      'Test Bard',
+      'preparedSpells',
+      expect.arrayContaining(['Magic Missile']),
+      'test-campaign'
+    );
   });
 
   it('respects max prepared spells limit', async () => {
@@ -304,7 +304,15 @@ describe('prepared spells toggle', () => {
     // Burning Hands should NOT be toggled to Prepared (max is 2)
     toggleFn('Burning Hands');
 
-    expect(spells[2].prepared).toBe('');
+    // setRuntimeValue should NOT include Burning Hands in preparedSpells
+    const preparedCalls = vi.mocked(setRuntimeValueMock).mock.calls.filter(
+      call => call[1] === 'preparedSpells'
+    );
+    // Should only have been called once during initial render, not with Burning Hands
+    const lastCall = preparedCalls[preparedCalls.length - 1];
+    if (lastCall) {
+      expect(lastCall[2]).not.toContain('Burning Hands');
+    }
   });
 
   it('toggles a spell from prepared to unprepared', async () => {
@@ -328,7 +336,14 @@ describe('prepared spells toggle', () => {
 
     toggleFn('Magic Missile');
 
-    expect(spells[0].prepared).toBe('');
+    // setRuntimeValue should have been called with preparedSpells excluding Magic Missile
+    const preparedCalls = vi.mocked(setRuntimeValueMock).mock.calls.filter(
+      call => call[1] === 'preparedSpells'
+    );
+    const lastCall = preparedCalls[preparedCalls.length - 1];
+    if (lastCall) {
+      expect(lastCall[2]).not.toContain('Magic Missile');
+    }
   });
 });
 

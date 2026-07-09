@@ -111,36 +111,49 @@ export async function getSpellLimits(className, level, version = '5e', majorName
  */
 function findSpellcastingInClass(classData, level, version, majorName = null) {
    // First, try to find spellcasting in current or previous levels
-  for (let i = level - 1; i >= 0; i--) {
-    const levelEntry = classData.class_levels[i];
-    if (levelEntry && levelEntry.spellcasting) {
-       // For 2024 classes, check if spellcasting requires a specific major
-      if (version === '2024' && levelEntry.spellcasting.required_major) {
-        if (levelEntry.spellcasting.required_major !== majorName) {
-          continue; // Skip this level's spellcasting if major doesn't match
-        }
-      }
-      return levelEntry.spellcasting;
-    }
-  }
+   for (let i = level - 1; i >= 0; i--) {
+     const levelEntry = classData.class_levels[i];
+     if (levelEntry && levelEntry.spellcasting) {
+        // For 2024 classes, check if spellcasting requires a specific major
+       if (version === '2024' && levelEntry.spellcasting.required_major) {
+         if (levelEntry.spellcasting.required_major !== majorName) {
+           continue; // Skip this level's spellcasting if major doesn't match
+         }
+       }
+       return levelEntry.spellcasting;
+     }
+   }
 
-    // If not found, check subclass features (for 2024)
-  if (version === '2024' && classData.subclass) {
-    const subclass = classData.subclass;
-    if (subclass.features) {
-      for (const feature of subclass.features) {
-        if (feature.spellcasting) {
-           // For 2024 classes, check if spellcasting requires a specific major
-          if (feature.spellcasting.required_major && feature.spellcasting.required_major !== majorName) {
-            continue; // Skip this feature's spellcasting if major doesn't match
-          }
-          return feature.spellcasting;
-        }
-      }
-    }
-  }
+   // Check subclass class_levels for spellcasting (5e subclasses like Arcane Trickster)
+   if (classData.subclasses && Array.isArray(classData.subclasses)) {
+     const subclass = classData.subclasses.find(s => s.name === majorName || s.index === majorName?.toLowerCase());
+     if (subclass && subclass.class_levels) {
+       for (let i = level - 1; i >= 0; i--) {
+         const levelEntry = subclass.class_levels[i];
+         if (levelEntry && levelEntry.spellcasting) {
+           return levelEntry.spellcasting;
+         }
+       }
+     }
+   }
 
-  return null;
+   // If not found, check subclass features (for 2024)
+   if (version === '2024' && classData.subclass) {
+     const subclass = classData.subclass;
+     if (subclass.features) {
+       for (const feature of subclass.features) {
+         if (feature.spellcasting) {
+            // For 2024 classes, check if spellcasting requires a specific major
+           if (feature.spellcasting.required_major && feature.spellcasting.required_major !== majorName) {
+             continue; // Skip this feature's spellcasting if major doesn't match
+           }
+           return feature.spellcasting;
+         }
+       }
+     }
+   }
+
+   return null;
 }
 
 /**
@@ -151,22 +164,24 @@ function convertSpellcastingToLimits(spellcasting, className = null) {
     return getDefaultSpellLimits(className);
    }
 
-  const limits = {
-    cantrip: spellcasting.cantrips_known || 0,
-    spellType: spellcasting.spell_type || 'known',
-    preparedSpells: spellcasting.prepared_spells || null,
-    level1: spellcasting.spell_slots_level_1 || 0,
-    level2: spellcasting.spell_slots_level_2 || 0,
-    level3: spellcasting.spell_slots_level_3 || 0,
-    level4: spellcasting.spell_slots_level_4 || 0,
-    level5: spellcasting.spell_slots_level_5 || 0,
-    level6: spellcasting.spell_slots_level_6 || 0,
-    level7: spellcasting.spell_slots_level_7 || 0,
-    level8: spellcasting.spell_slots_level_8 || 0,
-    level9: spellcasting.spell_slots_level_9 || 0
-  };
+   const isKnown = spellcasting.spell_type !== 'prepared';
 
-  return limits;
+   const limits = {
+     cantrip: spellcasting.cantrips_known || 0,
+     spellType: spellcasting.spell_type || 'known',
+     preparedSpells: spellcasting.prepared_spells || null,
+     level1: isKnown && spellcasting.spells_known ? spellcasting.spells_known : (spellcasting.spell_slots_level_1 || 0),
+     level2: spellcasting.spell_slots_level_2 || 0,
+     level3: spellcasting.spell_slots_level_3 || 0,
+     level4: spellcasting.spell_slots_level_4 || 0,
+     level5: spellcasting.spell_slots_level_5 || 0,
+     level6: spellcasting.spell_slots_level_6 || 0,
+     level7: spellcasting.spell_slots_level_7 || 0,
+     level8: spellcasting.spell_slots_level_8 || 0,
+     level9: spellcasting.spell_slots_level_9 || 0
+   };
+
+   return limits;
 }
 
 /**

@@ -85,18 +85,24 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             if (playerSummary.rules !== '2024') {
                 const preparedSpells = getRuntimeValue(playerSummary.name, 'preparedSpells');
 
-                if (preparedSpells) {
-                    stats.spellAbilities?.spells.forEach(spell => {
-                        if (preparedSpells.includes(spell.name)) {
-                            if (spell.prepared === '') {
-                                spell.prepared = 'Prepared';
+                if (preparedSpells && stats.spellAbilities?.spells?.length) {
+                    try {
+                        const mutableSpells = stats.spellAbilities.spells.map(spell => cloneDeep(spell));
+                        mutableSpells.forEach(spell => {
+                            if (preparedSpells.includes(spell.name)) {
+                                if (spell.prepared === '') {
+                                    spell.prepared = 'Prepared';
+                                }
+                            } else {
+                                if (spell.prepared === 'Prepared') {
+                                    spell.prepared = '';
+                                }
                             }
-                        } else {
-                            if (spell.prepared === 'Prepared') {
-                                spell.prepared = '';
-                            }
-                        }
-                    });
+                        });
+                        stats.spellAbilities = { ...stats.spellAbilities, spells: mutableSpells };
+                    } catch (e) {
+                        console.error('Error applying preparedSpells:', e, { preparedSpells, spellsLength: stats.spellAbilities?.spells?.length });
+                    }
                 }
             }
 
@@ -243,22 +249,26 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const handleTogglePreparedSpells = (spellName) => {
         const spell = playerStats.spellAbilities.spells.find(spell => spell.name === spellName);
         if (spell) {
-            if (spell.prepared === 'Prepared') {
-                spell.prepared = '';
-            } else if (spell.prepared === '') {
-                const preparedSpellCount = playerStats.spellAbilities.spells.filter(spell => spell.prepared === 'Prepared').length;
-                if (preparedSpellCount < playerStats.spellAbilities.maxPreparedSpells) {
-                    spell.prepared = 'Prepared';
+            const mutableStats = cloneDeep(playerStats);
+            const mutableSpell = mutableStats.spellAbilities.spells.find(s => s.name === spellName);
+            if (mutableSpell) {
+                if (mutableSpell.prepared === 'Prepared') {
+                    mutableSpell.prepared = '';
+                } else if (mutableSpell.prepared === '') {
+                    const preparedSpellCount = mutableStats.spellAbilities.spells.filter(s => s.prepared === 'Prepared').length;
+                    if (preparedSpellCount < mutableStats.spellAbilities.maxPreparedSpells) {
+                        mutableSpell.prepared = 'Prepared';
+                    }
                 }
             }
             const preparedSpells = [];
-            playerStats.spellAbilities.spells.forEach(spell => {
-                if (spell.prepared === 'Prepared') {
-                    preparedSpells.push(spell.name);
+            mutableStats.spellAbilities.spells.forEach(s => {
+                if (s.prepared === 'Prepared') {
+                    preparedSpells.push(s.name);
                 }
             });
-            setRuntimeValue(playerStats.name, 'preparedSpells', preparedSpells, campaignName);
-            setPlayerStats(cloneDeep(playerStats));
+            setRuntimeValue(mutableStats.name, 'preparedSpells', preparedSpells, campaignName);
+            setPlayerStats(mutableStats);
         }
     }
 

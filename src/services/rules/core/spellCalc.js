@@ -1,3 +1,4 @@
+import { cloneDeep } from 'lodash';
 import classRules from '../../character/classRules.js';
 import { getSpellMaxLevel } from '../../shared/spell-utils.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
@@ -23,10 +24,18 @@ export function getSpellAbilities(allSpells, playerStats) {
         if (playerStats.spells) {
             spellAbilities.spells = playerStats.spells.map(spell => {return { name: spell, prepared: ''};})
             if(playerStats.class.subclass && playerStats.class.subclass.name === 'Arcane Trickster') { // Mage Hand Legerdemain
-                spellAbilities.spells = [...new Set([...spellAbilities.spells, ...['Mage Hand']])];
+                const mageHandObj = { name: 'Mage Hand', prepared: '' };
+                const existing = spellAbilities.spells.find(s => s.name === 'Mage Hand');
+                if (!existing) {
+                    spellAbilities.spells.push(mageHandObj);
+                }
                 spellAbilities.cantrips_known += 3;                    
              } else if(playerStats.class.subclass && playerStats.class.subclass.name === 'Light') { // Bonus Cantrip
-                spellAbilities.spells = [...new Set([...spellAbilities.spells, ...['Light']])];
+                const lightObj = { name: 'Light', prepared: '' };
+                const existing = spellAbilities.spells.find(s => s.name === 'Light');
+                if (!existing) {
+                    spellAbilities.spells.push(lightObj);
+                }
                 spellAbilities.cantrips_known += 1;
              } else if(playerStats.class.subclass && playerStats.class.subclass.name === 'Nature') { // Acolyte of Nature
                 spellAbilities.cantrips_known += 1;
@@ -217,9 +226,11 @@ export function getSpellAbilities(allSpells, playerStats) {
             spellAbilities.spells = spellAbilities.spells.map(spell => {
                 let spellDetail = allSpells.find((spellDetail) => spellDetail.name === spell.name);
                 if (spellDetail) {
-                    return { ...spellDetail, prepared: spellDetail.level === 0 ? 'Always' : spell.prepared };
+                    const copy = cloneDeep(spellDetail);
+                    copy.prepared = spellDetail.level === 0 ? 'Always' : spell.prepared;
+                    return copy;
                  }
-                return { ...spell };
+                return cloneDeep(spell);
               });
              // Sort by level (ascending) and then by name
             spellAbilities.spells.sort((a, b) => {
