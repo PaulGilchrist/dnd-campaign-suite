@@ -77,7 +77,7 @@ function WizardStepBasic({ formData, errors, backgrounds, ruleset, campaignName,
              {formData.image ? (
                <img src={formData.image} alt="Character" />
              ) : formData.imagePath ? (
-               <img src={campaignName ? `campaigns/${campaignName}/${formData.imagePath}` : formData.imagePath} alt="Character" />
+               <img src={formData.imagePath && formData.imagePath.startsWith('http') ? formData.imagePath : (campaignName ? `campaigns/${campaignName}/${formData.imagePath}` : formData.imagePath)} alt="Character" />
              ) : (
               <span>Click to upload</span>
             )}

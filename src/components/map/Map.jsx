@@ -184,7 +184,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
 
     const fog = useFogOfWar(mapData?.players, mapData?.walls, placedItems, gridSize);
 
-    const { npcImages, setNpcImages } = useNpcImageCache(placedItems);
+    const { npcImages, setNpcImages } = useNpcImageCache(placedItems, campaignName);
 
     const handleRenameItem = useCallback((oldName, newName) => {
         if (!newName || !newName.trim()) return;

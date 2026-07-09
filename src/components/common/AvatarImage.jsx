@@ -1,7 +1,7 @@
 
 function AvatarImage({ name, imagePath, size = 60, onClick, campaignName }) {
     const cursorStyle = onClick ? { cursor: 'pointer' } : {};
-    const src = campaignName && imagePath ? `campaigns/${campaignName}/${imagePath}` : imagePath;
+    const src = imagePath && imagePath.startsWith('http') ? imagePath : (campaignName && imagePath ? `campaigns/${campaignName}/${imagePath}` : imagePath);
     if (src) {
         return (
             <div className="avatar-wrapper" style={{ width: size, height: size, ...cursorStyle }} onClick={onClick} role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined} onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); } : undefined}>

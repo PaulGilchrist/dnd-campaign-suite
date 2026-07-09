@@ -11,8 +11,10 @@ function stripTrailingNumber(name) {
  * Look up a monster image URL by NPC name, with optional campaign NPC fallback.
  * Strips trailing numbers (e.g., "Goblin 1" -> "Goblin") for case-insensitive lookup.
  * If an npcs array is provided, checks campaign NPCs first for avatar image.
+ * If campaignName is provided, relative imagePath values from campaign NPCs are prefixed with the campaign path.
+ * Returns fully formed URLs (absolute for remote monsters, campaign-prefixed for local NPC images).
  */
-export async function getMonsterImageUrl(npcName, npcs) {
+export async function getMonsterImageUrl(npcName, npcs, campaignName) {
     if (!npcName) return null;
 
     // Check campaign NPCs first if provided
@@ -22,7 +24,12 @@ export async function getMonsterImageUrl(npcName, npcs) {
             if (!n.imagePath) return false;
             return n.name?.toLowerCase() === baseName.toLowerCase();
         });
-        if (npc?.imagePath) return npc.imagePath;
+        if (npc?.imagePath) {
+            // Campaign NPC images are always local — prefix with campaign path if available
+            if (npc.imagePath.includes('campaigns/')) return npc.imagePath;
+            if (campaignName) return `campaigns/${campaignName}/${npc.imagePath}`;
+            return npc.imagePath;
+        }
     }
 
     if (!monstersCache) {

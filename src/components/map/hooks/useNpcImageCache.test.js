@@ -14,8 +14,8 @@ describe('useNpcImageCache', () => {
     vi.clearAllMocks();
   });
 
-  const getHook = (placedItems) => {
-    const { result } = renderHook(() => useNpcImageCache(placedItems));
+  const getHook = (placedItems, campaignName) => {
+    const { result } = renderHook(() => useNpcImageCache(placedItems, campaignName));
     return result;
   };
 
@@ -35,8 +35,8 @@ describe('useNpcImageCache', () => {
       });
 
       expect(getMonsterImageUrl).toHaveBeenCalledTimes(2);
-      expect(getMonsterImageUrl).toHaveBeenCalledWith('Goblin');
-      expect(getMonsterImageUrl).toHaveBeenCalledWith('Orc');
+      expect(getMonsterImageUrl).toHaveBeenCalledWith('Goblin', null, undefined);
+      expect(getMonsterImageUrl).toHaveBeenCalledWith('Orc', null, undefined);
     });
   });
 
@@ -121,7 +121,7 @@ describe('useNpcImageCache', () => {
       });
 
       expect(getMonsterImageUrl).toHaveBeenCalledTimes(2);
-      expect(getMonsterImageUrl).toHaveBeenLastCalledWith('Orc');
+      expect(getMonsterImageUrl).toHaveBeenLastCalledWith('Orc', null, undefined);
     });
   });
 

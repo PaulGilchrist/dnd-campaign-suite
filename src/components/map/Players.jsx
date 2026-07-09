@@ -6,7 +6,9 @@ const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, f
         if (!characters || !player) return null;
         const character = characters.find((c) => c.name === player.name);
         const relativePath = character?.imagePath;
-        if (!relativePath || !campaignName) return null;
+        if (!relativePath) return null;
+        if (relativePath.startsWith('http')) return relativePath;
+        if (!campaignName) return null;
         return `campaigns/${campaignName}/${relativePath}`;
     };
 

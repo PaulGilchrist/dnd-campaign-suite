@@ -2,7 +2,7 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import asyncHandler from '../utils/asyncHandler.js';
-import { campaignDir, campaignImagesDir, campaignDataDir, campaignDataFile } from '../utils/campaignPaths.js';
+import { campaignDir, campaignMapsDir, campaignImagesDir, campaignDataDir, campaignDataFile } from '../utils/campaignPaths.js';
 import { characterChangeData, spellOverlayData, activeMaps, saveFile, markDirty } from '../utils/changeData.js';
 
 const router = express.Router();

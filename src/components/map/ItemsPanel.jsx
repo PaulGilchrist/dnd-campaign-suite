@@ -161,7 +161,7 @@ function ItemsPanel({ itemsPanelOpen, onClose, characters = [], players = [], ma
                             >
                                 <div className="items-panel-char-avatar">
                                     {char.imagePath ? (
-                                        <img src={campaignName ? `campaigns/${campaignName}/${char.imagePath}` : char.imagePath} alt={char.name} className="items-panel-char-img" />
+                                        <img src={char.imagePath.startsWith('http') ? char.imagePath : (campaignName ? `campaigns/${campaignName}/${char.imagePath}` : char.imagePath)} alt={char.name} className="items-panel-char-img" />
                                     ) : (
                                         <span className="items-panel-char-initial">{char.name.charAt(0).toUpperCase()}</span>
                                     )}

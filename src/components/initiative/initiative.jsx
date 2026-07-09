@@ -244,7 +244,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         const npcs = combatSummary.creatures.filter(c => c.type === 'npc')
         const promises = npcs.map(async (creature) => {
             if (creature.imagePath) return { name: creature.name, url: null }
-            const url = await getMonsterImageUrl(creature.name, campaignNpcs)
+            const url = await getMonsterImageUrl(creature.name, campaignNpcs, campaignName)
             return { name: creature.name, url }
         })
         Promise.all(promises).then(results => {
@@ -252,7 +252,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             results.forEach(({ name, url }) => { newImages[name] = url })
             setNpcImages(newImages)
         })
-    }, [combatSummary, campaignNpcs])
+    }, [combatSummary, campaignNpcs, campaignName])
 
     const handleAddNpc = React.useCallback(() => {
         if (!combatSummary) return

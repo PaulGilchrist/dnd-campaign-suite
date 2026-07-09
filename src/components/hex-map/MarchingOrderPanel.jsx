@@ -44,8 +44,8 @@ function MarchingOrderPanel({ marchingOrder, setMarchingOrder, characters, onClo
                         <div key={name} className={`marching-order-row ${i === 0 ? 'marching-order-leader' : ''}`}>
                             <span className="marching-order-rank">{i + 1}</span>
                             <div className="marching-order-avatar">
-                                {char?.imagePath ? (
-                                    <img src={campaignName ? `campaigns/${campaignName}/${char.imagePath}` : char.imagePath} alt={name} className="marching-order-img" />
+                                    {char?.imagePath ? (
+                                        <img src={char.imagePath.startsWith('http') ? char.imagePath : (campaignName ? `campaigns/${campaignName}/${char.imagePath}` : char.imagePath)} alt={name} className="marching-order-img" />
                                 ) : (
                                     <span className="marching-order-initial">{name.charAt(0).toUpperCase()}</span>
                                 )}
