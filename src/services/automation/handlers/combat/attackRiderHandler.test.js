@@ -25,8 +25,13 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
     getDistanceFeet: vi.fn(() => 5),
 }));
 
-vi.mock('../../../../../services/encounters/combatData.js', () => ({
-    getCurrentCombatRound: vi.fn(() => 1),
+vi.mock('../../common/damageUtils.js', () => ({
+    getCombatContext: vi.fn(async () => ({
+        creatures: [{ name: 'Goblin', size: 'Medium', position: { x: 1, y: 1 } }],
+        round: 1,
+        activeCreatureName: 'TestHero',
+    })),
+    getTargetFromAttacker: vi.fn(() => ({ name: 'Goblin' })),
 }));
 
 // ── Re-import after mocking ────────────────────────────────────
@@ -348,6 +353,11 @@ describe('attackRiderHandler', () => {
 
         it('should allow oncePerTurn when not used this round', async () => {
             getRuntimeValue.mockReturnValue(0);
+            getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'Goblin', size: 'Medium', position: { x: 1, y: 1 } }],
+                round: 1,
+                activeCreatureName: 'TestHero',
+            });
             const action = makeAction({
                 automation: {
                     type: 'attack_rider',
@@ -358,7 +368,7 @@ describe('attackRiderHandler', () => {
             const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Cunning Strike']);
 
             expect(result.type).toBe('popup');
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', '_CunningStrike_usedRound', 1, 'campaign');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', '_CunningStrike_usedRound', { round: 1, activeCreature: 'TestHero' }, 'campaign');
         });
 
         it('should apply Versatile Trickster secondary targets when Trip applied', async () => {
@@ -390,7 +400,10 @@ describe('attackRiderHandler', () => {
         });
 
         it('should apply multiple effects and return combined description', async () => {
-            getRuntimeValue.mockReturnValue([]);
+            getRuntimeValue.mockImplementation((_name, key) => {
+                if (key === '_CunningStrike_usedRound') return null;
+                return [];
+            });
             const action = {
                 name: 'Improved Cunning Strike',
                 automation: {

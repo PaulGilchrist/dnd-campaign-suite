@@ -1,6 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
-import { getCurrentCombatRound } from '../../../encounters/combatData.js';
+import { checkOncePerTurnWithSkip, clearSkipFlag } from '../../../automation/common/oncePerTurn.js';
 
 export const stalkersFlurry = {
   name: 'stalkersFlurry',
@@ -9,22 +9,33 @@ export const stalkersFlurry = {
     const sf = (ctx.playerStats.automation?.passives || []).find(
       a => a.type === 'attack_rider' && a.trigger === 'weapon_attack_hit' && a.chooseOne && a.options?.length > 0 && a.name === "Stalker's Flurry"
     );
-    if (!sf) return null;
+    if (!sf) {
+      console.log('[stalkersFlurry] No Stalker\'s Flurry passive found');
+      return null;
+    }
 
     const key = `_${sf.name.replace(/\s+/g, '_')}_usedRound`;
     const skipKey = `_${sf.name.replace(/\s+/g, '_')}_skippedRound`;
-    const round = getCurrentCombatRound();
-    if (sf.oncePerTurn && (getRuntimeValue(ctx.playerStats.name, key, ctx.campaignName) === round || getRuntimeValue(ctx.playerStats.name, skipKey, ctx.campaignName) === round)) return { data: prevData };
-
+    const optKey = `_${sf.name.replace(/\s+/g, '_')}_option`;
     const cs = await getCombatContext(ctx.campaignName);
     const t = cs ? getTargetFromAttacker(cs, ctx.playerStats.name) : null;
-    if (!t?.name) return { data: prevData };
+    if (!t?.name) {
+      console.log('[stalkersFlurry] No target found');
+      return { data: prevData };
+    }
 
-    const optKey = `_${sf.name.replace(/\s+/g, '_')}_option`;
+    if (sf.oncePerTurn) {
+      const skip = await checkOncePerTurnWithSkip(sf.name, key, skipKey, ctx.playerStats, ctx.campaignName);
+      if (skip) {
+        return { data: prevData };
+      }
+    }
+
     const chosen = getRuntimeValue(ctx.playerStats.name, optKey, ctx.campaignName);
     const secondaryTarget = getRuntimeValue(ctx.playerStats.name, 'stalkersFlurryChosenTarget', ctx.campaignName);
     const effectTarget = secondaryTarget || t.name;
     if (!chosen) {
+      console.log('[stalkersFlurry] Showing modal');
       ctx.setAttackRiderModal?.({ action: sf, playerStats: ctx.playerStats, campaignName: ctx.campaignName, targetName: t.name });
       return {
         modal: { type: 'stalkersFlurry', props: { action: sf, playerStats: ctx.playerStats, campaignName: ctx.campaignName, targetName: t.name } },
@@ -48,9 +59,13 @@ export const stalkersFlurry = {
     return {
       data: prevData,
       sideEffects: async () => {
-        if (sf.oncePerTurn) setRuntimeValue(ctx.playerStats.name, key, round, ctx.campaignName);
-        const skipKey = `_${sf.name.replace(/\s+/g, '_')}_skippedRound`;
-        setRuntimeValue(ctx.playerStats.name, skipKey, null, ctx.campaignName);
+        if (sf.oncePerTurn) {
+          const cs2 = await getCombatContext(ctx.campaignName);
+          const round = cs2?.round || 1;
+          setRuntimeValue(ctx.playerStats.name, key, round, ctx.campaignName);
+        }
+        await clearSkipFlag(skipKey, ctx.playerStats, ctx.campaignName);
+        setRuntimeValue(ctx.playerStats.name, optKey, null, ctx.campaignName);
         setRuntimeValue(ctx.playerStats.name, 'stalkersFlurryChosenTarget', null, ctx.campaignName);
         setRuntimeValue(ctx.playerStats.name, 'stalkersFlurrySecondaryTargets', null, ctx.campaignName);
         setRuntimeValue(ctx.playerStats.name, 'stalkersFlurryPrimaryTarget', null, ctx.campaignName);

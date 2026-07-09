@@ -1,9 +1,10 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
-import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
 import { collectWeaponMastery } from '../../../combat/automation/automationService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
+import { checkOncePerTurn, markOncePerTurn } from '../../common/oncePerTurn.js';
+import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
 const MASTERY_EFFECTS = {
     Push: {
         label: 'Push (10 ft)',
@@ -150,36 +151,14 @@ export async function applyMasteryEffect(masteryName, playerStats, campaignName,
 
     // Check once-per-turn for Cleave
     if (mastery.oncePerTurn && masteryName === 'Cleave') {
-        const currentRound = getCurrentCombatRound();
-        const usedKey = `_Cleave_UsedRound`;
-        const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
-        if (usedRound === currentRound) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: masteryName,
-                    description: `${masteryName} can only be used once per turn.`,
-                },
-            };
-        }
+        const skip = await checkOncePerTurn(masteryName, '_Cleave_UsedRound', campaignName);
+        if (skip) return skip;
     }
 
     // Check once-per-turn for Nick
     if (mastery.oncePerTurn && masteryName === 'Nick') {
-        const currentRound = getCurrentCombatRound();
-        const usedKey = `_Nick_UsedRound`;
-        const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
-        if (usedRound === currentRound) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: masteryName,
-                    description: `${masteryName} can only be used once per turn.`,
-                },
-            };
-        }
+        const skip = await checkOncePerTurn(masteryName, '_Nick_UsedRound', campaignName);
+        if (skip) return skip;
     }
 
     const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
@@ -246,14 +225,12 @@ export async function applyMasteryEffect(masteryName, playerStats, campaignName,
 
     // Mark once-per-turn for Cleave
     if (mastery.oncePerTurn && masteryName === 'Cleave') {
-        const currentRound = getCurrentCombatRound();
-        await setRuntimeValue(playerStats.name, `_Cleave_UsedRound`, currentRound, campaignName);
+        await markOncePerTurn(masteryName, '_Cleave_UsedRound', playerStats, campaignName);
     }
 
     // Mark once-per-turn for Nick
     if (mastery.oncePerTurn && masteryName === 'Nick') {
-        const currentRound = getCurrentCombatRound();
-        await setRuntimeValue(playerStats.name, `_Nick_UsedRound`, currentRound, campaignName);
+        await markOncePerTurn(masteryName, '_Nick_UsedRound', playerStats, campaignName);
     }
 
     const desc = buildMasteryDescription(masteryName, targetName);

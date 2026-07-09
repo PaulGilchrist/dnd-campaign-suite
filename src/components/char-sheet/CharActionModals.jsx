@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
-import { getCurrentCombatRound } from '../../services/encounters/combatData.js';
+import { setSkipFlag } from '../../services/automation/common/oncePerTurn.js';
 import HealingPoolModal from './modals/divine/HealingPoolModal.jsx'
 import HandOfHealingModal from './modals/shared/HandOfHealingModal.jsx'
 import FontOfMagicModal from './modals/FontOfMagicModal.jsx'
@@ -268,18 +268,22 @@ export default function CharActionModals({
             {modalState.attackRiderModal && (
                 <AttackRiderModal
                     {...modalState.attackRiderModal}
-                    onClose={() => {
+                    onClose={async () => {
                         const modalAction = modalState.attackRiderModal?.action;
                         const isStalkersFlurry = modalAction?.name === "Stalker's Flurry";
+                        console.log('[CharActionModals] attackRiderModal onClose — isStalkersFlurry:', isStalkersFlurry);
                         setModalState({ attackRiderModal: null });
                         window.dispatchEvent(new CustomEvent('target-effects-updated'));
                         if (isStalkersFlurry) {
                             const optKey = `_${modalAction.name.replace(/\s+/g, '_')}_option`;
                             const chosen = getRuntimeValue(modalAction.playerStats.name, optKey, modalAction.campaignName);
+                            console.log('[CharActionModals] Stalker\'s Flurry — chosen after close:', chosen);
                             if (!chosen) {
-                                const round = getCurrentCombatRound();
                                 const skipKey = `_${modalAction.name.replace(/\s+/g, '_')}_skippedRound`;
-                                setRuntimeValue(modalAction.playerStats.name, skipKey, round, modalAction.campaignName);
+                                await setSkipFlag(skipKey, modalAction.playerStats, modalAction.campaignName);
+                                console.log('[CharActionModals] Setting skip flag for round');
+                            } else {
+                                console.log('[CharActionModals] Option was chosen — pipeline should have applied it');
                             }
                         }
                         const isCunningStrikeVariant = ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].includes(modalState.attackRiderModal?.action?.name);

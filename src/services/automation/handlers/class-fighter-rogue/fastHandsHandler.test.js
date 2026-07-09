@@ -6,8 +6,8 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(async () => {}),
 }));
 
-vi.mock('../../../../services/encounters/combatData.js', () => ({
-    getCurrentCombatRound: vi.fn(),
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+    getCombatContext: vi.fn(),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
@@ -17,8 +17,8 @@ vi.mock('../../../ui/logService.js', () => ({
 const { getRuntimeValue, setRuntimeValue } = await import(
     '../../../../hooks/runtime/useRuntimeState.js'
 );
-const { getCurrentCombatRound } = await import(
-    '../../../../services/encounters/combatData.js'
+const { getCombatContext } = await import(
+    '../../../rules/combat/damageUtils.js'
 );
 
 import { handle, applyFastHands } from './fastHandsHandler.js';
@@ -88,8 +88,8 @@ describe('fastHandsHandler', () => {
         });
 
         it('returns once-per-turn error popup when already used this round', async () => {
-            getCurrentCombatRound.mockReturnValue(3);
-            getRuntimeValue.mockReturnValue(3);
+            getCombatContext.mockResolvedValue({ round: 3, activeCreatureName: 'TestRogue' });
+            getRuntimeValue.mockReturnValue({ round: 3, activeCreature: 'TestRogue' });
 
             const action = makeAction({ automation: { oncePerTurn: true } });
             const result = await handle(action, makePlayerStats(), 'test-campaign');
@@ -98,14 +98,11 @@ describe('fastHandsHandler', () => {
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Fast Hands');
             expect(result.payload.description).toContain('once per turn');
-            expect(result.payload.automation.oncePerTurn).toBe(true);
-            expect(result.payload.automation.type).toBe('fast_hands');
-            expect(result.payload.automation.options).toHaveLength(3);
         });
 
         it('returns modal when oncePerTurn is true but not yet used this round', async () => {
-            getCurrentCombatRound.mockReturnValue(3);
-            getRuntimeValue.mockReturnValue(2);
+            getCombatContext.mockResolvedValue({ round: 4, activeCreatureName: 'TestRogue' });
+            getRuntimeValue.mockReturnValue({ round: 3, activeCreature: 'TestRogue' });
 
             const action = makeAction({ automation: { oncePerTurn: true } });
             const result = await handle(action, makePlayerStats(), 'test-campaign');
@@ -115,8 +112,7 @@ describe('fastHandsHandler', () => {
         });
 
         it('skips oncePerTurn check when oncePerTurn is not set', async () => {
-            getCurrentCombatRound.mockReturnValue(3);
-            getRuntimeValue.mockReturnValue(3);
+            getRuntimeValue.mockReturnValue({ round: 3, activeCreature: 'TestRogue' });
 
             const action = makeAction({ automation: { oncePerTurn: false } });
             const result = await handle(action, makePlayerStats(), 'test-campaign');
@@ -168,7 +164,7 @@ describe('fastHandsHandler', () => {
         });
 
         it('tracks oncePerTurn usage by calling setRuntimeValue', async () => {
-            getCurrentCombatRound.mockReturnValue(7);
+            getCombatContext.mockResolvedValue({ round: 7, activeCreatureName: 'TestRogue' });
 
             const action = makeAction({ automation: { oncePerTurn: true } });
             await applyFastHands(action, makePlayerStats(), 'test-campaign', 'Sleight of Hand');
@@ -176,9 +172,8 @@ describe('fastHandsHandler', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestRogue',
                 '_FastHands_usedRound',
-                7,
-                'test-campaign',
-                true
+                { round: 7, activeCreature: 'TestRogue' },
+                'test-campaign'
             );
         });
 

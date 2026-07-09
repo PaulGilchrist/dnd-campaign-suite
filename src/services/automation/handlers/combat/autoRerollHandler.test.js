@@ -741,24 +741,26 @@ describe('autoRerollHandler', () => {
 
         it('should track once per turn and set runtime value', async () => {
             getCombatContext.mockResolvedValue({
-                lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false }
+                lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false },
+                round: 3,
+                activeCreatureName: 'TestHero',
             });
-            getCurrentCombatRound.mockReturnValue(3);
 
             const action = makeAction({
                 automation: { effect: 'convert_miss_to_hit', oncePerTurn: true },
             });
             await handle(action, makePlayerStats(), 'campaign', 'map');
 
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', '_fearlessAim_usedRound', 3, 'campaign');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', '_fearlessAim_usedRound', { round: 3, activeCreature: 'TestHero' }, 'campaign');
         });
 
         it('should reject if already used once this turn', async () => {
             getCombatContext.mockResolvedValue({
-                lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false }
+                lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false },
+                round: 3,
+                activeCreatureName: 'TestHero',
             });
-            getCurrentCombatRound.mockReturnValue(3);
-            getRuntimeValue.mockReturnValue(3);
+            getRuntimeValue.mockReturnValue({ round: 3, activeCreature: 'TestHero' });
 
             const action = makeAction({
                 automation: { effect: 'convert_miss_to_hit', oncePerTurn: true },

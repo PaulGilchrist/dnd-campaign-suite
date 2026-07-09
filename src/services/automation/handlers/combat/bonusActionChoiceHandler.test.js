@@ -8,8 +8,8 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../../../services/encounters/combatData.js', () => ({
-    getCurrentCombatRound: vi.fn(() => 1),
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+    getCombatContext: vi.fn(async () => ({ round: 1, activeCreatureName: 'TestRogue' })),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
@@ -20,7 +20,7 @@ vi.mock('../../../ui/logService.js', () => ({
 
 import { handle, applyBonusActionChoice } from './bonusActionChoiceHandler.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as combatData from '../../../../services/encounters/combatData.js';
+import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as logService from '../../../ui/logService.js';
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -116,8 +116,8 @@ describe('bonusActionChoiceHandler.handle — once-per-turn', () => {
     it('returns info popup when oncePerTurn is true and already used this round', async () => {
         const ps = makePlayerStats();
         const action = makeAction({ oncePerTurn: true });
-        combatData.getCurrentCombatRound.mockReturnValue(1);
-        useRuntimeState.getRuntimeValue.mockReturnValue(1);
+        damageUtils.getCombatContext.mockResolvedValue({ round: 1, activeCreatureName: 'TestRogue' });
+        useRuntimeState.getRuntimeValue.mockReturnValue({ round: 1, activeCreature: 'TestRogue' });
 
         const result = await handle(action, ps, campaignName);
 
@@ -127,25 +127,23 @@ describe('bonusActionChoiceHandler.handle — once-per-turn', () => {
                 type: 'automation_info',
                 name: 'Cunning Action',
                 description: 'Cunning Action can only be used once per turn.',
-                automation: action.automation,
             },
         });
         expect(useRuntimeState.getRuntimeValue).toHaveBeenCalled();
-        expect(combatData.getCurrentCombatRound).toHaveBeenCalled();
     });
 
     it('returns info popup with Fast Hands tracking when oncePerTurn is true and already used', async () => {
         const ps = makePlayerStats();
         const action = makeFastHandsAction({ oncePerTurn: true });
-        combatData.getCurrentCombatRound.mockReturnValue(1);
-        useRuntimeState.getRuntimeValue.mockReturnValue(1);
+        damageUtils.getCombatContext.mockResolvedValue({ round: 1, activeCreatureName: 'TestRogue' });
+        useRuntimeState.getRuntimeValue.mockReturnValue({ round: 1, activeCreature: 'TestRogue' });
 
         const result = await handle(action, ps, campaignName);
 
         expect(result.type).toBe('popup');
         expect(result.payload.description).toContain('once per turn');
         expect(useRuntimeState.getRuntimeValue).toHaveBeenCalledWith(
-            ps.name,
+            null,
             '_FastHands_usedRound',
             campaignName,
         );
@@ -154,8 +152,8 @@ describe('bonusActionChoiceHandler.handle — once-per-turn', () => {
     it('proceeds to modal when oncePerTurn is true but round differs', async () => {
         const ps = makePlayerStats();
         const action = makeAction({ oncePerTurn: true });
-        combatData.getCurrentCombatRound.mockReturnValue(2);
-        useRuntimeState.getRuntimeValue.mockReturnValue(1);
+        damageUtils.getCombatContext.mockResolvedValue({ round: 2, activeCreatureName: 'TestRogue' });
+        useRuntimeState.getRuntimeValue.mockReturnValue({ round: 1, activeCreature: 'TestRogue' });
 
         const result = await handle(action, ps, campaignName);
 
@@ -250,32 +248,30 @@ describe('applyBonusActionChoice — once-per-turn tracking', () => {
     it('tracks once-per-turn usage with Cunning Action key when set', async () => {
         const ps = makePlayerStats();
         const action = makeAction({ oncePerTurn: true });
-        combatData.getCurrentCombatRound.mockReturnValue(3);
+        damageUtils.getCombatContext.mockResolvedValue({ round: 3, activeCreatureName: 'TestRogue' });
 
         await applyBonusActionChoice(action, ps, campaignName, 'Dash');
 
         expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
             ps.name,
             '_CunningAction_usedRound',
-            3,
+            { round: 3, activeCreature: 'TestRogue' },
             campaignName,
-            true,
         );
     });
 
     it('tracks once-per-turn usage with Fast Hands key when action name is Fast Hands', async () => {
         const ps = makePlayerStats();
         const action = makeFastHandsAction({ oncePerTurn: true });
-        combatData.getCurrentCombatRound.mockReturnValue(5);
+        damageUtils.getCombatContext.mockResolvedValue({ round: 5, activeCreatureName: 'TestRogue' });
 
         await applyBonusActionChoice(action, ps, campaignName, 'Sleight of Hand');
 
         expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
             ps.name,
             '_FastHands_usedRound',
-            5,
+            { round: 5, activeCreature: 'TestRogue' },
             campaignName,
-            true,
         );
     });
 

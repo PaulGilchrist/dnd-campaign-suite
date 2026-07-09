@@ -8,7 +8,6 @@ import {
     triggerWildMagicSurge,
 } from './wildMagicSurgeService.js';
 import { executeHandler } from '../../automation/index.js';
-import { getCurrentCombatRound } from '../../encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 vi.mock('../../automation/index.js', () => ({
@@ -20,8 +19,8 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../encounters/combatData.js', () => ({
-    getCurrentCombatRound: vi.fn(() => 1),
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+    getCombatContext: vi.fn(async () => ({ round: 1, activeCreatureName: 'Sorcerer' })),
 }));
 
 const CAMPAIGN_NAME = 'TestCampaign';
@@ -49,7 +48,6 @@ const SPELL = { name: 'Fire Bolt', level: 1 };
 
 function mockDefaults() {
     executeHandler.mockResolvedValue({ type: 'popup', payload: {} });
-    getCurrentCombatRound.mockReturnValue(1);
     getRuntimeValue.mockReturnValue(null);
     setRuntimeValue.mockReturnValue(undefined);
 }
@@ -583,7 +581,7 @@ describe('wildMagicSurgeService', () => {
             const spell = { ...SPELL };
 
             getRuntimeValue.mockImplementation((_charKey, prop) => {
-                if (prop === 'surgeUsedRound') return 1;
+                if (prop === 'surgeUsedRound') return { round: 1, activeCreature: 'Sorcerer' };
                 return null;
             });
 
@@ -656,9 +654,8 @@ describe('wildMagicSurgeService', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 playerStats.name,
                 'surgeUsedRound',
-                1,
+                { round: 1, activeCreature: 'Sorcerer' },
                 CAMPAIGN_NAME,
-                true,
             );
         });
 

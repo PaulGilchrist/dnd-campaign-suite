@@ -1,6 +1,5 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
 import { addEntry } from '../../../ui/logService.js';
+import { checkOncePerTurn, markOncePerTurn } from '../../common/oncePerTurn.js';
 
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation;
@@ -20,20 +19,9 @@ export async function handle(action, playerStats, campaignName) {
 
     // Check once-per-turn usage
     if (auto.oncePerTurn) {
-        const currentRound = getCurrentCombatRound();
         const trackingKey = action.name === 'Fast Hands' ? '_FastHands_usedRound' : '_CunningAction_usedRound';
-        const usedRound = getRuntimeValue(playerStats.name, trackingKey, campaignName);
-        if (usedRound === currentRound) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: `${action.name} can only be used once per turn.`,
-                    automation: auto,
-                },
-            };
-        }
+        const skip = await checkOncePerTurn(action.name, trackingKey, campaignName);
+        if (skip) return skip;
     }
 
     // Present choice modal
@@ -64,9 +52,8 @@ export async function applyBonusActionChoice(action, playerStats, campaignName, 
 
     // Track once-per-turn usage
     if (auto.oncePerTurn) {
-        const currentRound = getCurrentCombatRound();
         const trackingKey = action.name === 'Fast Hands' ? '_FastHands_usedRound' : '_CunningAction_usedRound';
-        setRuntimeValue(playerStats.name, trackingKey, currentRound, campaignName, true);
+        await markOncePerTurn(action.name, trackingKey, playerStats, campaignName);
     }
 
     await addEntry(campaignName, {

@@ -1,6 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
 import { addEntry } from '../../../ui/logService.js';
+import { checkOncePerTurn, markOncePerTurn } from '../../common/oncePerTurn.js';
 
 const OBJECT_KEY = 'illusoryRealityObject';
 const USED_ROUND_KEY = 'illusoryRealityUsedRound';
@@ -10,19 +10,8 @@ export async function handle(action, playerStats, campaignName) {
     const playerName = playerStats.name;
     const featureName = action.name || 'Illusory Reality';
 
-    const usedRound = getRuntimeValue(playerName, USED_ROUND_KEY, campaignName);
-    const currentRound = getCurrentCombatRound();
-    if (usedRound === currentRound) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName}: Can only be used once per round.`,
-                automation: auto,
-            },
-        };
-    }
+    const skip = await checkOncePerTurn(featureName, 'illusoryRealityUsedRound', campaignName);
+    if (skip) return skip;
 
     // Check if there's already a real object from this feature active
     const existingObject = getRuntimeValue(playerName, OBJECT_KEY, campaignName);
@@ -67,10 +56,9 @@ export async function confirmIllusoryReality(action, playerStats, campaignName, 
     }
 
     const trimmedName = objectName.trim();
-    const currentRound = getCurrentCombatRound();
 
     await setRuntimeValue(playerName, OBJECT_KEY, trimmedName, campaignName, true);
-    await setRuntimeValue(playerName, USED_ROUND_KEY, currentRound, campaignName, true);
+    await markOncePerTurn(featureName, USED_ROUND_KEY, playerStats, campaignName);
 
     await addEntry(campaignName, {
         type: 'ability_use',

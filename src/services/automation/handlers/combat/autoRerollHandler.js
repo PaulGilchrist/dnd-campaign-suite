@@ -7,9 +7,9 @@ import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidat
 import { resolveMapPositions } from '../../common/targetResolver.js';
 import { getClassFeatures } from '../../../../services/character/classFeatures.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
-import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
+import { checkOncePerTurn, markOncePerTurn } from '../../common/oncePerTurn.js';
 
 async function handleAttackRoll(action, bonus, lastAttack, playerStats, campaignName, skipDamageRoll = false) {
     const auto = action.automation;
@@ -360,12 +360,8 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
     if (auto.effect === 'convert_miss_to_hit') {
         if (auto.oncePerTurn) {
-            const currentRound = getCurrentCombatRound();
-            const trackingKey = `_fearlessAim_usedRound`;
-            const usedRound = getRuntimeValue(playerName, trackingKey, campaignName);
-            if (usedRound === currentRound) {
-                return infoPopup(action.name, `${action.name} can only be used once per turn.`, auto);
-            }
+            const skip = await checkOncePerTurn(action.name, '_fearlessAim_usedRound', campaignName);
+            if (skip) return skip;
         }
 
         const isAttack = lastAttack?.rollType === 'attack';
@@ -380,9 +376,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
         }
 
         if (auto.oncePerTurn) {
-            const currentRound = getCurrentCombatRound();
-            const trackingKey = `_fearlessAim_usedRound`;
-            await setRuntimeValue(playerName, trackingKey, currentRound, campaignName);
+            await markOncePerTurn(action.name, '_fearlessAim_usedRound', playerStats, campaignName);
         }
 
         const damageFormula = lastAttack.damageFormula;

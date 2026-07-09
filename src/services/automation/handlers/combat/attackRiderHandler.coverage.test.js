@@ -17,8 +17,14 @@ vi.mock('../../../ui/logService.js', () => ({
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(async () => ({
         creatures: [{ name: 'Goblin', size: 'Medium', position: { x: 1, y: 1 } }],
+        round: 1,
+        activeCreatureName: 'TestHero',
     })),
     getTargetFromAttacker: vi.fn(() => ({ name: 'Goblin' })),
+}));
+
+vi.mock('../../../rules/combat/rangeValidation.js', () => ({
+    getDistanceFeet: vi.fn(() => 5),
 }));
 
 vi.mock('../../../rules/combat/rangeValidation.js', () => ({
@@ -543,6 +549,11 @@ describe('attackRiderHandler - oncePerTurn marks used round', () => {
 
     it('should set usedRound runtime value using action name when oncePerTurn option is applied', async () => {
         getRuntimeValue.mockReturnValue(0);
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', size: 'Medium', position: { x: 1, y: 1 } }],
+            round: 1,
+            activeCreatureName: 'TestHero',
+        });
         const action = makeAction({
             automation: {
                 type: 'attack_rider',
@@ -552,7 +563,7 @@ describe('attackRiderHandler - oncePerTurn marks used round', () => {
         });
         await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Cleave']);
 
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', '_CunningStrike_usedRound', 1, 'campaign');
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', '_CunningStrike_usedRound', { round: 1, activeCreature: 'TestHero' }, 'campaign');
     });
 });
 

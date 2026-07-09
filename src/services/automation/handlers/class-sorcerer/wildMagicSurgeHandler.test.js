@@ -10,7 +10,7 @@ import {
 } from './wildMagicSurgeHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
-import * as combatData from '../../../../services/encounters/combatData.js';
+import * as damageUtils from '../../../rules/combat/damageUtils.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -21,8 +21,8 @@ vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../../services/encounters/combatData.js', () => ({
-    getCurrentCombatRound: vi.fn(() => 1),
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+    getCombatContext: vi.fn(async () => ({ round: 1, activeCreatureName: 'TestSorcerer' })),
 }));
 
 const surgeTable = [
@@ -52,21 +52,21 @@ describe('wildMagicSurgeHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         runtimeState.getRuntimeValue.mockReturnValue(null);
-        combatData.getCurrentCombatRound.mockReturnValue(1);
+        damageUtils.getCombatContext.mockResolvedValue({ round: 1, activeCreatureName: 'TestSorcerer' });
     });
 
     describe('handle', () => {
         it('should return popup when already used this round', async () => {
-            combatData.getCurrentCombatRound.mockReturnValue(3);
+            damageUtils.getCombatContext.mockResolvedValue({ round: 3, activeCreatureName: 'TestSorcerer' });
             runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'surgeUsedRound') return 3;
+                if (key === 'surgeUsedRound') return { round: 3, activeCreature: 'TestSorcerer' };
                 return null;
             });
 
             const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('once per round');
+            expect(result.payload.description).toContain('once per turn');
         });
 
         it('should return modal with double roll when doubleRoll flag is true', async () => {
@@ -94,9 +94,8 @@ describe('wildMagicSurgeHandler', () => {
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestSorcerer',
                 'surgeUsedRound',
-                1,
+                { round: 1, activeCreature: 'TestSorcerer' },
                 'campaign',
-                true,
             );
         });
 
@@ -122,9 +121,8 @@ describe('wildMagicSurgeHandler', () => {
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestSorcerer',
                 'surgeUsedRound',
-                1,
+                { round: 1, activeCreature: 'TestSorcerer' },
                 'campaign',
-                true,
             );
             expect(logService.addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
                 type: 'ability_use',
@@ -304,9 +302,8 @@ describe('wildMagicSurgeHandler', () => {
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestSorcerer',
                 'surgeUsedRound',
-                1,
+                { round: 1, activeCreature: 'TestSorcerer' },
                 'campaign',
-                true,
             );
             expect(logService.addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
                 type: 'ability_use',

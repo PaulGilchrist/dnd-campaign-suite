@@ -2,10 +2,10 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
-import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
 import { buildSaveDc, createSaveListener } from '../../../automation/common/savePrompt.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
+import { checkOncePerTurn, markOncePerTurn } from '../../common/oncePerTurn.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || action;
@@ -64,25 +64,20 @@ export async function applyRiderOption(action, playerStats, campaignName, target
 
     // Check oncePerTurn for Charger feat
     if (auto.oncePerTurn) {
-        const currentRound = getCurrentCombatRound();
         const isCsFeature = ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].includes(action.name);
         const usedKey = isCsFeature ? '_CunningStrike_usedRound' : `_${action.name.replace(/\s+/g, '_')}_usedRound`;
-        const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
-        if (usedRound === currentRound) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    automationType: auto.type,
-                    description: `${action.name} can only be used once per turn.`,
-                    automation: auto,
-                },
-            };
-        }
+        const skip = await checkOncePerTurn(action.name, usedKey, campaignName);
+        if (skip) return skip;
     }
 
     setRuntimeValue(playerStats.name, 'pendingRiderChoice', null, campaignName);
+
+    // Store the chosen option for features that read it from runtime state (e.g., Stalker's Flurry)
+    const optKey = `_${action.name.replace(/\s+/g, '_')}_option`;
+    if (chosenOptions.length === 1) {
+        console.log('[attackRiderHandler] Storing option:', optKey, '=', chosenOptions[0].name);
+        await setRuntimeValue(playerStats.name, optKey, chosenOptions[0].name, campaignName);
+    }
 
     // Validate prerequisites and size limits before applying
     for (const chosen of chosenOptions) {
@@ -103,10 +98,9 @@ export async function applyRiderOption(action, playerStats, campaignName, target
 
     // Mark oncePerTurn as used
     if (auto.oncePerTurn) {
-        const currentRound = getCurrentCombatRound();
         const isCsFeature = ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].includes(action.name);
         const usedKey = isCsFeature ? '_CunningStrike_usedRound' : `_${action.name.replace(/\s+/g, '_')}_usedRound`;
-        await setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
+        await markOncePerTurn(action.name, usedKey, playerStats, campaignName);
     }
 
     // Calculate total cost for Cunning Strike (Sneak Attack dice to forgo)
@@ -177,6 +171,10 @@ export async function applyRiderOption(action, playerStats, campaignName, target
                         distance: getDistanceFeet(primaryTarget.position, c.position),
                     }))
                     .filter(t => t.distance !== null && t.distance <= 5);
+            } else {
+                stalkersFlurrySecondaryTarget = cs.creatures
+                    .filter(c => c.name !== targetName)
+                    .map(c => ({ creature: c, distance: 0 }));
             }
         }
     }

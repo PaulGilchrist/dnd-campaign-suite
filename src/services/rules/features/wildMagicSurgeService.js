@@ -1,7 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { getCurrentCombatRound } from '../../encounters/combatData.js';
 import { executeHandler } from '../../automation/index.js';
 import { usesSpellSlot } from './spellUtils.js';
+import { checkOncePerTurn, markOncePerTurn } from '../../automation/common/oncePerTurn.js';
 
 function isSorcererSpell(spell, playerStats) {
     const casterClass = playerStats?.class?.name;
@@ -130,11 +130,8 @@ export async function triggerWildMagicSurge(spell, metaCtx, playerStats, campaig
     }
 
     const surgeFeature = surgeFeatures[0];
-    const currentRound = getCurrentCombatRound();
-    const usedRound = getRuntimeValue(playerStats.name, 'surgeUsedRound', campaignName);
-    if (usedRound === currentRound) {
-        return null;
-    }
+    const skip = await checkOncePerTurn('Wild Magic Surge', 'surgeUsedRound', campaignName);
+    if (skip) return null;
 
     const surgeTable = playerStats.wildMagicSurgeTable;
     if (surgeTable == null) {
@@ -155,7 +152,7 @@ export async function triggerWildMagicSurge(spell, metaCtx, playerStats, campaig
     try {
         const result = await executeHandler(action, playerStats, campaignName, mapName);
         if (result) {
-            await setRuntimeValue(playerStats.name, 'surgeUsedRound', currentRound, campaignName, true);
+            await markOncePerTurn('Wild Magic Surge', 'surgeUsedRound', playerStats, campaignName);
             return result;
         }
     } catch (e) {

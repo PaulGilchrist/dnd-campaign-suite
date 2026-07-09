@@ -8,7 +8,7 @@ import {
   clearObject,
 } from './illusoryRealityHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
+import { getCombatContext } from '../../../../services/rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -16,8 +16,8 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../../../services/encounters/combatData.js', () => ({
-  getCurrentCombatRound: vi.fn(),
+vi.mock('../../../../services/rules/combat/damageUtils.js', () => ({
+  getCombatContext: vi.fn(async () => ({ round: 1, activeCreatureName: 'TestWizard' })),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
@@ -47,8 +47,8 @@ function setupMocks() {
     return null;
   });
   setRuntimeValue.mockResolvedValue(undefined);
-  getCurrentCombatRound.mockReturnValue(1);
   addEntry.mockResolvedValue();
+  getCombatContext.mockResolvedValue({ round: 1, activeCreatureName: 'TestWizard' });
 }
 
 describe('illusoryRealityHandler.handle', () => {
@@ -56,7 +56,7 @@ describe('illusoryRealityHandler.handle', () => {
 
   it('should return popup with per-round guard when already used this round', async () => {
     getRuntimeValue.mockImplementation((_name, key) => {
-      if (key === 'illusoryRealityUsedRound') return 1;
+      if (key === 'illusoryRealityUsedRound') return { round: 1, activeCreature: 'TestWizard' };
       return null;
     });
 
@@ -65,13 +65,13 @@ describe('illusoryRealityHandler.handle', () => {
     expect(result.type).toBe('popup');
     expect(result.payload.type).toBe('automation_info');
     expect(result.payload.name).toBe('Illusory Reality');
-    expect(result.payload.description).toBe('Illusory Reality: Can only be used once per round.');
-    expect(result.payload.automation).toEqual(makeAction().automation);
+    expect(result.payload.description).toBe('Illusory Reality can only be used once per turn.');
   });
 
   it('should return modal when no existing object and feature not used this round', async () => {
+    getCombatContext.mockResolvedValue({ round: 2, activeCreatureName: 'TestWizard' });
     getRuntimeValue.mockImplementation((_name, key) => {
-      if (key === 'illusoryRealityUsedRound') return 2;
+      if (key === 'illusoryRealityUsedRound') return { round: 1, activeCreature: 'TestWizard' };
       if (key === 'illusoryRealityObject') return null;
       return null;
     });
@@ -158,14 +158,14 @@ describe('illusoryRealityHandler.confirmIllusoryReality', () => {
     expect(result.type).toBe('popup');
     expect(result.payload.type).toBe('automation_info');
     expect(setRuntimeValue).toHaveBeenNthCalledWith(1, 'TestWizard', 'illusoryRealityObject', 'Ladder', campaignName, true);
-    expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'TestWizard', 'illusoryRealityUsedRound', 1, campaignName, true);
+    expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'TestWizard', 'illusoryRealityUsedRound', { round: 1, activeCreature: 'TestWizard' }, campaignName);
   });
 
   it('should trim object name before storing', async () => {
     await confirmIllusoryReality(makeAction(), makePlayerStats(), campaignName, '  Ladder  ');
 
     expect(setRuntimeValue).toHaveBeenNthCalledWith(1, 'TestWizard', 'illusoryRealityObject', 'Ladder', campaignName, true);
-    expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'TestWizard', 'illusoryRealityUsedRound', 1, campaignName, true);
+    expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'TestWizard', 'illusoryRealityUsedRound', { round: 1, activeCreature: 'TestWizard' }, campaignName);
   });
 
   it('should call addEntry with ability_use log entry', async () => {
@@ -231,7 +231,7 @@ describe('illusoryRealityHandler.getActiveObject', () => {
   it('should return null when object exists but round has changed', async () => {
     getRuntimeValue.mockImplementation((_name, key) => {
       if (key === 'illusoryRealityObject') return 'Ladder';
-      if (key === 'illusoryRealityUsedRound') return 2;
+      if (key === 'illusoryRealityUsedRound') return { round: 2, activeCreature: 'TestWizard' };
       return null;
     });
 

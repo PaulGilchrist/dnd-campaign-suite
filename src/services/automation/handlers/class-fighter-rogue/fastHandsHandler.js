@@ -1,6 +1,5 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
 import { addEntry } from '../../../ui/logService.js';
+import { checkOncePerTurn, markOncePerTurn } from '../../common/oncePerTurn.js';
 
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation;
@@ -20,19 +19,8 @@ export async function handle(action, playerStats, campaignName) {
 
     // Check once-per-turn usage
     if (auto.oncePerTurn) {
-        const currentRound = getCurrentCombatRound();
-        const usedRound = getRuntimeValue(playerStats.name, '_FastHands_usedRound', campaignName);
-        if (usedRound === currentRound) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: `${action.name} can only be used once per turn.`,
-                    automation: auto,
-                },
-            };
-        }
+        const skip = await checkOncePerTurn(action.name, '_FastHands_usedRound', campaignName);
+        if (skip) return skip;
     }
 
     return {
@@ -62,8 +50,7 @@ export async function applyFastHands(action, playerStats, campaignName, chosenOp
 
     // Track once-per-turn usage
     if (auto.oncePerTurn) {
-        const currentRound = getCurrentCombatRound();
-        setRuntimeValue(playerStats.name, '_FastHands_usedRound', currentRound, campaignName, true);
+        await markOncePerTurn(action.name, '_FastHands_usedRound', playerStats, campaignName);
     }
 
     await addEntry(campaignName, {

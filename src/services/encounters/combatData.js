@@ -1,5 +1,7 @@
 import { getCombatContext } from '../rules/combat/damageUtils.js'
 
+export { getCombatContext }
+
 // In-memory store for combat data (synced via SSE events), keyed by campaign name
 const cachedCombatSummaries = new Map()
 

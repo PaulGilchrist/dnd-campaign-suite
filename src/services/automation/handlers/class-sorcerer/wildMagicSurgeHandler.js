@@ -1,23 +1,13 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
 import { addEntry } from '../../../ui/logService.js';
+import { checkOncePerTurn, markOncePerTurn } from '../../common/oncePerTurn.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
-    const currentRound = getCurrentCombatRound();
-    const usedRound = getRuntimeValue(playerName, 'surgeUsedRound', campaignName);
-    if (usedRound === currentRound) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${action.name}: Can only trigger once per round.`,
-                automation: auto,
-            },
-        };
-    }
+
+    const skip = await checkOncePerTurn(action.name, 'surgeUsedRound', campaignName);
+    if (skip) return skip;
 
     const roll1 = Math.floor(Math.random() * 20) + 1;
     const doubleRoll = getRuntimeValue(playerName, 'wildMagicDoubleRoll', campaignName) === true;
@@ -25,7 +15,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     if (doubleRoll) {
         await setRuntimeValue(playerName, 'wildMagicDoubleRoll', false, campaignName, true);
-        await setRuntimeValue(playerName, 'surgeUsedRound', currentRound, campaignName, true);
+        await markOncePerTurn(action.name, 'surgeUsedRound', playerStats, campaignName);
         return {
             type: 'modal',
             modalName: 'wildMagicDoubleRoll',
@@ -79,7 +69,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const effectText = surgeEntry.effect;
 
-    await setRuntimeValue(playerName, 'surgeUsedRound', currentRound, campaignName, true);
+    await markOncePerTurn(action.name, 'surgeUsedRound', playerStats, campaignName);
 
     await addEntry(campaignName, {
         type: 'ability_use',
@@ -210,7 +200,6 @@ export async function handleFeatsOfChaos(action, playerStats, _campaignName, _ma
 export async function onDoubleRollSelected(action, playerStats, campaignName, selectedRoll) {
     const playerName = playerStats.name;
     const auto = action.automation;
-    const currentRound = getCurrentCombatRound();
 
     await setRuntimeValue(playerName, 'wildMagicDoubleRoll', false, campaignName, true);
 
@@ -242,7 +231,7 @@ export async function onDoubleRollSelected(action, playerStats, campaignName, se
 
     const effectText = surgeEntry.effect;
 
-    await setRuntimeValue(playerName, 'surgeUsedRound', currentRound, campaignName, true);
+    await markOncePerTurn(action.name, 'surgeUsedRound', playerStats, campaignName);
 
     await addEntry(campaignName, {
         type: 'ability_use',
