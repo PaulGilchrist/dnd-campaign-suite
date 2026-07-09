@@ -127,6 +127,7 @@ export const LONG_REST_RESOURCES = [
   '_Mystic_Arcanum_(level_9_spell)_freeCastCount',
   'magicalCunningUsed',
   '_Phantasmal_Creatures_freeCastCount',
+  '_Fey_Reinforcements_freeCastCount',
   'breathWeaponUses',
   'stonecunningUses',
   'naturesVeilUses',

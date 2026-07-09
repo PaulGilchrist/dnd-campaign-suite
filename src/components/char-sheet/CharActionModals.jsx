@@ -26,6 +26,7 @@ import SacredWeaponModal from './modals/divine/SacredWeaponModal.jsx'
 import ElderChampionRestoreModal from './modals/ElderChampionRestoreModal.jsx'
 import PrimalCompanionBonusActionModal from './modals/PrimalCompanionBonusActionModal.jsx'
 import MistyWandererModal from './modals/MistyWandererModal.jsx'
+import FeyReinforcementsModal from './modals/FeyReinforcementsModal.jsx'
 import BonusActionChoiceModal from './modals/shared/BonusActionChoiceModal.jsx'
 import RevelationInFleshModal from './modals/RevelationInFleshModal.jsx'
 import ElementalAffinityModal from './modals/ElementalAffinityModal.jsx'
@@ -508,6 +509,12 @@ export default function CharActionModals({
                 <MistyWandererModal
                     {...modalState.mistyWandererModal}
                     onClose={() => setModalState({ mistyWandererModal: null })}
+                />
+            )}
+            {modalState.feyReinforcementsModal && (
+                <FeyReinforcementsModal
+                    {...modalState.feyReinforcementsModal}
+                    onClose={() => setModalState({ feyReinforcementsModal: null })}
                 />
             )}
             {modalState.bonusActionChoiceModal && (

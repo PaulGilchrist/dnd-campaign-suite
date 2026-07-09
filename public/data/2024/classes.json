@@ -8080,7 +8080,7 @@
                             "recharge": "long_rest",
                             "action": "action",
                             "duration": "Concentration, up to 1 hour",
-                            "casting_time": "1 action"
+                            "casting_time": "passive"
                         }
                     },
                     {
