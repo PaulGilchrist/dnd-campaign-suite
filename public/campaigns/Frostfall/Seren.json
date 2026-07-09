@@ -133,7 +133,7 @@
   "rules": "5e",
   "xp": 0,
   "xpMode": "milestone",
-  "imagePath": "campaigns/Frostfall/images/Seren.png",
+  "imagePath": "images/Seren.png",
   "_fileName": "Seren.json",
   "originalFileName": "Seren.json"
 }

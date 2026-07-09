@@ -1,11 +1,13 @@
 
 const RADIUS = 20;
 
-const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, fog, dragging, handlePointerDown, selectedPlayer, setSelectedPlayer }) => {
+const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, fog, dragging, handlePointerDown, selectedPlayer, setSelectedPlayer, campaignName }) => {
     const getPlayerImage = (player, characters) => {
         if (!characters || !player) return null;
         const character = characters.find((c) => c.name === player.name);
-        return character?.imagePath || null;
+        const relativePath = character?.imagePath;
+        if (!relativePath || !campaignName) return null;
+        return `campaigns/${campaignName}/${relativePath}`;
     };
 
     return (

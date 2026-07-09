@@ -2,7 +2,7 @@ import { npcHasStatBlock } from '../../services/encounters/npcStatBlockUtils.js'
 import { getAttitudeStyle } from '../../services/npcs/npcFormUtils.js';
 import AvatarImage from '../common/AvatarImage.jsx';
 
-function NPCListItem({ npc, onEdit, onAddToInitiative }) {
+function NPCListItem({ npc, campaignName, onEdit, onAddToInitiative }) {
   return (
     <li
       className="ct-list-item"
@@ -19,7 +19,7 @@ function NPCListItem({ npc, onEdit, onAddToInitiative }) {
       <div className="ct-list-item-header npcs-list-header">
         <div className="npcs-list-name-row">
           {npc.imagePath && (
-            <AvatarImage name={npc.name} imagePath={npc.imagePath} size={36} />
+            <AvatarImage name={npc.name} imagePath={npc.imagePath} campaignName={campaignName} size={36} />
           )}
           <span className="ct-list-name">{npc.name}</span>
         </div>

@@ -21,7 +21,7 @@ import TrapSVG from './TrapSVG.jsx';
 import TreeSVG from './TreeSVG.jsx';
 import WebSVG from './WebSVG.jsx';
 
-function ItemsPanel({ itemsPanelOpen, onClose, characters = [], players = [], mapVariant = 'indoor' }) {
+function ItemsPanel({ itemsPanelOpen, onClose, characters = [], players = [], mapVariant = 'indoor', campaignName }) {
     const createDragGhost = (e) => {
         const svgEl = e.currentTarget.querySelector('svg');
         if (!svgEl) return;
@@ -161,7 +161,7 @@ function ItemsPanel({ itemsPanelOpen, onClose, characters = [], players = [], ma
                             >
                                 <div className="items-panel-char-avatar">
                                     {char.imagePath ? (
-                                        <img src={char.imagePath} alt={char.name} className="items-panel-char-img" />
+                                        <img src={campaignName ? `campaigns/${campaignName}/${char.imagePath}` : char.imagePath} alt={char.name} className="items-panel-char-img" />
                                     ) : (
                                         <span className="items-panel-char-initial">{char.name.charAt(0).toUpperCase()}</span>
                                     )}

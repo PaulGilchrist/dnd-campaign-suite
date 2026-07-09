@@ -74,7 +74,7 @@ router.put('/api/campaigns/:campaign/:file', asyncHandler((req, res, next) => {
 
                 if (oldImageFullPath !== newImageFullPath) {
                     fs.renameSync(oldImageFullPath, newImageFullPath);
-                    character.imagePath = path.join('campaigns', campaign, 'images', newImageFileName);
+                    character.imagePath = path.join('images', newImageFileName);
                 }
             }
         }

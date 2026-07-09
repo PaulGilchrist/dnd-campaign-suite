@@ -15,7 +15,7 @@ const makePlayer = (overrides = {}) => ({
 
 const makeCharacter = (overrides = {}) => ({
     name: 'Thorin',
-    imagePath: 'https://example.com/thorin.png',
+    imagePath: 'images/thorin.png',
     ...overrides,
 });
 
@@ -36,6 +36,7 @@ const renderComponent = (props, players = [], characters = []) =>
                 handlePointerDown={vi.fn()}
                 selectedPlayer={undefined}
                 setSelectedPlayer={vi.fn()}
+                campaignName="test-campaign"
                 {...props}
             />
         </svg>
@@ -118,7 +119,7 @@ describe('Players', () => {
             const { container } = renderComponent({}, [player], [character]);
             const image = container.querySelector('image.creature-image');
             expect(image).toBeInTheDocument();
-            expect(image).toHaveAttribute('xlink:href', 'https://example.com/thorin.png');
+            expect(image).toHaveAttribute('xlink:href', 'campaigns/test-campaign/images/thorin.png');
         });
 
         it('should not render image when character has no imagePath', () => {
@@ -133,11 +134,11 @@ describe('Players', () => {
 
         it('should match character by name to find image', () => {
             const player = makePlayer({ name: 'Thorin' });
-            const character = makeCharacter({ name: 'Thorin', imagePath: 'https://example.com/thorin.png' });
-            const otherCharacter = makeCharacter({ name: 'Gimli', imagePath: 'https://example.com/gimli.png' });
+            const character = makeCharacter({ name: 'Thorin', imagePath: 'images/thorin.png' });
+            const otherCharacter = makeCharacter({ name: 'Gimli', imagePath: 'images/gimli.png' });
             const { container } = renderComponent({}, [player], [character, otherCharacter]);
             const image = container.querySelector('image.creature-image');
-            expect(image).toHaveAttribute('xlink:href', 'https://example.com/thorin.png');
+            expect(image).toHaveAttribute('xlink:href', 'campaigns/test-campaign/images/thorin.png');
         });
     });
 

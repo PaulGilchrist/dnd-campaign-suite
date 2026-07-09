@@ -31,7 +31,8 @@ vi.mock('fs', () => ({
             mockFsState.exists.delete(path);
         }),
         writeFileSync: vi.fn(),
-        readdirSync: vi.fn(),
+        readdirSync: vi.fn(() => []),
+        readFileSync: vi.fn(() => '{}'),
         statSync: vi.fn(),
     },
     existsSync: vi.fn((path) => mockFsState.exists.has(path)),
@@ -48,7 +49,8 @@ vi.mock('fs', () => ({
         mockFsState.exists.delete(path);
     }),
     writeFileSync: vi.fn(),
-    readdirSync: vi.fn(),
+    readdirSync: vi.fn(() => []),
+    readFileSync: vi.fn(() => '{}'),
     statSync: vi.fn(),
 }));
 
@@ -57,6 +59,15 @@ vi.mock('../utils/campaignPaths.js', () => ({
     campaignMapsDir: (name) => `/mock/campaigns/${name}/maps`,
     campaignImagesDir: (name) => `/mock/campaigns/${name}/images`,
     campaignDataDir: (name) => `/mock/campaigns/${name}/data`,
+    campaignDataFile: (campaign, fileName) => `/mock/campaigns/${campaign}/data/${fileName}`,
+}));
+
+vi.mock('../utils/changeData.js', () => ({
+    characterChangeData: new Map(),
+    spellOverlayData: new Map(),
+    activeMaps: new Map(),
+    saveFile: vi.fn(),
+    markDirty: vi.fn(),
 }));
 
 function ensureCampaign(name) {

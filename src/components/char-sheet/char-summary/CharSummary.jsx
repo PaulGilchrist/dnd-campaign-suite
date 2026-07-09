@@ -272,7 +272,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     return (
         <div>
              <div className='char-header'>
-                <AvatarImage name={playerStats.name} imagePath={playerStats.imagePath} size={60} onClick={() => setShowAvatarModal(true)} />
+                 <AvatarImage name={playerStats.name} imagePath={playerStats.imagePath} campaignName={campaignName} size={60} onClick={() => setShowAvatarModal(true)} />
                 <div className='char-header-text'>
                     <div className='name-row'>
                         <span className='name'>{playerStats.name}</span>&nbsp;&nbsp;
@@ -437,6 +437,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                 <AvatarModal
                     name={playerStats.name}
                     imagePath={playerStats.imagePath}
+                    campaignName={campaignName}
                     onClose={() => setShowAvatarModal(false)}
                 />
             )}

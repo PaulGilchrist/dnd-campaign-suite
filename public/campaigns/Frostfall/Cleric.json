@@ -69,7 +69,7 @@
   "immunities": [],
   "inventory": {
     "backpack": [
-              "Rope",
+      "Rope",
       "Silk",
       "Ration*5",
       "Blanket",
@@ -125,7 +125,7 @@
   "rules": "5e",
   "xp": 0,
   "xpMode": "milestone",
-  "imagePath": "campaigns/Frostfall/images/Cleric.png",
+  "imagePath": "images/Cleric.png",
   "_fileName": "Cleric.json",
   "originalFileName": "Cleric.json"
 }

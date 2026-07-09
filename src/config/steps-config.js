@@ -34,11 +34,12 @@ export const WIZARD_STEPS = [
     step: 2,
     title: 'Basic Information',
     component: WizardStepBasic,
-    getProps: ({ formData, errors, backgrounds, ruleset, onInputChange }) => ({
+    getProps: ({ formData, errors, backgrounds, ruleset, campaignName, onInputChange }) => ({
       formData,
       errors,
       backgrounds,
       ruleset,
+      campaignName,
       onInputChange,
     }),
   },

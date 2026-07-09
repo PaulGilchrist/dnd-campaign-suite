@@ -394,6 +394,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     handlePointerDown={handlePointerDown}
                     selectedPlayer={selectedPlayer}
                     setSelectedPlayer={setSelectedPlayer}
+                    campaignName={campaignName}
                 />
 
                 <PlacedItems
@@ -621,6 +622,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     characters={characters}
                     players={players}
                     mapVariant={mapData.parentHex ? 'outdoor' : 'indoor'}
+                    campaignName={campaignName}
                 />
             )}
 

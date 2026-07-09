@@ -162,6 +162,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
             <NPCListItem
               key={npc.name}
               npc={npc}
+              campaignName={campaignName}
               onEdit={handleEditNPC}
               onAddToInitiative={handleAddToInitiative}
             />
@@ -174,6 +175,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
           formData={formData}
           setFormData={setFormData}
           editingNPC={editingNPC}
+          campaignName={campaignName}
           saving={saving}
           deleting={deleting}
           disabled={saving || !formData.name.trim()}

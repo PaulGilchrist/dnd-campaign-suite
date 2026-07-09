@@ -515,6 +515,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                         marchingOrder={marchingOrder}
                         setMarchingOrder={setMarchingOrder}
                         characters={characters}
+                        campaignName={campaignName}
                         onClose={() => setMarchingOpen(false)}
                     />
                 </div>

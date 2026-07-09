@@ -9,6 +9,7 @@ function NPCFormModal({
   formData,
   setFormData,
   editingNPC,
+  campaignName,
   saving,
   deleting,
   disabled,
@@ -66,6 +67,7 @@ function NPCFormModal({
             <AvatarImage
               name={formData.name}
               imagePath={formData.image || formData.imagePath}
+              campaignName={campaignName}
               size={80}
               onClick={(formData.image || formData.imagePath) ? () => setShowNpcAvatarModal(true) : undefined}
             />
@@ -172,6 +174,7 @@ function NPCFormModal({
         <AvatarModal
           name={formData.name}
           imagePath={formData.image || formData.imagePath}
+          campaignName={campaignName}
           onClose={() => setShowNpcAvatarModal(false)}
         />
       )}

@@ -51,7 +51,7 @@ baseRouter.put('/api/campaigns/:campaign/npcs/:npcName', asyncHandler((req, res)
         const newImageFullPath = path.join(newCampaignImagesDir, newImageFileName);
         if (oldImageFullPath !== newImageFullPath) {
           fs.renameSync(oldImageFullPath, newImageFullPath);
-          updatedNpc.imagePath = path.join('campaigns', campaign, 'images', newImageFileName);
+          updatedNpc.imagePath = path.join('images', newImageFileName);
         }
       }
     }

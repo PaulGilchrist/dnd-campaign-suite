@@ -1,5 +1,5 @@
 
-function MarchingOrderPanel({ marchingOrder, setMarchingOrder, characters, onClose }) {
+function MarchingOrderPanel({ marchingOrder, setMarchingOrder, characters, onClose, campaignName }) {
     const moveUp = (index) => {
         if (index === 0) return;
         const next = [...marchingOrder];
@@ -45,7 +45,7 @@ function MarchingOrderPanel({ marchingOrder, setMarchingOrder, characters, onClo
                             <span className="marching-order-rank">{i + 1}</span>
                             <div className="marching-order-avatar">
                                 {char?.imagePath ? (
-                                    <img src={char.imagePath} alt={name} className="marching-order-img" />
+                                    <img src={campaignName ? `campaigns/${campaignName}/${char.imagePath}` : char.imagePath} alt={name} className="marching-order-img" />
                                 ) : (
                                     <span className="marching-order-initial">{name.charAt(0).toUpperCase()}</span>
                                 )}

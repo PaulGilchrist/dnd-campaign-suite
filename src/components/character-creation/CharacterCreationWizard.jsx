@@ -26,6 +26,7 @@ const WizardStepRenderer = React.memo(({
   ruleset,
   errors,
   formData,
+  campaignName,
   backgrounds,
   racesData,
   classSubtypes,
@@ -85,6 +86,7 @@ const WizardStepRenderer = React.memo(({
     ruleset,
     errors,
     formData,
+    campaignName,
     backgrounds,
     racesData,
     classSubtypes: classSubtypes,
@@ -138,7 +140,7 @@ const WizardStepRenderer = React.memo(({
 });
 WizardStepRenderer.displayName = 'WizardStepRenderer';
 
-function CharacterCreationWizard({ onComplete, onCancel, allSpells, allClasses, characterData, isEditing = false }) {
+function CharacterCreationWizard({ onComplete, onCancel, allSpells, allClasses, characterData, isEditing = false, campaignName }) {
   // Core form state
   const {
     formData,
@@ -329,6 +331,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, allClasses, 
         ruleset={ruleset}
         errors={errors}
         formData={formData}
+        campaignName={campaignName}
         backgrounds={backgrounds}
         racesData={racesData}
         classSubtypes={classSubtypes}
@@ -382,6 +385,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, allClasses, 
     ruleset,
     errors,
     formData,
+    campaignName,
     backgrounds,
     racesData,
     classSubtypes,

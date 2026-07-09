@@ -107,7 +107,7 @@ describe('imageUtils - processImageUpload', () => {
 
         const expectedPath = getWrittenFilePath('test-campaign-1', 'TestChar.jpg');
         expect(writtenFiles.has(expectedPath)).toBe(true);
-        expect(character.imagePath).toBe(path.join('campaigns', 'test-campaign-1', 'images', 'TestChar.jpg'));
+        expect(character.imagePath).toBe(path.join('images', 'TestChar.jpg'));
         expect(character.image).toBeUndefined();
         expect(character.imageName).toBeUndefined();
     });
@@ -119,7 +119,7 @@ describe('imageUtils - processImageUpload', () => {
 
         const expectedPath = getWrittenFilePath('test-campaign-2', 'TestChar.png');
         expect(writtenFiles.has(expectedPath)).toBe(true);
-        expect(character.imagePath).toBe(path.join('campaigns', 'test-campaign-2', 'images', 'TestChar.png'));
+        expect(character.imagePath).toBe(path.join('images', 'TestChar.png'));
     });
 
     it('should extract .gif extension from imageName', () => {
@@ -129,7 +129,7 @@ describe('imageUtils - processImageUpload', () => {
 
         const expectedPath = getWrittenFilePath('test-campaign-3', 'TestChar.gif');
         expect(writtenFiles.has(expectedPath)).toBe(true);
-        expect(character.imagePath).toBe(path.join('campaigns', 'test-campaign-3', 'images', 'TestChar.gif'));
+        expect(character.imagePath).toBe(path.join('images', 'TestChar.gif'));
     });
 
     it('should default to .png when imageName has no extension', () => {
@@ -139,7 +139,7 @@ describe('imageUtils - processImageUpload', () => {
 
         const expectedPath = getWrittenFilePath('test-campaign-4', 'TestChar.png');
         expect(writtenFiles.has(expectedPath)).toBe(true);
-        expect(character.imagePath).toBe(path.join('campaigns', 'test-campaign-4', 'images', 'TestChar.png'));
+        expect(character.imagePath).toBe(path.join('images', 'TestChar.png'));
     });
 
     it('should extract extension from imageName with dots in name', () => {
@@ -242,7 +242,7 @@ describe('imageUtils - processImageUpload', () => {
 
         const expectedPath = getWrittenFilePath('test-campaign-8', 'DragonSlayer.png');
         expect(writtenFiles.has(expectedPath)).toBe(true);
-        expect(character.imagePath).toBe(path.join('campaigns', 'test-campaign-8', 'images', 'DragonSlayer.png'));
+        expect(character.imagePath).toBe(path.join('images', 'DragonSlayer.png'));
     });
 
     it('should preserve other character fields', () => {
@@ -301,7 +301,7 @@ describe('imageUtils - processImageUpload', () => {
 
         const expectedPath = getWrittenFilePath(campaignName, 'TestChar.png');
         expect(writtenFiles.has(expectedPath)).toBe(true);
-        expect(character.imagePath).toBe(path.join('campaigns', campaignName, 'images', 'TestChar.png'));
+        expect(character.imagePath).toBe(path.join('images', 'TestChar.png'));
     });
 
     it('should handle campaign names with underscores', () => {
@@ -312,7 +312,7 @@ describe('imageUtils - processImageUpload', () => {
 
         const expectedPath = getWrittenFilePath(campaignName, 'TestChar.png');
         expect(writtenFiles.has(expectedPath)).toBe(true);
-        expect(character.imagePath).toBe(path.join('campaigns', campaignName, 'images', 'TestChar.png'));
+        expect(character.imagePath).toBe(path.join('images', 'TestChar.png'));
     });
 
     it('should handle large base64 data', () => {

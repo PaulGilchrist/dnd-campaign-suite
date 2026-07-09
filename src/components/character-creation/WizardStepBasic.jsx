@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-function WizardStepBasic({ formData, errors, backgrounds, ruleset, onInputChange }) {
+function WizardStepBasic({ formData, errors, backgrounds, ruleset, campaignName, onInputChange }) {
   const [alignments, setAlignments] = useState([]);
 
   useEffect(() => {
@@ -73,12 +73,12 @@ function WizardStepBasic({ formData, errors, backgrounds, ruleset, onInputChange
            className="image-upload-input"
            onChange={handleImageUpload}
           />
-          <div className="image-preview">
-            {formData.image ? (
-              <img src={formData.image} alt="Character" />
-            ) : formData.imagePath ? (
-              <img src={formData.imagePath} alt="Character" />
-            ) : (
+           <div className="image-preview">
+             {formData.image ? (
+               <img src={formData.image} alt="Character" />
+             ) : formData.imagePath ? (
+               <img src={campaignName ? `campaigns/${campaignName}/${formData.imagePath}` : formData.imagePath} alt="Character" />
+             ) : (
               <span>Click to upload</span>
             )}
           </div>

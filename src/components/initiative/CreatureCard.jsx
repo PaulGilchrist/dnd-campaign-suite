@@ -64,12 +64,13 @@ function CreatureCard({
             )}
             <div className='creature-avatar'>
                 {creature.type === 'player' ? (
-                    <AvatarImage name={creature.name} imagePath={creature.imagePath} size={150} />
+                    <AvatarImage name={creature.name} imagePath={creature.imagePath} campaignName={campaignName} size={150} />
                 ) : (
                     <NpcAvatar
                         name={creature.name}
                         imageUrl={npcImage}
                         imagePath={creature.imagePath}
+                        campaignName={campaignName}
                         onClick={() => onNpcClick(creature)}
                     />
                 )}

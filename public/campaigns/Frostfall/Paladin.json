@@ -87,7 +87,7 @@
       "Fishing tackle",
       "Grappling hook",
       "Tinderbox",
-      "Waterskin"        
+      "Waterskin"
     ],
     "equipped": [
       "Half Plate",
@@ -118,6 +118,6 @@
   "rules": "5e",
   "xp": 0,
   "xpMode": "milestone",
-  "imagePath": "campaigns/Frostfall/images/Paladin.png",
+  "imagePath": "images/Paladin.png",
   "_fileName": "Paladin.json"
 }

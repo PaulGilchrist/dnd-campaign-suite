@@ -37,8 +37,8 @@ export const processImageUpload = (campaignName, characterName, character, origi
         fs.fsyncSync(fd);
         fs.closeSync(fd);
 
-        // Set the relative path from public/
-        character.imagePath = path.join('campaigns', campaignName, 'images', imageFileName);
+        // Set the relative path from the campaign directory
+        character.imagePath = path.join('images', imageFileName);
 
         // Remove the temporary image and imageName fields from the character object
         delete character.image;
