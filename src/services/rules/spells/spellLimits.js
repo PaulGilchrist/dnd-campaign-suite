@@ -59,7 +59,7 @@ async function fetchClassData(className, version = '5e') {
  * @param {object} [extraOptions] - Additional class options (divineOrder, primalOrder)
  * @returns {object} - Object containing spell limits for each level
  */
-export async function getSpellLimits(className, level, version = '5e', majorName = null, extraOptions = null) {
+export async function getSpellLimits(className, level, version = '5e', majorName = null, extraOptions = null, abilityScores = null) {
   try {
     const classData = await fetchClassData(className, version);
     
@@ -75,7 +75,7 @@ export async function getSpellLimits(className, level, version = '5e', majorName
        // Check if class has spellcasting at higher levels (subclass feature)
       const spellcasting = findSpellcastingInClass(classData, level, version, majorName);
       if (spellcasting) {
-        return convertSpellcastingToLimits(spellcasting);
+        return convertSpellcastingToLimits(spellcasting, className, abilityScores, level);
       }
       return getDefaultSpellLimits(className);
      }
@@ -87,7 +87,7 @@ export async function getSpellLimits(className, level, version = '5e', majorName
      }
     }
 
-    let limits = convertSpellcastingToLimits(levelEntry.spellcasting, className);
+    let limits = convertSpellcastingToLimits(levelEntry.spellcasting, className, abilityScores, level);
 
     // Apply 2024 Divine Order / Primal Order bonus cantrips
     if (version === '2024' && extraOptions) {
@@ -159,17 +159,27 @@ function findSpellcastingInClass(classData, level, version, majorName = null) {
 /**
  * Converts spellcasting object to spell limits format
  */
-function convertSpellcastingToLimits(spellcasting, className = null) {
+function convertSpellcastingToLimits(spellcasting, className = null, abilityScores = null, characterLevel = null) {
   if (!spellcasting) {
     return getDefaultSpellLimits(className);
    }
 
    const isKnown = spellcasting.spell_type !== 'prepared';
+   let preparedSpells = spellcasting.prepared_spells;
+
+   // For prepared spellcasters, compute preparedSpells if not in JSON
+   if (isKnown) {
+    // Known spellcasters use spells_known for level 1
+    preparedSpells = null;
+   } else if (preparedSpells === null || preparedSpells === undefined) {
+    // Compute prepared spells limit based on class rules
+    preparedSpells = computePreparedSpellsLimit(className, spellcasting, abilityScores, characterLevel);
+   }
 
    const limits = {
      cantrip: spellcasting.cantrips_known || 0,
      spellType: spellcasting.spell_type || 'known',
-     preparedSpells: spellcasting.prepared_spells || null,
+     preparedSpells: preparedSpells,
      level1: isKnown && spellcasting.spells_known ? spellcasting.spells_known : (spellcasting.spell_slots_level_1 || 0),
      level2: spellcasting.spell_slots_level_2 || 0,
      level3: spellcasting.spell_slots_level_3 || 0,
@@ -182,6 +192,63 @@ function convertSpellcastingToLimits(spellcasting, className = null) {
    };
 
    return limits;
+}
+
+/**
+ * Computes the prepared spells limit for classes where it's not in the JSON data
+ */
+function computePreparedSpellsLimit(className, spellcasting, abilityScores, characterLevel) {
+  if (!className || !abilityScores || !Array.isArray(abilityScores)) {
+    return null;
+  }
+
+  // Ability names are always in this order in formData.abilities
+  const abilityOrder = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'];
+
+  // Get the spellcasting ability name from class data
+  let spellcastingAbility = null;
+  switch (className) {
+    case 'Cleric':
+    case 'Druid':
+      spellcastingAbility = 'Wisdom';
+      break;
+    case 'Wizard':
+      spellcastingAbility = 'Intelligence';
+      break;
+    case 'Paladin':
+      spellcastingAbility = 'Charisma';
+      break;
+    default:
+      return null;
+  }
+
+  // Find the ability index and compute total score + modifier
+  const abilityIndex = abilityOrder.indexOf(spellcastingAbility);
+  if (abilityIndex === -1) {
+    return null;
+  }
+
+  const abilityData = abilityScores[abilityIndex];
+  if (!abilityData) {
+    return null;
+  }
+
+  const baseScore = parseInt(abilityData.baseScore) || 8;
+  const backgroundIncrease = parseInt(abilityData.backgroundIncrease) || 0;
+  const miscIncrease = parseInt(abilityData.miscIncrease) || 0;
+  const featIncrease = parseInt(abilityData.featIncrease) || 0;
+  const racialIncrease = parseInt(abilityData.racialIncrease) || 0;
+  const totalScore = baseScore + backgroundIncrease + miscIncrease + featIncrease + racialIncrease;
+  const abilityModifier = Math.floor((totalScore - 10) / 2);
+  const level = characterLevel || 1;
+
+  // Cleric/Druid/Wizard: level + ability modifier
+  // Paladin: floor(level/2) + ability modifier
+  if (className === 'Paladin') {
+    return abilityModifier + Math.floor(level / 2);
+  }
+
+  return abilityModifier + level;
 }
 
 /**
@@ -208,8 +275,8 @@ function getDefaultSpellLimits() {
 /**
  * Validates if spell selection is within limits for a given class and level
  */
-export async function validateSpellSelection(selectedSpells, allSpells, className, level, version = '5e', majorName = null) {
-  const limits = await getSpellLimits(className, level, version, majorName);
+export async function validateSpellSelection(selectedSpells, allSpells, className, level, version = '5e', majorName = null, abilityScores = null) {
+  const limits = await getSpellLimits(className, level, version, majorName, null, abilityScores);
   const counts = countSpellsByLevel(selectedSpells, allSpells);
 
     // Non-spellcasting classes have no inherent restrictions — allow any selection for homebrew/feat/race feats

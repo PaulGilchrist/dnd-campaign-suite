@@ -29,7 +29,7 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
       
       setIsLoadingLimits(true);
       try {
-        const limits = await getSpellLimits(className, charLevel, version, majorName, classOptions);
+      const limits = await getSpellLimits(className, charLevel, version, majorName, classOptions, formData.abilities);
         setSpellLimits(limits);
       } catch (error) {
         console.error('Error fetching spell limits:', error);
@@ -161,7 +161,7 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
 
     // Validate spell selection (excluding pre-selected spells)
     const userSpells = (formData.spells || []).filter(s => !preSelected.includes(s));
-    const validation = await validateSpellSelection(userSpells, allSpells || [], className, charLevel, version, majorName);
+    const validation = await validateSpellSelection(userSpells, allSpells || [], className, charLevel, version, majorName, formData.abilities);
 
     if (!validation.valid) {
       return `Spell limit exceeded: ${validation.violations.join(', ')}`;
@@ -263,7 +263,7 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
             {isExpanded && (
               <div className="list-item-full-details">
                 <div className="spell-description">
-                  {spell.desc && spell.desc[0] && spell.desc[0]}
+                  {spell.description && spell.description[0] && spell.description[0]}
                 </div>
 
 

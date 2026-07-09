@@ -57,8 +57,8 @@ const mockProps = {
     spells: ['Fireball'],
   },
   allSpells: [
-    { name: 'Fireball', index: 'fireball', level: 3, school: 'Evocation', desc: ['A ball of fire.'], classes: ['Wizard'] },
-    { name: 'Magic Missile', index: 'magic_missile', level: 0, school: 'Evocation', desc: ['A missile.'], classes: ['Wizard'] },
+    { name: 'Fireball', index: 'fireball', level: 3, school: 'Evocation', description: ['A ball of fire.'], classes: ['Wizard'] },
+    { name: 'Magic Missile', index: 'magic_missile', level: 0, school: 'Evocation', description: ['A missile.'], classes: ['Wizard'] },
   ],
   onArrayFieldChange: vi.fn(),
 };
@@ -110,10 +110,10 @@ describe('WizardStepSpells', () => {
 
     it('shows exceeded class when cantrip count exceeds limit', async () => {
       const overLimitSpells = [
-        { name: 'C1', level: 0, school: 'Evocation', classes: ['Wizard'], desc: [] },
-        { name: 'C2', level: 0, school: 'Evocation', classes: ['Wizard'], desc: [] },
-        { name: 'C3', level: 0, school: 'Evocation', classes: ['Wizard'], desc: [] },
-        { name: 'C4', level: 0, school: 'Evocation', classes: ['Wizard'], desc: [] },
+        { name: 'C1', level: 0, school: 'Evocation', classes: ['Wizard'], description: [] },
+        { name: 'C2', level: 0, school: 'Evocation', classes: ['Wizard'], description: [] },
+        { name: 'C3', level: 0, school: 'Evocation', classes: ['Wizard'], description: [] },
+        { name: 'C4', level: 0, school: 'Evocation', classes: ['Wizard'], description: [] },
       ];
       render(<WizardStepSpells {...mockProps} allSpells={overLimitSpells} formData={{ ...mockProps.formData, spells: ['C1', 'C2', 'C3', 'C4'] }} />);
       await waitFor(() => {
@@ -143,9 +143,9 @@ describe('WizardStepSpells', () => {
     it('shows exceeded when prepared spells exceed limit', async () => {
       spellLimits.getSpellLimits.mockResolvedValueOnce({ ...preparedLimits, preparedSpells: 2 });
       const manySpells = [
-        { name: 'S1', level: 1, school: 'Abjuration', classes: ['Wizard'], desc: [] },
-        { name: 'S2', level: 1, school: 'Abjuration', classes: ['Wizard'], desc: [] },
-        { name: 'S3', level: 2, school: 'Evocation', classes: ['Wizard'], desc: [] },
+        { name: 'S1', level: 1, school: 'Abjuration', classes: ['Wizard'], description: [] },
+        { name: 'S2', level: 1, school: 'Abjuration', classes: ['Wizard'], description: [] },
+        { name: 'S3', level: 2, school: 'Evocation', classes: ['Wizard'], description: [] },
       ];
       render(<WizardStepSpells {...mockProps} allSpells={manySpells} formData={{ ...mockProps.formData, spells: ['S1', 'S2', 'S3'] }} />);
       await waitFor(() => {
@@ -209,7 +209,7 @@ describe('WizardStepSpells', () => {
       index: 'bless',
       level: 1,
       school: 'Abjuration',
-      desc: ['You bless your allies'],
+      description: ['You bless your allies'],
       classes: ['Cleric'],
       ritual: true,
       concentration: true,
@@ -259,10 +259,10 @@ describe('WizardStepSpells', () => {
         spellType: 'known', preparedSpells: null,
       });
       const allSpells = [
-        { name: 'PreSelCantrip', level: 0, school: 'Evocation', classes: ['Wizard'], desc: [] },
-        { name: 'PreSel1', level: 1, school: 'Abjuration', classes: ['Wizard'], desc: [] },
-        { name: 'PreSel2', level: 1, school: 'Abjuration', classes: ['Wizard'], desc: [] },
-        { name: 'UserSpell', level: 1, school: 'Abjuration', classes: ['Wizard'], desc: [] },
+        { name: 'PreSelCantrip', level: 0, school: 'Evocation', classes: ['Wizard'], description: [] },
+        { name: 'PreSel1', level: 1, school: 'Abjuration', classes: ['Wizard'], description: [] },
+        { name: 'PreSel2', level: 1, school: 'Abjuration', classes: ['Wizard'], description: [] },
+        { name: 'UserSpell', level: 1, school: 'Abjuration', classes: ['Wizard'], description: [] },
       ];
       render(<WizardStepSpells {...mockProps} allSpells={allSpells} formData={{ ...mockProps.formData, spells: ['PreSelCantrip', 'PreSel1', 'PreSel2', 'UserSpell'] }} preSelectedSpells={['PreSelCantrip', 'PreSel1', 'PreSel2']} />);
       await waitFor(() => {
@@ -279,10 +279,10 @@ describe('WizardStepSpells', () => {
         spellType: 'known', preparedSpells: null,
       });
       const allSpells = [
-        { name: 'Cantrip', level: 0, school: 'Evocation', classes: ['Wizard'], desc: [] },
-        { name: 'Level1', level: 1, school: 'Evocation', classes: ['Wizard'], desc: [] },
-        { name: 'Level2', level: 2, school: 'Evocation', classes: ['Wizard'], desc: [] },
-        { name: 'Level3', level: 3, school: 'Evocation', classes: ['Wizard'], desc: [] },
+        { name: 'Cantrip', level: 0, school: 'Evocation', classes: ['Wizard'], description: [] },
+        { name: 'Level1', level: 1, school: 'Evocation', classes: ['Wizard'], description: [] },
+        { name: 'Level2', level: 2, school: 'Evocation', classes: ['Wizard'], description: [] },
+        { name: 'Level3', level: 3, school: 'Evocation', classes: ['Wizard'], description: [] },
       ];
       render(<WizardStepSpells {...mockProps} allSpells={allSpells} formData={{ ...mockProps.formData, spells: [] }} />);
       await waitFor(() => {
@@ -300,8 +300,8 @@ describe('WizardStepSpells', () => {
         spellType: 'known', preparedSpells: null,
       });
       const allSpells = [
-        { name: 'Cantrip1', level: 0, school: 'Evocation', classes: ['Wizard'], desc: [] },
-        { name: 'Level1', level: 1, school: 'Evocation', classes: ['Wizard'], desc: [] },
+        { name: 'Cantrip1', level: 0, school: 'Evocation', classes: ['Wizard'], description: [] },
+        { name: 'Level1', level: 1, school: 'Evocation', classes: ['Wizard'], description: [] },
       ];
       render(<WizardStepSpells {...mockProps} allSpells={allSpells} formData={{ ...mockProps.formData, spells: [] }} />);
       await waitFor(() => {
@@ -320,7 +320,7 @@ describe('WizardStepSpells', () => {
       });
       render(<WizardStepSpells {...mockProps} formData={{ ...mockProps.formData, rules: '2024' }} />);
       await waitFor(() => {
-        expect(spellLimits.getSpellLimits).toHaveBeenCalledWith('Wizard', 5, '2024', expect.any(String), expect.any(Object));
+        expect(spellLimits.getSpellLimits).toHaveBeenCalledWith('Wizard', 5, '2024', expect.any(String), expect.any(Object), undefined);
       });
     });
   });
@@ -334,7 +334,7 @@ describe('WizardStepSpells', () => {
       });
       render(<WizardStepSpells {...mockProps} formData={{ ...mockProps.formData, class: { name: 'Wizard', major: { name: 'Evocation' } } }} />);
       await waitFor(() => {
-        expect(spellLimits.getSpellLimits).toHaveBeenCalledWith('Wizard', 5, '5e', 'Evocation', expect.any(Object));
+        expect(spellLimits.getSpellLimits).toHaveBeenCalledWith('Wizard', 5, '5e', 'Evocation', expect.any(Object), undefined);
       });
 
       vi.clearAllMocks();
@@ -345,7 +345,7 @@ describe('WizardStepSpells', () => {
       });
       render(<WizardStepSpells {...mockProps} formData={{ ...mockProps.formData, class: { name: 'Wizard', major: null, subclass: { name: 'School of Necromancy' } } }} />);
       await waitFor(() => {
-        expect(spellLimits.getSpellLimits).toHaveBeenCalledWith('Wizard', 5, '5e', 'School of Necromancy', expect.any(Object));
+        expect(spellLimits.getSpellLimits).toHaveBeenCalledWith('Wizard', 5, '5e', 'School of Necromancy', expect.any(Object), expect.any(Array));
       });
     });
   });
