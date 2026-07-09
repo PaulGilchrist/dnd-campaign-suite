@@ -31,7 +31,7 @@ vi.mock('../../../ui/logService.js', () => ({
 }));
 
 vi.mock('../../../ui/storage.js', () => ({
-    default: { set: vi.fn() },
+    default: { set: vi.fn(), setProperty: vi.fn(() => Promise.resolve()) },
 }));
 
 const campaignName = 'TestCampaign';

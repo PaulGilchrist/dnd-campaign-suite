@@ -950,6 +950,7 @@ export function createLogAndShow(deps) {
                         isNatural1: saveResult.roll === 1,
                         actionName,
                         rollType: 'save',
+                        saveConditions: context?.saveConditions || [],
                         timestamp: Date.now(),
                     };
                     storage.set('combatSummary', combatSummary, campaignName);
@@ -1014,6 +1015,7 @@ export function createLogAndShow(deps) {
                         isNatural1: r1 === 1,
                         actionName,
                         rollType: 'save',
+                        saveConditions: context?.saveConditions || [],
                         timestamp: Date.now(),
                     };
                     storage.set('combatSummary', combatSummary, campaignName);

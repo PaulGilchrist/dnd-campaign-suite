@@ -2,6 +2,7 @@ import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
+import storage from '../../../ui/storage.js';
 
 
 export async function handle(action, playerStats, campaignName, _mapName) {
@@ -29,6 +30,28 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }).catch((e) => { console.error("[friends] Error:", e); });
 
     const saveResult = await promise;
+
+    // Set combatSummary.lastAttack so features like Beguiling Twist can find this save
+    if (saveResult) {
+        const lastAttackData = {
+            attackerName: playerStats.name,
+            targetName,
+            d20: saveResult.roll,
+            d20Rolls: [saveResult.roll, ...(saveResult.rawRolls || [])],
+            bonus: saveResult.saveBonus,
+            total: saveResult.total,
+            saveType: 'WIS',
+            saveDc: dc,
+            saveResult: saveResult.success ? 'success' : 'failure',
+            isNatural20: saveResult.roll === 20,
+            isNatural1: saveResult.roll === 1,
+            actionName: 'Friends',
+            rollType: 'save',
+            saveConditions: ['charmed'],
+            timestamp: Date.now(),
+        };
+        await storage.setProperty('combatSummary', 'lastAttack', lastAttackData, campaignName);
+    }
 
     if (saveResult.success) {
         addEntry(campaignName, {

@@ -94,7 +94,7 @@ import { handle as handleAvengingAngel } from './handlers/class-cleric-paladin/a
 import { handle as handleRadianceOfDawn } from './handlers/class-cleric-paladin/radianceOfDawnHandler.js';
 import { handle as handlePrimalCompanionSummon, handleCommand as handlePrimalCompanionCommand, handleRestore as handlePrimalCompanionRestore, handleBonusActionCommand as handlePrimalCompanionBonusActionCommand, applyBonusActionCommand as applyPrimalCompanionBonusActionCommand } from './handlers/class-ranger/primalCompanionHandler.js';
 import { handle as handlePrimalCompanionSpellShare, applySpellShare as applyPrimalCompanionSpellShare } from './handlers/class-ranger/primalCompanionSpellShareHandler.js';
-import { handle as handleBeguilingTwist } from './handlers/class-warlock/beguilingTwistHandler.js';
+import { handle as handleBeguilingTwist } from './handlers/class-ranger/beguilingTwistHandler.js';
 import { handle as handleFeyReinforcements, confirmFeyReinforcement as handleFeyReinforcementsConfirm } from './handlers/class-warlock/feyReinforcementsHandler.js';
 import { handle as handleMistyWanderer, confirmMistyWanderer as handleMistyWandererConfirm } from './handlers/class-warlock/mistyWandererHandler.js';
 import { handle as handleShadowyDodge } from './handlers/class-warlock/shadowyDodgeHandler.js';

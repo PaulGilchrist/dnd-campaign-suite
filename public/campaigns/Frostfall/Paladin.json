@@ -1,0 +1,123 @@
+{
+  "name": "Paladin",
+  "level": 3,
+  "alignment": "Lawful Good",
+  "abilities": [
+    {
+      "name": "Strength",
+      "baseScore": 15,
+      "featIncrease": 0,
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
+    },
+    {
+      "name": "Dexterity",
+      "baseScore": 8,
+      "featIncrease": 0,
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
+    },
+    {
+      "name": "Constitution",
+      "baseScore": 15,
+      "featIncrease": 0,
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
+    },
+    {
+      "name": "Intelligence",
+      "baseScore": 8,
+      "featIncrease": 0,
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
+    },
+    {
+      "name": "Wisdom",
+      "baseScore": 8,
+      "featIncrease": 0,
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
+    },
+    {
+      "name": "Charisma",
+      "baseScore": 15,
+      "featIncrease": 0,
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
+    }
+  ],
+  "background": "",
+  "class": {
+    "name": "Paladin",
+    "subclass": {
+      "name": "Vengeance",
+      "type": ""
+    },
+    "fightingStyles": [
+      "Defense"
+    ]
+  },
+  "expertSkills": [],
+  "feats": [],
+  "fightingStyles": [],
+  "race": {
+    "name": "Human",
+    "subrace": {
+      "name": ""
+    }
+  },
+  "immunities": [],
+  "inventory": {
+    "backpack": [
+      "Rope",
+      "Silk",
+      "Ration*5",
+      "Blanket",
+      "Caltrops",
+      "Case",
+      "Clothes",
+      "traveler's",
+      "Crossbow bolt*20",
+      "Crowbar",
+      "Dice Set",
+      "Disguise Kit",
+      "Thieves' Tools",
+      "Forgery Kit",
+      "Climber's Kit",
+      "Fishing tackle",
+      "Grappling hook",
+      "Tinderbox",
+      "Waterskin"        
+    ],
+    "equipped": [
+      "Half Plate",
+      "Shield",
+      "Longsword",
+      "Crossbow, heavy"
+    ],
+    "gold": 10,
+    "magicItems": []
+  },
+  "languages": [
+    "Common",
+    "Elvish",
+    "Dwarvish",
+    "Gnomish"
+  ],
+  "resistances": [],
+  "skillProficiencies": [
+    "Athletics",
+    "Acrobatics"
+  ],
+  "specialActions": [],
+  "spells": [
+    "Searing Smite",
+    "Thunderous Smite",
+    "Wrathful Smite"
+  ],
+  "rules": "5e",
+  "xp": 0,
+  "xpMode": "milestone",
+  "imagePath": "campaigns/Frostfall/images/Paladin.png",
+  "_fileName": "Paladin.json"
+}

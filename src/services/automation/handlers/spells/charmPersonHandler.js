@@ -105,6 +105,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             isNatural1: saveResult.roll === 1,
             actionName: 'Charm Person',
             rollType: 'save',
+            saveConditions: ['charmed'],
             timestamp: Date.now(),
         };
         await storage.setProperty('combatSummary', 'lastAttack', lastAttackData, campaignName);

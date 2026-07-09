@@ -9,6 +9,10 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   addStorageChangeListener: vi.fn(),
 }));
 
+vi.mock('../../../services/automation/common/conditionEventStore.js', () => ({
+  storeConditionEvent: vi.fn(),
+}));
+
 vi.mock('../../../services/dice/diceRoller.js', () => ({
   rollD20: vi.fn(() => 15),
 }));

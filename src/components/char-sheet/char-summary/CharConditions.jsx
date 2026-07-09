@@ -2,6 +2,7 @@
 import React from 'react'
 import { getRuntimeValue, setRuntimeValue, addStorageChangeListener } from '../../../hooks/runtime/useRuntimeState.js'
 import { rollD20 } from '../../../services/dice/diceRoller.js'
+import { storeConditionEvent } from '../../../services/automation/common/conditionEventStore.js'
 import { CONDITIONS, CONDITION_SAVE_DC, CONDITION_SAVE_MAP, getAbilityLabel, getAbilitySaveBonus } from '../../../services/combat/conditions/conditionUtils.js'
 import { CONDITION_DESCRIPTIONS } from '../../../services/combat/conditions/effectDescriptions.js'
 import { addEntry } from '../../../services/ui/logService.js'
@@ -128,7 +129,7 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
    }
   }
 
-  const toggle = (key) => {
+    const toggle = (key) => {
     const saveAbility = CONDITION_SAVE_MAP[key]
 
     if (activeConditions.includes(key) && saveAbility) {
@@ -136,12 +137,16 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
       return
      }
 
+    const isAdding = !activeConditions.includes(key)
     setActiveConditions(prev => prev.includes(key) ? prev.filter(c => c !== key) : [...prev, key])
      onConditionsChange?.()
      if (key === 'incapacitated') {
-         clearUnbreakableMajesty(playerStats.name, campaignName)
+          clearUnbreakableMajesty(playerStats.name, campaignName)
+      }
+     if (isAdding && campaignName && key === 'charmed' || isAdding && campaignName && key === 'frightened') {
+         storeConditionEvent(campaignName, playerStats.name, key)
      }
-    }
+     }
 
    const adjustExhaustion = (delta) => {
     if (delta < 0 && exhaustionLevel > 0) {

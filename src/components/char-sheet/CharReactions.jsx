@@ -15,6 +15,9 @@ import { hasAutomation, hasTacticalShift, hasSpeedyOpportunityDisadvantage } fro
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
 import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { executeHandler } from '../../services/automation/index.js'
+import { createSaveListener } from '../../services/automation/common/savePrompt.js'
+import { addEntry } from '../../services/ui/logService.js'
+import { addExpiration } from '../../services/rules/effects/expirations.js'
 import { applyWarCasterReaction } from '../../services/automation/handlers/reactions/reactionSpellHandler.js'
 import { applyInspiringMovement } from '../../services/automation/handlers/reactions/reactionBonusHandler.js'
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js'
@@ -159,6 +162,8 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                 setModalState({ arcaneWardRestoreModal: result.payload });
             } else if (result.modalName === 'inspiringMovementAlly') {
                 setModalState({ inspiringMovementAllyModal: result.payload });
+            } else if (result.modalName === 'beguilingTwist') {
+                setModalState({ beguilingTwistModal: result.payload });
             } else {
                 const html = buildFeatureDetailHtml(reaction);
                 if (html) setPopupHtml(html);
@@ -213,6 +218,72 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
             setPopupHtml(result.payload);
         }
     }, [modalState.inspiringMovementAllyModal, setModalState, setPopupHtml]);
+
+    const handleBeguilingTwistConfirm = React.useCallback((targetName) => {
+        if (!modalState.beguilingTwistModal) return;
+        const { playerStats: btPlayerStats, campaignName: btCampaignName, conditionKey, saveDc, featureName } = modalState.beguilingTwistModal;
+        setModalState({ beguilingTwistModal: null });
+        if (!targetName) return;
+
+        const { promptId } = createSaveListener(btCampaignName, {
+            targetName,
+            saveType: 'WIS',
+            saveDc,
+        });
+
+        addEntry(btCampaignName, {
+            type: 'ability_use',
+            characterName: btPlayerStats.name,
+            abilityName: featureName,
+            description: `${btPlayerStats.name} used ${featureName} — ${targetName} must make WIS save (DC ${saveDc}) or be ${conditionKey} for 1 minute.`,
+            promptId,
+        }).catch((e) => { console.error("[beguilingTwist] Error:", e); });
+
+        const handleSaveResult = (event) => {
+            if (event.detail.promptId !== promptId) return;
+
+            if (!event.detail.success) {
+                const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+                const filtered = (Array.isArray(conditions) ? conditions : []).filter(c => String(c).toLowerCase() !== conditionKey);
+                setRuntimeValue(targetName, 'activeConditions', [...filtered, conditionKey], btCampaignName);
+
+                addExpiration(btPlayerStats.name, targetName, [
+                    { type: 'condition', condition: conditionKey }
+                ], btCampaignName);
+
+                addEntry(btCampaignName, {
+                    type: 'save_result',
+                    characterName: btPlayerStats.name,
+                    targetName,
+                    saveDc,
+                    saveType: 'WIS',
+                    success: false,
+                    description: `${targetName} failed WIS save. ${targetName} is now ${conditionKey} for 1 minute.`,
+                }).catch((e) => { console.error("[beguilingTwist] Error:", e); });
+            } else {
+                addEntry(btCampaignName, {
+                    type: 'save_result',
+                    characterName: btPlayerStats.name,
+                    targetName,
+                    saveDc,
+                    saveType: 'WIS',
+                    success: true,
+                    description: `${targetName} succeeded on WIS save. ${featureName} has no effect.`,
+                }).catch((e) => { console.error("[beguilingTwist] Error:", e); });
+            }
+
+            window.removeEventListener('save-result', handleSaveResult);
+        };
+
+        window.addEventListener('save-result', handleSaveResult);
+
+        setPopupHtml({
+            type: 'automation_info',
+            name: featureName,
+            targetName,
+            description: `Target ${targetName} must make a WIS saving throw (DC ${saveDc}) or be ${conditionKey} for 1 minute.`,
+        });
+    }, [modalState.beguilingTwistModal, setModalState, setPopupHtml]);
 
     return (
         <div className='char-actions'>
@@ -323,6 +394,17 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                     featureDescription="Both you and the chosen ally move up to half your Speeds without provoking Opportunity Attacks."
                     onTargetSelected={handleInspiringMovementConfirm}
                     onSkip={() => handleInspiringMovementConfirm(null)}
+                />
+            )}
+            {modalState.beguilingTwistModal && (
+                <SecondaryTargetModal
+                    title="Beguiling Twist — Choose Target"
+                    targets={modalState.beguilingTwistModal.targets}
+                    confirmLabel="Force Save"
+                    confirmIcon="fa-wand-sparkles"
+                    featureDescription={`Target must make a WIS save (DC ${modalState.beguilingTwistModal.saveDc}) or be ${modalState.beguilingTwistModal.conditionKey} for 1 minute.`}
+                    onTargetSelected={handleBeguilingTwistConfirm}
+                    onSkip={() => handleBeguilingTwistConfirm(null)}
                 />
             )}
             {reactions.filter(r => !getCategories(playerStats.rules || '5e').featuresToIgnore.includes(r.name)).map((reaction) => {
