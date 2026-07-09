@@ -146,13 +146,28 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             }
 
             // Apply Roving (Ranger level 6): climb speed and swim speed equal to walking speed
-            // Roving increases speed by 10 without heavy armor, then sets climb/swim to that speed
+            // Roving increases speed by 10 and sets climb/swim speeds when not wearing heavy armor
             const rovingPassive = (stats.automation?.passives || []).find(p => p.name === 'Roving');
-            if (rovingPassive && !stats.climbSpeed) {
-                stats.climbSpeed = (stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30) + 10;
-            }
-            if (rovingPassive && !stats.swimSpeed) {
-                stats.swimSpeed = (stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30) + 10;
+            if (rovingPassive) {
+                const equippedItems = stats.inventory?.equipped || [];
+                const allEquipment = stats.equipment || [];
+                let isWearingHeavyArmor = false;
+                for (const itemName of equippedItems) {
+                    const parsedName = itemName.includes('(') ? itemName.substring(0, itemName.indexOf('(')).trim() : itemName;
+                    const item = allEquipment.find(eq => eq.name === parsedName || eq.name === itemName);
+                    if (item && item.armor_category === 'Heavy') {
+                        isWearingHeavyArmor = true;
+                        break;
+                    }
+                }
+                if (!isWearingHeavyArmor) {
+                    if (!stats.climbSpeed) {
+                        stats.climbSpeed = (stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30) + 10;
+                    }
+                    if (!stats.swimSpeed) {
+                        stats.swimSpeed = (stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30) + 10;
+                    }
+                }
             }
 
             // Expose Athlete Hop Up flag: stand from prone with only 5 ft of movement

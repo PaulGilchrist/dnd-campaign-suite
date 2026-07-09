@@ -59,7 +59,10 @@
       "Archery"
     ]
   },
-  "expertSkills": [],
+  "expertSkills": [
+    "Stealth",
+    "Survival"
+  ],
   "feats": [],
   "fightingStyles": [],
   "race": {
@@ -91,7 +94,10 @@
     "gold": 10,
     "magicItems": []
   },
-  "languages": [],
+  "languages": [
+    "Common",
+    "Dwarvish"
+  ],
   "resistances": [
     "Poison"
   ],

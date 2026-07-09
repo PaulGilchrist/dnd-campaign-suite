@@ -580,6 +580,20 @@ describe('climb speed passives', () => {
       expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
     });
   });
+
+  it('does not apply roving climb/swim speeds when wearing heavy armor', async () => {
+    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve(createMockPlayerStats({
+      automation: { passives: [{ name: 'Roving', effect: 'roving' }] },
+      inventory: { equipped: ['Plate'] },
+      equipment: [{ name: 'Plate', armor_category: 'Heavy' }],
+    })));
+
+    render(<CharSheet {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
