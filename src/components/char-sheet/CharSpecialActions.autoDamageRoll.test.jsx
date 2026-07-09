@@ -24,11 +24,6 @@ const renderWithDiceRollContext = (component, options = {}) => {
   return render(component, { wrapper, ...options });
 };
 
-// Mock ui-config to eliminate delays
-vi.mock('../../config/ui-config.js', () => ({
-  SHOW_DICE_ROLL_DELAY: 0,
-}));
-
 // Mock executeHandler
 vi.mock('../../services/automation/index.js', () => ({
   executeHandler: vi.fn(),
@@ -463,9 +458,6 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
       };
 
       await autoDamageRoll(mockAutoDamage, false);
-
-      // Wait for setTimeout to fire (SHOW_DICE_ROLL_DELAY is mocked to 0)
-      await new Promise(r => setTimeout(r, 10));
 
       if (expected) {
         expect(capturedSetPopupHtml).toBe(expected);

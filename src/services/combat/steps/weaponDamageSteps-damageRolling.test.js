@@ -120,10 +120,6 @@ vi.mock('../../automation/common/savePrompt.js', () => ({
   createSaveListener: vi.fn(() => ({ promptId: 'test-prompt-id', promise: Promise.resolve({ success: true }) })),
 }));
 
-vi.mock('../../../config/ui-config.js', () => ({
-  SHOW_DICE_ROLL_DELAY: 0,
-}));
-
 // ── Imports ──────────────────────────────────────────────────────
 
 const { buildDamageSteps } = await import('./weaponDamageSteps.js');

@@ -15,7 +15,6 @@ import { featureModules } from './features/index.js';
 import { applyMasteryEffect } from '../../automation/handlers/combat/weaponMasteryHandler.js';
 import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
 import { createSaveListener } from '../../automation/common/savePrompt.js';
-import { SHOW_DICE_ROLL_DELAY } from '../../../config/ui-config.js';
 
 /**
  * Build the damage pipeline steps for a weapon-type action.
@@ -969,8 +968,6 @@ export function buildDamageSteps() {
 
         const toppleTargetName = lastAttack.targetName;
         if (!toppleTargetName) return { data: {} };
-
-        await new Promise(r => setTimeout(r, SHOW_DICE_ROLL_DELAY));
 
         const weaponAttack = ctx.playerStats.attacks?.find(a => a.name === lastAttack.attackName);
         const abilityName = weaponAttack?.abilityName || 'Strength';

@@ -3,7 +3,6 @@ import { executeHandler } from '../../services/automation/index.js';
 import { setRuntimeValue, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { loadCombatSummary, setCombatSummaryCache } from '../../services/encounters/combatData.js';
-import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
 import { rollExpression } from '../../services/dice/diceRoller.js';
 import { executeManeuver, onCombatSuperioritySelected } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 
@@ -238,7 +237,7 @@ export function useCombatSuperiorityModal(playerStats, campaignName, rollAttack,
                 });
             };
 
-            setTimeout(checkPopupVisible, SHOW_DICE_ROLL_DELAY);
+            checkPopupVisible();
         };
 
         const intervalId = setInterval(checkAndHandlePending, 500);

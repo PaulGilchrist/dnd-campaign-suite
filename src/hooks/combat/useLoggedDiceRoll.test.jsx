@@ -16,10 +16,6 @@ vi.mock('../../services/dice/diceRoller.js', () => ({
   rollExpressionDoubled: vi.fn(() => ({ total: 14, rolls: [7, 7], modifier: 0 })),
 }));
 
-vi.mock('../../config/ui-config.js', () => ({
-  SHOW_DICE_ROLL_DELAY: 2000,
-}));
-
 vi.mock('./useLoggedDiceRollAttack.js', () => ({
   createLogAndShow: vi.fn(() => vi.fn()),
 }));

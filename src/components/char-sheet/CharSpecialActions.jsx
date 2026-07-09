@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect } from 'react';
-import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
 import { useCombatSuperiorityModal } from '../../hooks/combat/useCombatSuperiorityModal.js';
@@ -42,9 +41,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                 const html = typeof payload === 'string'
                     ? payload
                     : `<b><i class="fa-solid fa-bolt"></i> ${payload.name || 'Combat Superiority'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-                setTimeout(() => {
-                    setPopupHtml(html);
-                }, SHOW_DICE_ROLL_DELAY);
+                setPopupHtml(html);
             }
         },
     });

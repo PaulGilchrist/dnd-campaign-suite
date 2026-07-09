@@ -24,10 +24,6 @@ vi.mock('../../services/encounters/combatData.js', () => ({
   setCombatSummaryCache: vi.fn(),
 }));
 
-vi.mock('../../config/ui-config.js', () => ({
-  SHOW_DICE_ROLL_DELAY: 2000,
-}));
-
 vi.mock('../../services/dice/diceRoller.js', () => ({
   rollExpression: vi.fn(),
 }));

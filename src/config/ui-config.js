@@ -1,1 +1,0 @@
-export const SHOW_DICE_ROLL_DELAY = 2000;
