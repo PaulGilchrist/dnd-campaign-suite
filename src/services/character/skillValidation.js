@@ -228,36 +228,52 @@ export async function getExpertiseLimits(formData) {
      };
    }
 
-   // Search through class levels for expertise features
-  let totalCount = 0;
-  for (const classLevel of classData.class_levels) {
-    if (classLevel.level > level) {
-      break;
-     }
-    
+    // Search through class levels for expertise features
+   let totalCount = 0;
+   for (const classLevel of classData.class_levels) {
+     if (classLevel.level > level) {
+       break;
+      }
+     
      // Check features in this level
     const features = classLevel.features || [];
     for (const feature of features) {
        // Check for expertise in feature_specific
-      if (feature.feature_specific?.expertise) {
-        totalCount += feature.feature_specific.expertise.count || 0;
-       }
-        // Also check if the feature name contains "Expertise"
-       else if (feature.name && feature.name.includes('Expertise')) {
-          // Parse the description for count
-         const match = feature.description?.match(/choose\s+(\d+)/i);
-         if (match) {
-           totalCount += parseInt(match[1], 10);
-          } else {
-           // Default to 2 if not specified
-           totalCount += 2;
-          }
+       if (feature.feature_specific?.expertise) {
+         totalCount += feature.feature_specific.expertise.count || 0;
         }
-        // Check for Scholar feature (Wizard 2024) which grants 1 expertise
-       else if (feature.name === 'Scholar' && feature.description?.includes('Expertise')) {
-         totalCount += 1;
-        }
-     }
+         // Also check if the feature name contains "Expertise"
+        else if (feature.name && feature.name.includes('Expertise')) {
+           // Parse the description for count
+          const match = feature.description?.match(/choose\s+(\d+)/i);
+          if (match) {
+            totalCount += parseInt(match[1], 10);
+           } else {
+            // Default to 2 if not specified
+            totalCount += 2;
+           }
+         }
+         // Check for Scholar feature (Wizard 2024) which grants 1 expertise
+        else if (feature.name === 'Scholar' && feature.description?.includes('Expertise')) {
+          totalCount += 1;
+         }
+         // Also check feature descriptions for expertise grants (e.g., Ranger "Deft Explorer")
+        else if (feature.description?.match(/\bexpertise\b/i)) {
+           // Check for "choose X" pattern
+          const chooseMatch = feature.description.match(/choose\s+(\d+)/i);
+          if (chooseMatch) {
+            totalCount += parseInt(chooseMatch[1], 10);
+           }
+           // Check for "gain expertise" pattern (1 expertise)
+          else if (feature.description.match(/\bgain\s+expertise\b/i)) {
+            totalCount += 1;
+           }
+           // Default to 1 if description mentions expertise but no count
+           else {
+            totalCount += 1;
+           }
+         }
+      }
    }
 
     // Also check subclass/majors features for 2024
@@ -275,6 +291,19 @@ export async function getExpertiseLimits(formData) {
                 }
               } else if (feature.name === 'Scholar' && feature.description?.includes('Expertise')) {
                totalCount += 1;
+              }
+              // Also check feature descriptions for expertise grants
+              else if (feature.description?.match(/\bexpertise\b/i)) {
+                const chooseMatch = feature.description.match(/choose\s+(\d+)/i);
+                if (chooseMatch) {
+                  totalCount += parseInt(chooseMatch[1], 10);
+                 }
+                else if (feature.description.match(/\bgain\s+expertise\b/i)) {
+                  totalCount += 1;
+                 }
+                else {
+                  totalCount += 1;
+                 }
               }
             }
           }
@@ -299,6 +328,19 @@ export async function getExpertiseLimits(formData) {
                   }
                 } else if (feature.name === 'Scholar' && feature.description?.includes('Expertise')) {
                  totalCount += 1;
+                }
+                // Also check feature descriptions for expertise grants
+                else if (feature.description?.match(/\bexpertise\b/i)) {
+                  const chooseMatch = feature.description.match(/choose\s+(\d+)/i);
+                  if (chooseMatch) {
+                    totalCount += parseInt(chooseMatch[1], 10);
+                   }
+                  else if (feature.description.match(/\bgain\s+expertise\b/i)) {
+                    totalCount += 1;
+                   }
+                  else {
+                    totalCount += 1;
+                   }
                 }
               }
             }

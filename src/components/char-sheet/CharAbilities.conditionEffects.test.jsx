@@ -228,7 +228,7 @@ describe('CharAbilities condition effects on rendering', () => {
         ],
       });
       render(<CharAbilities {...defaultProps} playerStats={stats} isRaging={true} />);
-      expect(screen.getByText('Athletics (+9)')).toBeInTheDocument();
+      expect(screen.getByText('Athletics (Expert) (+9)')).toBeInTheDocument();
     });
 
     it('uses strength bonus when primal skill but not proficient', () => {

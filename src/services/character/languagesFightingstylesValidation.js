@@ -187,6 +187,30 @@ export async function getLanguageLimits(formData) {
             allowed += 2;
             }
 
+        // Also check class_levels for language features (e.g., Ranger "Deft Explorer")
+        if (classData?.class_levels) {
+            for (const classLevel of classData.class_levels) {
+                if (classLevel.level <= level && classLevel.features) {
+                    for (const feature of classLevel.features) {
+                        if (feature.description?.match(/\blanguages?\b/i)) {
+                            // Try to match digit first, then spelled-out numbers
+                            const match = feature.description.match(/(?:know|gain|learn)\s+(\d+)\s+language/i)
+                                || feature.description.match(/(?:know|gain|learn)\s+(one|two|three|four|five)\s+language/i);
+                            if (match) {
+                                const count = parseInt(match[1], 10);
+                                if (!isNaN(count)) {
+                                    allowed += count;
+                                } else {
+                                    const wordToNum = { one: 1, two: 2, three: 3, four: 4, five: 5 };
+                                    allowed += wordToNum[match[1].toLowerCase()] || 0;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         details = `In 2024 rules, languages come from your race, class, and background.`;
            } else {
             // 5e rules
@@ -238,6 +262,13 @@ export async function getLanguageLimits(formData) {
                                 allowed += parseInt(match[1], 10);
             }
                              }
+                             // Also check feature descriptions for language grants (e.g., Ranger "Deft Explorer")
+                         else if (feature.description?.match(/\blanguages?\b/i) && feature.description.match(/(?:know|gain|learn)\s+(\d+)\s+language/i)) {
+                             const match = feature.description.match(/(?:know|gain|learn)\s+(\d+)\s+language/i);
+                             if (match) {
+                                 allowed += parseInt(match[1], 10);
+                             }
+                         }
                          }
                      }
                  }

@@ -1,0 +1,125 @@
+{
+  "name": "Seren",
+  "level": 3,
+  "alignment": "True Neutral",
+  "abilities": [
+    {
+      "name": "Strength",
+      "baseScore": 8,
+      "featIncrease": 0,
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
+    },
+    {
+      "name": "Dexterity",
+      "baseScore": 15,
+      "featIncrease": 0,
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
+    },
+    {
+      "name": "Constitution",
+      "baseScore": 15,
+      "featIncrease": 0,
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
+    },
+    {
+      "name": "Intelligence",
+      "baseScore": 15,
+      "featIncrease": 0,
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
+    },
+    {
+      "name": "Wisdom",
+      "baseScore": 8,
+      "featIncrease": 0,
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
+    },
+    {
+      "name": "Charisma",
+      "baseScore": 8,
+      "featIncrease": 0,
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
+    }
+  ],
+  "background": "",
+  "class": {
+    "name": "Rogue",
+    "subclass": {
+      "name": "Arcane Trickster",
+      "type": ""
+    }
+  },
+  "expertSkills": [
+    "Survival",
+    "Stealth"
+  ],
+  "feats": [],
+  "fightingStyles": [],
+  "race": {
+    "name": "Human",
+    "subrace": {
+      "name": ""
+    }
+  },
+  "immunities": [],
+  "inventory": {
+    "backpack": [
+      "Rope",
+      "Silk",
+      "Ration*5",
+      "Blanket",
+      "Caltrops",
+      "Case",
+      "Clothes",
+      "traveler's",
+      "Crossbow bolt*20",
+      "Crowbar",
+      "Dice Set",
+      "Disguise Kit",
+      "Thieves' Tools",
+      "Forgery Kit",
+      "Climber's Kit",
+      "Fishing tackle",
+      "Grappling hook",
+      "Tinderbox",
+      "Waterskin"
+    ],
+    "equipped": [
+      "Studded Leather",
+      "Scimitar",
+      "Scimitar",
+      "Crossbow",
+      "hand",
+      "Crossbow",
+      "hand"
+    ],
+    "gold": 10,
+    "magicItems": []
+  },
+  "languages": [
+    "Common",
+    "Thieves' Cant",
+    "Dwarvish",
+    "Elvish",
+    "Abyssal",
+    "Orc",
+    "Giant"
+  ],
+  "resistances": [],
+  "skillProficiencies": [
+    "Stealth",
+    "Survival"
+  ],
+  "specialActions": [],
+  "spells": [],
+  "rules": "5e",
+  "xp": 0,
+  "xpMode": "milestone",
+  "imagePath": "campaigns/Frostfall/images/Seren.png",
+  "_fileName": "Seren.json"
+}

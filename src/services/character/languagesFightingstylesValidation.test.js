@@ -372,6 +372,55 @@ describe('languagesFightingstylesValidation', () => {
             });
             expect(result2.allowed).toBe(0);
         });
+
+        it('should parse language count from Ranger Deft Explorer feature description', async () => {
+            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({});
+            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+                class_levels: [
+                    { level: 1, features: [] },
+                    {
+                        level: 2,
+                        features: [
+                            {
+                                name: 'Deft Explorer',
+                                description: 'Expertise. Choose one of your skill proficiencies with which you lack Expertise. You gain Expertise in that skill. Languages. You know two languages of your choice from the language tables.',
+                            },
+                        ],
+                    },
+                ],
+            });
+            vi.mocked(dataLoader.fetchBackgroundData).mockResolvedValue(null);
+            const result = await getLanguageLimits({
+                rules: '2024', race: { name: 'Human' }, class: { name: 'Ranger' }, level: 2,
+            });
+            expect(result.allowed).toBe(4);
+        });
+
+        it('should combine race languages + class feature languages for 2024 Ranger (Mountain Dwarf scenario)', async () => {
+            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({ languages: ['Common', 'Dwarvish'] });
+            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+                languages: [],
+                class_levels: [
+                    { level: 1, features: [] },
+                    {
+                        level: 2,
+                        features: [
+                            {
+                                name: 'Deft Explorer',
+                                description: 'Expertise. Choose one of your skill proficiencies with which you lack Expertise. You gain Expertise in that skill. Languages. You know two languages of your choice from the language tables.',
+                            },
+                        ],
+                    },
+                ],
+            });
+            vi.mocked(dataLoader.fetchBackgroundData).mockResolvedValue(null);
+            const result = await getLanguageLimits({
+                rules: '2024', race: { name: 'Dwarf' }, class: { name: 'Ranger' }, background: 'Guide', level: 2,
+            });
+            expect(result.allowed).toBe(6);
+            expect(result.preSelected).toContain('Common');
+            expect(result.preSelected).toContain('Dwarvish');
+        });
     });
 
     describe('validateLanguagesAndFightingStyles', () => {

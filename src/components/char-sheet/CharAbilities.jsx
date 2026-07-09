@@ -251,21 +251,22 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                             rollSavingThrow(ability.name, ability.save - exhaustionPenalty + getCosmicOmenBonus(), saveCtx);
                           }
                         }} title={getSaveAdvantageSource()}>{autoFailSave ? 'AUTO FAIL' : signFormatter.format(ability.save - exhaustionPenalty + getCosmicOmenBonus())}{hasSaveAdvantage(ability.name) ? ' (Adv)' : ''}</div>
-                    <div className='left'>{ability.skills.map((skill) => {
-                         const skillBonus = getSkillBonus(skill);
-                         return <span key={skill.name}>
-                               <span className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage ? ' stat--penalized' : '')} onClick={() => {
-                                  const checkCtx = { ...makeCheckContext(skill.name) };
-                                  const biDie = getRuntimeValue(playerStats.name, 'bardicInspirationDie', campaignName);
-                                  if (biDie) {
-                                    checkCtx.bardicInspiration = true;
-                                    checkCtx.bardicInspirationDie = biDie;
-                                  }
-                                  rollSkillCheck(skill.name, skillBonus + getCosmicOmenBonus(), checkCtx);
-                                }}>{skill.name} ({signFormatter.format(skillBonus + getCosmicOmenBonus())})</span>
-                             {ability.skills.indexOf(skill) < ability.skills.length - 1 ? ', ' : ''}
-                         </span>;
-                     })}</div>
+                     <div className='left'>{ability.skills.map((skill) => {
+                          const skillBonus = getSkillBonus(skill);
+                          const isExpert = playerStats.expertise?.includes(skill.name);
+                          return <span key={skill.name}>
+                                <span className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage ? ' stat--penalized' : '')} onClick={() => {
+                                   const checkCtx = { ...makeCheckContext(skill.name) };
+                                   const biDie = getRuntimeValue(playerStats.name, 'bardicInspirationDie', campaignName);
+                                   if (biDie) {
+                                     checkCtx.bardicInspiration = true;
+                                     checkCtx.bardicInspirationDie = biDie;
+                                   }
+                                   rollSkillCheck(skill.name, skillBonus + getCosmicOmenBonus(), checkCtx);
+                                 }}>{skill.name}{isExpert ? ' (Expert)' : ''} ({signFormatter.format(skillBonus + getCosmicOmenBonus())})</span>
+                              {ability.skills.indexOf(skill) < ability.skills.length - 1 ? ', ' : ''}
+                          </span>;
+                      })}</div>
                 </div>;
             })}
         </div>

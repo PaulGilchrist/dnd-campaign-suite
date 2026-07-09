@@ -470,6 +470,65 @@ describe('skillValidation', () => {
       expect(result.allowed).toBe(false);
       expect(result.count).toBe(0);
     });
+
+    it('should parse expertise from Ranger Deft Explorer feature description', async () => {
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+        class_levels: [
+          { level: 1, features: [] },
+          {
+            level: 2,
+            features: [
+              {
+                name: 'Deft Explorer',
+                description: 'Expertise. Choose one of your skill proficiencies with which you lack Expertise. You gain Expertise in that skill. Languages. You know two languages of your choice from the language tables.',
+              },
+            ],
+          },
+        ],
+      });
+
+      const result = await getExpertiseLimits({
+        rules: '2024',
+        class: { name: 'Ranger' },
+        level: 2,
+      });
+
+      expect(result.allowed).toBe(true);
+      expect(result.count).toBe(1);
+    });
+
+    it('should parse expertise from Ranger level 9 Expertise feature', async () => {
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+        class_levels: [
+          { level: 1, features: [] },
+          { level: 2, features: [] },
+          { level: 3, features: [] },
+          { level: 4, features: [] },
+          { level: 5, features: [] },
+          { level: 6, features: [] },
+          { level: 7, features: [] },
+          { level: 8, features: [] },
+          {
+            level: 9,
+            features: [
+              {
+                name: 'Expertise',
+                description: 'Choose two of your skill proficiencies with which you lack Expertise. You gain Expertise in those skills.',
+              },
+            ],
+          },
+        ],
+      });
+
+      const result = await getExpertiseLimits({
+        rules: '2024',
+        class: { name: 'Ranger' },
+        level: 9,
+      });
+
+      expect(result.allowed).toBe(true);
+      expect(result.count).toBe(2);
+    });
   });
 
   describe('validateSkills', () => {

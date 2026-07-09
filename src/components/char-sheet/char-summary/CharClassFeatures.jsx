@@ -368,8 +368,9 @@ const RangerFeatures = function RangerFeatures({ playerStats, campaignName }) {
                       </React.Fragment>
                   ))}</span>
               )}</div>}
-              {fightingStylePopup && <Popup html={fightingStylePopup} onClickOrKeyDown={() => setFightingStylePopup(null)} />}
-              {playerStats.level >= 14 && (
+               {fightingStylePopup && <Popup html={fightingStylePopup} onClickOrKeyDown={() => setFightingStylePopup(null)} />}
+               {playerStats.level > 2 && playerStats.expertise && playerStats.expertise.length > 0 && <div><b>Expertise: </b>{playerStats.expertise.join(', ')}</div>}
+               {playerStats.level >= 14 && (
                   <TrackedResourceInput label="Nature's Veil" resourceKey="naturesVeilUses" playerName={playerStats.name} getMax={() => Math.max((playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0), 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
               )}
           </div>
