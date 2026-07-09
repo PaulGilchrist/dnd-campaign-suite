@@ -64,6 +64,17 @@ export function getBonusActionSpellNames(playerStats, campaignName) {
             names.add(sn);
         }
     }
+    const specialActions = playerStats.automation?.specialActions || [];
+    for (const feature of specialActions) {
+        if (feature.type !== 'free_spell' && feature.type !== 'fey_reinforcements' && feature.type !== 'misty_wanderer') continue;
+        if (!feature.spell) continue;
+        const featureName = feature.name;
+        if (!isFeatureActive(featureName, playerStats.name, campaignName)) continue;
+        const spellNames = Array.isArray(feature.spell) ? feature.spell : [feature.spell];
+        for (const sn of spellNames) {
+            names.add(sn);
+        }
+    }
     return names;
 }
 

@@ -49,7 +49,7 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
 
   const actions = playerStats?.automation?.actions || [];
   for (const entry of actions) {
-    if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'dragon_companion') continue;
+    if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'misty_wanderer' && entry.type !== 'dragon_companion') continue;
 
     // Counter-based free casts (uses_expression + usesMax) — match by spell level, not name
     // This handles features like Mystic Arcanum where the spell field is a descriptive placeholder
@@ -96,7 +96,7 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
 
   const bonusActions = playerStats?.automation?.bonusActions || [];
   for (const entry of bonusActions) {
-    if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'dragon_companion') continue;
+    if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'misty_wanderer' && entry.type !== 'dragon_companion') continue;
 
     if (entry.uses_expression && entry.usesMax) {
       const spellField = Array.isArray(entry.spell) ? entry.spell[0] : entry.spell;
@@ -140,7 +140,7 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
 
   const specialActions = playerStats?.automation?.specialActions || [];
   for (const entry of specialActions) {
-    if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'dragon_companion') continue;
+    if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'misty_wanderer' && entry.type !== 'dragon_companion') continue;
 
     if (entry.uses_expression && entry.usesMax) {
       const spellField = Array.isArray(entry.spell) ? entry.spell[0] : entry.spell;
@@ -314,7 +314,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
       } else {
         const actions = playerStats?.automation?.actions || [];
         for (const entry of actions) {
-          if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'dragon_companion') continue;
+          if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'misty_wanderer' && entry.type !== 'dragon_companion') continue;
 
           // Counter-based free casts — match by spell level, not name
           // Must stay in sync with isFreeCastAuthorized logic above
@@ -361,7 +361,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
 
         const bonusActions = playerStats?.automation?.bonusActions || [];
         for (const entry of bonusActions) {
-          if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'dragon_companion') continue;
+          if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'misty_wanderer' && entry.type !== 'dragon_companion') continue;
 
           if (entry.uses_expression && entry.usesMax) {
             const spellField = Array.isArray(entry.spell) ? entry.spell[0] : entry.spell;
@@ -406,7 +406,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
 
         const specialActions = playerStats?.automation?.specialActions || [];
         for (const entry of specialActions) {
-          if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'dragon_companion') continue;
+          if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'misty_wanderer' && entry.type !== 'dragon_companion') continue;
 
           if (entry.uses_expression && entry.usesMax) {
             const spellField = Array.isArray(entry.spell) ? entry.spell[0] : entry.spell;

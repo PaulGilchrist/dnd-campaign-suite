@@ -646,7 +646,9 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 result.reactions.push(info)
                 break
             case 'misty_wanderer':
-                if (info.casting_time === '1 bonus action' || info.casting_time === 'bonus_action') {
+                if (info.casting_time === 'passive') {
+                    result.specialActions.push(info)
+                } else if (info.casting_time === '1 bonus action' || info.casting_time === 'bonus_action') {
                     result.bonusActions.push(info)
                 } else {
                     result.actions.push(info)

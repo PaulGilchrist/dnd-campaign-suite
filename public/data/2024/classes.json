@@ -8093,7 +8093,7 @@
                                 "spell": "Misty Step",
                                 "uses_expression": "WIS modifier_min_1",
                                 "recharge": "long_rest",
-                                "casting_time": "1 bonus action",
+                                "casting_time": "passive",
                                 "hasAutomation": true
                             },
                             {
@@ -8101,7 +8101,7 @@
                                 "uses_expression": "WIS modifier_min_1",
                                 "recharge": "long_rest",
                                 "range": "5_ft",
-                                "casting_time": "1 bonus action",
+                                "casting_time": "passive",
                                 "hasAutomation": true
                             }
                         ]
