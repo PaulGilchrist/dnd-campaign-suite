@@ -2,6 +2,8 @@ import { useEffect } from 'react'
 import { getRuntimeValue, setRuntimeBatch, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import utils from '../../services/ui/utils.js'
 import { rollExpression } from '../../services/dice/diceRoller.js';
+import { getCombatSummary } from '../../services/encounters/combatData.js';
+import * as storageService from '../../services/ui/storage.js';
 
 export default function useInitiativeEffects(playerStats, campaignName, rollDamage) {
     // Passive: recover Focus Points and Wild Shape uses when anyone rolls initiative
@@ -30,6 +32,16 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
 
             // Clear War God's Blessing active state on new combat
             setRuntimeValue(playerStats.name, '_War_Gods_Blessing_active', null, campaignName);
+
+            // Clear concentration on initiative roll (new combat round)
+            const cs = getCombatSummary(campaignName);
+            if (cs && cs.creatures) {
+                const creature = cs.creatures.find(c => c.name === playerStats.name);
+                if (creature?.concentration) {
+                    creature.concentration = null;
+                    storageService.default.set('combatSummary', cs, campaignName);
+                }
+            }
 
             const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
 

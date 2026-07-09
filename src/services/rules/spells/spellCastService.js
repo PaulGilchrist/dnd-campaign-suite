@@ -605,6 +605,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
             });
             return;
         }
+
     }
 
     // Hunter's Mark: does not deal damage on cast — adds 1d6 Force damage to weapon attacks via concentration
@@ -747,7 +748,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     } else {
         if (isMagicMissile(spell)) {
             await executeMagicMissile(spell, metaCtx, { rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters });
-        } else {
+        } else if (spell.attack_type || spell.damage) {
             const rollCtx = innateSorceryActive && !rollContext.forcedMode ? { ...rollContext, forcedMode: 'advantage' } : rollContext;
             const damageRollResult = rollExpression(overchannelFormula);
             const attackCtx = {

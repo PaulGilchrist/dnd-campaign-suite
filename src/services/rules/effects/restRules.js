@@ -4,6 +4,7 @@ import { clearAllExpirationEffects } from './expirations.js'
 import { rollD20 } from '../../../services/dice/diceRoller.js'
 import * as storageService from '../../../services/ui/storage.js'
 import { getCombatSummary } from '../../../services/encounters/combatData.js'
+import { clearAllConcentrations } from '../../../services/combat/concentration/concentrationService.js'
 
 export function clearHuntersMarkConcentration(name, campaignName) {
   const cs = getCombatSummary(campaignName)
@@ -349,6 +350,7 @@ export async function applyShortRest(playerStats, campaignName) {
 
   clearAllExpirationEffects(name, campaignName)
   clearHuntersMarkConcentration(name, campaignName)
+  clearAllConcentrations(campaignName)
 }
 
 export async function applyLongRest(playerStats, campaignName) {
@@ -467,6 +469,7 @@ export async function applyLongRest(playerStats, campaignName) {
 
     clearAllExpirationEffects(name, campaignName)
     clearHuntersMarkConcentration(name, campaignName)
+    clearAllConcentrations(campaignName)
 
       // Reset Psionic Strike once-per-turn flag on long rest
      setRuntimeValue(name, 'psionicStrikeUsedThisTurn', null, campaignName, true)

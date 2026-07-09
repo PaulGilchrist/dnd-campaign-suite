@@ -227,22 +227,17 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
 
     let shouldSetConcentration = false;
     let oldConcentrationSpell = null;
-    let isSameConcentrationRecast = false;
 
     if (!isWgbSpell && spell.concentration) {
       const cs = getCombatSummary(campaignName);
       if (cs) {
         const creature = cs.creatures.find(c => c.name === playerStats.name);
-        if (creature && creature.concentration) {
-          if (creature.concentration.spell === spell.name) {
-            isSameConcentrationRecast = true;
-          } else {
-            oldConcentrationSpell = creature.concentration.spell;
-            breakConcentration(cs, playerStats.name);
-            storageService.default.set('combatSummary', cs, campaignName);
-            shouldSetConcentration = true;
-          }
-        } else {
+        if (creature && creature.concentration && creature.concentration.spell !== spell.name) {
+          oldConcentrationSpell = creature.concentration.spell;
+          breakConcentration(cs, playerStats.name);
+          storageService.default.set('combatSummary', cs, campaignName);
+          shouldSetConcentration = true;
+        } else if (!creature?.concentration) {
           shouldSetConcentration = true;
         }
       }
@@ -258,10 +253,8 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
 
     let effectiveSpellLevel = spell.level;
 
-    if (isWgbSpell || isSameConcentrationRecast) {
-      if (isWgbSpell && spell.name === 'Spiritual Weapon') {
-        cleanupBuffsByName(playerStats.name, 'Shield of Faith', campaignName);
-      }
+    if (isWgbSpell && spell.name === 'Spiritual Weapon') {
+      cleanupBuffsByName(playerStats.name, 'Shield of Faith', campaignName);
     } else if (isUpcast) {
       const upcastLevel = Number(selectedUpcastLvl);
       effectiveSpellLevel = upcastLevel;
