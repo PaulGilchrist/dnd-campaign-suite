@@ -206,7 +206,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
         }
     }
 
-    let oldHp, newHp;
+    let oldHp, newHp, actualDamageTaken;
     if (isPlayer) {
        const storedCurrentHp = getRuntimeValue(creature.name, 'currentHitPoints');
        if (storedCurrentHp == null) {
@@ -225,19 +225,21 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
 
        oldHp = storedCurrentHp;
        newHp = Math.max(0, oldHp - damageAfterTempHp);
+       actualDamageTaken = oldHp - newHp;
        // If RE already fired in this damage sequence, don't let follow-up hits re-kill
        if (options?.damageSequenceId && _reTriggeredSequenceIds.has(options.damageSequenceId) && newHp <= 0 && oldHp > 0) {
            newHp = 1;
        }
        setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
-    } else {
-       oldHp = creature.currentHp;
-       newHp = Math.max(0, oldHp - wardDamage);
-       if (options?.damageSequenceId && _reTriggeredSequenceIds.has(options.damageSequenceId) && newHp <= 0 && oldHp > 0) {
-           newHp = 1;
+     } else {
+        oldHp = creature.currentHp;
+        newHp = Math.max(0, oldHp - wardDamage);
+        actualDamageTaken = oldHp - newHp;
+        if (options?.damageSequenceId && _reTriggeredSequenceIds.has(options.damageSequenceId) && newHp <= 0 && oldHp > 0) {
+            newHp = 1;
+        }
+        creature.currentHp = newHp;
        }
-       creature.currentHp = newHp;
-      }
 
     // Update lastAttack with actual HP damage dealt (after resistances, feature reduction, ward absorption)
     if (isSecondary) {
@@ -352,8 +354,8 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
    const wasAlive = oldHp > 0;
    const isNowUnconscious = newHp <= 0;
 
-   if (!options?.skipConcentration && creature.concentration && (finalDamage > 0 || options?.concentrationTotalDamage > 0)) {
-     const dcDamage = options?.concentrationTotalDamage ?? finalDamage;
+   if (!options?.skipConcentration && creature.concentration && (actualDamageTaken > 0 || options?.concentrationTotalDamage > 0)) {
+     const dcDamage = options?.concentrationTotalDamage ?? actualDamageTaken;
      creature.concentration.dc = Math.max(10, Math.floor(dcDamage / 2));
    }
 
@@ -395,15 +397,32 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
       });
     }
 
-    if (!options?.skipConcentration && creature.concentration && (finalDamage > 0 || options?.concentrationTotalDamage > 0)) {
-      const promptId = utils.guid();
-      sendConcentrationPrompt(campaignName, {
-        promptId,
-        targetName: creature.name,
-        spellName: creature.concentration.spell,
-        dc: creature.concentration.dc,
-      });
-      combatSummaryChanged = true;
+    if (!options?.skipConcentration && creature.concentration && (actualDamageTaken > 0 || options?.concentrationTotalDamage > 0)) {
+      const relentlessHunterActive = (() => {
+        const allCharacters = characters;
+        const player = allCharacters.find(c => c.name === creature.name || c.name.startsWith(creature.name + ' '));
+        const computed = player?.computedStats || player;
+        if (!computed || computed.class?.name !== 'Ranger') return false;
+        const rawClassLevels = computed.class?.class_levels;
+        if (rawClassLevels == null || !Array.isArray(rawClassLevels)) { console.error('[applyDamage] class_levels is not an array'); throw new Error('class_levels must be an array'); }
+        const classLevels = rawClassLevels;
+        if (player?.level == null) {
+          console.error('[applyDamage] Relentless Hunter: player level is missing')
+          throw new Error('player level is required for relentless hunter check')
+        }
+        const currentLevel = classLevels.find(cl => cl.level === player.level);
+        return (currentLevel?.level || 0) >= 13;
+      })();
+      if (!relentlessHunterActive) {
+        const promptId = utils.guid();
+        sendConcentrationPrompt(campaignName, {
+          promptId,
+          targetName: creature.name,
+          spellName: creature.concentration.spell,
+          dc: creature.concentration.dc,
+        });
+        combatSummaryChanged = true;
+      }
     }
   } else {
     combatSummaryChanged = true;
