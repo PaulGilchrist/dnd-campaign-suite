@@ -210,6 +210,23 @@
   font-size: 0.75rem;
 }
 
+.wizard-step-abilities .racial-increase-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background-color: var(--color-warning);
+  color: var(--color-text-inverse);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.wizard-step-abilities .racial-increase-badge i {
+  font-size: 0.75rem;
+}
+
 .wizard-step-abilities .feat-increase-input {
   max-width: 60px;
   padding: 6px 8px;

@@ -6,7 +6,8 @@ import useWizardAbilities from './useWizardAbilities.js';
 
 // Mock the utils module
 vi.mock('../../config/utils.js', () => ({
-  getPointBuyCosts: vi.fn()
+  getPointBuyCosts: vi.fn(),
+  getPointBuyCostsSync: vi.fn(() => ({ 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 }))
 }));
 
 import { getPointBuyCosts } from '../../config/utils.js';
@@ -287,7 +288,15 @@ describe('useWizardAbilities', () => {
 
   describe('onAbilityBaseScoreChange', () => {
     it('should call updateAbility with parsed integer value', () => {
-      const { result } = renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors, mockUpdateAbility);
+      const lowCostAbilities = [
+        makeAbility('Strength', 8),
+        makeAbility('Dexterity', 8),
+        makeAbility('Constitution', 8),
+        makeAbility('Intelligence', 8),
+        makeAbility('Wisdom', 8),
+        makeAbility('Charisma', 8)
+      ];
+      const { result } = renderWizardAbilities(makeFormData(lowCostAbilities), 5, mockSetErrors, mockUpdateAbility);
 
       result.current.onAbilityBaseScoreChange(2, '15');
 
@@ -310,13 +319,12 @@ describe('useWizardAbilities', () => {
       expect(mockUpdateAbility).toHaveBeenCalledWith(4, 'baseScore', 8);
     });
 
-    it('should not perform any validation — delegates to updateAbility only', () => {
+    it('should reject base scores above 15', () => {
       const { result } = renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors, mockUpdateAbility);
 
-      // Setting a score above 15 should still call updateAbility (validation is separate)
       result.current.onAbilityBaseScoreChange(0, '20');
 
-      expect(mockUpdateAbility).toHaveBeenCalledWith(0, 'baseScore', 20);
+      expect(mockUpdateAbility).not.toHaveBeenCalled();
       expect(mockSetErrors).not.toHaveBeenCalled();
     });
   });

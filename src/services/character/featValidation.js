@@ -70,7 +70,7 @@ export async function validateFeats(formData, allFeats) {
       // Check if too many feats selected (excluding pre-selected background feats)
     if (userSelectedCount > limits.allowed) {
         warnings.push({
-            message: `Rules allow ${limits.allowed} feat(s) at level ${formData.level}. You have selected ${userSelectedCount} (plus ${preSelectedCount} background feat). (${limits.details})`,
+            message: `Rules allow ${limits.allowed} feat(s) at level ${formData.level}. You have selected ${userSelectedCount} (plus ${preSelectedCount} pre-selected feat). (${limits.details})`,
             type: 'warning'
              });
          }

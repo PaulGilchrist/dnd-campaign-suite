@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import './WizardStepAbilities.css';
 import { loadAbilityScores, loadValidationRules, fetchBackgroundData } from '../../services/ui/dataLoader.js';
 import { computeAllFeatBuffs } from '../../services/character/featBuffService.js';
+import { computeRaceBuffs } from '../../services/character/raceBuffService.js';
 
 function parseBackgroundAbilityScores(abilityScoresStr) {
   if (!abilityScoresStr) return [];
@@ -23,7 +24,13 @@ function WizardStepAbilities({
   featAbilityChoices = [],
   featAbilityAssignments = {},
   onFeatAbilityChoiceChange,
+  racesData = [],
 }) {
+  const { race } = formData;
+  const fullRace = useMemo(() => {
+    if (!race?.name) return null;
+    return racesData.find(r => r.name === race.name) || null;
+  }, [race?.name, racesData]);
   const [pointBuyCosts, setPointBuyCosts] = useState({});
   const [pointsAllowed, setPointsAllowed] = useState(27);
   const [abilityNames, setAbilityNames] = useState(['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']);
@@ -37,6 +44,20 @@ function WizardStepAbilities({
   const effectiveBackgroundAbilityChoices = useProps ? backgroundAbilityChoices : localBackgroundAbilityChoices;
   const effectiveBackgroundAbilityAssignments = useProps ? backgroundAbilityAssignments : localBackgroundAbilityAssignments;
   const effectiveBackgroundValidationWarnings = useProps ? backgroundValidationWarnings : localBackgroundValidationWarnings;
+
+  const racialAbilityIncreases = useMemo(() => {
+    if (formData.rules !== '5e' || !fullRace?.name) {
+      return {};
+    }
+    const subraceName = race?.subrace?.name;
+    const subrace = subraceName ? fullRace.subraces?.find(sr => sr.name === subraceName) : null;
+    const raceBuffs = computeRaceBuffs(fullRace, { race: { name: fullRace.name, subrace: subrace || { name: subraceName } }, rules: formData.rules }, '5e');
+    const increases = {};
+    raceBuffs.abilityScoreIncreases.forEach(inc => {
+      increases[inc.name] = (increases[inc.name] || 0) + inc.amount;
+    });
+    return increases;
+  }, [fullRace, race?.subrace?.name, formData.rules]);
 
   useEffect(() => {
     const loadNames = async () => {
@@ -208,7 +229,7 @@ function WizardStepAbilities({
         (Total points allowed: {pointsAllowed})
       </div>
       <div className="step-description">
-        Total score (base + feat + background + misc) cannot exceed 20 for any ability.
+        Total score (base + feat + background + racial + misc) cannot exceed 20 for any ability.
       </div>
 
       {effectiveBackgroundAbilityChoices.length > 0 && (
@@ -277,8 +298,9 @@ function WizardStepAbilities({
           const backgroundIncrease = parseInt(abilityData.backgroundIncrease) || 0;
           const miscIncrease = parseInt(abilityData.miscIncrease) || 0;
           const featIncrease = getFeatIncreaseForAbility(ability);
+          const racialIncrease = racialAbilityIncreases[ability] || 0;
           const isBackgroundAbilityScore = isBackgroundAbility(ability);
-          const totalScore = baseScore + featIncrease + backgroundIncrease + miscIncrease;
+          const totalScore = baseScore + featIncrease + backgroundIncrease + miscIncrease + racialIncrease;
           const cost = pointBuyCosts[baseScore] || 0;
 
           return (
@@ -286,6 +308,11 @@ function WizardStepAbilities({
               {isBackgroundAbilityScore && (
                 <div className="bg-ability-badge">
                   <i className="fa-solid fa-star"></i> Background: +{backgroundIncrease}
+                </div>
+              )}
+              {racialIncrease > 0 && (
+                <div className="racial-increase-badge">
+                  <i className="fa-solid fa-dragon"></i> Racial: +{racialIncrease}
                 </div>
               )}
               {featIncrease > 0 && (

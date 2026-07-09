@@ -119,7 +119,7 @@ describe('WizardStepAbilities', () => {
 
       expect(screen.getByText(/Total points allowed: 24/)).toBeInTheDocument();
       expect(
-        screen.getByText(/Total score \(base \+ feat \+ background \+ misc\) cannot exceed 20/)
+        screen.getByText(/Total score \(base \+ feat \+ background \+ racial \+ misc\) cannot exceed 20/)
       ).toBeInTheDocument();
     });
   });

@@ -49,8 +49,10 @@ export function computeRaceBuffs(race, playerData, ruleset = '5e') {
   if (ruleset === '5e') {
     const abilityBonuses = race.ability_bonuses || [];
     abilityBonuses.forEach(ab => {
+      const abilityName = ab.name || ab.ability_score;
+      if (!abilityName) return;
       result.abilityScoreIncreases.push({
-        name: expandAbilityName(ab.name),
+        name: expandAbilityName(abilityName),
         amount: ab.bonus || 1,
       });
     });
@@ -159,14 +161,17 @@ export function computeRaceBuffs(race, playerData, ruleset = '5e') {
 
     if (ruleset === '5e' && subrace.ability_bonuses) {
       subrace.ability_bonuses.forEach(ab => {
+        const abilityName = ab.name || ab.ability_score;
+        if (!abilityName) return;
+        const expandedName = expandAbilityName(abilityName);
         const existing = result.abilityScoreIncreases.find(
-          inc => inc.name === expandAbilityName(ab.name)
+          inc => inc.name === expandedName
         );
         if (existing) {
           existing.amount += ab.bonus || 1;
         } else {
           result.abilityScoreIncreases.push({
-            name: expandAbilityName(ab.name),
+            name: expandedName,
             amount: ab.bonus || 1,
           });
         }

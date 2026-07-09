@@ -175,7 +175,7 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
         <p><strong>Rules:</strong> {featLimits.details}</p>
         <p>
           You have selected {userSelectedCount} of {featLimits.allowed} allowed feat(s)
-          {preSelectedCount > 0 ? ` (plus ${preSelectedCount} background feat)` : ''}.
+          {preSelectedCount > 0 ? ` (plus ${preSelectedCount} pre-selected feat)` : ''}.
         </p>
         {isVersatile && raceFeatChoices.length > 0 && (
           <div className="versatile-trait-info">

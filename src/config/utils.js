@@ -2,13 +2,33 @@ import { REQUIRED_FIELDS } from './constants.js';
 import { loadValidationRules } from '../services/ui/dataLoader.js';
 
 /**
+ * Synchronous point buy costs lookup (5e)
+ * These are the standard D&D 5e point buy costs.
+ */
+const POINT_BUY_COSTS_5E = { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 };
+
+/**
+ * Synchronous point buy costs lookup (2024)
+ */
+const POINT_BUY_COSTS_2024 = { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 6, 14: 7, 15: 9 };
+
+/**
+ * Get point buy costs synchronously
+ * @param {string} ruleset - '5e' or '2024'
+ * @returns {object} - Point buy costs object
+ */
+export function getPointBuyCostsSync(ruleset = '5e') {
+  return ruleset === '2024' ? POINT_BUY_COSTS_2024 : POINT_BUY_COSTS_5E;
+}
+
+/**
  * Get point buy costs (async, loads from JSON)
  * @param {string} ruleset - '5e' or '2024'
  * @returns {Promise<object>} - Point buy costs object
  */
 export async function getPointBuyCosts(ruleset = '5e') {
   const rules = await loadValidationRules(ruleset);
-  return rules.point_buy?.costs || {};
+  return rules.point_buy?.costs || POINT_BUY_COSTS_5E;
 }
 
 /**

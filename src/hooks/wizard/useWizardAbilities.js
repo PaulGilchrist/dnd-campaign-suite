@@ -1,20 +1,39 @@
 import { useEffect, useCallback } from 'react';
-import { getPointBuyCosts } from '../../config/utils.js';
+import { getPointBuyCosts, getPointBuyCostsSync } from '../../config/utils.js';
+import { computeRaceBuffs } from '../../services/character/raceBuffService.js';
+import { loadValidationRules } from '../../services/ui/dataLoader.js';
 
 function useWizardAbilities(formData, currentStep, setErrors, updateAbility) {
+  const { rules: ruleset, race, abilities } = formData;
+  
   useEffect(() => {
     const validateAbilities = async () => {
       if (currentStep === 5) {
         const abilityErrors = {};
-        const rules = await getPointBuyCosts(formData.rules || '5e');
+        const rules = await getPointBuyCosts(ruleset || '5e');
+        const rulesData = await loadValidationRules(ruleset || '5e');
+        const maxPoints = rulesData?.point_buy?.total_points ?? 27;
         let totalPointsSpent = 0;
 
-        formData.abilities.forEach((ability, index) => {
+        abilities.forEach((ability, index) => {
           const baseScore = parseInt(ability.baseScore) || 8;
           const featIncrease = parseInt(ability.featIncrease) || 0;
           const bgIncrease = parseInt(ability.backgroundIncrease) || 0;
           const misc = parseInt(ability.miscIncrease) || 0;
-          const totalScore = baseScore + featIncrease + bgIncrease + misc;
+          
+          let racialIncrease = 0;
+          if (ruleset === '5e' && race?.name) {
+            const raceBuffs = computeRaceBuffs(race, { race: { subrace: race.subrace }, rules: ruleset }, '5e');
+            const abilityBuffs = raceBuffs.abilityScoreIncreases.filter(b => b.name === ability.name);
+            racialIncrease = abilityBuffs.reduce((sum, b) => sum + b.amount, 0);
+            if (race.subrace?.name) {
+              const subraceBuffs = computeRaceBuffs(race, { race: { subrace: { name: race.subrace.name } } }, '5e');
+              const subraceAbilityBuffs = subraceBuffs.abilityScoreIncreases.filter(b => b.name === ability.name);
+              racialIncrease += subraceAbilityBuffs.reduce((sum, b) => sum + b.amount, 0);
+            }
+          }
+          
+          const totalScore = baseScore + featIncrease + bgIncrease + misc + racialIncrease;
 
           const cost = rules[baseScore] || 0;
           totalPointsSpent += cost;
@@ -26,19 +45,19 @@ function useWizardAbilities(formData, currentStep, setErrors, updateAbility) {
             abilityErrors[`ability_${index}_baseScore`] = 'Base score cannot exceed 15 (point buy max)';
            }
           if (totalScore > 20) {
-            abilityErrors[`ability_${index}_totalScore`] = `Total score (base + feat + background + misc) cannot exceed 20`;
+            abilityErrors[`ability_${index}_totalScore`] = `Total score (base + feat + background + racial + misc) cannot exceed 20`;
            }
           if (misc < 0) {
             abilityErrors[`ability_${index}_miscIncrease`] = 'Misc bonus must be 0 or above';
            }
           });
 
-        if (totalPointsSpent > 27) {
-          abilityErrors.pointsExceeded = `You have spent ${totalPointsSpent} points. You only have 27 points to spend.`;
+        if (totalPointsSpent > maxPoints) {
+          abilityErrors.pointsExceeded = `You have spent ${totalPointsSpent} points. You only have ${maxPoints} points to spend.`;
          }
 
         // Clear stale ability errors from previous validation
-        const abilityErrorKeys = formData.abilities.flatMap((_, index) => [
+        const abilityErrorKeys = abilities.flatMap((_, index) => [
           `ability_${index}_baseScore`,
           `ability_${index}_miscIncrease`,
           `ability_${index}_totalScore`,
@@ -53,7 +72,7 @@ function useWizardAbilities(formData, currentStep, setErrors, updateAbility) {
     };
 
     validateAbilities();
-   }, [formData.abilities, currentStep, formData.rules, setErrors]);
+   }, [abilities, currentStep, ruleset, race, setErrors]);
 
   const calculateTotalPointsSpent = useCallback(async (abilities, newIndex, newBaseScore) => {
     const rules = await getPointBuyCosts(formData.rules || '5e');
@@ -66,21 +85,49 @@ function useWizardAbilities(formData, currentStep, setErrors, updateAbility) {
      }, 0);
    }, [formData.rules]);
 
-  const onAbilityBaseScoreChange = useCallback(async (index, value) => {
+  const onAbilityBaseScoreChange = useCallback((index, value) => {
     const newBaseScore = parseInt(value) || 8;
+    if (newBaseScore < 8 || newBaseScore > 15) {
+      return;
+    }
+    const rules = getPointBuyCostsSync(formData.rules || '5e');
+    const maxPoints = 27;
+    const newTotalSpent = abilities.reduce((sum, ability, i) => {
+      if (i === index) {
+        return sum + (rules[newBaseScore] || 0);
+       }
+      const baseScore = parseInt(ability.baseScore) || 8;
+      return sum + (rules[baseScore] || 0);
+     }, 0);
+    if (newTotalSpent > maxPoints) {
+      return;
+    }
     updateAbility(index, 'baseScore', newBaseScore);
-  }, [updateAbility]);
+  }, [abilities, formData.rules, updateAbility]);
 
   const onAbilityMiscIncreaseChange = useCallback((index, value) => {
     const misc = parseInt(value) || 0;
-    const ability = formData.abilities[index];
+    const ability = abilities[index];
     const baseScore = parseInt(ability.baseScore) || 8;
     const featIncrease = parseInt(ability.featIncrease) || 0;
     const bgIncrease = parseInt(ability.backgroundIncrease) || 0;
-    const totalScore = baseScore + featIncrease + bgIncrease + misc;
+    
+    let racialIncrease = 0;
+    if (ruleset === '5e' && race?.name) {
+      const raceBuffs = computeRaceBuffs(race, { race: { subrace: race.subrace }, rules: ruleset }, '5e');
+      const abilityBuffs = raceBuffs.abilityScoreIncreases.filter(b => b.name === ability.name);
+      racialIncrease = abilityBuffs.reduce((sum, b) => sum + b.amount, 0);
+      if (race.subrace?.name) {
+        const subraceBuffs = computeRaceBuffs(race, { race: { subrace: { name: race.subrace.name } } }, '5e');
+        const subraceAbilityBuffs = subraceBuffs.abilityScoreIncreases.filter(b => b.name === ability.name);
+        racialIncrease += subraceAbilityBuffs.reduce((sum, b) => sum + b.amount, 0);
+      }
+    }
+    
+    const totalScore = baseScore + featIncrease + bgIncrease + misc + racialIncrease;
     if (misc < 0 || totalScore > 20) return;
     updateAbility(index, 'miscIncrease', misc);
-  }, [formData.abilities, updateAbility]);
+  }, [abilities, ruleset, race, updateAbility]);
 
   return {
     calculateTotalPointsSpent,

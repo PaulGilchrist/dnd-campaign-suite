@@ -209,7 +209,7 @@ describe('WizardStepFeats', () => {
       });
       await waitFor(() => {
         expect(screen.getByText(/1 of 2 allowed/)).toBeInTheDocument();
-        expect(screen.getByText(/plus 1 background feat/)).toBeInTheDocument();
+        expect(screen.getByText(/plus 1 pre-selected feat/)).toBeInTheDocument();
       });
     });
 
