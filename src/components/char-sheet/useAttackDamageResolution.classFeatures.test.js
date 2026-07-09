@@ -41,6 +41,7 @@ vi.mock('../../services/rules/core/attackCalc.js', () => ({
 }));
 
 vi.mock('../../services/automation/common/savePrompt.js', () => ({
+    buildSaveDc: vi.fn(() => 14),
     createSaveListener: vi.fn(),
 }));
 

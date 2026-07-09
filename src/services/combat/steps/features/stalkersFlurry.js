@@ -1,6 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { checkOncePerTurnWithSkip, clearSkipFlag } from '../../../automation/common/oncePerTurn.js';
+import { resolveMassFear } from '../../../automation/handlers/combat/massFearHandler.js';
 
 export const stalkersFlurry = {
   name: 'stalkersFlurry',
@@ -50,8 +51,7 @@ export const stalkersFlurry = {
         }
       }
       else if (opt.effect === 'mass_fear') {
-        const effs = getRuntimeValue(ctx.campaignName, 'targetEffects') || [];
-        setRuntimeValue(ctx.campaignName, 'targetEffects', [...effs, { target: effectTarget, source: sf.name, option: opt.name, effect: 'mass_fear', saveType: opt.saveType || 'WIS', saveDc: opt.saveDc || 'ability', saveAbility: opt.saveAbility || 'WIS', condition: opt.condition || 'frightened', duration: opt.duration || 'until_start_of_next_turn', range: opt.range || '10_ft' }], ctx.campaignName);
+        await resolveMassFear(ctx.campaignName, ctx.playerStats.name, effectTarget, opt, ctx.playerStats, null);
       }
     }
 

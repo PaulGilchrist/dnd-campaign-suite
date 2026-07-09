@@ -35,11 +35,14 @@ export function buildDamageSteps() {
       emit: 'maneuvers:check',
       condition: () => true,
       handler: async (ctx) => {
+        // Clear stale Stalker's Flurry state from previous turns
+        const sfOptKey = `_${"Stalker's Flurry".replace(/\s+/g, '_')}_option`;
+        setRuntimeValue(ctx.playerStats.name, sfOptKey, null, ctx.campaignName);
+        setRuntimeValue(ctx.playerStats.name, 'stalkersFlurryChosenTarget', null, ctx.campaignName);
+        setRuntimeValue(ctx.playerStats.name, 'pendingSuddenStrike', null, ctx.campaignName);
+        setRuntimeValue(ctx.playerStats.name, 'pendingSuddenStrikeTarget', null, ctx.campaignName);
+
         const isBonus = ctx.attack?.type === 'Bonus Action';
-        if (isBonus) {
-          const pending = getRuntimeValue(ctx.playerStats.name, 'pendingSuddenStrike', ctx.campaignName);
-          if (pending) setRuntimeValue(ctx.playerStats.name, 'pendingSuddenStrike', null, ctx.campaignName);
-        }
         if (ctx.attack?.name === 'Horde Breaker' && isBonus) {
           const choice = getRuntimeValue(ctx.playerStats.name, "_Hunter's_Prey_choice", ctx.campaignName);
           if (choice === 'Horde Breaker') {

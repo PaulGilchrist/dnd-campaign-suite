@@ -14,6 +14,14 @@ vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(async () => {}),
 }));
 
+vi.mock('../../../automation/common/savePrompt.js', () => ({
+    buildSaveDc: vi.fn(() => 14),
+    createSaveListener: vi.fn(() => ({
+        promptId: 'test-prompt',
+        promise: Promise.resolve({ success: false, roll: 5, total: 5 }),
+    })),
+}));
+
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(async () => ({
         creatures: [{ name: 'Goblin', size: 'Medium', position: { x: 1, y: 1 } }],
@@ -259,14 +267,14 @@ describe('attackRiderHandler', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'pendingSuddenStrike', true, 'campaign');
         });
 
-        it('should apply Mass Fear effect and set targetEffects', async () => {
+        it('should apply Mass Fear effect and resolve saves', async () => {
             getRuntimeValue.mockReturnValue([]);
             const action = makeAction();
             const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Mass Fear']);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Mass Fear');
-            expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', expect.any(Array), 'campaign');
+            expect(result.payload.description).toContain('affected');
         });
 
         it('should apply Push 15ft effect', async () => {

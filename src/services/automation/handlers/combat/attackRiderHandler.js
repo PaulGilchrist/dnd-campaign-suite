@@ -6,8 +6,9 @@ import { buildSaveDc, createSaveListener } from '../../../automation/common/save
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { checkOncePerTurn, markOncePerTurn } from '../../common/oncePerTurn.js';
+import { resolveMassFear } from './massFearHandler.js';
 
-export async function handle(action, playerStats, campaignName, _mapName) {
+export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation || action;
     const options = auto.options || [];
 
@@ -38,7 +39,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // Single option — apply immediately
     if (options.length === 1) {
         const chosen = options[0];
-        const result = await applyRiderEffect(action, playerStats, campaignName, targetName, chosen);
+        const result = await applyRiderEffect(action, playerStats, campaignName, targetName, chosen, mapName);
         return result;
     }
 
@@ -124,7 +125,7 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     );
 
     for (const chosen of chosenOptions) {
-        const res = await applyRiderEffect(action, playerStats, campaignName, targetName, chosen);
+        const res = await applyRiderEffect(action, playerStats, campaignName, targetName, chosen, undefined);
         results.push(res);
 
         // If Trip was applied and Versatile Trickster is available, find secondary targets
@@ -157,7 +158,7 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     }
 
     // If Sudden Strike or Mass Fear was applied, find secondary targets for the effect
-    const hasStalkersFlurry = chosenOptions.some(o => o.effect === 'sudden_strike' || o.effect === 'mass_fear');
+    const hasStalkersFlurry = chosenOptions.some(o => o.effect === 'sudden_strike');
     let stalkersFlurrySecondaryTarget = null;
     if (hasStalkersFlurry && targetName) {
         const cs = await getCombatContext(campaignName);
@@ -225,7 +226,7 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     };
 }
 
-async function applyRiderEffect(action, playerStats, campaignName, targetName, option) {
+async function applyRiderEffect(action, playerStats, campaignName, targetName, option, mapName) {
     const auto = action.automation || action;
     if (!targetName) {
         return {
@@ -255,25 +256,8 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
         };
     }
 
-    // Handle mass_fear: apply Frightened condition via targetEffects
+    // Handle mass_fear: resolve saves directly
     if (option.effect === 'mass_fear') {
-        const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
-        const newEffect = {
-            target: targetName,
-            source: playerStats.name,
-            option: option.name,
-            effect: 'mass_fear',
-            saveType: option.saveType || 'WIS',
-            saveDc: option.saveDc || 'ability',
-            saveAbility: option.saveAbility || 'WIS',
-            condition: option.condition || 'frightened',
-            duration: option.duration || 'until_start_of_next_turn',
-            range: option.range || '10_ft',
-            noOpportunityAttacks: option.noOpportunityAttacks || false,
-        };
-        const updatedEffects = [...storedEffects, newEffect];
-        setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
-
         const attackerBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
         const attackerBuffArray = Array.isArray(attackerBuffs) ? attackerBuffs : [];
         if (attackerBuffArray.some(b => b.name === 'Psychic Veil')) {
@@ -289,16 +273,7 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
             }
         }
 
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                automationType: auto.type,
-                description: `Mass Fear applied to ${targetName}. Target and creatures within 10 ft must make a Wisdom save or be Frightened until the start of your next turn.`,
-                automation: auto,
-            },
-        };
+        return resolveMassFear(campaignName, playerStats.name, targetName, option, playerStats, mapName);
     }
 
     // Default: apply standard rider effect

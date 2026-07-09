@@ -389,8 +389,8 @@ describe('useAttackDamageResolution', () => {
             );
         });
 
-        it('does not clear pendingSuddenStrike when flag is falsy or attack is not a bonus action', async () => {
-            getRuntimeValue.mockReturnValueOnce(false);
+        it('clears pendingSuddenStrike for all attacks', async () => {
+            getRuntimeValue.mockReturnValue(false);
             const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = {
                 name: 'Longsword',
@@ -403,7 +403,7 @@ describe('useAttackDamageResolution', () => {
             await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestFighter',
                 'pendingSuddenStrike',
                 null,
@@ -416,7 +416,7 @@ describe('useAttackDamageResolution', () => {
 
     describe('horde breaker handling', () => {
         it('marks horde breaker as used for the current round', async () => {
-            getRuntimeValue.mockReturnValueOnce(null).mockReturnValueOnce('Horde Breaker');
+            getRuntimeValue.mockReturnValueOnce('Horde Breaker');
             const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = {
                 name: 'Horde Breaker',

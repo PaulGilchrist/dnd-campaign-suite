@@ -44,7 +44,7 @@ export async function checkOncePerTurn(featureName, usedKey, campaignName) {
     const storedRound = stored?.round;
     const storedCreature = stored?.activeCreature;
 
-    if (currentRound > storedRound && currentCreature === storedCreature) {
+    if ((currentRound === storedRound + 1 && currentCreature === storedCreature) || currentRound > storedRound + 1) {
         return null;
     }
 
@@ -92,7 +92,7 @@ export async function checkOncePerTurnWithSkip(featureName, usedKey, skipKey, pl
             // New format: stored is { round, activeCreature }
             const storedRound = stored?.round;
             const storedCreature = stored?.activeCreature;
-            if (!(currentRound > storedRound && currentCreature === storedCreature)) {
+            if (!((currentRound === storedRound + 1 && currentCreature === storedCreature) || currentRound > storedRound + 1)) {
                 return {
                     type: 'popup',
                     payload: {

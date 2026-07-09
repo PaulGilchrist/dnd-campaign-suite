@@ -318,7 +318,8 @@ describe('attackRiderHandler - Psychic Veil removal', () => {
         });
         const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Mass Fear']);
 
-        expect(result.payload.description).toContain('Mass Fear applied');
+        expect(result.payload.description).toContain('Mass Fear');
+        expect(result.payload.description).toContain('affected');
         expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'activeConditions', ['poisoned'], 'campaign');
         expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'activeBuffs', [], 'campaign');
     });
@@ -622,9 +623,9 @@ describe('attackRiderHandler - mass_fear description format', () => {
         });
         const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Mass Fear']);
 
-        expect(result.payload.description).toContain('Mass Fear applied to Goblin');
-        expect(result.payload.description).toContain('Wisdom save');
-        expect(result.payload.description).toContain('Frightened');
+        expect(result.payload.description).toContain('Mass Fear');
+        expect(result.payload.description).toContain('affected');
+        expect(result.payload.description).toContain('Goblin');
     });
 
     it('should use default saveType WIS when not specified', async () => {

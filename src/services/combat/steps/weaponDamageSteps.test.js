@@ -290,12 +290,12 @@ describe('buildDamageSteps', () => {
         );
       });
 
-      it('does not clear pendingSuddenStrike for non-bonus action attacks', async () => {
+      it('clears pendingSuddenStrike for all attacks', async () => {
         getRuntimeValue.mockReturnValue(null);
         const ctx = makeCtx({ attack: { type: 'Action' } });
         await steps[0].handler(ctx);
 
-        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+        expect(setRuntimeValue).toHaveBeenCalledWith(
           'TestChar',
           'pendingSuddenStrike',
           null,
