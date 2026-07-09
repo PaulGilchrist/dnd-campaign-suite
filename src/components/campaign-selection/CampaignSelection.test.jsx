@@ -26,9 +26,10 @@ describe('CampaignSelection', () => {
     }
     render(<CampaignSelection {...options.props} />);
     await waitFor(() => {
-      campaigns.forEach((name) => {
-        expect(screen.getByText(name)).toBeInTheDocument();
-      });
+      expect(screen.queryByText('Loading campaigns...')).not.toBeInTheDocument();
+    });
+    campaigns.forEach((name) => {
+      expect(screen.getByText(name)).toBeInTheDocument();
     });
   }
 

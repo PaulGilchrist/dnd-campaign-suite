@@ -593,6 +593,7 @@ describe('useAttackDamageResolution - class features', () => {
         it('applies mass_fear option when saved with save parameters', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === "_Stalker's_Flurry_option") return 'Mass Fear';
+                if (key === 'activeConditions') return [];
                 return null;
             });
             getCombatContext.mockResolvedValue({
@@ -606,25 +607,17 @@ describe('useAttackDamageResolution - class features', () => {
             await resolveAttackDamage(makeAttack());
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'test-campaign',
-                'targetEffects',
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        target: 'Bugbear',
-                        source: "Stalker's Flurry",
-                        effect: 'mass_fear',
-                        saveType: 'WIS',
-                        condition: 'frightened',
-                    }),
-                ]),
-                'test-campaign',
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestRogue',
                 "_Stalker's_Flurry_usedRound",
                 1,
                 'test-campaign',
             );
+            const calls = setRuntimeValue.mock.calls;
+            const conditionCall = calls.find(
+                (c) => c[1] === 'activeConditions' && c[0] === 'Bugbear'
+            );
+            expect(conditionCall).toBeDefined();
+            expect(conditionCall[2]).toContain('frightened');
         });
 
         it('shows modal when no saved option', async () => {

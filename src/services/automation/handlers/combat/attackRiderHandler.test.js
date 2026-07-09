@@ -200,6 +200,7 @@ describe('attackRiderHandler', () => {
         });
 
         it('should handle missing combat context gracefully', async () => {
+            const defaultImpl = vi.mocked(getCombatContext).getMockImplementation();
             vi.mocked(getCombatContext).mockResolvedValue(null);
             const action = makeAction({
                 automation: {
@@ -216,6 +217,7 @@ describe('attackRiderHandler', () => {
                 abilityName: 'Cunning Strike',
                 description: 'Cunning Strike used',
             });
+            vi.mocked(getCombatContext).mockImplementation(defaultImpl);
         });
     });
 
