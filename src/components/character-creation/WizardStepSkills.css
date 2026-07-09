@@ -5,7 +5,6 @@
 /* Skill Expert Styling */
 .wizard-step-skills .skill-expert-label {
   font-weight: 600;
-  color: var(--color-success);
 }
 
 .wizard-step-skills .expertise-indicator {

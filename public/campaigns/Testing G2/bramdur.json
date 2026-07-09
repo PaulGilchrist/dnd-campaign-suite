@@ -60,8 +60,9 @@
     ]
   },
   "expertSkills": [
-    "Survival",
-    "Stealth"
+    "Stealth",
+    "Perception",
+    "Survival"
   ],
   "feats": [],
   "fightingStyles": [],
@@ -102,13 +103,9 @@
     "Poison"
   ],
   "skillProficiencies": [
-    "Animal Handling",
-    "Insight",
-    "Investigation",
-    "Nature",
-    "Perception",
+    "Stealth",
     "Survival",
-    "Stealth"
+    "Perception"
   ],
   "specialActions": [],
   "spells": [

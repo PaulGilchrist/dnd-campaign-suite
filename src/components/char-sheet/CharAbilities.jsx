@@ -15,7 +15,16 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
      const { setPopupHtml } = useDiceRollPopup();
      const { rollAbilityCheck, rollSavingThrow, rollSkillCheck } = useLoggedDiceRoll(playerStats.name, campaignName);
 
-    const getCosmicOmenBonus = useCallback(() => {
+     const getAbilityCheckBonus = useCallback((ability, condEffects) => {
+        if (condEffects?.wisCheckReplace && ability.name === 'Charisma') {
+           const wisAbility = playerStats?.abilities?.find(a => a.name === 'Wisdom');
+           const wisMod = wisAbility?.bonus || 0;
+           return Math.max(1, wisMod);
+        }
+        return ability.bonus;
+     }, [playerStats?.abilities]);
+
+     const getCosmicOmenBonus = useCallback(() => {
         const stored = getRuntimeValue(playerStats.name, 'cosmicOmenEffect', campaignName);
         if (!stored) return 0;
         try {
@@ -30,9 +39,26 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
         return 0;
      }, [playerStats.name, campaignName]);
 
-       const getSkillBonus = useCallback((skill) => {
-            let bonus = skill.bonus - exhaustionPenalty;
-            if (isRaging) {
+        const getSkillBonus = useCallback((skill) => {
+             let bonus = skill.bonus - exhaustionPenalty;
+             const isCharismaSkill = ['Deception', 'Intimidation', 'Performance', 'Persuasion'].includes(skill.name);
+             if (conditionEffects?.wisCheckReplace && isCharismaSkill) {
+                const wisAbility = playerStats?.abilities?.find(a => a.name === 'Wisdom');
+                const wisMod = wisAbility?.bonus || 0;
+                const wisBonus = Math.max(1, wisMod);
+                const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
+                const isProficient = playerStats.skillProficiencies?.includes(skill.name);
+                const isExpert = playerStats.expertise?.includes(skill.name);
+                let newBonus = wisBonus;
+                if (isProficient) {
+                    newBonus += proficiency;
+                }
+                if (isExpert) {
+                    newBonus += proficiency;
+                }
+                bonus = newBonus - exhaustionPenalty;
+             }
+             if (isRaging) {
                 const primalSkills = playerStats?.automation?.primalKnowledge || [];
                 if (primalSkills.includes(skill.name)) {
                     const strengthAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
@@ -63,7 +89,7 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                 bonus += parseInt(conditionEffects.passWithoutTraceBonus, 10);
             }
             return bonus;
-        }, [exhaustionPenalty, isRaging, playerStats, conditionEffects?.passWithoutTraceBonus]);
+        }, [exhaustionPenalty, isRaging, playerStats, conditionEffects?.passWithoutTraceBonus, conditionEffects?.wisCheckReplace]);
 
            const makeCheckContext = useCallback((checkName) => {
               let forcedMode = undefined
@@ -238,8 +264,9 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                             checkCtx.bardicInspiration = true;
                             checkCtx.bardicInspirationDie = biDie;
                           }
-                          rollAbilityCheck(ability.name, ability.bonus - exhaustionPenalty + getCosmicOmenBonus(), checkCtx);
-                        }}>{signFormatter.format(ability.bonus - exhaustionPenalty + getCosmicOmenBonus())}</div>
+                          const checkBonus = getAbilityCheckBonus(ability, conditionEffects);
+                          rollAbilityCheck(ability.name, checkBonus - exhaustionPenalty + getCosmicOmenBonus(), checkCtx);
+                        }}>{signFormatter.format(getAbilityCheckBonus(ability, conditionEffects) - exhaustionPenalty + getCosmicOmenBonus())}</div>
                       <div className={'clickable' + (exhaustionPenalty > 0 || autoFailSave || conditionEffects?.saveDisadvantage?.length > 0 ? ' stat--penalized' : '') + (hasSaveAdvantage(ability.name) ? ' stat--buffed' : '')} onClick={() => {
                           if (!autoFailSave) {
                             const saveCtx = { ...saveContext };
