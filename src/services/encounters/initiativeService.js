@@ -189,7 +189,12 @@ function mergeCombatSummaryWithCharacters(initialSummary, characters, getName) {
             concentration: null,
         }))
     mergedCreatures.push(...newPlayerCreatures)
-    mergedCreatures.sort((a, b) => a.name.localeCompare(b.name))
+    mergedCreatures.sort((a, b) => {
+        const aInit = Number(a.initiative) || -1
+        const bInit = Number(b.initiative) || -1
+        if (bInit !== aInit) return bInit - aInit
+        return a.name.localeCompare(b.name)
+    })
     return { round: initialSummary.round, creatures: mergedCreatures }
 }
 
