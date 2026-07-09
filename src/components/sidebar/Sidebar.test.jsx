@@ -163,24 +163,57 @@ describe('Sidebar', () => {
   });
 
   describe('active highlighting', () => {
-    it('should highlight active character', () => {
+    it('should highlight active character only when charSheet is active', () => {
       const props = {
         ...defaultProps,
         characters: [{ name: 'Aragorn' }, { name: 'Legolas' }],
         activeCharacter: { name: 'Legolas' },
       };
-      render(<Sidebar {...props} />);
+      const { unmount } = render(<Sidebar {...props} activeView="charSheet" />);
+      const charBtns = screen.getAllByText('Legolas').map(el => el.closest('button'));
+      const sidebarCharBtn = charBtns.find(btn => btn && btn.classList.contains('sidebar-link'));
+      expect(sidebarCharBtn).toHaveClass('active');
+      unmount();
+
+      render(<Sidebar {...props} activeView="initiative" />);
       const legolasBtn = screen.getByText('Legolas').closest('button');
-      expect(legolasBtn).toHaveClass('active');
+      expect(legolasBtn).not.toHaveClass('active');
     });
 
     it.each([
-      { activeView: { type: 'factions' }, label: /Factions/ },
-      { activeView: { type: 'npcs' }, label: /NPCs/ },
+      { activeView: 'encounter', label: /Encounters/ },
+      { activeView: 'factions', label: /Factions/ },
+      { activeView: 'initiative', label: /Initiative/ },
+      { activeView: 'campaignLog', label: /Log/ },
+      { activeView: 'mapsManager', label: /Maps/ },
+      { activeView: 'npcs', label: /NPCs/ },
+      { activeView: 'notes', label: /Notes/ },
       { activeView: 'quests', label: /Quests/ },
-    ])('should show active class on %p when activeView is %p', ({ activeView, label }) => {
+      { activeView: 'settlements', label: /Settlements/ },
+    ])('should show active class on $label button when activeView is $activeView', ({ activeView, label }) => {
       render(<Sidebar {...defaultProps} activeView={activeView} />);
-      expect(screen.getByText(label).closest('button')).toHaveClass('active');
+      const buttons = screen.getAllByText(label).map(el => el.closest('button'));
+      const sectionHeaderBtn = buttons.find(btn => btn && btn.classList.contains('sidebar-section-header'));
+      expect(sectionHeaderBtn).toHaveClass('active');
+    });
+  });
+
+  describe('active view indicator', () => {
+    it('should show active view name in indicator', () => {
+      const { container } = render(<Sidebar {...defaultProps} activeView="initiative" />);
+      const indicator = container.querySelector('.sidebar-active-indicator');
+      expect(indicator).toHaveTextContent('Initiative');
+    });
+
+    it('should show character name in indicator when charSheet is active', () => {
+      const { container } = render(<Sidebar {...defaultProps} activeView="charSheet" activeCharacter={{ name: 'Frodo' }} />);
+      const indicator = container.querySelector('.sidebar-active-indicator');
+      expect(indicator).toHaveTextContent('Frodo');
+    });
+
+    it('should not render indicator when activeView is null', () => {
+      const { container } = render(<Sidebar {...defaultProps} activeView={null} />);
+      expect(container.querySelector('.sidebar-active-indicator')).not.toBeInTheDocument();
     });
   });
 

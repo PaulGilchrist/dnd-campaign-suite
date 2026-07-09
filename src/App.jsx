@@ -436,8 +436,9 @@ function App() {
            onNPCsClick={handleNPCsClick}
            onSettlementsClick={handleSettlementsClick}
            onFactionsClick={handleFactionsClick}
-         onLogClick={handleLogClick}
-          />
+          onLogClick={handleLogClick}
+          activeView={activeView}
+           />
         {activeView === 'charSheet' && activeCharacter && (
           <CharSheet
              allAbilityScores={abilityScores}

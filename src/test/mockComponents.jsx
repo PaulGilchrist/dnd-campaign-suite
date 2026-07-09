@@ -40,71 +40,90 @@ export const MockWizard = vi.fn(({ onComplete, onCancel, characterData, isEditin
   </div>
 ));
 
+const MOCK_VIEW_LABELS = {
+  charSheet: 'Character',
+  encounter: 'Encounters',
+  factions: 'Factions',
+  initiative: 'Initiative',
+  mapsManager: 'Maps',
+  notes: 'Notes',
+  quests: 'Quests',
+  npcs: 'NPCs',
+  settlements: 'Settlements',
+  campaignLog: 'Log',
+};
+
 export const MockSidebar = vi.fn(({
   campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick,
   onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onNotesClick, onQuestsClick,
-  onNPCsClick, onSettlementsClick, onLogClick, onRenameCampaign, onDeleteCampaign, theme, toggleTheme, isLocalhost,
-}) => (
-  <div data-testid="sidebar">
-    <div data-testid="sidebar-campaign">{campaignName}</div>
-    <button data-testid="back-to-campaigns-btn" onClick={onBackToCampaigns}>
-      <i className="fa-solid fa-arrow-left"></i> Campaigns
-    </button>
-    <button data-testid="add-character-btn" onClick={onAddCharacter}>
-      <i className="fa-solid fa-plus"></i> Add Character
-    </button>
-    <div data-testid="sidebar-characters">
-      {characters?.map((char, i) => (
-        <button
-          key={`${char.name}-${i}`}
-          data-testid={`char-btn-${char.name}`}
-          className={activeCharacter?.name === char.name ? 'active' : ''}
-          onClick={() => onCharacterClick(char)}
-        >
-          {char.name}
-        </button>
-      ))}
+  onNPCsClick, onSettlementsClick, onLogClick, onRenameCampaign, onDeleteCampaign, theme, toggleTheme, isLocalhost, activeView,
+}) => {
+  const activeLabel = activeView === 'charSheet' && activeCharacter
+    ? activeCharacter.name
+    : MOCK_VIEW_LABELS[activeView] || '';
+  return (
+    <div data-testid="sidebar">
+      <div data-testid="sidebar-campaign">{campaignName}</div>
+      {activeView && <div data-testid="sidebar-active-indicator">{activeLabel}</div>}
+      <button data-testid="back-to-campaigns-btn" onClick={onBackToCampaigns}>
+        <i className="fa-solid fa-arrow-left"></i> Campaigns
+      </button>
+      <button data-testid="add-character-btn" onClick={onAddCharacter}>
+        <i className="fa-solid fa-plus"></i> Add Character
+      </button>
+      <div data-testid="sidebar-characters">
+        {characters?.map((char, i) => (
+          <button
+            key={`${char.name}-${i}`}
+            data-testid={`char-btn-${char.name}`}
+            className={activeView === 'charSheet' && activeCharacter?.name === char.name ? 'active' : ''}
+            onClick={() => onCharacterClick(char)}
+          >
+            {char.name}
+          </button>
+        ))}
+      </div>
+      <button data-testid="initiative-btn" onClick={onInitiativeClick}>
+        Initiative
+      </button>
+      <button data-testid="maps-btn" onClick={onMapsClick}>
+        {isLocalhost ? 'Maps' : 'Map'}
+      </button>
+      <button data-testid="notes-btn" onClick={onNotesClick}>
+        Notes
+      </button>
+      <button data-testid="encounter-btn" onClick={onEncounterClick}>
+        Encounters
+      </button>
+      <button data-testid="factions-btn" onClick={onFactionsClick}>
+        Factions
+      </button>
+      <button data-testid="npcs-btn" onClick={onNPCsClick}>
+        NPCs
+      </button>
+      <button data-testid="quests-btn" onClick={onQuestsClick}>
+        Quests
+      </button>
+      <button data-testid="settlements-btn" onClick={onSettlementsClick}>
+        Settlements
+      </button>
+      <button data-testid="log-btn" onClick={onLogClick}>
+        Log
+      </button>
+      <button data-testid="rename-campaign-btn" onClick={onRenameCampaign} disabled={!isLocalhost}>
+        Rename
+      </button>
+      <button data-testid="delete-campaign-btn" onClick={onDeleteCampaign} disabled={characters?.length > 0}>
+        Delete Campaign
+      </button>
+      <button data-testid="theme-toggle-btn" onClick={toggleTheme}>
+        {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+      </button>
+      <span data-testid="sidebar-theme">{theme}</span>
+      <span data-testid="sidebar-localhost">{String(isLocalhost)}</span>
     </div>
-    <button data-testid="initiative-btn" onClick={onInitiativeClick}>
-      Initiative
-    </button>
-    <button data-testid="maps-btn" onClick={onMapsClick}>
-      {isLocalhost ? 'Maps' : 'Map'}
-    </button>
-    <button data-testid="notes-btn" onClick={onNotesClick}>
-      Notes
-    </button>
-    <button data-testid="encounter-btn" onClick={onEncounterClick}>
-      Encounters
-    </button>
-    <button data-testid="factions-btn" onClick={onFactionsClick}>
-      Factions
-    </button>
-    <button data-testid="npcs-btn" onClick={onNPCsClick}>
-      NPCs
-    </button>
-    <button data-testid="quests-btn" onClick={onQuestsClick}>
-      Quests
-    </button>
-    <button data-testid="settlements-btn" onClick={onSettlementsClick}>
-      Settlements
-    </button>
-    <button data-testid="log-btn" onClick={onLogClick}>
-      Log
-    </button>
-    <button data-testid="rename-campaign-btn" onClick={onRenameCampaign} disabled={!isLocalhost}>
-      Rename
-    </button>
-    <button data-testid="delete-campaign-btn" onClick={onDeleteCampaign} disabled={characters?.length > 0}>
-      Delete Campaign
-    </button>
-    <button data-testid="theme-toggle-btn" onClick={toggleTheme}>
-      {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-    </button>
-    <span data-testid="sidebar-theme">{theme}</span>
-    <span data-testid="sidebar-localhost">{String(isLocalhost)}</span>
-  </div>
-));
+  );
+});
 
 export const MockMapsManager = vi.fn(({ campaignName, onOpenMap, onBack }) => (
   <div data-testid="maps-manager">

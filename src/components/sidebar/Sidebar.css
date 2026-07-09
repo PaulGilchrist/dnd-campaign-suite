@@ -114,3 +114,24 @@
   margin-left: 50px;
   gap: 2px;
 }
+
+.sidebar-active-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  margin: 4px 8px;
+  background-color: var(--color-primary);
+  color: #fff;
+  border-radius: 6px;
+  font-size: 0.95em;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-section-header.active {
+  color: var(--color-primary);
+  font-weight: 600;
+}

@@ -2,6 +2,19 @@ import { useState } from 'react';
 import { DiceTray, DicePopup } from './DiceTray.jsx';
 import './Sidebar.css';
 
+const VIEW_LABELS = {
+    charSheet: { label: 'Character', icon: 'fa-user' },
+    encounter: { label: 'Encounters', icon: 'fa-dragon' },
+    factions: { label: 'Factions', icon: 'fa-handshake' },
+    initiative: { label: 'Initiative', icon: 'fa-shield-alt' },
+    mapsManager: { label: 'Maps', icon: 'fa-map' },
+    notes: { label: 'Notes', icon: 'fa-book' },
+    quests: { label: 'Quests', icon: 'fa-scroll' },
+    npcs: { label: 'NPCs', icon: 'fa-users' },
+    settlements: { label: 'Settlements', icon: 'fa-city' },
+    campaignLog: { label: 'Log', icon: 'fa-book-journal-whills' },
+};
+
 function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onNotesClick, onQuestsClick, onNPCsClick, onSettlementsClick, onLogClick, onRenameCampaign, onDeleteCampaign, theme, toggleTheme, isLocalhost, activeView }) {
     const [isExpanded, setIsExpanded] = useState(() => {
         try {
@@ -22,6 +35,14 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
         });
     };
 
+    const viewInfo = VIEW_LABELS[activeView];
+    const activeLabel = activeView === 'charSheet' && activeCharacter
+        ? activeCharacter.name
+        : viewInfo?.label || '';
+    const activeIcon = activeView === 'charSheet' && activeCharacter
+        ? 'fa-user'
+        : viewInfo?.icon || '';
+
     return (
         <>
             <nav className="sidebar no-print">
@@ -35,6 +56,12 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
                         </button>
                     </div>
                 </div>
+                {activeView && (
+                    <div className="sidebar-active-indicator">
+                        <i className={`fa-solid ${activeIcon}`}></i>
+                        <span>{activeLabel}</span>
+                    </div>
+                )}
 
                 <button className="sidebar-section-header" onClick={onBackToCampaigns}>
                     <i className="fa-solid fa-arrow-left"></i> Campaigns
@@ -53,7 +80,7 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
                             {characters.map((char, index) => (
                                 <button
                                     key={`${char.name}-${index}`}
-                                    className={`sidebar-link${activeCharacter && activeCharacter.name === char.name ? ' active' : ''}`}
+                                    className={`sidebar-link${activeView === 'charSheet' && activeCharacter && activeCharacter.name === char.name ? ' active' : ''}`}
                                     onClick={() => onCharacterClick(char)}
                                 >
                                     {char.name}
@@ -64,24 +91,29 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
                 </div>
 
                 {isLocalhost && (
-                    <button className="sidebar-section-header" onClick={onEncounterClick}>
+                    <button
+                        className={`sidebar-section-header${activeView === 'encounter' ? ' active' : ''}`}
+                        onClick={onEncounterClick}
+                    >
                         <i className="fa-solid fa-dragon"></i> Encounters
                     </button>
                 )}
 
                 {isLocalhost && (
                     <button
-                        className={`sidebar-section-header${activeView?.type === 'factions' ? ' active' : ''}`}
+                        className={`sidebar-section-header${activeView === 'factions' ? ' active' : ''}`}
                         onClick={onFactionsClick}
                     >
                         <i className="fa-solid fa-handshake"></i> Factions
                     </button>
                 )}
 
-                <button className="sidebar-section-header" onClick={onInitiativeClick}>
+                <button
+                    className={`sidebar-section-header${activeView === 'initiative' ? ' active' : ''}`}
+                    onClick={onInitiativeClick}
+                >
                     <i className="fa-solid fa-shield-alt"></i> Initiative
                 </button>
-
 
                 <button
                     className={`sidebar-section-header${activeView === 'campaignLog' ? ' active' : ''}`}
@@ -90,20 +122,26 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
                     <i className="fa-solid fa-book-journal-whills"></i> Log
                 </button>
 
-                <button className="sidebar-section-header" onClick={onMapsClick}>
+                <button
+                    className={`sidebar-section-header${activeView === 'mapsManager' ? ' active' : ''}`}
+                    onClick={onMapsClick}
+                >
                     <i className="fa-solid fa-map"></i> {isLocalhost ? 'Maps' : 'Map'}
                 </button>
 
                 {isLocalhost && (
                     <button
-                        className={`sidebar-section-header${activeView?.type === 'npcs' ? ' active' : ''}`}
+                        className={`sidebar-section-header${activeView === 'npcs' ? ' active' : ''}`}
                         onClick={onNPCsClick}
                     >
                         <i className="fa-solid fa-users"></i> NPCs
                     </button>
                 )}
 
-                <button className="sidebar-section-header" onClick={onNotesClick}>
+                <button
+                    className={`sidebar-section-header${activeView === 'notes' ? ' active' : ''}`}
+                    onClick={onNotesClick}
+                >
                     <i className="fa-solid fa-book"></i> Notes
                 </button>
 
