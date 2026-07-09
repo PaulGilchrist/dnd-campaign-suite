@@ -68,8 +68,33 @@
   },
   "immunities": [],
   "inventory": {
-    "backpack": [],
-    "equipped": [],
+    "backpack": [
+              "Rope",
+      "Silk",
+      "Ration*5",
+      "Blanket",
+      "Caltrops",
+      "Case",
+      "Clothes",
+      "traveler's",
+      "Crossbow bolt*20",
+      "Crowbar",
+      "Dice Set",
+      "Disguise Kit",
+      "Thieves' Tools",
+      "Forgery Kit",
+      "Climber's Kit",
+      "Fishing tackle",
+      "Grappling hook",
+      "Tinderbox",
+      "Waterskin"
+    ],
+    "equipped": [
+      "Half Plate",
+      "Shield",
+      "Longsword",
+      "Longbow"
+    ],
     "gold": 10,
     "magicItems": []
   },

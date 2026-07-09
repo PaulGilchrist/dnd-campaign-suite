@@ -36,6 +36,7 @@ export const ALL_TRACKED_RESOURCES = [
   'naturesVeilUses',
   'favoredEnemyUses',
   'stonecunningUses',
+  'tirelessUses',
   'shortRestHitDice',
   'spell_slots_level_1',
   'spell_slots_level_2',
@@ -203,6 +204,9 @@ export function computeTrackedResources(playerStats) {
   const hasStonecunning = (playerStats.race?.traits || []).some(t => t.name === 'Stonecunning' && t.automation)
   const maxSC = hasStonecunning ? (playerStats.proficiency || 0) : 0
   resources.stonecunningUses = { current: maxSC, max: maxSC }
+
+  const maxTU = isRanger && playerStats.level >= 10 ? Math.max(wis?.bonus || 0, 1) : 0
+  resources.tirelessUses = { current: maxTU, max: maxTU }
 
   return resources
 }

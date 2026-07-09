@@ -129,7 +129,8 @@ export const LONG_REST_RESOURCES = [
   'breathWeaponUses',
   'stonecunningUses',
   'naturesVeilUses',
-  'favoredEnemyUses'
+  'favoredEnemyUses',
+  'tirelessUses'
 ]
 
 export function getLongRestResources() {
@@ -308,6 +309,14 @@ export async function applyShortRest(playerStats, campaignName) {
     if (hasBolsteringTreats) {
       const craftCount = playerStats.proficiency || 0
       updates.chefBolsteringTreats = craftCount
+    }
+
+    // Tireless: decrease exhaustion by 1 on short rest
+    if (playerStats.class?.name === 'Ranger' && playerStats.level >= 10) {
+      const currentExhaustion = getRuntimeValue(name, 'exhaustionLevel', campaignName)
+      if (typeof currentExhaustion === 'number' && currentExhaustion > 0) {
+        updates.exhaustionLevel = currentExhaustion - 1
+      }
     }
 
    // Celestial Resilience: Grant temp HP on short rest for Celestial Patron

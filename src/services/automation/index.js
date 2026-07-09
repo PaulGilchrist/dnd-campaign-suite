@@ -104,6 +104,7 @@ import { handle as handleDefensiveTactics } from './handlers/class-ranger/defens
 import { handle as handleSuperiorHunterPrey } from './handlers/class-ranger/superiorHunterPreyHandler.js';
 import { handle as handleSuperiorHunterDefense } from './handlers/class-ranger/superiorHunterDefenseHandler.js';
 import { handle as handleNaturesVeil } from './handlers/class-ranger/naturesVeilHandler.js';
+import { handle as handleTireless } from './handlers/class-ranger/tirelessHandler.js';
 import { handle as handleBonusActionChoice } from './handlers/combat/bonusActionChoiceHandler.js';
 import { handle as handleSteadyAim } from './handlers/class-fighter-rogue/steadyAimHandler.js';
 import { handle as handleStrokeOfLuck } from './handlers/class-fighter-rogue/strokeOfLuckHandler.js';
@@ -347,6 +348,7 @@ const HANDLER_MAP = {
         superior_hunter_prey: handleSuperiorHunterPrey,
         superior_hunter_defense: handleSuperiorHunterDefense,
         natures_veil: handleNaturesVeil,
+        tireless: handleTireless,
         bonus_action_choice: handleBonusActionChoice,
         steady_aim: handleSteadyAim,
         stroke_of_luck: handleStrokeOfLuck,

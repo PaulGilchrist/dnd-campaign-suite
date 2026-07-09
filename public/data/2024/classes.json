@@ -7597,7 +7597,15 @@
                         "name": "Tireless",
                         "description": "Temporary Hit Points. As a Action, you can give yourself Temporary Hit Points equal to 1d8 + Wisdom modifier (minimum 1). Uses = Wisdom modifier (minimum once). Regain all on Long Rest. Decrease Exhaustion. Whenever you finish a Short Rest, your Exhaustion level decreases by 1.",
                         "level": 10,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "tireless",
+                            "action": "action",
+                            "resourceKey": "tirelessUses",
+                            "recharge": "long_rest",
+                            "tempHpExpression": "1d8 + WIS modifier",
+                            "casting_time": "1 action"
+                        }
                     }
                 ],
                 "spellcasting": {
