@@ -50,9 +50,11 @@
                 "STR checks",
                 "STR saves"
               ],
-              "duration": "1_minute",
+              "duration": "until_next_turn_extendable",
               "maxRages": "class_level_scaling",
-              "recharge": "long_rest",
+              "recharge_short_rest": "1_use",
+              "recharge_long_rest": "all",
+              "blocksSpellcasting": true,
               "casting_time": "1 bonus action"
             }
           },
@@ -60,7 +62,12 @@
             "name": "Unarmored Defense",
             "level": 1,
             "prerequisites": [],
-            "description": "While you are not wearing any armor, your Armor Class equals 10 + your Dexterity modifier + your Constitution modifier. You can use a shield and still gain this benefit."
+            "description": "While you are not wearing any armor, your Armor Class equals 10 + your Dexterity modifier + your Constitution modifier. You can use a shield and still gain this benefit.",
+            "automation": {
+              "type": "passive_rule",
+              "effect": "unarmored_defense_ac",
+              "casting_time": "passive"
+            }
           }
         ],
         "class_specific": {
@@ -86,7 +93,7 @@
               "saveType": "DEX",
               "condition": "visible_effect",
               "effect": "advantage",
-              "casting_time": "1 action"
+              "casting_time": "passive"
             }
           },
           {
@@ -97,9 +104,9 @@
             "automation": {
               "type": "temp_buff",
               "effect": "advantage_attacks_disadvantage_against",
-              "duration": "until_next_turn",
+              "duration": "until_start_of_next_turn",
               "trigger": "first_attack_of_turn",
-              "casting_time": "1 action"
+              "casting_time": "passive"
             }
           }
         ],
@@ -156,7 +163,14 @@
             "name": "Fast Movement",
             "level": 5,
             "prerequisites": [],
-            "description": "Your speed increases by 10 feet while you aren't wearing heavy armor."
+            "description": "Your speed increases by 10 feet while you aren't wearing heavy armor.",
+            "automation": {
+              "type": "passive_buff",
+              "effect": "speed_bonus",
+              "bonusExpression": "10",
+              "condition": "no_heavy_armor",
+              "casting_time": "passive"
+            }
           }
         ],
         "class_specific": {
@@ -190,7 +204,8 @@
             "description": "Your instincts are so honed that you have advantage on initiative rolls. Additionally, if you are surprised at the beginning of combat and aren't incapacitated, you can act normally on your first turn, but only if you enter your rage before doing anything else on that turn.",
             "automation": {
               "type": "passive_rule",
-              "effect": "initiative_advantage"
+              "effect": "initiative_advantage",
+              "casting_time": "passive"
             }
           }
         ],
@@ -253,7 +268,16 @@
             "name": "Relentless Rage",
             "level": 11,
             "prerequisites": [],
-            "description": "Your rage can keep you fighting despite grievous wounds. If you drop to 0 hit points while you're raging and don't die outright, you can make a DC 10 Constitution saving throw. If you succeed, you drop to 1 hit point instead. Each time you use this feature after the first, the DC increases by 5. When you finish a short or long rest, the DC resets to 10."
+            "description": "Your rage can keep you fighting despite grievous wounds. If you drop to 0 hit points while you're raging and don't die outright, you can make a DC 10 Constitution saving throw. If you succeed, you drop to 1 hit point instead. Each time you use this feature after the first, the DC increases by 5. When you finish a short or long rest, the DC resets to 10.",
+            "automation": {
+              "type": "reaction_save_heal",
+              "saveType": "CON",
+              "saveDc": 10,
+              "dcScaling": 5,
+              "healExpression": "2 * barbarian_level",
+              "recharge": "short_or_long_rest",
+              "casting_time": "1 reaction"
+            }
           }
         ],
         "class_specific": {
@@ -315,7 +339,12 @@
             "name": "Persistent Rage",
             "level": 15,
             "prerequisites": [],
-            "description": "Your rage is so fierce that it ends early only if you fall unconscious or if you choose to end it."
+            "description": "Your rage is so fierce that it ends early only if you fall unconscious or if you choose to end it.",
+            "automation": {
+              "type": "passive_rule",
+              "effect": "persistent_rage",
+              "casting_time": "passive"
+            }
           }
         ],
         "class_specific": {
@@ -365,7 +394,16 @@
             "name": "Indomitable Might",
             "level": 18,
             "prerequisites": [],
-            "description": "If your total for a Strength check is less than your Strength score, you can use that score in place of the total."
+            "description": "If your total for a Strength check is less than your Strength score, you can use that score in place of the total.",
+            "automation": {
+              "type": "conditional_replacement",
+              "target": "ability_check",
+              "saveType": "STR",
+              "condition": "low_total",
+              "effect": "replacement",
+              "replacementAbility": "STR",
+              "casting_time": "passive"
+            }
           }
         ],
         "class_specific": {
@@ -421,7 +459,15 @@
                 "name": "Frenzy",
                 "level": 3,
                 "prerequisites": [],
-                "description": "You can go into a frenzy when you rage. If you do so, for the duration of your rage you can make a single melee weapon attack as a bonus action on each of your turns after this one. When your rage ends, you suffer one level of exhaustion (as described in appendix A)."
+                "description": "You can go into a frenzy when you rage. If you do so, for the duration of your rage you can make a single melee weapon attack as a bonus action on each of your turns after this one. When your rage ends, you suffer one level of exhaustion (as described in appendix A).",
+                "automation": {
+                  "type": "damage_bonus",
+                  "trigger": "reckless_attack_hit_while_raging",
+                  "damageExpression": "rage_damage_d6",
+                  "damageType": "same_as_weapon",
+                  "oncePerTurn": true,
+                  "casting_time": "passive"
+                }
               }
             ]
           },
@@ -432,7 +478,17 @@
                 "name": "Mindless Rage",
                 "level": 6,
                 "prerequisites": [],
-                "description": "You can't be charmed or frightened while raging. If you are charmed or frightened when you enter your rage, the effect is suspended for the duration of the rage."
+                "description": "You can't be charmed or frightened while raging. If you are charmed or frightened when you enter your rage, the effect is suspended for the duration of the rage.",
+                "automation": {
+                  "type": "condition_immunity_while_active",
+                  "target": "self",
+                  "immunities": [
+                    "charmed",
+                    "frightened"
+                  ],
+                  "requiresActive": "Rage",
+                  "casting_time": "passive"
+                }
               }
             ]
           },
@@ -648,7 +704,11 @@
             "name": "Jack of All Trades",
             "level": 2,
             "prerequisites": [],
-            "description": "You can add half your proficiency bonus, rounded down, to any ability check you make that doesn't already include your proficiency bonus."
+            "description": "You can add half your proficiency bonus, rounded down, to any ability check you make that doesn't already include your proficiency bonus.",
+            "automation": {
+              "type": "jack_of_all_trades",
+              "casting_time": "passive"
+            }
           },
           {
             "name": "Song of Rest",
@@ -807,7 +867,11 @@
             "name": "Font of Inspiration",
             "level": 5,
             "prerequisites": [],
-            "description": "You regain all of your expended uses of Bardic Inspiration when you finish a short or long rest."
+            "description": "You regain all of your expended uses of Bardic Inspiration when you finish a short or long rest.",
+            "automation": {
+              "type": "font_of_inspiration",
+              "casting_time": "passive"
+            }
           }
         ],
         "spellcasting": {
@@ -1014,7 +1078,11 @@
             "name": "Magical Secrets",
             "level": 10,
             "prerequisites": [],
-            "description": "You have plundered magical knowledge from a wide spectrum of disciplines. Choose two spells from any class, including this one. A spell you choose must be of a level you can cast, as shown on the Bard table, or a cantrip. The chosen spells count as bard spells for you and are included in the number in the Spells Known column of the Bard table."
+            "description": "You have plundered magical knowledge from a wide spectrum of disciplines. Choose two spells from any class, including this one. A spell you choose must be of a level you can cast, as shown on the Bard table, or a cantrip. The chosen spells count as bard spells for you and are included in the number in the Spells Known column of the Bard table.",
+            "automation": {
+              "type": "passive_rule",
+              "casting_time": "passive"
+            }
           }
         ],
         "spellcasting": {
@@ -1411,9 +1479,10 @@
                 "description": "You learn how to use your wit to distract, confuse, and otherwise sap the confidence and competence of others.  When a creature that you can see within 60 feet of you makes an attack roll, an ability check, or a damage roll, you can use your reaction to expend one of your uses of Bardic Inspiration, rolling a Bardic Inspiration die and subtracting the number rolled from the creature's roll. You can choose to use this feature after the creature makes its roll, but before the GM determines whether the attack roll or ability check succeeds or fails, or before the creature deals its damage. The creature is immune if it can't hear you or if it's immune to being charmed.",
                 "automation": {
                   "type": "reaction_debuff",
-                  "trigger": "creature_makes_roll",
+                  "trigger": "damage_ability_check_or_attack_roll_within_60ft",
                   "debuffExpression": "bardic_inspiration_die",
-                  "range": "60_ft",
+                  "subtractive": true,
+                  "range": "60 ft",
                   "casting_time": "1 reaction"
                 }
               }
@@ -1443,7 +1512,14 @@
                 "name": "Peerless Skill",
                 "level": 14,
                 "prerequisites": [],
-                "description": "When you make an ability check, you can expend one use of Bardic Inspiration. Roll a Bardic Inspiration die and add the number rolled to your ability check. You can choose to do so after you roll the die for the ability check, but before the GM tells you whether you succeed or fail."
+                "description": "When you make an ability check, you can expend one use of Bardic Inspiration. Roll a Bardic Inspiration die and add the number rolled to your ability check. You can choose to do so after you roll the die for the ability check, but before the GM tells you whether you succeed or fail.",
+                "automation": {
+                  "type": "auto_reroll",
+                  "trigger": "failed_ability_check_or_attack_roll",
+                  "effect": "add_to_failed_roll",
+                  "bonusExpression": "bardic_inspiration_die",
+                  "casting_time": "1 reaction"
+                }
               }
             ],
             "subclass_specific": {
@@ -1475,13 +1551,12 @@
                 "prerequisites": [],
                 "description": "You learn to inspire others in battle. A creature that has a Bardic Inspiration die from you can roll that die and add the number rolled to a weapon damage roll it just made. Alternatively, when an attack roll is made against the creature, it can use its reaction to roll the Bardic Inspiration die and add the number rolled to its AC against that attack, after seeing the roll but before knowing whether it hits or misses.",
                 "automation": {
-                  "type": "enhanced_buff_ally",
-                  "buffExpression": "bardic_inspiration_die",
-                  "extra_effects": [
-                    "damage_bonus",
-                    "ac_bonus"
+                  "type": "passive_rule",
+                  "effect": "bardic_inspiration_combat_options",
+                  "options": [
+                    "defense_add_to_ac",
+                    "offense_add_to_damage"
                   ],
-                  "range": "60_ft",
                   "casting_time": "1 reaction"
                 }
               }
@@ -1593,7 +1668,19 @@
             "name": "Channel Divinity",
             "level": 2,
             "prerequisites": [],
-            "description": "You gain the ability to channel divine energy directly from your deity, using that energy to fuel magical effects. You start with two such effects: Turn Undead and an effect determined by your domain. Some domains grant you additional effects as you advance in levels, as noted in the domain description. When you use your Channel Divinity, you choose which effect to create. You must then finish a short or long rest to use your Channel Divinity again. Some Channel Divinity effects require saving throws. When you use such an effect from this class, the DC equals your cleric spell save DC. Beginning at 6th level, you can use your Channel Divinity twice between rests. When you finish a short or long rest, you regain your expended uses."
+            "description": "You gain the ability to channel divine energy directly from your deity, using that energy to fuel magical effects. You start with two such effects: Turn Undead and an effect determined by your domain. Some domains grant you additional effects as you advance in levels, as noted in the domain description. When you use your Channel Divinity, you choose which effect to create. You must then finish a short or long rest to use your Channel Divinity again. Some Channel Divinity effects require saving throws. When you use such an effect from this class, the DC equals your cleric spell save DC. Beginning at 6th level, you can use your Channel Divinity twice between rests. When you finish a short or long rest, you regain your expended uses.",
+            "automation": {
+              "type": "resource_pool",
+              "resource": "Channel Divinity",
+              "uses_expression": "proficiency_bonus",
+              "recharge_short_rest": "1",
+              "recharge_long_rest": "all",
+              "effects": [
+                "Divine Spark",
+                "Turn Undead"
+              ],
+              "casting_time": "passive"
+            }
           },
           {
             "name": "Channel Divinity: Turn Undead",
@@ -1846,7 +1933,12 @@
             "name": "Divine Intervention",
             "level": 10,
             "prerequisites": [],
-            "description": "You can call on your deity to intervene on your behalf when your need is great. Imploring your deity's aid requires you to use your action. Describe the assistance you seek, and roll percentile dice. If you roll a number equal to or lower than your cleric level, your deity intervenes. The GM chooses the nature of the intervention; the effect of any cleric spell or cleric domain spell would be appropriate. If your deity intervenes, you can't use this feature again for 7 days. Otherwise, you can use it again after you finish a long rest. At 20th level, your call for intervention succeeds automatically, no roll required."
+            "description": "You can call on your deity to intervene on your behalf when your need is great. Imploring your deity's aid requires you to use your action. Describe the assistance you seek, and roll percentile dice. If you roll a number equal to or lower than your cleric level, your deity intervenes. The GM chooses the nature of the intervention; the effect of any cleric spell or cleric domain spell would be appropriate. If your deity intervenes, you can't use this feature again for 7 days. Otherwise, you can use it again after you finish a long rest. At 20th level, your call for intervention succeeds automatically, no roll required.",
+            "automation": {
+              "type": "divine_intervention",
+              "recharge": "long_rest",
+              "casting_time": "1 action"
+            }
           }
         ],
         "spellcasting": {
@@ -2305,7 +2397,13 @@
                 "name": "Blessed Healer",
                 "level": 6,
                 "prerequisites": [],
-                "description": "The healing spells you cast on others heal you as well. When you cast a spell of 1st level or higher that restores hit points to a creature other than you, you regain hit points equal to 2 + the spell's level."
+                "description": "The healing spells you cast on others heal you as well. When you cast a spell of 1st level or higher that restores hit points to a creature other than you, you regain hit points equal to 2 + the spell's level.",
+                "automation": {
+                  "type": "post_cast_self_heal",
+                  "healExpression": "2 + spell_slot_level",
+                  "othersOnly": true,
+                  "casting_time": "passive"
+                }
               }
             ]
           },
@@ -3367,7 +3465,10 @@
                 "automation": {
                   "type": "passive_buff",
                   "effect": "enhanced_distraction_and_healing",
-                  "bonusExpression": "cleric_level"
+                  "bonusExpression": "cleric_level",
+                  "healingRange": "5_ft",
+                  "attackAdvantageRange": "5_ft",
+                  "casting_time": "passive"
                 }
               }
             ]
@@ -3571,7 +3672,16 @@
                 "name": "Avatar of Battle",
                 "level": 17,
                 "prerequisites": [],
-                "description": "You gain resistance to bludgeoning, piercing, and slashing damage from nonmagical weapons."
+                "description": "You gain resistance to bludgeoning, piercing, and slashing damage from nonmagical weapons.",
+                "automation": {
+                  "type": "resistance",
+                  "damageTypes": [
+                    "Bludgeoning",
+                    "Piercing",
+                    "Slashing"
+                  ],
+                  "casting_time": "passive"
+                }
               }
             ]
           }
@@ -3580,7 +3690,7 @@
           "Heavy Armor",
           "Martial Weapons"
         ],
-        "description": "War has many manifestations. It can make heroes of ordinary people. It can be desperate and horrific, with acts of cruelty and cowardice eclipsing instances of excellence and courage. In either case, the gods of war watch over warriors and reward them for their great deeds. The clerics of such gods excel in battle, inspiring others to fight the good fight or offering acts of violence asprayers.Godsofwarincludechampionsofhonor and chivalry (such as Torm, Heironeous, and Kiri\u00ad Jolith) as well as gods of destruction and pillage (such as Erythnul, the Fury, Gruumsh, and Ares) and gods of conquest and domination (such as Bane, Hextor, and Maglubiyet). Other war gods (such as Tempus, Nike, and Nuada) take a more neutral stance, promoting war in all its manifestations and supporting warriors in any circumstance."
+        "description": "War has many manifestations. It can make heroes of ordinary people. It can be desperate and horrific, with acts of cruelty and cowardice eclipsing instances of excellence and courage. In either case, the gods of war watch over warriors and reward them for their great deeds. The clerics of such gods excel in battle, inspiring others to fight the good fight or offering acts of violence asprayers.Godsofwarincludechampionsofhonor and chivalry (such as Torm, Heironeous, and Kiri­ Jolith) as well as gods of destruction and pillage (such as Erythnul, the Fury, Gruumsh, and Ares) and gods of conquest and domination (such as Bane, Hextor, and Maglubiyet). Other war gods (such as Tempus, Nike, and Nuada) take a more neutral stance, promoting war in all its manifestations and supporting warriors in any circumstance."
       }
     ],
     "book": "Player's Handbook",
@@ -3685,12 +3795,16 @@
             "details": "Your druid level determines the beasts you can transform into, as shown in the Beast Shapes table. At 2nd level, for example, you can transform into any beast that has a challenge rating of 1/4 or lower that doesn't have a flying or swimming speed...",
             "description": "You can use your action to magically assume the shape of a beast that you have seen before. You can use this feature twice. You regain expended uses when you finish a short or long rest.",
             "automation": {
-              "type": "resource_pool",
-              "resource": "wild_shape_uses",
-              "uses_expression": "2",
-              "recharge_short_rest": "2",
-              "recharge_long_rest": "2",
-              "casting_time": "1 action"
+              "type": "temp_buff",
+              "effect": "shape_shift",
+              "action": "bonus_action",
+              "duration": "half_druid_level_hours",
+              "tempHpExpression": "druid_level",
+              "uses": 2,
+              "recharge_short_rest": 1,
+              "recharge_long_rest": "all",
+              "casting_time": "1 bonus action",
+              "blocksSpellcasting": true
             }
           }
         ],
@@ -4098,7 +4212,11 @@
             "name": "Beast Spells",
             "level": 18,
             "prerequisites": [],
-            "description": "You can cast many of your druid spells in any shape you assume using Wild Shape. You can perform the somatic and verbal components of a druid spell while in a beast shape, but you aren't able to provide material components."
+            "description": "You can cast many of your druid spells in any shape you assume using Wild Shape. You can perform the somatic and verbal components of a druid spell while in a beast shape, but you aren't able to provide material components.",
+            "automation": {
+              "type": "passive_rule",
+              "effect": "beast_spells"
+            }
           },
           {
             "name": "Timeless Body",
@@ -5242,7 +5360,18 @@
                 "name": "Nature's Ward",
                 "level": 10,
                 "prerequisites": [],
-                "description": "You can't be charmed or frightened by elementals or fey, and you are immune to poison and disease."
+                "description": "You can't be charmed or frightened by elementals or fey, and you are immune to poison and disease.",
+                "automation": {
+                  "type": "land_resistance",
+                  "conditionImmunity": "poisoned",
+                  "landMappings": {
+                    "arid": "Fire",
+                    "polar": "Cold",
+                    "temperate": "Lightning",
+                    "tropical": "Poison"
+                  },
+                  "casting_time": "passive"
+                }
               }
             ]
           },
@@ -5253,7 +5382,17 @@
                 "name": "Nature's Sanctuary",
                 "level": 14,
                 "prerequisites": [],
-                "description": "Creatures of the natural world sense your connection to nature and become hesitant to attack you. When a beast or plant creature attacks you, that creature must make a Wisdom saving throw against your druid spell save DC. On a failed save, the creature must choose a different target, or the attack automatically misses. On a successful save, the creature is immune to this effect for 24 hours. The creature is aware of this effect before it makes its attack against you."
+                "description": "Creatures of the natural world sense your connection to nature and become hesitant to attack you. When a beast or plant creature attacks you, that creature must make a Wisdom saving throw against your druid spell save DC. On a failed save, the creature must choose a different target, or the attack automatically misses. On a successful save, the creature is immune to this effect for 24 hours. The creature is aware of this effect before it makes its attack against you.",
+                "automation": {
+                  "type": "nature_sanctuary",
+                  "range": "120_ft",
+                  "cubeSize": 15,
+                  "duration": "1_minute",
+                  "moveRange": 60,
+                  "movesPerDuration": 1,
+                  "resourceCost": "wild_shape",
+                  "casting_time": "1 action"
+                }
               }
             ]
           }
@@ -5400,7 +5539,7 @@
               "type": "self_healing",
               "healExpression": "1d10 + fighter level",
               "action": "bonus_action",
-              "uses": 1,
+              "uses": 2,
               "resourceKey": "secondWindUses",
               "recharge": "short_rest",
               "casting_time": "1 bonus action"
@@ -5432,12 +5571,7 @@
               "type": "extra_action",
               "uses": 1,
               "recharge": "short_rest",
-              "scaling": [
-                {
-                  "level": 17,
-                  "uses": 2
-                }
-              ],
+              "oncePerTurn": true,
               "casting_time": "1 action"
             }
           }
@@ -5537,7 +5671,15 @@
             "name": "Indomitable",
             "level": 9,
             "prerequisites": [],
-            "description": "You can reroll a saving throw that you fail. If you do so, you must use the new roll, and you can't use this feature again until you finish a long rest."
+            "description": "You can reroll a saving throw that you fail. If you do so, you must use the new roll, and you can't use this feature again until you finish a long rest.",
+            "automation": {
+              "type": "auto_reroll",
+              "trigger": "failed_saving_throw",
+              "target": "saving_throw",
+              "bonusExpression": "fighter_level",
+              "recharge": "long_rest",
+              "casting_time": "passive"
+            }
           }
         ],
         "class_specific": {
@@ -5595,7 +5737,15 @@
             "name": "Indomitable",
             "level": 13,
             "prerequisites": [],
-            "description": "You can reroll a saving throw that you fail. If you do so, you must use the new roll. You can use this feature twice before needing a long rest for it to reset."
+            "description": "You can reroll a saving throw that you fail. If you do so, you must use the new roll. You can use this feature twice before needing a long rest for it to reset.",
+            "automation": {
+              "type": "auto_reroll",
+              "trigger": "failed_saving_throw",
+              "target": "saving_throw",
+              "bonusExpression": "fighter_level",
+              "recharge": "long_rest",
+              "casting_time": "passive"
+            }
           }
         ],
         "class_specific": {
@@ -5649,14 +5799,9 @@
             "description": "You can push yourself beyond your normal limits for a moment. On your turn, you can take one additional action on top of your regular action and a possible bonus action. You can use this twice before a short or long rest, but only once on the same turn.",
             "automation": {
               "type": "extra_action",
-              "uses": 1,
+              "uses": 2,
               "recharge": "short_rest",
-              "scaling": [
-                {
-                  "level": 17,
-                  "uses": 2
-                }
-              ],
+              "oncePerTurn": true,
               "casting_time": "1 action"
             }
           },
@@ -5664,7 +5809,15 @@
             "name": "Indomitable",
             "level": 17,
             "prerequisites": [],
-            "description": "You can reroll a saving throw that you fail. If you do so, you must use the new roll. You can use this feature three times before needing a long rest for it to reset."
+            "description": "You can reroll a saving throw that you fail. If you do so, you must use the new roll. You can use this feature three times before needing a long rest for it to reset.",
+            "automation": {
+              "type": "auto_reroll",
+              "trigger": "failed_saving_throw",
+              "target": "saving_throw",
+              "bonusExpression": "fighter_level",
+              "recharge": "long_rest",
+              "casting_time": "passive"
+            }
           }
         ],
         "class_specific": {
@@ -5733,7 +5886,7 @@
                   "type": "passive_rule",
                   "effect": "critical_range",
                   "criticalRange": "19-20",
-                  "casting_time": "1 action"
+                  "casting_time": "passive"
                 }
               }
             ]
@@ -5785,7 +5938,7 @@
                   "type": "passive_rule",
                   "effect": "critical_range",
                   "criticalRange": "18-20",
-                  "casting_time": "1 action"
+                  "casting_time": "passive"
                 }
               }
             ]
@@ -5798,11 +5951,25 @@
                 "level": 18,
                 "prerequisites": [],
                 "description": "You attain the pinnacle of resilience in battle. At the start of each of your turns, you regain hit points equal to 5 + your Constitution modifier if you have no more than half of your hit points left. You don't gain this benefit if you have 0 hit points.",
-                "automation": {
-                  "type": "healing_start_of_turn",
-                  "healExpression": "5 + CON modifier",
-                  "bloodiedOnly": true
-                }
+                "automation": [
+                  {
+                    "type": "conditional_advantage",
+                    "target": "death_saving_throws",
+                    "condition": "",
+                    "effect": "advantage",
+                    "abilities": []
+                  },
+                  {
+                    "type": "passive_rule",
+                    "effect": "death_save_nat18_as_20",
+                    "casting_time": "passive"
+                  },
+                  {
+                    "type": "healing_start_of_turn",
+                    "healExpression": "5 + CON modifier",
+                    "bloodiedOnly": true
+                  }
+                ]
               }
             ]
           }
@@ -5863,7 +6030,7 @@
                 "automation": {
                   "type": "know_enemy",
                   "casting_time": "1 bonus action",
-                  "range": "30 ft"
+                  "range": "30_ft"
                 }
               }
             ]
@@ -5875,7 +6042,12 @@
                 "name": "Improved Combat Superiority",
                 "level": 10,
                 "prerequisites": [],
-                "description": "Your superiority dice turn into d1Os."
+                "description": "Your superiority dice turn into d1Os.",
+                "automation": {
+                  "type": "passive_rule",
+                  "effect": "superiority_die_scaling",
+                  "casting_time": "passive"
+                }
               }
             ]
           },
@@ -5889,7 +6061,8 @@
                 "description": "When you roll initiative and have no superiority dice remaining, you regain one superiority die.",
                 "automation": {
                   "type": "passive_rule",
-                  "effect": "relentless"
+                  "effect": "relentless",
+                  "casting_time": "passive"
                 }
               }
             ]
@@ -5982,7 +6155,13 @@
                 "name": "War Magic",
                 "level": 7,
                 "prerequisites": [],
-                "description": "When you use your action to cast a cantrip, you can make one weapon attack as a bonus action."
+                "description": "When you use your action to cast a cantrip, you can make one weapon attack as a bonus action.",
+                "automation": {
+                  "type": "war_magic_cantrip",
+                  "spellList": "wizard_cantrips",
+                  "action": "action",
+                  "casting_time": "1 action"
+                }
               }
             ],
             "spellcasting": {
@@ -6025,7 +6204,19 @@
                 "name": "Eldritch Strike",
                 "level": 10,
                 "prerequisites": [],
-                "description": "You learn how to make your weapon strikes undercut a creature's resistance to your spells. When you hit a creature with a weapon attack, that creature has disadvantage on the next saving throw it makes against a spell you cast before the end of your next turn."
+                "description": "You learn how to make your weapon strikes undercut a creature's resistance to your spells. When you hit a creature with a weapon attack, that creature has disadvantage on the next saving throw it makes against a spell you cast before the end of your next turn.",
+                "automation": {
+                  "type": "attack_rider",
+                  "trigger": "weapon_attack_hit",
+                  "oncePerTurn": true,
+                  "options": [
+                    {
+                      "name": "Eldritch Strike",
+                      "effect": "disadvantage_on_next_save"
+                    }
+                  ],
+                  "casting_time": "passive"
+                }
               }
             ],
             "spellcasting": {
@@ -6092,7 +6283,12 @@
                 "name": "Arcane Charge",
                 "level": 15,
                 "prerequisites": [],
-                "description": "You gain the ability to teleport up to 30 feet to an unoccupied space you can see when you use your Action Surge. You can teleport before or after the additional action."
+                "description": "You gain the ability to teleport up to 30 feet to an unoccupied space you can see when you use your Action Surge. You can teleport before or after the additional action.",
+                "automation": {
+                  "type": "arcane_charge",
+                  "distance": "30 ft",
+                  "casting_time": "1 action"
+                }
               }
             ],
             "spellcasting": {
@@ -6135,7 +6331,23 @@
                 "name": "Improved War Magic",
                 "level": 18,
                 "prerequisites": [],
-                "description": "When you use your action to cast a spell, you can make one weapon attack as a bonus action."
+                "description": "When you use your action to cast a spell, you can make one weapon attack as a bonus action.",
+                "automation": [
+                  {
+                    "type": "war_magic_cantrip",
+                    "spellList": "wizard_cantrips",
+                    "action": "action",
+                    "casting_time": "1 action"
+                  },
+                  {
+                    "type": "war_magic_spell",
+                    "spellList": "wizard_spells",
+                    "maxSpellLevel": 2,
+                    "action": "action",
+                    "casting_time": "1 action",
+                    "replacesWarMagic": true
+                  }
+                ]
               }
             ],
             "spellcasting": {
@@ -6289,7 +6501,7 @@
               "attacks": 2,
               "attackType": "unarmed_strike",
               "cost": {
-                "resource": "ki_points",
+                "resource": "focus_points",
                 "amount": 1
               },
               "trigger": "after_attack_action",
@@ -6310,9 +6522,9 @@
             "automation": {
               "type": "bonus_attacks",
               "attacks": 2,
-              "attackType": "unarmed_strike",
+              "attackType": "disengage_dodge",
               "cost": {
-                "resource": "ki_points",
+                "resource": "focus_points",
                 "amount": 1
               },
               "trigger": "after_attack_action",
@@ -6327,9 +6539,9 @@
             "automation": {
               "type": "bonus_attacks",
               "attacks": 2,
-              "attackType": "unarmed_strike",
+              "attackType": "disengage_dash",
               "cost": {
-                "resource": "ki_points",
+                "resource": "focus_points",
                 "amount": 1
               },
               "trigger": "after_attack_action",
@@ -6340,7 +6552,13 @@
             "name": "Unarmored Movement",
             "level": 2,
             "prerequisites": [],
-            "description": "Your speed increases by 10 feet while you are not wearing armor or wielding a shield."
+            "description": "Your speed increases by 10 feet while you are not wearing armor or wielding a shield.",
+            "automation": {
+              "type": "passive_buff",
+              "effect": "speed_bonus",
+              "condition": "no_armor_no_shield",
+              "casting_time": "passive"
+            }
           }
         ],
         "class_specific": {
@@ -6437,16 +6655,17 @@
             "prerequisites": [],
             "description": "You can interfere with the flow of ki in an opponent's body. When you hit another creature with a melee weapon attack, you can spend 1 ki point to attempt a stunning strike. The target must succeed on a Constitution saving throw or be stunned until the end of your next turn.",
             "automation": {
-              "type": "save_attack",
-              "trigger": "melee_weapon_hit",
+              "type": "save_only",
+              "trigger": "monk_weapon_or_unarmed_hit",
               "cost": {
-                "resource": "ki_points",
+                "resource": "focus_points",
                 "amount": 1
               },
               "saveType": "CON",
               "saveDc": "ability",
               "conditionInflicted": "stunned",
-              "duration": "until_end_of_next_turn",
+              "duration": "until_start_of_next_turn",
+              "successEffect": "speed_halved_until_start_of_next_turn",
               "oncePerTurn": true,
               "casting_time": "1 action"
             }
@@ -6491,7 +6710,11 @@
             "name": "Evasion",
             "level": 7,
             "prerequisites": [],
-            "description": "Your instinctive agility lets you dodge out of the way of certain area effects, such as a blue dragon's lightning breath or a fireball spell. When you are subjected to an effect that allows you to make a Dexterity saving throw to take only half damage, you instead take no damage if you succeed on the saving throw, and only half damage if you fail."
+            "description": "Your instinctive agility lets you dodge out of the way of certain area effects, such as a blue dragon's lightning breath or a fireball spell. When you are subjected to an effect that allows you to make a Dexterity saving throw to take only half damage, you instead take no damage if you succeed on the saving throw, and only half damage if you fail.",
+            "automation": {
+              "type": "evasion",
+              "saveType": "DEX"
+            }
           },
           {
             "name": "Stillness of Mind",
@@ -6757,16 +6980,25 @@
                 "prerequisites": [],
                 "description": "You can manipulate your enemy's ki when you harness your own. Whenever you hit a creature with one of the attacks granted by your Flurry of Blows, you can impose one of the following effects on that target:<ul><li>It must succeed on a Dexterity saving throw or be knocked prone.</li><li>It must make a Strength saving throw. If it fails, you can push it up to 15 feet away from you.</li><li>It can't take reactions until the end of your next turn.</li></ul>",
                 "automation": {
-                  "type": "flurry_effect",
+                  "type": "open_hand_technique",
                   "options": [
-                    "prone",
-                    "push_15ft",
-                    "no_reactions"
+                    {
+                      "name": "Push",
+                      "effect": "push_15ft"
+                    },
+                    {
+                      "name": "Disadvantage Next Attack",
+                      "effect": "disadvantage_next_attack"
+                    },
+                    {
+                      "name": "No Reactions",
+                      "effect": "no_reactions"
+                    }
                   ],
-                  "saveType": "varies",
+                  "saveType": "STR",
                   "saveDc": "ability",
-                  "trigger": "flurry_of_blows_hit",
-                  "casting_time": "1 bonus action"
+                  "saveAbility": "WIS",
+                  "trigger": "flurry_of_blows_unarmed_strike_hit"
                 }
               }
             ]
@@ -6778,7 +7010,15 @@
                 "name": "Wholeness of Body",
                 "level": 6,
                 "prerequisites": [],
-                "description": "You gain the ability to heal yourself. As an action, you can regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again."
+                "description": "You gain the ability to heal yourself. As an action, you can regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+                "automation": {
+                  "type": "self_healing",
+                  "healExpression": "3 * monk_level",
+                  "action": "bonus_action",
+                  "uses": 1,
+                  "recharge": "long_rest",
+                  "casting_time": "1 bonus action"
+                }
               }
             ]
           },
@@ -6820,7 +7060,19 @@
                 "name": "Shadow Arts",
                 "level": 3,
                 "prerequisites": [],
-                "description": "You can use your ki to duplicate the effects of certain spells. As an action, you can spend 2 ki points to cast darkness, darkvision, pass without trace, or silence, without providing material components. Additionally, you gain the minorillusion cantrip ifyou don't already know it."
+                "description": "You can use your ki to duplicate the effects of certain spells. As an action, you can spend 2 ki points to cast darkness, darkvision, pass without trace, or silence, without providing material components. Additionally, you gain the minorillusion cantrip ifyou don't already know it.",
+                "automation": {
+                  "type": "free_spell",
+                  "spell": [
+                    "Darkness",
+                    "Darkvision",
+                    "Pass Without Trace",
+                    "Silence"
+                  ],
+                  "perSpellTracking": true,
+                  "recharge": "long_rest",
+                  "casting_time": "1 action"
+                }
               }
             ]
           },
@@ -6831,7 +7083,15 @@
                 "name": "Shadow Step",
                 "level": 6,
                 "prerequisites": [],
-                "description": "You gain the ability to step from one shadow into another. When you are in dim light or darkness, as a bonus action you can teleport up to 60 feet to an unoccupied space you can see that is also in dim light or darkness. You then have advantage on the first melee attack you make before the end of the turn."
+                "description": "You gain the ability to step from one shadow into another. When you are in dim light or darkness, as a bonus action you can teleport up to 60 feet to an unoccupied space you can see that is also in dim light or darkness. You then have advantage on the first melee attack you make before the end of the turn.",
+                "automation": {
+                  "type": "temp_buff",
+                  "effect": "shadow_step_teleport",
+                  "distance": "60 ft",
+                  "condition": "dim_light_or_darkness",
+                  "bonus": "advantage_on_next_melee_attack",
+                  "casting_time": "1 bonus action"
+                }
               }
             ]
           },
@@ -6866,7 +7126,7 @@
                 "name": "Disciple of the Elements",
                 "level": 3,
                 "prerequisites": [],
-                "description": "You learn magical disciplines that harness the power of the four elements. A discipline requires you to spend ki points each time you use it.<br/><br/> You know the Elemental Attunement discipline and one other elemental discipline of your choice, which are detailed in the &quot;Elemental Disciplines&quot; section below. You learn one additional elemental discipline of your choice at 6th, 11th, and 17th level.<br/><br/> Whenever you learn a new elemental discipline, you can also replace one elemental discipline that you already know with a different discipline.<br/><br/> Casting Elemental Spells. Some elemental disciplines allow you to cast spells. See chapter 10 for the general rules of spellcasting. To cast one of these spells, you use its casting time and other rules, but you don't need to provide material components for it.<br/><br/> Once you reach 5th level in this class, you can spend additional ki points to increase the level of an elemental discipline spell that you cast, provided that the spell has an enhanced effect at a higher level, as burning hands does. The spell's level increases by 1 for each additional ki point you spend. For example, if you are a 5th-level monk and use Sweeping Cinder Strike to cast burning hands, you can spend 3 ki points to cast it as a 2nd-level spell (the discipline's base cost of 2 ki points plus 1).<br/><br/> The maximum number of ki points you can spend to cast a spell in this way (including its base ki point cost and any additional ki points you spend to increase its level) is determined by your monk level, as shown in the Spells and Ki Points table.<br/><br/> <b>Spells and KI Points</b><br/> <table class='table table-condensed table-striped table-hover'><thead><tr><th>Monk Levels</th><th>Maximum Ki Points for a Spell</th></tr></thead><tbody> <tr><td>5th-8th</td><td>3</td></tr> <tr><td>9th-12th</td><td>4</td></tr> <tr><td>13th-16th</td><td>5</td></tr> <tr><td>17th-20th</td><td>6</td></tr> </tbody></table> <br/> <b>Elemental Disciplines</b><br/> <ul> <li><b>Breath of Winter (17th Level Required)</b>: You can spend 6 ki points to cast cone of cold.</li> <li><b>Clench of the North Wind (6th Level Required)</b>: You can spend 3 ki points to cast hold person.</li> <li> <b>Elemental Attunement</b>: You can use your action to briefly control elemental forces within 30 feet of you, causing one of the following effects of your choice: <ul> <li>Create a harmless, instantaneous sensory effect related to air, earth, fire, or water, such as a shower of sparks, a puff of wind, a spray of light mist, or a gentle rumbling of stone.</li> <li>Instantaneously light or snuff out a candle, a torch, or a small campfire.</li> <li>Chill or warm up to 1 pound of nonliving material for up to 1 hour.</li> <li>Cause earth, fire, water, or mist that can fit within a I-foot cube to shape itself into a crude form you desig\u00ad nate for 1 minute.</li> </ul> </li> <li><b>Eternal Mountain Defense (17th Level Required)</b>: You can spend 5 ki points to cast stoneskin, target\u00ad ing yourself.</li> <li><b>Fangs of the Fire Snake</b>: When you use the Attack action on your turn, you can spend 1 ki point to cause tendrils of flame to stretch out from your fists and feet. Your reach with your unarmed strikes increases by 10 feet for that action, as well as the rest of the turn. A hit with such an attack deals fire damage instead of bludgeoning damage, and if you spend 1 ki point when the attack hits, it also deals an extra ldlO fire damage.</li> <li><b>Fist ofFour Thunders</b>: You can spend 2 ki points to cast thunderwave.</li> <li><b>Fist of Unbroken Air</b>: You can create a blast of compressed air that strikes like a mighty fist. As an action, you can spend 2 ki points and choose a creature within 30 feet of you. That creature must make a Strength saving throw. On a failed save, the creature takes 3d10 bludgeoning damage, plus an extra ldlO bludgeoning damage for each additional ki point you spend, and you can push the creature up to 20 feet away from you and knock it prone. On a successful save, the creature takes half as much damage, and you don't push it or knock it prone.</li> <li><b>Flames ofthe Phoenix (11th Level Required)</b>: You can spend 4 ki points to cast fireball.</li> <li><b>Gong ofthe Summit (6th Level Required)</b>: You can spend 3 ki points to cast shatter.</li> <li><b>Mist Stance (11th Level Required)</b>: You can spend 4 ki points to cast gaseous form, targeting yourself.</li> <li><b>Ride the Wind (11th Level Required)</b>: You can spend 4 ki points to cast fly, targeting yourself.</li> <li><b>River of Hungry Flame (17th Level Required)</b>: You can spend 5 ki points to cast wall of fire.</li> <li><b>Rush of the Gale Spirits</b>: You can spend 2 ki points to cast gust of wind.</li> <li><b>Shape the Flowing River</b>: As an action, you can spend 1 ki point to choose an area of ice or water no larger than 30 feet on a side within 120 feet of you. You can change water to ice within the area and vice versa, and you can reshape ice in the area in any manner you choose. You can raise or lower the ice's elevation, create or fill in a trench, erect or flatten a wall, or form a pillar. The extent of any such changes can't exceed half the area's largest dimension. For example, ifyou affect a 30-foot square, you can create a pillar up to 15 feet high, raise or lower the square's elevation by up to 1 5 feet, dig a trench up to 15 feet deep, and so on. You can't shape the ice to trap or damage a creature in the area.</li> <li><b>Sweeping Cinder Strike</b>: You can spend 2 ki points to cast burning hands.</li> <li><b>Water Whip</b>: You can spend 2 ki points as an action to create a whip of water that shoves and pulls a creature to unbalance it. A creature that you can see that is within 30 feet of you must make a Dexterity saving throw. On a failed save, the creature takes 3d10 bludgeoning damage, plus an extra ldlO bludgeoning damage for each additional ki point you spend, and you can either knock it prone or pull it up to 25 feet closer to you. On a successful save, the creature takes half as much damage, and you don't pull it or knock it prone.</li> <li><b>Wave of Rolling Earth (17th Level Required)</b>: You can spend 6 ki points to cast wall ofstone.</li> </ul>"
+                "description": "You learn magical disciplines that harness the power of the four elements. A discipline requires you to spend ki points each time you use it.<br/><br/> You know the Elemental Attunement discipline and one other elemental discipline of your choice, which are detailed in the &quot;Elemental Disciplines&quot; section below. You learn one additional elemental discipline of your choice at 6th, 11th, and 17th level.<br/><br/> Whenever you learn a new elemental discipline, you can also replace one elemental discipline that you already know with a different discipline.<br/><br/> Casting Elemental Spells. Some elemental disciplines allow you to cast spells. See chapter 10 for the general rules of spellcasting. To cast one of these spells, you use its casting time and other rules, but you don't need to provide material components for it.<br/><br/> Once you reach 5th level in this class, you can spend additional ki points to increase the level of an elemental discipline spell that you cast, provided that the spell has an enhanced effect at a higher level, as burning hands does. The spell's level increases by 1 for each additional ki point you spend. For example, if you are a 5th-level monk and use Sweeping Cinder Strike to cast burning hands, you can spend 3 ki points to cast it as a 2nd-level spell (the discipline's base cost of 2 ki points plus 1).<br/><br/> The maximum number of ki points you can spend to cast a spell in this way (including its base ki point cost and any additional ki points you spend to increase its level) is determined by your monk level, as shown in the Spells and Ki Points table.<br/><br/> <b>Spells and KI Points</b><br/> <table class='table table-condensed table-striped table-hover'><thead><tr><th>Monk Levels</th><th>Maximum Ki Points for a Spell</th></tr></thead><tbody> <tr><td>5th-8th</td><td>3</td></tr> <tr><td>9th-12th</td><td>4</td></tr> <tr><td>13th-16th</td><td>5</td></tr> <tr><td>17th-20th</td><td>6</td></tr> </tbody></table> <br/> <b>Elemental Disciplines</b><br/> <ul> <li><b>Breath of Winter (17th Level Required)</b>: You can spend 6 ki points to cast cone of cold.</li> <li><b>Clench of the North Wind (6th Level Required)</b>: You can spend 3 ki points to cast hold person.</li> <li> <b>Elemental Attunement</b>: You can use your action to briefly control elemental forces within 30 feet of you, causing one of the following effects of your choice: <ul> <li>Create a harmless, instantaneous sensory effect related to air, earth, fire, or water, such as a shower of sparks, a puff of wind, a spray of light mist, or a gentle rumbling of stone.</li> <li>Instantaneously light or snuff out a candle, a torch, or a small campfire.</li> <li>Chill or warm up to 1 pound of nonliving material for up to 1 hour.</li> <li>Cause earth, fire, water, or mist that can fit within a I-foot cube to shape itself into a crude form you desig­ nate for 1 minute.</li> </ul> </li> <li><b>Eternal Mountain Defense (17th Level Required)</b>: You can spend 5 ki points to cast stoneskin, target­ ing yourself.</li> <li><b>Fangs of the Fire Snake</b>: When you use the Attack action on your turn, you can spend 1 ki point to cause tendrils of flame to stretch out from your fists and feet. Your reach with your unarmed strikes increases by 10 feet for that action, as well as the rest of the turn. A hit with such an attack deals fire damage instead of bludgeoning damage, and if you spend 1 ki point when the attack hits, it also deals an extra ldlO fire damage.</li> <li><b>Fist ofFour Thunders</b>: You can spend 2 ki points to cast thunderwave.</li> <li><b>Fist of Unbroken Air</b>: You can create a blast of compressed air that strikes like a mighty fist. As an action, you can spend 2 ki points and choose a creature within 30 feet of you. That creature must make a Strength saving throw. On a failed save, the creature takes 3d10 bludgeoning damage, plus an extra ldlO bludgeoning damage for each additional ki point you spend, and you can push the creature up to 20 feet away from you and knock it prone. On a successful save, the creature takes half as much damage, and you don't push it or knock it prone.</li> <li><b>Flames ofthe Phoenix (11th Level Required)</b>: You can spend 4 ki points to cast fireball.</li> <li><b>Gong ofthe Summit (6th Level Required)</b>: You can spend 3 ki points to cast shatter.</li> <li><b>Mist Stance (11th Level Required)</b>: You can spend 4 ki points to cast gaseous form, targeting yourself.</li> <li><b>Ride the Wind (11th Level Required)</b>: You can spend 4 ki points to cast fly, targeting yourself.</li> <li><b>River of Hungry Flame (17th Level Required)</b>: You can spend 5 ki points to cast wall of fire.</li> <li><b>Rush of the Gale Spirits</b>: You can spend 2 ki points to cast gust of wind.</li> <li><b>Shape the Flowing River</b>: As an action, you can spend 1 ki point to choose an area of ice or water no larger than 30 feet on a side within 120 feet of you. You can change water to ice within the area and vice versa, and you can reshape ice in the area in any manner you choose. You can raise or lower the ice's elevation, create or fill in a trench, erect or flatten a wall, or form a pillar. The extent of any such changes can't exceed half the area's largest dimension. For example, ifyou affect a 30-foot square, you can create a pillar up to 15 feet high, raise or lower the square's elevation by up to 1 5 feet, dig a trench up to 15 feet deep, and so on. You can't shape the ice to trap or damage a creature in the area.</li> <li><b>Sweeping Cinder Strike</b>: You can spend 2 ki points to cast burning hands.</li> <li><b>Water Whip</b>: You can spend 2 ki points as an action to create a whip of water that shoves and pulls a creature to unbalance it. A creature that you can see that is within 30 feet of you must make a Dexterity saving throw. On a failed save, the creature takes 3d10 bludgeoning damage, plus an extra ldlO bludgeoning damage for each additional ki point you spend, and you can either knock it prone or pull it up to 25 feet closer to you. On a successful save, the creature takes half as much damage, and you don't pull it or knock it prone.</li> <li><b>Wave of Rolling Earth (17th Level Required)</b>: You can spend 6 ki points to cast wall ofstone.</li> </ul>"
               }
             ]
           }
@@ -7021,7 +7281,15 @@
             "name": "Channel Divinity",
             "level": 3,
             "prerequisites": [],
-            "description": "Your oath allows you to channel divine energy to fuel magical effects. Each Channel Divinity option provided by your oath explains how to use it. When you use your Channel Divinity, you choose which option to use. You must then finish a short or long rest to use your Channel Divinity again. Some Channel Divinity effects require saving throws. When you use such an effect from this class, the DC equals your paladin spell save DC."
+            "description": "Your oath allows you to channel divine energy to fuel magical effects. Each Channel Divinity option provided by your oath explains how to use it. When you use your Channel Divinity, you choose which option to use. You must then finish a short or long rest to use your Channel Divinity again. Some Channel Divinity effects require saving throws. When you use such an effect from this class, the DC equals your paladin spell save DC.",
+            "automation": {
+              "type": "resource_pool",
+              "resource": "channel_divinity_charges",
+              "uses_expression": "class_level_scaling",
+              "recharge_short_rest": "1_use",
+              "recharge_long_rest": "all",
+              "casting_time": "1 bonus action"
+            }
           },
           {
             "name": "Divine Health",
@@ -7586,7 +7854,30 @@
                 "name": "Holy Nimbus",
                 "level": 20,
                 "prerequisites": [],
-                "description": "As an action, you can emanate an aura of sunlight. For 1 minute, bright light shines from you in a 30-foot radius, and dim light shines 30 feet beyond that. Whenever an enemy creature starts its turn in the bright light, the creature takes 10 radiant damage. In addition, for the duration, you have advantage on saving throws against spells cast by fiends or undead."
+                "description": "As an action, you can emanate an aura of sunlight. For 1 minute, bright light shines from you in a 30-foot radius, and dim light shines 30 feet beyond that. Whenever an enemy creature starts its turn in the bright light, the creature takes 10 radiant damage. In addition, for the duration, you have advantage on saving throws against spells cast by fiends or undead.",
+                "automation": [
+                  {
+                    "type": "holy_nimbus",
+                    "duration": "10_minutes",
+                    "casting_time": "1_bonus_action",
+                    "resourceCost": "channel_divinity"
+                  },
+                  {
+                    "type": "passive_rule",
+                    "effect": "holy_nimbus_radiant_damage",
+                    "damageExpression": "CHA modifier + proficiency_bonus",
+                    "range": "10_ft",
+                    "casting_time": "passive"
+                  },
+                  {
+                    "type": "passive_buff",
+                    "target": "allies_in_range",
+                    "range_expression": "10_ft",
+                    "effect": "sunlight_aura",
+                    "distance": "10_ft",
+                    "casting_time": "passive"
+                  }
+                ]
               }
             ],
             "subclass_specific": {
@@ -7769,7 +8060,9 @@
                   "target": "allies_in_range",
                   "range_expression": "10_ft",
                   "resistances": [
-                    "spells"
+                    "Necrotic",
+                    "Psychic",
+                    "Radiant"
                   ],
                   "casting_time": "passive"
                 }
@@ -7783,7 +8076,11 @@
                 "name": "Undying Sentinel",
                 "level": 15,
                 "prerequisites": [],
-                "description": "When you are reduced to 0 hit points and are not killed outright, you can choose to drop to 1 hit point instead. Once you use this ability, you can't use it again until you finish a long rest. Additionally, you suffer none of the drawbacks of old age, and you can't be aged magically."
+                "description": "When you are reduced to 0 hit points and are not killed outright, you can choose to drop to 1 hit point instead. Once you use this ability, you can't use it again until you finish a long rest. Additionally, you suffer none of the drawbacks of old age, and you can't be aged magically.",
+                "automation": {
+                  "type": "passive_immunity",
+                  "conditionImmunity": "aged"
+                }
               }
             ]
           },
@@ -7951,7 +8248,11 @@
                 "name": "Relentless Avenger",
                 "level": 7,
                 "prerequisites": [],
-                "description": "Your supernatural focus helps you close off a foe's retreat. When you hit a creature with an opportunity attack, you can move up to half your speed immediately after the attack and as part of the same reaction. This movement doesn't provoke opportunity attacks."
+                "description": "Your supernatural focus helps you close off a foe's retreat. When you hit a creature with an opportunity attack, you can move up to half your speed immediately after the attack and as part of the same reaction. This movement doesn't provoke opportunity attacks.",
+                "automation": {
+                  "type": "relentless_avenger",
+                  "duration": "until_end_of_current_turn"
+                }
               }
             ]
           },
@@ -7962,7 +8263,12 @@
                 "name": "Soul of Vengeance",
                 "level": 15,
                 "prerequisites": [],
-                "description": "The authority with which you speak your Vow of Enmity gives you greater power over your foe. When a creature under the effect of your Vow of Enmity makes an attack, you can use your reaction to make a melee weapon attack against that creature if it is within range."
+                "description": "The authority with which you speak your Vow of Enmity gives you greater power over your foe. When a creature under the effect of your Vow of Enmity makes an attack, you can use your reaction to make a melee weapon attack against that creature if it is within range.",
+                "automation": {
+                  "type": "soul_of_vengeance",
+                  "trigger": "after_vow_of_enmity_target_attacks",
+                  "casting_time": "1 reaction"
+                }
               }
             ]
           },
@@ -7973,7 +8279,19 @@
                 "name": "Avenging Angel",
                 "level": 20,
                 "prerequisites": [],
-                "description": "You can assume the form of an angelic avenger. Using your action, you undergo a transformation. For 1 hour, you gain the following benefits:<ul><li>Wings sprout from your back and grant you a flying speed of 60 feet.</li><li>You emanate an aura of menace in a 30-foot radius. The first time any enemy creature enters the aura or starts its turn there during a battle, the creature must succeed on a Wisdom saving throw or become frightened of you for 1 minute or until it takes any damage. Attack rolls against the frightened creature have advantage.</li></ul>Once you use this feature, you can't use it again until you finish a long rest."
+                "description": "You can assume the form of an angelic avenger. Using your action, you undergo a transformation. For 1 hour, you gain the following benefits:<ul><li>Wings sprout from your back and grant you a flying speed of 60 feet.</li><li>You emanate an aura of menace in a 30-foot radius. The first time any enemy creature enters the aura or starts its turn there during a battle, the creature must succeed on a Wisdom saving throw or become frightened of you for 1 minute or until it takes any damage. Attack rolls against the frightened creature have advantage.</li></ul>Once you use this feature, you can't use it again until you finish a long rest.",
+                "automation": {
+                  "type": "avenging_angel",
+                  "effect": "avenging_angel",
+                  "duration": "10_minutes",
+                  "action": "bonus_action",
+                  "flySpeed": 60,
+                  "hover": true,
+                  "auraRange": "aura_of_protection",
+                  "saveType": "WIS",
+                  "saveDc": "ability",
+                  "casting_time": "1 bonus action"
+                }
               }
             ]
           }
@@ -8028,7 +8346,27 @@
             "name": "Favored Enemy",
             "level": 1,
             "prerequisites": [],
-            "description": "You have significant experience studying, tracking, hunting, and even talking to a certain type of enemy.<br/><br/>Choose a type of favored enemy: aberrations, beasts, celestials, constructs, dragons, elementals, fey, fiends, giants, monstrosities, oozes, plants, or undead. Alternatively, you can select two races of humanoid (such as gnolls and orcs) as favored enemies.<br/><br/>You have advantage on Wisdom (Survival) checks to track your favored enemies, as well as on Intelligence checks to recall information about them. When you gain this feature, you also learn one language of your choice that is spoken by your favored enemies, if they speak one at all."
+            "description": "You have significant experience studying, tracking, hunting, and even talking to a certain type of enemy.<br/><br/>Choose a type of favored enemy: aberrations, beasts, celestials, constructs, dragons, elementals, fey, fiends, giants, monstrosities, oozes, plants, or undead. Alternatively, you can select two races of humanoid (such as gnolls and orcs) as favored enemies.<br/><br/>You have advantage on Wisdom (Survival) checks to track your favored enemies, as well as on Intelligence checks to recall information about them. When you gain this feature, you also learn one language of your choice that is spoken by your favored enemies, if they speak one at all.",
+            "automation": [
+              {
+                "type": "passive_rule",
+                "effect": "always_prepared_spells",
+                "spells": [
+                  "Hunter's Mark"
+                ],
+                "casting_time": "passive"
+              },
+              {
+                "type": "free_spell",
+                "spell": "Hunter's Mark",
+                "uses_expression": "favored_enemy_min_1",
+                "recharge": "long_rest",
+                "concentration": true,
+                "noConcentration": false,
+                "action": "bonus_action",
+                "casting_time": "1 bonus action"
+              }
+            ]
           },
           {
             "name": "Natural Explorer",
@@ -8505,7 +8843,12 @@
             "name": "Foe Slayer",
             "level": 20,
             "prerequisites": [],
-            "description": "You become an unparalleled hunter of your enemies. Once on each of your turns, you can add your Wisdom modifier to the attack roll or the damage roll of an attack you make against one of your favored enemies. You can choose to use this feature before or after the roll, but before any effects of the roll are applied."
+            "description": "You become an unparalleled hunter of your enemies. Once on each of your turns, you can add your Wisdom modifier to the attack roll or the damage roll of an attack you make against one of your favored enemies. You can choose to use this feature before or after the roll, but before any effects of the roll are applied.",
+            "automation": {
+              "type": "passive_rule",
+              "effect": "foe_slayer",
+              "casting_time": "passive"
+            }
           }
         ],
         "spellcasting": {
@@ -8547,7 +8890,11 @@
                     ]
                   }
                 },
-                "description": "You gain one of the following features of your choice.<br/><ul><li><b>Colossus Slayer</b>. Your tenacity can wear down the most potent foes. When you hit a creature with a weapon attack, the creature takes an extra 1d8 damage if it's below its hit point maximum. You can deal this extra damage only once per turn.</li><li><b>Giant Killer</b>. When a large or larger creature within 5 feet of you hits or misses you with an attack, you can use your reaction to attack that creature immediately after its attack, provided that you can see the creature.</li><li><b>Horde Breaker</b>. Once on each of your turns when you make a weapon attack, you can make another attack with the same weapon against a different creature that is within 5 feet of the original target and within range of your weapon.</li></ul>"
+                "description": "You gain one of the following features of your choice.<br/><ul><li><b>Colossus Slayer</b>. Your tenacity can wear down the most potent foes. When you hit a creature with a weapon attack, the creature takes an extra 1d8 damage if it's below its hit point maximum. You can deal this extra damage only once per turn.</li><li><b>Giant Killer</b>. When a large or larger creature within 5 feet of you hits or misses you with an attack, you can use your reaction to attack that creature immediately after its attack, provided that you can see the creature.</li><li><b>Horde Breaker</b>. Once on each of your turns when you make a weapon attack, you can make another attack with the same weapon against a different creature that is within 5 feet of the original target and within range of your weapon.</li></ul>",
+                "automation": {
+                  "type": "hunter_prey",
+                  "casting_time": "passive"
+                }
               }
             ]
           },
@@ -8568,7 +8915,11 @@
                     ]
                   }
                 },
-                "description": "You gain one of the following features of your choice.<br/><ul><li><b>Escape the Horde</b>. Opportunity attacks against you are made with disadvantage.</li><li><b>Multiattack Defense</b>. When a creature hits you with an attack, you gain a +4 bonus to AC against all subsequent attacks made by that creature for the rest of the turn.</li><li><b>Steel Will</b>. You have advantage on saving throws against being frightened.</li></ul>"
+                "description": "You gain one of the following features of your choice.<br/><ul><li><b>Escape the Horde</b>. Opportunity attacks against you are made with disadvantage.</li><li><b>Multiattack Defense</b>. When a creature hits you with an attack, you gain a +4 bonus to AC against all subsequent attacks made by that creature for the rest of the turn.</li><li><b>Steel Will</b>. You have advantage on saving throws against being frightened.</li></ul>",
+                "automation": {
+                  "type": "defensive_tactics",
+                  "casting_time": "passive"
+                }
               }
             ]
           },
@@ -8609,7 +8960,11 @@
                     ]
                   }
                 },
-                "description": "You gain one of the following features of your choice.<br/><ul><li><b>Evasion</b>. When you are subjected to an effect, such as a red dragon's fiery breath or a lightning bolt spell, that allows you to make a Dexterity saving throw to take only half damage, you instead take no damage if you succeed on the saving throw, and only half damage if you fail.</li><li><b>Stand Against the Tide</b>. When a hostile creature misses you with a melee attack, you can use your reaction to force that creature to repeat the same attack against another creature (other than itself) of your choice.</li><li><b>Uncanny Dodge</b>. When an attacker that you can see hits you with an attack, you can use your reaction to halve the attack's damage against you.</li></ul>"
+                "description": "You gain one of the following features of your choice.<br/><ul><li><b>Evasion</b>. When you are subjected to an effect, such as a red dragon's fiery breath or a lightning bolt spell, that allows you to make a Dexterity saving throw to take only half damage, you instead take no damage if you succeed on the saving throw, and only half damage if you fail.</li><li><b>Stand Against the Tide</b>. When a hostile creature misses you with a melee attack, you can use your reaction to force that creature to repeat the same attack against another creature (other than itself) of your choice.</li><li><b>Uncanny Dodge</b>. When an attacker that you can see hits you with an attack, you can use your reaction to halve the attack's damage against you.</li></ul>",
+                "automation": {
+                  "type": "superior_hunter_defense",
+                  "casting_time": "1 reaction"
+                }
               }
             ]
           }
@@ -8629,7 +8984,7 @@
                 "name": "Ranger's Companion",
                 "level": 3,
                 "prerequisites": [],
-                "description": "You gain a beast companion that accompanies you on your adventures and is trained to fight alongside you. Choose a beast that is no larger than Medium and that has a challenge rating of 1/4 or lower (appendix D presents statistics for the hawk, mastiff, and panther as examples). Add your proficiency bonus to the beast's AC, attack rolls, and damage rolls, as well as to any saving throws and skills it is proficient in. Its hit point maximum equals the hit point number in its stat block or four times your ranger level, whichever is higher. Like any creature, it can spend Hit Dice during a short rest to regain hit points. The beast obeys your commands as best as it can. It takes its turn on your initiative. On your turn, you can verbally command the beast where to move (no action required by you). You can use your action to verbally command it to take the Attack, Dash, Disengage, or Help action. Once you have the Extra Attack feature, you can make one weapon attack yourself when you com\u00ad mand the beast to take the Attack action. If you don't issue a command, the beast takes the Dodge action. If you are incapacitated or absent, the beast acts on its own, focusing on protecting you and itself. The beast never requires your command to use its reaction, such as when making an opportunity attack. While traveling through your favored terrain with only the beast, you can move stealthily at a normal pace. If the beast dies, you can obtain a new companion by spending 8 hours magically bonding with a beast that isn't hostile to you and that meets the requirements."
+                "description": "You gain a beast companion that accompanies you on your adventures and is trained to fight alongside you. Choose a beast that is no larger than Medium and that has a challenge rating of 1/4 or lower (appendix D presents statistics for the hawk, mastiff, and panther as examples). Add your proficiency bonus to the beast's AC, attack rolls, and damage rolls, as well as to any saving throws and skills it is proficient in. Its hit point maximum equals the hit point number in its stat block or four times your ranger level, whichever is higher. Like any creature, it can spend Hit Dice during a short rest to regain hit points. The beast obeys your commands as best as it can. It takes its turn on your initiative. On your turn, you can verbally command the beast where to move (no action required by you). You can use your action to verbally command it to take the Attack, Dash, Disengage, or Help action. Once you have the Extra Attack feature, you can make one weapon attack yourself when you com­ mand the beast to take the Attack action. If you don't issue a command, the beast takes the Dodge action. If you are incapacitated or absent, the beast acts on its own, focusing on protecting you and itself. The beast never requires your command to use its reaction, such as when making an opportunity attack. While traveling through your favored terrain with only the beast, you can move stealthily at a normal pace. If the beast dies, you can obtain a new companion by spending 8 hours magically bonding with a beast that isn't hostile to you and that meets the requirements."
               }
             ]
           },
@@ -8640,7 +8995,18 @@
                 "name": "Exceptional Training",
                 "level": 7,
                 "prerequisites": [],
-                "description": "On any of your turns when your beast companion doesn't attack, you can use a bonus action to command the beast to take the Dash, Disengage, Dodge, or Help action on its turn. In addition, the beast's attacks nowcount as magical for the purpose of overcoming resistance and immunity to nonmagical attacks and damage."
+                "description": "On any of your turns when your beast companion doesn't attack, you can use a bonus action to command the beast to take the Dash, Disengage, Dodge, or Help action on its turn. In addition, the beast's attacks nowcount as magical for the purpose of overcoming resistance and immunity to nonmagical attacks and damage.",
+                "automation": {
+                  "type": "primal_companion_bonus_action_command",
+                  "casting_time": "1 bonus action",
+                  "commandActions": [
+                    "Dash",
+                    "Disengage",
+                    "Dodge",
+                    "Help"
+                  ],
+                  "forceDamageOption": true
+                }
               }
             ]
           },
@@ -8651,7 +9017,20 @@
                 "name": "Bestial Fury",
                 "level": 11,
                 "prerequisites": [],
-                "description": "When you command your beast companion to take the Attack action, the beast can make two attacks, or it can take the Multiattack action if it has that action."
+                "description": "When you command your beast companion to take the Attack action, the beast can make two attacks, or it can take the Multiattack action if it has that action.",
+                "automation": [
+                  {
+                    "type": "primal_companion_double_strike",
+                    "casting_time": "passive"
+                  },
+                  {
+                    "type": "primal_companion_double_strike_damage",
+                    "trigger": "companion_beasts_strike_hit",
+                    "damageExpression": "1d6",
+                    "damageType": "Force",
+                    "oncePerTurn": true
+                  }
+                ]
               }
             ]
           },
@@ -8760,7 +9139,27 @@
             "name": "Sneak Attack",
             "level": 1,
             "prerequisites": [],
-            "description": "You know how to strike subtly and exploit a foe's distraction. Once per turn, you can deal an extra 1d6 damage to one creature you hit with an attack if you have advantage on the attack roll. The attack must use a finesse or a ranged weapon. You don't need advantage on the attack roll if another enemy of the target is within 5 feet of it, that enemy isn't incapacitated, and you don't have disadvantage on the attack roll. The amount of the extra damage increases as you gain levels in this class, as shown in the Sneak Attack column of the Rogue table."
+            "description": "You know how to strike subtly and exploit a foe's distraction. Once per turn, you can deal an extra 1d6 damage to one creature you hit with an attack if you have advantage on the attack roll. The attack must use a finesse or a ranged weapon. You don't need advantage on the attack roll if another enemy of the target is within 5 feet of it, that enemy isn't incapacitated, and you don't have disadvantage on the attack roll. The amount of the extra damage increases as you gain levels in this class, as shown in the Sneak Attack column of the Rogue table.",
+            "automation": {
+              "type": "attack_rider",
+              "damageExpression": "1d6",
+              "damageType": "same_as_weapon",
+              "oncePerTurn": true,
+              "chooseOne": false,
+              "maxEffects": 1,
+              "scaling": {
+                "3": "2d6",
+                "5": "3d6",
+                "7": "4d6",
+                "9": "5d6",
+                "11": "6d6",
+                "13": "7d6",
+                "15": "8d6",
+                "17": "9d6",
+                "19": "10d6"
+              },
+              "casting_time": "passive"
+            }
           },
           {
             "name": "Thieves' Cant",
@@ -8861,10 +9260,7 @@
             "prerequisites": [],
             "description": "When an attacker that you can see hits you with an attack, you can use your reaction to halve the attack's damage against you.",
             "automation": {
-              "type": "damage_reduction",
-              "reductionExpression": "half",
-              "trigger": "attacker_hits_melee",
-              "reaction": true,
+              "type": "superior_hunter_defense",
               "casting_time": "1 reaction"
             }
           }
@@ -8938,11 +9334,8 @@
             "prerequisites": [],
             "description": "You can nimbly dodge out of the way of certain area effects, such as a red dragon's fiery breath or an ice storm spell. When you are subjected to an effect that allows you to make a Dexterity saving throw to take only half damage, you instead take no damage if you succeed on the saving throw, and only half damage if you fail.",
             "automation": {
-              "type": "conditional_advantage",
-              "target": "dex_saving_throw",
-              "condition": "area_effect_half_damage",
-              "effect": "no_damage_on_success",
-              "casting_time": "1 action"
+              "type": "evasion",
+              "saveType": "DEX"
             }
           }
         ],
@@ -9060,7 +9453,21 @@
             "name": "Slippery Mind",
             "level": 15,
             "prerequisites": [],
-            "description": "You have acquired greater mental strength. You gain proficiency in Wisdom saving throws."
+            "description": "You have acquired greater mental strength. You gain proficiency in Wisdom saving throws.",
+            "automation": [
+              {
+                "type": "save_proficiency",
+                "saveType": "Wisdom",
+                "fallbackTypes": [],
+                "casting_time": "passive"
+              },
+              {
+                "type": "save_proficiency",
+                "saveType": "Charisma",
+                "fallbackTypes": [],
+                "casting_time": "passive"
+              }
+            ]
           }
         ],
         "class_specific": {
@@ -9165,7 +9572,26 @@
                 "name": "Fast Hands",
                 "level": 3,
                 "prerequisites": [],
-                "description": "You can use the bonus action granted by your Cunning Action to make a Dexterity (Sleight of Hand) check, use your thieves' tools to disarm a trap or open a lock, or take the Use an Object action."
+                "description": "You can use the bonus action granted by your Cunning Action to make a Dexterity (Sleight of Hand) check, use your thieves' tools to disarm a trap or open a lock, or take the Use an Object action.",
+                "automation": {
+                  "type": "fast_hands",
+                  "options": [
+                    {
+                      "name": "Sleight of Hand",
+                      "description": "Make a Dexterity (Sleight of Hand) check — pick pocket, palming, hiding small objects, etc."
+                    },
+                    {
+                      "name": "Thieves' Tools",
+                      "description": "Use thieves' tools to pick locks or disarm traps"
+                    },
+                    {
+                      "name": "Use an Object",
+                      "description": "Use an object — Utilize action for magic items, or Action for normal objects"
+                    }
+                  ],
+                  "casting_time": "1 bonus action",
+                  "hasAutomation": true
+                }
               },
               {
                 "name": "Second-Story Work",
@@ -9183,11 +9609,28 @@
                 "level": 9,
                 "prerequisites": [],
                 "description": "You have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn. As an action, you can expend 1d6 Sneak Attack dice to activate Stealth Attack, which preserves your Invisible condition when you end your turn behind Three-Quarters Cover or Total Cover.",
-                "automation": {
-                  "type": "stealth_attack",
-                  "cost": "1d6",
-                  "casting_time": "1 action"
-                }
+                "automation": [
+                  {
+                    "type": "conditional_advantage",
+                    "target": "ability_check",
+                    "condition": "invisible",
+                    "effect": "advantage",
+                    "abilities": [
+                      "DEX"
+                    ],
+                    "casting_time": "1 action"
+                  },
+                  {
+                    "type": "passive_rule",
+                    "effect": "supreme_sneak",
+                    "casting_time": "1 action"
+                  },
+                  {
+                    "type": "stealth_attack",
+                    "cost": "1d6",
+                    "casting_time": "1 action"
+                  }
+                ]
               }
             ]
           },
@@ -9198,7 +9641,17 @@
                 "name": "Use Magic Device",
                 "level": 13,
                 "prerequisites": [],
-                "description": "You have learned enough about the workings of magic that you can improvise the use of items even when they are not intended for you. You ignore all class, race, and level requirements on the use of magic items."
+                "description": "You have learned enough about the workings of magic that you can improvise the use of items even when they are not intended for you. You ignore all class, race, and level requirements on the use of magic items.",
+                "automation": {
+                  "type": "use_magic_device",
+                  "attunementLimit": 4,
+                  "chargeReroll": "1d6",
+                  "chargeRerollSuccess": 6,
+                  "scrollAbility": "INT",
+                  "scrollCheckDC": "10 + spell_level",
+                  "scrollDisintegratesOnFail": true,
+                  "casting_time": "passive"
+                }
               }
             ]
           },
@@ -9209,7 +9662,15 @@
                 "name": "Thief's Reflexes",
                 "level": 17,
                 "prerequisites": [],
-                "description": "You have become adept at laying ambushes and quickly escaping danger. You can take two turns during the first round of any combat. You take your first turn at your normal initiative and your second turn at your initiative minus 10. You can't use this feature when you are surprised."
+                "description": "You have become adept at laying ambushes and quickly escaping danger. You can take two turns during the first round of any combat. You take your first turn at your normal initiative and your second turn at your initiative minus 10. You can't use this feature when you are surprised.",
+                "automation": {
+                  "type": "extra_action",
+                  "uses": 1,
+                  "recharge": "long_rest",
+                  "oncePerCombat": true,
+                  "firstRoundOnly": true,
+                  "casting_time": "passive"
+                }
               }
             ]
           }
@@ -9230,13 +9691,28 @@
                 "level": 3,
                 "prerequisites": [],
                 "description": "You are at your deadliest when you get the drop on your enemies. You have advantage on attack rolls against any creature that hasn't taken a turn in the combat yet. In addition, any hit you score against a creature that is surprised is a critical hit.",
-                "automation": {
-                  "type": "conditional_advantage",
-                  "target": "attack_roll",
-                  "condition": "target_hasnt_taken_turn",
-                  "effect": "advantage",
-                  "casting_time": "1 action"
-                }
+                "automation": [
+                  {
+                    "type": "passive_rule",
+                    "effect": "initiative_advantage",
+                    "casting_time": "passive"
+                  },
+                  {
+                    "type": "conditional_advantage",
+                    "target": "attack_roll",
+                    "condition": "first_round_target_no_turn",
+                    "effect": "advantage",
+                    "casting_time": "passive"
+                  },
+                  {
+                    "type": "damage_bonus",
+                    "trigger": "first_round_sneak_attack_hit",
+                    "damageExpression": "rogue_level",
+                    "damageType": "Sneak Attack",
+                    "oncePerTurn": false,
+                    "casting_time": "passive"
+                  }
+                ]
               },
               {
                 "name": "Bonus Proficiencies",
@@ -9253,7 +9729,11 @@
                 "name": "Infiltration Expertise",
                 "level": 9,
                 "prerequisites": [],
-                "description": "You can unfailingly create false identities for yourself. You must spend seven days and 25 gp to establish the history, profession, and affiliations for an identity. You can't establish an identity that belongs to someone else. For example, you might acquire appropriate clothing, letters of introduction, and official\u00ad looking certification to establish yourself as a member of a trading house from a remote city so you can insinuate yourself into the company of other wealthy merchants. Thereafter, ifyou adopt the new identity as a disguise, other creatures believe you to be that person until given an obvious reason not to."
+                "description": "You can unfailingly create false identities for yourself. You must spend seven days and 25 gp to establish the history, profession, and affiliations for an identity. You can't establish an identity that belongs to someone else. For example, you might acquire appropriate clothing, letters of introduction, and official­ looking certification to establish yourself as a member of a trading house from a remote city so you can insinuate yourself into the company of other wealthy merchants. Thereafter, ifyou adopt the new identity as a disguise, other creatures believe you to be that person until given an obvious reason not to.",
+                "automation": {
+                  "type": "passive_rule",
+                  "effect": "roving_aim"
+                }
               }
             ]
           },
@@ -9311,7 +9791,32 @@
                 "name": "Mage Hand Legerdemain",
                 "level": 3,
                 "prerequisites": [],
-                "description": "When you cast mage hand, you can make the spectral hand invisible, and you can perform the following additional tasks with it:<br/><ul><li>You can stow one object the hand is holding in a container worn or carried by another creature.</li><li>You can retrieve an object in a container worn or carried by another creature.</li><li>You can use thieves' tools to pick locks and disarm traps at range.</li></ul>You can perform one of these tasks without being noticed by a creature if you succeed on a Dexterity (Sleight of Hand) check contested by the creature's Wisdom (Perception) check. In addition, you can use the bonus action granted by your Cunning Action to control the hand.<br/>"
+                "description": "When you cast mage hand, you can make the spectral hand invisible, and you can perform the following additional tasks with it:<br/><ul><li>You can stow one object the hand is holding in a container worn or carried by another creature.</li><li>You can retrieve an object in a container worn or carried by another creature.</li><li>You can use thieves' tools to pick locks and disarm traps at range.</li></ul>You can perform one of these tasks without being noticed by a creature if you succeed on a Dexterity (Sleight of Hand) check contested by the creature's Wisdom (Perception) check. In addition, you can use the bonus action granted by your Cunning Action to control the hand.<br/>",
+                "automation": [
+                  {
+                    "type": "passive_rule",
+                    "effect": "mage_hand_legerdemain",
+                    "casting_time": "passive",
+                    "hasAutomation": true
+                  },
+                  {
+                    "type": "conditional_advantage",
+                    "target": "ability_check",
+                    "condition": "mage_hand_legerdemain",
+                    "effect": "advantage",
+                    "abilities": [
+                      "DEX"
+                    ],
+                    "hasAutomation": true
+                  },
+                  {
+                    "type": "mage_hand_control",
+                    "range": "30_ft",
+                    "action": "bonus_action",
+                    "casting_time": "1 bonus action",
+                    "hasAutomation": true
+                  }
+                ]
               },
               {
                 "name": "Spellcasting",
@@ -9372,7 +9877,11 @@
                 "name": "Magical Ambush",
                 "level": 9,
                 "prerequisites": [],
-                "description": "If you are hidden from a creature when you cast a spell on it, the creature has disadvantage on any saving throw it makes against the spell this turn."
+                "description": "If you are hidden from a creature when you cast a spell on it, the creature has disadvantage on any saving throw it makes against the spell this turn.",
+                "automation": {
+                  "type": "passive_rule",
+                  "effect": "magical_ambush"
+                }
               }
             ],
             "spellcasting": {
@@ -9415,7 +9924,12 @@
                 "name": "Versatile Trickster",
                 "level": 13,
                 "prerequisites": [],
-                "description": "You gain the ability to distract targets with your mage hand. As a bonus action on your turn, you can designate a creature within 5 feet of the spectral hand created by the spell. Doing so gives you advantage on attack rolls against that creature until the end of the turn."
+                "description": "You gain the ability to distract targets with your mage hand. As a bonus action on your turn, you can designate a creature within 5 feet of the spectral hand created by the spell. Doing so gives you advantage on attack rolls against that creature until the end of the turn.",
+                "automation": {
+                  "type": "passive_rule",
+                  "effect": "versatile_trickster",
+                  "casting_time": "passive"
+                }
               }
             ],
             "spellcasting": {
@@ -10672,10 +11186,16 @@
                 "prerequisites": [],
                 "description": "When you cast a spell that deals damage of the type associated with your draconic ancestry, you can add your Charisma modifier to one damage roll of that spell. At the same time, you can spend 1 sorcery point to gain resistance to that damage type for 1 hour.",
                 "automation": {
-                  "type": "damage_bonus",
-                  "trigger": "draconic_ancestry_damage_type_spell",
-                  "damageExpression": "cha_modifier",
-                  "casting_time": "1 action"
+                  "type": "damage_type_choice",
+                  "damageTypes": [
+                    "Acid",
+                    "Cold",
+                    "Fire",
+                    "Lightning",
+                    "Poison"
+                  ],
+                  "effect": "elemental_affinity",
+                  "casting_time": "passive"
                 }
               }
             ]
@@ -10687,7 +11207,18 @@
                 "name": "Dragon Wings",
                 "level": 14,
                 "prerequisites": [],
-                "description": "You gain the ability to sprout a pair of dragon wings from your back, gaining a flying speed equal to your current speed. You can create these wings as a bonus action on your turn. They last until you dismiss them as a bonus action on your turn. You can't manifest your wings while wearing armor unless the armor is made to accommodate them, and clothing not made to accommodate your wings might be destroyed when you manifest them."
+                "description": "You gain the ability to sprout a pair of dragon wings from your back, gaining a flying speed equal to your current speed. You can create these wings as a bonus action on your turn. They last until you dismiss them as a bonus action on your turn. You can't manifest your wings while wearing armor unless the armor is made to accommodate them, and clothing not made to accommodate your wings might be destroyed when you manifest them.",
+                "automation": {
+                  "type": "dragon_wings",
+                  "action": "bonus_action",
+                  "duration": "1_hour",
+                  "flySpeed": 60,
+                  "hover": true,
+                  "uses": 1,
+                  "recharge": "long_rest",
+                  "resourceCost": "sorcery_points",
+                  "restoreCost": 3
+                }
               }
             ]
           },
@@ -10763,7 +11294,12 @@
                 "name": "Controlled Chaos",
                 "level": 14,
                 "prerequisites": [],
-                "description": "You gain a modicum of control over the surges of your wild magic. Whenever you roll on the Wild Magic Surge table, you can roll twice and use either number."
+                "description": "You gain a modicum of control over the surges of your wild magic. Whenever you roll on the Wild Magic Surge table, you can roll twice and use either number.",
+                "automation": {
+                  "type": "auto_effect",
+                  "effect": "wild_magic_double_roll",
+                  "trigger": "wild_magic_surge_roll"
+                }
               }
             ]
           },
@@ -11250,7 +11786,16 @@
             "name": "Mystic Arcanum",
             "level": 11,
             "prerequisites": [],
-            "description": "Your patron bestows upon you a magical secret called an arcanum. Choose one 6th-level spell from the warlock spell list as this arcanum. You can cast your arcanum spell once without expending a spell slot. You must finish a long rest before you can do so again. You regain all uses of your Mystic Arcanum when you finish a long rest."
+            "description": "Your patron bestows upon you a magical secret called an arcanum. Choose one 6th-level spell from the warlock spell list as this arcanum. You can cast your arcanum spell once without expending a spell slot. You must finish a long rest before you can do so again. You regain all uses of your Mystic Arcanum when you finish a long rest.",
+            "automation": {
+              "type": "free_spell",
+              "spell": "a level 6 Warlock spell (your choice)",
+              "uses_expression": "1",
+              "usesMax": 1,
+              "recharge": "long_rest",
+              "action": "action",
+              "casting_time": "1 action"
+            }
           }
         ],
         "spellcasting": {
@@ -11613,7 +12158,13 @@
             "name": "Eldritch Master",
             "level": 20,
             "prerequisites": [],
-            "description": "You can draw on your inner reserve of mystical power while entreating your patron to regain expended spell slots. You can spend 1 minute entreating your patron for aid to regain all your expended spell slots from your Pact Magic feature. Once you regain spell slots with this feature, you must finish a long rest before you can do so again."
+            "description": "You can draw on your inner reserve of mystical power while entreating your patron to regain expended spell slots. You can spend 1 minute entreating your patron for aid to regain all your expended spell slots from your Pact Magic feature. Once you regain spell slots with this feature, you must finish a long rest before you can do so again.",
+            "automation": {
+              "type": "magical_cunning",
+              "eldritchMaster": true,
+              "casting_time": "passive",
+              "description": "When you use your Magical Cunning feature, you regain all your expended Pact Magic spell slots."
+            }
           }
         ],
         "spellcasting": {
@@ -11813,7 +12364,26 @@
                 "name": "Fiendish Resilience",
                 "level": 10,
                 "prerequisites": [],
-                "description": "You can choose one damage type when you finish a short or long rest. You gain resistance to that damage type until you choose a different one with this feature. Damage from magical weapons or silver weapons ignores this resistance."
+                "description": "You can choose one damage type when you finish a short or long rest. You gain resistance to that damage type until you choose a different one with this feature. Damage from magical weapons or silver weapons ignores this resistance.",
+                "automation": {
+                  "type": "damage_type_choice",
+                  "damageTypes": [
+                    "Acid",
+                    "Bludgeoning",
+                    "Cold",
+                    "Fire",
+                    "Lightning",
+                    "Necrotic",
+                    "Piercing",
+                    "Poison",
+                    "Psychic",
+                    "Radiant",
+                    "Slashing",
+                    "Thunder"
+                  ],
+                  "effect": "fiendish_resilience",
+                  "casting_time": "passive"
+                }
               }
             ]
           },
@@ -11824,7 +12394,19 @@
                 "name": "Hurl Through Hell",
                 "level": 14,
                 "prerequisites": [],
-                "description": "When you hit a creature with an attack, you can use this feature to instantly transport the target through the lower planes. The creature disappears and hurtles through a nightmare landscape. At the end of your next turn, the target returns to the space it previously occupied, or the nearest unoccupied space. If the target is not a fiend, it takes 10d10 psychic damage as it reels from its horrific experience. Once you use this feature, you can't use it again until you finish a long rest."
+                "description": "When you hit a creature with an attack, you can use this feature to instantly transport the target through the lower planes. The creature disappears and hurtles through a nightmare landscape. At the end of your next turn, the target returns to the space it previously occupied, or the nearest unoccupied space. If the target is not a fiend, it takes 10d10 psychic damage as it reels from its horrific experience. Once you use this feature, you can't use it again until you finish a long rest.",
+                "automation": {
+                  "type": "hurl_through_hell",
+                  "damageExpression": "8d10",
+                  "damageType": "Psychic",
+                  "saveType": "CHA",
+                  "saveDc": "ability",
+                  "saveAbility": "CHA",
+                  "oncePerTurn": true,
+                  "uses": 1,
+                  "pactMagicRecharge": true,
+                  "casting_time": "passive"
+                }
               }
             ]
           }
@@ -11979,11 +12561,14 @@
                 "prerequisites": [],
                 "description": "You can vanish in a puff of mist in response to harm. When you take damage, you can use your reaction to turn invisible and teleport up to 60 feet to an unoccupied space you can see. You remain invisible until the start of your next turn or until you attack or cast a spell. Once you use this feature, you can't use it again until you finish a short or long rest.",
                 "automation": {
-                  "type": "temp_buff",
-                  "effect": "invisible_and_teleport",
-                  "duration": "next_turn",
-                  "action": "reaction",
-                  "recharge": "short_rest",
+                  "type": "misty_escape",
+                  "spell": "Misty Step",
+                  "saveType": "WIS",
+                  "saveDc": "ability",
+                  "saveAbility": "CHA",
+                  "damageExpression": "2d10",
+                  "damageType": "Psychic",
+                  "condition": "invisible",
                   "casting_time": "1 reaction"
                 }
               }
@@ -11996,7 +12581,25 @@
                 "name": "Beguiling Defenses",
                 "level": 10,
                 "prerequisites": [],
-                "description": "Your patron teaches you how to turn the mind-affecting magic of your enemies against them. You are immune to being charmed, and when another creature attempts to charm you, you can use your reaction to attempt to turn the charm back on that creature. The creature must succeed on a Wisdom saving throw against your warlock spell save DC or be charmed by you for 1 minute or until the creature takes any damage."
+                "description": "Your patron teaches you how to turn the mind-affecting magic of your enemies against them. You are immune to being charmed, and when another creature attempts to charm you, you can use your reaction to attempt to turn the charm back on that creature. The creature must succeed on a Wisdom saving throw against your warlock spell save DC or be charmed by you for 1 minute or until the creature takes any damage.",
+                "automation": [
+                  {
+                    "type": "passive_immunity",
+                    "conditionImmunity": "charmed",
+                    "casting_time": "passive"
+                  },
+                  {
+                    "type": "beguiling_defenses",
+                    "casting_time": "1 reaction",
+                    "saveType": "WIS",
+                    "saveDc": "ability",
+                    "saveAbility": "CHA",
+                    "damageType": "Psychic",
+                    "uses": 1,
+                    "recharge": "long_rest",
+                    "pactMagicRecharge": true
+                  }
+                ]
               }
             ]
           },
@@ -12171,7 +12774,24 @@
                 "name": "Thought Shield",
                 "level": 10,
                 "prerequisites": [],
-                "description": "Your thoughts can't be read by telepathy or other means unless you allow it. You also have resistance to psychic damage, and whenever a creature deals psychic damage to you, that creature takes the same amount of damage that you do."
+                "description": "Your thoughts can't be read by telepathy or other means unless you allow it. You also have resistance to psychic damage, and whenever a creature deals psychic damage to you, that creature takes the same amount of damage that you do.",
+                "automation": [
+                  {
+                    "type": "passive_immunity",
+                    "damage_resistance": [
+                      "Psychic"
+                    ],
+                    "casting_time": "passive"
+                  },
+                  {
+                    "type": "reaction_damage",
+                    "trigger": "psychic_damage_received",
+                    "damageExpression": "RAW damage",
+                    "damageType": "Psychic",
+                    "range": "5_ft",
+                    "casting_time": "1 reaction"
+                  }
+                ]
               }
             ]
           }
@@ -12223,13 +12843,24 @@
             "name": "Arcane Recovery",
             "level": 1,
             "prerequisites": [],
-            "description": "You have learned to regain some of your magical energy by studying your spellbook. Once per day when you finish a short rest, you can choose expended spell slots to recover. The spell slots can have a combined level that is equal to or less than half your wizard level (rounded up), and none of the slots can be 6th level or higher. For example, if you're a 4th-level wizard, you can recover up to two levels worth of spell slots. You can recover either a 2nd-level spell slot or two 1st-level spell slots."
+            "description": "You have learned to regain some of your magical energy by studying your spellbook. Once per day when you finish a short rest, you can choose expended spell slots to recover. The spell slots can have a combined level that is equal to or less than half your wizard level (rounded up), and none of the slots can be 6th level or higher. For example, if you're a 4th-level wizard, you can recover up to two levels worth of spell slots. You can recover either a 2nd-level spell slot or two 1st-level spell slots.",
+            "automation": {
+              "type": "resource_restoration",
+              "trigger": "short_rest",
+              "restore_expression": "Math.ceil(level / 2)",
+              "resourceKey": "arcaneRecoveryLevels",
+              "uses_max": 1,
+              "casting_time": "passive",
+              "recharge": "long_rest",
+              "restoreType": "spell_slots",
+              "maxSlotLevel": 5
+            }
           },
           {
             "name": "Spellcasting",
             "level": 1,
             "prerequisites": [],
-            "description": "As a student of arcane magic, you have a spellbook containing spells that show the first glimmerings of your true power.<br/><br/><h6>Cantrips</h6>At 1st level, you know three cantrips of your choice from the wizard spell list. You learn additional wizard cantrips of your choice at higher levels, as shown in the Cantrips Known column of the Wizard table.<br/><br/><h6>Spellbook</h6> At 1st level, you have a spellbook containing six 1st-level wizard spells of your choice. Your spellbook is the repository of the wizard spells you know, except your cantrips, which are fixed in your mind.<br/> <br/> <h6>Preparing and Casting Spells</h6> The Wizard table shows how many spell slots you have to cast your wizard spells of 1st level and higher. To cast one of these spells, you must expend a slot of the spell's level or higher. You regain all expended spell slots when you finish a long rest.<br/><br/> You prepare the list of wizard spells that are available for you to cast. To do so, choose a number of wizard spells from your spellbook equal to your Intelligence modifier + your wizard level (minimum of one spell). The spells must be of a level for which you have spell slots.<br/><br/> For example, if you're a 3rd-level wizard, you have four 1st-level and two 2nd-level spell slots. With an Intelli\u00adgence of 16, your list of prepared spells can include six spells of 1st or 2nd level, in any combination, chosen from your spellbook. If you prepare the 1st-level spell magic missile, you can cast it using a 1st-level or a 2nd-level slot. Casting the spell doesn't remove it from your list of prepared spells.<br/><br/> You can change your list of prepared spells when you finish a long rest. Preparing a new list of wizard spells requires time spent studying your spellbook and memorizing the incantations and gestures you must make to cast the spell: at least 1 minute per spell level for each spell on your list.<br/> <br/> <h6>Spellcasting Ability</h6> Intelligence is your spellcasting ability for your wizard spells, since you learn your spells through dedicated study and memorization. You use your Intelligence whenever a spell refers to your spellcasting ability. In addition, you use your Intelligence modifier when set\u00adting the saving throw DC for a wizard spell you cast and when making an attack roll with one.<br/><br/> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>Spell save DC</b> = 8 + your proficiency bonus + your Intelligence modifier<br/> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>Spell attack modifier</b> = your proficiency bonus + your Intelligence modifier<br/> <br/> <h6>Ritual Casting</h6> You can cast a wizard spell as a ritual if that spell has the ritual tag and you have the spell in your spellbook. You don't need to have the spell prepared.<br/> <br/> <h6>Spellcasting Focus</h6> You can use an arcane focus as a spellcasting focus for your wizard spells.<br/> <br/> <h6>Learning Spells of 1st Level and Higher</h6> Each time you gain a wizard level, you can add two wizard spells of your choice to your spellbook for free. Each of these spells must be of a level for which you have spell slots, as shown on the Wizard table. On your adventures, you might find other spells that you can add to your spellbook."
+            "description": "As a student of arcane magic, you have a spellbook containing spells that show the first glimmerings of your true power.<br/><br/><h6>Cantrips</h6>At 1st level, you know three cantrips of your choice from the wizard spell list. You learn additional wizard cantrips of your choice at higher levels, as shown in the Cantrips Known column of the Wizard table.<br/><br/><h6>Spellbook</h6> At 1st level, you have a spellbook containing six 1st-level wizard spells of your choice. Your spellbook is the repository of the wizard spells you know, except your cantrips, which are fixed in your mind.<br/> <br/> <h6>Preparing and Casting Spells</h6> The Wizard table shows how many spell slots you have to cast your wizard spells of 1st level and higher. To cast one of these spells, you must expend a slot of the spell's level or higher. You regain all expended spell slots when you finish a long rest.<br/><br/> You prepare the list of wizard spells that are available for you to cast. To do so, choose a number of wizard spells from your spellbook equal to your Intelligence modifier + your wizard level (minimum of one spell). The spells must be of a level for which you have spell slots.<br/><br/> For example, if you're a 3rd-level wizard, you have four 1st-level and two 2nd-level spell slots. With an Intelli­gence of 16, your list of prepared spells can include six spells of 1st or 2nd level, in any combination, chosen from your spellbook. If you prepare the 1st-level spell magic missile, you can cast it using a 1st-level or a 2nd-level slot. Casting the spell doesn't remove it from your list of prepared spells.<br/><br/> You can change your list of prepared spells when you finish a long rest. Preparing a new list of wizard spells requires time spent studying your spellbook and memorizing the incantations and gestures you must make to cast the spell: at least 1 minute per spell level for each spell on your list.<br/> <br/> <h6>Spellcasting Ability</h6> Intelligence is your spellcasting ability for your wizard spells, since you learn your spells through dedicated study and memorization. You use your Intelligence whenever a spell refers to your spellcasting ability. In addition, you use your Intelligence modifier when set­ting the saving throw DC for a wizard spell you cast and when making an attack roll with one.<br/><br/> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>Spell save DC</b> = 8 + your proficiency bonus + your Intelligence modifier<br/> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>Spell attack modifier</b> = your proficiency bonus + your Intelligence modifier<br/> <br/> <h6>Ritual Casting</h6> You can cast a wizard spell as a ritual if that spell has the ritual tag and you have the spell in your spellbook. You don't need to have the spell prepared.<br/> <br/> <h6>Spellcasting Focus</h6> You can use an arcane focus as a spellcasting focus for your wizard spells.<br/> <br/> <h6>Learning Spells of 1st Level and Higher</h6> Each time you gain a wizard level, you can add two wizard spells of your choice to your spellbook for free. Each of these spells must be of a level for which you have spell slots, as shown on the Wizard table. On your adventures, you might find other spells that you can add to your spellbook."
           }
         ],
         "spellcasting": {
@@ -12617,7 +13248,12 @@
             "name": "Spell Mastery",
             "level": 18,
             "prerequisites": [],
-            "description": "You have achieved such mastery over certain spells that you can cast them at will. Choose a 1st-level wizard spell and a 2nd-level wizard spell that are in your spellbook. You can cast those spells at their lowest level without expending a spell slot when you have them prepared. If you want to cast either spell at a higher level, you must expend a spell slot as normal. By spending 8 hours in study, you can exchange one or both of the spells you chose for different spells of the same levels."
+            "description": "You have achieved such mastery over certain spells that you can cast them at will. Choose a 1st-level wizard spell and a 2nd-level wizard spell that are in your spellbook. You can cast those spells at their lowest level without expending a spell slot when you have them prepared. If you want to cast either spell at a higher level, you must expend a spell slot as normal. By spending 8 hours in study, you can exchange one or both of the spells you chose for different spells of the same levels.",
+            "automation": {
+              "type": "spell_mastery",
+              "casting_time": "passive",
+              "action": "action"
+            }
           }
         ],
         "spellcasting": {
@@ -12737,7 +13373,11 @@
                 "name": "Empowered Evocation",
                 "level": 10,
                 "prerequisites": [],
-                "description": "You can add your Intelligence modifier to one damage roll of any wizard evocation spell you cast."
+                "description": "You can add your Intelligence modifier to one damage roll of any wizard evocation spell you cast.",
+                "automation": {
+                  "type": "empowered_evocation",
+                  "casting_time": "passive"
+                }
               }
             ]
           },
@@ -12827,13 +13467,21 @@
                 "level": 14,
                 "prerequisites": [],
                 "description": "You have advantage on saving throws against spells. Furthermore, you have resistance against the damage of spells.",
-                "automation": {
-                  "type": "conditional_advantage",
-                  "target": "saving_throw",
-                  "condition": "against_spell",
-                  "effect": "advantage",
-                  "casting_time": "passive"
-                }
+                "automation": [
+                  {
+                    "type": "conditional_advantage",
+                    "target": "saving_throw",
+                    "condition": "against_spell",
+                    "effect": "advantage",
+                    "casting_time": "passive"
+                  },
+                  {
+                    "type": "passive_immunity",
+                    "damage_resistance": [
+                      "Spell"
+                    ]
+                  }
+                ]
               }
             ]
           }
@@ -13081,7 +13729,7 @@
                 "name": "Illusory Reality",
                 "level": 14,
                 "prerequisites": [],
-                "description": "You have learned the secret of weaving shadow magic into your illusions to give them a semi\u00ad reality. When you cast an illusion spell of 1st level or higher, you can choose one inanimate, nonmagical object that is part of the illusion and make that object real. You can do this on your turn as a bonus action while the spell is ongoing. The object remains real for 1 minute. For example, you can create an illusion of a bridge over a chasm and then make it real long enough for your allies to cross. The object can't deal damage or otherwise directly harm anyone."
+                "description": "You have learned the secret of weaving shadow magic into your illusions to give them a semi­ reality. When you cast an illusion spell of 1st level or higher, you can choose one inanimate, nonmagical object that is part of the illusion and make that object real. You can do this on your turn as a bonus action while the spell is ongoing. The object remains real for 1 minute. For example, you can create an illusion of a bridge over a chasm and then make it real long enough for your allies to cross. The object can't deal damage or otherwise directly harm anyone."
               }
             ]
           }

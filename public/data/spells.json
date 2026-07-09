@@ -122,7 +122,13 @@
     ],
     "subclasses": [
       "Lore"
-    ]
+    ],
+    "automation": {
+      "type": "aid",
+      "range": "30 feet",
+      "maxTargets": 3,
+      "hpMaxIncreaseExpression": "5 + ((spellSlotLevel - 2) * 5)"
+    }
   },
   {
     "index": "alarm",
@@ -749,7 +755,7 @@
     "index": "beast-bond",
     "name": "Beast Bond",
     "description": [
-      "You establish a telepathic link with one beast you touch that is friendly to you or charmed by you. The spell fails if the beast\u2019s Intelligence is 4 or higher. Until the spell ends, the link is active while you and the beast are within line of sight of each other. Through the link, the beast can understand your telepathic messages to it, and it can telepathically communicate simple emotions and concepts back to you. While the link is active, the beast gains advantage on attack rolls against any creature within 5 feet of you that you can see."
+      "You establish a telepathic link with one beast you touch that is friendly to you or charmed by you. The spell fails if the beast’s Intelligence is 4 or higher. Until the spell ends, the link is active while you and the beast are within line of sight of each other. Through the link, the beast can understand your telepathic messages to it, and it can telepathically communicate simple emotions and concepts back to you. While the link is active, the beast gains advantage on attack rolls against any creature within 5 feet of you that you can see."
     ],
     "range": "Touch",
     "components": [
@@ -2071,7 +2077,7 @@
     "index": "control-weather",
     "name": "Control Weather",
     "description": [
-      "You take control of the weather within 5 miles of you for the duration. You must be outdoors to cast this spell. Moving to a place where you don't have a clear path to the sky ends the spell early.<br/><br/>When you cast the spell, you change the current weather conditions, which are determined by the DM based on the climate and season. You can change precipitation, temperature, and wind. It takes 1d4 \u00d7 10 minutes for the new conditions to take effect. Once they do so, you can change the conditions again. When the spell ends, the weather gradually returns to normal.<br/><br/>When you change the weather conditions, find a current condition on the following tables and change its stage by one, up or down. When changing the wind, you can change its direction."
+      "You take control of the weather within 5 miles of you for the duration. You must be outdoors to cast this spell. Moving to a place where you don't have a clear path to the sky ends the spell early.<br/><br/>When you cast the spell, you change the current weather conditions, which are determined by the DM based on the climate and season. You can change precipitation, temperature, and wind. It takes 1d4 × 10 minutes for the new conditions to take effect. Once they do so, you can change the conditions again. When the spell ends, the weather gradually returns to normal.<br/><br/>When you change the weather conditions, find a current condition on the following tables and change its stage by one, up or down. When changing the wind, you can change its direction."
     ],
     "range": "Self",
     "components": [
@@ -3542,7 +3548,13 @@
     ],
     "subclasses": [
       "Lore"
-    ]
+    ],
+    "automation": {
+      "type": "fear",
+      "saveType": "WIS",
+      "range": "Self (30-foot Cone)",
+      "duration": "Concentration, up to 1 minute"
+    }
   },
   {
     "index": "feather-fall",
@@ -4044,7 +4056,13 @@
       "Warlock",
       "Wizard"
     ],
-    "subclasses": []
+    "subclasses": [],
+    "automation": {
+      "type": "flesh_to_stone",
+      "saveType": "CON",
+      "saveDc": "ability",
+      "saveAbility": "CON"
+    }
   },
   {
     "index": "floating-disk",
@@ -4220,7 +4238,11 @@
       "Warlock",
       "Wizard"
     ],
-    "subclasses": []
+    "subclasses": [],
+    "automation": {
+      "type": "foresight",
+      "duration": "8 hours"
+    }
   },
   {
     "index": "freedom-of-movement",
@@ -4520,7 +4542,13 @@
       "Sorcerer",
       "Wizard"
     ],
-    "subclasses": []
+    "subclasses": [],
+    "automation": {
+      "type": "globe_of_invulnerability",
+      "duration": "Concentration, up to 1 minute",
+      "auraRange": 10,
+      "maxBlockedSpellLevel": 5
+    }
   },
   {
     "index": "glyph-of-warding",
@@ -4610,6 +4638,25 @@
     ],
     "subclasses": [
       "Lore"
+    ],
+    "automation": [
+      {
+        "type": "save_attack",
+        "saveType": "DEX",
+        "shape": "square",
+        "range": "60 feet",
+        "conditionInflicted": "Prone",
+        "duration": "1 minute",
+        "dcSuccess": "none"
+      },
+      {
+        "type": "grease_area_save",
+        "saveType": "DEX",
+        "shape": "square",
+        "size": "10-foot",
+        "conditionInflicted": "Prone",
+        "duration": "1 minute"
+      }
     ]
   },
   {
@@ -4636,7 +4683,14 @@
     ],
     "subclasses": [
       "Land"
-    ]
+    ],
+    "automation": {
+      "type": "temp_buff",
+      "effect": "invisible",
+      "duration": "Concentration, up to 1 minute",
+      "action": "action",
+      "casting_time": "1 action"
+    }
   },
   {
     "index": "greater-restoration",
@@ -4662,7 +4716,11 @@
       "Cleric",
       "Druid"
     ],
-    "subclasses": []
+    "subclasses": [],
+    "automation": {
+      "type": "greater_restoration",
+      "range": "Touch"
+    }
   },
   {
     "index": "guardian-of-faith",
@@ -4996,7 +5054,14 @@
     "subclasses": [
       "Lore",
       "Land"
-    ]
+    ],
+    "automation": {
+      "type": "buff_ally",
+      "effect": "haste",
+      "duration": "Concentration, up to 1 minute",
+      "target": "willing_creature",
+      "casting_time": "1 action"
+    }
   },
   {
     "index": "heal",
@@ -5172,7 +5237,14 @@
       "Cleric",
       "Druid"
     ],
-    "subclasses": []
+    "subclasses": [],
+    "automation": {
+      "type": "heroes_feast",
+      "range": "Self",
+      "maxTargets": 12,
+      "hpMaxIncreaseExpression": "2d10",
+      "slotLevel": 6
+    }
   },
   {
     "index": "heroism",
@@ -5197,7 +5269,12 @@
     ],
     "subclasses": [
       "Lore"
-    ]
+    ],
+    "automation": {
+      "type": "heroism",
+      "tempHpExpression": "spellcasting_ability_modifier",
+      "duration": "Concentration, up to 1 minute"
+    }
   },
   {
     "index": "hideous-laughter",
@@ -5329,7 +5406,12 @@
     "classes": [
       "Cleric"
     ],
-    "subclasses": []
+    "subclasses": [],
+    "automation": {
+      "type": "holy_aura",
+      "duration": "Concentration, up to 1 minute",
+      "auraRange": 30
+    }
   },
   {
     "index": "hunters-mark",
@@ -5387,7 +5469,13 @@
     ],
     "subclasses": [
       "Lore"
-    ]
+    ],
+    "automation": {
+      "type": "hypnotic_pattern",
+      "saveType": "WIS",
+      "range": "120 feet",
+      "duration": "Concentration, up to 1 minute"
+    }
   },
   {
     "index": "ice-knife",
@@ -5754,7 +5842,14 @@
     "subclasses": [
       "Lore",
       "Land"
-    ]
+    ],
+    "automation": {
+      "type": "temp_buff",
+      "effect": "invisible",
+      "duration": "Concentration, up to 1 hour",
+      "action": "action",
+      "casting_time": "1 action"
+    }
   },
   {
     "index": "irresistible-dance",
@@ -5892,7 +5987,18 @@
       "Lore",
       "Life",
       "Devotion"
-    ]
+    ],
+    "automation": {
+      "type": "lesser_restoration",
+      "range": "Touch",
+      "casting_time": "bonus_action",
+      "conditions": [
+        "blinded",
+        "deafened",
+        "paralyzed",
+        "poisoned"
+      ]
+    }
   },
   {
     "index": "levitate",
@@ -6151,7 +6257,14 @@
     ],
     "subclasses": [
       "Lore"
-    ]
+    ],
+    "automation": {
+      "type": "mage_armor",
+      "target": "willing_creature",
+      "duration": "8 hours",
+      "casting_time": "1 action",
+      "range": "Touch"
+    }
   },
   {
     "index": "mage-hand",
@@ -6507,7 +6620,15 @@
     ],
     "subclasses": [
       "Lore"
-    ]
+    ],
+    "automation": {
+      "type": "healing",
+      "healExpression": "heal_at_slot_level",
+      "action": "bonus_action",
+      "casting_time": "1 bonus action",
+      "maxTargets": 6,
+      "range": "60 feet"
+    }
   },
   {
     "index": "mass-suggestion",
@@ -6540,7 +6661,15 @@
       "Warlock",
       "Wizard"
     ],
-    "subclasses": []
+    "subclasses": [],
+    "automation": {
+      "type": "mass_suggestion",
+      "saveType": "WIS",
+      "saveDc": "spell_save_dc",
+      "range": "60 feet",
+      "duration": "24 hours",
+      "maxTargets": 12
+    }
   },
   {
     "index": "maze",
@@ -7006,7 +7135,12 @@
     "subclasses": [
       "Lore",
       "Land"
-    ]
+    ],
+    "automation": {
+      "type": "pass_without_trace",
+      "duration": "Concentration, up to 1 hour",
+      "auraRange": 30
+    }
   },
   {
     "index": "passwall",
@@ -7605,7 +7739,21 @@
     "subclasses": [
       "Lore",
       "Land"
-    ]
+    ],
+    "automation": {
+      "type": "protection_from_energy",
+      "damageTypes": [
+        "Acid",
+        "Cold",
+        "Fire",
+        "Lightning",
+        "Thunder"
+      ],
+      "target": "willing_creature",
+      "duration": "Concentration, up to 1 hour",
+      "casting_time": "1 action",
+      "range": "Touch"
+    }
   },
   {
     "index": "protection-from-evil-and-good",
@@ -7635,7 +7783,21 @@
     "subclasses": [
       "Lore",
       "Devotion"
-    ]
+    ],
+    "automation": {
+      "type": "protection_from_evil_and_good",
+      "wardedCreatureTypes": [
+        "Aberration",
+        "Celestial",
+        "Elemental",
+        "Fey",
+        "Fiend",
+        "Undead"
+      ],
+      "duration": "Concentration, up to 10 minutes",
+      "casting_time": "1 action",
+      "range": "Touch"
+    }
   },
   {
     "index": "protection-from-poison",
@@ -7662,7 +7824,13 @@
     ],
     "subclasses": [
       "Lore"
-    ]
+    ],
+    "automation": {
+      "type": "protection_from_poison",
+      "duration": "1 hour",
+      "casting_time": "1 action",
+      "range": "Touch"
+    }
   },
   {
     "index": "purify-food-and-drink",
@@ -7865,7 +8033,12 @@
     ],
     "subclasses": [
       "Lore"
-    ]
+    ],
+    "automation": {
+      "type": "remove_curse",
+      "range": "Touch",
+      "casting_time": "1 action"
+    }
   },
   {
     "index": "resilient-sphere",
@@ -7926,7 +8099,14 @@
     ],
     "subclasses": [
       "Lore"
-    ]
+    ],
+    "automation": {
+      "type": "damage_reduction",
+      "reductionExpression": "1d4",
+      "damageTypes": [],
+      "trigger": "damage_taken_of_chosen_resistance_type",
+      "casting_time": "1 action"
+    }
   },
   {
     "index": "resurrection",
@@ -8466,7 +8646,14 @@
     ],
     "subclasses": [
       "Lore"
-    ]
+    ],
+    "automation": {
+      "type": "shield_of_faith",
+      "target": "willing_creature",
+      "duration": "Concentration, up to 10 minutes",
+      "casting_time": "Bonus Action",
+      "range": "60 feet"
+    }
   },
   {
     "index": "shillelagh",
@@ -8658,7 +8845,14 @@
     ],
     "subclasses": [
       "Lore"
-    ]
+    ],
+    "automation": {
+      "type": "sleep",
+      "saveType": "WIS",
+      "saveDc": "spell_save_dc",
+      "range": "60 feet",
+      "duration": "Concentration, up to 1 minute"
+    }
   },
   {
     "index": "sleet-storm",
@@ -8728,7 +8922,14 @@
     "subclasses": [
       "Lore",
       "Land"
-    ]
+    ],
+    "automation": {
+      "type": "slow",
+      "saveType": "WIS",
+      "range": "120 feet",
+      "duration": "Concentration, up to 1 minute",
+      "repeatingSave": true
+    }
   },
   {
     "index": "spare-the-dying",
@@ -9133,7 +9334,14 @@
     ],
     "subclasses": [
       "Lore"
-    ]
+    ],
+    "automation": {
+      "type": "suggestion",
+      "saveType": "WIS",
+      "saveDc": "spell_save_dc",
+      "range": "30 feet",
+      "duration": "Concentration, up to 8 hours"
+    }
   },
   {
     "index": "sunbeam",
@@ -9245,7 +9453,13 @@
       "Cleric",
       "Wizard"
     ],
-    "subclasses": []
+    "subclasses": [],
+    "automation": {
+      "type": "hypnotic_pattern",
+      "saveType": "WIS",
+      "range": "120 feet",
+      "duration": "Concentration, up to 1 minute"
+    }
   },
   {
     "index": "telekinesis",
@@ -10101,6 +10315,25 @@
     "subclasses": [
       "Lore",
       "Land"
+    ],
+    "automation": [
+      {
+        "type": "save_attack",
+        "saveType": "DEX",
+        "shape": "cube",
+        "range": "60 feet",
+        "conditionInflicted": "Restrained",
+        "duration": "Concentration, up to 1 hour",
+        "dcSuccess": "none"
+      },
+      {
+        "type": "web_area_save",
+        "saveType": "DEX",
+        "shape": "cube",
+        "size": "20-foot",
+        "conditionInflicted": "Restrained",
+        "duration": "Concentration, up to 1 hour"
+      }
     ]
   },
   {
