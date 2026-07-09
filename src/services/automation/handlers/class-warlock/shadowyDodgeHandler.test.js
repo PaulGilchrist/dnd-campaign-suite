@@ -6,6 +6,7 @@ import * as infoPopupModule from '../../common/infoPopup.js';
 
 vi.mock('../../common/damageRollback.js', () => ({
     findLastAttack: vi.fn(),
+    rollbackDamage: vi.fn().mockResolvedValue(0),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
@@ -217,6 +218,64 @@ describe('shadowyDodgeHandler', () => {
                 abilityName: 'Shadowy Dodge',
                 targetName: 'Red Dragon',
             }));
+        });
+
+        it('should rollback damage and show negated message when hit→miss', async () => {
+            mockRandom([0.05]);
+            const freshTimestamp = Date.now();
+            damageRollback.findLastAttack.mockResolvedValue({
+                attackEvent: { timestamp: freshTimestamp, d20: 15, bonus: 7, targetAc: 14, hit: true, effectiveAc: 14 },
+                attackerName: 'Goblin',
+                targetName: 'Test Rogue',
+                primaryDamage: 10,
+                secondaryDamage: 0,
+                totalDamage: 10,
+                damageTypes: ['slashing'],
+            });
+            damageRollback.rollbackDamage.mockResolvedValue(10);
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+
+            expect(damageRollback.rollbackDamage).toHaveBeenCalledWith('Goblin', 'Test Rogue', 'test-campaign', 'Shadowy Dodge');
+            expect(result.payload.description).toContain('Damage negated: 10 HP restored');
+            expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                description: expect.stringContaining('10 damage was negated'),
+            }));
+        });
+
+        it('should not call rollbackDamage when original attack already missed', async () => {
+            const freshTimestamp = Date.now();
+            damageRollback.findLastAttack.mockResolvedValue({
+                attackEvent: { timestamp: freshTimestamp, d20: 3, bonus: 2, targetAc: 14, hit: false, effectiveAc: 14 },
+                attackerName: 'Goblin',
+                targetName: 'Test Rogue',
+                primaryDamage: 0,
+                secondaryDamage: 0,
+                totalDamage: 0,
+                damageTypes: [],
+            });
+
+            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+
+            expect(damageRollback.rollbackDamage).not.toHaveBeenCalled();
+        });
+
+        it('should not call rollbackDamage when attack still hits with disadvantage', async () => {
+            mockRandom([0.95]);
+            const freshTimestamp = Date.now();
+            damageRollback.findLastAttack.mockResolvedValue({
+                attackEvent: { timestamp: freshTimestamp, d20: 18, bonus: 7, targetAc: 14, hit: true, effectiveAc: 14 },
+                attackerName: 'Orc',
+                targetName: 'Test Rogue',
+                primaryDamage: 12,
+                secondaryDamage: 0,
+                totalDamage: 12,
+                damageTypes: ['bludgeoning'],
+            });
+
+            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+
+            expect(damageRollback.rollbackDamage).not.toHaveBeenCalled();
         });
 
         it('should pass automation config through to popup payload', async () => {

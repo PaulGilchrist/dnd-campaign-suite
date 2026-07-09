@@ -1,5 +1,5 @@
 import { addEntry } from '../../../ui/logService.js';
-import { findLastAttack } from '../../common/damageRollback.js';
+import { findLastAttack, rollbackDamage } from '../../common/damageRollback.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
@@ -28,21 +28,31 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     description += `Original roll: d20(${d20}) + ${bonus} = ${d20 + bonus} vs AC ${ac != null ? ac : '—'} → <b>${hit ? 'HIT' : 'MISS'}</b><br/>`;
     description += `Disadvantage (second d20: ${secondD20}): d20(${finalD20}) + ${bonus} = ${finalD20 + bonus} vs AC ${ac != null ? ac : '—'} → <b>${finalHit == null ? 'N/A' : finalHit ? 'HIT' : 'MISS'}</b><br/>`;
 
+    let damageRolledBack = 0;
     if (hit === true && finalHit === true) {
         description += `<br/><i>The attack still hits despite Disadvantage.</i>`;
     } else if (hit === true && finalHit === false) {
         description += `<br/><i>The attack now misses due to Disadvantage!</i>`;
+        damageRolledBack = await rollbackDamage(attackerName, playerName, campaignName, featureName);
+        if (damageRolledBack > 0) {
+            description += `<br/>Damage negated: ${damageRolledBack} HP restored.`;
+        }
     } else if (hit === false) {
         description += `<br/><i>The attack already missed — Disadvantage has no additional effect.</i>`;
     }
 
     description += `<br/>Teleported 30 feet to an unoccupied space you can see.`;
 
+    let logDesc = `${playerName} used ${featureName} on ${attackerName}, imposing Disadvantage and teleporting 30 feet.`;
+    if (damageRolledBack > 0) {
+        logDesc += ` ${damageRolledBack} damage was negated.`;
+    }
+
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
         abilityName: featureName,
-        description: `${playerName} used ${featureName} on ${attackerName}, imposing Disadvantage and teleporting 30 feet.`,
+        description: logDesc,
         targetName: attackerName,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[shadowyDodge] Error:", e); });
