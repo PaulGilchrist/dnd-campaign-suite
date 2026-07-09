@@ -19,8 +19,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     let currentUses = 0;
     if (auto.uses_expression) {
         const maxUses = evaluateAutoExpression(auto.uses_expression, playerStats);
-        currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? maxUses);
+        console.log('[dreadAmbush] uses check - maxUses:', maxUses, 'playerName:', playerName);
+        currentUses = Number(getRuntimeValue(playerName, usesKey) ?? maxUses);
+        console.log('[dreadAmbush] uses check - currentUses:', currentUses, 'from store (null fallback to maxUses:', maxUses + ')');
         if (currentUses <= 0) {
+            console.log('[dreadAmbush] BLOCKED - no uses remaining:', currentUses);
             return {
                 type: 'popup',
                 payload: {

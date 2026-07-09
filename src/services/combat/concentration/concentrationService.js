@@ -1,8 +1,8 @@
 import * as concentrationRules from './concentrationRules.js'
 import { computeAuraBonus } from '../auras/auraOfProtection.js'
 import { getCreatureSaveBonus } from '../conditions/conditionSaveService.js'
-import * as storageService from '../../../services/ui/storage.js'
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
+import storage from '../../../services/ui/storage.js'
 
 function hasDragonConstellation(creature, characters) {
     if (!creature || !creature.name) return false;
@@ -35,14 +35,18 @@ function breakConcentration(combatSummary, creatureName) {
 }
 
 function clearAllConcentrations(campaignName) {
-    const cs = { __name: campaignName };
-    const creatures = getRuntimeValue(campaignName, 'combatSummary')?.creatures || [];
+    const cs = getRuntimeValue(campaignName, 'combatSummary');
+    const creatures = cs?.creatures || [];
+    let changed = false;
     for (const creature of creatures) {
         if (creature.concentration) {
             creature.concentration = null;
+            changed = true;
         }
     }
-    storageService.default.set('combatSummary', cs, campaignName);
+    if (changed && cs) {
+        storage.set('combatSummary', cs, campaignName);
+    }
 }
 
 function addConcentration(combatSummary, creatureName, spellName, dc, target = null) {
