@@ -47,7 +47,7 @@ function makeAction(automation = {}) {
 describe('damageTypeModifierHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    combatData.setCombatSummaryCache(null);
+    combatData.setCombatSummaryCache(null, campaignName);
   });
 
   describe('handle', () => {
@@ -190,7 +190,7 @@ describe('damageTypeModifierHandler', () => {
       const action = makeAction({ options: [{ name: 'Thunder', damageType: 'Thunder' }] });
       const ps = makePlayerStats();
 
-      combatData.setCombatSummaryCache({ round: 5 });
+      combatData.setCombatSummaryCache({ round: 5 }, campaignName);
 
       await applyDamageTypeChoice(action, ps, campaignName, 'Thunder');
 
@@ -200,7 +200,7 @@ describe('damageTypeModifierHandler', () => {
       expect(usedRoundCall[2]).toBe(5);
 
       vi.clearAllMocks();
-      combatData.setCombatSummaryCache(null);
+      combatData.setCombatSummaryCache(null, campaignName);
 
       await applyDamageTypeChoice(action, ps, campaignName, 'Thunder');
 

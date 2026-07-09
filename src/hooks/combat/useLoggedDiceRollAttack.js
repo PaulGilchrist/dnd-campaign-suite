@@ -1167,7 +1167,7 @@ export function createLogAndShow(deps) {
                     c => c.type === 'player' && c.name === firstName
                 );
                 if (creature) {
-                    creature.initiative = String(r1 + totalBonus);
+                    creature.initiative = String(effectiveD20Roll + totalBonus);
                     combatSummary.creatures.sort((a, b) => b.initiative - a.initiative);
                     storage.set('combatSummary', combatSummary, campaignName);
                 }
@@ -1189,7 +1189,7 @@ export function createLogAndShow(deps) {
                 bardicInspiration: context?.bardicInspiration,
                 bardicInspirationDie: context?.bardicInspirationDie,
             });
-            window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: firstName, roll: r1 + totalBonus } }));
+            window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: firstName, roll: effectiveD20Roll + totalBonus } }));
             clearHuntersMarkConcentration(firstName, campaignName);
         }
     };

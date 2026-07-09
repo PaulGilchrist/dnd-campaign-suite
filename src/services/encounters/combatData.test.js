@@ -25,26 +25,40 @@ function stubFetchCombatSummaryError() {
 describe('combatData', () => {
   beforeEach(() => {
     localStorage.clear();
-    combatData.setCombatSummaryCache(null);
+    combatData.setCombatSummaryCache(null, 'testCampaign');
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
     globalThis.fetch = originalFetch;
-    combatData.setCombatSummaryCache(null);
+    combatData.setCombatSummaryCache(null, 'testCampaign');
   });
 
   describe('setCombatSummaryCache', () => {
     it('stores the summary in the in-memory cache', () => {
       const summary = { round: 7, creatures: [{ name: 'Orc' }] };
       combatData.setCombatSummaryCache(summary, 'testCampaign');
-      expect(combatData.getCombatSummary()).toBe(summary);
+      expect(combatData.getCombatSummary('testCampaign')).toBe(summary);
     });
 
     it('clears cache when null is passed', () => {
       combatData.setCombatSummaryCache({ round: 1 }, 'testCampaign');
       combatData.setCombatSummaryCache(null, 'testCampaign');
-      expect(combatData.getCombatSummary()).toBeNull();
+      expect(combatData.getCombatSummary('testCampaign')).toBeNull();
+    });
+
+    it('does not interfere with other campaigns', () => {
+      const summaryA = { round: 1, campaign: 'A' };
+      const summaryB = { round: 2, campaign: 'B' };
+      combatData.setCombatSummaryCache(summaryA, 'campaignA');
+      combatData.setCombatSummaryCache(summaryB, 'campaignB');
+      expect(combatData.getCombatSummary('campaignA')).toBe(summaryA);
+      expect(combatData.getCombatSummary('campaignB')).toBe(summaryB);
+      expect(combatData.getCombatSummary('campaignA')).not.toBe(summaryB);
+    });
+
+    it('returns null for unknown campaign', () => {
+      expect(combatData.getCombatSummary('unknownCampaign')).toBeNull();
     });
   });
 
@@ -53,7 +67,7 @@ describe('combatData', () => {
       stubFetchCombatSummary({ round: 5, creatures: [{ name: 'Orc' }] });
       const result = await combatData.loadCombatSummary('testCampaign');
       expect(result).toEqual({ round: 5, creatures: [{ name: 'Orc' }] });
-      expect(combatData.getCombatSummary()).toEqual(result);
+      expect(combatData.getCombatSummary('testCampaign')).toEqual(result);
     });
 
     it('returns null when the API returns no combatSummary', async () => {
@@ -96,11 +110,15 @@ describe('combatData', () => {
     it('returns the cached summary after loadCombatSummary', async () => {
       stubFetchCombatSummary({ round: 4, creatures: [] });
       await combatData.loadCombatSummary('testCampaign');
-      expect(combatData.getCombatSummary()).toEqual({ round: 4, creatures: [] });
+      expect(combatData.getCombatSummary('testCampaign')).toEqual({ round: 4, creatures: [] });
     });
 
     it('returns null when no summary has been loaded', () => {
-      expect(combatData.getCombatSummary()).toBeNull();
+      expect(combatData.getCombatSummary('testCampaign')).toBeNull();
+    });
+
+    it('returns null when campaignName is falsy', () => {
+      expect(combatData.getCombatSummary(null)).toBeNull();
     });
   });
 
@@ -126,12 +144,16 @@ describe('combatData', () => {
 
   describe('getActiveCreatureName', () => {
     it('returns the cached active creature name', () => {
-      combatData.setCombatSummaryCache({ round: 1, activeCreatureName: 'Goblin' });
-      expect(combatData.getActiveCreatureName()).toBe('Goblin');
+      combatData.setCombatSummaryCache({ round: 1, activeCreatureName: 'Goblin' }, 'testCampaign');
+      expect(combatData.getActiveCreatureName('testCampaign')).toBe('Goblin');
     });
 
     it('returns null when no cache is set', () => {
-      expect(combatData.getActiveCreatureName()).toBeNull();
+      expect(combatData.getActiveCreatureName('testCampaign')).toBeNull();
+    });
+
+    it('returns null when campaignName is falsy', () => {
+      expect(combatData.getActiveCreatureName(null)).toBeNull();
     });
   });
 
@@ -165,12 +187,16 @@ describe('combatData', () => {
 
   describe('getCurrentCombatRound', () => {
     it('returns the cached round', () => {
-      combatData.setCombatSummaryCache({ round: 3, creatures: [] });
-      expect(combatData.getCurrentCombatRound()).toBe(3);
+      combatData.setCombatSummaryCache({ round: 3, creatures: [] }, 'testCampaign');
+      expect(combatData.getCurrentCombatRound('testCampaign')).toBe(3);
     });
 
     it('returns 1 when no cache is set', () => {
-      expect(combatData.getCurrentCombatRound()).toBe(1);
+      expect(combatData.getCurrentCombatRound('testCampaign')).toBe(1);
+    });
+
+    it('returns 1 when campaignName is falsy', () => {
+      expect(combatData.getCurrentCombatRound(null)).toBe(1);
     });
   });
 });

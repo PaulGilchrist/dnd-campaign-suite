@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { applyRiderOption } from '../../../../services/automation/handlers/combat/attackRiderHandler.js';
-import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import SecondaryTargetModal from './SecondaryTargetModal.jsx';
 import '../../CharSheet.css';
 
@@ -12,6 +12,9 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
     const [versatileTricksterTargets, setVersatileTricksterTargets] = useState(null);
     const [vtApplied, setVtApplied] = useState(false);
     const [vtResult, setVtResult] = useState(null);
+    const [stalkersFlurryTargets, setStalkersFlurryTargets] = useState(null);
+    const [sfApplied, setSfApplied] = useState(false);
+    const [sfResult, setSfResult] = useState(null);
 
     useEffect(() => {
         if (applied && !result) {
@@ -29,6 +32,16 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
             const secondaryTargets = getRuntimeValue(playerStats.name, 'versatileTricksterSecondaryTargets', campaignName);
             if (secondaryTargets && secondaryTargets.length > 0) {
                 setVersatileTricksterTargets(secondaryTargets);
+            }
+        }
+    }, [applied, result, playerStats.name, campaignName]);
+
+    // Check for Stalker's Flurry secondary targets after applying
+    useEffect(() => {
+        if (applied && result) {
+            const secondaryTargets = getRuntimeValue(playerStats.name, 'stalkersFlurrySecondaryTargets', campaignName);
+            if (secondaryTargets && secondaryTargets.length > 0) {
+                setStalkersFlurryTargets(secondaryTargets);
             }
         }
     }, [applied, result, playerStats.name, campaignName]);
@@ -90,6 +103,62 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
                 onTargetSelected={handleVtTargetSelected}
                 onSkip={onClose}
                 confirmLabel="Trip Secondary Target"
+                confirmIcon="fa-bolt"
+                showSize={true}
+            />
+        );
+    }
+
+    // Stalker's Flurry secondary target selection
+    if (stalkersFlurryTargets && stalkersFlurryTargets.length > 0) {
+        if (sfApplied && sfResult) {
+            return (
+                <div className="sp-overlay" onClick={onClose}>
+                    <div className="sp-modal" onClick={e => e.stopPropagation()}>
+                        <div className="sp-header">
+                            <i className="fa-solid fa-bolt"></i> Stalker's Flurry
+                        </div>
+                        <div className="sp-body" dangerouslySetInnerHTML={{ __html: sfResult.payload.description }}>
+                        </div>
+                        <div className="sp-actions">
+                            <button className="sp-roll-btn" onClick={onClose}>Done</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const stalkerOptions = getRuntimeValue(playerStats.name, 'stalkersFlurryOptions', campaignName);
+        const isSuddenStrike = stalkerOptions?.includes('Sudden Strike');
+
+        const handleSfTargetSelected = async (selectedTargetName) => {
+            setRuntimeValue(playerStats.name, 'stalkersFlurryChosenTarget', selectedTargetName, campaignName);
+            if (isSuddenStrike) {
+                setRuntimeValue(playerStats.name, 'pendingSuddenStrikeTarget', selectedTargetName, campaignName);
+            }
+            setSfResult({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: "Stalker's Flurry",
+                    description: isSuddenStrike
+                        ? `Sudden Strike target set to <b>${selectedTargetName}</b>. You may now make a bonus action attack against this creature.`
+                        : `Mass Fear epicenter set to <b>${selectedTargetName}</b>. ${selectedTargetName} and creatures within 10 ft must make a Wisdom save or be Frightened.`,
+                },
+            });
+            setSfApplied(true);
+        };
+
+        return (
+            <SecondaryTargetModal
+                title="Stalker's Flurry"
+                targets={stalkersFlurryTargets}
+                description={isSuddenStrike
+                    ? `Sudden Strike: Choose a target within 5 ft of <b>${targetName}</b> for your bonus action attack:`
+                    : `Mass Fear: Choose a target for the fear effect. The target and creatures within 10 ft will make a Wisdom save or be Frightened.`}
+                onTargetSelected={handleSfTargetSelected}
+                onSkip={onClose}
+                confirmLabel={isSuddenStrike ? "Attack Target" : "Apply Fear"}
                 confirmIcon="fa-bolt"
                 showSize={true}
             />

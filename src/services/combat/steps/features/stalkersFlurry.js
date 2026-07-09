@@ -12,8 +12,9 @@ export const stalkersFlurry = {
     if (!sf) return null;
 
     const key = `_${sf.name.replace(/\s+/g, '_')}_usedRound`;
+    const skipKey = `_${sf.name.replace(/\s+/g, '_')}_skippedRound`;
     const round = getCurrentCombatRound();
-    if (sf.oncePerTurn && getRuntimeValue(ctx.playerStats.name, key, ctx.campaignName) === round) return { data: prevData };
+    if (sf.oncePerTurn && (getRuntimeValue(ctx.playerStats.name, key, ctx.campaignName) === round || getRuntimeValue(ctx.playerStats.name, skipKey, ctx.campaignName) === round)) return { data: prevData };
 
     const cs = await getCombatContext(ctx.campaignName);
     const t = cs ? getTargetFromAttacker(cs, ctx.playerStats.name) : null;
@@ -21,6 +22,8 @@ export const stalkersFlurry = {
 
     const optKey = `_${sf.name.replace(/\s+/g, '_')}_option`;
     const chosen = getRuntimeValue(ctx.playerStats.name, optKey, ctx.campaignName);
+    const secondaryTarget = getRuntimeValue(ctx.playerStats.name, 'stalkersFlurryChosenTarget', ctx.campaignName);
+    const effectTarget = secondaryTarget || t.name;
     if (!chosen) {
       ctx.setAttackRiderModal?.({ action: sf, playerStats: ctx.playerStats, campaignName: ctx.campaignName, targetName: t.name });
       return {
@@ -30,10 +33,15 @@ export const stalkersFlurry = {
 
     const opt = sf.options.find(o => o.name === chosen);
     if (opt) {
-      if (opt.effect === 'sudden_strike') setRuntimeValue(ctx.playerStats.name, 'pendingSuddenStrike', true, ctx.campaignName);
+      if (opt.effect === 'sudden_strike') {
+        setRuntimeValue(ctx.playerStats.name, 'pendingSuddenStrike', true, ctx.campaignName);
+        if (secondaryTarget) {
+          setRuntimeValue(ctx.playerStats.name, 'pendingSuddenStrikeTarget', secondaryTarget, ctx.campaignName);
+        }
+      }
       else if (opt.effect === 'mass_fear') {
         const effs = getRuntimeValue(ctx.campaignName, 'targetEffects') || [];
-        setRuntimeValue(ctx.campaignName, 'targetEffects', [...effs, { target: t.name, source: sf.name, option: opt.name, effect: 'mass_fear', saveType: opt.saveType || 'WIS', saveDc: opt.saveDc || 'ability', saveAbility: opt.saveAbility || 'WIS', condition: opt.condition || 'frightened', duration: opt.duration || 'until_start_of_next_turn', range: opt.range || '10_ft' }], ctx.campaignName);
+        setRuntimeValue(ctx.campaignName, 'targetEffects', [...effs, { target: effectTarget, source: sf.name, option: opt.name, effect: 'mass_fear', saveType: opt.saveType || 'WIS', saveDc: opt.saveDc || 'ability', saveAbility: opt.saveAbility || 'WIS', condition: opt.condition || 'frightened', duration: opt.duration || 'until_start_of_next_turn', range: opt.range || '10_ft' }], ctx.campaignName);
       }
     }
 
@@ -41,6 +49,12 @@ export const stalkersFlurry = {
       data: prevData,
       sideEffects: async () => {
         if (sf.oncePerTurn) setRuntimeValue(ctx.playerStats.name, key, round, ctx.campaignName);
+        const skipKey = `_${sf.name.replace(/\s+/g, '_')}_skippedRound`;
+        setRuntimeValue(ctx.playerStats.name, skipKey, null, ctx.campaignName);
+        setRuntimeValue(ctx.playerStats.name, 'stalkersFlurryChosenTarget', null, ctx.campaignName);
+        setRuntimeValue(ctx.playerStats.name, 'stalkersFlurrySecondaryTargets', null, ctx.campaignName);
+        setRuntimeValue(ctx.playerStats.name, 'stalkersFlurryPrimaryTarget', null, ctx.campaignName);
+        setRuntimeValue(ctx.playerStats.name, 'stalkersFlurryOptions', null, ctx.campaignName);
       },
     };
   },

@@ -162,6 +162,32 @@ export async function applyRiderOption(action, playerStats, campaignName, target
         setRuntimeValue(playerStats.name, 'versatileTricksterAction', { type: 'versatile_trickster', automation: { type: 'versatile_trickster', casting_time: 'passive' } }, campaignName);
     }
 
+    // If Sudden Strike or Mass Fear was applied, find secondary targets for the effect
+    const hasStalkersFlurry = chosenOptions.some(o => o.effect === 'sudden_strike' || o.effect === 'mass_fear');
+    let stalkersFlurrySecondaryTarget = null;
+    if (hasStalkersFlurry && targetName) {
+        const cs = await getCombatContext(campaignName);
+        if (cs?.creatures) {
+            const primaryTarget = cs.creatures.find(c => c.name === targetName);
+            if (primaryTarget?.position) {
+                stalkersFlurrySecondaryTarget = cs.creatures
+                    .filter(c => c.name !== targetName && c.position)
+                    .map(c => ({
+                        creature: c,
+                        distance: getDistanceFeet(primaryTarget.position, c.position),
+                    }))
+                    .filter(t => t.distance !== null && t.distance <= 5);
+            }
+        }
+    }
+
+    if (stalkersFlurrySecondaryTarget && stalkersFlurrySecondaryTarget.length > 0) {
+        const stalkerFlurryOptions = chosenOptions.map(o => o.name);
+        setRuntimeValue(playerStats.name, 'stalkersFlurrySecondaryTargets', stalkersFlurrySecondaryTarget.map(t => t.creature), campaignName);
+        setRuntimeValue(playerStats.name, 'stalkersFlurryPrimaryTarget', targetName, campaignName);
+        setRuntimeValue(playerStats.name, 'stalkersFlurryOptions', stalkerFlurryOptions, campaignName);
+    }
+
     if (results.length === 1) {
         return results[0];
     }

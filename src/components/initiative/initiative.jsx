@@ -422,7 +422,6 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             const summary = getCombatSummary(campaignName)
             if (!summary) return
             combatSummaryRef.current = summary
-            setCombatSummary(summary)
             let clearedHuntersMark = false
             for (const creature of (summary?.creatures || [])) {
                 if (creature.type === 'player') {
@@ -438,14 +437,14 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 }
             }
             if (clearedHuntersMark) {
-                setCombatSummary(cloneDeep(summary))
+                setCombatSummaryG(cloneDeep(summary))
             }
         }
         window.addEventListener('initiative-rolled', handler)
         return () => {
             window.removeEventListener('initiative-rolled', handler)
           }
-      }, [campaignName])
+      }, [campaignName, setCombatSummaryG])
 
     React.useEffect(() => {
         const handler = (e) => {

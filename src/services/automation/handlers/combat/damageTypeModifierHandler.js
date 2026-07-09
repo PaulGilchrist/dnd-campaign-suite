@@ -48,7 +48,7 @@ export async function applyDamageTypeChoice(action, playerStats, campaignName, c
 
     // Store the chosen damage type for the current round
     setRuntimeValue(playerStats.name, 'empoweredStrikesDamageType', chosen.damageType, campaignName);
-    setRuntimeValue(playerStats.name, usedKey, getCombatRoundFromCache(), campaignName);
+    setRuntimeValue(playerStats.name, usedKey, getCombatRoundFromCache(campaignName), campaignName);
 
     addEntry(campaignName, {
         type: 'ability_use',

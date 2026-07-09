@@ -1,5 +1,5 @@
 {
-  "name": "Cleric",
+  "name": "Luna",
   "level": 3,
   "alignment": "Neutral Good",
   "abilities": [
@@ -125,7 +125,7 @@
   "rules": "5e",
   "xp": 0,
   "xpMode": "milestone",
-  "imagePath": "images/Cleric.png",
+  "imagePath": "images/Luna.png",
   "_fileName": "Cleric.json",
   "originalFileName": "Cleric.json"
 }

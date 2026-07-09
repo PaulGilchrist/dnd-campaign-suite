@@ -1,5 +1,5 @@
 {
-  "name": "Paladin",
+  "name": "Armenta",
   "level": 3,
   "alignment": "Lawful Good",
   "abilities": [
@@ -53,6 +53,8 @@
       "name": "Vengeance",
       "type": ""
     },
+    "divineOrder": "",
+    "primalOrder": "",
     "fightingStyles": [
       "Defense"
     ]
@@ -119,5 +121,6 @@
   "xp": 0,
   "xpMode": "milestone",
   "imagePath": "images/Paladin.png",
-  "_fileName": "Paladin.json"
+  "_fileName": "Paladin.json",
+  "originalFileName": "Paladin.json"
 }
