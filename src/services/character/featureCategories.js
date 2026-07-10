@@ -151,6 +151,7 @@ const categories2024 = {
         "Eldritch Invocations",
         "Epic Boon",
         "Extra Attack",
+        "Evergreen Wild Shape", // Already shown under Archdruid
         "Two Extra Attacks",
         "Three Extra Attacks",
         "Fast Movement",

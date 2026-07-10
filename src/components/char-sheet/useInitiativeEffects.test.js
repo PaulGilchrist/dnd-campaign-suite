@@ -115,14 +115,15 @@ describe('useInitiativeEffects', () => {
                 });
                 const stats = {
                     ...defaultPlayerStats,
-                    actions: [
-                        {
-                            automation: {
+                    automation: {
+                        ...defaultPlayerStats.automation,
+                        actions: [
+                            {
                                 type: 'initiative_action',
                                 effect: 'other',
                             },
-                        },
-                    ],
+                        ],
+                    },
                 };
                 renderHookWithStats(stats);
                 dispatchInitiativeRoll({
@@ -145,14 +146,15 @@ describe('useInitiativeEffects', () => {
                 });
                 const stats = {
                     ...defaultPlayerStats,
-                    actions: [
-                        {
-                            automation: {
+                    automation: {
+                        ...defaultPlayerStats.automation,
+                        actions: [
+                            {
                                 type: 'initiative_action',
                                 effect: 'other',
                             },
-                        },
-                    ],
+                        ],
+                    },
                 };
                 renderHookWithStats(stats);
                 dispatchInitiativeRoll({
@@ -196,14 +198,15 @@ describe('useInitiativeEffects', () => {
                         ...defaultPlayerStats.class,
                         class_levels: [{ level: 15, focus_points: 0 }],
                     },
-                    actions: [
-                        {
-                            automation: {
+                    automation: {
+                        ...defaultPlayerStats.automation,
+                        actions: [
+                            {
                                 type: 'initiative_action',
                                 effect: 'other',
                             },
-                        },
-                    ],
+                        ],
+                    },
                 };
                 renderHookWithStats(stats);
                 dispatchInitiativeRoll({
@@ -225,14 +228,15 @@ describe('useInitiativeEffects', () => {
                 });
                 const stats = {
                     ...defaultPlayerStats,
-                    actions: [
-                        {
-                            automation: {
+                    automation: {
+                        ...defaultPlayerStats.automation,
+                        actions: [
+                            {
                                 type: 'initiative_action',
                                 effect: 'wild_shape_regen_on_initiative',
                             },
-                        },
-                    ],
+                        ],
+                    },
                 };
                 renderHookWithStats(stats);
                 dispatchInitiativeRoll({
@@ -395,14 +399,15 @@ describe('useInitiativeEffects', () => {
                 const stats = {
                     ...defaultPlayerStats,
                     level: 18,
-                    actions: [
-                        {
-                            automation: {
+                    automation: {
+                        ...defaultPlayerStats.automation,
+                        actions: [
+                            {
                                 type: 'initiative_action',
                                 effect: 'wild_shape_regen_on_initiative',
                             },
-                        },
-                    ],
+                        ],
+                    },
                     class: {
                         ...defaultPlayerStats.class,
                         class_levels: [
@@ -431,14 +436,15 @@ describe('useInitiativeEffects', () => {
                 const stats = {
                     ...defaultPlayerStats,
                     level: 18,
-                    actions: [
-                        {
-                            automation: {
+                    automation: {
+                        ...defaultPlayerStats.automation,
+                        actions: [
+                            {
                                 type: 'initiative_action',
                                 effect: 'wild_shape_regen_on_initiative',
                             },
-                        },
-                    ],
+                        ],
+                    },
                     class: {
                         ...defaultPlayerStats.class,
                         class_levels: [
@@ -467,14 +473,15 @@ describe('useInitiativeEffects', () => {
                 const stats = {
                     ...defaultPlayerStats,
                     level: 18,
-                    actions: [
-                        {
-                            automation: {
+                    automation: {
+                        ...defaultPlayerStats.automation,
+                        actions: [
+                            {
                                 type: 'initiative_action',
                                 effect: 'wild_shape_regen_on_initiative',
                             },
-                        },
-                    ],
+                        ],
+                    },
                     class: {
                         ...defaultPlayerStats.class,
                         class_levels: [

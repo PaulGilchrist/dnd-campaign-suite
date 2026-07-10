@@ -55,7 +55,8 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
             const uncannyMetabolismUsed = getRuntimeValue(playerStats.name, 'uncannyMetabolismUsed', campaignName) === true;
 
             // Recover Focus Points (Monk Uncanny Metabolism passive)
-            const hasFocusPointsAction = playerStats.actions?.some(a => a.automation?.type === 'initiative_action' && a.automation?.effect !== 'wild_shape_regen_on_initiative');
+            const automationActions = playerStats.automation?.actions || [];
+            const hasFocusPointsAction = automationActions.some(a => a.type === 'initiative_action' && a.effect !== 'wild_shape_regen_on_initiative');
             if (hasFocusPointsAction && !hasPerfectFocus) {
                 const maxFP = classLevel?.focus_points || getRuntimeValue(playerStats.name, 'focusPoints', campaignName) || 0;
                 if (maxFP > 0) {
@@ -81,7 +82,7 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
             }
 
             // Recover Wild Shape use on initiative (Archdruid Evergreen Wild Shape)
-            const hasEvergreen = playerStats.actions?.some(a => a.automation?.type === 'initiative_action' && a.automation?.effect === 'wild_shape_regen_on_initiative');
+            const hasEvergreen = automationActions.some(a => a.type === 'initiative_action' && a.effect === 'wild_shape_regen_on_initiative');
             if (hasEvergreen) {
                 const druidLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
                 const maxWS = druidLevel?.wild_shape || 0;
