@@ -115,8 +115,6 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
                     sourceName: attackerName,
                 });
                 playerPrompts.push({ promptId, targetName });
-
-                logSaveEntry(campaignName, featureName, attackerName, targetName, saveDc, saveType, false, 0, [], 0, '1d20 (waiting)');
             }
         });
 

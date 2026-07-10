@@ -77,6 +77,7 @@ function AreaEffectTargetModalBase({
   });
 
   const handleApply = useCallback(() => {
+    console.log('[AreaEffectTargetModalBase] handleApply called');
     handleApplyOverrideRef.current(ctxRef.current);
   }, []);
 

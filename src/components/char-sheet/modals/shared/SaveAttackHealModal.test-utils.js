@@ -5,7 +5,7 @@ export const baseProps = {
     creatures: [
       { name: 'Goblin A', type: 'npc' },
       { name: 'Goblin B', type: 'npc' },
-      { name: 'Player One', type: 'player' },
+      { name: 'Player One', type: 'player', currentHitPoints: 100 },
     ],
   },
   attackerName: 'Cleric1',

@@ -53,7 +53,7 @@ export const categorizeFeatures = (items, categories, options = {}) => {
     };
 
     // Categorize by casting_time for features that have automations with casting_time
-    let castingTime = item.automation?.casting_time;
+    let castingTime = item.casting_time || item.automation?.casting_time;
     let hasReaction = false;
     if (!castingTime && Array.isArray(item.automation) && item.automation.length > 0) {
       const firstAuto = item.automation.find(a => a?.casting_time);

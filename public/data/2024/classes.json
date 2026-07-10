@@ -3496,6 +3496,7 @@
                         "name": "Land's Aid",
                         "description": "As a Action, expend a use of Wild Shape and choose a point within 60 feet. Creatures in a 10-foot-radius Sphere make a Constitution saving throw, taking 2d6 Necrotic damage on a failed save or half on success. One creature regains 2d6 Hit Points. Damage and healing increase by 1d6 at Druid levels 10 (3d6) and 14 (4d6).",
                         "level": 3,
+                        "casting_time": "1 action",
                         "automation": {
                             "type": "save_attack",
                             "damage": "2d6",
@@ -3516,8 +3517,7 @@
                                 "14": "4d6"
                             },
                             "dcSuccess": "half",
-                            "resourceKey": "wildShapeUses",
-                            "casting_time": "1 action"
+                            "resourceKey": "wildShapeUses"
                         }
                     },
                     {
