@@ -50,9 +50,9 @@ describe('defensiveTacticsHandler', () => {
         });
 
         it.each([
-            ['Escape the Horde', 'Opportunity Attacks have Disadvantage'],
-            ['Multiattack Defense', 'Disadvantage on all other attack rolls'],
-        ])('returns info popup for %s', async (choice, expectedText) => {
+            ['Escape the Horde'],
+            ['Multiattack Defense'],
+        ])('returns info popup for %s', async (choice) => {
             getRuntimeValue.mockReturnValue(choice);
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
@@ -61,7 +61,7 @@ describe('defensiveTacticsHandler', () => {
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Defensive Tactics');
             expect(result.payload.description).toContain(choice);
-            expect(result.payload.description).toContain(expectedText);
+            expect(result.payload.description).toContain('Short Rest or Long Rest');
             expect(result.payload.automation).toBeDefined();
         });
 
@@ -98,7 +98,7 @@ describe('defensiveTacticsHandler', () => {
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Defensive Tactics');
             expect(result.payload.description).toContain(expectedText);
-            expect(result.payload.description).toContain('Short or Long Rest');
+            expect(result.payload.description).toContain('Short Rest or Long Rest');
             expect(result.payload.automation).toBeUndefined();
 
             expect(setRuntimeValue).toHaveBeenCalledWith(

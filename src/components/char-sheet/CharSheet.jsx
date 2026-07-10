@@ -455,14 +455,6 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         }
     }
 
-    // Defensive Tactics: Escape the Horde — all attacks against you have Disadvantage
-    if (playerStats) {
-        const defensiveChoice = getRuntimeValue(playerStats.name, '_Defensive_Tactics_choice', campaignName);
-        if (defensiveChoice === 'Escape the Horde') {
-            conditionEffects.targetDisadvantageCount = (conditionEffects.targetDisadvantageCount || 0) + 1;
-        }
-    }
-
     // Elusive: No attack roll can have Advantage against you unless you have the Incapacitated condition
     if (playerStats) {
         const hasElusive = [

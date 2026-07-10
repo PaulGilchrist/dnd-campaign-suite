@@ -13,7 +13,6 @@ import { sendSavePrompt } from '../../services/combat/conditions/savePromptServi
 import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../../services/rules/combat/aoeService.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { loadCombatSummary, getCombatSummary } from '../../services/encounters/combatData.js';
-import { addExpiration } from '../../services/rules/effects/expirations.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition, hasGreatWeaponFighting, applyGreatWeaponFightingToDamage, evaluateAutoExpression } from '../../services/combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import {
@@ -1236,27 +1235,6 @@ export function createLogDamageAndShow(deps) {
             }
             const cleanedEffects = storedEffects.filter(te => te.effect !== 'death_strike' || te.target !== target.name);
             setRuntimeValue(campaignName, 'targetEffects', cleanedEffects, campaignName);
-        }
-
-        if (target?.type === 'player' && applyResult && applyResult.finalDamage > 0) {
-            const attackerNameResolved = attackerName || characterName;
-            const defensiveChoice = getRuntimeValue(target.name, '_Defensive_Tactics_choice', campaignName);
-            if (defensiveChoice === 'Multiattack Defense') {
-                const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
-                const newEffect = {
-                    target: target.name,
-                    source: 'Defensive Tactics',
-                    option: 'Multiattack Defense',
-                    effect: 'multiattack_defense',
-                    attacker: attackerNameResolved,
-                    duration: 'until_end_of_current_turn',
-                };
-                const updatedEffects = [...storedEffects, newEffect];
-                setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
-                addExpiration(target.name, target.name, [
-                    { type: 'remove_target_effect', effectKey: 'multiattack_defense', source: 'Defensive Tactics', target: target.name }
-                ], campaignName, 1);
-            }
         }
 
         if (context?.ramActive && context?.isMelee && target && applyResult) {

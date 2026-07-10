@@ -390,11 +390,11 @@ export async function applyLongRest(playerStats, campaignName) {
      }
    }
 
-   // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
-   charData.activeBuffs = [];
-   charData.activeConditions = [];
+    // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
+    charData.activeBuffs = [];
+    charData.activeConditions = [];
 
-   const currentExhaustion = getRuntimeValue(name, 'exhaustionLevel')
+    const currentExhaustion = getRuntimeValue(name, 'exhaustionLevel')
    if (typeof currentExhaustion === 'number' && currentExhaustion > 0) {
      charData.exhaustionLevel = getLevelAfterLongRest(currentExhaustion)
          }

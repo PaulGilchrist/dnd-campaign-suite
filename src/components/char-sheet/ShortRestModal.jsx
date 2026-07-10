@@ -215,6 +215,8 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         clearAllExpirationEffects(playerStats.name, campaignName);
         clearHuntersMarkConcentration(playerStats.name, campaignName);
 
+        setRuntimeValue(playerStats.name, '_Defensive_Tactics_choice', null, campaignName);
+
         onComplete && onComplete();
        };
 

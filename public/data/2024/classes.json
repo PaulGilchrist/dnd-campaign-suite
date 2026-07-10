@@ -8293,7 +8293,7 @@
                     },
                     {
                         "name": "Defensive Tactics",
-                        "description": "Choose one, can replace on Short/Long Rest: Escape the Horde (Opportunity Attacks have Disadvantage against you), or Multiattack Defense (when a creature hits you with an attack roll, that creature has Disadvantage on all other attack rolls against you this turn).",
+                        "description": "Choose one, can replace on Short/Long Rest:<ul><li><b>Escape the Horde:</b> Opportunity Attacks have Disadvantage against you</li><li><b>Multiattack Defense:</b> When a creature hits you with an attack roll, that creature has Disadvantage on all other attack rolls against you this turn</li></ul>",
                         "level": 7,
                         "automation": {
                             "type": "defensive_tactics",

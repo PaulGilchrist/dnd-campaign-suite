@@ -182,32 +182,6 @@ describe('Plain damage edge cases', () => {
         });
     });
 
-    describe('multiattack defense', () => {
-        it('applies multiattack defense effect when defensiveChoice is set on a player target', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'test-campaign') return [];
-                if (key === 'Ally1') return 'Multiattack Defense';
-                return null;
-            });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Ally1', type: 'player', ac: 14, currentHp: 20, maxHp: 20 }],
-            });
-
-            const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Ally1',
-                damageType: 'slashing',
-            });
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'test-campaign',
-                'targetEffects',
-                expect.any(Array),
-                'test-campaign'
-            );
-        });
-    });
-
     describe('plain damage with secondary', () => {
         it('applies secondary damage with multi-attack sequence', async () => {
             rollExpression.mockReturnValueOnce({ total: 10, rolls: [6, 4], modifier: 0 });

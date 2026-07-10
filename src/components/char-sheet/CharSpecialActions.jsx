@@ -4,10 +4,12 @@ import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
 import { useCombatSuperiorityModal } from '../../hooks/combat/useCombatSuperiorityModal.js';
 import { normalizeAutoDamage, resolveAttackDamageStandalone } from './useAttackDamageResolution.js';
 import { getCategories } from '../../services/character/featureCategories.js';
-import { renderMarkdownInline } from '../../services/ui/sanitize.js';
+import { renderMarkdownInline, sanitizeHtml } from '../../services/ui/sanitize.js';
 import { loadFightingStyles } from '../../services/ui/dataLoader.js';
 import { executeHandler } from '../../services/automation/index.js';
 import { isInteractiveAutomation } from '../../services/combat/automation/automationService.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { applyChoice } from '../../services/automation/handlers/class-ranger/defensiveTacticsHandler.js';
 import TeleportModal from './modals/TeleportModal.jsx';
 import SignatureSpellsModal from './modals/arcane/SignatureSpellsModal.jsx';
 import SpellMasteryModal from './modals/arcane/SpellMasteryModal.jsx';
@@ -28,6 +30,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
     const [savantModal, setSavantModal] = useState(null);
     const [weaponKindMasteryModal, setWeaponKindMasteryModal] = useState(null);
     const [weaponMasteryChoiceModal, setWeaponMasteryChoiceModal] = useState(null);
+    const [featureChoiceModal, setFeatureChoiceModal] = useState(null);
     const [fightingStylesMap, setFightingStylesMap] = useState(null);
     const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats?.name, campaignName, {
@@ -64,8 +67,41 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
         return () => { cancelled = true; };
     }, []);
 
+    const handleFeatureChoiceConfirm = useCallback(async (choice) => {
+        if (!featureChoiceModal) return;
+        const { action, optionKey } = featureChoiceModal;
+        if (action.automation?.type === 'defensive_tactics') {
+            const result = await applyChoice(playerStats, campaignName, choice);
+            if (result?.type === 'popup') {
+                setPopupHtml(result.payload);
+            }
+            setFeatureChoiceModal(null);
+            return;
+        }
+        setRuntimeValue(playerStats.name, optionKey, choice, campaignName);
+        setFeatureChoiceModal(null);
+        const restMessage = action.automation?.type === 'defensive_tactics'
+            ? 'This choice can be changed on a Short Rest or Long Rest.'
+            : 'This choice can be changed by clicking the feature again.';
+        const html = `<b>${action.name}</b><br/>Option chosen: <b>${choice}</b>. ${restMessage}`;
+        setPopupHtml(html);
+    }, [featureChoiceModal, playerStats, campaignName, setPopupHtml]);
+
+    const handleFeatureChoiceSkip = useCallback(() => {
+        setFeatureChoiceModal(null);
+    }, []);
+
     const handleAutomationClick = useCallback(async (action) => {
         if (cannotAct) return;
+        const auto = action.automation;
+        if (auto?.type === 'defensive_tactics') {
+            const optionKey = `_${action.name.replace(/\s+/g, '_')}_choice`;
+            const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
+            if (!chosenOption) {
+                setFeatureChoiceModal({ action, options: ['Escape the Horde', 'Multiattack Defense'], optionKey });
+                return;
+            }
+        }
         const result = await executeHandler(action, playerStats, campaignName, null);
         if (!result) return;
         if (result.type === 'modal') {
@@ -229,6 +265,37 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                     onClose={() => setWeaponMasteryChoiceModal(null)}
                     onConfirm={() => setWeaponMasteryChoiceModal(null)}
                 />
+            )}
+            {featureChoiceModal && (
+                <div className="sp-overlay" onClick={handleFeatureChoiceSkip}>
+                    <div className="sp-modal" onClick={e => e.stopPropagation()}>
+                        <div className="sp-header">
+                            <i className="fa-solid fa-bolt"></i> {featureChoiceModal.action.name}
+                        </div>
+                        <div className="sp-body">
+                            <p><b>Choose your option:</b></p>
+                            <p style={{ opacity: 0.8, fontSize: '0.9em' }} dangerouslySetInnerHTML={{ __html: sanitizeHtml(featureChoiceModal.action.description) }}></p>
+                            <div style={{ textAlign: 'center', marginTop: '16px' }}>
+                                {featureChoiceModal.options.map((opt, i) => {
+                                    const optName = typeof opt === 'string' ? opt : opt.name;
+                                    return (
+                                        <button
+                                            key={optName || i}
+                                            className="sp-roll-btn"
+                                            style={{ margin: '0 6px 8px 6px' }}
+                                            onClick={() => handleFeatureChoiceConfirm(optName)}
+                                        >
+                                            {optName}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        <div className="sp-actions">
+                            <button className="sp-dismiss-btn" onClick={handleFeatureChoiceSkip}>Cancel</button>
+                        </div>
+                    </div>
+                </div>
             )}
             {uniqueActions.map((specialAction, index) => {
                 const isClickable = isInteractiveAutomation(specialAction);

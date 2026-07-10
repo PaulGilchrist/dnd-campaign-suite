@@ -855,23 +855,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'arcaneWardRestore':
                         setModalState({ arcaneWardRestoreModal: result.payload });
                         break;
-                    case 'defensiveTactics': {
-                        const actionData = result.payload?.action;
-                        const defensiveChoice = getRuntimeValue(playerStats.name, '_Defensive_Tactics_choice', campaignName);
-                        if (!defensiveChoice) {
-                            const choicesHtml = `
-                                <b>Defensive Tactics</b><br/><br/>
-                                Choose one option:<br/><br/>
-                                <b>Escape the Horde</b><br/>
-                                Opportunity Attacks have Disadvantage against you.<br/><br/>
-                                <b>Multiattack Defense</b><br/>
-                                When a creature hits you with an attack roll, that creature has Disadvantage on all other attack rolls against you this turn.<br/><br/>
-                                To set your choice, use the Defensive Tactics button below or set the runtime value manually.
-                            `;
-                            setPopupHtml({ type: 'automation_info', name: actionData?.name || 'Defensive Tactics', description: choicesHtml });
-                        }
-                        break;
-                    }
                 }
                 break;
             case 'roll':

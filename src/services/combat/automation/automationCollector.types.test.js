@@ -234,7 +234,7 @@ describe('collectAutomationFromFeatures – passive types', () => {
         'shadow_step_rider', 'holy_nimbus_radiant_damage', 'umbral_sight',
         'naturally_stealthy', 'cantrip_spellcasting_ability',
         'dark_ones_blessing', 'dark_ones_look', 'hunter_prey',
-        'defensive_tactics', 'superior_hunter_prey', 'stroke_of_luck',
+        'superior_hunter_prey', 'stroke_of_luck',
         'modify_d20_roll', 'supreme_sneak', 'save_proficiency',
         'damage_type_choice', 'radiant_soul', 'hurl_through_hell',
         'create_thrall_temp_hp', 'sentinel', 'potent_cantrip',

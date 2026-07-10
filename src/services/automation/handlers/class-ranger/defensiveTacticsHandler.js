@@ -7,7 +7,6 @@ export async function handle(action, playerStats, campaignName) {
     const optionKey = `_${action.name.replace(/\s+/g, '_')}_choice`;
     const chosen = getRuntimeValue(playerStats.name, optionKey, campaignName);
 
-    // No choice yet — show the modal
     if (!chosen) {
         return {
             type: 'modal',
@@ -20,17 +19,12 @@ export async function handle(action, playerStats, campaignName) {
         };
     }
 
-    // Choice already made — show info popup
-    const description = chosen === 'Escape the Horde'
-        ? 'Escape the Horde active: Opportunity Attacks have Disadvantage against you.'
-        : 'Multiattack Defense active: When a creature hits you with an attack roll, that creature has Disadvantage on all other attack rolls against you this turn.';
-
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
             name: action.name,
-            description: `Selected: <b>${chosen}</b><br/><br/>${description}`,
+            description: `<b>${chosen}</b> has been selected. This choice can be changed on a Short Rest or Long Rest.`,
             automation: action.automation,
         },
     };
@@ -54,7 +48,7 @@ export async function applyChoice(playerStats, campaignName, choice) {
         payload: {
             type: 'automation_info',
             name: "Defensive Tactics",
-            description: `Selected: <b>${choice}</b>. This choice can be changed on a Short or Long Rest.`,
+            description: `Selected: <b>${choice}</b>. This choice can be changed on a Short Rest or Long Rest.`,
         },
     };
 }

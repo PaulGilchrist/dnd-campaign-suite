@@ -700,9 +700,6 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'hunter_prey':
                 result.passives.push(info)
                 break
-            case 'defensive_tactics':
-                result.passives.push(info)
-                break
             case 'superior_hunter_prey':
                 result.passives.push(info)
                 break
