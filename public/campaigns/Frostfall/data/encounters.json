@@ -1,0 +1,29 @@
+{
+  "encounters": [
+    {
+      "name": "Ambush",
+      "savedAt": "2026-07-10T01:09:16.211Z",
+      "selectedMonsters": [
+        {
+          "index": "goblin-boss",
+          "name": "Goblin Boss",
+          "qty": 1
+        },
+        {
+          "index": "hobgoblin",
+          "name": "Hobgoblin",
+          "qty": 2
+        }
+      ],
+      "description": "",
+      "lootData": {
+        "lootEntries": [
+          "No loot for these monsters"
+        ],
+        "totalEncounterXp": 400
+      },
+      "encounterCompleted": false,
+      "effectiveXP": 600
+    }
+  ]
+}
