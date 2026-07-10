@@ -157,14 +157,9 @@ export function setRuntimeBatch(characterKey, properties, campaignName) {
             changed = true;
         }
     }
-    console.log('[setRuntimeBatch] Applied to store', { characterKey, changed, propertiesKeys: Object.keys(properties) });
     if (!changed) return;
 
     const obj = Object.fromEntries(store);
-    console.log('[setRuntimeBatch] Full store snapshot sent to server', {
-        characterKey,
-        spellSlots: Object.fromEntries(Object.entries(obj).filter(([k]) => k.startsWith('spell_slots_level_'))),
-    });
     if (!campaignName) {
         console.error('setRuntimeBatch called with undefined campaignName', { characterKey, properties, stack: new Error().stack });
     }

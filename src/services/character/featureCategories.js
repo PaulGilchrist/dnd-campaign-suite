@@ -219,6 +219,7 @@ const categories2024 = {
         "Magical Secrets",
         "Otherworldly Presence",
         "Pact Magic",
+        "Primal Order",
         "Second-Storywork",
         "Slippery Mind",
         "Somatic Components",

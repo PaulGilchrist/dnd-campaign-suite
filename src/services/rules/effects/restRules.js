@@ -5,6 +5,7 @@ import { rollD20 } from '../../../services/dice/diceRoller.js'
 import * as storageService from '../../../services/ui/storage.js'
 import { getCombatSummary } from '../../../services/encounters/combatData.js'
 import { clearAllConcentrations } from '../../../services/combat/concentration/concentrationService.js'
+import { addEntry } from '../../../services/ui/logService.js'
 
 export function clearHuntersMarkConcentration(name, campaignName) {
   const cs = getCombatSummary(campaignName)
@@ -550,5 +551,30 @@ export async function applyLongRest(playerStats, campaignName) {
     if (hasBolsteringTreats) {
         const craftCount = playerStats.proficiency || 0
         setRuntimeValue(name, 'chefBolsteringTreats', craftCount, campaignName, true)
+    }
+
+    // Log long rest to campaign log
+    const logEntries = [];
+    logEntries.push(`${name} takes a long rest.`);
+    const resources = [];
+    resources.push('All hit dice restored');
+    resources.push('All spell slots restored');
+    if (playerStats.class?.name === 'Warlock') resources.push('Pact Magic (Warlock spell slots)');
+    if (hasPortent) resources.push('Portent dice');
+    if (hasBolsteringTreats) resources.push('Bolstering Treats');
+    const hasCelestialResilience = playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron';
+    if (hasCelestialResilience && playerStats.characterAdvancement?.some(f => f.name === 'Celestial Resilience')) resources.push('Celestial Resilience (temp HP)');
+    if (hasNaturalRecovery) resources.push('Natural Recovery (spell slots)');
+    if (resources.length > 0) {
+        logEntries.push(`Resources restored: ${resources.join(', ')}`);
+    }
+    if (typeof currentExhaustion === 'number' && currentExhaustion > 0) {
+        const newExhaustion = getLevelAfterLongRest(currentExhaustion);
+        logEntries.push(`Exhaustion: ${currentExhaustion} → ${newExhaustion}`);
+    }
+    try {
+        addEntry(campaignName, { type: 'long_rest', message: logEntries.join(' | ') });
+    } catch (err) {
+        console.error('[restRules] Failed to log long rest:', err.message);
     }
 }
