@@ -206,6 +206,7 @@ const categories2024 = {
         "Deft Explorer",
         "Divine Order",
         "Draconic Ancestry",
+        "Dwarven Resilience",
         "Dwarven Toughness",
         "Elfish Lineage",
         "Expertise",
