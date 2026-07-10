@@ -856,3 +856,26 @@
     background-color: rgba(168, 85, 247, 0.3);
 }
 
+/* Wild Shape badge */
+.initiative .wild-shape-badge-wrapper {
+    position: relative;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+.initiative .initiative-wild-shape-badge {
+    padding: 2px 6px;
+    border: 1px solid rgba(34, 197, 94, 0.5);
+    border-radius: 4px;
+    background-color: rgba(34, 197, 94, 0.2);
+    color: inherit;
+    font-size: 0.7em;
+    white-space: nowrap;
+}
+
+.initiative .initiative-wild-shape-badge .fa-paw {
+    margin-right: 3px;
+    font-size: 0.85em;
+}
+

@@ -3435,7 +3435,7 @@
                 "features": [
                     {
                         "name": "Archdruid",
-                        "description": "The vitality of nature constantly blooms within you, granting you the following benefits. Evergreen Wild Shape. Whenever you roll Initiative and have no uses of Wild Shape left, you regain one expended use of it. Nature Magician. You can convert uses of Wild Shape into a spell slot (no action required). Choose a number of your unexpended uses of Wild Shape and convert them into a single spell slot, with each use contributing 2 spell levels. Longevity. The primal magic that you wield causes you to age more slowly. For every ten years that pass, your body ages only one year.",
+                        "description": "The vitality of nature constantly blooms within you, granting you the following benefits.<ul><li><b>Evergreen Wild Shape:</b> Whenever you roll Initiative and have no uses of Wild Shape left, you regain one expended use of it.</li><li><b>Nature Magician:</b> You can convert uses of Wild Shape into a spell slot (no action required). Choose a number of your unexpended uses of Wild Shape and convert them into a single spell slot, with each use contributing 2 spell levels.</li><li><b>Longevity:</b> The primal magic that you wield causes you to age more slowly. For every ten years that pass, your body ages only one year</li></ul>",
                         "level": 20,
                         "type": "class_feature"
                     },

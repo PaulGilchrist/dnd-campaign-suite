@@ -471,11 +471,12 @@ describe('buffHandler.handle', () => {
     it('uses Circle of the Moon override for temp HP when effect is shape_shift', async () => {
       const ps = makePlayerStats({
         level: 7,
-        class: { major: { name: 'Druid' }, subclass: { name: 'Moon' } },
+        class: { major: { name: 'Druid' }, subclass: { name: 'Moon' }, class_levels: [{ level: 7, wild_shape: 2 }] },
       });
       const action = makeAction({ tempHpExpression: '2d6+2', effect: 'shape_shift' });
       buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
       automationService.evaluateAutoExpression.mockReturnValue(7);
+      runtimeState.getRuntimeValue.mockReturnValue(2);
 
       await handle(action, ps, campaignName, null);
 

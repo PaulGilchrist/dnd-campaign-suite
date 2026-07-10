@@ -40,14 +40,20 @@ vi.mock('../../services/combat/conditions/conditionUtils.js', () => ({
     getAbilityLabel: (ability) => ability?.toUpperCase() || '',
 }));
 
+vi.mock('../../services/automation/common/buffToggle.js', () => ({
+    isBuffActive: vi.fn(() => false),
+}));
+
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getStore: vi.fn(() => new Map()),
   useSyncedState: vi.fn(() => [null, vi.fn()]),
+  useRuntimeValue: vi.fn((campaignName, key) => {
+      if (key === 'targetEffects') return [];
+      return null;
+  }),
+  getRuntimeValue: vi.fn(() => undefined),
+  setRuntimeValue: vi.fn(),
   listeners: new Map(),
-    useRuntimeValue: vi.fn((campaignName, key) => {
-        if (key === 'targetEffects') return [];
-        return null;
-    }),
 }));
 
 vi.mock('../../services/combat/auras/unbreakableMajesty.js', () => ({

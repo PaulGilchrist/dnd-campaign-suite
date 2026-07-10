@@ -139,12 +139,22 @@ const ClericFeatures = function ClericFeatures({ playerStats, campaignName }) {
  const MULTI_MINUTE_DURATIONS = new Set([
       '1_minute', '10_minutes', 'hour', 'half_druid_level_hours',
       'long_rest', 'while_illusion_active'
- ]);
+  ]);
 
- function getMultiMinuteBadges(activeBuffs) {
-     void activeBuffs;
-     return Array.isArray(activeBuffs) ? activeBuffs.filter(b => MULTI_MINUTE_DURATIONS.has(b.duration)) : [];
- }
+  function getMultiMinuteBadges(activeBuffs) {
+      void activeBuffs;
+      return Array.isArray(activeBuffs) ? activeBuffs.filter(b => MULTI_MINUTE_DURATIONS.has(b.duration)) : [];
+  }
+
+  function formatDuration(duration, playerStats) {
+      if (duration === 'half_druid_level_hours') {
+          const druidLevel = playerStats?.class?.class_levels?.find(cl => cl.level === playerStats?.level);
+          const wildShape = druidLevel?.wild_shape || 0;
+          const hours = Math.floor(wildShape / 2);
+          return `${hours} hour${hours !== 1 ? 's' : ''}`;
+      }
+      return duration;
+  }
 
 /* ─── Generic Hook: subscribe to buffs for any class ─── */
  function useActiveBuffs(playerStats, campaignName) {
@@ -163,7 +173,7 @@ const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
     if (playerStats.level < 2) return null;
     return (
            <div data-testid="char-class-druid">
-               {multiMinuteBadges.map((b, i) => <span key={i} className="automation-badge">{b.name}</span>)}
+               {multiMinuteBadges.map((b, i) => <span key={i} className="automation-badge">{b.name}: {formatDuration(b.duration, playerStats)}</span>)}
                {druidFeatures?.beastKnownForms > 0 && <div><b>Beast Forms Known: </b>{druidFeatures.beastKnownForms}</div>}
                {hasNaturalRecovery && (
                    <div>

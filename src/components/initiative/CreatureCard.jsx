@@ -7,6 +7,7 @@ import CreatureHp from './CreatureHp.jsx'
 import { getAbilityLabel } from '../../services/combat/conditions/conditionUtils.js'
 import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import ConditionEffectBadges from './ConditionEffectBadges.jsx'
+import { isBuffActive } from '../../services/automation/common/buffToggle.js';
 import { CONDITION_DESCRIPTIONS } from '../../services/combat/conditions/effectDescriptions.js'
 import { isUnbreakableMajestyActive, getUnbreakableMajestySaveDc, clearUnbreakableMajesty } from '../../services/combat/auras/unbreakableMajesty.js'
 
@@ -49,6 +50,7 @@ function CreatureCard({
     const myTargetEffects = allTargetEffects.filter(te => te.target === creature.name);
     const isMajestyActive = creature.type === 'player' && isUnbreakableMajestyActive(creature.name, campaignName);
     const majestyDc = isMajestyActive ? getUnbreakableMajestySaveDc(creature.name, campaignName) : 0;
+    const wildShapeActive = isBuffActive(creature.name, 'Wild Shape', campaignName);
 
     return (
         <div className={`creature-card ${creature.type} ${isActive ? 'active' : ''} ${isUnconscious ? 'creature-unconscious' : ''}`}>
@@ -223,6 +225,13 @@ function CreatureCard({
                                 <i className='fa-solid fa-xmark'></i>
                             </button>
                         )}
+                    </div>
+                )}
+                {wildShapeActive && (
+                    <div className='wild-shape-badge-wrapper'>
+                        <span className='initiative-wild-shape-badge' title='Wild Shape: Animal form active — spellcasting blocked, resistance types apply'>
+                            <i className='fa-solid fa-paw'></i> Wild Shape
+                        </span>
                     </div>
                 )}
             </div>
