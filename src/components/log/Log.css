@@ -759,3 +759,24 @@
 .log-gwf i {
     margin-right: 3px;
 }
+
+/* Rest entries */
+.log-rest {
+    border-left: 3px solid #3498db;
+}
+
+.log-rest-long {
+    border-left-color: #8e44ad;
+}
+
+.log-rest-short {
+    border-left-color: #2ecc71;
+}
+
+.log-rest-details {
+    padding-left: 28px;
+    margin-top: 2px;
+    font-size: 0.85rem;
+    color: var(--color-text);
+    line-height: 1.5;
+}

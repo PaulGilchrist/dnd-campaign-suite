@@ -28,6 +28,10 @@ vi.mock('../../combat/conditions/exhaustionRules.js', () => ({
   getLevelAfterLongRest: vi.fn((level) => Math.max(0, level - 1)),
 }))
 
+vi.mock('../../../services/ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve({})),
+}))
+
 // Import mocked functions for per-test customization
 import { getRuntimeValue, setRuntimeBatch, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { clearAllExpirationEffects } from './expirations.js'
