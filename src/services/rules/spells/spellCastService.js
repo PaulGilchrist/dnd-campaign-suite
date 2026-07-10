@@ -663,15 +663,18 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     }
 
     // Blessed Strikes / Potent Spellcasting: add Wisdom modifier to cantrip damage
-    const isCantrip = spell.baseLevel === 0;
+    const isCantrip = spell.baseLevel === 0 || spell.level === 0;
     let finalFormula = empEvocFormula;
+    console.error('[spellCastService] isCantrip=' + isCantrip + ' spell.baseLevel=' + spell.baseLevel + ' spell.level=' + spell.level + ' spell.damage=' + spell.damage + ' automationActions=' + !!playerStats.automation?.actions + ' automation=' + JSON.stringify(playerStats.automation));
     if (isCantrip && spell.damage && playerStats.automation?.actions) {
         const potentFeature = playerStats.automation.actions.find(
             a => a.type === 'damage_bonus' && !a.upgrades && a.options?.some(o => o.toLowerCase().includes('spellcasting'))
         );
+        console.error('[spellCastService] potentFeature=' + !!potentFeature);
         if (potentFeature) {
             const optKey = `_${(potentFeature.name || 'PotentSpellcasting').replace(/\s+/g, '_')}_option`;
             const chosen = getRuntimeValue(playerStats.name, optKey, campaignName);
+            console.error('[spellCastService] potentFeature found, options.length=' + potentFeature.options.length + ' chosen=' + chosen);
             if (potentFeature.options.length > 1 && !chosen) {
                 // multi-option feature with no choice yet — skip
             } else if (chosen && chosen.toLowerCase().includes('spellcasting')) {
@@ -763,8 +766,9 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         } else if (spell.attack_type || spell.damage) {
             const rollCtx = innateSorceryActive && !rollContext.forcedMode ? { ...rollContext, forcedMode: 'advantage' } : rollContext;
             const damageRollResult = rollExpression(overchannelFormula);
+            console.error('[spellCastService] autoDamageFormula=' + finalFormula + ' overchannelFormula=' + overchannelFormula + ' isCantrip=' + (spell.baseLevel === 0 || spell.level === 0));
             const attackCtx = {
-                autoDamageFormula: overchannelFormula,
+                autoDamageFormula: finalFormula,
                 autoDamageName: spell.name,
                 autoDamageSchool: spell.school,
                 overchannelActive,

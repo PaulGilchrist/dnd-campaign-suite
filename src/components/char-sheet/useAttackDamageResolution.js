@@ -83,6 +83,7 @@ export async function resolveAttackDamageStandalone(attack, ctxOverrides, { play
  * @returns {{ attack: object, ctx: object }}
  */
 export function normalizeAutoDamage(autoDamage, isCrit, playerStats) {
+  console.error('[normalizeAutoDamage] autoDamage.formula=' + autoDamage.formula);
   const attack = {
     name: autoDamage.name,
     damage: autoDamage.formula,

@@ -35,6 +35,8 @@ export function buildSpellDamageSteps() {
       handler: async (ctx) => {
         let formula = ctx.attack?.damage || ctx.autoFormulaOverride || '0';
         const ps = ctx.playerStats;
+        const isCantripFlag = ctx.isCantrip || false;
+        console.error('[spellContext] isCantrip=' + isCantripFlag + ' formula=' + formula + ' hasAutomation=' + !!ps.automation?.actions);
 
         // Empowered Evocation: add int mod to evocation cantrip damage
         const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(ps).length > 0;
@@ -47,8 +49,7 @@ export function buildSpellDamageSteps() {
         }
 
         // Blessed Strikes / Potent Spellcasting: add spellcasting ability mod to cantrip damage
-        const isCantrip = ctx.isCantrip || false;
-        if (isCantrip && ps.automation?.actions) {
+        if (isCantripFlag && ps.automation?.actions) {
           const potentFeature = ps.automation.actions.find(
             a => a.type === 'damage_bonus' && !a.upgrades && a.options?.some(o => o.toLowerCase().includes('spellcasting'))
           );

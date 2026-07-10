@@ -11,6 +11,7 @@ export const cantripBonuses = {
   handler: async (ctx, prevData) => {
     const ps = ctx.playerStats;
     const isCantrip = ctx.isCantrip || ps.spellAbilities?.spells?.some(s => s.name === ctx.attack?.name && s.level === 0) || false;
+    console.error('[cantripBonuses] isCantrip=' + isCantrip + ' formula=' + prevData.formula + ' total=' + prevData.total);
     if (!isCantrip) return null;
 
     const allA = [...(ps.automation.actions || []), ...(ps.automation.passives || [])];
