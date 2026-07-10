@@ -233,33 +233,5 @@ describe('CharBonusActions - Interactive', () => {
     });
   });
 
-  describe('Horde Breaker click handlers', () => {
-    const hordeBreakerAttack = {
-      name: 'Horde Breaker',
-      range: 30,
-      hitBonus: 5,
-      damage: '1d8+3',
-      damageType: 'Piercing',
-      type: 'Bonus Action',
-      isHordeBreaker: true,
-    };
-
-    const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
-
-    it('calls onAttackClick when Horde Breaker hit bonus is clicked', () => {
-      const mockOnAttackClick = vi.fn();
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === "_Hunter's Prey_choice") return 'Horde Breaker';
-        if (key === '_Hunters_Prey_HordeBreaker_UsedRound') return 0;
-        return null;
-      });
-      render(<CharBonusActions playerStats={createStats({ attacks: [hordeBreakerAttack], spellAbilities: { spells: [bonusActionSpell] } })} onAttackClick={mockOnAttackClick} campaignName="test" exhaustionPenalty={0} />);
-      expect(screen.getByText('Horde Breaker')).toBeInTheDocument();
-      const hitBonusElement = screen.getByText('+5');
-      fireEvent.click(hitBonusElement);
-      expect(mockOnAttackClick).toHaveBeenCalledWith(hordeBreakerAttack);
-    });
-
-  });
 
 });

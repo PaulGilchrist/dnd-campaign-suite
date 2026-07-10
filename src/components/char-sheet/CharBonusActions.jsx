@@ -71,14 +71,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
     const bonusSpellNameSet = getBonusActionSpellNames(playerStats, campaignName);
     const bonusActionSpells = (playerStats.spellAbilities?.spells || []).filter(spell => bonusSpellNameSet.has(spell.name));
     const hasBonusActions = playerStats.bonusActions.length > 0;
-    const hordeBreakerAttack = playerStats.attacks.find(a => a.isHordeBreaker);
-    const hunterPreyChoice = hordeBreakerAttack ? getRuntimeValue(playerStats.name, "_Hunter's Prey_choice", campaignName) : null;
-    const isHordeBreakerActive = hunterPreyChoice === 'Horde Breaker';
-    const usedKey = '_Hunters_Prey_HordeBreaker_UsedRound';
-    const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
-    const currentRound = getCurrentCombatRound();
-    const isHordeBreakerAvailable = isHordeBreakerActive && usedRound !== currentRound && !cannotAct;
-    const hasBonusContent = bonusActionSpells.length > 0 || bonusActionAttacks.length > 0 || hasBonusActions || isHordeBreakerAvailable;
+    const hasBonusContent = bonusActionSpells.length > 0 || bonusActionAttacks.length > 0 || hasBonusActions;
 
     if (!hasBonusContent) return null;
 
@@ -87,7 +80,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
     return (
          <div className='char-actions'>
              <div className='sectionHeader'>Bonus Actions</div>
-               {(bonusActionAttacks.length > 0 || bonusActionSpells.length > 0 || isHordeBreakerAvailable) ? (
+                {(bonusActionAttacks.length > 0 || bonusActionSpells.length > 0) ? (
                   <div className={`attacks ${is2024Rules ? 'mastery-enabled' : ''}`}>
                     <div className='left'><b>Name</b></div>
                         <div><b>Level</b></div>
@@ -114,22 +107,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                               <div className='left'>{attack.damageType}</div>
                                {is2024Rules && (() => { const mastery = getWeaponMastery(attack.name, attack, playerStats); return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>; })()}
                          </React.Fragment>;
-                        })}
-                        {isHordeBreakerAvailable && hordeBreakerAttack ? (() => {
-                            const hbItem = { ...hordeBreakerAttack };
-                            return <React.Fragment key="Horde Breaker">
-                                <div className='left'>{hordeBreakerAttack.name}</div>
-                                <div></div>
-                                <div>{formatRange(hordeBreakerAttack.range)}</div>
-                                <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(hbItem)}>{signFormatter.format(hordeBreakerAttack.hitBonus - exhaustionPenalty)}</div>
-                                <div className={hordeBreakerAttack.damage ? "clickable" : ""} onClick={() => {
-                                    if (cannotAct) return;
-                                    handleSimpleDamageRoll(hbItem);
-                                }}>{hordeBreakerAttack.damage}</div>
-                                <div className='left'>{hordeBreakerAttack.damageType}</div>
-                                {is2024Rules && <div></div>}
-                            </React.Fragment>;
-                        })() : null}
+                         })}
                         {bonusActionSpells.map((spell) => {
                             const damageType = typeof spell.damage === 'string' ? '' : (spell.damage?.damage_type || '');
                             const resolvedDamage = spell.heal_at_slot_level ? '' : resolveSpellDamageAtLevel(spell, playerStats.level);

@@ -202,7 +202,6 @@ describe('CharActions state and modals', () => {
   describe('feature choice modal', () => {
     const featureChoiceCases = [
       { name: 'Blessed Strikes', automation: { type: 'damage_bonus', options: ['Lightning', 'Thunder'] }, actionText: /Blessed Strikes:/ },
-      { name: "Hunter's Prey", automation: { type: 'hunter_prey' }, actionText: /Hunter's Prey:/ },
       { name: 'Defensive Tactics', automation: { type: 'defensive_tactics' }, actionText: /Defensive Tactics:/ },
     ];
 

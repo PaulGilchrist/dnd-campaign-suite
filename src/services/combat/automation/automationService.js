@@ -22,6 +22,7 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     'concentration_bonus_attack',
     'font_of_inspiration',
     'defensive_tactics',
+    'hunter_prey',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([

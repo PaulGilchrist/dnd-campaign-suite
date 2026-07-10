@@ -10,6 +10,7 @@ import { executeHandler } from '../../services/automation/index.js';
 import { isInteractiveAutomation } from '../../services/combat/automation/automationService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { applyChoice } from '../../services/automation/handlers/class-ranger/defensiveTacticsHandler.js';
+import { applyChoice as applyHunterPreyChoice } from '../../services/automation/handlers/class-ranger/hunterPreyHandler.js';
 import TeleportModal from './modals/TeleportModal.jsx';
 import SignatureSpellsModal from './modals/arcane/SignatureSpellsModal.jsx';
 import SpellMasteryModal from './modals/arcane/SpellMasteryModal.jsx';
@@ -78,9 +79,17 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
             setFeatureChoiceModal(null);
             return;
         }
+        if (action.automation?.type === 'hunter_prey') {
+            const result = await applyHunterPreyChoice(playerStats, campaignName, choice);
+            if (result?.type === 'popup') {
+                setPopupHtml(result.payload);
+            }
+            setFeatureChoiceModal(null);
+            return;
+        }
         setRuntimeValue(playerStats.name, optionKey, choice, campaignName);
         setFeatureChoiceModal(null);
-        const restMessage = action.automation?.type === 'defensive_tactics'
+        const restMessage = (action.automation?.type === 'defensive_tactics' || action.automation?.type === 'hunter_prey')
             ? 'This choice can be changed on a Short Rest or Long Rest.'
             : 'This choice can be changed by clicking the feature again.';
         const html = `<b>${action.name}</b><br/>Option chosen: <b>${choice}</b>. ${restMessage}`;
@@ -99,6 +108,14 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
             const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
             if (!chosenOption) {
                 setFeatureChoiceModal({ action, options: ['Escape the Horde', 'Multiattack Defense'], optionKey });
+                return;
+            }
+        }
+        if (auto?.type === 'hunter_prey') {
+            const optionKey = `_${action.name.replace(/\s+/g, '_')}_choice`;
+            const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
+            if (!chosenOption) {
+                setFeatureChoiceModal({ action, options: ['Colossus Slayer', 'Horde Breaker'], optionKey });
                 return;
             }
         }

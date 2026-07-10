@@ -648,16 +648,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             }
         }
 
-        // Hunter's Prey: present choice between Colossus Slayer and Horde Breaker
-        if (auto?.type === 'hunter_prey') {
-            const optionKey = `_${action.name.replace(/\s+/g, '_')}_choice`;
-            const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
-            if (!chosenOption) {
-                setModalState({ featureChoice: { action, options: ['Colossus Slayer', 'Horde Breaker'], optionKey } });
-                return;
-            }
-        }
-
         // Defensive Tactics: present choice between Escape the Horde and Multiattack Defense
         if (auto?.type === 'defensive_tactics') {
             const optionKey = `_${action.name.replace(/\s+/g, '_')}_choice`;

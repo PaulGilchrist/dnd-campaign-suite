@@ -698,7 +698,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 result.passives.push(info)
                 break
             case 'hunter_prey':
-                result.passives.push(info)
+                result.specialActions.push(info)
                 break
             case 'superior_hunter_prey':
                 result.passives.push(info)

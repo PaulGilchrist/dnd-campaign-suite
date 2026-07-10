@@ -256,23 +256,6 @@ describe('useModalHandlers - features & constellation', () => {
     });
 
     describe('handleFeatureChoiceConfirm', () => {
-        it('stores chosen option and shows popup with rest message for hunter_prey', () => {
-            const deps = createDeps({
-                modalState: {
-                    featureChoice: {
-                        action: { name: "Hunter's Prey", automation: { type: 'hunter_prey' } },
-                        optionKey: "_Hunter's_Prey_choice",
-                    },
-                },
-            });
-            const { handleFeatureChoiceConfirm } = useModalHandlers(deps);
-            handleFeatureChoiceConfirm("Colossus Slayer");
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', "_Hunter's_Prey_choice", "Colossus Slayer", 'test-campaign');
-            expect(deps.setModalState).toHaveBeenCalledWith({ featureChoice: null });
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.stringContaining("Hunter's Prey"));
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Short or Long Rest'));
-        });
-
         it('stores chosen option and shows popup with rest message for defensive_tactics', () => {
             const deps = createDeps({
                 modalState: {

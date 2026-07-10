@@ -349,6 +349,9 @@ export async function applyShortRest(playerStats, campaignName) {
     // Reset Psionic Strike once-per-turn flag on short rest
     updates.psionicStrikeUsedThisTurn = null;
 
+    // Reset Hunter's Prey choice on short rest
+    updates["_Hunter's_Prey_choice"] = null;
+
     setRuntimeBatch(name, updates, campaignName)
 
   clearAllExpirationEffects(name, campaignName)
@@ -558,6 +561,12 @@ export async function applyLongRest(playerStats, campaignName) {
 
     // Reset Overchannel use count on long rest
     setRuntimeValue(name, 'Overchannel_useCount', 0, campaignName, true)
+
+    // Reset Hunter's Prey choice on long rest
+    setRuntimeValue(name, "_Hunter's_Prey_choice", null, campaignName, true)
+
+    // Reset Hunter's Prey choice on long rest
+    setRuntimeValue(name, "_Hunter's_Prey_choice", null, campaignName, true)
 
     // Chef: Bolstering Treats crafted on Long Rest
     const hasBolsteringTreats = (playerStats.automation?.passives ?? []).some(

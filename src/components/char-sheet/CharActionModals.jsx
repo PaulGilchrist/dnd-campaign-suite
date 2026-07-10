@@ -56,6 +56,7 @@ import MantleOfInspirationModal from './modals/MantleOfInspirationModal.jsx'
 import { handleClearWard, handleSpendDice, handleApply } from '../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js'
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
+import { sanitizeHtml } from '../../services/ui/sanitize.js'
 
 
 import { logHealingToSSE } from '../../services/automation/common/healingRoll.js'
@@ -761,7 +762,7 @@ export default function CharActionModals({
                         </div>
                         <div className="sp-body">
                             <p><b>Choose your option:</b></p>
-                            <p style={{ opacity: 0.8, fontSize: '0.9em' }}>{modalState.featureChoice.action.description}</p>
+                            <p style={{ opacity: 0.8, fontSize: '0.9em' }} dangerouslySetInnerHTML={{ __html: sanitizeHtml(modalState.featureChoice.action.description) }}></p>
                             <div style={{ textAlign: 'center', marginTop: '16px' }}>
                                 {modalState.featureChoice.options.map((opt, i) => {
                                     const optName = typeof opt === 'string' ? opt : opt.name;

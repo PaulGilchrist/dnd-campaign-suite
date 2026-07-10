@@ -328,6 +328,9 @@ const RangerFeatures = function RangerFeatures({ playerStats, campaignName }) {
     const [fightingStylePopup, setFightingStylePopup] = React.useState(null);
     const [fightingStylesMap, setFightingStylesMap] = React.useState(null);
 
+    const defensiveTacticsChoice = useRuntimeValue(playerStats.name, '_Defensive_Tactics_choice', campaignName);
+    const huntersPreyChoice = useRuntimeValue(playerStats.name, "_Hunter's_Prey_choice", campaignName);
+
     React.useEffect(() => {
         let cancelled = false;
         loadFightingStyles().then(styles => {
@@ -355,12 +358,12 @@ const RangerFeatures = function RangerFeatures({ playerStats, campaignName }) {
                    )}
                </div>
               <div><b>Extra Attacks: </b>{rangerFeatures?.extraAttacks || 0}</div>
-               {playerStats.level >= 2 && (
-                   <TrackedResourceInput label="Favored Enemy" resourceKey="favoredEnemyUses" playerName={playerStats.name} getMax={() => Math.max(1, (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level)?.favored_enemy || 0)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-               )}
-               {playerStats.level >= 3 && (
-                   <TrackedResourceInput label="Dread Ambush" resourceKey="dreadambushUses" playerName={playerStats.name} getMax={() => Math.max(1, (playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0))} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-               )}
+              {playerStats.level >= 2 && (
+                  <TrackedResourceInput label="Favored Enemy" resourceKey="favoredEnemyUses" playerName={playerStats.name} getMax={() => Math.max(1, (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level)?.favored_enemy || 0)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+              )}
+              {playerStats.level >= 3 && (
+                  <TrackedResourceInput label="Dread Ambush" resourceKey="dreadambushUses" playerName={playerStats.name} getMax={() => Math.max(1, (playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0))} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+              )}
               {playerStats.class.fightingStyles && playerStats.level > 1 && <div><b>Fighting Styles: </b>{(
                   <span>{playerStats.class.fightingStyles.map((style, idx) => (
                       <React.Fragment key={style}>
@@ -371,15 +374,17 @@ const RangerFeatures = function RangerFeatures({ playerStats, campaignName }) {
                       </React.Fragment>
                   ))}</span>
               )}</div>}
-               {fightingStylePopup && <Popup html={fightingStylePopup} onClickOrKeyDown={() => setFightingStylePopup(null)} />}
-               {playerStats.level > 2 && playerStats.expertise && playerStats.expertise.length > 0 && <div><b>Expertise: </b>{playerStats.expertise.join(', ')}</div>}
-               {playerStats.level >= 14 && (
-                   <TrackedResourceInput label="Nature's Veil" resourceKey="naturesVeilUses" playerName={playerStats.name} getMax={() => Math.max((playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0), 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-               )}
-               {playerStats.level >= 10 && (
-                   <TrackedResourceInput label="Tireless" resourceKey="tirelessUses" playerName={playerStats.name} getMax={() => Math.max((playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0), 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-               )}
-          </div>
+              {fightingStylePopup && <Popup html={fightingStylePopup} onClickOrKeyDown={() => setFightingStylePopup(null)} />}
+              {playerStats.level > 2 && playerStats.expertise && playerStats.expertise.length > 0 && <div><b>Expertise: </b>{playerStats.expertise.join(', ')}</div>}
+              {playerStats.level >= 14 && (
+                  <TrackedResourceInput label="Nature's Veil" resourceKey="naturesVeilUses" playerName={playerStats.name} getMax={() => Math.max((playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0), 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+              )}
+              {playerStats.level >= 10 && (
+                  <TrackedResourceInput label="Tireless" resourceKey="tirelessUses" playerName={playerStats.name} getMax={() => Math.max((playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0), 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+              )}
+              {defensiveTacticsChoice && <span className="automation-badge"><i className="fa-solid fa-shield"></i> {defensiveTacticsChoice}</span>}
+              {huntersPreyChoice && <span className="automation-badge"><i className="fa-solid fa-crosshairs"></i> {huntersPreyChoice}</span>}
+         </div>
     );
 };
 

@@ -8284,7 +8284,7 @@
                     },
                     {
                         "name": "Hunter's Prey",
-                        "description": "Choose one, can replace on Short/Long Rest: Colossus Slayer (extra 1d8 damage to creature missing HP, once per turn), or Horde Breaker (once per turn, make another attack with same weapon against different creature within 5 feet of original target and within weapon's range).",
+                        "description": "Choose one, can replace on Short/Long Rest:<ul><li><b>Colossus Slayer:</b> Extra 1d8 damage to creature missing HP, once per turn</li><li><b>Horde Breaker:</b> Once per turn, make another attack with same weapon against different creature within 5 feet of original target and within weapon's range)</li></ul>",
                         "level": 3,
                         "automation": {
                             "type": "hunter_prey",

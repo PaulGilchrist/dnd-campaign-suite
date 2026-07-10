@@ -216,6 +216,8 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         clearHuntersMarkConcentration(playerStats.name, campaignName);
 
         setRuntimeValue(playerStats.name, '_Defensive_Tactics_choice', null, campaignName);
+        setRuntimeValue(playerStats.name, "_Hunter's_Prey_choice", null, campaignName);
+        setRuntimeValue(playerStats.name, "_Hunter's_Prey_choice", null, campaignName);
 
         onComplete && onComplete();
        };
