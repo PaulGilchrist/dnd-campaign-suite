@@ -22,6 +22,7 @@ import ResourcePoolModal from './modals/ResourcePoolModal.jsx';
 import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
 import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
 import { onSavantSelected } from '../../services/automation/handlers/class-wizard/SavantHandler.js';
+import { addEntry } from '../../services/ui/logService.js';
 import './CharSpecialActions.css';
 
 
@@ -91,6 +92,12 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
         }
         setRuntimeValue(playerStats.name, optionKey, choice, campaignName);
         setFeatureChoiceModal(null);
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: action.name,
+            description: `Chose option: ${choice}`,
+        }).catch(() => {});
         const restMessage = (action.automation?.type === 'defensive_tactics' || action.automation?.type === 'hunter_prey')
             ? 'This choice can be changed on a Short Rest or Long Rest.'
             : 'This choice can be changed by clicking the feature again.';
@@ -118,6 +125,14 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
             const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
             if (!chosenOption) {
                 setFeatureChoiceModal({ action, options: ['Colossus Slayer', 'Horde Breaker'], optionKey });
+                return;
+            }
+        }
+        if (auto?.type === 'damage_bonus' && auto.options?.length > 0 && auto.options.every(o => typeof o === 'string')) {
+            const optionKey = `_${action.name.replace(/\s+/g, '_')}_option`;
+            const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
+            if (!chosenOption) {
+                setFeatureChoiceModal({ action, options: auto.options, optionKey });
                 return;
             }
         }
@@ -327,7 +342,12 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                 </div>
             )}
             {uniqueActions.map((specialAction, index) => {
-                const isClickable = isInteractiveAutomation(specialAction);
+                const isInteractive = isInteractiveAutomation(specialAction);
+                const auto = specialAction.automation;
+                const hasStringOptions = auto?.type === 'damage_bonus' && auto.options?.length > 0 && auto.options.every(o => typeof o === 'string');
+                const optionKey = hasStringOptions ? `_${specialAction.name.replace(/\s+/g, '_')}_option` : null;
+                const hasChoice = optionKey ? getRuntimeValue(playerStats.name, optionKey, campaignName) : false;
+                const isClickable = isInteractive || (hasStringOptions && !hasChoice);
                 return <div key={specialAction.name || `special-action-${index}`}>
                         <b className={isClickable ? "clickable" : ""} onClick={isClickable ? () => handleAutomationClick(specialAction) : undefined}>{specialAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: renderMarkdownInline(specialAction.description) }}></span>
                     </div>

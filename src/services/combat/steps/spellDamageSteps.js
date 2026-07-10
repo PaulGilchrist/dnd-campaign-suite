@@ -2,6 +2,7 @@ import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '
 import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../rules/spells/postCastRiderService.js';
 import { addEntry } from '../../ui/logService.js';
 import { featureModules } from './features/index.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 /**
  * Build the damage pipeline steps for a spell-type action.
@@ -52,11 +53,24 @@ export function buildSpellDamageSteps() {
             a => a.type === 'damage_bonus' && !a.upgrades && a.options?.some(o => o.toLowerCase().includes('spellcasting'))
           );
           if (potentFeature) {
-            const spellcastingAbility = potentFeature.abilityName || 'Wisdom';
-            const wis = ps.abilities?.find(a => a.name === spellcastingAbility);
-            const spellcastingMod = Math.max(0, wis?.bonus || 0);
-            if (spellcastingMod > 0) {
-              formula = `${formula} + ${spellcastingMod} [Blessed Strikes]`;
+            const optKey = `_${(potentFeature.name || 'PotentSpellcasting').replace(/\s+/g, '_')}_option`;
+            const chosen = getRuntimeValue(ps.name, optKey, ctx.campaignName);
+            if (potentFeature.options.length > 1 && !chosen) {
+              // multi-option feature with no choice yet — skip
+            } else if (chosen && chosen.toLowerCase().includes('spellcasting')) {
+              const spellcastingAbility = potentFeature.abilityName || 'Wisdom';
+              const wis = ps.abilities?.find(a => a.name === spellcastingAbility);
+              const spellcastingMod = Math.max(0, wis?.bonus || 0);
+              if (spellcastingMod > 0) {
+                formula = `${formula} + ${spellcastingMod} [Blessed Strikes]`;
+              }
+            } else if (potentFeature.options.length === 1) {
+              const spellcastingAbility = potentFeature.abilityName || 'Wisdom';
+              const wis = ps.abilities?.find(a => a.name === spellcastingAbility);
+              const spellcastingMod = Math.max(0, wis?.bonus || 0);
+              if (spellcastingMod > 0) {
+                formula = `${formula} + ${spellcastingMod} [Blessed Strikes]`;
+              }
             }
           }
         }

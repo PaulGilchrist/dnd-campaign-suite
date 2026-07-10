@@ -170,6 +170,8 @@ const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
         p => p.type === 'resource_restoration' && p.resourceKey === 'naturalRecoverySlots'
     );
     const naturalRecoveryFreeCast = getRuntimeValue(playerStats.name, 'naturalRecoveryFreeCast');
+    const elementalFuryChoice = useRuntimeValue(playerStats.name, '_Elemental_Fury_option', campaignName);
+    const improvedElementalFuryChoice = useRuntimeValue(playerStats.name, '_Improved_Elemental_Fury_option', campaignName);
     if (playerStats.level < 2) return null;
     return (
            <div data-testid="char-class-druid">
@@ -193,6 +195,8 @@ const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
                <div><b>Wild Shape Limitations: </b>{druidFeatures.wildShapeLimitations}</div>
                <div><b>Wild Shape Max Challenge Rating: </b>{druidFeatures?.maxWildShapeChallengeRating}</div>
                <TrackedResourceInput label="Wild Shape Uses" resourceKey="wildShapeUses" playerName={playerStats.name} getMax={() => druidFeatures?.maxWildShapeUses || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+               {elementalFuryChoice && <span className="automation-badge"><i className="fa-solid fa-bolt"></i> Elemental Fury: {elementalFuryChoice}</span>}
+               {improvedElementalFuryChoice && <span className="automation-badge"><i className="fa-solid fa-bolt"></i> Improved Elemental Fury: {improvedElementalFuryChoice}</span>}
            </div>
         );
 };

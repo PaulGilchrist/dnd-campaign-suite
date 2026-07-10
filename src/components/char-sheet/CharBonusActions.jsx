@@ -31,6 +31,24 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
 
     const is2024Rules = playerStats.rules === '2024';
 
+    const getBonusSpellDamageDisplay = React.useCallback((spell) => {
+        if (spell.heal_at_slot_level) return '';
+        const resolved = resolveSpellDamageAtLevel(spell, playerStats.level);
+        if (!resolved || spell.level !== 0) return resolved;
+        const potentFeature = playerStats.automation?.actions?.find(
+            a => a.type === 'damage_bonus' && !a.upgrades && a.options?.some(o => o.toLowerCase().includes('spellcasting'))
+        );
+        if (!potentFeature) return resolved;
+        const optKey = `_${(potentFeature.name || 'PotentSpellcasting').replace(/\s+/g, '_')}_option`;
+        const chosen = getRuntimeValue(playerStats.name, optKey, campaignName);
+        if (potentFeature.options.length > 1 && !chosen) return resolved;
+        if (chosen && !chosen.toLowerCase().includes('spellcasting')) return resolved;
+        const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
+        const wisMod = Math.max(0, wis?.bonus || 0);
+        if (wisMod <= 0) return resolved;
+        return `${resolved}+${wisMod}`;
+    }, [playerStats, campaignName]);
+
     const handleBonusSpellClick = (spellName) => {
         const spell = bonusSpellNames[spellName];
         if (!spell) return;
@@ -131,7 +149,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                                     if (isSpellAtk && spell.saveDc) { onResolveSpellDamage(attackItem); return; }
                                     if (isSpellAtk) { bonusCastAction(spell, {}); return; }
                                     bonusCastAction(spell, {});
-                                }}>{isUtilityConc ? '' : resolvedDamage}</div>
+                                }}>{isUtilityConc ? '' : getBonusSpellDamageDisplay(spell)}</div>
                                 <div className='left'>{isUtilityConc ? 'Utility' : (damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility'))}</div>
                                 {is2024Rules && <div></div>}
                            </React.Fragment>;

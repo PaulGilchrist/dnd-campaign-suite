@@ -5,12 +5,12 @@ import { evaluateAutoExpression } from '../../../combat/automation/automationSer
 export const cantripBonuses = {
   name: 'cantripBonuses',
   condition: (ctx) => {
-    const isCantrip = ctx.attack?.baseLevel === 0 || ctx.playerStats.spellAbilities?.spells?.some(s => s.name === ctx.attack?.name && s.level === 0);
+    const isCantrip = ctx.isCantrip || ctx.playerStats.spellAbilities?.spells?.some(s => s.name === ctx.attack?.name && s.level === 0) || false;
     return isCantrip && !!ctx.playerStats.automation?.actions;
   },
   handler: async (ctx, prevData) => {
     const ps = ctx.playerStats;
-    const isCantrip = ctx.attack?.baseLevel === 0 || ps.spellAbilities?.spells?.some(s => s.name === ctx.attack?.name && s.level === 0);
+    const isCantrip = ctx.isCantrip || ps.spellAbilities?.spells?.some(s => s.name === ctx.attack?.name && s.level === 0) || false;
     if (!isCantrip) return null;
 
     const allA = [...(ps.automation.actions || []), ...(ps.automation.passives || [])];
@@ -21,6 +21,10 @@ export const cantripBonuses = {
     let rolls = [...prevData.rolls];
 
     for (const a of ps.automation.actions.filter(x => x.type === 'damage_bonus' && x.options?.length > 0).filter(b => !upgradedCantrip.has(b.name))) {
+      const optKey = `_${a.name.replace(/\s+/g, '_')}_option`;
+      const chosen = getRuntimeValue(ps.name, optKey, ctx.campaignName);
+      if (a.options.length > 1 && !chosen) continue;
+      if (chosen && !chosen.toLowerCase().includes('spellcasting')) continue;
       const wis = ps.abilities?.find(x => x.name === 'Wisdom');
       const wisMod = Math.max(0, wis?.bonus || 0);
       if (wisMod > 0) { formula += ` + ${wisMod} [Cantrip]`; total += wisMod; }

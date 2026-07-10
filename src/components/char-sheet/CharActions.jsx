@@ -63,6 +63,24 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
     const { popupHtml, setPopupHtml } = useDiceRollPopup();
 
+    const getSpellDamageDisplay = React.useCallback((spell) => {
+        if (spell.heal_at_slot_level) return '';
+        const resolved = resolveSpellDamageAtLevel(spell, playerStats.level);
+        if (!resolved || spell.level !== 0) return resolved;
+        const potentFeature = playerStats.automation?.actions?.find(
+            a => a.type === 'damage_bonus' && !a.upgrades && a.options?.some(o => o.toLowerCase().includes('spellcasting'))
+        );
+        if (!potentFeature) return resolved;
+        const optKey = `_${(potentFeature.name || 'PotentSpellcasting').replace(/\s+/g, '_')}_option`;
+        const chosen = getRuntimeValue(playerStats.name, optKey, campaignName);
+        if (potentFeature.options.length > 1 && !chosen) return resolved;
+        if (chosen && !chosen.toLowerCase().includes('spellcasting')) return resolved;
+        const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
+        const wisMod = Math.max(0, wis?.bonus || 0);
+        if (wisMod <= 0) return resolved;
+        return `${resolved}+${wisMod}`;
+    }, [playerStats, campaignName]);
+
     useEffect(() => {
         computeFeatRangeEffects(playerStats.feats, playerStats.rules, playerStats).then(setFeatRangeEffects).catch((e) => { console.error("[CharActions] Error:", e); });
     }, [playerStats.feats, playerStats.rules, playerStats]);
@@ -1009,7 +1027,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                 if (isSpellAtk && spell.saveDc) { resolveSpellDamage(attackItem); return; }
                                 if (isSpellAtk) { actionCastAction(spell, {}); return; }
                                 actionCastAction(spell, {});
-                            }}>{resolvedDamage}</div>
+                            }}>{getSpellDamageDisplay(spell)}</div>
                             <div className='left'>{damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility')}</div>
                             {is2024Rules && <div></div>}
                         </React.Fragment>;

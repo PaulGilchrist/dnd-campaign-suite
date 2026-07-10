@@ -60,6 +60,32 @@ export function useActionSpellMetamagic({
         };
     };
 
+    const applyPotentSpellcasting = (attack, formula, total, rolls, modifier) => {
+        const isCantrip = attack.baseLevel === 0 || attack.level === 0;
+        if (!isCantrip) return { formula, total, rolls, modifier };
+
+        const potentFeature = playerStats.automation?.actions?.find(
+            a => a.type === 'damage_bonus' && !a.upgrades && a.options?.some(o => o.toLowerCase().includes('spellcasting'))
+        );
+        if (!potentFeature) return { formula, total, rolls, modifier };
+
+        const optKey = `_${(potentFeature.name || 'PotentSpellcasting').replace(/\s+/g, '_')}_option`;
+        const chosen = getRuntimeValue(playerStats.name, optKey, campaignName);
+        if (potentFeature.options.length > 1 && !chosen) return { formula, total, rolls, modifier };
+        if (chosen && !chosen.toLowerCase().includes('spellcasting')) return { formula, total, rolls, modifier };
+
+        const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
+        const wisMod = Math.max(0, wis?.bonus || 0);
+        if (wisMod <= 0) return { formula, total, rolls, modifier };
+
+        return {
+            formula: `${formula} + ${wisMod} [Blessed Strikes]`,
+            total: total + wisMod,
+            rolls: [...rolls],
+            modifier,
+        };
+    };
+
     const handleActionMetamagicConfirm = useCallback((result) => {
         const pending = pendingActionMetamagic;
         setPendingActionMetamagic(null);
@@ -142,7 +168,8 @@ export function useActionSpellMetamagic({
             if (!rawResult) return;
 
             const affResult = applyElementalAffinity(attack, attack.damage, rawResult.total, rawResult.rolls, rawResult.modifier);
-            const { formula, total, rolls, modifier } = applyEmpoweredEvocation(attack, affResult.formula, affResult.total, affResult.rolls, affResult.modifier);
+            const empResult = applyEmpoweredEvocation(attack, affResult.formula, affResult.total, affResult.rolls, affResult.modifier);
+            const { formula, total, rolls, modifier } = applyPotentSpellcasting(attack, empResult.formula, empResult.total, empResult.rolls, empResult.modifier);
 
             if (!mapName) {
                 const ctx = await buildCtxSync(attack);
@@ -174,7 +201,8 @@ export function useActionSpellMetamagic({
                 if (!rawR) return;
 
                 const affR = applyElementalAffinity(attack, attack.damage, rawR.total, rawR.rolls, rawR.modifier);
-                const { formula, total, rolls, modifier } = applyEmpoweredEvocation(attack, affR.formula, affR.total, affR.rolls, affR.modifier);
+                const empR = applyEmpoweredEvocation(attack, affR.formula, affR.total, affR.rolls, affR.modifier);
+                const { formula, total, rolls, modifier } = applyPotentSpellcasting(attack, empR.formula, empR.total, empR.rolls, empR.modifier);
 
                 if (!mapName) {
                     const ctx = await buildCtxSync(attack);

@@ -537,8 +537,11 @@ export function buildDamageSteps() {
 
         for (const bonus of bonuses) {
           const optKey = `_${bonus.name.replace(/\s+/g, '_')}_option`;
-          const chosen = getRuntimeValue(ctx.playerStats.name, optKey, ctx.campaignName) || bonus.options?.[0] || '';
-          if (bonus.options?.length > 0 && !chosen.toLowerCase().includes('strike')) continue;
+          const chosen = getRuntimeValue(ctx.playerStats.name, optKey, ctx.campaignName);
+          if (bonus.options?.length > 0) {
+            if (!chosen) continue;
+            if (!chosen.toLowerCase().includes('strike')) continue;
+          }
 
           const usedKey = `_${bonus.name.replace(/\s+/g, '_')}_usedRound`;
           const round = getCurrentCombatRound();
