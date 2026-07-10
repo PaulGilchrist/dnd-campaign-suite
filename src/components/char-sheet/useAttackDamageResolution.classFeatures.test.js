@@ -368,16 +368,43 @@ describe('useAttackDamageResolution - class features', () => {
             });
         }
 
-        it('rolls 1d6 Force damage and applies to a different creature within 30ft', async () => {
+        it('shows SecondaryTargetModal with valid targets when Hunter Mark is active', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === "_Hunter's_Prey_choice") return 'Colossus Slayer';
                 return null;
             });
             getCombatContext.mockResolvedValue({
                 creatures: [
-                    { name: 'TestRogue', type: 'player', concentration: { spell: "Hunter's Mark" } },
-                    { name: 'Goblin', type: 'npc' },
-                    { name: 'Orc', type: 'npc' },
+                    { name: 'TestRogue', type: 'player', concentration: { spell: "Hunter's Mark", target: 'Goblin' } },
+                    { name: 'Goblin', type: 'npc', maxHp: 20 },
+                    { name: 'Orc', type: 'npc', maxHp: 30 },
+                ],
+            });
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeSuperiorHunterStats() });
+            await resolveAttackDamage(makeAttack());
+            await tick();
+            expect(mockSetModalState).toHaveBeenCalledWith(expect.objectContaining({
+                secondaryTargetModal: expect.objectContaining({
+                    title: "Superior Hunter's Prey — Choose Second Target",
+                    confirmLabel: 'Deal Damage',
+                }),
+            }));
+            const modalCall = mockSetModalState.mock.calls.find(c => c[0]?.secondaryTargetModal);
+            expect(modalCall[0].secondaryTargetModal.targets.map(t => t.name)).toEqual(['Orc']);
+            expect(applyDamageToTarget).not.toHaveBeenCalled();
+        });
+
+        it('applies 1d6 Force damage when target is selected via modal', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === "_Hunter's_Prey_choice") return 'Colossus Slayer';
+                return null;
+            });
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'TestRogue', type: 'player', concentration: { spell: "Hunter's Mark", target: 'Goblin' } },
+                    { name: 'Goblin', type: 'npc', maxHp: 20 },
+                    { name: 'Orc', type: 'npc', maxHp: 30 },
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
@@ -385,6 +412,9 @@ describe('useAttackDamageResolution - class features', () => {
             const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeSuperiorHunterStats() });
             await resolveAttackDamage(makeAttack());
             await tick();
+            const modalCall = mockSetModalState.mock.calls.find(c => c[0]?.secondaryTargetModal);
+            const onTargetSelected = modalCall[0].secondaryTargetModal.onTargetSelected;
+            await onTargetSelected('Orc');
             expect(rollExpression).toHaveBeenCalledWith('1d6');
             expect(loadCombatSummary).toHaveBeenCalledWith('test-campaign');
             expect(applyDamageToTarget).toHaveBeenCalledWith(
@@ -393,7 +423,7 @@ describe('useAttackDamageResolution - class features', () => {
                 5,
                 ['Force'],
                 'test-campaign',
-                null,
+                [],
                 false,
                 'TestRogue',
             );
@@ -409,6 +439,29 @@ describe('useAttackDamageResolution - class features', () => {
                 'test-campaign',
             );
             expect(mockSetPopupHtml).toHaveBeenCalled();
+            expect(mockSetModalState).toHaveBeenCalledWith({ secondaryTargetModal: null });
+        });
+
+        it('dismisses modal without applying damage when skipped', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === "_Hunter's_Prey_choice") return 'Colossus Slayer';
+                return null;
+            });
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'TestRogue', type: 'player', concentration: { spell: "Hunter's Mark", target: 'Goblin' } },
+                    { name: 'Goblin', type: 'npc', maxHp: 20 },
+                    { name: 'Orc', type: 'npc', maxHp: 30 },
+                ],
+            });
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeSuperiorHunterStats() });
+            await resolveAttackDamage(makeAttack());
+            await tick();
+            const modalCall = mockSetModalState.mock.calls.find(c => c[0]?.secondaryTargetModal);
+            modalCall[0].secondaryTargetModal.onSkip();
+            expect(applyDamageToTarget).not.toHaveBeenCalled();
+            expect(mockSetModalState).toHaveBeenCalledWith({ secondaryTargetModal: null });
         });
 
         it('does not spread damage when Hunter Mark is not active', async () => {
