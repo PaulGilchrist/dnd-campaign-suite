@@ -641,6 +641,8 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
  export function clearAllExpirationEffects(characterName, campaignName) {
     if (!characterName || !campaignName) return;
 
+    console.log('[clearAllExpirationEffects] START', { characterName });
+
      // Clear all active buffs (Innate Sorcery, Reckless Attack, etc.)
       setRuntimeValue(characterName, 'activeBuffs', [], campaignName);
       setRuntimeValue(characterName, 'mantleOfMajestyActive', null, campaignName);

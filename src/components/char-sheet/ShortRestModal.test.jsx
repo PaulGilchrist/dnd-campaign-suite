@@ -5,6 +5,7 @@ import ShortRestModal from './ShortRestModal.jsx';
 
 const getRuntimeValueMock = vi.fn(() => null);
 const setRuntimeValueMock = vi.fn();
+const setRuntimeBatchMock = vi.fn();
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getStore: vi.fn(() => new Map()),
@@ -12,6 +13,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   listeners: new Map(),
     getRuntimeValue: vi.fn((...args) => getRuntimeValueMock(...args)),
     setRuntimeValue: vi.fn((...args) => setRuntimeValueMock(...args)),
+    setRuntimeBatch: vi.fn((...args) => setRuntimeBatchMock(...args)),
 }));
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
@@ -320,7 +322,7 @@ describe('ShortRestModal', () => {
         it('resets spell slot resources to null on completion', () => {
             renderModal();
             fireEvent.click(screen.getByText('Complete Short Rest'));
-            const spellSlotCalls = setRuntimeValueMock.mock.calls.filter(
+            const spellSlotCalls = setRuntimeBatchMock.mock.calls.filter(
                 (call) => call[1] === 'spell_slots_level_1'
             );
             expect(spellSlotCalls.length).toBeGreaterThan(0);
@@ -331,7 +333,7 @@ describe('ShortRestModal', () => {
             renderModal();
             fireEvent.click(screen.getByText('Roll One'));
             fireEvent.click(screen.getByText('Complete Short Rest'));
-            const hpCalls = setRuntimeValueMock.mock.calls.filter(
+            const hpCalls = setRuntimeBatchMock.mock.calls.filter(
                 (call) => call[1] === 'currentHitPoints'
             );
             expect(hpCalls.length).toBeGreaterThan(0);
@@ -342,7 +344,7 @@ describe('ShortRestModal', () => {
             renderModal();
             fireEvent.click(screen.getByText('Roll One'));
             fireEvent.click(screen.getByText('Complete Short Rest'));
-            const hpCalls = setRuntimeValueMock.mock.calls.filter(
+            const hpCalls = setRuntimeBatchMock.mock.calls.filter(
                 (call) => call[1] === 'currentHitPoints'
             );
             expect(hpCalls.length).toBeGreaterThan(0);
@@ -354,7 +356,7 @@ describe('ShortRestModal', () => {
             renderModal();
             fireEvent.click(screen.getByText('Roll One'));
             fireEvent.click(screen.getByText('Complete Short Rest'));
-            const hpCalls = setRuntimeValueMock.mock.calls.filter(
+            const hpCalls = setRuntimeBatchMock.mock.calls.filter(
                 (call) => call[1] === 'currentHitPoints'
             );
             expect(hpCalls.length).toBeGreaterThan(0);
@@ -377,7 +379,7 @@ describe('ShortRestModal', () => {
             );
             fireEvent.click(screen.getByText(/Regain.*Sorcery Points/));
             fireEvent.click(screen.getByText('Complete Short Rest'));
-            const spCalls = setRuntimeValueMock.mock.calls.filter(
+            const spCalls = setRuntimeBatchMock.mock.calls.filter(
                 (call) => call[1] === 'sorceryPoints'
             );
             expect(spCalls.length).toBeGreaterThan(0);
@@ -400,7 +402,7 @@ describe('ShortRestModal', () => {
             );
             fireEvent.click(screen.getByText(/Regain.*Sorcery Points/));
             fireEvent.click(screen.getByText('Complete Short Rest'));
-            const srCalls = setRuntimeValueMock.mock.calls.filter(
+            const srCalls = setRuntimeBatchMock.mock.calls.filter(
                 (call) => call[1] === 'sorcerousRestorationUses'
             );
             expect(srCalls.length).toBeGreaterThan(0);
@@ -422,7 +424,7 @@ describe('ShortRestModal', () => {
                 />
             );
             fireEvent.click(screen.getByText('Complete Short Rest'));
-            const biCalls = setRuntimeValueMock.mock.calls.filter(
+            const biCalls = setRuntimeBatchMock.mock.calls.filter(
                 (call) => call[1] === 'bardicInspirationUses'
             );
             expect(biCalls.length).toBeGreaterThan(0);
@@ -450,7 +452,7 @@ describe('ShortRestModal', () => {
             );
             fireEvent.click(screen.getByText(/Recover Spell Slots/));
             fireEvent.click(screen.getByText('Complete Short Rest'));
-            const slotCalls = setRuntimeValueMock.mock.calls.filter(
+            const slotCalls = setRuntimeBatchMock.mock.calls.filter(
                 (call) => call[1].startsWith('spell_slots_level_')
             );
             expect(slotCalls.length).toBeGreaterThan(0);
@@ -479,7 +481,7 @@ describe('ShortRestModal', () => {
             );
             fireEvent.click(screen.getByText(/Recover Spell Slots/));
             fireEvent.click(screen.getByText('Complete Short Rest'));
-            const slotCalls = setRuntimeValueMock.mock.calls.filter(
+            const slotCalls = setRuntimeBatchMock.mock.calls.filter(
                 (call) => call[1] === 'spell_slots_level_6'
             );
             expect(slotCalls.length).toBe(0);
@@ -506,7 +508,7 @@ describe('ShortRestModal', () => {
                 />
             );
             fireEvent.click(screen.getByText('Complete Short Rest'));
-            const usedCalls = setRuntimeValueMock.mock.calls.filter(
+            const usedCalls = setRuntimeBatchMock.mock.calls.filter(
                 (call) => call[1].includes('_used')
             );
             expect(usedCalls.length).toBeGreaterThan(0);

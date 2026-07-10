@@ -362,7 +362,6 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 break
 
             case 'resource_pool':
-            case 'natural_recovery':
             case 'open_hand_technique':
             case 'initiative_action':
             case 'spell_modifier':
@@ -440,6 +439,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 break
             }
             case 'resource_restoration':
+            case 'natural_recovery':
             case 'font_of_inspiration':
             case 'conditional_advantage':
             case 'conditional_replacement':

@@ -5,7 +5,7 @@
   "abilities": [
     {
       "name": "Strength",
-      "baseScore": 8,
+      "baseScore": 9,
       "featIncrease": 0,
       "backgroundIncrease": 0,
       "miscIncrease": 0
@@ -19,28 +19,28 @@
     },
     {
       "name": "Constitution",
-      "baseScore": 15,
+      "baseScore": 13,
       "featIncrease": 0,
       "backgroundIncrease": 0,
       "miscIncrease": 0
     },
     {
       "name": "Intelligence",
-      "baseScore": 15,
+      "baseScore": 13,
       "featIncrease": 0,
       "backgroundIncrease": 0,
       "miscIncrease": 0
     },
     {
       "name": "Wisdom",
-      "baseScore": 8,
+      "baseScore": 11,
       "featIncrease": 0,
       "backgroundIncrease": 0,
       "miscIncrease": 0
     },
     {
       "name": "Charisma",
-      "baseScore": 8,
+      "baseScore": 9,
       "featIncrease": 0,
       "backgroundIncrease": 0,
       "miscIncrease": 0
@@ -57,8 +57,8 @@
     "primalOrder": ""
   },
   "expertSkills": [
-    "Stealth",
-    "Sleight of Hand"
+    "Sleight of Hand",
+    "Perception"
   ],
   "feats": [],
   "fightingStyles": [],
@@ -114,8 +114,8 @@
   ],
   "resistances": [],
   "skillProficiencies": [
-    "Stealth",
-    "Sleight of Hand"
+    "Sleight of Hand",
+    "Perception"
   ],
   "specialActions": [],
   "spells": [

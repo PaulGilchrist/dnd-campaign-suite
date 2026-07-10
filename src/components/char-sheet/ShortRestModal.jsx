@@ -1,6 +1,6 @@
 
 import React from 'react'
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue, setRuntimeBatch } from '../../hooks/runtime/useRuntimeState.js'
 import { rollDice } from '../../services/dice/diceRoller.js'
 import { getHitDieSize, computeHitDieRecovery, SHORT_REST_RESOURCES, getShortRestResourceLabels } from '../../services/rules/effects/restRules.js'
 import { clearAllExpirationEffects } from '../../services/rules/effects/expirations.js'
@@ -43,10 +43,27 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         a => a.type === 'natural_recovery'
     );
     const naturalRecoveryCur = getRuntimeValue(playerStats.name, 'naturalRecoverySlots');
-    const naturalRecoveryAvailable = !!naturalRecovery && naturalRecoveryCur !== 0;
+    const naturalRecoveryAvailable = !!naturalRecovery && naturalRecoveryCur !== null && naturalRecoveryCur !== 0;
     const naturalRecoveryMaxLevels = isDruid ? Math.floor(playerStats.level / 2) : 0;
     const [naturalRecoveryRequested, setNaturalRecoveryRequested] = React.useState(false);
     const [naturalRecoverySelections, setNaturalRecoverySelections] = React.useState({});
+
+    React.useEffect(() => {
+        if (naturalRecovery) {
+            console.log('[ShortRestModal] Natural Recovery detected:', {
+                isDruid,
+                naturalRecovery: !!naturalRecovery,
+                naturalRecoveryName: naturalRecovery.name,
+                naturalRecoveryCur,
+                naturalRecoveryAvailable,
+                naturalRecoveryMaxLevels,
+                naturalRecoveryRequested,
+                naturalRecoverySelections,
+                spellAbilities: playerStats.spellAbilities,
+                automationPassives: JSON.stringify(playerStats.automation?.passives?.map(p => p.type)),
+            });
+        }
+    }, [naturalRecovery, isDruid, naturalRecoveryCur, naturalRecoveryAvailable, naturalRecoveryMaxLevels, naturalRecoveryRequested, naturalRecoverySelections, playerStats.spellAbilities, playerStats.automation?.passives]);
 
     const naturalRecoverySlotLevels = React.useMemo(() => {
         if (!naturalRecovery) return [];
@@ -71,12 +88,11 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         setNaturalRecoverySelections(prev => {
             const current = prev[level] || 0;
             const newVal = Math.max(0, current + delta);
-            if (newVal === 0) {
-                return Object.fromEntries(
-                    Object.entries(prev).filter(([k]) => k !== String(level))
-                );
-            }
-            return { ...prev, [level]: newVal };
+            const newSelections = newVal === 0
+                ? Object.fromEntries(Object.entries(prev).filter(([k]) => k !== String(level)))
+                : { ...prev, [level]: newVal };
+            console.log('[ShortRestModal] Natural Recovery selection changed:', { level, delta, current, newVal, newSelections });
+            return newSelections;
         });
     };
 
@@ -188,7 +204,22 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
        };
 
     const handleComplete = () => {
-        setRuntimeValue(playerStats.name, 'shortRestHitDice', remainingHitDice, campaignName);
+        console.log('[ShortRestModal] handleComplete START', {
+            isDruid,
+            naturalRecovery: !!naturalRecovery,
+            naturalRecoveryAvailable,
+            naturalRecoveryRequested,
+            naturalRecoveryCur,
+            naturalRecoverySelections,
+            naturalRecoveryBudgetUsed,
+            naturalRecoveryMaxLevels,
+            playerStatsClass: playerStats?.class?.name,
+            automationPassives: JSON.stringify(playerStats?.automation?.passives),
+        });
+
+        const updates = {};
+
+        updates.shortRestHitDice = remainingHitDice;
 
         let currentHp = getRuntimeValue(playerStats.name, 'currentHitPoints');
         if (currentHp == null || currentHp === '') {
@@ -196,10 +227,10 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
            } else {
             currentHp = Number(currentHp) + recoveredHp;
            }
-        setRuntimeValue(playerStats.name, 'currentHitPoints', Math.min(playerStats.hitPoints, currentHp), campaignName);
+        updates.currentHitPoints = Math.min(playerStats.hitPoints, currentHp);
 
         SHORT_REST_RESOURCES.forEach((key) => {
-            setRuntimeValue(playerStats.name, key, null, campaignName);
+            updates[key] = null;
             });
 
         if (playerStats.class?.name === 'Fighter') {
@@ -207,19 +238,19 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
             const maxSW = classLevel?.second_wind || 0;
             const currentSW = Number(getRuntimeValue(playerStats.name, 'secondWindUses', campaignName) ?? 0);
             if (currentSW < maxSW) {
-                setRuntimeValue(playerStats.name, 'secondWindUses', Math.min(maxSW, currentSW + 1), campaignName);
+                updates.secondWindUses = Math.min(maxSW, currentSW + 1);
             }
         }
 
         if (sorcRestoration && restorationAvailable && restorationRequested) {
             let curSorcery = getRuntimeValue(playerStats.name, 'sorceryPoints');
             const maxSp = getClassFeatures(playerStats)?.maxSorceryPoints || 0;
-            setRuntimeValue(playerStats.name, 'sorceryPoints', Math.min(maxSp, (curSorcery != null ? Number(curSorcery) : 0) + restoreAmount), campaignName);
-            setRuntimeValue(playerStats.name, 'sorcerousRestorationUses', 0, campaignName);
+            updates.sorceryPoints = Math.min(maxSp, (curSorcery != null ? Number(curSorcery) : 0) + restoreAmount);
+            updates.sorcerousRestorationUses = 0;
             }
 
         if (hasFontOfInspiration && fontOfInspirationAvailable) {
-            setRuntimeValue(playerStats.name, 'bardicInspirationUses', bardicInspirationMax, campaignName);
+            updates.bardicInspirationUses = bardicInspirationMax;
             }
 
         if (arcaneRecovery && arcaneRecoveryAvailable && arcaneRecoveryRequested) {
@@ -233,26 +264,32 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
                 const available = max - current;
                 if (available > 0) {
                     const toRecover = Math.min(available, maxSlotsToRecover - slotsRecovered);
-                    setRuntimeValue(playerStats.name, slotKey, current + toRecover, campaignName);
+                    updates[slotKey] = current + toRecover;
                     slotsRecovered += toRecover;
                 }
             }
-            setRuntimeValue(playerStats.name, 'arcaneRecoveryLevels', null, campaignName);
+            updates.arcaneRecoveryLevels = null;
             }
 
         if (naturalRecovery && naturalRecoveryAvailable && naturalRecoveryRequested) {
+            console.log('[ShortRestModal] Natural Recovery block EXECUTING', {
+                naturalRecoverySelections,
+                naturalRecoveryBudgetUsed,
+            });
             for (const [levelStr, count] of Object.entries(naturalRecoverySelections)) {
                 if (count > 0) {
                     const slotKey = `spell_slots_level_${levelStr}`;
                     const max = playerStats.spellAbilities?.[slotKey] || 0;
                     const current = Number(getRuntimeValue(playerStats.name, slotKey) ?? max);
-                    setRuntimeValue(playerStats.name, slotKey, Math.min(max, current + count), campaignName);
+                    console.log(`[ShortRestModal] Recovering ${count} slot(s) of level ${levelStr}`, {
+                        slotKey, max, current, newTotal: Math.min(max, current + count),
+                    });
+                    updates[slotKey] = Math.min(max, current + count);
                 }
             }
-            setRuntimeValue(playerStats.name, 'naturalRecoverySlots', null, campaignName);
+            updates.naturalRecoverySlots = null;
             }
 
-        // Signature Spells: Reset per-spell used flags on short rest
         const hasSignatureSpells = (playerStats.automation?.specialActions ?? []).some(
             a => a.type === 'signature_spells'
         )
@@ -261,17 +298,20 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
             if (selection && Array.isArray(selection)) {
                 for (const spell of selection) {
                     const usedKey = `SignatureSpells_${spell.replace(/\s+/g, '_')}_used`
-                    setRuntimeValue(playerStats.name, usedKey, null, campaignName)
+                    updates[usedKey] = null
                 }
             }
         }
 
+        updates['_Defensive_Tactics_choice'] = null;
+        updates["_Hunter's_Prey_choice"] = null;
+
+        console.log('[ShortRestModal] Updates object before setRuntimeBatch:', JSON.stringify(updates, null, 2));
+
+        setRuntimeBatch(playerStats.name, updates, campaignName);
+
         clearAllExpirationEffects(playerStats.name, campaignName);
         clearHuntersMarkConcentration(playerStats.name, campaignName);
-
-        setRuntimeValue(playerStats.name, '_Defensive_Tactics_choice', null, campaignName);
-        setRuntimeValue(playerStats.name, "_Hunter's_Prey_choice", null, campaignName);
-        setRuntimeValue(playerStats.name, "_Hunter's_Prey_choice", null, campaignName);
 
         onComplete && onComplete();
        };
@@ -436,7 +476,14 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
                                     <div className="short-rest-dice-row">
                                         <button
                                             className="char-btn"
-                                            onClick={() => setNaturalRecoveryRequested(true)}
+                                            onClick={() => {
+                                                console.log('[ShortRestModal] Recover Spell Slots clicked:', {
+                                                    naturalRecoveryBudgetUsed,
+                                                    naturalRecoverySelections,
+                                                    naturalRecoveryAvailable,
+                                                });
+                                                setNaturalRecoveryRequested(true);
+                                            }}
                                             disabled={!naturalRecoveryAvailable || naturalRecoveryBudgetUsed === 0}
                                         >
                                             <i className="fa-solid fa_leaf"></i> Recover Spell Slots
