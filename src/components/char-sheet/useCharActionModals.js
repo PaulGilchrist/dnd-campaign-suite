@@ -23,6 +23,7 @@ export default function useCharActionModals({
         playerStats, campaignName, mapName,
         popupHtml, setPopupHtml, rollDamage, buildCtx, buildCtxSync,
         setModalState, modalState,
+        setPendingDamage,
     });
 
     const {

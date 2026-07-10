@@ -19,6 +19,7 @@ import CombatSuperiorityModal from './modals/CombatSuperiorityModal.jsx';
 import WeaponKindMasteryModal from './modals/WeaponKindMasteryModal.jsx';
 import WeaponMasteryChoiceModal from './modals/WeaponMasteryChoiceModal.jsx';
 import ResourcePoolModal from './modals/ResourcePoolModal.jsx';
+import NaturalRecoveryModal from './modals/NaturalRecoveryModal.jsx';
 import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
 import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
 import { onSavantSelected } from '../../services/automation/handlers/class-wizard/SavantHandler.js';
@@ -34,6 +35,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
     const [weaponKindMasteryModal, setWeaponKindMasteryModal] = useState(null);
     const [weaponMasteryChoiceModal, setWeaponMasteryChoiceModal] = useState(null);
     const [resourcePoolModal, setResourcePoolModal] = useState(null);
+    const [naturalRecoveryModal, setNaturalRecoveryModal] = useState(null);
     const [featureChoiceModal, setFeatureChoiceModal] = useState(null);
     const [fightingStylesMap, setFightingStylesMap] = useState(null);
     const { setPopupHtml } = useDiceRollPopup();
@@ -130,11 +132,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
         }
         if (auto?.type === 'damage_bonus' && auto.options?.length > 0 && auto.options.every(o => typeof o === 'string')) {
             const optionKey = `_${action.name.replace(/\s+/g, '_')}_option`;
-            const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
-            if (!chosenOption) {
-                setFeatureChoiceModal({ action, options: auto.options, optionKey });
-                return;
-            }
+            setFeatureChoiceModal({ action, options: auto.options, optionKey });
+            return;
         }
         const result = await executeHandler(action, playerStats, campaignName, null);
         if (!result) return;
@@ -155,6 +154,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                 setWeaponMasteryChoiceModal(result.payload);
             } else if (result.modalName === 'resourcePool') {
                 setResourcePoolModal(result.payload);
+            } else if (result.modalName === 'naturalRecovery') {
+                setNaturalRecoveryModal(result.payload);
             }
         } else if (result.type === 'popup') {
             const payload = result.payload;
@@ -310,6 +311,13 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                     onClose={() => setResourcePoolModal(null)}
                 />
             )}
+            {naturalRecoveryModal && (
+                <NaturalRecoveryModal
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    onClose={() => setNaturalRecoveryModal(null)}
+                />
+            )}
             {featureChoiceModal && (
                 <div className="sp-overlay" onClick={handleFeatureChoiceSkip}>
                     <div className="sp-modal" onClick={e => e.stopPropagation()}>
@@ -345,9 +353,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                 const isInteractive = isInteractiveAutomation(specialAction);
                 const auto = specialAction.automation;
                 const hasStringOptions = auto?.type === 'damage_bonus' && auto.options?.length > 0 && auto.options.every(o => typeof o === 'string');
-                const optionKey = hasStringOptions ? `_${specialAction.name.replace(/\s+/g, '_')}_option` : null;
-                const hasChoice = optionKey ? getRuntimeValue(playerStats.name, optionKey, campaignName) : false;
-                const isClickable = isInteractive || (hasStringOptions && !hasChoice);
+                const isClickable = isInteractive || (hasStringOptions);
                 return <div key={specialAction.name || `special-action-${index}`}>
                         <b className={isClickable ? "clickable" : ""} onClick={isClickable ? () => handleAutomationClick(specialAction) : undefined}>{specialAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: renderMarkdownInline(specialAction.description) }}></span>
                     </div>

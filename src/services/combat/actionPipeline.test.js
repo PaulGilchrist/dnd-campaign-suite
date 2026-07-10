@@ -79,6 +79,8 @@ describe('createPipeline', () => {
         popupHtml: ctx.popupHtml,
         chosen: 'yes',
         _pausedStep: 'modalStep',
+        _modalType: 'choice',
+        _modalProps: undefined,
       });
     });
 

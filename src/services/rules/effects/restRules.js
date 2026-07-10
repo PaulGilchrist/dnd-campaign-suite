@@ -180,33 +180,6 @@ export async function applyShortRest(playerStats, campaignName) {
     }
   }
 
-    // Natural Recovery: Druid Circle of the Land spell slot recovery on short rest
-    const hasNaturalRecovery = (playerStats.automation?.passives ?? []).some(
-      p => p.type === 'resource_restoration' && p.resourceKey === 'naturalRecoverySlots'
-    )
-    if (hasNaturalRecovery && playerStats.class?.name === 'Druid') {
-      if (playerStats.level == null) {
-          console.error('[restRules] applyShortRest: playerStats.level is missing for druid natural recovery')
-          throw new Error('playerStats.level is required for natural recovery')
-        }
-        const druidLevel = playerStats.level
-      const maxSlotsToRecover = Math.floor(druidLevel / 2)
-      let slotsRecovered = 0
-      const slotLevels = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-      for (const level of slotLevels) {
-        if (slotsRecovered >= maxSlotsToRecover) break
-        const slotKey = `spell_slots_level_${level}`
-        const max = playerStats.spellAbilities?.[slotKey] || 0
-        const current = Number(getRuntimeValue(name, slotKey) ?? max)
-        const available = max - current
-        if (available > 0) {
-          const toRecover = Math.min(available, maxSlotsToRecover - slotsRecovered)
-          updates[slotKey] = current + toRecover
-          slotsRecovered += toRecover
-        }
-      }
-    }
-
     // Arcane Recovery: Wizard spell slot recovery on short rest
     const hasArcaneRecovery = (playerStats.automation?.passives ?? []).some(
       p => p.type === 'resource_restoration' && p.resourceKey === 'arcaneRecoveryLevels'
@@ -454,10 +427,11 @@ export async function applyLongRest(playerStats, campaignName) {
 
     // Natural Recovery: reset free cast tracking on long rest
     const hasNaturalRecovery = (playerStats.automation?.passives ?? []).some(
-      p => p.type === 'resource_restoration' && p.resourceKey === 'naturalRecoverySlots'
+      p => p.type === 'natural_recovery'
     )
     if (hasNaturalRecovery) {
       charData.naturalRecoveryFreeCast = null
+      charData.naturalRecoveryFreeCastUsed = null
       charData.naturalRecoverySlots = null
     }
 

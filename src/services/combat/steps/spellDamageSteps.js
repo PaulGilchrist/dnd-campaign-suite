@@ -36,7 +36,6 @@ export function buildSpellDamageSteps() {
         let formula = ctx.attack?.damage || ctx.autoFormulaOverride || '0';
         const ps = ctx.playerStats;
         const isCantripFlag = ctx.isCantrip || false;
-        console.error('[spellContext] isCantrip=' + isCantripFlag + ' formula=' + formula + ' hasAutomation=' + !!ps.automation?.actions);
 
         // Empowered Evocation: add int mod to evocation cantrip damage
         const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(ps).length > 0;

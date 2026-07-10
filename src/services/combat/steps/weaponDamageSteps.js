@@ -536,7 +536,7 @@ export function buildDamageSteps() {
         ).filter(b => !upgraded.has(b.name));
 
         for (const bonus of bonuses) {
-          const optKey = `_${bonus.name.replace(/\s+/g, '_')}_option`;
+          const optKey = `_${(bonus.upgrades || bonus.name).replace(/\s+/g, '_')}_option`;
           const chosen = getRuntimeValue(ctx.playerStats.name, optKey, ctx.campaignName);
           if (bonus.options?.length > 0) {
             if (!chosen) continue;

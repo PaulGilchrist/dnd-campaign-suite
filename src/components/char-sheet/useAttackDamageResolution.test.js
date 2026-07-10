@@ -77,6 +77,7 @@ function createMockDeps(overrides = {}) {
         modalState: {},
         setModalState: vi.fn(),
         pendingDamage: null,
+        setPendingDamage: vi.fn(),
         resumeRef: { current: null },
         ...overrides,
     };

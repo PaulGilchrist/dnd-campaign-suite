@@ -83,7 +83,6 @@ export async function resolveAttackDamageStandalone(attack, ctxOverrides, { play
  * @returns {{ attack: object, ctx: object }}
  */
 export function normalizeAutoDamage(autoDamage, isCrit, playerStats) {
-  console.error('[normalizeAutoDamage] autoDamage.formula=' + autoDamage.formula);
   const attack = {
     name: autoDamage.name,
     damage: autoDamage.formula,
@@ -129,6 +128,7 @@ export default function useAttackDamageResolution({
     playerStats, campaignName, mapName,
     popupHtml, setPopupHtml, rollDamage, buildCtx, buildCtxSync,
     setModalState, _modalState,
+    setPendingDamage,
     resumeRef = { current: null },
 }) {
     let pendingCtxOverrides = {};
@@ -199,6 +199,37 @@ export default function useAttackDamageResolution({
 
         const pipeline = buildPipelineForAction(attack, playerStats);
         await pipeline.run('housekeeping:do', ctx, resumeRef);
+        if (resumeRef.current?._pausedStep) {
+            const paused = resumeRef.current;
+            if (paused._modalType === 'damageTypeChoice') {
+                setModalState({ damageTypeChoice: paused._modalProps });
+                setPendingDamage({
+                    attack: paused.attack,
+                    formula: paused.formula,
+                    total: paused.total,
+                    rolls: paused.rolls,
+                    modifier: paused.modifier,
+                    bonusExpr: paused.bonusExpr,
+                    bonusTotal: paused.bonusTotal,
+                    bonusRolls: paused.bonusRolls,
+                    oncePerTurnKey: paused._weaponHitOnceKey,
+                });
+            } else if (paused._modalType === 'divineFury') {
+                setModalState({ divineFuryChoice: paused._modalProps });
+                setPendingDamage({
+                    attack: paused.attack,
+                    formula: paused.formula,
+                    total: paused.total,
+                    rolls: paused.rolls,
+                    modifier: paused.modifier,
+                    bonusExpr: paused.bonusExpr,
+                    bonusTotal: paused.bonusTotal,
+                    bonusRolls: paused.bonusRolls,
+                });
+            } else if (paused._modalType === 'secondaryTarget') {
+                setModalState({ secondaryTargetModal: paused._modalProps });
+            }
+        }
     };
 
     const handleAttackRiderManeuverUse = async (maneuver, attack, popupHtmlData, currentFormula, currentTotal, currentRolls) => {

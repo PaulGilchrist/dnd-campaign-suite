@@ -10,6 +10,7 @@ import { handle as handleSpellCast } from './handlers/spells/spellCastHandler.js
 import { handle as handleInitiative } from './handlers/combat/initiativeHandler.js';
 
 import { handle as handleResourcePool } from './handlers/resources/resourcePoolHandler.js';
+import { handle as handleNaturalRecovery } from './handlers/resources/naturalRecoveryHandler.js';
 import { handle as handleFontOfMagic } from './handlers/resources/fontOfMagicHandler.js';
 import { handle as handleHealingPool } from './handlers/healing/healingPoolHandler.js';
 import { automationInfoPopup } from '../shared/popupResponse.js';
@@ -238,6 +239,7 @@ const HANDLER_MAP = {
     bonus_action_attack: handleBonusActionAttack,
     buff_ally: handleBuffAlly,
     resource_pool: handleResourcePool,
+    natural_recovery: handleNaturalRecovery,
     divine_spark: handleDivineSpark,
     divine_intervention: handleDivineIntervention,
     font_of_magic: handleFontOfMagic,

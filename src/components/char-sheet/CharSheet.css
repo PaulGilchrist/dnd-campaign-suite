@@ -79,6 +79,32 @@
 .short-rest-modal ul li {
     margin-bottom: 2px;
 }
+.short-rest-nr-budget {
+    font-size: 0.9em;
+    margin-bottom: 8px;
+    opacity: 0.8;
+}
+.short-rest-nr-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8px;
+    font-size: 0.9em;
+}
+.short-rest-nr-table th,
+.short-rest-nr-table td {
+    padding: 3px 6px;
+    text-align: center;
+}
+.short-rest-nr-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+.short-rest-nr-count {
+    min-width: 20px;
+    text-align: center;
+}
 
 /* Hand of Healing Modal */
 .healing-roll-details {

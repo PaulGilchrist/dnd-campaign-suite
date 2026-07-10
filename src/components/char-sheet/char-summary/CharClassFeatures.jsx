@@ -167,9 +167,10 @@ const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
     const druidFeatures = getClassFeatures(playerStats);
     const multiMinuteBadges = useActiveBuffs(playerStats, campaignName);
     const hasNaturalRecovery = (playerStats.automation?.passives ?? []).some(
-        p => p.type === 'resource_restoration' && p.resourceKey === 'naturalRecoverySlots'
+        p => p.type === 'natural_recovery'
     );
     const naturalRecoveryFreeCast = getRuntimeValue(playerStats.name, 'naturalRecoveryFreeCast');
+    const naturalRecoveryFreeCastUsed = getRuntimeValue(playerStats.name, 'naturalRecoveryFreeCastUsed');
     const elementalFuryChoice = useRuntimeValue(playerStats.name, '_Elemental_Fury_option', campaignName);
     const improvedElementalFuryChoice = useRuntimeValue(playerStats.name, '_Improved_Elemental_Fury_option', campaignName);
     if (playerStats.level < 2) return null;
@@ -180,15 +181,11 @@ const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
                {hasNaturalRecovery && (
                    <div>
                        <div><b>Natural Recovery:</b></div>
-                       {naturalRecoveryFreeCast ? (
+                       {Array.isArray(naturalRecoveryFreeCast) && naturalRecoveryFreeCast.length > 0 && (
+                           <div className="automation-badge"><i className="fa-solid fa-check"></i> Free cast: {naturalRecoveryFreeCast[0]}</div>
+                       )}
+                       {naturalRecoveryFreeCastUsed && (
                            <div className="automation-badge"><i className="fa-solid fa-check"></i> Free cast used</div>
-                       ) : (
-                           <button className="char-btn char-btn-sm" onClick={() => {
-                               const circleSpells = (playerStats.spellAbilities?.spells || []).filter(s => s.level >= 1);
-                               if (circleSpells.length > 0) {
-                                   setRuntimeValue(playerStats.name, 'naturalRecoveryFreeCast', circleSpells.map(s => s.name), campaignName);
-                               }
-                           }}>Grant Free Cast (1/Long Rest)</button>
                        )}
                    </div>
                )}

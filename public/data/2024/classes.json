@@ -3489,7 +3489,7 @@
                 "features": [
                     {
                         "name": "Circle of the Land Spells",
-                        "description": "Choose one land type (arid, polar, temperate, tropical) after each Long Rest. ARID LAND: Level 3: Blur, Burning Hands, Fire Bolt. Level 5: Fireball. Level 7: Blight. Level 9: Wall of Stone. POLAR LAND: Level 3: Fog Cloud, Hold Person, Ray of Frost. Level 5: Sleet Storm. Level 7: Ice Storm. Level 9: Cone of Cold. TEMPERATE LAND: Level 3: Misty Step, Shocking Grasp, Sleep. Level 5: Lightning Bolt. Level 7: Freedom of Movement. Level 9: Tree Stride. TROPICAL LAND: Level 3: Acid Splash, Ray of Sickness, Web. Level 5: Stinking Cloud. Level 7: Polymorph. Level 9: Insect Plague.",
+                        "description": "Choose one land type (arid, polar, temperate, tropical) after each Long Rest.<ul><li><b>ARID LAND:</b> Level 3: Blur, Burning Hands, Fire Bolt. Level 5: Fireball. Level 7: Blight. Level 9: Wall of Stone.</li><li><b>POLAR LAND:</b> Level 3: Fog Cloud, Hold Person, Ray of Frost. Level 5: Sleet Storm. Level 7: Ice Storm. Level 9: Cone of Cold.</li><li><b>TEMPERATE LAND:</b> Level 3: Misty Step, Shocking Grasp, Sleep. Level 5: Lightning Bolt. Level 7: Freedom of Movement. Level 9: Tree Stride.</li><li><b>TROPICAL LAND:</b> Level 3: Acid Splash, Ray of Sickness, Web. Level 5: Stinking Cloud. Level 7: Polymorph. Level 9: Insect Plague.</li></ul>",
                         "level": 3
                     },
                     {
@@ -3525,13 +3525,13 @@
                         "description": "You can cast one level 1+ prepared spell from Circle Spells without expending a spell slot, once per Long Rest. When you finish a Short Rest, you can recover expended spell slots with combined levels equal to or less than half your Druid level.",
                         "level": 6,
                         "automation": {
-                            "type": "resource_restoration",
+                            "type": "natural_recovery",
                             "trigger": "short_rest",
                             "restore_expression": "druid_level / 2",
                             "resourceKey": "naturalRecoverySlots",
                             "uses_max": 1,
-                            "casting_time": "passive",
-                            "restoreType": "spell_slots"
+                            "restoreType": "spell_slots",
+                            "casting_time": "passive"
                         }
                     },
                     {

@@ -458,6 +458,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
         const nrFreeCast = getRuntimeValue(playerStats.name, 'naturalRecoveryFreeCast');
         if (nrFreeCast && Array.isArray(nrFreeCast) && nrFreeCast.includes(spell.name)) {
           setRuntimeValue(playerStats.name, 'naturalRecoveryFreeCast', null, campaignName);
+          setRuntimeValue(playerStats.name, 'naturalRecoveryFreeCastUsed', true, campaignName);
         }
         if (getRuntimeValue(playerStats.name, '_Bewitching_Magic_freeCast') && spell.name === 'Misty Step') {
           setRuntimeValue(playerStats.name, '_Bewitching_Magic_freeCast', null, campaignName);

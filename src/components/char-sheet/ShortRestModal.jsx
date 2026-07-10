@@ -38,6 +38,47 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const arcaneRecoveryMaxSlots = isWizard ? Math.ceil(playerStats.level / 2) : 0;
     const [arcaneRecoveryRequested, setArcaneRecoveryRequested] = React.useState(false);
 
+    const isDruid = playerStats?.class?.name === 'Druid';
+    const naturalRecovery = isDruid && (playerStats.automation?.passives ?? []).find(
+        a => a.type === 'natural_recovery'
+    );
+    const naturalRecoveryCur = getRuntimeValue(playerStats.name, 'naturalRecoverySlots');
+    const naturalRecoveryAvailable = !!naturalRecovery && naturalRecoveryCur !== 0;
+    const naturalRecoveryMaxLevels = isDruid ? Math.floor(playerStats.level / 2) : 0;
+    const [naturalRecoveryRequested, setNaturalRecoveryRequested] = React.useState(false);
+    const [naturalRecoverySelections, setNaturalRecoverySelections] = React.useState({});
+
+    const naturalRecoverySlotLevels = React.useMemo(() => {
+        if (!naturalRecovery) return [];
+        const levels = [];
+        for (let lvl = 1; lvl <= 9; lvl++) {
+            const slotKey = `spell_slots_level_${lvl}`;
+            const max = playerStats.spellAbilities?.[slotKey] || 0;
+            if (max > 0) {
+                const current = Number(getRuntimeValue(playerStats.name, slotKey) ?? max);
+                levels.push({ level: lvl, max, current, available: max - current });
+            }
+        }
+        return levels;
+    }, [naturalRecovery, playerStats.spellAbilities, playerStats.name]);
+
+    const naturalRecoveryBudgetUsed = Object.entries(naturalRecoverySelections).reduce(
+        (sum, [lvl, count]) => sum + (Number(lvl) * count), 0
+    );
+    const naturalRecoveryBudgetRemaining = naturalRecoveryMaxLevels - naturalRecoveryBudgetUsed;
+
+    const handleNaturalRecoveryChange = (level, delta) => {
+        setNaturalRecoverySelections(prev => {
+            const current = prev[level] || 0;
+            const newVal = Math.max(0, current + delta);
+            if (newVal === 0) {
+                const { [level]: _, ...rest } = prev;
+                return rest;
+            }
+            return { ...prev, [level]: newVal };
+        });
+    };
+
     const hasMemorizeSpell = isWizard && (playerStats.automation?.passives ?? []).find(
         a => a.type === 'memorize_spell'
     );
@@ -198,6 +239,18 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
             setRuntimeValue(playerStats.name, 'arcaneRecoveryLevels', null, campaignName);
             }
 
+        if (naturalRecovery && naturalRecoveryAvailable && naturalRecoveryRequested) {
+            for (const [levelStr, count] of Object.entries(naturalRecoverySelections)) {
+                if (count > 0) {
+                    const slotKey = `spell_slots_level_${levelStr}`;
+                    const max = playerStats.spellAbilities?.[slotKey] || 0;
+                    const current = Number(getRuntimeValue(playerStats.name, slotKey) ?? max);
+                    setRuntimeValue(playerStats.name, slotKey, Math.min(max, current + count), campaignName);
+                }
+            }
+            setRuntimeValue(playerStats.name, 'naturalRecoverySlots', null, campaignName);
+            }
+
         // Signature Spells: Reset per-spell used flags on short rest
         const hasSignatureSpells = (playerStats.automation?.specialActions ?? []).some(
             a => a.type === 'signature_spells'
@@ -330,6 +383,68 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
                            </ul>
                        </div>
                    )}
+
+                    {naturalRecovery && (naturalRecoveryAvailable || naturalRecoveryRequested) && (
+                        <div className="short-rest-section">
+                            <h4>Natural Recovery</h4>
+                            <p>Recover expended spell slots with combined level up to {naturalRecoveryMaxLevels}.</p>
+                            {naturalRecoveryRequested ? (
+                                <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Natural Recovery applied</span>
+                            ) : (
+                                <>
+                                    <div className="short-rest-nr-budget">
+                                        Budget: {naturalRecoveryBudgetRemaining} of {naturalRecoveryMaxLevels} levels remaining
+                                    </div>
+                                    <table className="short-rest-nr-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Level</th>
+                                                <th>Current</th>
+                                                <th>Available</th>
+                                                <th>Recover</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {naturalRecoverySlotLevels.map(({ level, max, current, available }) => {
+                                                const selected = naturalRecoverySelections[level] || 0;
+                                                const canAdd = selected < available && naturalRecoveryBudgetRemaining >= level;
+                                                const canRemove = selected > 0;
+                                                return (
+                                                    <tr key={level}>
+                                                        <td>{level}</td>
+                                                        <td>{current} / {max}</td>
+                                                        <td>{available}</td>
+                                                        <td className="short-rest-nr-controls">
+                                                            <button
+                                                                className="char-btn char-btn-sm"
+                                                                onClick={() => handleNaturalRecoveryChange(level, -1)}
+                                                                disabled={!canRemove}
+                                                            >-</button>
+                                                            <span className="short-rest-nr-count">{selected}</span>
+                                                            <button
+                                                                className="char-btn char-btn-sm"
+                                                                onClick={() => handleNaturalRecoveryChange(level, 1)}
+                                                                disabled={!canAdd}
+                                                            >+</button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                    <div className="short-rest-dice-row">
+                                        <button
+                                            className="char-btn"
+                                            onClick={() => setNaturalRecoveryRequested(true)}
+                                            disabled={!naturalRecoveryAvailable || naturalRecoveryBudgetUsed === 0}
+                                        >
+                                            <i className="fa-solid fa_leaf"></i> Recover Spell Slots
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
 
                     {arcaneRecovery && (arcaneRecoveryAvailable || arcaneRecoveryRequested) && (
                         <div className="short-rest-section">

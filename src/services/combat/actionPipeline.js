@@ -54,6 +54,8 @@ export function createPipeline() {
             popupHtml: ctx.popupHtml,
             ...result.data,
             _pausedStep: step.name,
+            _modalType: result.modal.type,
+            _modalProps: result.modal.props,
           };
           return;
         }

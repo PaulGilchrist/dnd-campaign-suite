@@ -1,0 +1,101 @@
+.nr-overlay {
+    position: fixed;
+    top: 0;
+    left: 180px;
+    width: calc(100vw - 180px);
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+}
+
+.nr-modal {
+    background: var(--background-color-header-inner);
+    color: var(--color-header-inner);
+    border: 1px solid var(--color-header);
+    border-radius: 8px;
+    padding: 24px;
+    max-width: 480px;
+    width: 90%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+.nr-modal h3 {
+    color: var(--color-header);
+    margin: 0 0 4px;
+    font-size: 1.3em;
+}
+
+.nr-subtitle {
+    margin: 0 0 12px;
+    font-size: 0.85em;
+    opacity: 0.7;
+}
+
+.nr-section {
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color-light);
+}
+
+.nr-section:last-of-type {
+    border-bottom: none;
+}
+
+.nr-hint {
+    margin: 0 0 8px;
+    font-size: 0.8em;
+    opacity: 0.65;
+}
+
+.nr-blocked {
+    font-size: 0.9em;
+    opacity: 0.5;
+    font-style: italic;
+    margin: 8px 0;
+}
+
+.nr-spell-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.nr-spell-list li {
+    margin-bottom: 4px;
+}
+
+.nr-spell-btn {
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: 1px solid var(--border-color-light);
+    border-radius: 4px;
+    color: var(--color-header-inner);
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.nr-spell-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--color-header);
+}
+
+.nr-spell-level {
+    opacity: 0.6;
+    font-size: 0.85em;
+}
+
+.nr-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 8px;
+}

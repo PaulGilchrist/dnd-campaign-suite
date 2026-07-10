@@ -5332,12 +5332,13 @@
                 "prerequisites": [],
                 "description": "You can regain some of your magical energy by sitting in meditation and communing with nature. During a short rest, you choose expended spell slots to recover. The spell slots can have a combined level that is equal to or less than half your druid level (rounded up), and none of the slots can be 6th level or higher. You can't use this feature again until you finish a long rest. For example, when you are a 4th-level druid, you can recover up to two levels worth of spell slots. You can recover either a 2nd-level slot or two 1st-level slots.",
                 "automation": {
-                  "type": "resource_pool",
-                  "resource": "natural_recovery",
-                  "uses_expression": "1",
-                  "recharge_short_rest": "half_druid_level_spell_slots",
-                  "recharge_long_rest": "half_druid_level_spell_slots",
-                  "casting_time": "1 action"
+                  "type": "natural_recovery",
+                  "trigger": "short_rest",
+                  "restore_expression": "druid_level / 2",
+                  "resourceKey": "naturalRecoverySlots",
+                  "uses_max": 1,
+                  "restoreType": "spell_slots",
+                  "casting_time": "passive"
                 }
               }
             ]
