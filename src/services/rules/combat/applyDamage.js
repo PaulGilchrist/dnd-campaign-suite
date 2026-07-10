@@ -114,8 +114,6 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
   if (!creature) return null;
   if (isNaN(rawDamage) || rawDamage === null || rawDamage === undefined) return null;
 
-  // Save unified last attack to combat summary — accessible by any creature for reactions
-  // This overwrites the attack roll info with damage results after applyDamageToTarget runs
   const existingAttack = combatSummary.lastAttack;
   const isSecondary = existingAttack?.primaryDamage != null;
   combatSummary.lastAttack = {
@@ -125,8 +123,12 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
     weaponType: existingAttack?.weaponType || 'melee',
     isUnarmedStrike: existingAttack?.isUnarmedStrike || false,
     rawDamage,
-    ...(isSecondary ? {} : { primaryDamage: rawDamage }),
+    ...(isSecondary ? {} : {
+      primaryDamage: rawDamage,
+      primaryDamageType: damageTypes[0] || null
+    }),
     secondaryDamage: isSecondary ? rawDamage : null,
+    secondaryDamageType: isSecondary ? damageTypes[0] || null : null,
     damageTypes,
     damageApplied: true,
     timestamp: Date.now(),

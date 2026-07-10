@@ -102,13 +102,13 @@ export function setupEventListeners(deps) {
                 endInvisibilityOnHostileAction(attacker, pending.campaignName);
             }
 
-            // Apply secondary damage (skip concentration — handled by primary call with combined total)
             let secondaryResult = null;
             let secondaryFinalDamage = 0;
+            let secondaryApplyResultData = null;
             if (secondaryData) {
-                const secondaryApplyResult = applyDamageToTarget(combatSummary, pendingTargetName, secondaryData.total, [secondaryData.damageType], pending.campaignName, charactersRef.current, secondaryData.ignoreResistance, attacker, true, { skipConcentration: true });
-                secondaryFinalDamage = secondaryApplyResult?.finalDamage ?? secondaryData.total;
-                if (secondaryApplyResult && secondaryApplyResult.finalDamage > 0) {
+                secondaryApplyResultData = applyDamageToTarget(combatSummary, pendingTargetName, secondaryData.total, [secondaryData.damageType], pending.campaignName, charactersRef.current, secondaryData.ignoreResistance, attacker, true, { skipConcentration: true });
+                secondaryFinalDamage = secondaryApplyResultData?.finalDamage ?? secondaryData.total;
+                if (secondaryApplyResultData && secondaryApplyResultData.finalDamage > 0) {
                     endInvisibilityOnHostileAction(attacker, pending.campaignName);
                 }
                 secondaryResult = {
@@ -119,6 +119,7 @@ export function setupEventListeners(deps) {
                     modifier: secondaryData.modifier,
                     damageType: secondaryData.damageType,
                     finalDamage: secondaryFinalDamage,
+                    resistanceDetails: secondaryApplyResultData?.resistanceDetails || [],
                 };
             }
 
@@ -135,6 +136,21 @@ export function setupEventListeners(deps) {
             else if (!wasBloodied && isBloodied) threshold = 'bloodied';
             else if (wasBloodied && !isBloodied && newHp > 0) threshold = 'recovering';
 
+            const damageBreakdown = [{
+                damageType: pending.damageType,
+                amount: applyResult?.finalDamage ?? finalDamage,
+                resisted: applyResult?.resistanceDetails?.some(rd => rd.status === 'resistant') ?? false,
+                status: applyResult?.resistanceDetails?.[0]?.status || null,
+            }];
+            if (secondaryResult) {
+                damageBreakdown.push({
+                    damageType: secondaryResult.damageType,
+                    amount: secondaryResult.finalDamage,
+                    resisted: secondaryResult.resistanceDetails?.some(rd => rd.status === 'resistant') ?? false,
+                    status: secondaryResult.resistanceDetails?.[0]?.status || null,
+                });
+            }
+
             const hpEntry = {
                 type: 'hp_change',
                 targetName: pendingTargetName,
@@ -143,6 +159,7 @@ export function setupEventListeners(deps) {
                 maxHp,
                 isHealing: false,
                 isUnconscious: isDead,
+                damageBreakdown,
             };
             if (threshold) hpEntry.threshold = threshold;
             addEntry(pending.campaignName, hpEntry).catch((e) => { console.error("[useLoggedDiceRollEventHandlers] Error:", e); });

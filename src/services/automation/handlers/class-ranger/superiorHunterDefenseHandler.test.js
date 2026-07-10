@@ -16,8 +16,17 @@ vi.mock('../../common/damageRollback.js', () => ({
     findLastAttack: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+    getCombatContext: vi.fn(() => Promise.resolve({})),
+}));
+
+vi.mock('../../../rules/combat/applyHealing.js', () => ({
+    applyHealingToTarget: vi.fn(() => Promise.resolve({ actualHeal: 0, oldHp: 0, newHp: 0 })),
+}));
+
 const { getRuntimeValue, setRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js');
 const { addEntry } = await import('../../../ui/logService.js');
+const { applyHealingToTarget } = await import('../../../rules/combat/applyHealing.js');
 
 function makePlayerStats(overrides = {}) {
     return {
@@ -203,6 +212,92 @@ describe('superiorHunterDefenseHandler', () => {
             expect(result.payload.description).toContain('15 lightning');
         });
 
+        it('grants resistance to secondary damage type when secondary damage exceeds primary', async () => {
+            getRuntimeValue.mockReturnValue([]);
+            damageRollback.findLastAttack.mockResolvedValue({
+                attackEvent: { damageType: 'Slashing', primaryDamageType: 'Slashing', secondaryDamageType: 'Necrotic', primaryDamage: 11, secondaryDamage: 17, targetName: 'Test Ranger' },
+                attackerName: 'Death Knight',
+                targetName: 'Test Ranger',
+                primaryDamage: 11,
+                secondaryDamage: 17,
+                totalDamage: 28,
+                damageTypes: ['Slashing'],
+                primaryDamageType: 'Slashing',
+                secondaryDamageType: 'Necrotic',
+            });
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            expect(result.payload.description).toContain('Resistance to Necrotic damage');
+            expect(result.payload.description).toContain('17 Necrotic');
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'Test Ranger',
+                'activeBuffs',
+                expect.arrayContaining([
+                    expect.objectContaining({ resistanceTypes: ['necrotic'] }),
+                ]),
+                'test-campaign'
+            );
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                description: expect.stringContaining('Resistance to Necrotic'),
+            }));
+        });
+
+        it('grants resistance to primary damage type when primary exceeds secondary', async () => {
+            getRuntimeValue.mockReturnValue([]);
+            damageRollback.findLastAttack.mockResolvedValue({
+                attackEvent: { damageType: 'Slashing', primaryDamageType: 'Slashing', secondaryDamageType: 'Necrotic', primaryDamage: 17, secondaryDamage: 11, targetName: 'Test Ranger' },
+                attackerName: 'Death Knight',
+                targetName: 'Test Ranger',
+                primaryDamage: 17,
+                secondaryDamage: 11,
+                totalDamage: 28,
+                damageTypes: ['Slashing'],
+                primaryDamageType: 'Slashing',
+                secondaryDamageType: 'Necrotic',
+            });
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            expect(result.payload.description).toContain('Resistance to Slashing damage');
+            expect(result.payload.description).toContain('17 Slashing');
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'Test Ranger',
+                'activeBuffs',
+                expect.arrayContaining([
+                    expect.objectContaining({ resistanceTypes: ['slashing'] }),
+                ]),
+                'test-campaign'
+            );
+        });
+
+        it('grants resistance to secondary damage type when primary and secondary are equal', async () => {
+            getRuntimeValue.mockReturnValue([]);
+            damageRollback.findLastAttack.mockResolvedValue({
+                attackEvent: { damageType: 'Fire', primaryDamageType: 'Fire', secondaryDamageType: 'Cold', primaryDamage: 10, secondaryDamage: 10, targetName: 'Test Ranger' },
+                attackerName: 'Dragon',
+                targetName: 'Test Ranger',
+                primaryDamage: 10,
+                secondaryDamage: 10,
+                totalDamage: 20,
+                damageTypes: ['Fire'],
+                primaryDamageType: 'Fire',
+                secondaryDamageType: 'Cold',
+            });
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            expect(result.payload.description).toContain('Resistance to Cold damage');
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'Test Ranger',
+                'activeBuffs',
+                expect.arrayContaining([
+                    expect.objectContaining({ resistanceTypes: ['cold'] }),
+                ]),
+                'test-campaign'
+            );
+        });
+
         it('handles null stored activeBuffs by treating as empty array', async () => {
             getRuntimeValue.mockReturnValue(null);
             damageRollback.findLastAttack.mockResolvedValue({
@@ -226,6 +321,35 @@ describe('superiorHunterDefenseHandler', () => {
                 ]),
                 'test-campaign'
             );
+        });
+
+        it('heals the target for half the resisted damage amount', async () => {
+            getRuntimeValue.mockReturnValue([]);
+            applyHealingToTarget.mockResolvedValue({ actualHeal: 7, oldHp: 150, newHp: 157 });
+            damageRollback.findLastAttack.mockResolvedValue({
+                attackEvent: { damageType: 'Slashing', primaryDamageType: 'Slashing', secondaryDamageType: null, primaryDamage: 15, secondaryDamage: 0, targetName: 'Test Ranger' },
+                attackerName: 'Orc',
+                targetName: 'Test Ranger',
+                primaryDamage: 15,
+                secondaryDamage: 0,
+                totalDamage: 15,
+                damageTypes: ['Slashing'],
+                primaryDamageType: 'Slashing',
+                secondaryDamageType: null,
+            });
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            expect(applyHealingToTarget).toHaveBeenCalledWith(
+                expect.anything(),
+                'Test Ranger',
+                7,
+                'test-campaign'
+            );
+            expect(result.payload.description).toContain('Retroactively healed for 7 HP');
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                description: expect.stringContaining('Retroactively healed for 7 HP'),
+            }));
         });
     });
 });

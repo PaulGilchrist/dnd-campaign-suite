@@ -144,9 +144,6 @@ function RollEntry({ entry }) {
             {entry.secondaryFormula && <span className="log-dice-formula">{entry.secondaryFormula}</span>}
             <span className="log-total"><b>{entry.secondaryTotal}</b></span>
             {entry.secondaryDamageType && <span className="log-damage-type">{entry.secondaryDamageType}</span>}
-            {entry.secondaryFinalDamage != null && entry.secondaryDamageType && (
-              <span className="log-final-damage">→ {entry.secondaryFinalDamage} {entry.secondaryDamageType} damage</span>
-            )}
             {entry.secondarySaveResult && (
               <span className={`log-save-result ${entry.secondarySaveResult === 'success' ? 'log-condition-success' : 'log-condition-failure'}`}>
                 {entry.secondarySaveResult === 'success' ? 'SAVE SUCCESS' : 'SAVE FAILURE'}
@@ -375,8 +372,22 @@ function HpChangeEntry({ entry }) {
           <span className="log-hp-delta">{entry.delta > 0 ? '+' : ''}{entry.delta} HP</span>
         ) : (
           <>
-            <span className="log-hp-delta">{entry.delta > 0 ? '+' : ''}{entry.delta} HP</span>
-            <span className="log-hp-current"> {entry.currentHp}/{entry.maxHp}</span>
+            {entry.damageBreakdown && entry.damageBreakdown.length > 0 ? (
+              <span className="log-hp-delta">
+                {entry.delta > 0 ? '+' : ''}{entry.delta} HP
+                {' ('}{entry.damageBreakdown.map((db, i) => (
+                  <span key={i} className="log-damage-breakdown-item">
+                    {i > 0 && <span className="log-damage-breakdown-sep">, </span>}
+                    {db.amount} {db.damageType}
+                    {db.status === 'resistant' && <span className="log-resistance-note"> (Resistance)</span>}
+                    {db.status === 'immune' && <span className="log-immunity-note"> (Immune)</span>}
+                  </span>
+                ))}{')'}
+              </span>
+            ) : (
+              <span className="log-hp-delta">{entry.delta > 0 ? '+' : ''}{entry.delta} HP</span>
+            )}
+            <span className="log-hp-current"> {entry.currentHp}/{entry.maxHp} remaining</span>
             {entry.rollInfo && !isDamage && <span className="log-roll-info"> ({entry.rollInfo})</span>}
             {entry.formula && !isDamage && <span className="log-dice-formula">{entry.formula}</span>}
           </>

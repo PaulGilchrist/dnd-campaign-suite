@@ -26,6 +26,8 @@ export async function findLastAttack(campaignName) {
         secondaryDamage: secondary,
         totalDamage: actualDamage,
         damageTypes: a.damageTypes || [],
+        primaryDamageType: a.primaryDamageType || a.damageType || null,
+        secondaryDamageType: a.secondaryDamageType || null,
     };
 }
 

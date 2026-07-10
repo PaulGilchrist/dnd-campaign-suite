@@ -424,6 +424,7 @@ export function createLogDamageAndShow(deps) {
                     modifier: secondaryRollResult.modifier,
                     damageType: secondaryDamageType,
                     finalDamage: secondaryFinalDamage,
+                    resistanceDetails: secondaryApplyResult?.resistanceDetails || [],
                     saveResult: isSoulstitchProtected ? 'soulstitch_auto_success' : (secondarySaveResult.success ? 'success' : 'failure'),
                     saveRoll: secondarySaveResult.roll,
                     saveBonus: secondarySaveResult.bonus,
@@ -502,6 +503,21 @@ export function createLogDamageAndShow(deps) {
         else if (!wasBloodied && isBloodied) threshold = 'bloodied';
         else if (wasBloodied && !isBloodied && newHp > 0) threshold = 'recovering';
 
+        const damageBreakdown = [{
+            damageType,
+            amount: primaryApplyResult?.finalDamage ?? finalDamage,
+            resisted: primaryApplyResult?.resistanceDetails?.some(rd => rd.status === 'resistant') ?? false,
+            status: primaryApplyResult?.resistanceDetails?.[0]?.status || null,
+        }];
+        if (secondaryResult) {
+            damageBreakdown.push({
+                damageType: secondaryResult.damageType,
+                amount: secondaryResult.finalDamage,
+                resisted: secondaryResult.resistanceDetails?.some(rd => rd.status === 'resistant') ?? false,
+                status: secondaryResult.resistanceDetails?.[0]?.status || null,
+            });
+        }
+
         const hpEntry = {
             type: 'hp_change',
             targetName: target.name,
@@ -510,6 +526,7 @@ export function createLogDamageAndShow(deps) {
             maxHp,
             isHealing: false,
             isUnconscious: isDead,
+            damageBreakdown,
         };
         if (threshold) hpEntry.threshold = threshold;
         addEntry(campaignName, hpEntry).catch((e) => { console.error("[useLoggedDiceRollDamage] Error:", e); });
@@ -980,6 +997,7 @@ export function createLogDamageAndShow(deps) {
         let applyResult = null;
         let secondaryResult = null;
         let secondaryFinalDamage = 0;
+        let secondaryApplyResultData = null;
         let reducedTotal = 0;
 
         if (target) {
@@ -1033,9 +1051,9 @@ export function createLogDamageAndShow(deps) {
                     const secondaryIgnoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, secondaryDamageType)) || false;
                     const damageSequenceId = `seq_${Date.now()}_${Math.random()}`;
                     const multiAttackOptions = { damageSequenceId };
-                    const secondaryApplyResult = applyDamageToTarget(combatSummary, target.name, secondaryRawDamage, [secondaryDamageType], campaignName, characters, secondaryIgnoreResistance, characterName, true, { ...multiAttackOptions, skipConcentration: true });
-                    secondaryFinalDamage = secondaryApplyResult?.finalDamage ?? secondaryRawDamage;
-                    if (secondaryApplyResult && secondaryApplyResult.finalDamage > 0) {
+                    secondaryApplyResultData = applyDamageToTarget(combatSummary, target.name, secondaryRawDamage, [secondaryDamageType], campaignName, characters, secondaryIgnoreResistance, characterName, true, { ...multiAttackOptions, skipConcentration: true });
+                    secondaryFinalDamage = secondaryApplyResultData?.finalDamage ?? secondaryRawDamage;
+                    if (secondaryApplyResultData && secondaryApplyResultData.finalDamage > 0) {
                         endInvisibilityOnHostileAction(characterName, campaignName);
                     }
                     secondaryResult = {
@@ -1046,6 +1064,7 @@ export function createLogDamageAndShow(deps) {
                         modifier: secondaryRollResult.modifier,
                         damageType: secondaryDamageType,
                         finalDamage: secondaryFinalDamage,
+                        resistanceDetails: secondaryApplyResultData?.resistanceDetails || [],
                     };
 
                     const totalConcentrationDamage = reducedTotal + secondaryRawDamage;
@@ -1112,6 +1131,21 @@ export function createLogDamageAndShow(deps) {
 
         await new Promise(resolve => setTimeout(resolve, 500));
 
+        const damageBreakdown = [{
+            damageType,
+            amount: applyResult?.finalDamage ?? reducedTotal,
+            resisted: applyResult?.resistanceDetails?.some(rd => rd.status === 'resistant') ?? false,
+            status: applyResult?.resistanceDetails?.[0]?.status || null,
+        }];
+        if (secondaryResult) {
+            damageBreakdown.push({
+                damageType: secondaryResult.damageType,
+                amount: secondaryResult.finalDamage,
+                resisted: secondaryResult.resistanceDetails?.some(rd => rd.status === 'resistant') ?? false,
+                status: secondaryResult.resistanceDetails?.[0]?.status || null,
+            });
+        }
+
         const hpEntry = {
             type: 'hp_change',
             targetName: target?.name,
@@ -1120,6 +1154,7 @@ export function createLogDamageAndShow(deps) {
             maxHp,
             isHealing: false,
             isUnconscious: isDead,
+            damageBreakdown,
         };
         if (threshold) hpEntry.threshold = threshold;
         addEntry(campaignName, hpEntry).catch((e) => { console.error("[useLoggedDiceRollDamage] Error:", e); });
