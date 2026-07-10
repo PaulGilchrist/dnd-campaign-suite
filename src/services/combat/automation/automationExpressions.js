@@ -12,7 +12,7 @@ function resolveUses(playerStats, usesSpec) {
 }
 
 function resolveScaling(playerStats, scaling) {
-    if (!scaling) return null
+    if (!scaling || !Array.isArray(scaling)) return null
     let result = null
     for (const entry of scaling) {
         if (playerStats.level >= entry.level) {

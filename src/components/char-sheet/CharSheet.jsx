@@ -84,12 +84,13 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             // Load prepared spells from runtime state (skip for 2024 ruleset where all spells are known/prepared)
             if (playerSummary.rules !== '2024') {
                 const preparedSpells = getRuntimeValue(playerSummary.name, 'preparedSpells');
+                const preparedSpellsArray = Array.isArray(preparedSpells) ? preparedSpells : [];
 
-                if (preparedSpells && stats.spellAbilities?.spells?.length) {
+                if (preparedSpellsArray.length && stats.spellAbilities?.spells?.length) {
                     try {
                         const mutableSpells = stats.spellAbilities.spells.map(spell => cloneDeep(spell));
                         mutableSpells.forEach(spell => {
-                            if (preparedSpells.includes(spell.name)) {
+                            if (preparedSpellsArray.includes(spell.name)) {
                                 if (spell.prepared === '') {
                                     spell.prepared = 'Prepared';
                                 }
