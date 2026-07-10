@@ -350,13 +350,7 @@ const RangerFeatures = function RangerFeatures({ playerStats, campaignName }) {
     };
     return (
           <div data-testid="char-class-ranger">
-               <div className="automation-actions">
-                   {playerStats.level >= 2 && (
-                       <button className="automation-btn" title="Favored Foe: Mark a foe for extra 1d4 damage">
-                           <i className="fas fa-crosshairs"></i> Favored Foe
-                       </button>
-                   )}
-               </div>
+
               <div><b>Extra Attacks: </b>{rangerFeatures?.extraAttacks || 0}</div>
               {playerStats.level >= 2 && (
                   <TrackedResourceInput label="Favored Enemy" resourceKey="favoredEnemyUses" playerName={playerStats.name} getMax={() => Math.max(1, (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level)?.favored_enemy || 0)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />

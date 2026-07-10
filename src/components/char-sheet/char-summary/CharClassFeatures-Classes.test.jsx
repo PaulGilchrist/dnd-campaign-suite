@@ -364,25 +364,6 @@ describe('CharClassFeatures', () => {
     });
 
     describe('Ranger features', () => {
-        it('renders favored foe button at level 2+', () => {
-            const stats = makeStats({
-                class: { name: 'Ranger', class_levels: [{ level: 5 }] },
-                automation: { passives: [] },
-            });
-            renderComponent(stats);
-            expect(screen.getByTitle(/Favored Foe/)).toBeInTheDocument();
-        });
-
-        it('does not render favored foe button at level 1', () => {
-            const stats = makeStats({
-                level: 1,
-                class: { name: 'Ranger', class_levels: [{ level: 1 }] },
-                automation: { passives: [] },
-            });
-            renderComponent(stats);
-            expect(screen.queryByTitle(/Favored Foe/)).not.toBeInTheDocument();
-        });
-
         it('does not render fighting styles when level is 1 or styles is null', () => {
             const statsLevel1 = makeStats({
                 level: 1,
