@@ -3,16 +3,24 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
 import { addEntry } from '../../../services/ui/logService.js'
 import './NaturalRecoveryModal.css'
 
+// Arid land spells for Circle of the Land (level 1+ only, cantrips excluded)
+// TODO: replace with dynamic land-type selection when "Circle of the Land Spells" becomes clickable
+const CIRCLE_OF_LAND_ARID_SPELLS = new Set([
+    'Blur', 'Burning Hands', 'Fire Bolt', 'Fireball', 'Blight', 'Wall of Stone',
+]);
+
 function NaturalRecoveryModal({ playerStats, campaignName, onClose }) {
     const name = playerStats.name
     const naturalRecoveryFreeCast = getRuntimeValue(name, 'naturalRecoveryFreeCast')
     const naturalRecoveryFreeCastUsed = getRuntimeValue(name, 'naturalRecoveryFreeCastUsed')
 
+    const isCircleOfLand = playerStats.class?.major?.name === 'Circle of the Land';
+
     const eligibleSpells = React.useMemo(() => {
         return (playerStats.spellAbilities?.spells || []).filter(
-            s => s.level >= 1 && (s.prepared === 'Prepared' || s.alwaysPrepared)
-        );
-    }, [playerStats.spellAbilities?.spells]);
+            s => s.level >= 1 && s.prepared === 'Always'
+        ).filter(s => !isCircleOfLand || CIRCLE_OF_LAND_ARID_SPELLS.has(s.name));
+    }, [playerStats.spellAbilities?.spells, isCircleOfLand]);
 
     const handleSelectSpell = (spellName) => {
         setRuntimeValue(name, 'naturalRecoveryFreeCast', [spellName], campaignName);

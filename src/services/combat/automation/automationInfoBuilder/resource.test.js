@@ -111,3 +111,48 @@ describe('resourceHandlers – resource_restoration', () => {
         expect(result.casting_time).toBe('1 action')
     })
 })
+
+describe('resourceHandlers – natural_recovery', () => {
+    it('returns type, name, and hasAutomation', () => {
+        const feature = makeFeature({ type: 'natural_recovery' }, 'Natural Recovery')
+        const result = resourceHandlers.natural_recovery(feature, BASE_STATS)
+        expect(result.type).toBe('natural_recovery')
+        expect(result.name).toBe('Natural Recovery')
+        expect(result.hasAutomation).toBe(true)
+    })
+
+    it('defaults trigger, casting_time, and uses_max', () => {
+        const feature = makeFeature({ type: 'natural_recovery' })
+        const result = resourceHandlers.natural_recovery(feature, BASE_STATS)
+        expect(result.trigger).toBe('short_rest')
+        expect(result.casting_time).toBe('passive')
+        expect(result.uses_max).toBe(1)
+    })
+
+    it('returns 0 when restore_expression is absent or nullish', () => {
+        expect(resourceHandlers.natural_recovery(makeFeature({ type: 'natural_recovery' }), BASE_STATS).restore_amount).toBe(0)
+        expect(resourceHandlers.natural_recovery(makeFeature({ type: 'natural_recovery', restore_expression: null }), BASE_STATS).restore_amount).toBe(0)
+    })
+
+    it('resolves restore_expression to a numeric value', () => {
+        const result = resourceHandlers.natural_recovery(makeFeature({ type: 'natural_recovery', restore_expression: 'proficiency_bonus' }), BASE_STATS)
+        expect(result.restore_amount).toBe(3)
+    })
+
+    it('passes through custom fields', () => {
+        const feature = makeFeature({
+            type: 'natural_recovery',
+            trigger: 'short_rest',
+            restore_expression: 'druid_level / 2',
+            resourceKey: 'naturalRecoverySlots',
+            uses_max: 1,
+            casting_time: 'passive'
+        })
+        const result = resourceHandlers.natural_recovery(feature, BASE_STATS)
+        expect(result.trigger).toBe('short_rest')
+        expect(result.restore_expression).toBe('druid_level / 2')
+        expect(result.resourceKey).toBe('naturalRecoverySlots')
+        expect(result.uses_max).toBe(1)
+        expect(result.casting_time).toBe('passive')
+    })
+})

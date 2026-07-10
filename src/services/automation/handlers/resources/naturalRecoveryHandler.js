@@ -1,4 +1,4 @@
-export async function handle(action, playerStats, campaignName) {
+export async function handle(action, _playerStats, _campaignName) {
     return {
         type: 'modal',
         modalName: 'naturalRecovery',

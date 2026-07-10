@@ -72,8 +72,9 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
             const current = prev[level] || 0;
             const newVal = Math.max(0, current + delta);
             if (newVal === 0) {
-                const { [level]: _, ...rest } = prev;
-                return rest;
+                return Object.fromEntries(
+                    Object.entries(prev).filter(([k]) => k !== String(level))
+                );
             }
             return { ...prev, [level]: newVal };
         });

@@ -98,7 +98,7 @@ describe('SpellDetailPopup - handleCast: Free cast tracking cleanup', () => {
   });
 
   describe('Natural Recovery cleanup', () => {
-    it('clears naturalRecoveryFreeCast after casting the spell', () => {
+    it('clears naturalRecoveryFreeCast and sets naturalRecoveryFreeCastUsed after casting the spell', () => {
       const onCast = vi.fn();
       vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
         if (key === 'naturalRecoveryFreeCast') return ['Healing Word'];
@@ -121,6 +121,12 @@ describe('SpellDetailPopup - handleCast: Free cast tracking cleanup', () => {
         'Elara',
         'naturalRecoveryFreeCast',
         null,
+        mockCampaignName
+      );
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Elara',
+        'naturalRecoveryFreeCastUsed',
+        true,
         mockCampaignName
       );
     });

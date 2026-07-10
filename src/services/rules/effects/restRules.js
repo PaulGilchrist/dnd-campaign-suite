@@ -116,6 +116,7 @@ export const LONG_REST_RESOURCES = [
   'wildResurgenceReversedThisRest',
   'indomitableUses',
   'naturalRecoveryFreeCast',
+  'naturalRecoveryFreeCastUsed',
   'naturalRecoverySlots',
   'wardingflareUses',
   '_Star_Map_freeCastCount',

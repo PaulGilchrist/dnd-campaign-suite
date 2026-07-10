@@ -58,6 +58,7 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
             case 'innateSorceryUses': return 1;
             case 'portentDice': return null;
             case 'naturalRecoveryFreeCast': return undefined;
+            case 'naturalRecoveryFreeCastUsed': return undefined;
             case 'stealthAttackCost': return 0;
             default: return null;
         }
@@ -68,6 +69,7 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
             case 'portentDice': return null;
             case 'stealthAttackCost': return 0;
             case 'naturalRecoveryFreeCast': return undefined;
+            case 'naturalRecoveryFreeCastUsed': return undefined;
             default: return null;
         }
     }),
@@ -153,18 +155,17 @@ describe('CharClassFeatures', () => {
             expect(screen.getByTestId('tracked-resource-Wild Shape Uses')).toBeInTheDocument();
         });
 
-        it('renders natural recovery section with grant free cast button when resource_restoration passive exists', () => {
+        it('renders natural recovery section when natural_recovery passive exists', () => {
             const stats = makeStats({
                 level: 5,
                 class: { name: 'Druid', class_levels: [{ level: 5 }] },
-                automation: { passives: [{ type: 'resource_restoration', resourceKey: 'naturalRecoverySlots' }] },
+                automation: { passives: [{ type: 'natural_recovery' }] },
             });
             renderComponent(stats);
             expect(screen.getByText(/Natural Recovery:/)).toBeInTheDocument();
-            expect(screen.getByText(/Grant Free Cast/)).toBeInTheDocument();
         });
 
-        it('shows free cast used badge when natural recovery free cast is set', () => {
+        it('shows free cast granted badge when natural recovery free cast is set', () => {
             vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
                 if (key === 'naturalRecoveryFreeCast') return ['fireball'];
                 return null;
@@ -172,7 +173,21 @@ describe('CharClassFeatures', () => {
             const stats = makeStats({
                 level: 5,
                 class: { name: 'Druid', class_levels: [{ level: 5 }] },
-                automation: { passives: [{ type: 'resource_restoration', resourceKey: 'naturalRecoverySlots' }] },
+                automation: { passives: [{ type: 'natural_recovery' }] },
+            });
+            renderComponent(stats);
+            expect(screen.getByText(/Free cast: fireball/)).toBeInTheDocument();
+        });
+
+        it('shows free cast used badge when natural recovery free cast is used', () => {
+            vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+                if (key === 'naturalRecoveryFreeCastUsed') return true;
+                return null;
+            });
+            const stats = makeStats({
+                level: 5,
+                class: { name: 'Druid', class_levels: [{ level: 5 }] },
+                automation: { passives: [{ type: 'natural_recovery' }] },
             });
             renderComponent(stats);
             expect(screen.getByText(/Free cast used/)).toBeInTheDocument();

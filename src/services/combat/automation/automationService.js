@@ -24,6 +24,7 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     'defensive_tactics',
     'hunter_prey',
     'resource_pool',
+    'natural_recovery',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([

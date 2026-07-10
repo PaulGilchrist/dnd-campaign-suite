@@ -183,31 +183,6 @@ describe('restRules', () => {
       await applyShortRest(bardStats, CAMPAIGN)
       expect(getBatchUpdates().bardicInspirationUses).toBe(2)
 
-      // Natural Recovery spell slots
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'spell_slots_level_1') return 2
-        if (key === 'spell_slots_level_2') return 0
-        if (key === 'spell_slots_level_3') return 2
-        return undefined
-      })
-      const druidStats = makeStats({
-        class: { name: 'Druid' },
-        level: 6,
-        spellAbilities: {
-          spell_slots_level_1: 4,
-          spell_slots_level_2: 3,
-          spell_slots_level_3: 3,
-          spell_slots_level_4: 0,
-        },
-        automation: { passives: [{ type: 'resource_restoration', resourceKey: 'naturalRecoverySlots' }] },
-      })
-      await applyShortRest(druidStats, CAMPAIGN)
-      const druidUpdates = getBatchUpdates()
-      expect(druidUpdates.spell_slots_level_1).toBe(4)
-      expect(druidUpdates.spell_slots_level_2).toBe(1)
-      expect(druidUpdates.spell_slots_level_3).toBeUndefined()
-
       // Arcane Recovery
       vi.clearAllMocks()
       vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
@@ -319,7 +294,7 @@ describe('restRules', () => {
       expect(getBatchUpdates().wardingflareUses).toBeNull()
     })
 
-    it('throws when level is missing for Celestial Resilience, Natural Recovery, and Arcane Recovery', async () => {
+    it('throws when level is missing for Celestial Resilience and Arcane Recovery', async () => {
       const missingLevelStats = (automation) => makeStats({
         class: { name: 'Warlock', subclass: { name: 'Celestial Patron' } },
         level: null,
@@ -328,7 +303,6 @@ describe('restRules', () => {
       })
 
       await expect(applyShortRest(missingLevelStats({}), CAMPAIGN)).rejects.toThrow('playerStats.level is required')
-      await expect(applyShortRest(missingLevelStats({ passives: [{ type: 'resource_restoration', resourceKey: 'naturalRecoverySlots' }] }), CAMPAIGN)).rejects.toThrow('playerStats.level is required')
       await expect(applyShortRest(missingLevelStats({ passives: [{ type: 'resource_restoration', resourceKey: 'arcaneRecoveryLevels' }] }), CAMPAIGN)).rejects.toThrow('playerStats.level is required')
     })
   })
@@ -512,10 +486,11 @@ describe('restRules', () => {
         return undefined
       })
       const nrStats = makeStats({
-        automation: { passives: [{ type: 'resource_restoration', resourceKey: 'naturalRecoverySlots' }] },
+        automation: { passives: [{ type: 'natural_recovery' }] },
       })
       await applyLongRest(nrStats, CAMPAIGN)
       expect(getBatchUpdates().naturalRecoveryFreeCast).toBeNull()
+      expect(getBatchUpdates().naturalRecoveryFreeCastUsed).toBeNull()
       expect(getBatchUpdates().naturalRecoverySlots).toBeNull()
 
       vi.clearAllMocks()

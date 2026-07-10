@@ -58,6 +58,7 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
             case 'innateSorceryUses': return 1;
             case 'portentDice': return null;
             case 'naturalRecoveryFreeCast': return undefined;
+            case 'naturalRecoveryFreeCastUsed': return undefined;
             default: return null;
         }
     }),
@@ -67,6 +68,7 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
             case 'portentDice': return null;
             case 'stealthAttackCost': return 0;
             case 'naturalRecoveryFreeCast': return undefined;
+            case 'naturalRecoveryFreeCastUsed': return undefined;
             default: return null;
         }
     }),
