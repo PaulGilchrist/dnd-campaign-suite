@@ -18,6 +18,7 @@ import SavantModal from './modals/arcane/SavantModal.jsx';
 import CombatSuperiorityModal from './modals/CombatSuperiorityModal.jsx';
 import WeaponKindMasteryModal from './modals/WeaponKindMasteryModal.jsx';
 import WeaponMasteryChoiceModal from './modals/WeaponMasteryChoiceModal.jsx';
+import ResourcePoolModal from './modals/ResourcePoolModal.jsx';
 import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
 import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
 import { onSavantSelected } from '../../services/automation/handlers/class-wizard/SavantHandler.js';
@@ -31,6 +32,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
     const [savantModal, setSavantModal] = useState(null);
     const [weaponKindMasteryModal, setWeaponKindMasteryModal] = useState(null);
     const [weaponMasteryChoiceModal, setWeaponMasteryChoiceModal] = useState(null);
+    const [resourcePoolModal, setResourcePoolModal] = useState(null);
     const [featureChoiceModal, setFeatureChoiceModal] = useState(null);
     const [fightingStylesMap, setFightingStylesMap] = useState(null);
     const { setPopupHtml } = useDiceRollPopup();
@@ -136,6 +138,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                 setWeaponKindMasteryModal(result.payload);
             } else if (result.modalName === 'weaponMasteryChoice') {
                 setWeaponMasteryChoiceModal(result.payload);
+            } else if (result.modalName === 'resourcePool') {
+                setResourcePoolModal(result.payload);
             }
         } else if (result.type === 'popup') {
             const payload = result.payload;
@@ -281,6 +285,14 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                     campaignName={campaignName}
                     onClose={() => setWeaponMasteryChoiceModal(null)}
                     onConfirm={() => setWeaponMasteryChoiceModal(null)}
+                />
+            )}
+            {resourcePoolModal && (
+                <ResourcePoolModal
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    automation={resourcePoolModal.automation}
+                    onClose={() => setResourcePoolModal(null)}
                 />
             )}
             {featureChoiceModal && (

@@ -23,6 +23,7 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     'font_of_inspiration',
     'defensive_tactics',
     'hunter_prey',
+    'resource_pool',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([
