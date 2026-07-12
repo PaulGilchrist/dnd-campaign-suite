@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { sendSavePrompt, sendSaveResult } from '../../../../services/combat/conditions/savePromptService.js';
 import { rollExpression } from '../../../../services/dice/diceRoller.js';
 import { addEntry } from '../../../../services/ui/logService.js';
@@ -12,8 +12,6 @@ import { renderTargetList, logSaveEntry, persistAndNotify } from './AreaEffectTa
 function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc, campaignName, mapData, featureName, saveType, rangeFeet, damageExpression, damageType, healExpression, onClose }) {
     const [healedTarget, setHealedTarget] = useState(null);
     const [healResult, setHealResult] = useState(null);
-    const [processing, setProcessing] = useState(false);
-    const busyRef = useRef(false);
 
     const resolveAllSavesAndDamage = useCallback((targets) => {
         const results = [];
@@ -80,13 +78,7 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
 
     const handleApplyOverride = useCallback((ctx) => {
         if (ctx.selected.size === 0) return;
-        if (processing) {
-            console.warn('[SaveAttackHealModal] Already busy, ignoring duplicate call');
-            return;
-        }
-        setProcessing(true);
         ctx.setProcessing(true);
-        busyRef.current = true;
 
         console.log('[SaveAttackHealModal] handleApplyOverride called, selected:', Array.from(ctx.selected));
 
@@ -100,7 +92,7 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
         persistAndNotify(ctx.combatSummary, campaignName);
         ctx.setResults(results);
         ctx.setPendingPrompts(prompts);
-    }, [campaignName, attackerName, saveDc, saveType, featureName, resolveAllSavesAndDamage, processing]);
+    }, [campaignName, attackerName, saveDc, saveType, featureName, resolveAllSavesAndDamage]);
 
     const handleSaveResultOverride = useCallback((event, ctx) => {
         const detail = event.detail;
@@ -182,9 +174,6 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
             rolls: rollResult.rolls, bonus: 0, timestamp: Date.now(),
         }).catch((e) => { console.error('[SaveAttackHealModal] Error:', e); });
 
-        ctx.setProcessing(false);
-        setProcessing(false);
-        busyRef.current = false;
     }, [healedTarget, healExpression, campaignName, attackerName, featureName]);
 
     const renderBody = (ctx) => {
@@ -244,7 +233,7 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
         if (!ctx.processing && !ctx.allResolved) {
             return (
                 <>
-                    <button className="sp-roll-btn" onClick={ctx.handleApply} disabled={ctx.selected.size === 0 || processing} type="button">
+                    <button className="sp-roll-btn" onClick={ctx.handleApply} disabled={ctx.selected.size === 0 || ctx.processing} type="button">
                         <i className="fa-solid fa-dice-d20"></i> {featureName} ({ctx.selected.size} target{ctx.selected.size !== 1 ? 's' : ''})
                     </button>
                     <button className="sp-dismiss-btn" onClick={onClose} type="button">Cancel</button>
@@ -270,8 +259,6 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
     };
 
     const extraState = { healedTarget, setHealedTarget, healResult, setHealResult, handleHeal };
-
-    useEffect(() => { return () => { busyRef.current = false; }; }, []);
 
     return (
         <AreaEffectTargetModalBase

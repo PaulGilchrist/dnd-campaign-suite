@@ -220,18 +220,11 @@ describe('SaveAttackHealModal — save flows', () => {
     }));
   });
 
-  it('adds a roll log entry for player save prompt with waiting formula', async () => {
+  it('does not log save entry for pending player targets', async () => {
     const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
     await applyFeature(getByRole, ['Player One']);
-    const rollCall = logService.addEntry.mock.calls.find(c => c[1].type === 'roll' && c[1].targetName === 'Player One');
-    expect(rollCall[1]).toEqual(expect.objectContaining({
-      type: 'roll',
-      name: 'Divine Smite',
-      characterName: 'Cleric1',
-      rollType: 'save-damage',
-      targetName: 'Player One',
-      formula: '1d20 (waiting)',
-    }));
+    const rollCalls = logService.addEntry.mock.calls.filter(c => c[1].type === 'roll' && c[1].targetName === 'Player One');
+    expect(rollCalls).toHaveLength(0);
   });
 
   it('adds one log entry per NPC target', async () => {

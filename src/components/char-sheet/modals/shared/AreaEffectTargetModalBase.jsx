@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { getDistanceFeet } from '../../../../services/rules/combat/rangeValidation.js';
+import { isApplyBusy, setApplyBusy } from './areaEffectModalInstances.js';
 
 function AreaEffectTargetModalBase({
   combatSummary,
@@ -77,6 +78,8 @@ function AreaEffectTargetModalBase({
   });
 
   const handleApply = useCallback(() => {
+    if (isApplyBusy()) return;
+    setApplyBusy(true);
     console.log('[AreaEffectTargetModalBase] handleApply called');
     handleApplyOverrideRef.current(ctxRef.current);
   }, []);
@@ -100,6 +103,11 @@ function AreaEffectTargetModalBase({
     window.addEventListener('save-result', handleSaveResult);
     return () => window.removeEventListener('save-result', handleSaveResult);
   }, [processing, handleSaveResult]);
+
+  useEffect(() => {
+    if (processing) return;
+    setApplyBusy(false);
+  }, [processing]);
 
   const ctx = ctxRef.current;
 

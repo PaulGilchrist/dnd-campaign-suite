@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
+import { clearActiveInstances } from '../components/char-sheet/modals/shared/areaEffectModalInstances.js';
 
 // Mock localStorage for all tests
 const localStorageMock = (() => {
@@ -26,4 +27,5 @@ Object.defineProperty(window, 'localStorage', {
 // Cleanup after each test
 afterEach(() => {
   cleanup();
+  clearActiveInstances();
 });

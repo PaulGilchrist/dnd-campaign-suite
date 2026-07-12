@@ -3,8 +3,8 @@
 export const baseProps = {
   combatSummary: {
     creatures: [
-      { name: 'Goblin A', type: 'npc' },
-      { name: 'Goblin B', type: 'npc' },
+      { name: 'Goblin A', type: 'npc', maxHp: 82 },
+      { name: 'Goblin B', type: 'npc', maxHp: 82 },
       { name: 'Player One', type: 'player', currentHitPoints: 100 },
     ],
   },

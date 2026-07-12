@@ -155,10 +155,11 @@ describe('SaveAttackHealModal — heal flows', () => {
     await selectFirstHealRadio();
     await clickHealButton();
     expect(healingRoll.applyHealingDirectly).toHaveBeenCalledWith(
-      { name: 'Goblin A', hitPoints: 0 },
+      { name: 'Goblin A', hitPoints: 82 },
       'Goblin A',
       10,
-      'test-campaign'
+      'test-campaign',
+      82
     );
   });
 
