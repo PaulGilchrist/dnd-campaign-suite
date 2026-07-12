@@ -3993,7 +3993,7 @@
                     },
                     {
                         "name": "Starry Form",
-                        "description": "As a Bonus Action, expend Wild Shape to take on a starry form for 10 minutes. Choose a constellation: Archer - ranged spell attack hurling luminous arrow (1d8 + Wisdom Radiant damage). Chalice - when you cast a healing spell, another creature within 30 feet regains 1d8 + Wisdom Hit Points. Dragon - treat d20 rolls of 9 or lower on Concentration checks/saves as 10.",
+                        "description": "As a Bonus Action, you can expend a use of your Wild Shape feature to take on a starry form rather than shape-shifting. While in your starry form, you retain your game statistics, but your body becomes luminous, your joints glimmer like stars, and glowing lines connect them as on a star chart. This form sheds Bright Light in a 10-foot radius and Dim Light for an additional 10 feet. The form lasts for 10 minutes. It ends early if you dismiss it (no action required), have the Incapacitated condition, or use this feature again. Whenever you assume your starry form, choose which of the following constellations glimmers on your body; your choice gives you certain benefits while in the form.<ul><li><b>Archer:</b> A constellation of an archer appears on you. When you activate this form and as a Bonus Action on your subsequent turns while it lasts, you can make a ranged spell attack, hurling a luminous arrow that targets one creature within 60 feet of yourself. On a hit, the attack deals Radiant damage equal to 1d8 plus your Wisdom modifier.</li><li><b>Chalice:</b> A constellation of a life-giving goblet appears on you. Whenever you cast a spell using a spell slot that restores Hit Points to a creative, you or another creature within 30 feet of you can regain Hit Points equal to 1d8 plus your Wisdom modifier.</li><li><b>Dragon:</b> A constellation of a wise dragon appears on you. When you maize an Intelligence or a Wisdom check or a Constitution saving throw to maintain Concentration, you can treat a roll of 9 or lower on the d20 as a 10.</li></ul>",
                         "level": 3,
                         "automation": [
                             {
@@ -4013,18 +4013,18 @@
                     },
                     {
                         "name": "Cosmic Omen",
-                        "description": "After Long Rest, roll on Star Map. Even = Weal (add 1d6 to allied D20 tests). Odd = Woe (subtract 1d6 from enemy D20 tests). Uses equal to Wisdom modifier.",
+                        "description": "Whenever you finish a Long Rest, you can consult your Star Map for omens and roll a die. Until you finish your next Long Rest, you gain access to a special Reaction based on whether you rolled an even or an odd number on the die:<ul><li><b>Weal (Even):</b> Whenever a creature you can see within 30 feet of you is about to make a D20 Test, you can take a Reaction to roll 1d6 and add the number rolled to the total.</li><li><b>Woe (Odd):</b> Whenever a creature you can see within 30 feet of you is about to make a D20 Test, you can take a Reaction to roll 1d6 and subtract the number rolled from the total.</li></ul>You can use this Reaction a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
                         "level": 6,
                         "automation": {
                             "type": "cosmic_omen",
                             "uses_expression": "WIS modifier",
                             "recharge": "long_rest",
-                            "casting_time": "1 action"
+                            "casting_time": "1 reaction"
                         }
                     },
                     {
                         "name": "Twinkling Constellations",
-                        "description": "Archer and Chalice become 2d8. Dragon gains Fly Speed 20 feet (hover). Can change constellation at start of each turn.",
+                        "description": "The constellations of your Starry Form improve. The 1d8 of the Archer and the Chalice becomes 2d8, and while the Dragon is active, you have a Fly Speed of 20 feet and can hover. Moreover, at the start of each of your turns while in your Starry Form. you can change which constellation glimmers on your body.",
                         "level": 10,
                         "automation": {
                             "type": "twinkling_constellations",
@@ -4033,7 +4033,7 @@
                     },
                     {
                         "name": "Full of Stars",
-                        "description": "Partially incorporeal - Resistance to Bludgeoning, Piercing, and Slashing damage.",
+                        "description": "While in your Starry Form, you become partially incorporeal, giving you Resistance to Bludgeoning, Piercing, and Slashing damage.",
                         "level": 14,
                         "automation": {
                             "type": "resistance",

@@ -1,7 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
-import { addExpiration } from '../../../rules/effects/expirations.js';
-import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
+import { addEntry } from '../../../ui/logService.js';
 
 function getRuntimeUsesKey(featureName) {
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
@@ -16,6 +15,7 @@ export async function handle(action, playerStats, campaignName) {
     let usesMax = auto.usesMax ?? 0;
 
     if (!usesMax && auto.uses_expression) {
+        const { evaluateAutoExpression } = await import('../../../combat/automation/automationService.js');
         usesMax = evaluateAutoExpression(auto.uses_expression, playerStats) || 0;
     }
 
@@ -34,43 +34,70 @@ export async function handle(action, playerStats, campaignName) {
         }
     }
 
-    const starMapRoll = rollExpression('1d20');
-    if (!starMapRoll) {
+    const omenEffectRaw = getRuntimeValue(playerName, 'cosmicOmenEffect', campaignName);
+    if (!omenEffectRaw) {
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: featureName,
-                description: 'Star Map roll failed.',
+                description: `${featureName} has no omen active. Consult your Star Map on Long Rest.`,
                 automation: auto,
             },
         };
     }
 
-    const isEven = starMapRoll.total % 2 === 0;
-    const d6Roll = rollExpression('1d6');
-    const d6Value = d6Roll?.total ?? 0;
+    let omenEffect;
+    try {
+        omenEffect = JSON.parse(omenEffectRaw);
+    } catch (_e) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: `${featureName} has corrupted omen data.`,
+                automation: auto,
+            },
+        };
+    }
 
-    const result = isEven ? 'Weal' : 'Woe';
-    const description = `<b>${featureName}</b><br/>Star Map roll: 1d20 = <b>${starMapRoll.total}</b> (${isEven ? 'Even' : 'Odd'})<br/>Result: <b>${result}</b><br/>1d6 = <b>${d6Value}</b><br/>${isEven
-        ? `Allies add ${d6Value} to D20 tests.`
-        : `Enemies subtract ${d6Value} from D20 tests.`}`;
+    const d6Roll = rollExpression('1d6');
+    if (!d6Roll) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: `${featureName} roll failed.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const d6Value = d6Roll.total;
+    const isWeal = omenEffect.type === 'Weal';
+    const modifierLabel = isWeal ? `+${d6Value}` : `-${d6Value}`;
+
+    const description = `<b>${featureName}</b><br/>Star Map result: <b>${omenEffect.type} (${omenEffect.isEven ? 'Even' : 'Odd'})</b>, Star Map roll: <b>${omenEffect.starMapRoll}</b><br/>1d6: <b>${d6Value}</b><br/>Next d20 test: <b>${modifierLabel}</b>`;
 
     if (usesMax > 0) {
         const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? usesMax);
         await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
     }
 
-    await setRuntimeValue(playerName, 'cosmicOmenEffect', JSON.stringify({
-        type: result,
-        d6Value,
-        isEven,
-        starMapRoll: starMapRoll.total,
+    await setRuntimeValue(playerName, 'cosmicOmenPendingBonus', JSON.stringify({
+        value: d6Value,
+        type: omenEffect.type,
     }), campaignName);
 
-    addExpiration(playerName, playerName, [
-        { type: 'remove_cosmic_omen' }
-    ], campaignName);
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: featureName,
+        description: `${playerName} used ${featureName} (${omenEffect.type}). Rolled 1d6: ${d6Value}. Next d20 test modified ${modifierLabel}.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error(`[${featureName}] Error:`, e); });
 
     return {
         type: 'popup',
@@ -79,12 +106,6 @@ export async function handle(action, playerStats, campaignName) {
             name: featureName,
             description,
             automation: auto,
-            cosmicOmenResult: {
-                type: result,
-                d6Value,
-                isEven,
-                starMapRoll: starMapRoll.total,
-            },
         },
     };
 }

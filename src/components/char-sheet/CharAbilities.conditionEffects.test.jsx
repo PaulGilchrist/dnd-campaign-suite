@@ -251,17 +251,14 @@ describe('CharAbilities condition effects on rendering', () => {
   });
 
   describe('cosmic omen effect', () => {
-    it.each([
-      { type: 'Weal', isEven: true, d6Value: 3, expectedBonus: '+7', label: 'Weal with even number adds bonus' },
-      { type: 'Woe', isEven: false, d6Value: 5, expectedBonus: '-1', label: 'Woe with odd number subtracts bonus' },
-      { type: 'Weal', isEven: false, d6Value: 3, expectedBonus: '+4', label: 'Weal with odd number adds no bonus' },
-      { type: 'Woe', isEven: true, d6Value: 4, expectedBonus: '+4', label: 'Woe with even number adds no bonus' },
-    ])('applies $label', ({ type, isEven, d6Value, expectedBonus }) => {
+    it('does not include cosmic omen bonus in displayed ability check values', () => {
       const stats = createPlayerStats();
-      vi.mocked(getRuntimeValue).mockReturnValueOnce(JSON.stringify({ type, isEven, d6Value }));
+      vi.mocked(getRuntimeValue).mockReturnValueOnce(JSON.stringify({ type: 'Weal', isEven: true, d6Value: 3 }));
       const { container } = render(<CharAbilities {...defaultProps} playerStats={stats} />);
       const bonusTexts = getBonusTexts(container);
-      expect(bonusTexts).toContain(expectedBonus);
+      // Cosmic Omen bonus is now applied at roll time, not displayed statically
+      expect(bonusTexts).not.toContain('+7');
+      expect(bonusTexts).toContain('+4');
     });
 
     it('handles invalid JSON in cosmicOmenEffect gracefully', () => {

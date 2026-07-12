@@ -22,22 +22,7 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
            return Math.max(1, wisMod);
         }
         return ability.bonus;
-     }, [playerStats?.abilities]);
-
-     const getCosmicOmenBonus = useCallback(() => {
-        const stored = getRuntimeValue(playerStats.name, 'cosmicOmenEffect', campaignName);
-        if (!stored) return 0;
-        try {
-            const effect = JSON.parse(stored);
-            if (effect.type === 'Weal' && effect.isEven) {
-                return effect.d6Value || 0;
-            }
-            if (effect.type === 'Woe' && !effect.isEven) {
-                return -(effect.d6Value || 0);
-            }
-         } catch (_e) { /* ignore */ }
-        return 0;
-      }, [playerStats.name, campaignName]);
+      }, [playerStats?.abilities]);
 
       const getSaveBonus = useCallback((abilityName) => {
          if (!conditionEffects?.saveBonusExpression) return 0;
@@ -247,18 +232,18 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                  if (checkType === 'check') {
                      const ability = playerStats?.abilities?.find(a => a.name === skillName);
                      if (ability) {
-                         rollAbilityCheck(skillName, ability.bonus - exhaustionPenalty + getCosmicOmenBonus(), makeCheckContext(skillName));
+                         rollAbilityCheck(skillName, ability.bonus - exhaustionPenalty, makeCheckContext(skillName));
                      }
                  } else {
                      const skill = playerStats?.abilities?.flatMap(a => a.skills || []).find(s => s.name === skillName);
                      if (skill) {
-                         rollSkillCheck(skillName, getSkillBonus(skill) + getCosmicOmenBonus(), makeCheckContext(skillName));
+                          rollSkillCheck(skillName, getSkillBonus(skillName), makeCheckContext(skillName));
                      }
                  }
              };
              window.addEventListener(INTERNAL_SKILL_CHECK_EVENT, handler);
              return () => window.removeEventListener(INTERNAL_SKILL_CHECK_EVENT, handler);
-          }, [playerStats, campaignName, exhaustionPenalty, conditionEffects, isRaging, rollSkillCheck, rollAbilityCheck, getCosmicOmenBonus, getSkillBonus, makeCheckContext]);
+           }, [playerStats, campaignName, exhaustionPenalty, conditionEffects, isRaging, rollSkillCheck, rollAbilityCheck, getSkillBonus, makeCheckContext]);
 
     return (
         <div className='char-abilities'>
@@ -285,8 +270,8 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                             checkCtx.bardicInspirationDie = biDie;
                           }
                           const checkBonus = getAbilityCheckBonus(ability, conditionEffects);
-                          rollAbilityCheck(ability.name, checkBonus - exhaustionPenalty + getCosmicOmenBonus(), checkCtx);
-                        }}>{signFormatter.format(getAbilityCheckBonus(ability, conditionEffects) - exhaustionPenalty + getCosmicOmenBonus())}</div>
+                          rollAbilityCheck(ability.name, checkBonus - exhaustionPenalty, checkCtx);
+                        }}>{signFormatter.format(getAbilityCheckBonus(ability, conditionEffects) - exhaustionPenalty)}</div>
                        <div className={'clickable' + (exhaustionPenalty > 0 || autoFailSave || conditionEffects?.saveDisadvantage?.length > 0 ? ' stat--penalized' : '') + (hasSaveAdvantage(ability.name) ? ' stat--buffed' : '')} onClick={() => {
                            if (!autoFailSave) {
                              const saveCtx = { ...saveContext };
@@ -296,9 +281,9 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                                saveCtx.bardicInspirationDie = biDie;
                              }
                              const saveBonus = getSaveBonus(ability.name);
-                             rollSavingThrow(ability.name, ability.save + saveBonus - exhaustionPenalty + getCosmicOmenBonus(), saveCtx);
-                           }
-                         }} title={getSaveAdvantageSource()}>{autoFailSave ? 'AUTO FAIL' : signFormatter.format(ability.save + getSaveBonus(ability.name) - exhaustionPenalty + getCosmicOmenBonus())}{hasSaveAdvantage(ability.name) ? ' (Adv)' : ''}</div>
+                              rollSavingThrow(ability.name, ability.save + saveBonus - exhaustionPenalty, saveCtx);
+                            }
+                          }} title={getSaveAdvantageSource()}>{autoFailSave ? 'AUTO FAIL' : signFormatter.format(ability.save + getSaveBonus(ability.name) - exhaustionPenalty)}{hasSaveAdvantage(ability.name) ? ' (Adv)' : ''}</div>
                      <div className='left'>{ability.skills.map((skill) => {
                           const skillBonus = getSkillBonus(skill);
                           const isExpert = playerStats.expertise?.includes(skill.name);
@@ -310,8 +295,8 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                                      checkCtx.bardicInspiration = true;
                                      checkCtx.bardicInspirationDie = biDie;
                                    }
-                                   rollSkillCheck(skill.name, skillBonus + getCosmicOmenBonus(), checkCtx);
-                                 }}>{skill.name}{isExpert ? ' (Expert)' : ''} ({signFormatter.format(skillBonus + getCosmicOmenBonus())})</span>
+                                    rollSkillCheck(skill.name, skillBonus, checkCtx);
+                                  }}>{skill.name}{isExpert ? ' (Expert)' : ''} ({signFormatter.format(skillBonus)})</span>
                               {ability.skills.indexOf(skill) < ability.skills.length - 1 ? ', ' : ''}
                           </span>;
                       })}</div>

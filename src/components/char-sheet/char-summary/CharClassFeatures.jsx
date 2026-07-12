@@ -175,9 +175,11 @@ const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
     const improvedElementalFuryChoice = useRuntimeValue(playerStats.name, '_Improved_Elemental_Fury_option', campaignName);
     const circleOfTheLandType = useRuntimeValue(playerStats.name, '_circleOfTheLandType', campaignName);
     const isCircleOfTheMoon = playerStats.class?.major?.name === 'Circle of the Moon' || playerStats.class?.subclass?.name === 'Circle of the Moon';
+    const isCircleOfTheStars = playerStats.class?.major?.name === 'Circle of the Stars' || playerStats.class?.subclass?.name === 'Circle of the Stars';
     const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
     const moonlightStepMax = isCircleOfTheMoon ? Math.max(wis?.bonus || 0, 1) : 0;
     const wrathOfTheSeaActive = useRuntimeValue(playerStats.name, 'wrathOfTheSeaActive', campaignName);
+    const cosmicOmenEffect = useRuntimeValue(playerStats.name, 'cosmicOmenEffect', campaignName);
     if (playerStats.level < 2) return null;
     return (
            <div data-testid="char-class-druid">
@@ -198,6 +200,20 @@ const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
                <div><b>Wild Shape Max Challenge Rating: </b>{druidFeatures?.maxWildShapeChallengeRating}</div>
                 <TrackedResourceInput label="Wild Shape Uses" resourceKey="wildShapeUses" playerName={playerStats.name} getMax={() => druidFeatures?.maxWildShapeUses || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
                 {isCircleOfTheMoon && <TrackedResourceInput label="Moonlight Step Uses" resourceKey="moonlightStepUses" playerName={playerStats.name} getMax={() => moonlightStepMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />}
+                {isCircleOfTheStars && playerStats.level >= 6 && (
+                    <>
+                        {cosmicOmenEffect && (() => {
+                            try {
+                                const effect = JSON.parse(cosmicOmenEffect);
+                                if (effect.type) {
+                                    return <span className="automation-badge"><i className="fa-solid fa-star"></i> Cosmic Omen: {effect.type} ({effect.isEven ? 'Even' : 'Odd'})</span>;
+                                }
+                            } catch (_e) { /* ignore */ }
+                            return null;
+                        })()}
+                        <TrackedResourceInput label="Cosmic Omen Uses" resourceKey="cosmicomenUses" playerName={playerStats.name} getMax={() => Math.max(wis?.bonus || 0, 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+                    </>
+                )}
                {elementalFuryChoice && <span className="automation-badge"><i className="fa-solid fa-bolt"></i> Elemental Fury: {elementalFuryChoice}</span>}
                 {improvedElementalFuryChoice && <span className="automation-badge"><i className="fa-solid fa-bolt"></i> Improved Elemental Fury: {improvedElementalFuryChoice}</span>}
                 {circleOfTheLandType && <span className="automation-badge"><i className="fa-solid fa-mountain-sun"></i> Circle of the Land: {circleOfTheLandType}</span>}

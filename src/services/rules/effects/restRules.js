@@ -135,9 +135,10 @@ export const LONG_REST_RESOURCES = [
   'stonecunningUses',
   'naturesVeilUses',
   'favoredEnemyUses',
-  'tirelessUses',
-  'moonlightStepUses',
-  'dreadambushUses'
+   'tirelessUses',
+   'moonlightStepUses',
+   'dreadambushUses',
+   'cosmicomenUses'
 ]
 
 export function getLongRestResources() {
@@ -565,6 +566,22 @@ export async function applyLongRest(playerStats, campaignName) {
     if (hasBolsteringTreats) {
         const craftCount = playerStats.proficiency || 0
         setRuntimeValue(name, 'chefBolsteringTreats', craftCount, campaignName, true)
+    }
+
+    // Circle of the Stars: Cosmic Omen Star Map roll on Long Rest
+    const isDruid = playerStats.class?.name === 'Druid'
+    const isCircleOfTheStars = playerStats.class?.major?.name === 'Circle of the Stars' || playerStats.class?.subclass?.name === 'Circle of the Stars'
+    if (isDruid && isCircleOfTheStars && playerStats.level >= 6) {
+        const starMapRoll = rollD20()
+        const isEven = starMapRoll % 2 === 0
+        const omenType = isEven ? 'Weal' : 'Woe'
+        setRuntimeValue(name, 'cosmicOmenEffect', JSON.stringify({
+            type: omenType,
+            isEven,
+            starMapRoll,
+        }), campaignName, true)
+        clearAllExpirationEffects(name, campaignName)
+        logEntries.push(`Cosmic Omen Star Map: ${starMapRoll} → ${omenType}`)
     }
 
     // Log long rest to campaign log

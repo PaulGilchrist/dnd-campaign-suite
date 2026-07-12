@@ -76,9 +76,11 @@ describe('collectAutomationFromFeatures – handler dispatch', () => {
 
         const cosmicResult = collectAutomationFromFeatures([
             makeFeature({ type: 'cosmic_omen', casting_time: '1 bonus_action' }),
+            makeFeature({ type: 'cosmic_omen', casting_time: '1 reaction' }),
             makeFeature({ type: 'cosmic_omen', casting_time: '1 action' }),
         ], ps)
         expect(cosmicResult.bonusActions).toHaveLength(1)
+        expect(cosmicResult.reactions).toHaveLength(1)
         expect(cosmicResult.actions).toHaveLength(1)
     })
 

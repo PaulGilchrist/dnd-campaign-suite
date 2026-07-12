@@ -74,6 +74,21 @@ export function createLogAndShow(deps) {
             luckyRerolled = true;
         }
 
+        // Cosmic Omen: apply global pending bonus to next d20 roll
+        let cosmicOmenAppliedBonus = 0;
+        const cosmicOmenPendingRaw = getRuntimeValue(campaignName, 'cosmicOmenPendingBonus', campaignName);
+        if (cosmicOmenPendingRaw) {
+            try {
+                const pending = JSON.parse(cosmicOmenPendingRaw);
+                if (pending && typeof pending.value === 'number' && pending.value > 0) {
+                    const isWeal = pending.type === 'Weal';
+                    effectiveD20Roll += isWeal ? pending.value : -pending.value;
+                    cosmicOmenAppliedBonus = isWeal ? pending.value : -pending.value;
+                    setRuntimeValue(campaignName, 'cosmicOmenPendingBonus', null, campaignName, true);
+                }
+            } catch (_e) { /* ignore */ }
+        }
+
         const combatSummary = await loadCombatSummary(campaignName);
 
         // Pre-load maneuver cache for skill check / initiative superiority buttons
@@ -487,6 +502,7 @@ export function createLogAndShow(deps) {
                 bardicInspirationDefenseTargetName: context?.bardicInspirationDefenseTargetName,
                 bardicInspirationOffense: context?.bardicInspirationOffense || (context?.playerStats ? hasBardicInspirationOffense(context.playerStats, campaignName) : false),
                 bardicInspirationOffenseDieSize: context?.bardicInspirationOffenseDieSize || getBardicInspirationDieSize(characterName, campaignName) || (context?.playerStats ? getBardicInspirationDieSizeFromClass(context.playerStats) : null),
+                cosmicOmenAppliedBonus,
                 luckyRerolled,
                 luckyRerollValue,
                 characterName,
@@ -913,6 +929,21 @@ export function createLogAndShow(deps) {
                 saveTotal = saveResult.total;
                 saveResultData = saveResult;
 
+                // Cosmic Omen: apply global pending bonus to save total
+                const cosmicOmenPendingRawSave = getRuntimeValue(campaignName, 'cosmicOmenPendingBonus', campaignName);
+                if (cosmicOmenPendingRawSave) {
+                    try {
+                        const pending = JSON.parse(cosmicOmenPendingRawSave);
+                        if (pending && typeof pending.value === 'number' && pending.value > 0) {
+                            const isWeal = pending.type === 'Weal';
+                            saveTotal += isWeal ? pending.value : -pending.value;
+                            cosmicOmenAppliedBonus = isWeal ? pending.value : -pending.value;
+                            saveSuccess = saveTotal >= saveDc;
+                            setRuntimeValue(campaignName, 'cosmicOmenPendingBonus', null, campaignName, true);
+                        }
+                    } catch (_e) { /* ignore */ }
+                }
+
                 setRuntimeValue(characterName, 'lastSaveRoll', {
                     d20: effectiveD20ForSave,
                     bonus: saveResult.saveBonus,
@@ -974,9 +1005,23 @@ export function createLogAndShow(deps) {
                     id: utils.guid(),
                 });
             } else {
-                saveTotal = effectiveD20 + bonus;
+                // Cosmic Omen: apply global pending bonus to effectiveD20
+                let effectiveD20ForSave = effectiveD20;
+                const cosmicOmenPendingRawSave2 = getRuntimeValue(campaignName, 'cosmicOmenPendingBonus', campaignName);
+                if (cosmicOmenPendingRawSave2) {
+                    try {
+                        const pending = JSON.parse(cosmicOmenPendingRawSave2);
+                        if (pending && typeof pending.value === 'number' && pending.value > 0) {
+                            const isWeal = pending.type === 'Weal';
+                            effectiveD20ForSave += isWeal ? pending.value : -pending.value;
+                            cosmicOmenAppliedBonus = isWeal ? pending.value : -pending.value;
+                            setRuntimeValue(campaignName, 'cosmicOmenPendingBonus', null, campaignName, true);
+                        }
+                    } catch (_e) { /* ignore */ }
+                }
+
+                saveTotal = effectiveD20ForSave + bonus;
                 saveSuccess = saveDc != null ? (saveTotal >= saveDc) : null;
-                effectiveD20ForSave = effectiveD20;
 
                 setRuntimeValue(characterName, 'lastSaveRoll', {
                     d20: effectiveD20ForSave,
@@ -1188,6 +1233,7 @@ export function createLogAndShow(deps) {
                 strokeOfLuck: context?.strokeOfLuck,
                 bardicInspiration: context?.bardicInspiration,
                 bardicInspirationDie: context?.bardicInspirationDie,
+                cosmicOmenAppliedBonus,
             });
             window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: firstName, roll: effectiveD20Roll + totalBonus } }));
             clearHuntersMarkConcentration(firstName, campaignName);

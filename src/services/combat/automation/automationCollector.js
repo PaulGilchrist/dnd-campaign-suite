@@ -493,6 +493,8 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'cosmic_omen':
                 if (info.casting_time === '1 bonus_action' || info.casting_time === 'bonus_action') {
                     result.bonusActions.push(info)
+                } else if (info.casting_time === '1 reaction' || info.casting_time === 'reaction') {
+                    result.reactions.push(info)
                 } else {
                     result.actions.push(info)
                 }

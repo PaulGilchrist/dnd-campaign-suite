@@ -39,6 +39,8 @@ export const ALL_TRACKED_RESOURCES = [
   'stonecunningUses',
   'tirelessUses',
   'moonlightStepUses',
+  'dreadambushUses',
+  'cosmicomenUses',
   'shortRestHitDice',
   'spell_slots_level_1',
   'spell_slots_level_2',
@@ -217,6 +219,10 @@ export function computeTrackedResources(playerStats) {
   const moonlightSubclass = playerStats.class?.major?.name === 'Circle of the Moon' || playerStats.class?.subclass?.name === 'Circle of the Moon'
   const maxMoonlightStep = isDruid && moonlightSubclass ? Math.max(wis?.bonus || 0, 1) : 0
   resources.moonlightStepUses = { current: maxMoonlightStep, max: maxMoonlightStep }
+
+  const isCircleOfTheStars = playerStats.class?.major?.name === 'Circle of the Stars' || playerStats.class?.subclass?.name === 'Circle of the Stars'
+  const maxCosmicOmen = isDruid && isCircleOfTheStars && playerStats.level >= 6 ? Math.max(wis?.bonus || 0, 1) : 0
+  resources.cosmicomenUses = { current: maxCosmicOmen, max: maxCosmicOmen }
 
   return resources
 }

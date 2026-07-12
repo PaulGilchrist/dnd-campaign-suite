@@ -61,7 +61,7 @@ describe('starryHandlers – cosmic_omen', () => {
         const result = starryHandlers.cosmic_omen(makeFeature({ type: 'cosmic_omen' }), BASE_STATS)
         expect(result).toMatchObject({
             type: 'cosmic_omen', usesMax: 0, usesRecharge: 'long_rest',
-            action: 'action', casting_time: '1 action', hasAutomation: true,
+            action: 'action', casting_time: '1 reaction', hasAutomation: true,
         })
     })
 

@@ -331,7 +331,11 @@ describe('collectAutomationFromFeatures – casting_time conditional types', () 
         expect(bonusResult.bonusActions).toHaveLength(1)
         expect(bonusResult.actions).toHaveLength(0)
 
-        const actionResult = collectAutomationFromFeatures([makeFeature({ type: 'cosmic_omen' })], ps)
+        const reactionResult = collectAutomationFromFeatures([makeFeature({ type: 'cosmic_omen', casting_time: '1 reaction' })], ps)
+        expect(reactionResult.reactions).toHaveLength(1)
+        expect(reactionResult.actions).toHaveLength(0)
+
+        const actionResult = collectAutomationFromFeatures([makeFeature({ type: 'cosmic_omen', casting_time: '1 action' })], ps)
         expect(actionResult.actions).toHaveLength(1)
         expect(actionResult.bonusActions).toHaveLength(0)
     })

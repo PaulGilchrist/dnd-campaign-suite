@@ -29,7 +29,7 @@ export const starryHandlers = {
             usesMax,
             usesRecharge: auto.recharge || 'long_rest',
             action: auto.action || 'action',
-            casting_time: auto.casting_time || '1 action',
+            casting_time: auto.casting_time || '1 reaction',
             hasAutomation: true
         }
     },
