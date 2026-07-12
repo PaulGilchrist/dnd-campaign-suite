@@ -5,7 +5,7 @@ import MonsterNameAutocomplete from '../common/MonsterNameAutocomplete.jsx'
 import NpcAvatar from './NpcAvatar.jsx'
 import CreatureHp from './CreatureHp.jsx'
 import { getAbilityLabel } from '../../services/combat/conditions/conditionUtils.js'
-import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { useRuntimeValue, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import ConditionEffectBadges from './ConditionEffectBadges.jsx'
 import { isBuffActive } from '../../services/automation/common/buffToggle.js';
 import { CONDITION_DESCRIPTIONS } from '../../services/combat/conditions/effectDescriptions.js'
@@ -51,6 +51,20 @@ function CreatureCard({
     const isMajestyActive = creature.type === 'player' && isUnbreakableMajestyActive(creature.name, campaignName);
     const majestyDc = isMajestyActive ? getUnbreakableMajestySaveDc(creature.name, campaignName) : 0;
     const wildShapeActive = isBuffActive(creature.name, 'Wild Shape', campaignName);
+
+    const sanctuaryInfo = (() => {
+        for (const other of allCreatures) {
+            if (other.type !== 'player') continue;
+            const active = getRuntimeValue(other.name, 'naturesSanctuaryActive', campaignName);
+            if (!active) continue;
+            const creatureList = getRuntimeValue(other.name, 'naturesSanctuaryCreatures', campaignName) || [];
+            if (creatureList.includes(creature.name)) {
+                const resistance = getRuntimeValue(other.name, 'naturesSanctuaryResistance', campaignName) || 'None';
+                return { druid: other.name, resistance };
+            }
+        }
+        return null;
+    })();
 
     return (
         <div className={`creature-card ${creature.type} ${isActive ? 'active' : ''} ${isUnconscious ? 'creature-unconscious' : ''}`}>
@@ -231,6 +245,13 @@ function CreatureCard({
                     <div className='wild-shape-badge-wrapper'>
                         <span className='initiative-wild-shape-badge' title='Wild Shape: Animal form active — spellcasting blocked, resistance types apply'>
                             <i className='fa-solid fa-paw'></i> Wild Shape
+                        </span>
+                    </div>
+                )}
+                {sanctuaryInfo && (
+                    <div className='sanctuary-badge-wrapper'>
+                        <span className='initiative-sanctuary-badge' title={`Nature's Sanctuary: Half Cover (AC +2), ${sanctuaryInfo.resistance} resistance. Protected by ${sanctuaryInfo.druid}'s Nature's Sanctuary`}>
+                            <i className='fa-solid fa-leaf'></i> Sanctuary
                         </span>
                     </div>
                 )}

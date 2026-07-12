@@ -27,6 +27,7 @@ import { executeSpellCast } from '../../services/rules/spells/spellCastService.j
 import { getTargetFromAttacker, getCombatContext, getAttackerTargetName } from '../../services/rules/combat/damageUtils.js';
 import { executeSweepingAttack, executeBaitAndSwitchChoice, executeCommanderStrikeChoice, executeRallyChoice } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { activateBulwarkOfForce } from '../../services/automation/handlers/class-sorcerer/bulwarkOfForceHandler.js';
+import { activateNaturesSanctuary, moveNaturesSanctuary } from '../../services/automation/handlers/class-ranger/naturesSanctuaryHandler.js';
 import { activateCoronaOfLight } from '../../services/automation/handlers/class-cleric-paladin/coronaOfLightHandler.js';
 import { confirmRadianceOfDawn } from '../../services/automation/handlers/class-cleric-paladin/radianceOfDawnHandler.js';
 import { applyBardicInspiration } from '../../services/automation/handlers/class-bard/bardicInspirationHandler.js';
@@ -537,6 +538,32 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         setModalState({ bulwarkOfForceModal: null });
     }, [setPopupHtml, modalState.bulwarkOfForceModal, setModalState]);
 
+    const handleNaturesSanctuaryConfirm = React.useCallback(async (targetNames) => {
+        if (!targetNames || !modalState.naturesSanctuaryCreaturesModal) return;
+        const { action, isMove } = modalState.naturesSanctuaryCreaturesModal;
+        let result;
+        if (isMove) {
+            result = await moveNaturesSanctuary(
+                action,
+                modalState.naturesSanctuaryCreaturesModal.playerStats,
+                modalState.naturesSanctuaryCreaturesModal.campaignName,
+                targetNames
+            );
+        } else {
+            result = await activateNaturesSanctuary(
+                action,
+                modalState.naturesSanctuaryCreaturesModal.playerStats,
+                modalState.naturesSanctuaryCreaturesModal.campaignName,
+                mapName,
+                targetNames
+            );
+        }
+        if (result?.payload) {
+            setPopupHtml(result.payload);
+        }
+        setModalState({ naturesSanctuaryCreaturesModal: null });
+    }, [setPopupHtml, modalState.naturesSanctuaryCreaturesModal, setModalState, mapName]);
+
     const handleCoronaEnemySelectionConfirm = React.useCallback(async (selectedEnemies) => {
         if (!selectedEnemies || !modalState.coronaEnemySelectionModal) return;
         const result = await activateCoronaOfLight(
@@ -842,6 +869,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'bulwarkOfForceTarget':
                         setModalState({ bulwarkOfForceModal: result.payload });
                         break;
+                    case 'naturesSanctuaryCreatures':
+                        setModalState({ naturesSanctuaryCreaturesModal: result.payload });
+                        break;
                     case 'coronaEnemySelection':
                         setModalState({ coronaEnemySelectionModal: result.payload });
                         break;
@@ -1095,6 +1125,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleCommanderStrikeChoiceConfirm={handleCommanderStrikeChoiceConfirm}
                     handleRallyChoiceConfirm={handleRallyChoiceConfirm}
                     handleBulwarkOfForceConfirm={handleBulwarkOfForceConfirm}
+                    handleNaturesSanctuaryConfirm={handleNaturesSanctuaryConfirm}
                     handleCoronaEnemySelectionConfirm={handleCoronaEnemySelectionConfirm}
                     handleRadianceOfDawnConfirm={handleRadianceOfDawnConfirm}
                     handleMantleOfInspirationConfirm={handleMantleOfInspirationConfirm}

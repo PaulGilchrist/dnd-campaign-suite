@@ -939,10 +939,9 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
             case 'remove_natures_sanctuary':
                 setRuntimeValue(targetName, 'naturesSanctuaryActive', null, campaignName);
                 setRuntimeValue(targetName, 'naturesSanctuaryMoves', null, campaignName);
-                setRuntimeValue(targetName, 'naturesSanctuaryCubeX', null, campaignName);
-                setRuntimeValue(targetName, 'naturesSanctuaryCubeY', null, campaignName);
                 setRuntimeValue(targetName, 'naturesSanctuaryRange', null, campaignName);
                 setRuntimeValue(targetName, 'naturesSanctuaryResistance', null, campaignName);
+                setRuntimeValue(targetName, 'naturesSanctuaryCreatures', null, campaignName);
                 break;
 
             case 'remove_bulwark_of_force':

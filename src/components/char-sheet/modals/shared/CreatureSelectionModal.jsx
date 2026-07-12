@@ -12,8 +12,9 @@ export default function CreatureSelectionModal({
     confirmIcon,
     onConfirm,
     onSkip,
+    defaultSelected,
 }) {
-    const [selected, setSelected] = useState([]);
+    const [selected, setSelected] = useState(defaultSelected || []);
 
     const toggleTarget = (name) => {
         setSelected(prev =>

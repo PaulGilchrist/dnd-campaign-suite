@@ -879,3 +879,26 @@
     font-size: 0.85em;
 }
 
+/* Nature's Sanctuary badge */
+.initiative .sanctuary-badge-wrapper {
+    position: relative;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+.initiative .initiative-sanctuary-badge {
+    padding: 2px 6px;
+    border: 1px solid rgba(132, 204, 115, 0.5);
+    border-radius: 4px;
+    background-color: rgba(132, 204, 115, 0.2);
+    color: inherit;
+    font-size: 0.7em;
+    white-space: nowrap;
+}
+
+.initiative .initiative-sanctuary-badge .fa-leaf {
+    margin-right: 3px;
+    font-size: 0.85em;
+}
+

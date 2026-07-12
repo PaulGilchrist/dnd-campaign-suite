@@ -51,7 +51,12 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
       if (key === 'targetEffects') return [];
       return null;
   }),
-  getRuntimeValue: vi.fn(() => undefined),
+  getRuntimeValue: vi.fn((target, key) => {
+      if (key === 'naturesSanctuaryActive') return undefined;
+      if (key === 'naturesSanctuaryCreatures') return undefined;
+      if (key === 'naturesSanctuaryResistance') return undefined;
+      return undefined;
+  }),
   setRuntimeValue: vi.fn(),
   listeners: new Map(),
 }));
@@ -352,6 +357,73 @@ describe('CreatureCard', () => {
             const creature = { ...defaultPlayerCreature, currentHp: null };
             render(<CreatureCard {...props} creature={creature} />);
             expect(screen.getByTestId('hp-input-Alice')).toHaveValue(0);
+        });
+    });
+
+    describe('Nature\'s Sanctuary badge', () => {
+        it('should not render sanctuary badge when no sanctuary is active', () => {
+            render(<CreatureCard {...props} creature={defaultPlayerCreature} />);
+            expect(screen.queryByText('Sanctuary')).not.toBeInTheDocument();
+        });
+
+        it('should render sanctuary badge when creature is in sanctuary list', () => {
+            const mockRuntime = vi.mocked(require('../../hooks/runtime/useRuntimeState.js')).getRuntimeValue;
+            mockRuntime.mockImplementation((target, key) => {
+                if (key === 'naturesSanctuaryActive' && target === 'Druid') return true;
+                if (key === 'naturesSanctuaryCreatures' && target === 'Druid') return ['Alice', 'Goblin'];
+                if (key === 'naturesSanctuaryResistance' && target === 'Druid') return 'Fire';
+                return undefined;
+            });
+
+            const allCreatures = [
+                { name: 'Druid', type: 'player' },
+                defaultPlayerCreature,
+                { name: 'Goblin', type: 'npc' },
+            ];
+
+            render(<CreatureCard {...props} creature={defaultPlayerCreature} allCreatures={allCreatures} />);
+            expect(screen.getByText('Sanctuary')).toBeInTheDocument();
+
+            mockRuntime.mockRestore();
+        });
+
+        it('should not render sanctuary badge when creature is not in sanctuary list', () => {
+            const mockRuntime = vi.mocked(require('../../hooks/runtime/useRuntimeState.js')).getRuntimeValue;
+            mockRuntime.mockImplementation((target, key) => {
+                if (key === 'naturesSanctuaryActive' && target === 'Druid') return true;
+                if (key === 'naturesSanctuaryCreatures' && target === 'Druid') return ['Goblin', 'Wolf'];
+                return undefined;
+            });
+
+            const allCreatures = [
+                { name: 'Druid', type: 'player' },
+                defaultPlayerCreature,
+                { name: 'Goblin', type: 'npc' },
+            ];
+
+            render(<CreatureCard {...props} creature={defaultPlayerCreature} allCreatures={allCreatures} />);
+            expect(screen.queryByText('Sanctuary')).not.toBeInTheDocument();
+
+            mockRuntime.mockRestore();
+        });
+
+        it('should not render sanctuary badge when sanctuary is not active', () => {
+            const mockRuntime = vi.mocked(require('../../hooks/runtime/useRuntimeState.js')).getRuntimeValue;
+            mockRuntime.mockImplementation((target, key) => {
+                if (key === 'naturesSanctuaryActive' && target === 'Druid') return false;
+                if (key === 'naturesSanctuaryCreatures' && target === 'Druid') return ['Alice'];
+                return undefined;
+            });
+
+            const allCreatures = [
+                { name: 'Druid', type: 'player' },
+                defaultPlayerCreature,
+            ];
+
+            render(<CreatureCard {...props} creature={defaultPlayerCreature} allCreatures={allCreatures} />);
+            expect(screen.queryByText('Sanctuary')).not.toBeInTheDocument();
+
+            mockRuntime.mockRestore();
         });
     });
 });

@@ -157,6 +157,7 @@ export default function CharActionModals({
     handleCommanderStrikeChoiceConfirm,
     handleRallyChoiceConfirm,
     handleBulwarkOfForceConfirm,
+    handleNaturesSanctuaryConfirm,
     handleCoronaEnemySelectionConfirm,
     handleRadianceOfDawnConfirm,
     handleMantleOfInspirationConfirm,
@@ -811,6 +812,20 @@ export default function CharActionModals({
                     maxTargets={modalState.bulwarkOfForceModal.maxTargets}
                     onConfirm={handleBulwarkOfForceConfirm}
                     onSkip={() => setModalState({ bulwarkOfForceModal: null })}
+                />
+            )}
+            {modalState.naturesSanctuaryCreaturesModal && (
+                <CreatureSelectionModal
+                    title={modalState.naturesSanctuaryCreaturesModal.isMove ? "Nature's Sanctuary (Move) — Choose Creatures" : "Nature's Sanctuary — Choose Creatures"}
+                    icon="fa-tree"
+                    targets={modalState.naturesSanctuaryCreaturesModal.creatureTargets}
+                    description="Select creatures to include in the sanctuary. Creatures in the sanctuary gain Half Cover and resistance to your Nature's Ward damage type."
+                    note={modalState.naturesSanctuaryCreaturesModal.isMove ? "Existing creatures are pre-selected. Toggle to add or remove creatures." : "Expend 1 Wild Shape use to create the sanctuary."}
+                    confirmLabel={modalState.naturesSanctuaryCreaturesModal.isMove ? "Move Sanctuary" : "Create Sanctuary"}
+                    confirmIcon="fa-tree"
+                    defaultSelected={modalState.naturesSanctuaryCreaturesModal.defaultSelected}
+                    onConfirm={handleNaturesSanctuaryConfirm}
+                    onSkip={() => setModalState({ naturesSanctuaryCreaturesModal: null })}
                 />
             )}
             {modalState.coronaEnemySelectionModal && (

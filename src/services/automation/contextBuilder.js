@@ -579,20 +579,10 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                     coverResult = { level: 'none', acBonus: 0 };
                 }
 
-                // Check Nature's Sanctuary half cover (15-ft cube = 3x3 grid centered on placement)
-                const sanctuaryActive = getRuntimeValue(playerStats.name, 'naturesSanctuaryActive', campaignName);
-                if (sanctuaryActive) {
-                    const sanctuaryX = Number(getRuntimeValue(playerStats.name, 'naturesSanctuaryCubeX', campaignName) || 0);
-                    const sanctuaryY = Number(getRuntimeValue(playerStats.name, 'naturesSanctuaryCubeY', campaignName) || 0);
-                    const cubeHalfSize = 1; // 15ft cube = 3 cells wide, half-size = 1 cell from center
-                    if (sanctuaryX > 0 && sanctuaryY > 0) {
-                        const dx = Math.abs(targetPos.gridX - sanctuaryX);
-                        const dy = Math.abs(targetPos.gridY - sanctuaryY);
-                        const inCube = dx <= cubeHalfSize && dy <= cubeHalfSize;
-                        if (inCube && coverResult.acBonus < 2) {
-                            coverResult = { level: 'half', acBonus: 2 };
-                        }
-                    }
+                // Check Nature's Sanctuary half cover — any creature in the sanctuary list
+                const sanctuaryCreatures = getRuntimeValue(playerStats.name, 'naturesSanctuaryCreatures', campaignName);
+                if (sanctuaryCreatures?.includes(base.targetName) && coverResult.acBonus < 2) {
+                    coverResult = { level: 'half', acBonus: 2 };
                 }
 
                 // Check Bulwark of Force half cover — any PC with the buff can grant cover to the target

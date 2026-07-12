@@ -467,7 +467,7 @@ describe('CharSummary - Aura Sources', () => {
             exhaustionLevel={0}
             auraComboEffects={{ immunities: ['poison'], immunitySources: { poison: 'Aura of Protection' } }}
         />);
-        expect(screen.getByText('poison')).toBeInTheDocument();
+        expect(screen.getByText('Poison')).toBeInTheDocument();
     });
 
     it('merges base and aura immunities with deduplication', () => {
@@ -478,8 +478,8 @@ describe('CharSummary - Aura Sources', () => {
             exhaustionLevel={0}
             auraComboEffects={{ immunities: ['poison', 'cold'], immunitySources: { cold: 'Aura of Protection' } }}
         />);
-        expect(screen.getByText('poison')).toBeInTheDocument();
-        expect(screen.getByText(/cold/)).toBeInTheDocument();
+        expect(screen.getByText('Poison')).toBeInTheDocument();
+        expect(screen.getByText(/Cold/)).toBeInTheDocument();
     });
 
     it('merges base and aura resistances with deduplication', () => {

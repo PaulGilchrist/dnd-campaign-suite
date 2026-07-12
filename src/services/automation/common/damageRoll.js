@@ -40,34 +40,15 @@ export async function buildAttackContextForDamage(attackContext, playerName, cam
     const { targetName, resistanceNotice: initialNotice } = await buildBaseAttackContext(playerName, campaignName, attackContext.damageType);
     let resistanceNotice = initialNotice;
 
-    // Check Nature's Sanctuary resistance for allies in the cube
-    if (!resistanceNotice && targetName && mapName && campaignName) {
-        const sanctuaryActive = getRuntimeValue(playerName, 'naturesSanctuaryActive', campaignName);
-        if (sanctuaryActive) {
-            const sanctuaryX = Number(getRuntimeValue(playerName, 'naturesSanctuaryCubeX', campaignName) || 0);
-            const sanctuaryY = Number(getRuntimeValue(playerName, 'naturesSanctuaryCubeY', campaignName) || 0);
-            if (sanctuaryX > 0 && sanctuaryY > 0 && targetName) {
-                const mapData = await mapsService.loadMapData(campaignName, mapName);
-                const targetPlayer = mapData?.players?.find(p => p.name === targetName);
-                const targetNpc = mapData?.placedItems?.find(i => i.name === targetName || i.name?.startsWith(targetName + ' '));
-                let targetGridPos = null;
-                if (targetPlayer) {
-                    targetGridPos = { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY };
-                } else if (targetNpc) {
-                    targetGridPos = { gridX: targetNpc.gridX, gridY: targetNpc.gridY };
-                }
-                if (targetGridPos) {
-                    const dx = Math.abs(targetGridPos.gridX - sanctuaryX);
-                    const dy = Math.abs(targetGridPos.gridY - sanctuaryY);
-                    if (dx <= 1 && dy <= 1) {
-                        const landResistance = getRuntimeValue(playerName, 'naturesSanctuaryResistance', campaignName);
-                        if (landResistance) {
-                            const lowerDamageType = attackContext.damageType.toLowerCase();
-                            if (lowerDamageType === landResistance.toLowerCase()) {
-                                resistanceNotice = `${targetName} resists ${attackContext.damageType} (Nature's Sanctuary)`;
-                            }
-                        }
-                    }
+    // Check Nature's Sanctuary resistance for creatures in the sanctuary
+    if (!resistanceNotice && targetName && campaignName) {
+        const sanctuaryCreatures = getRuntimeValue(playerName, 'naturesSanctuaryCreatures', campaignName);
+        if (sanctuaryCreatures?.includes(targetName)) {
+            const landResistance = getRuntimeValue(playerName, 'naturesSanctuaryResistance', campaignName);
+            if (landResistance) {
+                const lowerDamageType = attackContext.damageType.toLowerCase();
+                if (lowerDamageType === landResistance.toLowerCase()) {
+                    resistanceNotice = `${targetName} resists ${attackContext.damageType} (Nature's Sanctuary)`;
                 }
             }
         }

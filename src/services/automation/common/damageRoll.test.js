@@ -548,35 +548,32 @@ describe('buildAttackContextForDamage', () => {
 
     describe('Nature Sanctuary resistance', () => {
         const attackerPlayer = { name: playerName, gridX: 5, gridY: 10 };
-        const targetInCube = { name: 'Goblin', gridX: 6, gridY: 11 };
-        const targetOutsideCube = { name: 'Goblin', gridX: 20, gridY: 20 };
+        const targetName = 'Goblin';
 
         beforeEach(() => {
             damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
-            damageUtils.getTargetFromAttacker.mockReturnValue(targetInCube);
+            damageUtils.getTargetFromAttacker.mockReturnValue({ name: targetName });
             damageUtils.getResistanceNotice.mockReturnValue(null);
             damageUtils.getAttackerTargetName.mockReturnValue(undefined);
             npcsService.loadNPCs.mockResolvedValue([]);
         });
 
-        function makeSanctuaryScenario(target, sanctuaryActive = true) {
-            mapsService.loadMapData.mockResolvedValue(makeMapData([attackerPlayer, target]));
+        function makeSanctuaryScenario(targetInList = true, resistanceType = 'fire') {
+            mapsService.loadMapData.mockResolvedValue(makeMapData([attackerPlayer]));
             rangeValidation.rangeToFeet.mockReturnValue(0);
             coverService.computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
 
-            if (sanctuaryActive) {
+            if (targetInList) {
                 runtimeState.getRuntimeValue
-                    .mockReturnValueOnce('true')
-                    .mockReturnValueOnce('5')
-                    .mockReturnValueOnce('10')
-                    .mockReturnValueOnce('fire');
+                    .mockReturnValueOnce(['Goblin'])
+                    .mockReturnValueOnce(resistanceType);
             } else {
                 runtimeState.getRuntimeValue.mockReturnValue(null);
             }
         }
 
-        it('adds resistance notice when target is in sanctuary cube and damage matches', async () => {
-            makeSanctuaryScenario(targetInCube, true);
+        it('adds resistance notice when target is in sanctuary creature list and damage matches', async () => {
+            makeSanctuaryScenario(true, 'fire');
 
             const result = await buildAttackContextForDamage(
                 makeAttackContext({ damageType: 'fire' }),
@@ -586,8 +583,8 @@ describe('buildAttackContextForDamage', () => {
             expect(result.resistanceNotice).toBe("Goblin resists fire (Nature's Sanctuary)");
         });
 
-        it('does not add resistance when target is outside sanctuary cube', async () => {
-            makeSanctuaryScenario(targetOutsideCube, true);
+        it('does not add resistance when target is not in sanctuary creature list', async () => {
+            makeSanctuaryScenario(false, 'fire');
 
             const result = await buildAttackContextForDamage(
                 makeAttackContext({ damageType: 'fire' }),
@@ -598,7 +595,7 @@ describe('buildAttackContextForDamage', () => {
         });
 
         it('does not add resistance when sanctuary is not active', async () => {
-            makeSanctuaryScenario(targetInCube, false);
+            makeSanctuaryScenario(false, 'fire');
 
             const result = await buildAttackContextForDamage(
                 makeAttackContext({ damageType: 'fire' }),
@@ -609,10 +606,10 @@ describe('buildAttackContextForDamage', () => {
         });
 
         it('does not add resistance when damage type does not match sanctuary resistance', async () => {
-            makeSanctuaryScenario(targetInCube, true);
+            makeSanctuaryScenario(true, 'cold');
 
             const result = await buildAttackContextForDamage(
-                makeAttackContext({ damageType: 'cold' }),
+                makeAttackContext({ damageType: 'fire' }),
                 playerName, campaignName, mapName,
             );
 
@@ -621,13 +618,13 @@ describe('buildAttackContextForDamage', () => {
 
         it('does not override existing resistance notice', async () => {
             damageUtils.getTargetFromAttacker.mockReturnValue({
-                ...targetInCube,
+                name: 'Goblin',
                 resistances: ['fire'],
                 immunities: [],
             });
             damageUtils.getResistanceNotice.mockReturnValue('Goblin resists fire');
 
-            makeSanctuaryScenario(targetInCube, true);
+            makeSanctuaryScenario(true, 'fire');
 
             const result = await buildAttackContextForDamage(
                 makeAttackContext({ damageType: 'fire' }),
@@ -638,14 +635,12 @@ describe('buildAttackContextForDamage', () => {
         });
 
         it('matches sanctuary resistance case-insensitively', async () => {
-            mapsService.loadMapData.mockResolvedValue(makeMapData([attackerPlayer, targetInCube]));
+            mapsService.loadMapData.mockResolvedValue(makeMapData([attackerPlayer]));
             rangeValidation.rangeToFeet.mockReturnValue(0);
             coverService.computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
 
             runtimeState.getRuntimeValue
-                .mockReturnValueOnce('true')
-                .mockReturnValueOnce('5')
-                .mockReturnValueOnce('10')
+                .mockReturnValueOnce(['Goblin'])
                 .mockReturnValueOnce('Fire');
 
             const result = await buildAttackContextForDamage(

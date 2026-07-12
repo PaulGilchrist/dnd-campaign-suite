@@ -18,16 +18,16 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
   rangeToFeet: vi.fn(),
 }));
 
-vi.mock('../../../maps/mapsService.js', () => ({
-  loadMapData: vi.fn(),
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+  getCombatContext: vi.fn(),
 }));
 
-import { handle, handleMove } from './naturesSanctuaryHandler.js';
+import { handle, handleMove, activateNaturesSanctuary, moveNaturesSanctuary } from './naturesSanctuaryHandler.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as expirations from '../../../rules/effects/expirations.js';
 import * as logService from '../../../ui/logService.js';
 import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
-import * as mapsService from '../../../maps/mapsService.js';
+import * as damageUtils from '../../../rules/combat/damageUtils.js';
 
 const campaignName = 'test-campaign';
 
@@ -78,15 +78,22 @@ function makeMoveAction(overrides = {}) {
   };
 }
 
+const mockCreatures = [
+  { name: 'Druid', type: 'player', currentHp: 50, maxHp: 50 },
+  { name: 'Goblin', type: 'monster', currentHp: 7, maxHp: 7 },
+  { name: 'Wolf', type: 'monster', currentHp: 11, maxHp: 11 },
+  { name: 'Ally', type: 'npc', currentHp: 30, maxHp: 30 },
+];
+
 beforeEach(() => {
   vi.resetAllMocks();
   rangeValidation.rangeToFeet.mockReturnValue(120);
-  mapsService.loadMapData.mockResolvedValue(null);
+  damageUtils.getCombatContext.mockResolvedValue({ creatures: mockCreatures });
 });
 
 describe("Nature's Sanctuary Handler", () => {
   describe('handle (activation)', () => {
-    it('activates sanctuary and returns popup info', async () => {
+    it('returns modal with creature targets excluding self', async () => {
       useRuntimeState.getRuntimeValue.mockImplementation((player, key) => {
         if (key === 'wildShapeUses') return 3;
         if (key === 'naturesSanctuaryActive') return null;
@@ -98,40 +105,12 @@ describe("Nature's Sanctuary Handler", () => {
 
       const result = await handle(action, playerStats, campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe("Nature's Sanctuary");
-      expect(result.payload.automationType).toBe('nature_sanctuary');
-      expect(result.payload.description).toContain('activated');
-      expect(result.payload.description).toContain('15-foot cube');
-      expect(result.payload.description).toContain('Half Cover');
-      expect(result.payload.description).toContain('1 minute');
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Druid',
-        'wildShapeUses',
-        2,
-        campaignName,
-      );
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Druid',
-        'naturesSanctuaryActive',
-        true,
-        campaignName,
-      );
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        'Druid',
-        'Druid',
-        [{ type: 'remove_natures_sanctuary' }],
-        campaignName,
-      );
-      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
-        type: 'ability_use',
-        characterName: 'Druid',
-        abilityName: "Nature's Sanctuary",
-        description: 'Druid activated Nature\'s Sanctuary.',
-        timestamp: expect.any(Number),
-      });
-      expect(mapsService.loadMapData).not.toHaveBeenCalled();
+      expect(result.type).toBe('modal');
+      expect(result.modalName).toBe('naturesSanctuaryCreatures');
+      expect(result.payload.creatureTargets).toHaveLength(4);
+      expect(result.payload.creatureTargets.map(t => t.name)).toEqual(['Druid', 'Goblin', 'Wolf', 'Ally']);
+      expect(result.payload.isMove).toBe(false);
+      expect(result.payload.defaultSelected).toBeUndefined();
     });
 
     it('returns error when no wild shape uses remain', async () => {
@@ -152,7 +131,6 @@ describe("Nature's Sanctuary Handler", () => {
       );
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
       expect(expirations.addExpiration).not.toHaveBeenCalled();
-      expect(logService.addEntry).not.toHaveBeenCalled();
     });
 
     it('returns error when sanctuary is already active', async () => {
@@ -169,16 +147,39 @@ describe("Nature's Sanctuary Handler", () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('already active');
-      expect(result.payload.description).toContain('Bonus Action');
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
       expect(expirations.addExpiration).not.toHaveBeenCalled();
-      expect(logService.addEntry).not.toHaveBeenCalled();
+    });
+
+    it('sets up expiration and resolves land resistance', async () => {
+      useRuntimeState.getRuntimeValue.mockImplementation((player, key) => {
+        if (key === 'wildShapeUses') return 3;
+        if (key === 'naturesSanctuaryActive') return null;
+        return null;
+      });
+
+      const action = makeAction();
+      const playerStats = makePlayerStats();
+
+      await handle(action, playerStats, campaignName, null);
+
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Druid',
+        'naturesSanctuaryResistance',
+        'Lightning',
+        campaignName,
+      );
+      expect(expirations.addExpiration).toHaveBeenCalledWith(
+        'Druid',
+        'Druid',
+        [{ type: 'remove_natures_sanctuary' }],
+        campaignName,
+      );
     });
 
     it.each([
       ['Arid', 'Fire'],
       ['Polar', 'Cold'],
-      ['Temperate', 'Lightning'],
       ['Tropical', 'Poison'],
     ])(
       'resists %s land type (%s)',
@@ -206,108 +207,13 @@ describe("Nature's Sanctuary Handler", () => {
         );
       },
     );
-
-    it('sets cube position from map when player is on a map', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'wildShapeUses') return 3;
-        if (key === 'naturesSanctuaryActive') return null;
-        return null;
-      });
-
-      const action = makeAction();
-      const playerStats = makePlayerStats();
-      const mapName = 'battlefield';
-
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: 'Druid', gridX: 10, gridY: 20 }],
-      });
-
-      await handle(action, playerStats, campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Druid',
-        'naturesSanctuaryCubeX',
-        10,
-        campaignName,
-      );
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Druid',
-        'naturesSanctuaryCubeY',
-        20,
-        campaignName,
-      );
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Druid',
-        'naturesSanctuaryRange',
-        120,
-        campaignName,
-      );
-    });
-
-    it('handles missing class data gracefully', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'wildShapeUses') return 3;
-        if (key === 'naturesSanctuaryActive') return null;
-        return null;
-      });
-
-      const action = makeAction();
-      const playerStats = makePlayerStats({ class: undefined });
-
-      const result = await handle(action, playerStats, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Druid',
-        'naturesSanctuaryActive',
-        true,
-        campaignName,
-      );
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        'Druid',
-        'naturesSanctuaryResistance',
-        expect.anything(),
-        campaignName,
-      );
-    });
-
-    it('uses custom range when provided in automation config', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'wildShapeUses') return 3;
-        if (key === 'naturesSanctuaryActive') return null;
-        return null;
-      });
-
-      rangeValidation.rangeToFeet.mockReturnValue(60);
-
-      const action = makeAction({
-        automation: { range: '60_ft' },
-      });
-      const playerStats = makePlayerStats();
-      const mapName = 'battlefield';
-
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: 'Druid', gridX: 1, gridY: 2 }],
-      });
-
-      await handle(action, playerStats, campaignName, mapName);
-
-      expect(rangeValidation.rangeToFeet).toHaveBeenCalledWith('60_ft');
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Druid',
-        'naturesSanctuaryRange',
-        60,
-        campaignName,
-      );
-    });
   });
 
-  describe('handleMove (bonus action)', () => {
-    it('moves sanctuary and decrements moves', async () => {
+  describe('handleMove', () => {
+    it('returns modal with creature targets and defaultSelected', async () => {
       useRuntimeState.getRuntimeValue.mockImplementation((player, key) => {
         if (key === 'naturesSanctuaryActive') return true;
-        if (key === 'naturesSanctuaryMoves') return 1;
+        if (key === 'naturesSanctuaryCreatures') return ['Goblin', 'Wolf'];
         return null;
       });
 
@@ -316,17 +222,11 @@ describe("Nature's Sanctuary Handler", () => {
 
       const result = await handleMove(action, playerStats, campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.automationType).toBe('nature_sanctuary_move');
-      expect(result.payload.description).toContain('moved the cube');
-      expect(result.payload.description).toContain('0 move');
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Druid',
-        'naturesSanctuaryMoves',
-        0,
-        campaignName,
-      );
+      expect(result.type).toBe('modal');
+      expect(result.modalName).toBe('naturesSanctuaryCreatures');
+      expect(result.payload.creatureTargets).toHaveLength(4);
+      expect(result.payload.defaultSelected).toEqual(['Goblin', 'Wolf']);
+      expect(result.payload.isMove).toBe(true);
     });
 
     it('returns error when sanctuary not active', async () => {
@@ -342,63 +242,186 @@ describe("Nature's Sanctuary Handler", () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('not currently active');
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
+  });
 
-    it('returns error when no moves remaining', async () => {
+  describe('activateNaturesSanctuary', () => {
+    it('activates sanctuary and stores creature list', async () => {
+      const action = makeAction();
+      const playerStats = makePlayerStats();
+      const targetNames = ['Goblin', 'Wolf', 'Ally'];
+
       useRuntimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'naturesSanctuaryActive') return true;
-        if (key === 'naturesSanctuaryMoves') return 0;
+        if (key === 'wildShapeUses') return 3;
         return null;
       });
 
-      const action = makeMoveAction();
-      const playerStats = makePlayerStats();
-
-      const result = await handleMove(action, playerStats, campaignName, null);
+      const result = await activateNaturesSanctuary(action, playerStats, campaignName, null, targetNames);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('no moves remaining');
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('uses movesPerDuration from automation config', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'naturesSanctuaryActive') return true;
-        if (key === 'naturesSanctuaryMoves') return 2;
-        return null;
-      });
-
-      const action = makeMoveAction({
-        automation: { movesPerDuration: 2 },
-      });
-      const playerStats = makePlayerStats();
-
-      const result = await handleMove(action, playerStats, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('1 move');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.name).toBe("Nature's Sanctuary");
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Druid',
-        'naturesSanctuaryMoves',
-        1,
+        'wildShapeUses',
+        2,
+        campaignName,
+      );
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Druid',
+        'naturesSanctuaryActive',
+        true,
+        campaignName,
+      );
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Druid',
+        'naturesSanctuaryCreatures',
+        ['Goblin', 'Wolf', 'Ally'],
+        campaignName,
+      );
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Druid',
+        'naturesSanctuaryRange',
+        120,
+        campaignName,
+      );
+      expect(expirations.addExpiration).not.toHaveBeenCalled();
+      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'ability_use',
+        characterName: 'Druid',
+        abilityName: "Nature's Sanctuary",
+        description: expect.stringContaining('Goblin, Wolf, Ally'),
+        timestamp: expect.any(Number),
+      });
+    });
+
+    it('handles empty creature list', async () => {
+      const action = makeAction();
+      const playerStats = makePlayerStats();
+
+      useRuntimeState.getRuntimeValue.mockImplementation((player, key) => {
+        if (key === 'wildShapeUses') return 3;
+        return null;
+      });
+
+      const result = await activateNaturesSanctuary(action, playerStats, campaignName, null, []);
+
+      expect(result.type).toBe('popup');
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Druid',
+        'naturesSanctuaryCreatures',
+        [],
         campaignName,
       );
     });
+  });
 
-    it('uses custom move range from automation config', async () => {
+  describe('moveNaturesSanctuary', () => {
+    it('updates creature list and logs delta with added creatures', async () => {
+      const action = makeMoveAction();
+      const playerStats = makePlayerStats();
+      const targetNames = ['Goblin', 'Wolf', 'Ally', 'Orc'];
+
       useRuntimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'naturesSanctuaryActive') return true;
-        if (key === 'naturesSanctuaryMoves') return 1;
+        if (key === 'naturesSanctuaryCreatures') return ['Goblin', 'Wolf'];
         return null;
       });
 
+      const result = await moveNaturesSanctuary(action, playerStats, campaignName, targetNames);
+
+      expect(result.type).toBe('popup');
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Druid',
+        'naturesSanctuaryCreatures',
+        ['Goblin', 'Wolf', 'Ally', 'Orc'],
+        campaignName,
+      );
+      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'ability_use',
+        characterName: 'Druid',
+        abilityName: "Nature's Sanctuary (Move)",
+        description: expect.stringContaining('Added: Ally, Orc'),
+        timestamp: expect.any(Number),
+      });
+    });
+
+    it('logs delta with removed creatures', async () => {
+      const action = makeMoveAction();
+      const playerStats = makePlayerStats();
+      const targetNames = ['Goblin'];
+
+      useRuntimeState.getRuntimeValue.mockImplementation((player, key) => {
+        if (key === 'naturesSanctuaryCreatures') return ['Goblin', 'Wolf', 'Ally'];
+        return null;
+      });
+
+      await moveNaturesSanctuary(action, playerStats, campaignName, targetNames);
+
+      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'ability_use',
+        characterName: 'Druid',
+        abilityName: "Nature's Sanctuary (Move)",
+        description: expect.stringContaining('Removed: Wolf, Ally'),
+        timestamp: expect.any(Number),
+      });
+    });
+
+    it('logs delta with both added and removed creatures', async () => {
+      const action = makeMoveAction();
+      const playerStats = makePlayerStats();
+      const targetNames = ['Ally', 'Orc'];
+
+      useRuntimeState.getRuntimeValue.mockImplementation((player, key) => {
+        if (key === 'naturesSanctuaryCreatures') return ['Goblin', 'Wolf'];
+        return null;
+      });
+
+      await moveNaturesSanctuary(action, playerStats, campaignName, targetNames);
+
+      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'ability_use',
+        characterName: 'Druid',
+        abilityName: "Nature's Sanctuary (Move)",
+        description: expect.stringContaining('Added: Ally, Orc'),
+        timestamp: expect.any(Number),
+      });
+      const callArgs = logService.addEntry.mock.calls[0][1];
+      expect(callArgs.description).toContain('Removed: Goblin, Wolf');
+    });
+
+    it('handles no changes in creature list', async () => {
+      const action = makeMoveAction();
+      const playerStats = makePlayerStats();
+      const targetNames = ['Goblin', 'Wolf'];
+
+      useRuntimeState.getRuntimeValue.mockImplementation((player, key) => {
+        if (key === 'naturesSanctuaryCreatures') return ['Goblin', 'Wolf'];
+        return null;
+      });
+
+      await moveNaturesSanctuary(action, playerStats, campaignName, targetNames);
+
+      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'ability_use',
+        characterName: 'Druid',
+        abilityName: "Nature's Sanctuary (Move)",
+        description: expect.stringContaining('No creatures added or removed'),
+        timestamp: expect.any(Number),
+      });
+    });
+
+    it('uses custom move range from automation config', async () => {
       const action = makeMoveAction({
         automation: { moveRange: 30 },
       });
       const playerStats = makePlayerStats();
 
-      const result = await handleMove(action, playerStats, campaignName, null);
+      useRuntimeState.getRuntimeValue.mockImplementation((player, key) => {
+        if (key === 'naturesSanctuaryCreatures') return ['Goblin'];
+        return null;
+      });
+
+      const result = await moveNaturesSanctuary(action, playerStats, campaignName, ['Goblin']);
 
       expect(result.payload.description).toContain('30 feet');
     });

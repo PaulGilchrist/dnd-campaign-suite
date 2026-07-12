@@ -309,10 +309,9 @@ describe('clearExpirationEffects effect types (via clearAllExpirationEffects)', 
         checks: [
           { key: 'naturesSanctuaryActive', value: null },
           { key: 'naturesSanctuaryMoves', value: null },
-          { key: 'naturesSanctuaryCubeX', value: null },
-          { key: 'naturesSanctuaryCubeY', value: null },
           { key: 'naturesSanctuaryRange', value: null },
           { key: 'naturesSanctuaryResistance', value: null },
+          { key: 'naturesSanctuaryCreatures', value: null },
         ],
       },
       {
