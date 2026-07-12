@@ -37,9 +37,29 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
             }
          } catch (_e) { /* ignore */ }
         return 0;
-     }, [playerStats.name, campaignName]);
+      }, [playerStats.name, campaignName]);
 
-        const getSkillBonus = useCallback((skill) => {
+      const getSaveBonus = useCallback((abilityName) => {
+         if (!conditionEffects?.saveBonusExpression) return 0;
+         const abbr = abilityName.substring(0, 3).toUpperCase();
+         if (conditionEffects.saveBonusAbilities && !conditionEffects.saveBonusAbilities.includes(abbr)) return 0;
+         try {
+             const parts = conditionEffects.saveBonusExpression.split('+').map(p => p.trim());
+             let total = 0;
+             for (const part of parts) {
+                 if (part.includes('wisdom_modifier')) {
+                     const wisAbility = playerStats?.abilities?.find(a => a.name === 'Wisdom');
+                     total += wisAbility?.bonus || 0;
+                 } else {
+                     const parsed = parseInt(part, 10);
+                     if (!isNaN(parsed)) total += parsed;
+                 }
+             }
+             return total;
+         } catch (_e) { return 0; }
+      }, [playerStats?.abilities, conditionEffects?.saveBonusExpression, conditionEffects?.saveBonusAbilities]);
+
+         const getSkillBonus = useCallback((skill) => {
              let bonus = skill.bonus - exhaustionPenalty;
              const isCharismaSkill = ['Deception', 'Intimidation', 'Performance', 'Persuasion'].includes(skill.name);
              if (conditionEffects?.wisCheckReplace && isCharismaSkill) {
@@ -267,17 +287,18 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                           const checkBonus = getAbilityCheckBonus(ability, conditionEffects);
                           rollAbilityCheck(ability.name, checkBonus - exhaustionPenalty + getCosmicOmenBonus(), checkCtx);
                         }}>{signFormatter.format(getAbilityCheckBonus(ability, conditionEffects) - exhaustionPenalty + getCosmicOmenBonus())}</div>
-                      <div className={'clickable' + (exhaustionPenalty > 0 || autoFailSave || conditionEffects?.saveDisadvantage?.length > 0 ? ' stat--penalized' : '') + (hasSaveAdvantage(ability.name) ? ' stat--buffed' : '')} onClick={() => {
-                          if (!autoFailSave) {
-                            const saveCtx = { ...saveContext };
-                            const biDie = getRuntimeValue(playerStats.name, 'bardicInspirationDie', campaignName);
-                            if (biDie) {
-                              saveCtx.bardicInspiration = true;
-                              saveCtx.bardicInspirationDie = biDie;
-                            }
-                            rollSavingThrow(ability.name, ability.save - exhaustionPenalty + getCosmicOmenBonus(), saveCtx);
-                          }
-                        }} title={getSaveAdvantageSource()}>{autoFailSave ? 'AUTO FAIL' : signFormatter.format(ability.save - exhaustionPenalty + getCosmicOmenBonus())}{hasSaveAdvantage(ability.name) ? ' (Adv)' : ''}</div>
+                       <div className={'clickable' + (exhaustionPenalty > 0 || autoFailSave || conditionEffects?.saveDisadvantage?.length > 0 ? ' stat--penalized' : '') + (hasSaveAdvantage(ability.name) ? ' stat--buffed' : '')} onClick={() => {
+                           if (!autoFailSave) {
+                             const saveCtx = { ...saveContext };
+                             const biDie = getRuntimeValue(playerStats.name, 'bardicInspirationDie', campaignName);
+                             if (biDie) {
+                               saveCtx.bardicInspiration = true;
+                               saveCtx.bardicInspirationDie = biDie;
+                             }
+                             const saveBonus = getSaveBonus(ability.name);
+                             rollSavingThrow(ability.name, ability.save + saveBonus - exhaustionPenalty + getCosmicOmenBonus(), saveCtx);
+                           }
+                         }} title={getSaveAdvantageSource()}>{autoFailSave ? 'AUTO FAIL' : signFormatter.format(ability.save + getSaveBonus(ability.name) - exhaustionPenalty + getCosmicOmenBonus())}{hasSaveAdvantage(ability.name) ? ' (Adv)' : ''}</div>
                      <div className='left'>{ability.skills.map((skill) => {
                           const skillBonus = getSkillBonus(skill);
                           const isExpert = playerStats.expertise?.includes(skill.name);

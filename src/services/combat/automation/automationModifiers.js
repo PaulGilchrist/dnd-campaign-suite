@@ -250,6 +250,17 @@ export function collectSaveModifiers(features) {
                     effect: 'overchannel',
                 })
             }
+            if (auto.type === 'conditional_save_bonus') {
+                const abilities = auto.abilities || (auto.saveType ? [auto.saveType.toUpperCase()] : []);
+                modifiers.push({
+                    source: feature.name,
+                    target: auto.target,
+                    condition: auto.condition,
+                    effect: 'save_bonus',
+                    abilities,
+                    bonusExpression: auto.bonusExpression || '0',
+                })
+            }
             if (auto.type === 'conditional_disadvantage') {
                 const abilities = auto.abilities || (auto.saveType ? [auto.saveType.toUpperCase()] : []);
                 const target = auto.target || 'attack_roll';

@@ -658,4 +658,57 @@ describe('collectSaveModifiers', () => {
       expect(result[0].source).toBe('Valid Feature')
     })
   })
+
+  describe('conditional_save_bonus type', () => {
+    it('extracts save bonus modifier from feature with abilities array', () => {
+      const features = [{
+        name: 'Increased Toughness',
+        automation: {
+          type: 'conditional_save_bonus',
+          abilities: ['CON'],
+          target: 'saving_throw',
+          condition: 'shape_shift',
+          bonusExpression: 'wisdom_modifier'
+        }
+      }]
+      const result = collectSaveModifiers(features)
+      expect(result).toEqual([{
+        source: 'Increased Toughness',
+        target: 'saving_throw',
+        condition: 'shape_shift',
+        effect: 'save_bonus',
+        abilities: ['CON'],
+        bonusExpression: 'wisdom_modifier'
+      }])
+    })
+
+    it('converts saveType to uppercase abilities', () => {
+      const features = [{
+        name: 'Feature',
+        automation: {
+          type: 'conditional_save_bonus',
+          saveType: 'con',
+          target: 'saving_throw',
+          condition: 'test',
+          bonusExpression: '2'
+        }
+      }]
+      const result = collectSaveModifiers(features)
+      expect(result[0].abilities).toEqual(['CON'])
+    })
+
+    it('returns empty abilities when neither abilities nor saveType provided', () => {
+      const features = [{
+        name: 'Feature',
+        automation: {
+          type: 'conditional_save_bonus',
+          target: 'saving_throw',
+          condition: 'test',
+          bonusExpression: '1'
+        }
+      }]
+      const result = collectSaveModifiers(features)
+      expect(result[0].abilities).toEqual([])
+    })
+  })
 })

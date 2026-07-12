@@ -290,6 +290,12 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
     else if (mod.effect === 'ray_of_enfeeble_damage_reduction') {
       effects.rayOfEnfeebleDamageReduction = true;
     }
+    else if (mod.effect === 'save_bonus') {
+      if (mod.abilities && mod.abilities.length > 0) {
+        effects.saveBonusAbilities = [...(effects.saveBonusAbilities || []), ...mod.abilities];
+      }
+      effects.saveBonusExpression = (effects.saveBonusExpression || '0') + ' + ' + (mod.bonusExpression || '0');
+    }
   }
 }
 
@@ -382,6 +388,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     toppleSaveType: null,
     toppleSaveDc: null,
     toppleSaveAbility: null,
+    saveBonusExpression: null,
    }
 
   const conditionSet = new Set(conditions)
