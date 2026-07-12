@@ -247,6 +247,7 @@ describe('starryFormHandler', () => {
           expect.objectContaining({
             effect: 'starry_form',
             constellation: 'Archer',
+            resistanceTypes: ['Bludgeoning', 'Piercing', 'Slashing'],
           }),
         ]),
         campaignName,
@@ -273,6 +274,7 @@ describe('starryFormHandler', () => {
           expect.objectContaining({
             effect: 'starry_form',
             constellation: 'Chalice',
+            resistanceTypes: ['Bludgeoning', 'Piercing', 'Slashing'],
           }),
         ]),
         campaignName,
@@ -298,7 +300,7 @@ describe('starryFormHandler', () => {
         'TestSorcerer',
         'activeBuffs',
         expect.arrayContaining([
-          expect.objectContaining({ effect: 'starry_form' }),
+          expect.objectContaining({ effect: 'starry_form', resistanceTypes: ['Bludgeoning', 'Piercing', 'Slashing'] }),
         ]),
         campaignName,
       );
@@ -324,6 +326,7 @@ describe('starryFormHandler', () => {
           expect.objectContaining({
             effect: 'fly_speed_20_hover',
             flySpeed: 20,
+            resistanceTypes: ['Bludgeoning', 'Piercing', 'Slashing'],
           }),
         ]),
         campaignName,

@@ -112,6 +112,13 @@ const rulesFactory = {
                         return [];
                     }
                 }
+                if (p.name === 'Full of Stars') {
+                    const activeBuffs = getRuntimeValue(playerSummary.name, 'activeBuffs', playerSummary.campaignName);
+                    const starryFormActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Starry Form');
+                    if (!starryFormActive) {
+                        return [];
+                    }
+                }
                 return damageTypes;
             });
         if (autoResistances.length) {

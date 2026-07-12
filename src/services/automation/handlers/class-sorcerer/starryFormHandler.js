@@ -97,6 +97,7 @@ export async function applyConstellationOption(action, playerStats, campaignName
         constellation: optionName,
         duration: auto.duration || '1_minute',
         hasAutomation: true,
+        resistanceTypes: ['Bludgeoning', 'Piercing', 'Slashing'],
     };
     if (optionName === 'Dragon' && isTwinkled) {
         buffEntry.effect = 'fly_speed_20_hover';

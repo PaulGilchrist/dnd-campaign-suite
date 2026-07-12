@@ -57,6 +57,7 @@ export async function applyConstellationOption(action, playerStats, campaignName
         constellation: optionName,
         duration: '1_minute',
         hasAutomation: true,
+        resistanceTypes: ['Bludgeoning', 'Piercing', 'Slashing'],
     };
 
     if (optionName === 'Dragon' && isTwinkled) {

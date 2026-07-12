@@ -50,7 +50,7 @@
   "class": {
     "name": "Barbarian",
     "subclass": {
-      "name": "Path of the Berserker",
+      "name": "Path of the Zealot",
       "type": ""
     },
     "divineOrder": "",
@@ -60,7 +60,10 @@
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Orc"
+    "name": "Orc",
+    "subrace": {
+      "name": ""
+    }
   },
   "immunities": [],
   "inventory": {
