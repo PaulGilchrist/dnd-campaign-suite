@@ -176,7 +176,17 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const baseResistances = playerStats.resistances || [];
     const auraResistances = auraComboEffects?.resistances || [];
     const auraResistanceSource = auraComboEffects?.resistanceSource || null;
-    const allResistances = [...new Set([...baseResistances, ...auraResistances])];
+
+    const stormbornResistances = (playerStats.automation?.passives || [])
+        .filter(p => p.type === 'resistance' && p.name === 'Stormborn')
+        .flatMap(p => p.damageTypes || []);
+
+    const wrathOfTheSeaActive = useRuntimeValue(playerStats.name, 'wrathOfTheSeaActive', campaignName);
+    const stormbornResistancesActive = wrathOfTheSeaActive && stormbornResistances.length > 0
+        ? stormbornResistances
+        : [];
+
+    const allResistances = [...new Set([...baseResistances, ...auraResistances, ...stormbornResistancesActive])];
 
     let flySpeed = null;
     let swimSpeed = null;
@@ -242,7 +252,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         swimSpeed = speed;
     }
     const stormbornPassive = (playerStats.automation?.passives || []).find(p => p.effect === 'fly_speed_equals_walk_speed');
-    if (stormbornPassive && flySpeed === null) {
+    if (stormbornPassive && flySpeed === null && wrathOfTheSeaActive) {
         flySpeed = speed;
     }
     const totalSpeedWithBuff = totalSpeed + buffSpeedBonus;

@@ -331,6 +331,10 @@ describe('CharSummary - Passive Buff Effects', () => {
     });
 
     it('sets fly speed when stormborn passive is present and no fly speed exists', () => {
+        useRuntimeValue.mockImplementation((name, key, _campaign) => {
+            if (key === 'wrathOfTheSeaActive') return true;
+            return null;
+        });
         const stats = {
             ...mockPlayerStats,
             automation: {

@@ -5,6 +5,7 @@ import classRules from '../character/classRules.js';
 import classRules2024 from '../character/classRules2024.js';
 import { computeTrackedResources } from './trackedResources.js';
 import { getChosenRuntimeValue } from '../automation/common/choiceStorage.js';
+import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 const rulesFactory = {
       /**
@@ -104,6 +105,12 @@ const rulesFactory = {
                 if (!Array.isArray(damageTypes)) {
                     console.error('rulesFactory.getPlayerStats: expected damageTypes array');
                     throw new Error('Expected damageTypes to be an array');
+                }
+                if (p.name === 'Stormborn') {
+                    const wrathActive = getRuntimeValue(playerSummary.name, 'wrathOfTheSeaActive', playerSummary.campaignName);
+                    if (!wrathActive) {
+                        return [];
+                    }
                 }
                 return damageTypes;
             });
