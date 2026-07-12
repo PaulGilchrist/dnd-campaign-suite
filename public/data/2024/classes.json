@@ -3711,7 +3711,7 @@
                 "features": [
                     {
                         "name": "Circle Forms",
-                        "description": "Challenge Rating equals Druid level divided by 3 (round down). AC equals 13 + Wisdom modifier if higher than Beast's AC. Temporary Hit Points equal to three times your Druid level.",
+                        "description": "You can channel lunar magic when you assume a Wild Shape form, granting you the benefits below.<ul><li><b>Challenge Rating:</b> The maximum Challenge Rating for the form equals your Druid level divided by 3 (round down).</li><li><b>Armor Class:</b> Until you leave the form, your AC equals 13 plus your Wisdom modifier if that total is higher than the Beast's AC.</li><li><b>Temporary Hit Points:</b> You gain a number of TemporaryHit Points equal to three times your Druid level.</li></ul>",
                         "level": 3,
                         "automation": {
                             "type": "passive_buff",
