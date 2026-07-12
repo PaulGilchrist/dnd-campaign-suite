@@ -162,7 +162,6 @@ export function createLogAndShow(deps) {
         const effectiveAc = target ? targetAc + coverAcBonus + (context?.gloriousDefenseBonus || 0) + (context?.defensiveDuelistBonus || 0) + (context?.baitAndSwitchBonus || 0) + getShieldAcBonus(target.name, campaignName) + getShieldOfFaithAcBonus(target.name, campaignName) : undefined;
         let hit = isAutoMiss ? false : (target ? (effectiveD20Roll + bonus >= effectiveAc) : undefined);
         const targetName = (rollType === 'attack' || rollType === 'save') ? (target?.name || context?.targetName) : undefined;
-        console.log('[useLoggedDiceRollAttack] targetName resolved:', { rollType, targetFromCombatSummary: target?.name, contextTargetName: context?.targetName, finalTargetName: targetName, attackerName: context?.attackerName || characterName });
         const attackerName = context?.attackerName || characterName;
 
         if (!hit && !isAutoMiss && rollType === 'attack' && context?.isWeaponAttack) {
@@ -388,7 +387,6 @@ export function createLogAndShow(deps) {
             isAutoCrit: isCrit,
             sneakAttackDice: context?.sneakAttackDice || 0,
         } : undefined;
-        console.log('[useLoggedDiceRollAttack] autoDamage created:', { hasAutoDamage: !!autoDamage, autoDamageTargetName: autoDamage?.targetName, hit, hasAutoDamageFormula: !!context?.autoDamageFormula });
 
         // Apply Death Strike attack_rider (Rogue Assassin level 17) — forces CON save, doubles damage on fail
         if (hit && context?.sneakAttackDice && context?.sneakAttackDice > 0) {

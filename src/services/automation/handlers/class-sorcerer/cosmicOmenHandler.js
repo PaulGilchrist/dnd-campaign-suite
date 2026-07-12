@@ -7,7 +7,6 @@ function getRuntimeUsesKey(featureName) {
 }
 
 export async function handle(action, playerStats, campaignName) {
-    console.log('[cosmicOmenHandler] handle called:', { featureName: action.name, playerName: playerStats.name, campaignName, automation: JSON.stringify(action.automation) });
     const auto = action.automation;
     const playerName = playerStats.name;
     const featureName = action.name || 'Cosmic Omen';
@@ -87,12 +86,10 @@ export async function handle(action, playerStats, campaignName) {
         await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
     }
 
-    console.log('[cosmicOmenHandler] storing cosmicOmenPendingBonus:', { value: d6Value, type: omenEffect.type });
     await setRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus', JSON.stringify({
         value: d6Value,
         type: omenEffect.type,
     }), campaignName);
-    console.log('[cosmicOmenHandler] verified cosmicOmenPendingBonus after set:', { verified: getRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus') });
 
     addEntry(campaignName, {
         type: 'ability_use',

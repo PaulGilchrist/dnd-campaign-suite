@@ -131,30 +131,22 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
       }
     }
 
-    console.log('[SavePromptModal] handleRollSave entry:', { targetName: current.targetName, saveType: current.saveType, saveDc: current.saveDc });
     const roll1 = forceRollTo20Ref.current ? 20 : rollD20();
     const roll2 = current.disadvantage ? rollD20() : roll1;
     const finalRoll = current.disadvantage ? Math.min(roll1, roll2) : hasAdvantage ? Math.max(roll1, roll2) : roll1;
     let cosmicOmenAppliedBonus = 0;
     let cosmicOmenDetail = '';
     const cosmicOmenPendingRaw = getRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus');
-    console.log('[SavePromptModal] cosmicOmen check:', { cosmicOmenPendingRaw, campaignName });
     if (cosmicOmenPendingRaw) {
       try {
         const pending = JSON.parse(cosmicOmenPendingRaw);
-        console.log('[SavePromptModal] cosmicOmen parsed:', { pending, isWeal: pending.type === 'Weal', value: pending.value });
         if (pending && typeof pending.value === 'number' && pending.value > 0) {
           const isWeal = pending.type === 'Weal';
           cosmicOmenAppliedBonus = isWeal ? pending.value : -pending.value;
           cosmicOmenDetail = `(${cosmicOmenAppliedBonus} from ${pending.type})`;
           setRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus', null, campaignName, true);
-          console.log('[SavePromptModal] cosmicOmen applied:', { cosmicOmenAppliedBonus, cosmicOmenDetail });
-        } else {
-          console.log('[SavePromptModal] cosmicOmen condition not met:', { value: pending?.value, type: pending?.type });
         }
-      } catch (_e) { console.error('[SavePromptModal] cosmicOmen parse error:', _e); }
-    } else {
-      console.log('[SavePromptModal] no cosmicOmen pending value found');
+      } catch (_e) { /* ignore */ }
     }
     const total = finalRoll + saveBonus + auraBonus + cosmicOmenAppliedBonus;
     const success = total >= current.saveDc;
