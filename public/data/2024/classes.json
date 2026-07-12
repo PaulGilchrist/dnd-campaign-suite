@@ -3854,7 +3854,7 @@
                     },
                     {
                         "name": "Aquatic Affinity",
-                        "description": "Emanation size increases to 10 feet. Gain Swim Speed equal to your Speed.",
+                        "description": "The size of the Emanation created by your Wrath of the Sea increases to 10 feet. In addition, you gain a Swim Speed equal to your Speed.",
                         "level": 6,
                         "automation": {
                             "type": "passive_buff",
@@ -3865,7 +3865,7 @@
                     },
                     {
                         "name": "Stormborn",
-                        "description": "Gain Fly Speed equal to your Speed. Resistance to Cold, Lightning, and Thunder damage.",
+                        "description": "Your Wrath of the Sea confers two more benefits while active, as detailed below.<ul><li><b>Flight:</b> You gain a Fly Speed equal to your Speed.</li><li><b>Resistance:</b> You have Resistance to Cold, Lightning, and Thunder damage.</li></ul>",
                         "level": 10,
                         "automation": [
                             {
