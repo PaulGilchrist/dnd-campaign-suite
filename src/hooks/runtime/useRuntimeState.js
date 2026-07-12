@@ -159,10 +159,6 @@ export function setRuntimeBatch(characterKey, properties, campaignName) {
     }
     if (!changed) return;
 
-    if (properties.ragePoints !== undefined) {
-        console.log('[setRuntimeBatch] ragePoints update:', { characterKey, campaignName, ragePoints: properties.ragePoints, storeSnapshot: Object.fromEntries(store) });
-    }
-
     const obj = Object.fromEntries(store);
     if (!campaignName) {
         console.error('setRuntimeBatch called with undefined campaignName', { characterKey, properties, stack: new Error().stack });

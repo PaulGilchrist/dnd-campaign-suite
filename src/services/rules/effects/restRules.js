@@ -175,15 +175,6 @@ export async function applyShortRest(playerStats, campaignName) {
     const trackedRage = playerStats._trackedResources?.ragePoints;
     const storedRage = getRuntimeValue(name, 'ragePoints', campaignName);
     const currentRage = storedRage != null ? Number(storedRage) : (trackedRage?.current ?? maxRage);
-    console.log('[applyShortRest] Barbarian 2024 rage recharge:', {
-      name,
-      maxRage,
-      trackedRage,
-      storedRage,
-      currentRage,
-      shouldRecharge: currentRage < maxRage,
-      proposedValue: maxRage > 0 ? Math.min(maxRage, currentRage + 1) : null
-    });
     if (currentRage < maxRage) {
       updates.ragePoints = Math.min(maxRage, currentRage + 1);
     }

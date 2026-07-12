@@ -199,13 +199,10 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         let currentHp = hpBeforeRest + recoveredHp;
         updates.currentHitPoints = Math.min(playerStats.hitPoints, currentHp);
 
-        console.log('[ShortRestModal] handleComplete: class=', playerStats.class?.name, 'rules=', playerStats.rules, 'SHORT_REST_RESOURCES count=', SHORT_REST_RESOURCES.length);
         SHORT_REST_RESOURCES.forEach((key) => {
-            console.log('[ShortRestModal] setting resource to null:', key);
             updates[key] = null;
             });
 
-        console.log('[ShortRestModal] Barbarian check: class=', playerStats.class?.name, 'rules=', playerStats.rules, 'isBarbarian2024=', playerStats.class?.name === 'Barbarian' && playerStats.rules === '2024');
         if (playerStats.class?.name === 'Fighter') {
             const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
             const maxSW = classLevel?.second_wind || 0;
@@ -222,14 +219,6 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
             const trackedRage = playerStats._trackedResources?.ragePoints;
             const storedRage = getRuntimeValue(playerStats.name, 'ragePoints', campaignName);
             const currentRage = storedRage != null ? Number(storedRage) : (trackedRage?.current ?? maxRage);
-            console.log('[ShortRestModal] Barbarian 2024 rage recharge:', {
-                maxRage,
-                trackedRage,
-                storedRage,
-                currentRage,
-                shouldRecharge: currentRage < maxRage,
-                proposedValue: maxRage > 0 ? Math.min(maxRage, currentRage + 1) : null
-            });
             if (currentRage < maxRage) {
                 updates.ragePoints = Math.min(maxRage, currentRage + 1);
             }
