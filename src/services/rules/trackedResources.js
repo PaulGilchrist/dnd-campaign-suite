@@ -224,6 +224,10 @@ export function computeTrackedResources(playerStats) {
   const maxCosmicOmen = isDruid && isCircleOfTheStars && playerStats.level >= 6 ? Math.max(wis?.bonus || 0, 1) : 0
   resources.cosmicomenUses = { current: maxCosmicOmen, max: maxCosmicOmen }
 
+  const isDruidStars = playerStats.class?.name === 'Druid' && isCircleOfTheStars
+  const maxStarMap = isDruidStars && playerStats.level >= 3 ? Math.max(wis?.bonus || 0, 1) : 0
+  resources._Star_Map_freeCastCount = { current: maxStarMap, max: maxStarMap }
+
   return resources
 }
 

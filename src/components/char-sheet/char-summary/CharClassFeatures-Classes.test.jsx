@@ -192,6 +192,16 @@ describe('CharClassFeatures', () => {
             renderComponent(stats);
             expect(screen.getByText(/Free cast used/)).toBeInTheDocument();
         });
+
+        it('renders Star Map free casts for Circle of the Stars at level 6+', () => {
+            const stats = makeStats({
+                level: 6,
+                class: { name: 'Druid', subclass: { name: 'Circle of the Stars' }, class_levels: [{ level: 6 }] },
+                automation: { passives: [] },
+            });
+            renderComponent(stats);
+            expect(screen.getByTestId('tracked-resource-Star Map Free Casts')).toBeInTheDocument();
+        });
     });
 
     describe('Fighter features', () => {

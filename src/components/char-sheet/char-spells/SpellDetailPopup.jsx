@@ -312,12 +312,14 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
       if (spell.name === masteryLevel1 || spell.name === masteryLevel2) {
         // At-will casting, no tracking needed
       } else {
-        const actions = playerStats?.automation?.actions || [];
-        for (const entry of actions) {
+        // Decrement counter-based free cast (single source of truth — must stay in sync with isFreeCastAuthorized)
+        const allActions = [
+          ...(playerStats?.automation?.actions || []),
+          ...(playerStats?.automation?.bonusActions || []),
+          ...(playerStats?.automation?.specialActions || []),
+        ];
+        for (const entry of allActions) {
           if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'misty_wanderer' && entry.type !== 'dragon_companion') continue;
-
-          // Counter-based free casts — match by spell level, not name
-          // Must stay in sync with isFreeCastAuthorized logic above
           if (entry.uses_expression && entry.usesMax) {
             const spellField = Array.isArray(entry.spell) ? entry.spell[0] : entry.spell;
             const levelMatch = spellField ? spellField.match(/level (\d+)/) : null;
@@ -343,10 +345,8 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
             }
             if (featureLevel !== null) continue;
           }
-
           const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
           if (!spells.includes(spell.name)) continue;
-
           if (entry.perSpellTracking) {
             const usedKey = `_${entry.name.replace(/\s+/g, '_')}_${spell.name.replace(/\s+/g, '_')}_used`;
             setRuntimeValue(playerStats.name, usedKey, true, campaignName);
@@ -359,95 +359,6 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
           }
         }
 
-        const bonusActions = playerStats?.automation?.bonusActions || [];
-        for (const entry of bonusActions) {
-          if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'misty_wanderer' && entry.type !== 'dragon_companion') continue;
-
-          if (entry.uses_expression && entry.usesMax) {
-            const spellField = Array.isArray(entry.spell) ? entry.spell[0] : entry.spell;
-            const levelMatch = spellField ? spellField.match(/level (\d+)/) : null;
-            const featureLevel = levelMatch ? parseInt(levelMatch[1], 10) : null;
-            if (featureLevel !== null && featureLevel === spell.level) {
-              const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
-              const count = Number(getRuntimeValue(playerStats.name, freeCastCountKey) ?? entry.usesMax);
-              if (count > 0) {
-                setRuntimeValue(playerStats.name, freeCastCountKey, count - 1, campaignName);
-              }
-              break;
-            }
-            else if (featureLevel === null) {
-              const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
-              if (spells.includes(spell.name)) {
-                const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
-                const count = Number(getRuntimeValue(playerStats.name, freeCastCountKey) ?? entry.usesMax);
-                if (count > 0) {
-                  setRuntimeValue(playerStats.name, freeCastCountKey, count - 1, campaignName);
-                }
-                break;
-              }
-            }
-            if (featureLevel !== null) continue;
-          }
-
-          const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
-          if (!spells.includes(spell.name)) continue;
-
-          if (entry.perSpellTracking) {
-            const usedKey = `_${entry.name.replace(/\s+/g, '_')}_${spell.name.replace(/\s+/g, '_')}_used`;
-            setRuntimeValue(playerStats.name, usedKey, true, campaignName);
-            const entrySpells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
-            for (const s of entrySpells) {
-              const freeKey = `_${entry.name.replace(/\s+/g, '_')}_${s.replace(/\s+/g, '_')}_freeCast`;
-              setRuntimeValue(playerStats.name, freeKey, null, campaignName);
-            }
-            break;
-          }
-        }
-
-        const specialActions = playerStats?.automation?.specialActions || [];
-        for (const entry of specialActions) {
-          if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'misty_wanderer' && entry.type !== 'dragon_companion') continue;
-
-          if (entry.uses_expression && entry.usesMax) {
-            const spellField = Array.isArray(entry.spell) ? entry.spell[0] : entry.spell;
-            const levelMatch = spellField ? spellField.match(/level (\d+)/) : null;
-            const featureLevel = levelMatch ? parseInt(levelMatch[1], 10) : null;
-            if (featureLevel !== null && featureLevel === spell.level) {
-              const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
-              const count = Number(getRuntimeValue(playerStats.name, freeCastCountKey) ?? entry.usesMax);
-              if (count > 0) {
-                setRuntimeValue(playerStats.name, freeCastCountKey, count - 1, campaignName);
-              }
-              break;
-            }
-            else if (featureLevel === null) {
-              const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
-              if (spells.includes(spell.name)) {
-                const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
-                const count = Number(getRuntimeValue(playerStats.name, freeCastCountKey) ?? entry.usesMax);
-                if (count > 0) {
-                  setRuntimeValue(playerStats.name, freeCastCountKey, count - 1, campaignName);
-                }
-                break;
-              }
-            }
-            if (featureLevel !== null) continue;
-          }
-
-          const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
-          if (!spells.includes(spell.name)) continue;
-
-          if (entry.perSpellTracking) {
-            const usedKey = `_${entry.name.replace(/\s+/g, '_')}_${spell.name.replace(/\s+/g, '_')}_used`;
-            setRuntimeValue(playerStats.name, usedKey, true, campaignName);
-            const entrySpells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
-            for (const s of entrySpells) {
-              const freeKey = `_${entry.name.replace(/\s+/g, '_')}_${s.replace(/\s+/g, '_')}_freeCast`;
-              setRuntimeValue(playerStats.name, freeKey, null, campaignName);
-            }
-            break;
-          }
-        }
         const favoredEnemyCount = getRuntimeValue(playerStats.name, '_Favored_Enemy_freeCastCount');
         if (favoredEnemyCount != null) {
           const newCount = Number(favoredEnemyCount);

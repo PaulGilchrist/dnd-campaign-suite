@@ -42,35 +42,35 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName
     };
 
     return (
-         <div data-testid="char-class-barbarian">
-             {hasAspectOfTheWilds && (
-                 <div>
-                     <b>Aspect of the Wilds: </b>
-                     {ASPECT_OPTIONS.map(opt => (
-                         <button
-                             key={opt}
-                             className={'automation-btn' + (aspectChoice === opt ? ' automation-btn--active' : '')}
-                             onClick={() => handleAspectChoice(opt)}
-                             title={`Select ${opt}`}
-                         >
-                             <i className={`fas fa-${opt === 'Owl' ? 'eye' : opt === 'Panther' ? 'paw' : 'fish'}`}></i> {opt}{aspectChoice === opt ? ' ✓' : ''}
-                         </button>
-                     ))}
-                     {aspectChoice && <span className="automation-badge">{aspectChoice} active</span>}
-                 </div>
-             )}
-             <div><b>Extra Attacks: </b>{extraAttacks}</div>
-             <div>
-                 <b>Rage Damage Bonus: </b>
-                 <span className={rageActive ? "stat--buffed" : ""}>{rageDamage}</span>
-                 <button className="automation-btn" onClick={() => setRageActive(!rageActive)} title={rageActive ? "End Rage" : "Enter Rage (toggle for damage bonus)"}>
-                     <i className={`fas fa-${rageActive ? "fire-alt" : "fire"}`}></i> {rageActive ? "Raging" : "Rage"}
-                 </button>
-                 {rageActive && <span className="automation-badge">BPS Resist, STR Adv, +{rageDamage} dmg</span>}
-             </div>
-             <TrackedResourceInput label="Rage Points" resourceKey="ragePoints" playerName={playerStats.name} getMax={() => rageCount} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-            <div><b>Weapon Mastery: </b><span className="clickable" onClick={onWeaponMasteryClick}>{weaponMastery}</span></div>
-        </div>
+          <div data-testid="char-class-barbarian">
+              {hasAspectOfTheWilds && (
+                  <div>
+                      <b>Aspect of the Wilds: </b>
+                      {ASPECT_OPTIONS.map(opt => (
+                          <button
+                              key={opt}
+                              className={'automation-btn' + (aspectChoice === opt ? ' automation-btn--active' : '')}
+                              onClick={() => handleAspectChoice(opt)}
+                              title={`Select ${opt}`}
+                          >
+                              <i className={`fas fa-${opt === 'Owl' ? 'eye' : opt === 'Panther' ? 'paw' : 'fish'}`}></i> {opt}{aspectChoice === opt ? ' ✓' : ''}
+                          </button>
+                      ))}
+                      {aspectChoice && <span className="automation-badge">{aspectChoice} active</span>}
+                  </div>
+              )}
+              <div><b>Extra Attacks: </b>{extraAttacks}</div>
+              <div>
+                  <b>Rage Damage Bonus: </b>
+                  <span className={rageActive ? "stat--buffed" : ""}>{rageDamage}</span>
+                  <button className="automation-btn" onClick={() => setRageActive(!rageActive)} title={rageActive ? "End Rage" : "Enter Rage (toggle for damage bonus)"}>
+                      <i className={`fas fa-${rageActive ? "fire-alt" : "fire"}`}></i> {rageActive ? "Raging" : "Rage"}
+                  </button>
+                  {rageActive && <span className="automation-badge">BPS Resist, STR Adv, +{rageDamage} dmg</span>}
+              </div>
+              <TrackedResourceInput label="Rage Points" resourceKey="ragePoints" playerName={playerStats.name} getMax={() => rageCount} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+              <div><b>Weapon Mastery: </b><span className="clickable" onClick={onWeaponMasteryClick}>{weaponMastery}</span></div>
+         </div>
     );
 };
 
@@ -94,6 +94,14 @@ const BardFeatures = function BardFeatures({ playerStats, campaignName }) {
     return (
            <div data-testid="char-class-bard">
                 {multiMinuteBadges.map((b, i) => <span key={i} className="automation-badge">{b.name}</span>)}
+                {(playerStats.automation?.passives ?? []).some(p => p.type === 'passive_rule' && p.riderSave) && (
+                    <TrackedResourceInput label="Beguiling Magic" resourceKey="postCastRider_Beguiling_Magic" playerName={playerStats.name} getMax={() => 1} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+                )}
+                <div><b>Bardic Inspiration Die: </b>d{bardFeatures?.bardicDie ?? 0}</div>
+                <TrackedResourceInput label="Bardic Inspiration Uses" resourceKey="bardicInspirationUses" playerName={playerStats.name} getMax={() => { const charisma = playerStats.abilities?.find((a) => a.name === 'Charisma'); return charisma?.bonus || 0; }} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+                {playerStats.level > 2 && playerStats.expertise && playerStats.expertise.length > 0 && <div><b>Expertise: </b>{playerStats.expertise.join(', ')}</div>}
+                {playerStats.level > 5 && (bardFeatures?.magicalSecrets ?? false) && <div><b>Extra Attacks: </b>1</div>}
+                {bardFeatures?.magicalSecrets !== null && <TrackedResourceInput label="Magical Secrets" resourceKey="magicalSecrets" playerName={playerStats.name} getMax={() => bardFeatures.magicalSecrets + bardFeatures.subclassMagicalSecrets} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />}
                 {majestyActive && (
                     <button
                         className="automation-btn majesty-badge majesty-badge--active"
@@ -103,14 +111,6 @@ const BardFeatures = function BardFeatures({ playerStats, campaignName }) {
                         <i className="fa-solid fa-shield-halved"></i> Unbreakable Majesty DC {majestyDc}
                     </button>
                 )}
-                <div><b>Bardic Inspiration Die: </b>d{bardFeatures?.bardicDie ?? 0}</div>
-                <TrackedResourceInput label="Bardic Inspiration Uses" resourceKey="bardicInspirationUses" playerName={playerStats.name} getMax={() => { const charisma = playerStats.abilities?.find((a) => a.name === 'Charisma'); return charisma?.bonus || 0; }} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-                {(playerStats.automation?.passives ?? []).some(p => p.type === 'passive_rule' && p.riderSave) && (
-                    <TrackedResourceInput label="Beguiling Magic" resourceKey="postCastRider_Beguiling_Magic" playerName={playerStats.name} getMax={() => 1} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-                )}
-                 {playerStats.level > 2 && playerStats.expertise && playerStats.expertise.length > 0 && <div><b>Expertise: </b>{playerStats.expertise.join(', ')}</div>}
-                {playerStats.level > 5 && (bardFeatures?.magicalSecrets ?? false) && <div><b>Extra Attacks: </b>1</div>}
-                {bardFeatures?.magicalSecrets !== null && <TrackedResourceInput label="Magical Secrets" resourceKey="magicalSecrets" playerName={playerStats.name} getMax={() => bardFeatures.magicalSecrets + bardFeatures.subclassMagicalSecrets} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />}
                 {bardFeatures?.songOfRestDie && <div><b>Song of Rest Die: </b>d{bardFeatures.songOfRestDie}</div>}
             </div>
          );
@@ -183,23 +183,8 @@ const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
     if (playerStats.level < 2) return null;
     return (
            <div data-testid="char-class-druid">
-               {multiMinuteBadges.map((b, i) => <span key={i} className="automation-badge">{b.name}: {formatDuration(b.duration, playerStats)}</span>)}
-               {druidFeatures?.beastKnownForms > 0 && <div><b>Beast Forms Known: </b>{druidFeatures.beastKnownForms}</div>}
-               {hasNaturalRecovery && (
-                   <div>
-                       <div><b>Natural Recovery:</b></div>
-                       {Array.isArray(naturalRecoveryFreeCast) && naturalRecoveryFreeCast.length > 0 && (
-                           <div className="automation-badge"><i className="fa-solid fa-check"></i> Free cast: {naturalRecoveryFreeCast[0]}</div>
-                       )}
-                       {naturalRecoveryFreeCastUsed && (
-                           <div className="automation-badge"><i className="fa-solid fa-check"></i> Free cast used</div>
-                       )}
-                   </div>
-               )}
-               <div><b>Wild Shape Limitations: </b>{druidFeatures.wildShapeLimitations}</div>
-               <div><b>Wild Shape Max Challenge Rating: </b>{druidFeatures?.maxWildShapeChallengeRating}</div>
-                <TrackedResourceInput label="Wild Shape Uses" resourceKey="wildShapeUses" playerName={playerStats.name} getMax={() => druidFeatures?.maxWildShapeUses || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-                {isCircleOfTheMoon && <TrackedResourceInput label="Moonlight Step Uses" resourceKey="moonlightStepUses" playerName={playerStats.name} getMax={() => moonlightStepMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />}
+                {multiMinuteBadges.map((b, i) => <span key={i} className="automation-badge">{b.name}: {formatDuration(b.duration, playerStats)}</span>)}
+                {druidFeatures?.beastKnownForms > 0 && <div><b>Beast Forms Known: </b>{druidFeatures.beastKnownForms}</div>}
                 {isCircleOfTheStars && playerStats.level >= 6 && (
                     <>
                         {cosmicOmenEffect && (() => {
@@ -212,11 +197,27 @@ const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
                             return null;
                         })()}
                         <TrackedResourceInput label="Cosmic Omen Uses" resourceKey="cosmicomenUses" playerName={playerStats.name} getMax={() => Math.max(wis?.bonus || 0, 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+                        <TrackedResourceInput label="Star Map Free Casts" resourceKey="_Star_Map_freeCastCount" playerName={playerStats.name} getMax={() => Math.max(wis?.bonus || 0, 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
                     </>
                 )}
-               {elementalFuryChoice && <span className="automation-badge"><i className="fa-solid fa-bolt"></i> Elemental Fury: {elementalFuryChoice}</span>}
-                {improvedElementalFuryChoice && <span className="automation-badge"><i className="fa-solid fa-bolt"></i> Improved Elemental Fury: {improvedElementalFuryChoice}</span>}
                 {circleOfTheLandType && <span className="automation-badge"><i className="fa-solid fa-mountain-sun"></i> Circle of the Land: {circleOfTheLandType}</span>}
+                {elementalFuryChoice && <span className="automation-badge"><i className="fa-solid fa-bolt"></i> Elemental Fury: {elementalFuryChoice}</span>}
+                {improvedElementalFuryChoice && <span className="automation-badge"><i className="fa-solid fa-bolt"></i> Improved Elemental Fury: {improvedElementalFuryChoice}</span>}
+                {isCircleOfTheMoon && <TrackedResourceInput label="Moonlight Step Uses" resourceKey="moonlightStepUses" playerName={playerStats.name} getMax={() => moonlightStepMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />}
+                {hasNaturalRecovery && (
+                    <div>
+                        <div><b>Natural Recovery:</b></div>
+                        {Array.isArray(naturalRecoveryFreeCast) && naturalRecoveryFreeCast.length > 0 && (
+                            <div className="automation-badge"><i className="fa-solid fa-check"></i> Free cast: {naturalRecoveryFreeCast[0]}</div>
+                        )}
+                        {naturalRecoveryFreeCastUsed && (
+                            <div className="automation-badge"><i className="fa-solid fa-check"></i> Free cast used</div>
+                        )}
+                    </div>
+                )}
+                <div><b>Wild Shape Limitations: </b>{druidFeatures.wildShapeLimitations}</div>
+                <div><b>Wild Shape Max Challenge Rating: </b>{druidFeatures?.maxWildShapeChallengeRating}</div>
+                <TrackedResourceInput label="Wild Shape Uses" resourceKey="wildShapeUses" playerName={playerStats.name} getMax={() => druidFeatures?.maxWildShapeUses || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
                 {wrathOfTheSeaActive && (
                     <span className="automation-badge"><i className="fa-solid fa-water"></i> Wrath of the Sea Active</span>
                 )}
@@ -283,7 +284,7 @@ const FighterFeatures = function FighterFeatures({ playerStats, campaignName, on
                    ))}</span>
                ) : 'N/A'}</div>
                {fightingStylePopup && <Popup html={fightingStylePopup} onClickOrKeyDown={() => setFightingStylePopup(null)} />}
-              <TrackedResourceInput label="Second Wind" resourceKey="secondWindUses" playerName={playerStats.name} getMax={() => classLevel?.second_wind || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+               <TrackedResourceInput label="Second Wind" resourceKey="secondWindUses" playerName={playerStats.name} getMax={() => classLevel?.second_wind || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
                {hasSuperiorityDice && (
                    <>
                    <TrackedResourceInput label="Superiority Dice" resourceKey="superiorityDice" playerName={playerStats.name} getMax={() => superiorityDiceMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
@@ -387,14 +388,13 @@ const RangerFeatures = function RangerFeatures({ playerStats, campaignName }) {
     };
     return (
           <div data-testid="char-class-ranger">
-
-              <div><b>Extra Attacks: </b>{rangerFeatures?.extraAttacks || 0}</div>
-              {playerStats.level >= 2 && (
-                  <TrackedResourceInput label="Favored Enemy" resourceKey="favoredEnemyUses" playerName={playerStats.name} getMax={() => Math.max(1, (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level)?.favored_enemy || 0)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-              )}
               {playerStats.level >= 3 && (
                   <TrackedResourceInput label="Dread Ambush" resourceKey="dreadambushUses" playerName={playerStats.name} getMax={() => Math.max(1, (playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0))} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
               )}
+              {playerStats.level >= 2 && (
+                  <TrackedResourceInput label="Favored Enemy" resourceKey="favoredEnemyUses" playerName={playerStats.name} getMax={() => Math.max(1, (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level)?.favored_enemy || 0)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+              )}
+              {playerStats.level > 2 && playerStats.expertise && playerStats.expertise.length > 0 && <div><b>Expertise: </b>{playerStats.expertise.join(', ')}</div>}
               {playerStats.class.fightingStyles && playerStats.level > 1 && <div><b>Fighting Styles: </b>{(
                   <span>{playerStats.class.fightingStyles.map((style, idx) => (
                       <React.Fragment key={style}>
@@ -406,16 +406,16 @@ const RangerFeatures = function RangerFeatures({ playerStats, campaignName }) {
                   ))}</span>
               )}</div>}
               {fightingStylePopup && <Popup html={fightingStylePopup} onClickOrKeyDown={() => setFightingStylePopup(null)} />}
-              {playerStats.level > 2 && playerStats.expertise && playerStats.expertise.length > 0 && <div><b>Expertise: </b>{playerStats.expertise.join(', ')}</div>}
+              <div><b>Extra Attacks: </b>{rangerFeatures?.extraAttacks || 0}</div>
+              {defensiveTacticsChoice && <span className="automation-badge"><i className="fa-solid fa-shield"></i> {defensiveTacticsChoice}</span>}
               {playerStats.level >= 14 && (
                   <TrackedResourceInput label="Nature's Veil" resourceKey="naturesVeilUses" playerName={playerStats.name} getMax={() => Math.max((playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0), 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
               )}
+              {huntersPreyChoice && <span className="automation-badge"><i className="fa-solid fa-crosshairs"></i> {huntersPreyChoice}</span>}
               {playerStats.level >= 10 && (
                   <TrackedResourceInput label="Tireless" resourceKey="tirelessUses" playerName={playerStats.name} getMax={() => Math.max((playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0), 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
               )}
-              {defensiveTacticsChoice && <span className="automation-badge"><i className="fa-solid fa-shield"></i> {defensiveTacticsChoice}</span>}
-              {huntersPreyChoice && <span className="automation-badge"><i className="fa-solid fa-crosshairs"></i> {huntersPreyChoice}</span>}
-         </div>
+          </div>
     );
 };
 
@@ -597,6 +597,13 @@ const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
     if ((wizardFeatures?.showWizardFeatures ?? true) === false) return null;
     return (
          <div data-testid="char-class-wizard">
+             <div className="automation-actions">
+                 <button className="automation-btn" title="Arcane Recovery: Regain spell slots on short rest">
+                     <i className="fas fa-book-open"></i> Arcane Recovery
+                 </button>
+             </div>
+             <TrackedResourceInput label="Arcane Recovery Levels" resourceKey="arcaneRecoveryLevels" playerName={playerStats.name} getMax={() => wizardFeatures?.arcaneRecoveryLevels || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+             <TrackedResourceInput label="Arcane Ward HP" resourceKey="arcaneWardHp" playerName={playerStats.name} getMax={() => playerStats._trackedResources?.arcaneWardMax?.current || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
              {portentPopup && <Popup html={portentPopup} onClickOrKeyDown={() => setPortentPopup(null)} />}
              {portentModal && (
                  <div className="portent-modal-overlay" onClick={() => setPortentModal(null)}>
@@ -626,13 +633,6 @@ const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
                      </div>
                  </div>
              )}
-             <div className="automation-actions">
-                 <button className="automation-btn" title="Arcane Recovery: Regain spell slots on short rest">
-                     <i className="fas fa-book-open"></i> Arcane Recovery
-                 </button>
-             </div>
-             <TrackedResourceInput label="Arcane Recovery Levels" resourceKey="arcaneRecoveryLevels" playerName={playerStats.name} getMax={() => wizardFeatures?.arcaneRecoveryLevels || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-             <TrackedResourceInput label="Arcane Ward HP" resourceKey="arcaneWardHp" playerName={playerStats.name} getMax={() => playerStats._trackedResources?.arcaneWardMax?.current || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
              {hasPortent && (
                   <div>
                       <b>Portent Dice:</b>
@@ -652,13 +652,13 @@ const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
                       <span className="automation-badge">{portentDice.length} remaining (refreshes on Long Rest)</span>
                   </div>
               )}
-             {hasProjectedWard && (
-                <div className="automation-badge">Projected Ward: Allies within {projectedWardRange} ft. (Reaction)</div>
-             )}
-             {thirdEyeBuff && (
-                 <span className="automation-badge">The Third Eye: {THIRD_EYE_EFFECTS[thirdEyeBuff.effect] || 'Active'}</span>
-             )}
-         </div>
+              {hasProjectedWard && (
+                 <div className="automation-badge">Projected Ward: Allies within {projectedWardRange} ft. (Reaction)</div>
+              )}
+              {thirdEyeBuff && (
+                  <span className="automation-badge">The Third Eye: {THIRD_EYE_EFFECTS[thirdEyeBuff.effect] || 'Active'}</span>
+              )}
+          </div>
     );
 };
 

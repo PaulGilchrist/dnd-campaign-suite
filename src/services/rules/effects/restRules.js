@@ -588,10 +588,20 @@ export async function applyLongRest(playerStats, campaignName) {
         logEntries.push(`Exhaustion: ${currentExhaustion} → ${newExhaustion}`);
     }
 
-    // Circle of the Stars: Cosmic Omen Star Map roll on Long Rest
+    // Circle of the Stars: Star Map free cast count on Long Rest (reset to WIS modifier, min 1)
     const isDruid = playerStats.class?.name === 'Druid'
     const isCircleOfTheStars = playerStats.class?.major?.name === 'Circle of the Stars' || playerStats.class?.subclass?.name === 'Circle of the Stars'
-    if (isDruid && isCircleOfTheStars && playerStats.level >= 6) {
+    if (isDruid && isCircleOfTheStars && playerStats.level >= 3) {
+        const wis = playerStats.abilities?.find(a => a.name === 'Wisdom')
+        const maxUses = Math.max(wis?.bonus || 0, 1)
+        setRuntimeValue(name, '_Star_Map_freeCastCount', maxUses, campaignName, true)
+        logEntries.push(`Star Map free casts: ${maxUses}`)
+    }
+
+    // Circle of the Stars: Cosmic Omen Star Map roll on Long Rest
+    const isDruid2 = playerStats.class?.name === 'Druid'
+    const isCircleOfTheStars2 = playerStats.class?.major?.name === 'Circle of the Stars' || playerStats.class?.subclass?.name === 'Circle of the Stars'
+    if (isDruid2 && isCircleOfTheStars2 && playerStats.level >= 6) {
         const starMapRoll = rollD20()
         const isEven = starMapRoll % 2 === 0
         const omenType = isEven ? 'Weal' : 'Woe'

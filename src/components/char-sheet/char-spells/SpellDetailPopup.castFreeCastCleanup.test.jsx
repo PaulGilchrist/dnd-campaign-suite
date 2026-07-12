@@ -314,6 +314,7 @@ describe('SpellDetailPopup - handleCast: Free cast tracking cleanup', () => {
 
       fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
 
+      expect(onCast).toHaveBeenCalledTimes(1);
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'Elara',
         '_Mystic_Arcanum_freeCastCount',
