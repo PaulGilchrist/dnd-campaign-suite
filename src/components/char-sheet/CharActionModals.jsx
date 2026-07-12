@@ -164,6 +164,7 @@ export default function CharActionModals({
     handleTricksterBlessingConfirm,
     handleBardicInspirationConfirm,
     handleInspiringMovementConfirm,
+    handleOceanicGiftConfirm,
     handleDivineInterventionCast,
     pendingDamage,
     buildCtx,
@@ -921,6 +922,20 @@ export default function CharActionModals({
                     featureDescription="Both you and the chosen ally move up to half your Speeds without provoking Opportunity Attacks."
                     onTargetSelected={handleInspiringMovementConfirm}
                     onSkip={() => handleInspiringMovementConfirm(null)}
+                />
+            )}
+            {modalState.oceanicGiftTargetModal && (
+                <SecondaryTargetModal
+                    title={modalState.oceanicGiftTargetModal.doubleEmanation ? "Oceanic Gift — Choose Ally (Self + Ally, 2 Wild Shape)" : "Oceanic Gift — Choose Ally"}
+                    targets={modalState.oceanicGiftTargetModal.creatureTargets}
+                    confirmLabel="Grant Wrath of the Sea"
+                    confirmIcon="fa-water"
+                    featureDescription={modalState.oceanicGiftTargetModal.doubleEmanation
+                        ? "Manifest the Emanation around both yourself and the chosen ally. Costs 2 Wild Shape uses."
+                        : "Manifest the Emanation around one willing creature within 60 feet. Costs 1 Wild Shape."
+                    }
+                    onTargetSelected={(targetName) => handleOceanicGiftConfirm(targetName)}
+                    onSkip={() => handleOceanicGiftConfirm(null)}
                 />
             )}
         </>

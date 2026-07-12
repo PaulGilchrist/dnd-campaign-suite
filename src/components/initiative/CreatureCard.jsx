@@ -51,6 +51,7 @@ function CreatureCard({
     const isMajestyActive = creature.type === 'player' && isUnbreakableMajestyActive(creature.name, campaignName);
     const majestyDc = isMajestyActive ? getUnbreakableMajestySaveDc(creature.name, campaignName) : 0;
     const wildShapeActive = isBuffActive(creature.name, 'Wild Shape', campaignName);
+    const wrathOfTheSeaActive = creature.type === 'player' && getRuntimeValue(creature.name, 'wrathOfTheSeaActive', campaignName);
 
     const sanctuaryInfo = (() => {
         for (const other of allCreatures) {
@@ -245,6 +246,13 @@ function CreatureCard({
                     <div className='wild-shape-badge-wrapper'>
                         <span className='initiative-wild-shape-badge' title='Wild Shape: Animal form active — spellcasting blocked, resistance types apply'>
                             <i className='fa-solid fa-paw'></i> Wild Shape
+                        </span>
+                    </div>
+                )}
+                {wrathOfTheSeaActive && (
+                    <div className='wrath-of-the-sea-badge-wrapper'>
+                        <span className='initiative-wrath-of-the-sea-badge' title='Wrath of the Sea: Ocean spray emanation active — Bonus Action to force CON save or take WIS modifier d6 Cold damage'>
+                            <i className='fa-solid fa-water'></i> Wrath of the Sea
                         </span>
                     </div>
                 )}

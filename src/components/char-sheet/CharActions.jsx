@@ -33,6 +33,7 @@ import { confirmRadianceOfDawn } from '../../services/automation/handlers/class-
 import { applyBardicInspiration } from '../../services/automation/handlers/class-bard/bardicInspirationHandler.js';
 import { applyInspiringMovement } from '../../services/automation/handlers/reactions/reactionBonusHandler.js';
 import { confirmMantleOfInspiration } from '../../services/automation/handlers/buffs/tempHpBuffHandler.js';
+import { confirmOceanicGift } from '../../services/automation/handlers/class-druid/oceanicGiftHandler.js';
 import { endFriendsOnHostileAction } from '../../services/rules/features/friendsService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
@@ -670,6 +671,18 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         }
     }, [modalState.inspiringMovementAllyModal, setModalState, setPopupHtml]);
 
+    const handleOceanicGiftConfirm = React.useCallback(async (selectedAllyName) => {
+        if (!modalState.oceanicGiftTargetModal) return;
+        const { action, playerStats: ogPlayerStats, campaignName: ogCampaignName, spellSaveDc, wisMod, doubleEmanation } = modalState.oceanicGiftTargetModal;
+        setModalState({ oceanicGiftTargetModal: null });
+        if (!selectedAllyName) return;
+        const result = await confirmOceanicGift(action, ogPlayerStats, ogCampaignName, selectedAllyName, spellSaveDc, wisMod, doubleEmanation);
+        if (!result) return;
+        if (result.type === 'popup') {
+            setPopupHtml(result.payload);
+        }
+    }, [modalState.oceanicGiftTargetModal, setModalState, setPopupHtml]);
+
     async function handleAutomationAction(action) {
         if (cannotAct) return;
 
@@ -893,6 +906,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         break;
                     case 'arcaneWardRestore':
                         setModalState({ arcaneWardRestoreModal: result.payload });
+                        break;
+                    case 'oceanicGiftTarget':
+                        setModalState({ oceanicGiftTargetModal: result.payload });
                         break;
                 }
                 break;
@@ -1133,6 +1149,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleTricksterBlessingConfirm={handleTricksterBlessingConfirm}
                     handleBardicInspirationConfirm={handleBardicInspirationConfirm}
                     handleInspiringMovementConfirm={handleInspiringMovementConfirm}
+                    handleOceanicGiftConfirm={handleOceanicGiftConfirm}
                     handleDivineInterventionCast={handleDivineInterventionCast}
                     pendingDamage={pendingDamage}
                     buildCtx={buildCtx}

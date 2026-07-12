@@ -177,6 +177,7 @@ const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
     const isCircleOfTheMoon = playerStats.class?.major?.name === 'Circle of the Moon' || playerStats.class?.subclass?.name === 'Circle of the Moon';
     const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
     const moonlightStepMax = isCircleOfTheMoon ? Math.max(wis?.bonus || 0, 1) : 0;
+    const wrathOfTheSeaActive = useRuntimeValue(playerStats.name, 'wrathOfTheSeaActive', campaignName);
     if (playerStats.level < 2) return null;
     return (
            <div data-testid="char-class-druid">
@@ -200,7 +201,10 @@ const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
                {elementalFuryChoice && <span className="automation-badge"><i className="fa-solid fa-bolt"></i> Elemental Fury: {elementalFuryChoice}</span>}
                 {improvedElementalFuryChoice && <span className="automation-badge"><i className="fa-solid fa-bolt"></i> Improved Elemental Fury: {improvedElementalFuryChoice}</span>}
                 {circleOfTheLandType && <span className="automation-badge"><i className="fa-solid fa-mountain-sun"></i> Circle of the Land: {circleOfTheLandType}</span>}
-           </div>
+                {wrathOfTheSeaActive && (
+                    <span className="automation-badge"><i className="fa-solid fa-water"></i> Wrath of the Sea Active</span>
+                )}
+            </div>
         );
 };
 

@@ -879,6 +879,29 @@
     font-size: 0.85em;
 }
 
+/* Wrath of the Sea badge */
+.initiative .wrath-of-the-sea-badge-wrapper {
+    position: relative;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+.initiative .initiative-wrath-of-the-sea-badge {
+    padding: 2px 6px;
+    border: 1px solid rgba(59, 130, 246, 0.5);
+    border-radius: 4px;
+    background-color: rgba(59, 130, 246, 0.2);
+    color: inherit;
+    font-size: 0.7em;
+    white-space: nowrap;
+}
+
+.initiative .initiative-wrath-of-the-sea-badge .fa-water {
+    margin-right: 3px;
+    font-size: 0.85em;
+}
+
 /* Nature's Sanctuary badge */
 .initiative .sanctuary-badge-wrapper {
     position: relative;

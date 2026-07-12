@@ -3833,10 +3833,10 @@
                     },
                     {
                         "name": "Wrath of the Sea",
-                        "description": "As a Bonus Action, expend Wild Shape to manifest a 5-foot Emanation of ocean spray for 10 minutes. As a Bonus Action, choose creatures in the Emanation to make Constitution saving throw or take Cold damage (Wisdom modifier d6) and be pushed up to 15 feet.",
+                        "description": "As a Bonus Action, you can expend a use of your Wild Shape to manifest a 5-foot Emanation that takes the form of ocean spray that surrounds you for 10 minutes. It ends early if you dismiss it (no action required), manifest it again, or have the Incapacitated condition. When you manifest the Emanation and as a Bonus Action on your subsequent turns, you can choose another creature you can see in the Emanation. The target must succeed on a Constitution saving throw against your spell save DC or take Cold damage and, if the creature is Large or smaller, be pushed up to 15 feet away fr·o1n you. To determine this damage, roll a number of d6s equal to your Wisdom modifier (minimum of one die).",
                         "level": 3,
                         "automation": {
-                            "type": "save_attack",
+                            "type": "wrath_of_the_sea",
                             "action": "bonus_action",
                             "saveType": "CON",
                             "saveDc": "ability",
@@ -3886,11 +3886,11 @@
                     },
                     {
                         "name": "Oceanic Gift",
-                        "description": "Manifest Emanation around one willing creature within 60 feet. Can also manifest around both yourself and the creature by expending two uses of Wild Shape.",
+                        "description": "Instead of manifesting the Emanation of Wrath of the Sea around yourself, you can manifest it around one willing creature within 60 feet of yourself. That creature gains all the benefits of the Emanation and uses your spell save DC and Wisdom modifier for it. In addition, you can manifest the Emanation around both the other creature and yourself if you expend two uses of your Wild Shape instead of one when manifesting it.",
                         "level": 14,
                         "automation": [
                             {
-                                "type": "save_attack",
+                                "type": "oceanic_gift",
                                 "action": "bonus_action",
                                 "saveType": "CON",
                                 "saveDc": "ability",
@@ -3906,7 +3906,7 @@
                                 "casting_time": "1 bonus action"
                             },
                             {
-                                "type": "save_attack",
+                                "type": "oceanic_gift",
                                 "action": "bonus_action",
                                 "saveType": "CON",
                                 "saveDc": "ability",

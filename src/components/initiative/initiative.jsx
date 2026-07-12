@@ -429,6 +429,10 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                     setRuntimeValue(creature.name, 'invokeDuplicityAdvantageTargets', [], campaignName)
                     setRuntimeValue(creature.name, 'unbreakableMajestyActive', null, campaignName)
                     setRuntimeValue(creature.name, 'unbreakableMajestySaveDc', null, campaignName)
+                    setRuntimeValue(creature.name, 'wrathOfTheSeaActive', null, campaignName)
+                    setRuntimeValue(creature.name, 'wrathOfTheSeaDc', null, campaignName)
+                    setRuntimeValue(creature.name, 'wrathOfTheSeaWisMod', null, campaignName)
+                    setRuntimeValue(creature.name, 'wrathOfTheSeaSource', null, campaignName)
                 }
                 if (creature.concentration?.spell === "Hunter's Mark") {
                     creature.concentration = null

@@ -328,6 +328,12 @@ export async function applyShortRest(playerStats, campaignName) {
     // Reset Hunter's Prey choice on short rest
     updates["_Hunter's_Prey_choice"] = null;
 
+    // Clear Wrath of the Sea badge on short rest
+    updates.wrathOfTheSeaActive = null;
+    updates.wrathOfTheSeaDc = null;
+    updates.wrathOfTheSeaWisMod = null;
+    updates.wrathOfTheSeaSource = null;
+
     setRuntimeBatch(name, updates, campaignName)
 
   clearAllExpirationEffects(name, campaignName)
@@ -427,6 +433,12 @@ export async function applyLongRest(playerStats, campaignName) {
 
         // Single atomic write fires ONE SSE event with the complete final state
     setRuntimeBatch(name, charData, campaignName)
+
+    // Clear Wrath of the Sea badge on long rest
+    charData.wrathOfTheSeaActive = null;
+    charData.wrathOfTheSeaDc = null;
+    charData.wrathOfTheSeaWisMod = null;
+    charData.wrathOfTheSeaSource = null;
 
     // Natural Recovery: reset free cast tracking on long rest
     const hasNaturalRecovery = (playerStats.automation?.passives ?? []).some(
