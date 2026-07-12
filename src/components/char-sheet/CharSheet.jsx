@@ -80,7 +80,15 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             const effectiveClasses = playerSummary.rules === '2024' ? allClasses2024 : allClasses;
             const effectiveRaces = playerSummary.rules === '2024' ? allRaces2024 : allRaces;
             const effectiveMagicItems = playerSummary.rules === '2024' ? allMagicItems2024 : allMagicItems;
-            const stats = await rulesFactory.getPlayerStats(effectiveClasses, allEquipment, effectiveMagicItems, effectiveRaces, spellData, playerSummary);
+            const processingSummary = cloneDeep(playerSummary);
+            if (cotlLandTypeRuntime && processingSummary.class) {
+                if (processingSummary.class.subclass) {
+                    processingSummary.class.subclass.type = cotlLandTypeRuntime;
+                } else if (processingSummary.class.major) {
+                    processingSummary.class.major.type = cotlLandTypeRuntime;
+                }
+            }
+            const stats = await rulesFactory.getPlayerStats(effectiveClasses, allEquipment, effectiveMagicItems, effectiveRaces, spellData, processingSummary);
 
             // Load prepared spells from runtime state (skip for 2024 ruleset where all spells are known/prepared)
             if (playerSummary.rules !== '2024') {

@@ -369,7 +369,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
               <b>Immunities: </b>
               {allImmunities.map((imm, i) => (
                 <span key={imm}>
-                  {i > 0 ? ', ' : ''}{imm}
+                  {i > 0 ? ', ' : ''}{imm.charAt(0).toUpperCase() + imm.slice(1)}
                   {auraImmunities.includes(imm) && auraImmunitySources[imm] && <span className="aura-source" title={`From ${auraImmunitySources[imm]}'s aura`}>*</span>}
                 </span>
               ))}

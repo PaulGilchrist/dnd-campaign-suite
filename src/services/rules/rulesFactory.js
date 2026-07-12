@@ -164,6 +164,22 @@ const rulesFactory = {
             ])];
         }
 
+        // Resolve land_resistance conditionImmunity (Nature's Ward: poisoned condition immunity)
+        const landConditionImmunities = passives
+            .filter(p => p.type === 'land_resistance' && p.conditionImmunity)
+            .map(p => p.conditionImmunity);
+        if (landConditionImmunities.length) {
+            const immunities = playerStats.immunities;
+            if (!Array.isArray(immunities)) {
+                console.error('rulesFactory.getPlayerStats: expected immunities array');
+                throw new Error('Expected immunities to be an array');
+            }
+            playerStats.immunities = [...new Set([
+                ...immunities,
+                ...landConditionImmunities
+            ])];
+        }
+
         // Resolve Elemental Affinity damage type resistance (2024 Draconic Sorcery)
         const elementalAffinityType = getChosenRuntimeValue(playerStats, 'Elemental Affinity', 'chosenType');
         if (elementalAffinityType) {
