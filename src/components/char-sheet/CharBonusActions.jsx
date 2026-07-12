@@ -206,28 +206,30 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                            {exhausted && isRageExpendable && <span className="automation-badge clickable" onClick={restoreRage}><i className="fa-solid fa-fire-flame-curved"></i> Restore with Rage</span>}
                       </div>
                   })}
-               </div>}
+                </div>}
 
-               {(() => {
-                   const wrathActive = getRuntimeValue(playerStats.name, 'wrathOfTheSeaActive', campaignName);
-                   if (!wrathActive) return null;
-                   return (
-                       <div>
-                           <b className="clickable" onClick={() => onAutomationAction({
-                               name: 'Wrath of the Sea',
-                               description: 'Force a creature to make a CON save or take WIS modifier d6 Cold damage.',
-                               automation: {
-                                   type: 'wrath_of_the_sea',
-                                   action: 'bonus_action',
-                                   allyAttack: true,
-                               },
-                           })}>Wrath of the Sea:</b> <span>Force a creature to make a CON save or take WIS modifier d6 Cold damage.</span>
-                       </div>
-                   );
-               })()}
+                {(() => {
+                    const wrathActive = getRuntimeValue(playerStats.name, 'wrathOfTheSeaActive', campaignName);
+                    if (!wrathActive) return null;
+                    const hasWotSInBonusActions = (playerStats.bonusActions || []).some(a => a.name === 'Wrath of the Sea');
+                    if (hasWotSInBonusActions) return null;
+                    return (
+                        <div>
+                            <b className="clickable" onClick={() => onAutomationAction({
+                                name: 'Wrath of the Sea',
+                                description: 'Force a creature to make a CON save or take WIS modifier d6 Cold damage.',
+                                automation: {
+                                    type: 'wrath_of_the_sea',
+                                    action: 'bonus_action',
+                                    allyAttack: true,
+                                },
+                            })}>Wrath of the Sea:</b> <span>Force a creature to make a CON save or take WIS modifier d6 Cold damage.</span>
+                        </div>
+                    );
+                })()}
 
-           </div>
-       );
+            </div>
+        );
 }
 
 export default CharBonusActions

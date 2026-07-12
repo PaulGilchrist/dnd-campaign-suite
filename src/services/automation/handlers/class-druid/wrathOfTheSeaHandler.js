@@ -1,6 +1,13 @@
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
+import { loadCombatSummary } from '../../../encounters/combatData.js';
+import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
+import { endInvisibilityOnHostileAction } from '../../../rules/features/invisibilityService.js';
+import { sendSavePrompt } from '../../../combat/conditions/savePromptService.js';
+import storage from '../../../../services/ui/storage.js';
+import { getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
+import { rollD20 } from '../../../dice/diceRoller.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -64,24 +71,137 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         ? (Number(getRuntimeValue(playerName, 'wrathOfTheSeaDc', campaignName)) || 0)
         : (8 + (playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0) + (playerStats.proficiency || 0));
 
-    return {
-        type: 'roll',
-        payload: {
-            rollType: 'damage',
+    const combatSummary = await loadCombatSummary(campaignName);
+    const target = getTargetFromAttacker(combatSummary, playerName);
+
+    if (!target) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${action.name}: No current target selected.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const isNpc = target.type === 'npc';
+    const results = [];
+    const playerPrompts = [];
+
+    if (isNpc) {
+        const saveBonus = target?.saveBonuses?.['con'] ?? 0;
+        const saveRoll = rollD20();
+        const saveTotal = saveRoll + saveBonus;
+        const saveSuccess = saveTotal >= saveDc;
+
+        const finalDamage = saveSuccess ? 0 : damageResult.total;
+        const applyResult = applyDamageToTarget(
+            combatSummary, target.name, finalDamage, ['cold'], campaignName,
+            [playerStats], false, playerName, true
+        );
+
+        const actualDamage = applyResult?.finalDamage ?? finalDamage;
+        const newHp = applyResult?.newHp ?? target.currentHp;
+
+        if (actualDamage > 0) {
+            endInvisibilityOnHostileAction(playerName, campaignName);
+        }
+
+        results.push({
+            targetName: target.name,
+            saveSuccess,
+            saveRoll,
+            saveTotal,
+            saveBonus,
+            damage: actualDamage,
+            newHp,
+        });
+
+        await addEntry(campaignName, {
+            type: 'roll',
+            characterName: playerName,
+            rollType: 'save-damage',
             name: action.name,
             formula: damageFormula,
-            total: damageResult.total,
             rolls: damageResult.rolls,
+            total: damageResult.total,
             modifier: damageResult.modifier,
-            contextConfig: {
-                damageType: 'cold',
-                saveDc: saveDc,
-                saveType: 'CON',
-                dcSuccess: 'none',
-                attackerName: playerName,
-                conditionInflicted: null,
-                shape: auto?.shape || 'emanation',
-            },
+            damageType: 'cold',
+            targetName: target.name,
+            saveType: 'CON',
+            saveDc,
+            dcSuccess: 'none',
+            saveResult: saveSuccess ? 'success' : 'failure',
+            saveRoll,
+            saveBonus,
+            saveRawRolls: [saveRoll, saveRoll],
+            finalDamage: actualDamage,
+            note: 'combined_save_damage_roll',
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[wrathOfTheSea] Log error:', e); });
+    } else {
+        const promptId = `${action.name.replace(/\s+/g, '_')}_${target.name}_${Date.now()}`;
+
+        const pendingSaves = getRuntimeValue(campaignName, 'pendingSavePrompts') || {};
+        pendingSaves[promptId] = {
+            targetName: target.name,
+            rawDamage: damageResult.total,
+            saveDc,
+            saveType: 'CON',
+            dcSuccess: 'none',
+            damageType: 'cold',
+            attackerName: playerName,
+            name: action.name,
+            formula: damageFormula,
+            modifier: damageResult.modifier,
+            rolls: damageResult.rolls,
+            campaignName,
+            setPopupHtml: () => { },
+            isAoe: true,
+        };
+        setRuntimeValue(campaignName, 'pendingSavePrompts', pendingSaves, campaignName);
+
+        sendSavePrompt(campaignName, {
+            promptId,
+            targetName: target.name,
+            saveType: 'CON',
+            saveDc,
+            sourceName: playerName,
+        });
+
+        playerPrompts.push({ promptId, targetName: target.name });
+    }
+
+    if (combatSummary) {
+        storage.set('combatSummary', combatSummary, campaignName);
+        window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+    }
+
+    let resultsHtml = `<b>${action.name} used!</b><br/><br/>`;
+    resultsHtml += `<b>Save DC: ${saveDc}</b> (CON)<br/><br/>`;
+    resultsHtml += `<b>Rolls:</b> ${damageFormula} = ${damageResult.total} Cold damage<br/><br/>`;
+
+    for (const r of results) {
+        const saveResult = r.saveSuccess ? '<span style="color: #4caf50;">Passed</span>' : '<span style="color: #f44336;">Failed</span>';
+        const damageWord = r.saveSuccess ? 'none' : 'full';
+        resultsHtml += `<b>${r.targetName}</b>: ${saveResult} (${r.saveRoll}+${r.saveBonus}=${r.saveTotal} vs DC ${saveDc}) — ${damageWord} damage: ${r.damage}<br/>`;
+    }
+
+    if (playerPrompts.length > 0) {
+        resultsHtml += `<br/><b>${playerPrompts.length} player${playerPrompts.length !== 1 ? 's' : ''} rolling saves...</b>`;
+    }
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            automationType: auto.type,
+            description: resultsHtml,
+            automation: auto,
+            results,
         },
     };
 }
