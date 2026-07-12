@@ -437,7 +437,7 @@ describe('CharClassFeatures', () => {
             expect(screen.queryByTitle(/Supreme Sneak/)).not.toBeInTheDocument();
         });
 
-        it('renders sneak attack damage display and button with dice count', () => {
+        it('renders sneak attack damage display', () => {
             const stats = makeStats({
                 level: 9,
                 class: { name: 'Rogue', class_levels: [{ level: 9 }] },
@@ -445,9 +445,6 @@ describe('CharClassFeatures', () => {
             });
             renderComponent(stats);
             expect(screen.getByText(/Sneak Attack Damage:/)).toBeInTheDocument();
-            expect(screen.getByText(/Sneak Attack \(5d6\)/)).toBeInTheDocument();
-            const allButtons = screen.getAllByTitle(/Sneak Attack/);
-            expect(allButtons.length).toBeGreaterThan(0);
         });
 
         it('renders expertise when available from class features', () => {

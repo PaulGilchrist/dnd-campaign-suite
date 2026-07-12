@@ -435,16 +435,11 @@ const RogueFeatures = function RogueFeatures({ playerStats, campaignName }) {
                       <div><b>Energy Die Type: </b>d{classLevel.energy.energy_die_type}</div>
                   </div>
               )}
-              <div className="automation-actions">
-                  <button className="automation-btn" title="Sneak Attack: Extra damage when you have advantage or ally adjacent">
-                      <i className="fas fa-user-ninja"></i> Sneak Attack ({rogueFeatures?.sneakAttack?.dice_count || 0}d{rogueFeatures?.sneakAttack?.dice_value || 0})
-                  </button>
-                  {playerStats.level >= 9 && (
-                      <span className={'automation-badge' + (stealthAttackActive ? ' automation-badge--active' : '')} title={stealthAttackActive ? "Supreme Sneak: Stealth Attack active — next attack costs 1d6 Sneak Attack, Invisible preserved with cover" : "Supreme Sneak: Available at Rogue level 9 — activate from Actions section"}>
-                          <i className="fas fa-eye-slash"></i> Supreme Sneak
-                      </span>
-                  )}
-              </div>
+               {playerStats.level >= 9 && (
+                   <span className={'automation-badge' + (stealthAttackActive ? ' automation-badge--active' : '')} title={stealthAttackActive ? "Supreme Sneak: Stealth Attack active — next attack costs 1d6 Sneak Attack, Invisible preserved with cover" : "Supreme Sneak: Available at Rogue level 9 — activate from Actions section"}>
+                       <i className="fas fa-eye-slash"></i> Supreme Sneak
+                   </span>
+               )}
               <div><b>Sneak Attack Damage: </b>+{rogueFeatures?.sneakAttack?.dice_count || 0}d{rogueFeatures?.sneakAttack?.dice_value || 0}</div>
           </div>
     );
@@ -596,12 +591,7 @@ const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
     if ((wizardFeatures?.showWizardFeatures ?? true) === false) return null;
     return (
          <div data-testid="char-class-wizard">
-             <div className="automation-actions">
-                 <button className="automation-btn" title="Arcane Recovery: Regain spell slots on short rest">
-                     <i className="fas fa-book-open"></i> Arcane Recovery
-                 </button>
-             </div>
-             <TrackedResourceInput label="Arcane Recovery Levels" resourceKey="arcaneRecoveryLevels" playerName={playerStats.name} getMax={() => wizardFeatures?.arcaneRecoveryLevels || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+              <TrackedResourceInput label="Arcane Recovery Levels" resourceKey="arcaneRecoveryLevels" playerName={playerStats.name} getMax={() => wizardFeatures?.arcaneRecoveryLevels || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
              <TrackedResourceInput label="Arcane Ward HP" resourceKey="arcaneWardHp" playerName={playerStats.name} getMax={() => playerStats._trackedResources?.arcaneWardMax?.current || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
              {portentPopup && <Popup html={portentPopup} onClickOrKeyDown={() => setPortentPopup(null)} />}
              {portentModal && (

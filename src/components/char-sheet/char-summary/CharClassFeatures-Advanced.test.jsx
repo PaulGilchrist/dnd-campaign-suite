@@ -215,11 +215,10 @@ describe('CharClassFeatures', () => {
             automation: { passives: [] },
         });
 
-        it('renders wizard tracked resources and automation button', () => {
+        it('renders wizard tracked resources', () => {
             renderComponent(wizardStats());
             expect(screen.getByTestId('tracked-resource-Arcane Recovery Levels')).toBeInTheDocument();
             expect(screen.getByTestId('tracked-resource-Arcane Ward HP')).toBeInTheDocument();
-            expect(screen.getByTitle(/Arcane Recovery: Regain spell slots/)).toBeInTheDocument();
         });
 
         it('renders projected ward with custom range', () => {
