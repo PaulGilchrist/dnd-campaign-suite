@@ -269,6 +269,12 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         updates['_Defensive_Tactics_choice'] = null;
         updates["_Hunter's_Prey_choice"] = null;
 
+        // Clear Wrath of the Sea badge on short rest
+        updates.wrathOfTheSeaActive = null;
+        updates.wrathOfTheSeaDc = null;
+        updates.wrathOfTheSeaWisMod = null;
+        updates.wrathOfTheSeaSource = null;
+
         setRuntimeBatch(playerStats.name, updates, campaignName);
 
         const logEntries = [];

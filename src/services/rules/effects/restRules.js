@@ -435,10 +435,10 @@ export async function applyLongRest(playerStats, campaignName) {
     setRuntimeBatch(name, charData, campaignName)
 
     // Clear Wrath of the Sea badge on long rest
-    charData.wrathOfTheSeaActive = null;
-    charData.wrathOfTheSeaDc = null;
-    charData.wrathOfTheSeaWisMod = null;
-    charData.wrathOfTheSeaSource = null;
+    setRuntimeValue(name, 'wrathOfTheSeaActive', null, campaignName, true)
+    setRuntimeValue(name, 'wrathOfTheSeaDc', null, campaignName, true)
+    setRuntimeValue(name, 'wrathOfTheSeaWisMod', null, campaignName, true)
+    setRuntimeValue(name, 'wrathOfTheSeaSource', null, campaignName, true)
 
     // Natural Recovery: reset free cast tracking on long rest
     const hasNaturalRecovery = (playerStats.automation?.passives ?? []).some(

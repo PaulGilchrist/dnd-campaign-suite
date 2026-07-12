@@ -24,19 +24,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    const wrathActive = getRuntimeValue(playerName, 'wrathOfTheSeaActive', campaignName);
-    if (wrathActive) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${action.name}: You already have Wrath of the Sea active.`,
-                automation: auto,
-            },
-        };
-    }
-
     const combatSummary = await loadCombatSummary(campaignName);
     const allyTargets = combatSummary?.creatures
         ? combatSummary.creatures.filter(c => c.name !== playerName && c.type === 'player')
