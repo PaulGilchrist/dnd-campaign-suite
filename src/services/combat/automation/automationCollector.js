@@ -440,6 +440,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             }
             case 'resource_restoration':
             case 'natural_recovery':
+            case 'circle_of_the_land_spells':
             case 'font_of_inspiration':
             case 'conditional_advantage':
             case 'conditional_replacement':

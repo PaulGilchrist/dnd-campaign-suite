@@ -97,14 +97,26 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
 
         // Add subclass (major) spells as always prepared (2024 format: {name, level})
         if (playerStats.level > 2 && playerStats.class.major && playerStats.class.major.spells) {
+            const majorName = playerStats.class.major?.name;
+            const isCircleOfLand = majorName === 'Circle of the Land';
+            const chosenLandType = isCircleOfLand
+                ? (getRuntimeValue(playerStats.name, '_circleOfTheLandType') || '').toLowerCase()
+                : null;
+
             playerStats.class.major.spells.forEach((subclassSpell) => {
                 const spellName = subclassSpell.name || (subclassSpell.spell && subclassSpell.spell.name);
                 if (!spellName) return;
                 if (subclassSpell.level == null) {
-                    console.error('[spellCalc2024] getSpellAbilities: subclassSpell.level is missing for spell:', subclassSpell.name || (subclassSpell.spell && subclassSpell.spell.name))
+                    console.error('[spellCalc2024] getSpellAbilities: subclassSpell.level is missing for spell:', spellName)
                     throw new Error('subclassSpell.level is required for subclass spells')
                   }
                   const spellLevel = subclassSpell.level
+
+                if (isCircleOfLand) {
+                    if (chosenLandType && subclassSpell.landType !== chosenLandType) return;
+                    if (!chosenLandType) return;
+                }
+
                 if (playerStats.level >= spellLevel) {
                     const knownSpell = spellAbilities.spells.find((s) => s.name === spellName);
                     if (knownSpell) {

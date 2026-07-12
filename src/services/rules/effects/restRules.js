@@ -435,6 +435,7 @@ export async function applyLongRest(playerStats, campaignName) {
       charData.naturalRecoveryFreeCast = null
       charData.naturalRecoveryFreeCastUsed = null
       charData.naturalRecoverySlots = null
+      charData._circleOfTheLandType = null
     }
 
     // Handle Greater Divine Intervention Wish cooldown (2d4 long rests) — must run AFTER batch reset

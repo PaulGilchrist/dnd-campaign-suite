@@ -3490,7 +3490,11 @@
                     {
                         "name": "Circle of the Land Spells",
                         "description": "Choose one land type (arid, polar, temperate, tropical) after each Long Rest.<ul><li><b>ARID LAND:</b> Level 3: Blur, Burning Hands, Fire Bolt. Level 5: Fireball. Level 7: Blight. Level 9: Wall of Stone.</li><li><b>POLAR LAND:</b> Level 3: Fog Cloud, Hold Person, Ray of Frost. Level 5: Sleet Storm. Level 7: Ice Storm. Level 9: Cone of Cold.</li><li><b>TEMPERATE LAND:</b> Level 3: Misty Step, Shocking Grasp, Sleep. Level 5: Lightning Bolt. Level 7: Freedom of Movement. Level 9: Tree Stride.</li><li><b>TROPICAL LAND:</b> Level 3: Acid Splash, Ray of Sickness, Web. Level 5: Stinking Cloud. Level 7: Polymorph. Level 9: Insect Plague.</li></ul>",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "circle_of_the_land_spells",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Land's Aid",
@@ -3580,99 +3584,123 @@
                 "spells": [
                     {
                         "name": "Blur",
-                        "level": 3
+                        "level": 3,
+                        "landType": "arid"
                     },
                     {
                         "name": "Burning Hands",
-                        "level": 3
+                        "level": 3,
+                        "landType": "arid"
                     },
                     {
                         "name": "Fire Bolt",
-                        "level": 3
+                        "level": 3,
+                        "landType": "arid"
                     },
                     {
                         "name": "Fireball",
-                        "level": 5
+                        "level": 5,
+                        "landType": "arid"
                     },
                     {
                         "name": "Blight",
-                        "level": 7
+                        "level": 7,
+                        "landType": "arid"
                     },
                     {
                         "name": "Wall of Stone",
-                        "level": 9
+                        "level": 9,
+                        "landType": "arid"
                     },
                     {
                         "name": "Fog Cloud",
-                        "level": 3
+                        "level": 3,
+                        "landType": "polar"
                     },
                     {
                         "name": "Hold Person",
-                        "level": 3
+                        "level": 3,
+                        "landType": "polar"
                     },
                     {
                         "name": "Ray of Frost",
-                        "level": 3
+                        "level": 3,
+                        "landType": "polar"
                     },
                     {
                         "name": "Sleet Storm",
-                        "level": 5
+                        "level": 5,
+                        "landType": "polar"
                     },
                     {
                         "name": "Ice Storm",
-                        "level": 7
+                        "level": 7,
+                        "landType": "polar"
                     },
                     {
                         "name": "Cone of Cold",
-                        "level": 9
+                        "level": 9,
+                        "landType": "polar"
                     },
                     {
                         "name": "Misty Step",
-                        "level": 3
+                        "level": 3,
+                        "landType": "temperate"
                     },
                     {
                         "name": "Shocking Grasp",
-                        "level": 3
+                        "level": 3,
+                        "landType": "temperate"
                     },
                     {
                         "name": "Sleep",
-                        "level": 3
+                        "level": 3,
+                        "landType": "temperate"
                     },
                     {
                         "name": "Lightning Bolt",
-                        "level": 5
+                        "level": 5,
+                        "landType": "temperate"
                     },
                     {
                         "name": "Freedom of Movement",
-                        "level": 7
+                        "level": 7,
+                        "landType": "temperate"
                     },
                     {
                         "name": "Tree Stride",
-                        "level": 9
+                        "level": 9,
+                        "landType": "temperate"
                     },
                     {
                         "name": "Acid Splash",
-                        "level": 3
+                        "level": 3,
+                        "landType": "tropical"
                     },
                     {
                         "name": "Ray of Sickness",
-                        "level": 3
+                        "level": 3,
+                        "landType": "tropical"
                     },
                     {
                         "name": "Web",
-                        "level": 3
+                        "level": 3,
+                        "landType": "tropical"
                     },
                     {
                         "name": "Stinking Cloud",
-                        "level": 5
+                        "level": 5,
+                        "landType": "tropical"
                     },
                     {
                         "name": "Polymorph",
-                        "level": 7
+                        "level": 7,
+                        "landType": "tropical"
                     },
                     {
                         "name": "Insect Plague",
-                        "level": 9
+                        "level": 9,
+                        "landType": "tropical"
                     }
                 ]
             },

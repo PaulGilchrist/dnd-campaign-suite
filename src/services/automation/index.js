@@ -11,6 +11,7 @@ import { handle as handleInitiative } from './handlers/combat/initiativeHandler.
 
 import { handle as handleResourcePool } from './handlers/resources/resourcePoolHandler.js';
 import { handle as handleNaturalRecovery } from './handlers/resources/naturalRecoveryHandler.js';
+import { handle as handleCircleOfTheLandSpells } from './handlers/class-druid/circleOfTheLandSpellsHandler.js';
 import { handle as handleFontOfMagic } from './handlers/resources/fontOfMagicHandler.js';
 import { handle as handleHealingPool } from './handlers/healing/healingPoolHandler.js';
 import { automationInfoPopup } from '../shared/popupResponse.js';
@@ -240,6 +241,7 @@ const HANDLER_MAP = {
     buff_ally: handleBuffAlly,
     resource_pool: handleResourcePool,
     natural_recovery: handleNaturalRecovery,
+    circle_of_the_land_spells: handleCircleOfTheLandSpells,
     divine_spark: handleDivineSpark,
     divine_intervention: handleDivineIntervention,
     font_of_magic: handleFontOfMagic,

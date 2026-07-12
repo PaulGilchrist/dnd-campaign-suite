@@ -148,8 +148,21 @@ describe('NaturalRecoveryModal', () => {
 
   describe('Circle of the Land — Arid filtering', () => {
     it('filters to only Arid land spells for Circle of the Land', () => {
+      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+        if (key === '_circleOfTheLandType') return 'arid';
+        return null;
+      });
       const stats = makePlayerStats({
-        class: { major: { name: 'Circle of the Land' } },
+        class: { major: { name: 'Circle of the Land', spells: [
+          { name: 'Blur', level: 3, landType: 'arid' },
+          { name: 'Burning Hands', level: 3, landType: 'arid' },
+          { name: 'Fire Bolt', level: 3, landType: 'arid' },
+          { name: 'Fireball', level: 5, landType: 'arid' },
+          { name: 'Blight', level: 7, landType: 'arid' },
+          { name: 'Wall of Stone', level: 9, landType: 'arid' },
+          { name: 'Fog Cloud', level: 3, landType: 'polar' },
+          { name: 'Cone of Cold', level: 9, landType: 'polar' },
+        ] } },
         spellAbilities: {
           spells: [
             { name: 'Blur', level: 3, prepared: 'Always' },
@@ -169,8 +182,15 @@ describe('NaturalRecoveryModal', () => {
     });
 
     it('excludes Arid cantrips (level 0)', () => {
+      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+        if (key === '_circleOfTheLandType') return 'arid';
+        return null;
+      });
       const stats = makePlayerStats({
-        class: { major: { name: 'Circle of the Land' } },
+        class: { major: { name: 'Circle of the Land', spells: [
+          { name: 'Fire Bolt', level: 3, landType: 'arid' },
+          { name: 'Burning Hands', level: 3, landType: 'arid' },
+        ] } },
         spellAbilities: {
           spells: [
             { name: 'Fire Bolt', level: 0, prepared: 'Always' },

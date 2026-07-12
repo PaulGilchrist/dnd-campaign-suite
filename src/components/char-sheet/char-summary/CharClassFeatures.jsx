@@ -173,6 +173,7 @@ const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
     const naturalRecoveryFreeCastUsed = getRuntimeValue(playerStats.name, 'naturalRecoveryFreeCastUsed');
     const elementalFuryChoice = useRuntimeValue(playerStats.name, '_Elemental_Fury_option', campaignName);
     const improvedElementalFuryChoice = useRuntimeValue(playerStats.name, '_Improved_Elemental_Fury_option', campaignName);
+    const circleOfTheLandType = useRuntimeValue(playerStats.name, '_circleOfTheLandType', campaignName);
     if (playerStats.level < 2) return null;
     return (
            <div data-testid="char-class-druid">
@@ -193,7 +194,8 @@ const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
                <div><b>Wild Shape Max Challenge Rating: </b>{druidFeatures?.maxWildShapeChallengeRating}</div>
                <TrackedResourceInput label="Wild Shape Uses" resourceKey="wildShapeUses" playerName={playerStats.name} getMax={() => druidFeatures?.maxWildShapeUses || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
                {elementalFuryChoice && <span className="automation-badge"><i className="fa-solid fa-bolt"></i> Elemental Fury: {elementalFuryChoice}</span>}
-               {improvedElementalFuryChoice && <span className="automation-badge"><i className="fa-solid fa-bolt"></i> Improved Elemental Fury: {improvedElementalFuryChoice}</span>}
+                {improvedElementalFuryChoice && <span className="automation-badge"><i className="fa-solid fa-bolt"></i> Improved Elemental Fury: {improvedElementalFuryChoice}</span>}
+                {circleOfTheLandType && <span className="automation-badge"><i className="fa-solid fa-mountain-sun"></i> Circle of the Land: {circleOfTheLandType}</span>}
            </div>
         );
 };
