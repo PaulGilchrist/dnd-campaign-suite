@@ -3517,6 +3517,7 @@
                                 "14": "4d6"
                             },
                             "dcSuccess": "half",
+                            "resourceCost": "wild_shape",
                             "resourceKey": "wildShapeUses"
                         }
                     },

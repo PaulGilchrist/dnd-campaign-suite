@@ -32,8 +32,6 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
                 const rawDamage = damageRoll?.total ?? 0;
                 const finalDamage = computeDamageAfterSave(rawDamage, success, 'half');
 
-                console.log('[SaveAttackHealModal] NPC:', { targetName, saveRoll: saveRoll?.total, saveTotal, success, rawDamage, finalDamage });
-
                 sendSaveResult(campaignName, targetName, {
                     promptId: utils.guid(),
                     success,
@@ -50,7 +48,6 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
                         combatSummary, targetName, finalDamage, [damageType],
                         campaignName, characters, false, attackerName, false
                     );
-                    console.log('[SaveAttackHealModal] NPC damage applied:', { targetName, finalDamage: applyResult?.finalDamage, oldHp: applyResult?.oldHp, newHp: applyResult?.newHp });
 
                     addEntry(campaignName, {
                         type: 'roll', characterName: attackerName, rollType: 'save-damage',
@@ -79,8 +76,6 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
     const handleApplyOverride = useCallback((ctx) => {
         if (ctx.selected.size === 0) return;
         ctx.setProcessing(true);
-
-        console.log('[SaveAttackHealModal] handleApplyOverride called, selected:', Array.from(ctx.selected));
 
         addEntry(campaignName, {
             type: 'ability_use', characterName: attackerName, abilityName: featureName,
@@ -119,7 +114,6 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
                     combatSummary, targetName, finalDamage, [damageType],
                     campaignName, characters, false, attackerName, false
                 );
-                console.log('[SaveAttackHealModal] Player damage applied:', { targetName, finalDamage: applyResult?.finalDamage, oldHp: applyResult?.oldHp, newHp: applyResult?.newHp });
 
                 addEntry(campaignName, {
                     type: 'roll', characterName: attackerName, rollType: 'save-damage',

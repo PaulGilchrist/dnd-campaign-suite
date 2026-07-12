@@ -76,7 +76,7 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     // Store the chosen option for features that read it from runtime state (e.g., Stalker's Flurry)
     const optKey = `_${action.name.replace(/\s+/g, '_')}_option`;
     if (chosenOptions.length === 1) {
-        console.log('[attackRiderHandler] Storing option:', optKey, '=', chosenOptions[0].name);
+            // Storing option in chosenOptions
         await setRuntimeValue(playerStats.name, optKey, chosenOptions[0].name, campaignName);
     }
 

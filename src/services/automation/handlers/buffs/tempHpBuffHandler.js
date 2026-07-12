@@ -177,7 +177,7 @@ export async function handleMantleOfInspiration(action, playerStats, campaignNam
 
     if (usesMax > 0) {
         const currentUses = Number(getRuntimeValue(playerName, 'bardicInspirationUses', campaignName) ?? usesMax);
-        console.log('[handleMantleOfInspiration] usesMax:', usesMax, 'currentUses:', currentUses);
+        // usesMax and currentUses available via handleMantleOfInspiration params
         if (currentUses <= 0) {
             return {
                 type: 'popup',
@@ -190,7 +190,7 @@ export async function handleMantleOfInspiration(action, playerStats, campaignNam
             };
         }
         await setRuntimeValue(playerName, 'bardicInspirationUses', currentUses - 1, campaignName);
-        console.log('[handleMantleOfInspiration] decremented to:', currentUses - 1);
+        // decremented to currentUses - 1
     }
 
     const dieRoll = rollDie(bardicDieSize);

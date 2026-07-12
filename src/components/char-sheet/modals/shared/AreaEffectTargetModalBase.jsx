@@ -80,7 +80,6 @@ function AreaEffectTargetModalBase({
   const handleApply = useCallback(() => {
     if (isApplyBusy()) return;
     setApplyBusy(true);
-    console.log('[AreaEffectTargetModalBase] handleApply called');
     handleApplyOverrideRef.current(ctxRef.current);
   }, []);
 

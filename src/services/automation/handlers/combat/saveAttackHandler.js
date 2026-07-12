@@ -177,8 +177,8 @@ export async function handle(action, playerStats, campaignName, mapName) {
             }
         }
     } else {
-        const resolvedUses = auto.usesMax ?? resolveUses(playerStats, auto.uses) ?? 1;
-        const maxUses = resolvedUses > 0 ? resolvedUses : 0;
+    const resolvedUses = auto.usesMax ?? resolveUses(playerStats, auto.uses) ?? playerStats.level;
+    const maxUses = resolvedUses > 0 ? resolvedUses : 0;
 
         if (maxUses > 0) {
             const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');

@@ -11,7 +11,7 @@ export const stalkersFlurry = {
       a => a.type === 'attack_rider' && a.trigger === 'weapon_attack_hit' && a.chooseOne && a.options?.length > 0 && a.name === "Stalker's Flurry"
     );
     if (!sf) {
-      console.log('[stalkersFlurry] No Stalker\'s Flurry passive found');
+      // No Stalker's Flurry passive found
       return null;
     }
 
@@ -21,7 +21,7 @@ export const stalkersFlurry = {
     const cs = await getCombatContext(ctx.campaignName);
     const t = cs ? getTargetFromAttacker(cs, ctx.playerStats.name) : null;
     if (!t?.name) {
-      console.log('[stalkersFlurry] No target found');
+      // No target found
       return { data: prevData };
     }
 

@@ -628,7 +628,7 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
 
             const { processed, changed } = processExpirationList(list, currentRound, key, campaignName, targetName);
             if (changed) {
-               console.log('[expireForTarget] writing updated list for', key);
+                // writing updated list for target
                setRuntimeValue(key, KEY, processed, campaignName);
                totalChanged = true;
            }
