@@ -173,9 +173,10 @@ describe('combatStanceHandler - instinctive pounce', () => {
 
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.name).toBe('Instinctive Pounce');
+        expect(result.payload.name).toBe('Rage');
         expect(result.payload.description).toContain('You can move up to');
         expect(result.payload.description).toContain('as part of entering your Rage');
+        expect(result.payload.description).toContain('Rage activated');
         expect(tempHpBuff.grantTempHpOnRage).toHaveBeenCalled();
     });
 

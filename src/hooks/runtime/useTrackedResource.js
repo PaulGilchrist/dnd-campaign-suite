@@ -3,6 +3,7 @@ import { getRuntimeValue, setRuntimeValue, addStorageChangeListener } from './us
 
 function resolveCurrent(storageKey, playerName, playerStats, maxGetter) {
   const storedValue = getRuntimeValue(playerName, storageKey);
+  console.log('[resolveCurrent] storageKey:', storageKey, 'playerName:', playerName, 'storedValue:', storedValue, 'trackedResources:', playerStats?._trackedResources?.[storageKey], 'maxGetter:', maxGetter());
   if (storedValue != null) return storedValue;
   if (playerStats?._trackedResources?.[storageKey]) {
     return playerStats._trackedResources[storageKey].current;

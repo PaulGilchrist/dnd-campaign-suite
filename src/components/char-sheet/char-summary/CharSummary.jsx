@@ -186,7 +186,11 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         ? stormbornResistances
         : [];
 
-    const allResistances = [...new Set([...baseResistances, ...auraResistances, ...stormbornResistancesActive])];
+    const rageResistances = Array.isArray(activeBuffs)
+        ? activeBuffs.filter(b => b.name === 'Rage').flatMap(b => b.resistanceTypes || [])
+        : [];
+
+    const allResistances = [...new Set([...baseResistances, ...auraResistances, ...stormbornResistancesActive, ...rageResistances])];
 
     let flySpeed = null;
     let swimSpeed = null;

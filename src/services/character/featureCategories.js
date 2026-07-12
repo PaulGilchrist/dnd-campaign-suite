@@ -15,7 +15,6 @@ const categories5e = {
         "Martial Archetype",
         "Monastic Tradition",
         "Primal Path",
-        "Rage",
         "Ranger Archetype",
         "Roguish Archetype",
         "Sacred Oath",
@@ -170,7 +169,6 @@ const categories2024 = {
         "Monk Subclass",
         "Necrotic Shroud", // Included in Celestial Revelation
         "Paladin Subclass",
-        "Rage",
         "Ranger Subclass",
         "Rogue Subclass",
         "Scholar",

@@ -199,16 +199,39 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         let currentHp = hpBeforeRest + recoveredHp;
         updates.currentHitPoints = Math.min(playerStats.hitPoints, currentHp);
 
+        console.log('[ShortRestModal] handleComplete: class=', playerStats.class?.name, 'rules=', playerStats.rules, 'SHORT_REST_RESOURCES count=', SHORT_REST_RESOURCES.length);
         SHORT_REST_RESOURCES.forEach((key) => {
+            console.log('[ShortRestModal] setting resource to null:', key);
             updates[key] = null;
             });
 
+        console.log('[ShortRestModal] Barbarian check: class=', playerStats.class?.name, 'rules=', playerStats.rules, 'isBarbarian2024=', playerStats.class?.name === 'Barbarian' && playerStats.rules === '2024');
         if (playerStats.class?.name === 'Fighter') {
             const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
             const maxSW = classLevel?.second_wind || 0;
             const currentSW = Number(getRuntimeValue(playerStats.name, 'secondWindUses', campaignName) ?? 0);
             if (currentSW < maxSW) {
                 updates.secondWindUses = Math.min(maxSW, currentSW + 1);
+            }
+        }
+
+        // Barbarian 2024: Rage recharges 1 use on short rest
+        if (playerStats.class?.name === 'Barbarian' && playerStats.rules === '2024') {
+            const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+            const maxRage = classLevel?.rages || 0;
+            const trackedRage = playerStats._trackedResources?.ragePoints;
+            const storedRage = getRuntimeValue(playerStats.name, 'ragePoints', campaignName);
+            const currentRage = storedRage != null ? Number(storedRage) : (trackedRage?.current ?? maxRage);
+            console.log('[ShortRestModal] Barbarian 2024 rage recharge:', {
+                maxRage,
+                trackedRage,
+                storedRage,
+                currentRage,
+                shouldRecharge: currentRage < maxRage,
+                proposedValue: maxRage > 0 ? Math.min(maxRage, currentRage + 1) : null
+            });
+            if (currentRage < maxRage) {
+                updates.ragePoints = Math.min(maxRage, currentRage + 1);
             }
         }
 
@@ -301,6 +324,14 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
             const maxSW = classLevel?.secondWind || 0;
             const currentSW = Number(getRuntimeValue(playerStats.name, 'secondWindUses', campaignName) ?? 0);
             if (currentSW < maxSW) restoredResources.push('Second Wind');
+        }
+        if (playerStats.class?.name === 'Barbarian' && playerStats.rules === '2024') {
+            const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+            const maxRage = classLevel?.rages || 0;
+            const storedRage = getRuntimeValue(playerStats.name, 'ragePoints', campaignName);
+            const trackedRage = playerStats._trackedResources?.ragePoints;
+            const currentRage = storedRage != null ? Number(storedRage) : (trackedRage?.current ?? maxRage);
+            if (currentRage < maxRage) restoredResources.push('Rage (2024)');
         }
         const hasImprovedWardingFlare = playerStats.characterAdvancement?.some(f => f.name === 'Improved Warding Flare');
         if (hasImprovedWardingFlare) restoredResources.push('Warding Flare');

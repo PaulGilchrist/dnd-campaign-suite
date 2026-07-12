@@ -130,7 +130,12 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
     } else {
         const resourceKey = auto.resourceKey || 'ragePoints';
         const storedResource = getRuntimeValue(playerName, resourceKey, campaignName);
-        const currentResource = storedResource != null ? Number(storedResource) : 0;
+        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+        const is2024 = playerStats.rules === '2024';
+        const maxRage = is2024
+            ? (classLevel?.rages || 0)
+            : (classLevel?.class_specific?.rage_count || 0);
+        const currentResource = storedResource != null ? Number(storedResource) : (playerStats._trackedResources?.ragePoints?.current ?? maxRage);
 
         if (currentResource <= 0) {
             return {
@@ -233,15 +238,7 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
         if (instinctivePounce) {
             const speed = playerStats.speed || 30;
             const maxMove = Math.floor(speed / 2);
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: instinctivePounce.name,
-                    description: `${instinctivePounce.name}: You can move up to ${maxMove} feet as part of entering your Rage. Move your token on the combat map.`,
-                    automationType: instinctivePounce.automation?.type,
-                },
-            };
+            auto._instinctivePounce = `${instinctivePounce.name}: You can move up to ${maxMove} feet as part of entering your Rage. Move your token on the combat map.`;
         }
     }
 
@@ -274,6 +271,9 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
     let description = maxUses > 0
         ? `${action.name} activated (${currentUses - 1}/${maxUses} uses remaining)`
         : `${action.name} activated`;
+    if (auto._instinctivePounce) {
+        description += `\n\n${auto._instinctivePounce}`;
+    }
     if (auto.effect === 'create_illusion') {
         description += ' While active, you can cast spells as though you were in the illusion\'s space.';
     }

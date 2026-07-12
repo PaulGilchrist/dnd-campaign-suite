@@ -139,21 +139,6 @@ describe('CharClassFeatures', () => {
     });
 
     describe('Barbarian features', () => {
-        const barbarianStats = (overrides = {}) => makeStats({
-            level: 5,
-            class: {
-                name: 'Barbarian',
-                class_levels: [{ level: 1 }, { level: 2 }, { level: 3 }, { level: 4 }, { level: 5, class_specific: { rage_count: 2, rage_damage_bonus: 2 } }],
-            },
-            automation: { passives: [] },
-            ...overrides,
-        });
-
-        it('renders rage toggle button with correct title when not raging', () => {
-            renderComponent(barbarianStats());
-            expect(screen.getByTitle('Enter Rage (toggle for damage bonus)')).toBeInTheDocument();
-        });
-
         it('renders barbarian with Aspect of the Wilds passive', () => {
             const stats = makeStats({
                 level: 5,

@@ -13,7 +13,6 @@ import { isUnbreakableMajestyActive, getUnbreakableMajestySaveDc, clearUnbreakab
 const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName, onWeaponMasteryClick }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     const is2024 = playerStats.rules === '2024';
-    const [rageActive, setRageActive] = React.useState(false);
 
     const extraAttacks = is2024
         ? (classLevel?.extra_attacks || 0)
@@ -36,6 +35,9 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName
         p => p.effect === 'animal_aspect'
     );
     const ASPECT_OPTIONS = ['Owl', 'Panther', 'Salmon'];
+
+    const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+    const rageActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Rage');
 
     const handleAspectChoice = (option) => {
         setRuntimeValue(playerStats.name, 'aspectOfTheWildsOption', option, campaignName);
@@ -60,15 +62,12 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName
                   </div>
               )}
               <div><b>Extra Attacks: </b>{extraAttacks}</div>
+              <TrackedResourceInput label="Rage Points" resourceKey="ragePoints" playerName={playerStats.name} getMax={() => rageCount} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
               <div>
                   <b>Rage Damage Bonus: </b>
                   <span className={rageActive ? "stat--buffed" : ""}>{rageDamage}</span>
-                  <button className="automation-btn" onClick={() => setRageActive(!rageActive)} title={rageActive ? "End Rage" : "Enter Rage (toggle for damage bonus)"}>
-                      <i className={`fas fa-${rageActive ? "fire-alt" : "fire"}`}></i> {rageActive ? "Raging" : "Rage"}
-                  </button>
                   {rageActive && <span className="automation-badge">BPS Resist, STR Adv, +{rageDamage} dmg</span>}
               </div>
-              <TrackedResourceInput label="Rage Points" resourceKey="ragePoints" playerName={playerStats.name} getMax={() => rageCount} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
               <div><b>Weapon Mastery: </b><span className="clickable" onClick={onWeaponMasteryClick}>{weaponMastery}</span></div>
          </div>
     );

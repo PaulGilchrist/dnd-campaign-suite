@@ -24,7 +24,6 @@ describe('featureCategories5e', () => {
         'Extra Attack',
         'Ki',
         'Martial Archetype',
-        'Rage',
         'Sacred Oath',
         'Spellcasting',
       ];

@@ -168,6 +168,27 @@ export async function applyShortRest(playerStats, campaignName) {
     }
   }
 
+  // Barbarian 2024: Rage recharges 1 use on short rest
+  if (playerStats.class?.name === 'Barbarian' && playerStats.rules === '2024') {
+    const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+    const maxRage = classLevel?.rages || 0;
+    const trackedRage = playerStats._trackedResources?.ragePoints;
+    const storedRage = getRuntimeValue(name, 'ragePoints', campaignName);
+    const currentRage = storedRage != null ? Number(storedRage) : (trackedRage?.current ?? maxRage);
+    console.log('[applyShortRest] Barbarian 2024 rage recharge:', {
+      name,
+      maxRage,
+      trackedRage,
+      storedRage,
+      currentRage,
+      shouldRecharge: currentRage < maxRage,
+      proposedValue: maxRage > 0 ? Math.min(maxRage, currentRage + 1) : null
+    });
+    if (currentRage < maxRage) {
+      updates.ragePoints = Math.min(maxRage, currentRage + 1);
+    }
+  }
+
   const hasImprovedWardingFlare = playerStats.characterAdvancement?.some(f => f.name === 'Improved Warding Flare')
   if (hasImprovedWardingFlare) {
     updates.wardingflareUses = null
