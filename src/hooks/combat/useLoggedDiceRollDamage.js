@@ -275,8 +275,13 @@ export function createLogDamageAndShow(deps) {
 
     async function handleNpcSaveDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls, gwfBaseRolls, gwfDisplayRolls) {
         const { saveDc, saveType, dcSuccess, damageType } = context || {};
+        console.log('[useLoggedDiceRollDamage] handleNpcSaveDamage entry:', { name, contextTargetName: context?.targetName, allCreatureNames: combatSummary?.creatures?.map(c => c.name), combatSummaryCreaturesCount: combatSummary?.creatures?.length });
         const target = combatSummary?.creatures?.find(c => c.name === context?.targetName) || null;
-        if (!target) return;
+        console.log('[useLoggedDiceRollDamage] handleNpcSaveDamage resolved target:', { targetName: target?.name, targetType: target?.type, found: !!target, contextTargetName: context?.targetName });
+        if (!target) {
+            console.error('[useLoggedDiceRollDamage] handleNpcSaveDamage early return - target not found:', { contextTargetName: context?.targetName });
+            return;
+        }
         const targetMaxHp = target?.type === 'player'
             ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
             : target?.maxHp ?? 0;
@@ -1392,6 +1397,7 @@ export function createLogDamageAndShow(deps) {
     }
 
     return async function logDamageAndShow(name, formula, total, rolls, modifier, context) {
+        console.log('[useLoggedDiceRollDamage] logDamageAndShow entry:', { name, rollType: 'save-damage', contextTargetName: context?.targetName, contextSaveDc: context?.saveDc, contextSaveType: context?.saveType, characterName });
         // Apply Feinting Attack superiority die damage bonus
         const feintDieValue = getRuntimeValue(characterName, 'feintingAttackDieValue');
         if (feintDieValue && Number(feintDieValue) > 0) {
@@ -1458,14 +1464,17 @@ export function createLogDamageAndShow(deps) {
         }
 
         const targetTargetName = context?.targetName;
+        console.log('[useLoggedDiceRollDamage] dispatch phase:', { targetTargetName, saveDc, saveType, isAutoMiss: context?.isAutoMiss, allCreatureNames: combatSummary?.creatures?.map(c => c.name) });
         if (targetTargetName && targetTargetName.startsWith('overlay-')) {
             await handleAoeDamage(name, formula, total, rolls, modifier, context, adjustedTotal, displayRolls, gwfBaseRolls, gwfDisplayRolls);
             return;
         }
 
         const target = combatSummary?.creatures?.find(c => c.name === context?.targetName) || null;
+        console.log('[useLoggedDiceRollDamage] resolved target for dispatch:', { targetName: target?.name, targetType: target?.type, found: !!target, contextTargetName: context?.targetName });
 
         if (saveDc && saveType && target) {
+            console.log('[useLoggedDiceRollDamage] dispatching to handler:', { handler: target.type === 'npc' ? 'handleNpcSaveDamage' : 'handlePlayerSaveDamage', targetName: target.name });
             if (target.type === 'npc') {
                 await handleNpcSaveDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls, gwfBaseRolls, gwfDisplayRolls);
                 return;

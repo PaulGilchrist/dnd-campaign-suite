@@ -26,6 +26,7 @@ export function createSaveListener(campaignName, config) {
     const pendingSaves = getRuntimeValue(campaignName, 'pendingSavePrompts') || {};
     pendingSaves[promptId] = {
         promptId,
+        campaignName,
         targetName: config.targetName,
         saveType: config.saveType || 'CON',
         saveDc: config.saveDc,

@@ -44,12 +44,11 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
     if (!event.key || event.data == null) return;
     const prefix = `change-${campaignName}-savePrompt-`;
     if (!event.key.startsWith(prefix)) return;
-    const targetName = event.key.slice(prefix.length);
-    if (!targetName) return;
 
     setPrompts(prev => {
       if (prev.some(p => p.promptId === event.data.promptId)) return prev;
-      const { sourceAttackerName, ...restData } = event.data;
+      const { sourceAttackerName, targetName: dataTargetName, ...restData } = event.data;
+      const targetName = dataTargetName || event.key.slice(prefix.length) || null;
       const newPrompt = { targetName, attackerName: sourceAttackerName, ...restData };
 
       const pendingSaves = getRuntimeValue(campaignName, 'pendingSavePrompts') || {};
@@ -132,12 +131,35 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
       }
     }
 
+    console.log('[SavePromptModal] handleRollSave entry:', { targetName: current.targetName, saveType: current.saveType, saveDc: current.saveDc });
     const roll1 = forceRollTo20Ref.current ? 20 : rollD20();
     const roll2 = current.disadvantage ? rollD20() : roll1;
     const finalRoll = current.disadvantage ? Math.min(roll1, roll2) : hasAdvantage ? Math.max(roll1, roll2) : roll1;
-    const total = finalRoll + saveBonus + auraBonus;
+    let cosmicOmenAppliedBonus = 0;
+    let cosmicOmenDetail = '';
+    const cosmicOmenPendingRaw = getRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus');
+    console.log('[SavePromptModal] cosmicOmen check:', { cosmicOmenPendingRaw, campaignName });
+    if (cosmicOmenPendingRaw) {
+      try {
+        const pending = JSON.parse(cosmicOmenPendingRaw);
+        console.log('[SavePromptModal] cosmicOmen parsed:', { pending, isWeal: pending.type === 'Weal', value: pending.value });
+        if (pending && typeof pending.value === 'number' && pending.value > 0) {
+          const isWeal = pending.type === 'Weal';
+          cosmicOmenAppliedBonus = isWeal ? pending.value : -pending.value;
+          cosmicOmenDetail = `(${cosmicOmenAppliedBonus} from ${pending.type})`;
+          setRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus', null, campaignName, true);
+          console.log('[SavePromptModal] cosmicOmen applied:', { cosmicOmenAppliedBonus, cosmicOmenDetail });
+        } else {
+          console.log('[SavePromptModal] cosmicOmen condition not met:', { value: pending?.value, type: pending?.type });
+        }
+      } catch (_e) { console.error('[SavePromptModal] cosmicOmen parse error:', _e); }
+    } else {
+      console.log('[SavePromptModal] no cosmicOmen pending value found');
+    }
+    const total = finalRoll + saveBonus + auraBonus + cosmicOmenAppliedBonus;
     const success = total >= current.saveDc;
-    const bonusDetail = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined;
+    const auraBonusStr = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined;
+    const bonusDetail = [auraBonusStr, cosmicOmenDetail].filter(Boolean).join(' ') || undefined;
 
     const rollMode = current.disadvantage ? 'disadvantage' : hasAdvantage ? 'advantage' : 'normal';
 
@@ -146,9 +168,10 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
       success,
       roll: finalRoll,
       total,
-      saveBonus: saveBonus + auraBonus,
+      saveBonus: saveBonus + auraBonus + cosmicOmenAppliedBonus,
       rawRolls: [roll1, roll2],
       mode: rollMode,
+      bonusDetail,
     });
 
     window.dispatchEvent(new CustomEvent('save-result', {
@@ -160,7 +183,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
         success,
         roll: finalRoll,
         total,
-        saveBonus: saveBonus + auraBonus,
+        saveBonus: saveBonus + auraBonus + cosmicOmenAppliedBonus,
         bonusDetail,
         rawDamage: current.rawDamage,
         dcSuccess: current.dcSuccess,
@@ -172,7 +195,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
 
     setPrompts(prev => prev.map((p, i) =>
       i === 0
-        ? { ...p, result: { success, roll: finalRoll, total, saveBonus: saveBonus + auraBonus, bonusDetail, rawRolls: [roll1, roll2], mode: rollMode } }
+        ? { ...p, result: { success, roll: finalRoll, total, saveBonus: saveBonus + auraBonus + cosmicOmenAppliedBonus, bonusDetail, rawRolls: [roll1, roll2], mode: rollMode } }
         : p
     ));
 

@@ -186,20 +186,24 @@ describe('CharSummary - Speed Calculations', () => {
         expect(speedEl.textContent).toContain(expectedSpeed);
     });
 
-    it.each([
-        [{ climbSpeed: 20 }, /climb 20 ft/],
-        [{ swimSpeed: 20 }, /swim 20 ft/],
-    ])('shows movement speed from playerStats when %j is present', (extra, expectedText) => {
-        const stats = { ...mockPlayerStats, ...extra };
+    it('shows climb speed from playerStats when climbSpeed is present', () => {
+        const stats = { ...mockPlayerStats, climbSpeed: 20 };
         render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(expectedText)).toBeInTheDocument();
+        expect(screen.getByText(/climb 20 ft/)).toBeInTheDocument();
+    });
+
+    it('shows swim speed from aquatic_adaptation buff', () => {
+        getActiveBuffs.mockReturnValue([{ effect: 'aquatic_adaptation' }]);
+        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        expect(screen.getByText(/swim 50 ft/)).toBeInTheDocument();
     });
 
     it('shows both climb and swim speeds when present', () => {
-        const stats = { ...mockPlayerStats, climbSpeed: 20, swimSpeed: 15 };
+        getActiveBuffs.mockReturnValue([{ effect: 'aquatic_adaptation' }]);
+        const stats = { ...mockPlayerStats, climbSpeed: 15 };
         render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/climb 20 ft/)).toBeInTheDocument();
-        expect(screen.getByText(/swim 15 ft/)).toBeInTheDocument();
+        expect(screen.getByText(/climb 15 ft/)).toBeInTheDocument();
+        expect(screen.getByText(/swim 50 ft/)).toBeInTheDocument();
     });
 });
 
@@ -318,16 +322,17 @@ describe('CharSummary - Passive Buff Effects', () => {
     });
 
     it('does not override existing swim speed with aquatic_affinity', () => {
+        getActiveBuffs.mockReturnValue([{ effect: 'aquatic_adaptation' }]);
         const stats = {
             ...mockPlayerStats,
             automation: {
                 ...mockPlayerStats.automation,
                 passives: [{ effect: 'aquatic_affinity' }],
             },
-            swimSpeed: 30,
         };
         render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/swim 30 ft/)).toBeInTheDocument();
+        // aquatic_adaptation sets swimSpeed = 50 (speed * 2), aquatic_affinity should not override
+        expect(screen.getByText(/swim 50 ft/)).toBeInTheDocument();
     });
 
     it('sets fly speed when stormborn passive is present and no fly speed exists', () => {

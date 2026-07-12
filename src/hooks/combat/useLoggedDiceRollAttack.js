@@ -74,19 +74,23 @@ export function createLogAndShow(deps) {
             luckyRerolled = true;
         }
 
-        // Cosmic Omen: apply global pending bonus to next d20 roll
+        // Cosmic Omen: apply global pending bonus to next d20 roll by anyone (not save rolls — handled in SavePromptModal)
         let cosmicOmenAppliedBonus = 0;
-        const cosmicOmenPendingRaw = getRuntimeValue(campaignName, 'cosmicOmenPendingBonus', campaignName);
-        if (cosmicOmenPendingRaw) {
-            try {
-                const pending = JSON.parse(cosmicOmenPendingRaw);
-                if (pending && typeof pending.value === 'number' && pending.value > 0) {
-                    const isWeal = pending.type === 'Weal';
-                    effectiveD20Roll += isWeal ? pending.value : -pending.value;
-                    cosmicOmenAppliedBonus = isWeal ? pending.value : -pending.value;
-                    setRuntimeValue(campaignName, 'cosmicOmenPendingBonus', null, campaignName, true);
+        let cosmicOmenDetail = null;
+        if (rollType !== 'save') {
+            const cosmicOmenPendingRaw = getRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus');
+            if (cosmicOmenPendingRaw) {
+                try {
+                    const pending = JSON.parse(cosmicOmenPendingRaw);
+                    if (pending && typeof pending.value === 'number' && pending.value > 0) {
+                        const isWeal = pending.type === 'Weal';
+                        effectiveD20Roll += isWeal ? pending.value : -pending.value;
+                        cosmicOmenAppliedBonus = isWeal ? pending.value : -pending.value;
+                                cosmicOmenDetail = `(${cosmicOmenAppliedBonus} from ${pending.type})`;
+                        setRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus', null, campaignName, true);
                 }
             } catch (_e) { /* ignore */ }
+        }
         }
 
         const combatSummary = await loadCombatSummary(campaignName);
@@ -157,7 +161,8 @@ export function createLogAndShow(deps) {
 
         const effectiveAc = target ? targetAc + coverAcBonus + (context?.gloriousDefenseBonus || 0) + (context?.defensiveDuelistBonus || 0) + (context?.baitAndSwitchBonus || 0) + getShieldAcBonus(target.name, campaignName) + getShieldOfFaithAcBonus(target.name, campaignName) : undefined;
         let hit = isAutoMiss ? false : (target ? (effectiveD20Roll + bonus >= effectiveAc) : undefined);
-        const targetName = target?.name || context?.targetName;
+        const targetName = (rollType === 'attack' || rollType === 'save') ? (target?.name || context?.targetName) : undefined;
+        console.log('[useLoggedDiceRollAttack] targetName resolved:', { rollType, targetFromCombatSummary: target?.name, contextTargetName: context?.targetName, finalTargetName: targetName, attackerName: context?.attackerName || characterName });
         const attackerName = context?.attackerName || characterName;
 
         if (!hit && !isAutoMiss && rollType === 'attack' && context?.isWeaponAttack) {
@@ -383,6 +388,7 @@ export function createLogAndShow(deps) {
             isAutoCrit: isCrit,
             sneakAttackDice: context?.sneakAttackDice || 0,
         } : undefined;
+        console.log('[useLoggedDiceRollAttack] autoDamage created:', { hasAutoDamage: !!autoDamage, autoDamageTargetName: autoDamage?.targetName, hit, hasAutoDamageFormula: !!context?.autoDamageFormula });
 
         // Apply Death Strike attack_rider (Rogue Assassin level 17) — forces CON save, doubles damage on fail
         if (hit && context?.sneakAttackDice && context?.sneakAttackDice > 0) {
@@ -434,7 +440,8 @@ export function createLogAndShow(deps) {
             rolls: [r1, r2],
             mode: context?.forcedMode || 'normal',
             total: effectiveD20Roll,
-            bonus,
+            bonus: bonus + cosmicOmenAppliedBonus,
+            bonusDetail: cosmicOmenDetail,
             isNatural20: effectiveD20Roll === 20,
             isNatural1: effectiveD20Roll === 1,
             targetName,
@@ -459,7 +466,8 @@ export function createLogAndShow(deps) {
                 rollType,
                 name,
                 rolls: luckyRerolled ? [luckyRerollValue] : [r1, r2],
-                bonus,
+                bonus: bonus + cosmicOmenAppliedBonus,
+                bonusDetail: cosmicOmenDetail || undefined,
                 targetName,
                 targetAc,
                 hit,
@@ -929,21 +937,6 @@ export function createLogAndShow(deps) {
                 saveTotal = saveResult.total;
                 saveResultData = saveResult;
 
-                // Cosmic Omen: apply global pending bonus to save total
-                const cosmicOmenPendingRawSave = getRuntimeValue(campaignName, 'cosmicOmenPendingBonus', campaignName);
-                if (cosmicOmenPendingRawSave) {
-                    try {
-                        const pending = JSON.parse(cosmicOmenPendingRawSave);
-                        if (pending && typeof pending.value === 'number' && pending.value > 0) {
-                            const isWeal = pending.type === 'Weal';
-                            saveTotal += isWeal ? pending.value : -pending.value;
-                            cosmicOmenAppliedBonus = isWeal ? pending.value : -pending.value;
-                            saveSuccess = saveTotal >= saveDc;
-                            setRuntimeValue(campaignName, 'cosmicOmenPendingBonus', null, campaignName, true);
-                        }
-                    } catch (_e) { /* ignore */ }
-                }
-
                 setRuntimeValue(characterName, 'lastSaveRoll', {
                     d20: effectiveD20ForSave,
                     bonus: saveResult.saveBonus,
@@ -1007,7 +1000,7 @@ export function createLogAndShow(deps) {
             } else {
                 // Cosmic Omen: apply global pending bonus to effectiveD20
                 let effectiveD20ForSave = effectiveD20;
-                const cosmicOmenPendingRawSave2 = getRuntimeValue(campaignName, 'cosmicOmenPendingBonus', campaignName);
+                const cosmicOmenPendingRawSave2 = getRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus');
                 if (cosmicOmenPendingRawSave2) {
                     try {
                         const pending = JSON.parse(cosmicOmenPendingRawSave2);
@@ -1015,7 +1008,8 @@ export function createLogAndShow(deps) {
                             const isWeal = pending.type === 'Weal';
                             effectiveD20ForSave += isWeal ? pending.value : -pending.value;
                             cosmicOmenAppliedBonus = isWeal ? pending.value : -pending.value;
-                            setRuntimeValue(campaignName, 'cosmicOmenPendingBonus', null, campaignName, true);
+                    cosmicOmenDetail = `(${cosmicOmenAppliedBonus} from ${pending.type})`;
+                            setRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus', null, campaignName, true);
                         }
                     } catch (_e) { /* ignore */ }
                 }

@@ -90,6 +90,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
             return;
           }
           const target = getTarget();
+          console.log('[MonsterCardModal] autoDamageRoll:', { autoDamageTargetName: autoDamage.targetName, getTargetResult: target?.name, attacker: monsterName, hit: popupHtml?.hit, isCrit: autoDamage.isAutoCrit });
           const wasCrit = isCrit || autoDamage.isAutoCrit;
           const result = wasCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
           if (result) {
@@ -133,11 +134,18 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   const getTarget = useCallback(() => {
     if (!creatures) {
       const cs = fallbackCsRef.current;
+      console.log('[MonsterCardModal] getTarget no creatures:', { fallbackCs: !!cs, monsterName });
       return cs ? getTargetFromAttacker(cs, monsterName) : null;
     }
     const attacker = findCreatureByName({ creatures }, monsterName);
-    if (!attacker || !attacker.targetName) return null;
-    return creatures.find(c => c.name === attacker.targetName) || null;
+    console.log('[MonsterCardModal] getTarget:', { monsterName, attackerName: attacker?.name, attackerTargetName: attacker?.targetName, creaturesCount: creatures?.length });
+    if (!attacker || !attacker.targetName) {
+      console.log('[MonsterCardModal] getTarget early return:', { hasAttacker: !!attacker, hasTargetName: !!attacker?.targetName });
+      return null;
+    }
+    const found = creatures.find(c => c.name === attacker.targetName);
+    console.log('[MonsterCardModal] getTarget resolved:', { targetName: found?.name, found: !!found });
+    return found || null;
   }, [creatures, monsterName]);
 
   const getDamageTypesForAction = useCallback((action) => {
@@ -156,6 +164,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
 
   const handleAttack = (name, bonus, action) => {
     const target = getTarget();
+    console.log('[MonsterCardModal] handleAttack:', { actionName: name, targetName: target?.name, attacker: monsterName, targetExistsInCreatures: !!creatures?.find(c => c.name === target?.name) });
     const primaryDamageType = action?.damage_type_primary ? [action.damage_type_primary] : [];
 
     const isMeleeAttack = (action?.reach ? rangeToFeet(action.reach) : (action?.range ? rangeToFeet(action.range) : 30)) <= 5;
@@ -277,6 +286,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       }
     }
 
+    console.log('[MonsterCardModal] rollAttack context targetName:', target?.name);
     rollAttack(name, bonus, {
       damageType: formatDamageTypes(primaryDamageType),
       resistanceNotice,
