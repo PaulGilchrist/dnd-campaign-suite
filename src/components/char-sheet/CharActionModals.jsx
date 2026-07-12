@@ -427,7 +427,38 @@ export default function CharActionModals({
                 <TeleportModal
                     {...modalState.teleportModal}
                     onClose={() => { setModalState({ teleportModal: null }); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
+                    isMoonlightStep={modalState.teleportModal.action?.automation?.effect === 'moonlight_step_teleport'}
                 />
+            )}
+            {modalState.moonlightStepFallbackModal && (
+                <div className="sp-overlay" onClick={() => setModalState({ moonlightStepFallbackModal: null })}>
+                    <div className="sp-modal" onClick={e => e.stopPropagation()}>
+                        <div className="sp-header">
+                            <i className="fa-solid fa-moon"></i> {modalState.moonlightStepFallbackModal.action.name}
+                        </div>
+                        <div className="sp-body">
+                            <p>No Moonlight Step uses remaining. Consume a level {modalState.moonlightStepFallbackModal.slotLevel} spell slot to use Moonlight Step?</p>
+                        </div>
+                        <div className="sp-actions">
+                            <button className="sp-roll-btn" onClick={async () => {
+                                const { action, playerStats: fallbackStats, campaignName: fallbackCampaign, slotLevel } = modalState.moonlightStepFallbackModal;
+                                setModalState({ moonlightStepFallbackModal: null });
+                                const { confirmTeleport } = await import('../../services/automation/handlers/class-warlock/tempTeleportHandler.js');
+                                const res = await confirmTeleport(action, fallbackStats, fallbackCampaign, false, slotLevel);
+                                if (res?.type === 'popup') {
+                                    const payload = res.payload;
+                                    const html = `<b>${payload.name || action.name}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+                                    setPopupHtml(html);
+                                }
+                            }}>
+                                <i className="fa-solid fa-check"></i> Yes, Consume Slot
+                            </button>
+                            <button className="sp-dismiss-btn" onClick={() => setModalState({ moonlightStepFallbackModal: null })}>
+                                <i className="fa-solid fa-times"></i> No
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
             {modalState.healingIllusionModal && (
                 <SecondaryTargetModal

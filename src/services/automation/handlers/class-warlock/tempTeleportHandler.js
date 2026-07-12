@@ -2,6 +2,20 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
+import { addEntry } from '../../../ui/logService.js';
+
+function getAvailableSpellSlotLevel(playerStats) {
+    for (let lvl = 2; lvl <= 9; lvl++) {
+        const key = `spell_slots_level_${lvl}`;
+        const max = playerStats.spellAbilities?.[key] || 0;
+        const current = getRuntimeValue(playerStats.name, key, null);
+        const available = current != null ? Math.min(max, Number(current)) : max;
+        if (available > 0) {
+            return lvl;
+        }
+    }
+    return null;
+}
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -11,6 +25,19 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         const usesMax = evaluateAutoExpression('WIS modifier', playerStats);
         const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
         if (currentUses <= 0) {
+            const slotLevel = getAvailableSpellSlotLevel(playerStats);
+            if (slotLevel !== null) {
+                return {
+                    type: 'modal',
+                    modalName: 'moonlightStepFallback',
+                    payload: {
+                        action,
+                        playerStats,
+                        campaignName,
+                        slotLevel,
+                    },
+                };
+            }
             return {
                 type: 'popup',
                 payload: {
@@ -31,9 +58,19 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
-export async function confirmTeleport(action, playerStats, campaignName, useExtended) {
+export async function confirmTeleport(action, playerStats, campaignName, useExtended, consumedSlotLevel) {
     const auto = action.automation;
     const playerName = playerStats.name;
+
+    if (consumedSlotLevel) {
+        const slotKey = `spell_slots_level_${consumedSlotLevel}`;
+        const current = getRuntimeValue(playerName, slotKey, campaignName);
+        const max = playerStats.spellAbilities?.[slotKey] || 0;
+        const available = current != null ? Math.min(max, Number(current)) : max;
+        if (available > 0) {
+            setRuntimeValue(playerName, slotKey, available - 1, campaignName);
+        }
+    }
 
     const distance = useExtended
         ? (auto.extendedDistance || '150 ft')
@@ -54,6 +91,18 @@ export async function confirmTeleport(action, playerStats, campaignName, useExte
     }
 
     if (auto.effect === 'shadow_step_teleport' || auto.effect === 'moonlight_step_teleport') {
+        let logDescription = `${playerName} used ${action.name} to teleport ${distance}. Gains Advantage on next attack roll.`;
+        if (consumedSlotLevel) {
+            logDescription += ` Expend a level ${consumedSlotLevel} spell slot.`;
+        }
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: action.name,
+            description: logDescription,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[tempTeleport] Error logging:", e); });
+
         const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
         const newEffect = {
             target: playerName,

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { confirmTeleport, isExtendedAvailable } from '../../../services/automation/handlers/class-warlock/tempTeleportHandler.js';
 import '../CharSheet.css';
 
-function TeleportModal({ action, playerStats, campaignName, onClose, triggeredByElementalStride }) {
+function TeleportModal({ action, playerStats, campaignName, onClose, triggeredByElementalStride, isMoonlightStep }) {
     const auto = action.automation;
     const isSwap = auto?.effect === 'teleport_swap_with_illusion';
     const extendedAvailable = isExtendedAvailable(playerStats.name, campaignName);
@@ -102,38 +102,44 @@ function TeleportModal({ action, playerStats, campaignName, onClose, triggeredBy
         <div className="sp-overlay" onClick={onClose}>
             <div className="sp-modal" onClick={e => e.stopPropagation()}>
                 <div className="sp-header">
-                    <i className="fa-solid fa-tree"></i> {action.name}
+                    <i className={isMoonlightStep ? "fa-solid fa-moon" : "fa-solid fa-tree"}></i> {action.name}
                 </div>
                 <div className="sp-body">
                     <p>Teleport to an unoccupied space you can see:</p>
-                    <div style={{ textAlign: 'left', marginTop: '12px' }}>
-                        <label style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: 'pointer', background: !useExtended ? 'rgba(255,255,255,0.15)' : 'transparent', border: !useExtended ? '1px solid var(--color-link)' : '1px solid transparent' }}>
-                            <input
-                                type="radio"
-                                name="teleportRange"
-                                checked={!useExtended}
-                                onChange={() => setUseExtended(false)}
-                                style={{ marginRight: '8px' }}
-                            />
-                            <strong>{standardDistance}</strong>
-                            <span style={{ opacity: 0.8, marginLeft: '8px' }}>— Standard teleport</span>
-                        </label>
-                        <label style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: extendedAvailable ? 'pointer' : 'not-allowed', background: useExtended ? 'rgba(255,255,255,0.15)' : 'transparent', border: useExtended ? '1px solid var(--color-link)' : '1px solid transparent', opacity: extendedAvailable ? 1 : 0.5 }}>
-                            <input
-                                type="radio"
-                                name="teleportRange"
-                                checked={useExtended}
-                                onChange={() => extendedAvailable && setUseExtended(true)}
-                                disabled={!extendedAvailable}
-                                style={{ marginRight: '8px' }}
-                            />
-                            <strong>{extendedDistance}</strong>
-                            <span style={{ opacity: 0.8, marginLeft: '8px' }}>
-                                {extendedAvailable ? '— Once per Rage' : '— Already used this Rage'}
-                            </span>
-                        </label>
-                    </div>
-                    {(auto && auto.bringAllies && auto.allyCount > 0) && (
+                    {isMoonlightStep ? (
+                        <p style={{ marginTop: '12px', opacity: 0.8 }}>
+                            Gains Advantage on next attack roll.
+                        </p>
+                    ) : (
+                        <div style={{ textAlign: 'left', marginTop: '12px' }}>
+                            <label style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: 'pointer', background: !useExtended ? 'rgba(255,255,255,0.15)' : 'transparent', border: !useExtended ? '1px solid var(--color-link)' : '1px solid transparent' }}>
+                                <input
+                                    type="radio"
+                                    name="teleportRange"
+                                    checked={!useExtended}
+                                    onChange={() => setUseExtended(false)}
+                                    style={{ marginRight: '8px' }}
+                                />
+                                <strong>{standardDistance}</strong>
+                                <span style={{ opacity: 0.8, marginLeft: '8px' }}>— Standard teleport</span>
+                            </label>
+                            <label style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: extendedAvailable ? 'pointer' : 'not-allowed', background: useExtended ? 'rgba(255,255,255,0.15)' : 'transparent', border: useExtended ? '1px solid var(--color-link)' : '1px solid transparent', opacity: extendedAvailable ? 1 : 0.5 }}>
+                                <input
+                                    type="radio"
+                                    name="teleportRange"
+                                    checked={useExtended}
+                                    onChange={() => extendedAvailable && setUseExtended(true)}
+                                    disabled={!extendedAvailable}
+                                    style={{ marginRight: '8px' }}
+                                />
+                                <strong>{extendedDistance}</strong>
+                                <span style={{ opacity: 0.8, marginLeft: '8px' }}>
+                                    {extendedAvailable ? '— Once per Rage' : '— Already used this Rage'}
+                                </span>
+                            </label>
+                        </div>
+                    )}
+                    {!isMoonlightStep && (auto && auto.bringAllies && auto.allyCount > 0) && (
                         <p style={{ marginTop: '12px', opacity: 0.8 }}>
                             <i className="fa-solid fa-users"></i> When using the extended teleport, you can bring up to {auto.allyCount} willing creatures within 10 ft of you. Each appears within {(auto && auto.teleportRange) || '10 ft'} of your destination.
                         </p>
@@ -141,7 +147,7 @@ function TeleportModal({ action, playerStats, campaignName, onClose, triggeredBy
                 </div>
                 <div className="sp-actions">
                     <button className="sp-roll-btn" onClick={handleConfirm}>
-                        <i className="fa-solid fa-tree"></i> Teleport
+                        <i className={isMoonlightStep ? "fa-solid fa-moon" : "fa-solid fa-tree"}></i> Teleport
                     </button>
                     <button className="sp-dismiss-btn" onClick={onClose}>Cancel</button>
                 </div>

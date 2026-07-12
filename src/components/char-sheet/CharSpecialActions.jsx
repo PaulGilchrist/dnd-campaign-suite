@@ -12,6 +12,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntime
 import { applyChoice } from '../../services/automation/handlers/class-ranger/defensiveTacticsHandler.js';
 import { applyChoice as applyHunterPreyChoice } from '../../services/automation/handlers/class-ranger/hunterPreyHandler.js';
 import TeleportModal from './modals/TeleportModal.jsx';
+import { confirmTeleport } from '../../services/automation/handlers/class-warlock/tempTeleportHandler.js';
 import SignatureSpellsModal from './modals/arcane/SignatureSpellsModal.jsx';
 import SpellMasteryModal from './modals/arcane/SpellMasteryModal.jsx';
 import SavantModal from './modals/arcane/SavantModal.jsx';
@@ -30,6 +31,7 @@ import './CharSpecialActions.css';
 
 function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }) {
     const [teleportModal, setTeleportModal] = useState(null);
+    const [moonlightStepFallback, setMoonlightStepFallback] = useState(null);
     const [signatureSpellsModal, setSignatureSpellsModal] = useState(null);
     const [spellMasteryModal, setSpellMasteryModal] = useState(null);
     const [savantModal, setSavantModal] = useState(null);
@@ -160,6 +162,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                 setNaturalRecoveryModal(result.payload);
             } else if (result.modalName === 'circleOfTheLandSpells') {
                 setCircleOfTheLandSpellsModal(result.payload);
+            } else if (result.modalName === 'moonlightStepFallback') {
+                setMoonlightStepFallback(result.payload);
             }
         } else if (result.type === 'popup') {
             const payload = result.payload;
@@ -169,6 +173,18 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
             setPopupHtml(html);
         }
     }, [playerStats, campaignName, cannotAct, setCombatSuperiorityModal, setPopupHtml]);
+
+    const handleMoonlightStepFallbackConfirm = useCallback(async () => {
+        if (!moonlightStepFallback) return;
+        const { action, playerStats: fallbackStats, campaignName: fallbackCampaign, slotLevel } = moonlightStepFallback;
+        setMoonlightStepFallback(null);
+        const res = await confirmTeleport(action, fallbackStats, fallbackCampaign, false, slotLevel);
+        if (res?.type === 'popup') {
+            const payload = res.payload;
+            const html = `<b>${payload.name || action.name}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+            setPopupHtml(html);
+        }
+    }, [moonlightStepFallback, setPopupHtml]);
 
     const handleSignatureSpellsConfirm = useCallback(async (spell1, spell2) => {
         if (!signatureSpellsModal) return;
@@ -253,13 +269,34 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
     return (
             <div className='char-special-actions'>
                 <div className='sectionHeader'>Special Actions</div>
-             {teleportModal && (
+              {teleportModal && (
                 <TeleportModal
                     action={teleportModal.action}
                     playerStats={teleportModal.playerStats}
                     campaignName={teleportModal.campaignName}
                     onClose={() => setTeleportModal(null)}
+                    isMoonlightStep={teleportModal.action?.automation?.effect === 'moonlight_step_teleport'}
                 />
+            )}
+            {moonlightStepFallback && (
+                <div className="sp-overlay" onClick={() => setMoonlightStepFallback(null)}>
+                    <div className="sp-modal" onClick={e => e.stopPropagation()}>
+                        <div className="sp-header">
+                            <i className="fa-solid fa-moon"></i> {moonlightStepFallback.action.name}
+                        </div>
+                        <div className="sp-body">
+                            <p>No Moonlight Step uses remaining. Consume a level {moonlightStepFallback.slotLevel} spell slot to use Moonlight Step?</p>
+                        </div>
+                        <div className="sp-actions">
+                            <button className="sp-roll-btn" onClick={handleMoonlightStepFallbackConfirm}>
+                                <i className="fa-solid fa-check"></i> Yes, Consume Slot
+                            </button>
+                            <button className="sp-dismiss-btn" onClick={() => setMoonlightStepFallback(null)}>
+                                <i className="fa-solid fa-times"></i> No
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
             {signatureSpellsModal && (
                 <SignatureSpellsModal

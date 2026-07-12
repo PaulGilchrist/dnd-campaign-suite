@@ -773,6 +773,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         setModalState({ divineInterventionAction: action, divineInterventionModal: result.payload });
                         break;
                     case 'moonlightStepResource': setModalState({ moonlightStepResourceModal: result.payload }); break;
+                    case 'moonlightStepFallback': setModalState({ moonlightStepFallbackModal: result.payload }); break;
                     case 'starryFormConstellation': setModalState({ starryFormConstellationModal: result.payload }); break;
                     case 'twinklingConstellation': setModalState({ twinklingConstellationModal: result.payload }); break;
                     case 'arcaneCharge': setModalState({ arcaneChargeModal: result.payload }); break;

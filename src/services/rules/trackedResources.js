@@ -38,6 +38,7 @@ export const ALL_TRACKED_RESOURCES = [
   'favoredEnemyUses',
   'stonecunningUses',
   'tirelessUses',
+  'moonlightStepUses',
   'shortRestHitDice',
   'spell_slots_level_1',
   'spell_slots_level_2',
@@ -212,6 +213,10 @@ export function computeTrackedResources(playerStats) {
 
   const maxTU = isRanger && playerStats.level >= 10 ? Math.max(wis?.bonus || 0, 1) : 0
   resources.tirelessUses = { current: maxTU, max: maxTU }
+
+  const moonlightSubclass = playerStats.class?.major?.name === 'Circle of the Moon' || playerStats.class?.subclass?.name === 'Circle of the Moon'
+  const maxMoonlightStep = isDruid && moonlightSubclass ? Math.max(wis?.bonus || 0, 1) : 0
+  resources.moonlightStepUses = { current: maxMoonlightStep, max: maxMoonlightStep }
 
   return resources
 }

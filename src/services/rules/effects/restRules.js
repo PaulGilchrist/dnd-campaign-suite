@@ -136,6 +136,7 @@ export const LONG_REST_RESOURCES = [
   'naturesVeilUses',
   'favoredEnemyUses',
   'tirelessUses',
+  'moonlightStepUses',
   'dreadambushUses'
 ]
 
