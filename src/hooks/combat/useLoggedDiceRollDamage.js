@@ -1077,6 +1077,10 @@ export function createLogDamageAndShow(deps) {
             }
         }
 
+        if (applyResult?.intercepted) {
+            return;
+        }
+
         if (applyResult && applyResult.finalDamage > 0) {
             endInvisibilityOnHostileAction(characterName, campaignName);
         }

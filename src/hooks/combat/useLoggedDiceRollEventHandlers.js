@@ -98,6 +98,10 @@ export function setupEventListeners(deps) {
                 ? applyDamageToTarget(combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, charactersRef.current, ignoreResistance, attacker, true, { concentrationTotalDamage: finalDamage + secondaryData.total })
                 : applyDamageToTarget(combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, charactersRef.current, ignoreResistance, attacker, true);
 
+            if (applyResult?.intercepted) {
+                return;
+            }
+
             if (applyResult && applyResult.finalDamage > 0) {
                 endInvisibilityOnHostileAction(attacker, pending.campaignName);
             }

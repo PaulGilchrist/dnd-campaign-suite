@@ -113,14 +113,14 @@ describe('relentlessRageService', () => {
       expect(result.intercepted).toBe(false);
     });
 
-    it('returns intercepted: false when uses are exhausted', () => {
+    it('returns intercepted: true when uses are exhausted (unlimited uses per rest)', () => {
       runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
         if (key === 'ragePoints') return 1;
         if (key === 'relentlessrageUses') return 1;
         return null;
       });
       const result = checkRelentlessRage(makeCreature(), makePlayerComputed(), campaignName);
-      expect(result.intercepted).toBe(false);
+      expect(result.intercepted).toBe(true);
     });
 
     it('returns intercepted: true with awaitingSave when all conditions met', () => {
@@ -155,8 +155,12 @@ describe('relentlessRageService', () => {
         if (key === 'relentlessrageUses') return 1;
         return null;
       });
-      const result = checkRelentlessRage(makeCreature(), makePlayerComputed(), campaignName);
-      expect(result.intercepted).toBe(false);
+      checkRelentlessRage(makeCreature(), makePlayerComputed(), campaignName);
+      expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
+        targetName: 'TestBarbarian',
+        saveType: 'CON',
+        saveDc: 15,
+      });
     });
 
     it('logs trigger entry with source field', () => {
