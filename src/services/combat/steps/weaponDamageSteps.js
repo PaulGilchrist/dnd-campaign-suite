@@ -508,11 +508,17 @@ export function buildDamageSteps() {
         // attack_rider (Brutal Strike) — gated on _brutalStrikeActive
         const brutalStrikeActive = getRuntimeValue(ctx.playerStats.name, '_brutalStrikeActive', ctx.campaignName);
         if (brutalStrikeActive) {
-          const allAutomation = [...(ctx.playerStats.automation.actions || []), ...(ctx.playerStats.automation.passives || [])];
-          const matchingRiders = allAutomation.filter(
-            x => x.type === 'attack_rider' && x.damageExpression && x.trigger === 'strength_attack_hit_after_reckless'
-          );
-          const rider = matchingRiders[matchingRiders.length - 1];
+            const allAutomation = [...(ctx.playerStats.automation.actions || []), ...(ctx.playerStats.automation.passives || [])];
+            const matchingRiders = allAutomation.filter(
+                x => x.type === 'attack_rider' && x.damageExpression && x.trigger === 'strength_attack_hit_after_reckless'
+            ).sort((a, b) => {
+                const exprA = a.damageExpression || '';
+                const exprB = b.damageExpression || '';
+                const countA = parseInt(exprA.match(/^(\d+)/)?.[1] || '0', 10);
+                const countB = parseInt(exprB.match(/^(\d+)/)?.[1] || '0', 10);
+                return countB - countA;
+            });
+            const rider = matchingRiders[0];
           if (rider) {
             const r = rollExpression(rider.damageExpression);
             if (r) {
@@ -549,15 +555,6 @@ export function buildDamageSteps() {
               }
               setRuntimeValue(ctx.campaignName, 'targetEffects', storedEffects, ctx.campaignName);
             }
-
-            // Log to campaign log
-            const effectNames = effectChoices.join(' + ') || 'no effect';
-            addEntry(ctx.campaignName, {
-              type: 'ability_use',
-              characterName: ctx.playerStats.name,
-              abilityName: rider.name,
-              description: `${rider.name}: ${rider.damageExpression} ${rider.damageType === 'same_as_weapon' ? (ctx.attack?.damageType || 'weapon') : (rider.damageType || 'weapon')} damage to ${targetName || 'target'} — ${effectNames}`,
-            }).catch(() => {});
 
             // Clear active flags
             setRuntimeValue(ctx.playerStats.name, '_brutalStrikeActive', null, ctx.campaignName);

@@ -192,6 +192,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const targetRiderForTarget = allTargetEffects.filter(te => te.target === target?.name)
     const targetEffectData = computeConditionEffects(targetConditions, [], targetRiderForTarget)
 
+    const riderAttackBonus = targetEffectData.riderAttackBonus || 0;
+    const effectiveBonus = bonus + riderAttackBonus;
+
     if (targetEffectData.targetAdvantageCount > 0) {
       console.log('[MonsterCardModal] Reckless target effects:', { targetName: target?.name, targetRiderForTarget: targetRiderForTarget.map(t => t.effect), targetAdvantageCount: targetEffectData.targetAdvantageCount });
     }
@@ -281,7 +284,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       }
     }
 
-    rollAttack(name, bonus, {
+    rollAttack(name, effectiveBonus, {
       damageType: formatDamageTypes(primaryDamageType),
       resistanceNotice,
       forcedMode: rangeForcedMode || (forcedMode !== 'normal' ? forcedMode : (duplicityAdvantage ? 'advantage' : undefined)),

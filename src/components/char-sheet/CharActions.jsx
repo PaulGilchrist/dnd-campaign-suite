@@ -409,11 +409,17 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         const currentCreature = getActiveCreatureName(campaignName);
         const isOfferedThisTurn = offeredValue && offeredValue.activeCreature === currentCreature;
 
-        // Detect Brutal Strike from passives
+        // Detect Brutal Strike from passives — pick the highest-level one (2d10 > 1d10)
         const brutalStrikePassives = (playerStats.automation?.passives || []).filter(
             p => p.type === 'attack_rider' && p.trigger === 'strength_attack_hit_after_reckless'
-        );
-        const brutalStrikePassive = brutalStrikePassives[brutalStrikePassives.length - 1];
+        ).sort((a, b) => {
+            const exprA = a.damageExpression || '';
+            const exprB = b.damageExpression || '';
+            const countA = parseInt(exprA.match(/^(\d+)/)?.[1] || '0', 10);
+            const countB = parseInt(exprB.match(/^(\d+)/)?.[1] || '0', 10);
+            return countB - countA;
+        });
+        const brutalStrikePassive = brutalStrikePassives[0];
         const hasBrutalStrike = !!brutalStrikePassive;
         const brutalStrikeOptions = brutalStrikePassive?.options || [];
         const maxEffects = brutalStrikePassive?.maxEffects || 1;
@@ -449,6 +455,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             campaignName,
             playerStats.name
         );
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: 'Reckless Attack',
+            description: `${playerStats.name} uses Reckless Attack, granting advantage on the first attack roll on this turn`,
+        }).catch(() => {});
         addExpiration(playerStats.name, playerStats.name, [
             { type: 'remove_active_buff', buffName: 'Reckless Attack' }
         ], campaignName, undefined, playerStats.name);
@@ -466,13 +478,25 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             setRuntimeValue(playerStats.name, '_brutalStrikeActive', true, campaignName);
             setRuntimeValue(playerStats.name, '_brutalStrikeEffects', brutalStrikeChoice.effectChoices, campaignName);
             markOncePerTurn('Brutal Strike', '_BrutalStrike_usedRound', playerStats, campaignName).catch((e) => { console.error("[CharActions] Error:", e); });
+            setRuntimeValue(playerStats.name, '_brutalStrikeNoAdvantage', true, campaignName);
+            const effectNames = brutalStrikeChoice.effectChoices.join(' + ') || 'no effect';
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName: playerStats.name,
+                abilityName: 'Brutal Strike',
+                description: `${playerStats.name} uses Brutal Strike on ${attack.name} — ${effectNames}`,
+            }).catch(() => {});
         }
 
         setModalState({ recklessAttackModal: null });
         buildCtx(attack).then(ctx => {
             const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;
             rollAttack(attack.name, effectiveHitBonus - exhaustionPenalty, ctx);
-        }).catch((e) => { console.error("[CharActions] Error:", e); });
+        }).catch((e) => { console.error("[CharActions] Error:", e); }).finally(() => {
+            if (brutalStrikeChoice?.useBrutalStrike) {
+                setRuntimeValue(playerStats.name, '_brutalStrikeNoAdvantage', null, campaignName);
+            }
+        });
     }, [buildCtx, rollAttack, exhaustionPenalty, playerStats, campaignName, setModalState]);
 
     const handleRecklessAttackCancel = React.useCallback((attack) => {
@@ -490,6 +514,14 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             setRuntimeValue(playerStats.name, '_brutalStrikeActive', true, campaignName);
             setRuntimeValue(playerStats.name, '_brutalStrikeEffects', brutalStrikeChoice.effectChoices, campaignName);
             markOncePerTurn('Brutal Strike', '_BrutalStrike_usedRound', playerStats, campaignName).catch((e) => { console.error("[CharActions] Error:", e); });
+            const attack = modalState?.recklessAttackModal?.attack;
+            const effectNames = brutalStrikeChoice.effectChoices.join(' + ') || 'no effect';
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName: playerStats.name,
+                abilityName: 'Brutal Strike',
+                description: `${playerStats.name} uses Brutal Strike on ${attack?.name || 'attack'} — ${effectNames}`,
+            }).catch(() => {});
         }
         setModalState({ recklessAttackModal: null });
         // Proceed with the attack - get the attack from the modal state

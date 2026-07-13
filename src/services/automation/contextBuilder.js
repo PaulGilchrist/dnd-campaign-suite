@@ -118,6 +118,12 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             }
         }
 
+        // Brutal Strike: override advantage to normal when chosen
+        const brutalStrikeNoAdvantage = getRuntimeValue(playerStats.name, '_brutalStrikeNoAdvantage', campaignName);
+        if (brutalStrikeNoAdvantage) {
+            forcedMode = 'normal';
+        }
+
         // Sacred Weapon: Add Charisma modifier to attack rolls (minimum +1) for melee attacks
         let sacredWeaponBonus = 0;
         const sacredWeaponActive = activeBuffs.some(b => b.effect === 'sacred_weapon');
@@ -132,6 +138,32 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
         const hasBlessedWarrior = activeBuffs.some(b => b.effect === 'blessed_warrior');
         if (hasBlessedWarrior && (attack.weaponType === 'melee' || attack.weaponType === 'unarmed')) {
             blessedWarriorBonus = 2;
+        }
+
+        // Brutal Strike: add extra damage dice when active
+        let brutalStrikeBonus = 0;
+        const brutalStrikeActive = getRuntimeValue(playerName, '_brutalStrikeActive', campaignName);
+        if (brutalStrikeActive) {
+            const allAutomation = [...(playerStats.automation?.actions || []), ...(playerStats.automation?.passives || [])];
+            const matchingRiders = allAutomation.filter(
+                x => x.type === 'attack_rider' && x.damageExpression && x.trigger === 'strength_attack_hit_after_reckless'
+            ).sort((a, b) => {
+                const exprA = a.damageExpression || '';
+                const exprB = b.damageExpression || '';
+                const countA = parseInt(exprA.match(/^(\d+)/)?.[1] || '0', 10);
+                const countB = parseInt(exprB.match(/^(\d+)/)?.[1] || '0', 10);
+                return countB - countA;
+            });
+            const rider = matchingRiders[0];
+            if (rider) {
+                const diceMatch = rider.damageExpression.match(/^(\d+)d(\d+)/);
+                if (diceMatch) {
+                    const numDice = parseInt(diceMatch[1], 10);
+                    const dieSize = parseInt(diceMatch[2], 10);
+                    const avgDamage = Math.ceil((dieSize + 1) / 2) * numDice;
+                    brutalStrikeBonus = avgDamage;
+                }
+            }
         }
 
         // Vow of Enmity: Advantage on attack rolls against the vowed creature
@@ -160,9 +192,9 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             }
         }
 
-        const autoDamageFormula = stanceDamageBonus > 0
-            ? `${attack.damage}+${stanceDamageBonus}`
-            : attack.damage;
+        const autoDamageFormula = [attack.damage, stanceDamageBonus > 0 ? stanceDamageBonus : null, brutalStrikeBonus > 0 ? brutalStrikeBonus : null]
+            .filter(v => v !== null)
+            .join('+');
 
         const effectiveHitBonus = attack.hitBonus + sacredWeaponBonus + blessedWarriorBonus + sunderingBonus;
         const hitBonusFormulaParts = [attack.hitBonusFormula];

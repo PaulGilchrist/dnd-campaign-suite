@@ -1,5 +1,5 @@
 {
-  "name": "Armenta",
+  "name": "Nyra",
   "level": 3,
   "alignment": "Lawful Good",
   "abilities": [
@@ -120,7 +120,7 @@
   "rules": "5e",
   "xp": 0,
   "xpMode": "milestone",
-  "imagePath": "images/Armenta.png",
+  "imagePath": "images/Nyra.png",
   "_fileName": "Paladin.json",
   "originalFileName": "Armenta.json"
 }

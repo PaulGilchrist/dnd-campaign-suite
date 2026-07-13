@@ -140,6 +140,19 @@ export function createLogAndShow(deps) {
             target = combatSummary ? getTargetFromAttacker(combatSummary, utils.getName(characterName)) : null;
         }
 
+        // Sundering Blow: add +5 to hit bonus for next attack against the target
+        let sunderingBlowBonus = 0;
+        if (target && rollType === 'attack') {
+            const allTargetEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+            const targetEffectsForTarget = allTargetEffects.filter(te => te.target === target.name);
+            for (const te of targetEffectsForTarget) {
+                if (te.effect === 'next_attack_bonus') {
+                    sunderingBlowBonus += parseInt(te.value, 10) || 5;
+                }
+            }
+        }
+        const effectiveBonus = bonus + sunderingBlowBonus;
+
         let isAutoMiss = context?.isAutoMiss === true;
 
         const coverAcBonus = context?.coverAcBonus || 0;
@@ -160,7 +173,7 @@ export function createLogAndShow(deps) {
         }
 
         const effectiveAc = target ? targetAc + coverAcBonus + (context?.gloriousDefenseBonus || 0) + (context?.defensiveDuelistBonus || 0) + (context?.baitAndSwitchBonus || 0) + getShieldAcBonus(target.name, campaignName) + getShieldOfFaithAcBonus(target.name, campaignName) : undefined;
-        let hit = isAutoMiss ? false : (target ? (effectiveD20Roll + bonus >= effectiveAc) : undefined);
+        let hit = isAutoMiss ? false : (target ? (effectiveD20Roll + effectiveBonus >= effectiveAc) : undefined);
         const targetName = (rollType === 'attack' || rollType === 'save') ? (target?.name || context?.targetName) : undefined;
         const attackerName = context?.attackerName || characterName;
 
@@ -238,7 +251,7 @@ export function createLogAndShow(deps) {
             context.bardicInspirationDefenseDieSize = dieSize;
             context.bardicInspirationDefenseTargetName = targetName;
             context.bardicInspirationDefenseAttackRoll = hit ? effectiveD20Roll : null;
-            context.bardicInspirationDefenseBonus = hit ? bonus : null;
+            context.bardicInspirationDefenseBonus = hit ? effectiveBonus : null;
             context.bardicInspirationDefenseEffectiveAc = hit ? effectiveAc : null;
         }
 
@@ -438,7 +451,7 @@ export function createLogAndShow(deps) {
             rolls: [r1, r2],
             mode: context?.forcedMode || 'normal',
             total: effectiveD20Roll,
-            bonus: bonus + cosmicOmenAppliedBonus,
+            bonus: bonus + cosmicOmenAppliedBonus + sunderingBlowBonus,
             bonusDetail: cosmicOmenDetail,
             isNatural20: effectiveD20Roll === 20,
             isNatural1: effectiveD20Roll === 1,
@@ -464,7 +477,7 @@ export function createLogAndShow(deps) {
                 rollType,
                 name,
                 rolls: luckyRerolled ? [luckyRerollValue] : [r1, r2],
-                bonus: bonus + cosmicOmenAppliedBonus,
+            bonus: bonus + cosmicOmenAppliedBonus + sunderingBlowBonus,
                 bonusDetail: cosmicOmenDetail || undefined,
                 targetName,
                 targetAc,
@@ -538,8 +551,8 @@ export function createLogAndShow(deps) {
                     targetName,
                     d20: effectiveD20,
                     d20Rolls: [r1, r2],
-                    bonus,
-                    total: effectiveD20 + bonus,
+                    bonus: effectiveBonus,
+                    total: effectiveD20 + effectiveBonus,
                     targetAc,
                     effectiveAc,
                     hit,
@@ -1029,7 +1042,7 @@ export function createLogAndShow(deps) {
                     saveDc: context?.saveDc || null,
                     actionName: context?.actionName || name,
                     targetName,
-                    oldTotal: effectiveD20 + bonus,
+                oldTotal: effectiveD20 + effectiveBonus,
                     oldSuccess: context?.saveDc != null ? (effectiveD20 + bonus >= context.saveDc) : null,
                     timestamp: Date.now(),
                 }, campaignName);
