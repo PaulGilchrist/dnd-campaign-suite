@@ -15,6 +15,7 @@ import { hasAutomation } from '../../services/combat/automation/automationServic
 import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { toggleBuff } from '../../services/automation/common/buffToggle.js';
+import { addExpiration } from '../../services/rules/effects/expirations.js';
 import { addEntry } from '../../services/ui/logService.js';
 import CharActionModals from './CharActionModals.jsx'
 import CharActionSpellPopups from './CharActionSpellPopups.jsx'
@@ -25,6 +26,7 @@ import { getClassFeatures } from '../../services/character/classFeatures.js';
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js'
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
 import { getTargetFromAttacker, getCombatContext, getAttackerTargetName } from '../../services/rules/combat/damageUtils.js';
+import { getActiveCreatureName } from '../../services/encounters/combatData.js';
 import { executeSweepingAttack, executeBaitAndSwitchChoice, executeCommanderStrikeChoice, executeRallyChoice } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { activateBulwarkOfForce } from '../../services/automation/handlers/class-sorcerer/bulwarkOfForceHandler.js';
 import { activateNaturesSanctuary, moveNaturesSanctuary } from '../../services/automation/handlers/class-ranger/naturesSanctuaryHandler.js';
@@ -395,11 +397,88 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         // Making an attack roll ends any active Friends spell early
         endFriendsOnHostileAction(playerStats.name, campaignName);
         endInvisibilityOnHostileAction(playerStats.name, campaignName);
+
+        const hasRecklessFeature = playerStats.automation?.specialActions?.some(
+            a => a.effect === 'advantage_attacks_advantage_against' && a.trigger === 'first_attack_of_turn'
+        );
+        const activeBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || [];
+        const isRecklessActive = activeBuffs.some(b => b.effect === 'advantage_attacks_advantage_against');
+        const offeredKey = '_recklessAttack_offeredThisTurn';
+        const offeredValue = getRuntimeValue(playerStats.name, offeredKey);
+        const currentCreature = getActiveCreatureName(campaignName);
+        const isOfferedThisTurn = offeredValue && offeredValue.activeCreature === currentCreature;
+
+        if (playerStats.name === 'Thulgar') {
+            console.log('[Reckless] tracker check:', { offeredKey, offeredValue, currentCreature, isOfferedThisTurn });
+        }
+
+        const recklessAction = playerStats.automation?.specialActions?.find(a => a.name === 'Reckless Attack');
+        console.log('[handleAttackClick] Reckless Attack pre-conditions:', {
+            hasRecklessFeature,
+            isRecklessActive,
+            isOfferedThisTurn,
+            attackName: attack.name,
+            attackAbilityName: attack.abilityName,
+            attackWeaponType: attack.weaponType,
+            specialActionsCount: playerStats.automation?.specialActions?.length,
+            specialActionsNames: playerStats.automation?.specialActions?.map(a => a.name),
+            recklessAction: recklessAction ? { name: recklessAction.name, effect: recklessAction.effect, trigger: recklessAction.trigger } : null,
+        });
+
+        if (hasRecklessFeature && !isRecklessActive && !isOfferedThisTurn) {
+            setModalState({ recklessAttackModal: { attack } });
+            return;
+        }
+
         buildCtx(attack).then(ctx => {
             const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;
             rollAttack(attack.name, effectiveHitBonus - exhaustionPenalty, ctx);
         }).catch((e) => { console.error("[CharActions] Error:", e); });
-    }, [cannotAct, buildCtx, rollAttack, exhaustionPenalty, playerStats.name, campaignName]);
+    }, [cannotAct, buildCtx, rollAttack, exhaustionPenalty, playerStats.name, campaignName, setModalState, playerStats.automation?.specialActions]);
+
+    const handleRecklessAttackConfirm = React.useCallback((attack) => {
+        toggleBuff(
+            playerStats.name,
+            'Reckless Attack',
+            { effect: 'advantage_attacks_advantage_against', duration: 'until_start_of_next_turn' },
+            campaignName,
+            playerStats.name
+        );
+        addExpiration(playerStats.name, playerStats.name, [
+            { type: 'remove_active_buff', buffName: 'Reckless Attack' }
+        ], campaignName, undefined, playerStats.name);
+        const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+        const hasRecklessEffect = storedEffects.some(te => te.effect === 'reckless_attack' && te.target === playerStats.name);
+        if (!hasRecklessEffect) {
+            const newEffects = [...storedEffects, { target: playerStats.name, source: playerStats.name, effect: 'reckless_attack', duration: 'until_start_of_next_turn' }];
+            setRuntimeValue(campaignName, 'targetEffects', newEffects, campaignName);
+        }
+        const currentCreature = getActiveCreatureName(campaignName);
+        const trackerValue = { round: 1, activeCreature: currentCreature };
+        setRuntimeValue(playerStats.name, '_recklessAttack_offeredThisTurn', trackerValue, campaignName);
+        if (playerStats.name === 'Thulgar') {
+            console.log('[Reckless] tracker SET (confirm):', trackerValue, 'storeKey:', playerStats.name);
+        }
+        setModalState({ recklessAttackModal: null });
+        buildCtx(attack).then(ctx => {
+            const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;
+            rollAttack(attack.name, effectiveHitBonus - exhaustionPenalty, ctx);
+        }).catch((e) => { console.error("[CharActions] Error:", e); });
+    }, [buildCtx, rollAttack, exhaustionPenalty, playerStats.name, campaignName, setModalState]);
+
+    const handleRecklessAttackCancel = React.useCallback((attack) => {
+        const currentCreature = getActiveCreatureName(campaignName);
+        const trackerValue = { round: 1, activeCreature: currentCreature };
+        setRuntimeValue(playerStats.name, '_recklessAttack_offeredThisTurn', trackerValue, campaignName);
+        if (playerStats.name === 'Thulgar') {
+            console.log('[Reckless] tracker SET (cancel):', trackerValue, 'storeKey:', playerStats.name);
+        }
+        setModalState({ recklessAttackModal: null });
+        buildCtx(attack).then(ctx => {
+            const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;
+            rollAttack(attack.name, effectiveHitBonus - exhaustionPenalty, ctx);
+        }).catch((e) => { console.error("[CharActions] Error:", e); });
+    }, [buildCtx, rollAttack, exhaustionPenalty, playerStats.name, campaignName, setModalState]);
 
     const handleSimpleDamageRoll = useSimpleDamageRoll(playerStats.name, campaignName, popupHtml, setPopupHtml);
 
@@ -1173,6 +1252,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleFeatureChoiceSkip={handleFeatureChoiceSkip}
                     handleConstellationSelect={handleConstellationSelect}
                     handleElderChampionRestore={handleElderChampionRestore}
+                    handleRecklessAttackConfirm={handleRecklessAttackConfirm}
+                    handleRecklessAttackCancel={handleRecklessAttackCancel}
                 />
                 <CharActionSpellPopups
                     playerStats={playerStats}

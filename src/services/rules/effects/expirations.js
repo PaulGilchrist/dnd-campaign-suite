@@ -175,6 +175,7 @@ export async function applyTurnStartEffects(activeName, playerStats, campaignNam
                     setRuntimeValue(toppleTarget, 'activeConditions', filtered, campaignName);
                 }
             }
+            const hadRecklessBefore = allTargetEffectsTopple.some(te => te.effect === 'reckless_attack' && te.target === 'Thulgar');
             const cleanedTopple = allTargetEffectsTopple.filter(te => {
                 if (te.effect !== 'topple') return true;
                 if (!te.appliedRound) return true;
@@ -183,6 +184,10 @@ export async function applyTurnStartEffects(activeName, playerStats, campaignNam
                 }
                 return true;
             });
+            const hadRecklessAfter = cleanedTopple.some(te => te.effect === 'reckless_attack' && te.target === 'Thulgar');
+            if (cleanedTopple.length !== allTargetEffectsTopple.length && hadRecklessBefore && !hadRecklessAfter) {
+                console.log('[Reckless] cleared by topple logic on turn of', activeName);
+            }
             if (cleanedTopple.length !== allTargetEffectsTopple.length) {
                 setRuntimeValue(campaignName, 'targetEffects', cleanedTopple, campaignName);
             }
@@ -582,7 +587,7 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
                 currentRound > item.appliedRound;
             const isExpired = isRoundExpired || isCreatureExpired;
             if (isExpired) {
-                clearExpirationEffects(item.effects, item.target, targetOwner, campaignName);
+                clearExpirationEffects(item.effects, item.target, targetOwner, campaignName, activeName, currentRound);
                 expiredCount++;
                 changed = true;
             } else {
@@ -600,7 +605,6 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
     function expireForCreature(attackerName, currentRound, campaignName) {
         let list = getRuntimeValue(attackerName, KEY);
         if (!Array.isArray(list)) {
-            console.warn('expirations: pendingExpirations not initialized for', attackerName, '— initializing empty array');
             list = [];
             setRuntimeValue(attackerName, KEY, list, campaignName);
         }
@@ -771,7 +775,7 @@ export async function applyAuraDamage(activeName, playerStats, campaignName, cha
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 }
 
-function clearExpirationEffects(effects, targetName, attackerName, campaignName) {
+function clearExpirationEffects(effects, targetName, attackerName, campaignName, activeName, currentRound) {
     if (!effects || !Array.isArray(effects)) return;
 
     for (const effect of effects) {
@@ -869,6 +873,9 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
             }
 
             case 'remove_active_buff': {
+                if (effect.buffName === 'Reckless Attack') {
+                    console.log('[Reckless] remove_active_buff triggered for', targetName, 'attacker:', attackerName, 'activeName:', activeName, 'round:', currentRound);
+                }
                 const allBuffs = Array.isArray(getRuntimeValue(targetName, 'activeBuffs')) ? getRuntimeValue(targetName, 'activeBuffs') : [];
                 const wasHaste = allBuffs.some(b => b.name === effect.buffName && b.effect === 'haste');
                 setRuntimeValue(
@@ -877,6 +884,13 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                     allBuffs.filter(b => b.name !== effect.buffName),
                     campaignName
                 );
+                if (effect.buffName === 'Reckless Attack') {
+                    const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                    const cleanedEffects = storedEffects.filter(te => !(te.effect === 'reckless_attack' && te.target === targetName));
+                    if (cleanedEffects.length !== storedEffects.length) {
+                        setRuntimeValue(campaignName, 'targetEffects', cleanedEffects, campaignName);
+                    }
+                }
                 if (wasHaste) {
                     const conditions = Array.isArray(getRuntimeValue(targetName, 'activeConditions')) ? getRuntimeValue(targetName, 'activeConditions') : [];
                     const hasSpeedZero = conditions.some(c => String(c).toLowerCase() === 'speed_zero');

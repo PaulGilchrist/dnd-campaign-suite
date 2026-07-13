@@ -52,6 +52,15 @@ function CreatureCard({
     const majestyDc = isMajestyActive ? getUnbreakableMajestySaveDc(creature.name, campaignName) : 0;
     const wildShapeActive = isBuffActive(creature.name, 'Wild Shape', campaignName);
     const wrathOfTheSeaActive = creature.type === 'player' && getRuntimeValue(creature.name, 'wrathOfTheSeaActive', campaignName);
+    const recklessAttackActive = myTargetEffects.some(te => te.effect === 'reckless_attack');
+
+    if (creature.name === 'Thulgar') {
+        const raw = getRuntimeValue(campaignName, 'targetEffects') ?? [];
+        const rawHasReckless = raw.some(te => te.effect === 'reckless_attack');
+        if (rawHasReckless !== recklessAttackActive) {
+            console.log('[Reckless] MISMATCH: rawStore has reckless:', rawHasReckless, 'useRuntimeValue filtered has reckless:', recklessAttackActive, 'hook value length:', allTargetEffects.length, 'raw length:', raw.length);
+        }
+    }
 
     const sanctuaryInfo = (() => {
         for (const other of allCreatures) {
@@ -260,6 +269,13 @@ function CreatureCard({
                     <div className='sanctuary-badge-wrapper'>
                         <span className='initiative-sanctuary-badge' title={`Nature's Sanctuary: Half Cover (AC +2), ${sanctuaryInfo.resistance} resistance. Protected by ${sanctuaryInfo.druid}'s Nature's Sanctuary`}>
                             <i className='fa-solid fa-leaf'></i> Sanctuary
+                        </span>
+                    </div>
+                )}
+                {recklessAttackActive && (
+                    <div className='reckless-attack-badge-wrapper'>
+                        <span className='initiative-reckless-attack-badge' title='Reckless Attack: Advantage on Strength attack rolls, attack rolls against you have Advantage'>
+                            <i className='fa-solid fa-shield-halved'></i> Reckless Attack
                         </span>
                     </div>
                 )}

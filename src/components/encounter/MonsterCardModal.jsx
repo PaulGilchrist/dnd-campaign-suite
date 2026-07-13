@@ -192,6 +192,10 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const targetRiderForTarget = allTargetEffects.filter(te => te.target === target?.name)
     const targetEffectData = computeConditionEffects(targetConditions, [], targetRiderForTarget)
 
+    if (targetEffectData.targetAdvantageCount > 0) {
+      console.log('[MonsterCardModal] Reckless target effects:', { targetName: target?.name, targetRiderForTarget: targetRiderForTarget.map(t => t.effect), targetAdvantageCount: targetEffectData.targetAdvantageCount });
+    }
+
     // Elusive: No attack roll can have Advantage against you unless you have the Incapacitated condition
     const targetIsPlayer = target?.type === 'player'
     if (targetIsPlayer && targetComputed) {

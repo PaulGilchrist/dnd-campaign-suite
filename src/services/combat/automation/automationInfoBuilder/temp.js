@@ -29,6 +29,7 @@ export const tempHandlers = {
             triggerOnRage: !!auto.triggerOnRage,
             distanceExpression: auto.distanceExpression || '',
             casting_time: auto.casting_time || '',
+            trigger: auto.trigger || null,
             uses: auto.uses || null,
             usesMax,
             hasAutomation: true

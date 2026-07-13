@@ -562,6 +562,9 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     if (te.effect === 'goad') {
       effects.attackDisadvantageCount = (effects.attackDisadvantageCount || 0) + 1;
     }
+    if (te.effect === 'reckless_attack') {
+      effects.targetAdvantageCount = (effects.targetAdvantageCount || 0) + 1;
+    }
     if (te.effect === 'disadvantage_perception_checks') {
       effects.abilityCheckDisadvantage = true;
     }

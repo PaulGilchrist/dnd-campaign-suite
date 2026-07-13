@@ -397,7 +397,7 @@ describe('contextBuilder: buildAttackContextSync', () => {
   describe('activeBuffs — reckless attack', () => {
     it('sets forcedMode to advantage when reckless attack buff is active', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [{ effect: 'advantage_attacks_disadvantage_against' }];
+        if (key === 'activeBuffs') return [{ effect: 'advantage_attacks_advantage_against' }];
         return undefined;
       });
 
@@ -968,7 +968,7 @@ describe('contextBuilder: buildAttackContextSync', () => {
   describe('forcedMode priority chain', () => {
     it('conditionAttackMode takes highest priority over all advantage sources', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [{ effect: 'advantage_attacks_disadvantage_against' }];
+        if (key === 'activeBuffs') return [{ effect: 'advantage_attacks_advantage_against' }];
         return undefined;
       });
       getInnateSorceryBonus.mockReturnValue({ spellAdvantage: true, saveDcBonus: 0 });
@@ -981,7 +981,7 @@ describe('contextBuilder: buildAttackContextSync', () => {
 
     it('all advantage sources are checked before any disadvantage sources', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [{ effect: 'advantage_attacks_disadvantage_against' }];
+        if (key === 'activeBuffs') return [{ effect: 'advantage_attacks_advantage_against' }];
         if (key === 'targetEffects') return [{ effect: 'protection', target: 'Orc', source: 'Paladin' }];
         return undefined;
       });

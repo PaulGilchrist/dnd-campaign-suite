@@ -192,7 +192,7 @@ describe('useAttackDamageResolution - automation damage bonuses', () => {
         it('applies Frenzy damage when reckless, raging, strength-based', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'activeBuffs') return [
-                    { effect: 'advantage_attacks_disadvantage_against' },
+                    { effect: 'advantage_attacks_advantage_against' },
                     { damageBonusExpression: '2' },
                 ];
                 return null;
@@ -224,7 +224,7 @@ describe('useAttackDamageResolution - automation damage bonuses', () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === '_frenzyUsedRound') return 1;
                 if (key === 'activeBuffs') return [
-                    { effect: 'advantage_attacks_disadvantage_against' },
+                    { effect: 'advantage_attacks_advantage_against' },
                     { damageBonusExpression: '2' },
                 ];
                 return null;

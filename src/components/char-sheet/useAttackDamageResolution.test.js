@@ -562,7 +562,7 @@ describe('useAttackDamageResolution', () => {
             };
             getRuntimeValue.mockImplementation((key, prop) => {
                 if (prop === '_divineFuryUsedRound') return null;
-                if (prop === 'activeBuffs') return [{ effect: 'advantage_attacks_disadvantage_against' }, { damageBonusExpression: '1d4' }];
+                if (prop === 'activeBuffs') return [{ effect: 'advantage_attacks_advantage_against' }, { damageBonusExpression: '1d4' }];
                 if (prop === 'resumeRef') return {};
                 return null;
             });

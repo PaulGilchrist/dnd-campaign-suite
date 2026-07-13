@@ -38,6 +38,7 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName
 
     const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
     const rageActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Rage');
+    const recklessAttackActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'advantage_attacks_advantage_against');
 
     const handleAspectChoice = (option) => {
         setRuntimeValue(playerStats.name, 'aspectOfTheWildsOption', option, campaignName);
@@ -61,14 +62,15 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName
                       {aspectChoice && <span className="automation-badge">{aspectChoice} active</span>}
                   </div>
               )}
-              <div><b>Extra Attacks: </b>{extraAttacks}</div>
-              <TrackedResourceInput label="Rage Points" resourceKey="ragePoints" playerName={playerStats.name} getMax={() => rageCount} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-              <div>
-                  <b>Rage Damage Bonus: </b>
-                  <span className={rageActive ? "stat--buffed" : ""}>{rageDamage}</span>
-                  {rageActive && <span className="automation-badge">BPS Resist, STR Adv, +{rageDamage} dmg</span>}
-              </div>
-              <div><b>Weapon Mastery: </b><span className="clickable" onClick={onWeaponMasteryClick}>{weaponMastery}</span></div>
+               <div><b>Extra Attacks: </b>{extraAttacks}</div>
+               <TrackedResourceInput label="Rage Points" resourceKey="ragePoints" playerName={playerStats.name} getMax={() => rageCount} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+               <div>
+                   <b>Rage Damage Bonus: </b>
+                   <span className={rageActive ? "stat--buffed" : ""}>{rageDamage}</span>
+                   {rageActive && <span className="automation-badge">BPS Resist, STR Adv, +{rageDamage} dmg</span>}
+               </div>
+               {recklessAttackActive && <span className="automation-badge">Reckless Attack — attacks against you have Advantage</span>}
+               <div><b>Weapon Mastery: </b><span className="clickable" onClick={onWeaponMasteryClick}>{weaponMastery}</span></div>
          </div>
     );
 };

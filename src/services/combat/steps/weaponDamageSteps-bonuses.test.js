@@ -770,7 +770,7 @@ describe('buildDamageSteps - twoWeaponFighting, targetEffects, superiorityDieBon
         getRuntimeValue.mockImplementation((_key, prop, _campaign) => {
           if (prop === '_frenzyUsedRound') return null;
           if (prop === 'activeBuffs') return [
-            { effect: 'advantage_attacks_disadvantage_against' },
+            { effect: 'advantage_attacks_advantage_against' },
             { damageBonusExpression: '1d6' },
           ];
           return null;
@@ -835,7 +835,7 @@ describe('buildDamageSteps - twoWeaponFighting, targetEffects, superiorityDieBon
       it('does not apply frenzy when not raging', async () => {
         getRuntimeValue.mockImplementation((_key, prop, _campaign) => {
           if (prop === '_frenzyUsedRound') return null;
-          if (prop === 'activeBuffs') return [{ effect: 'advantage_attacks_disadvantage_against' }];
+          if (prop === 'activeBuffs') return [{ effect: 'advantage_attacks_advantage_against' }];
           return null;
         });
 
@@ -864,7 +864,7 @@ describe('buildDamageSteps - twoWeaponFighting, targetEffects, superiorityDieBon
         getRuntimeValue.mockImplementation((_key, prop, _campaign) => {
           if (prop === '_frenzyUsedRound') return null;
           if (prop === 'activeBuffs') return [
-            { effect: 'advantage_attacks_disadvantage_against' },
+            { effect: 'advantage_attacks_advantage_against' },
             { damageBonusExpression: '1d6' },
           ];
           return null;
@@ -895,7 +895,7 @@ describe('buildDamageSteps - twoWeaponFighting, targetEffects, superiorityDieBon
         getRuntimeValue.mockImplementation((_key, prop, _campaign) => {
           if (prop === '_frenzyUsedRound') return 1;
           if (prop === 'activeBuffs') return [
-            { effect: 'advantage_attacks_disadvantage_against' },
+            { effect: 'advantage_attacks_advantage_against' },
             { damageBonusExpression: '1d6' },
           ];
           return null;

@@ -197,16 +197,24 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         if (!event.key.startsWith(`change-${campaignName}-`)) return
 
         const dataKey = event.key.slice(`change-${campaignName}-`.length)
-            if (dataKey === 'combatSummary') {
-                if (!event.data?.creatures) return
-                const prevRound = combatSummaryRef.current?.round ?? 1
-                const merged = { ...event.data, activeCreatureName: event.data.activeCreatureName || activeCreatureName }
-                combatSummaryRef.current = merged
-               setCombatSummaryCache(merged, campaignName)
-               setCombatSummaryG(merged)
-               if (merged.round !== prevRound) {
-                   expireStaleEffects(campaignName, merged.activeCreatureName || null)
+        const barbarianName = 'Thulgar'
+        if (dataKey === 'combatSummary') {
+            if (!event.data?.creatures) return
+            const prevRound = combatSummaryRef.current?.round ?? 1
+            const merged = { ...event.data, activeCreatureName: event.data.activeCreatureName || activeCreatureName }
+            combatSummaryRef.current = merged
+           setCombatSummaryCache(merged, campaignName)
+           setCombatSummaryG(merged)
+           if (merged.round !== prevRound) {
+               const te = getRuntimeValue(campaignName, 'targetEffects') || []
+               const hadReckless = te.some(t => t.effect === 'reckless_attack' && t.target === barbarianName)
+               expireStaleEffects(campaignName, merged.activeCreatureName || null)
+               const teAfter = getRuntimeValue(campaignName, 'targetEffects') || []
+               const hasRecklessAfter = teAfter.some(t => t.effect === 'reckless_attack' && t.target === barbarianName)
+               if (hadReckless && !hasRecklessAfter) {
+                   console.log('[Reckless] CLEAR on round', prevRound, '→', merged.round, 'active:', merged.activeCreatureName)
                }
+           }
              } else if (dataKey === 'activeCreatureName') {
                const prevActive = activeCreatureNameRef.current
                const newActive = event.data
@@ -221,8 +229,8 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
               // (not on SSE snapshot re-sync where the creature is the same)
               const lastApplied = lastAppliedTurnStartCreatureRef.current
               const shouldApply = prevActive !== event.data && lastApplied !== event.data
-              if (shouldApply) {
-                  lastAppliedTurnStartCreatureRef.current = event.data
+               if (shouldApply) {
+                   lastAppliedTurnStartCreatureRef.current = event.data
                   // Persist to runtime store so it survives remount (sync access)
                   setRuntimeValue('__initiative__', 'lastAppliedTurnStartCreature', event.data, campaignName)
                   // Also persist to server so it syncs to all clients
@@ -294,37 +302,37 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                storage.set('combatSummary', cs, campaignName)
                setCombatSummary(cloneDeep(cs))
                storage.set('activeCreatureName', newActiveName, campaignName)
-               setActiveCreatureName(newActiveName)
-                for (const creature of cs.creatures) {
-                    clearPerRoundMajestyTrackers(creature.name, campaignName)
-                    if (creature.type === 'player') {
-                        setRuntimeValue(creature.name, '_cunningStrikeCostUsed', 0, campaignName);
-                        setRuntimeValue(creature.name, '_CunningStrike_usedRound', null, campaignName);
-                    }
-                }
-             }
-             expireStaleEffects(campaignName)
-           }, [activeCreatureName, campaignName])
+                setActiveCreatureName(newActiveName)
+                 for (const creature of cs.creatures) {
+                     clearPerRoundMajestyTrackers(creature.name, campaignName)
+                     if (creature.type === 'player') {
+                         setRuntimeValue(creature.name, '_cunningStrikeCostUsed', 0, campaignName);
+                         setRuntimeValue(creature.name, '_CunningStrike_usedRound', null, campaignName);
+                     }
+                 }
+              }
+              expireStaleEffects(campaignName, newActiveName)
+            }, [activeCreatureName, campaignName])
 
     const handlePreviousCreature = React.useCallback(() => {
           if (isPrevDisabled) return
           const cs = combatSummaryRef.current
           if (!cs) return
            const { newActiveName, roundDecrement } = getPreviousCreatureName(cs, activeCreatureName)
-          if (!roundDecrement) {
-              storage.set('activeCreatureName', newActiveName, campaignName)
-             setActiveCreatureName(newActiveName)
-            } else {
-              if (cs.round > 1) {
-                  cs.round--
-                 storage.set('combatSummary', cs, campaignName)
-                 setCombatSummary(cloneDeep(cs))
-                }
-              storage.set('activeCreatureName', newActiveName, campaignName)
-             setActiveCreatureName(newActiveName)
-            }
-             expireStaleEffects(campaignName)
-            }, [activeCreatureName, campaignName, isPrevDisabled])
+           if (!roundDecrement) {
+               storage.set('activeCreatureName', newActiveName, campaignName)
+              setActiveCreatureName(newActiveName)
+             } else {
+               if (cs.round > 1) {
+                   cs.round--
+                  storage.set('combatSummary', cs, campaignName)
+                  setCombatSummary(cloneDeep(cs))
+                 }
+               storage.set('activeCreatureName', newActiveName, campaignName)
+              setActiveCreatureName(newActiveName)
+             }
+              expireStaleEffects(campaignName, newActiveName)
+             }, [activeCreatureName, campaignName, isPrevDisabled])
 
     React.useEffect(() => {
         let cancelled = false
@@ -397,11 +405,17 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
     React.useEffect(() => {
         if (!carouselRef.current || !activeCreatureName) return
+        const storeActive = getActiveCreatureName(campaignName)
+        const currentRound = combatSummaryRef.current?.round ?? 1
+        if (activeCreatureName !== activeCreatureNameRef.current) {
+            console.log('[Initiative] activeCreature changed:', activeCreatureName, 'round:', currentRound, 'store:', storeActive)
+        }
+        activeCreatureNameRef.current = activeCreatureName
         const activeCard = carouselRef.current.querySelector('.creature-card.active')
         if (activeCard) {
             activeCard.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
         }
-    }, [activeCreatureName])
+    }, [activeCreatureName, campaignName])
 
     React.useEffect(() => {
         const handler = () => {

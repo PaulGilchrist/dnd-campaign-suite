@@ -363,7 +363,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         }
     }
     // Reckless Attack: enemies have Advantage on attack rolls against you
-    if (Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'advantage_attacks_disadvantage_against')) {
+    if (Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'advantage_attacks_advantage_against')) {
         conditionEffects.targetAdvantageCount = (conditionEffects.targetAdvantageCount || 0) + 1;
     }
 

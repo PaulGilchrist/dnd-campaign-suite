@@ -53,6 +53,7 @@ import BulwarkOfForceModal from './modals/BulwarkOfForceModal.jsx'
 import CoronaEnemySelectionModal from './modals/CoronaEnemySelectionModal.jsx'
 import RadianceOfDawnModal from './modals/RadianceOfDawnModal.jsx'
 import MantleOfInspirationModal from './modals/MantleOfInspirationModal.jsx'
+import RecklessAttackModal from './modals/shared/RecklessAttackModal.jsx'
 import { handleClearWard, handleSpendDice, handleApply } from '../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js'
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
@@ -188,6 +189,8 @@ export default function CharActionModals({
     handleFeatureChoiceSkip,
     handleConstellationSelect,
     handleElderChampionRestore,
+    handleRecklessAttackConfirm,
+    handleRecklessAttackCancel,
 }) {
     const [combatSummary, setCombatSummary] = React.useState(null);
 
@@ -936,6 +939,15 @@ export default function CharActionModals({
                     }
                     onTargetSelected={(targetName) => handleOceanicGiftConfirm(targetName)}
                     onSkip={() => handleOceanicGiftConfirm(null)}
+                />
+            )}
+            {modalState.recklessAttackModal && (
+                <RecklessAttackModal
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    attack={modalState.recklessAttackModal.attack}
+                    onConfirm={() => handleRecklessAttackConfirm(modalState.recklessAttackModal.attack)}
+                    onCancel={() => handleRecklessAttackCancel(modalState.recklessAttackModal.attack)}
                 />
             )}
         </>

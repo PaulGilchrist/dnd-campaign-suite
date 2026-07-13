@@ -76,6 +76,15 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
                 forcedMode = 'disadvantage';
             }
         }
+        if (forcedMode === undefined && targetName) {
+            const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+            const recklessEffect = storedEffects.find(
+                te => te.effect === 'reckless_attack' && te.target === targetName
+            );
+            if (recklessEffect) {
+                forcedMode = 'advantage';
+            }
+        }
         if (hasSaveAdvantage && forcedMode === undefined) {
             forcedMode = 'advantage';
         }
@@ -98,7 +107,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
         // Grant attack advantage if Reckless Attack (or similar buff) is active
         let ramActive = false;
         for (const buff of activeBuffs) {
-            if (buff.effect === 'advantage_attacks_disadvantage_against') {
+            if (buff.effect === 'advantage_attacks_advantage_against') {
                 if (forcedMode === undefined) {
                     forcedMode = 'advantage';
                 }

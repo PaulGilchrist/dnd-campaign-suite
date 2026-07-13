@@ -459,7 +459,7 @@ export function buildDamageSteps() {
           const round = getCurrentCombatRound();
           if (used !== round) {
             const buffs = getRuntimeValue(ctx.playerStats.name, 'activeBuffs', ctx.campaignName) || [];
-            const isReckless = buffs.some(b => b.effect === 'advantage_attacks_disadvantage_against');
+            const isReckless = buffs.some(b => b.effect === 'advantage_attacks_advantage_against');
             const isRaging = buffs.some(b => b.damageBonusExpression);
             const isStr = (ctx.attack?.abilityName || '').toLowerCase() === 'strength';
             if (isReckless && isRaging && isStr) {
