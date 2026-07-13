@@ -327,7 +327,7 @@
                             "dcScaling": 5,
                             "healExpression": "2 * barbarian_level",
                             "recharge": "short_or_long_rest",
-                            "casting_time": "1 reaction"
+                            "casting_time": "passive"
                         }
                     }
                 ]

@@ -7,12 +7,12 @@
       "name": "Strength",
       "baseScore": 15,
       "featIncrease": 0,
-      "backgroundIncrease": 1,
+      "backgroundIncrease": 2,
       "miscIncrease": 0
     },
     {
       "name": "Dexterity",
-      "baseScore": 12,
+      "baseScore": 15,
       "featIncrease": 0,
       "backgroundIncrease": 0,
       "miscIncrease": 0
@@ -26,21 +26,21 @@
     },
     {
       "name": "Intelligence",
-      "baseScore": 9,
+      "baseScore": 8,
       "featIncrease": 0,
-      "backgroundIncrease": 1,
+      "backgroundIncrease": 0,
       "miscIncrease": 0
     },
     {
       "name": "Wisdom",
-      "baseScore": 11,
+      "baseScore": 8,
       "featIncrease": 0,
       "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
       "name": "Charisma",
-      "baseScore": 9,
+      "baseScore": 8,
       "featIncrease": 0,
       "backgroundIncrease": 0,
       "miscIncrease": 0

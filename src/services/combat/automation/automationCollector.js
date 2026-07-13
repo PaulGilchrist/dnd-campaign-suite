@@ -388,6 +388,12 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'reaction_debuff':
             case 'bardic_inspiration_defense':
             case 'reaction_save_heal':
+                if (info.casting_time === 'passive') {
+                    result.specialActions.push(info)
+                } else {
+                    result.reactions.push(info)
+                }
+                break
             case 'reaction_bonus':
             case 'bardic_inspiration_offense':
                 result.reactions.push(info)

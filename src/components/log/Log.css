@@ -745,6 +745,45 @@
     color: var(--color-text-muted);
 }
 
+.log-ability-save-details {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+
+.log-ability-death-save {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 0.82rem;
+}
+
+.log-icon-inline {
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+}
+
+.log-hp-gained {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #2ecc71;
+    background: rgba(46, 204, 113, 0.15);
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.log-source-tag {
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+    background: var(--background-color-input);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-style: italic;
+}
+
 .log-gwf {
     display: inline-block;
     font-size: 0.8em;

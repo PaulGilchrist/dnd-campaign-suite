@@ -20,6 +20,14 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
 
+vi.mock('../../../combat/conditions/savePromptService.js', () => ({
+  sendDeathSavePrompt: vi.fn(),
+}));
+
+vi.mock('../../../ui/utils.js', () => ({
+  default: { guid: vi.fn(() => 'death-prompt-123') },
+}));
+
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './reactionSaveHealHandler.js';
@@ -27,6 +35,7 @@ import * as savePrompt from '../../common/savePrompt.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
+import { sendDeathSavePrompt } from '../../../combat/conditions/savePromptService.js';
 
 const campaignName = 'TestCampaign';
 
@@ -138,7 +147,7 @@ describe('reactionSaveHealHandler', () => {
   // ── Log entry ───────────────────────────────────────────────
 
   describe('log entry', () => {
-    it('adds ability_use log entry with correct details', async () => {
+    it('adds ability_use log entry with source field', async () => {
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
@@ -146,6 +155,7 @@ describe('reactionSaveHealHandler', () => {
         characterName: 'TestBarbarian',
         abilityName: 'Relentless Rage',
         description: 'Relentless Rage triggered — TestBarbarian must make CON save (DC 12)',
+        source: 'Relentless Rage',
         promptId: 'prompt-123',
       });
     });
@@ -157,6 +167,7 @@ describe('reactionSaveHealHandler', () => {
       expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         abilityName: 'Unbreakable Spirit',
         description: expect.stringContaining('Unbreakable Spirit'),
+        source: 'Unbreakable Spirit',
       }));
       expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         description: expect.stringContaining('WIS save'),
@@ -224,7 +235,7 @@ describe('reactionSaveHealHandler', () => {
   describe('save result - success', () => {
     function triggerSuccess() {
       window.dispatchEvent(new CustomEvent('save-result', {
-        detail: { promptId: 'prompt-123', success: true },
+        detail: { promptId: 'prompt-123', success: true, roll: 15, saveBonus: 7, total: 22 },
       }));
     }
 
@@ -253,18 +264,21 @@ describe('reactionSaveHealHandler', () => {
       });
     });
 
-    it('logs save_result with success=true', async () => {
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
+    it('logs ability_use with save details and hpGained on success', async () => {
+      await handle(makeAction({ healExpression: '2 * barbarian_level' }), makePlayerStats(), campaignName, null);
       triggerSuccess();
 
       await vi.waitFor(() => {
         const calls = logService.addEntry.mock.calls.filter(
-          (call) => call[1]?.type === 'save_result',
+          (call) => call[1]?.type === 'ability_use' && call[1]?.saveSuccess === true,
         );
         expect(calls.length).toBeGreaterThan(0);
-        expect(calls[0][1].success).toBe(true);
-        expect(calls[0][1].saveType).toBe('CON');
+        expect(calls[0][1].saveRoll).toBe(15);
+        expect(calls[0][1].saveBonus).toBe(7);
+        expect(calls[0][1].saveTotal).toBe(22);
         expect(calls[0][1].saveDc).toBe(12);
+        expect(calls[0][1].hpGained).toBe(10);
+        expect(calls[0][1].source).toBe('Relentless Rage');
       });
     });
 
@@ -300,7 +314,7 @@ describe('reactionSaveHealHandler', () => {
   describe('save result - failure', () => {
     function triggerFailure() {
       window.dispatchEvent(new CustomEvent('save-result', {
-        detail: { promptId: 'prompt-123', success: false },
+        detail: { promptId: 'prompt-123', success: false, roll: 8, saveBonus: 7, total: 15 },
       }));
     }
 
@@ -314,15 +328,33 @@ describe('reactionSaveHealHandler', () => {
       expect(hpCalls.length).toBe(0);
     });
 
-    it('logs save_result with success=false', async () => {
+    it('logs ability_use with save details and saveSuccess=false on failure', async () => {
       await handle(makeAction(), makePlayerStats(), campaignName, null);
       triggerFailure();
 
-      const calls = logService.addEntry.mock.calls.filter(
-        (call) => call[1]?.type === 'save_result',
-      );
-      expect(calls.length).toBeGreaterThan(0);
-      expect(calls[0][1].success).toBe(false);
+      await vi.waitFor(() => {
+        const calls = logService.addEntry.mock.calls.filter(
+          (call) => call[1]?.type === 'ability_use' && call[1]?.saveSuccess === false,
+        );
+        expect(calls.length).toBeGreaterThan(0);
+        expect(calls[0][1].saveRoll).toBe(8);
+        expect(calls[0][1].saveBonus).toBe(7);
+        expect(calls[0][1].saveTotal).toBe(15);
+        expect(calls[0][1].saveDc).toBe(12);
+        expect(calls[0][1].source).toBe('Relentless Rage');
+      });
+    });
+
+    it('sends death save prompt when HP is 0 after failed save', async () => {
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+      triggerFailure();
+
+      await vi.waitFor(() => {
+        expect(sendDeathSavePrompt).toHaveBeenCalledWith(campaignName, {
+          promptId: 'death-prompt-123',
+          targetName: 'TestBarbarian',
+        });
+      });
     });
   });
 
@@ -331,7 +363,7 @@ describe('reactionSaveHealHandler', () => {
   describe('heal expression evaluation', () => {
     function triggerSuccess() {
       window.dispatchEvent(new CustomEvent('save-result', {
-        detail: { promptId: 'prompt-123', success: true },
+        detail: { promptId: 'prompt-123', success: true, roll: 15, saveBonus: 7, total: 22 },
       }));
     }
 

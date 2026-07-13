@@ -2,6 +2,8 @@ import { createSaveListener } from '../../common/savePrompt.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { sendDeathSavePrompt } from '../../../combat/conditions/savePromptService.js';
+import utils from '../../../ui/utils.js';
 
 function getRuntimeUsesKey(featureName) {
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
@@ -119,6 +121,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         characterName: playerName,
         abilityName: featureName,
         description: `${featureName} triggered — ${playerName} must make ${auto.saveType || 'CON'} save (DC ${saveDc})`,
+        source: featureName,
         promptId,
     }).catch((e) => { console.error("[reactionSaveHeal] Error:", e); });
 
@@ -126,33 +129,91 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         if (event.detail.promptId !== promptId) return;
 
         const healAmount = evaluateHealExpression(auto.healExpression, playerStats);
+        const saveRoll = event.detail.roll;
+        const saveBonus = event.detail.saveBonus;
+        const saveTotal = event.detail.total;
 
         if (event.detail.success) {
             await setRuntimeValue(playerName, 'currentHitPoints', healAmount, campaignName);
 
             addEntry(campaignName, {
-                type: 'save_result',
+                type: 'ability_use',
                 characterName: playerName,
-                rollType: `save-${auto.type}`,
-                targetName: playerName,
+                abilityName: featureName,
+                description: `${playerName} succeeded on ${auto.saveType || 'CON'} save. ${featureName} sets Hit Points to ${healAmount}.`,
+                saveRoll,
+                saveBonus,
+                saveTotal,
                 saveDc,
-                saveType: auto.saveType || 'CON',
-                success: true,
-                description: `${playerName} succeeded on ${auto.saveType || 'CON'} save. Relentless Rage sets Hit Points to ${healAmount}.`,
+                saveSuccess: true,
+                hpGained: healAmount,
+                source: featureName,
             }).catch((e) => { console.error("[reactionSaveHeal] Error:", e); });
 
             window.dispatchEvent(new CustomEvent('combat-summary-updated'));
         } else {
             addEntry(campaignName, {
-                type: 'save_result',
+                type: 'ability_use',
                 characterName: playerName,
-                rollType: `save-${auto.type}`,
-                targetName: playerName,
+                abilityName: featureName,
+                description: `${playerName} failed ${auto.saveType || 'CON'} save. ${featureName} did not activate.`,
+                saveRoll,
+                saveBonus,
+                saveTotal,
                 saveDc,
-                saveType: auto.saveType || 'CON',
-                success: false,
-                description: `${playerName} failed ${auto.saveType || 'CON'} save. Relentless Rage does not activate.`,
+                saveSuccess: false,
+                source: featureName,
             }).catch((e) => { console.error("[reactionSaveHeal] Error:", e); });
+
+            const currentHp = getRuntimeValue(playerName, 'currentHitPoints', campaignName);
+            if (currentHp != null && Number(currentHp) <= 0) {
+                const deathSavePromptId = utils.guid();
+                sendDeathSavePrompt(campaignName, {
+                    promptId: deathSavePromptId,
+                    targetName: playerName,
+                });
+
+                const handleDeathSaveResult = (deathEvent) => {
+                    if (deathEvent.detail?.promptId !== deathSavePromptId) return;
+                    window.removeEventListener('death-save-result', handleDeathSaveResult);
+
+                    const dsResult = deathEvent.detail;
+                    const currentSaves = getRuntimeValue(playerName, 'deathSaves', campaignName) || [false, false, false];
+                    const currentFailures = getRuntimeValue(playerName, 'deathFailures', campaignName) || [false, false, false];
+
+                    let newSaves = [...currentSaves];
+                    let newFailures = [...currentFailures];
+
+                    if (dsResult.isNat20) {
+                        newSaves = [false, false, false];
+                        newFailures = [false, false, false];
+                        setRuntimeValue(playerName, 'currentHitPoints', 1, campaignName);
+                    } else if (dsResult.success) {
+                        const firstEmpty = newSaves.indexOf(false);
+                        if (firstEmpty !== -1) newSaves[firstEmpty] = true;
+                    } else {
+                        const failMultiplier = dsResult.isNat1 ? 2 : 1;
+                        for (let i = 0; i < failMultiplier; i++) {
+                            const firstEmpty = newFailures.indexOf(false);
+                            if (firstEmpty !== -1) newFailures[firstEmpty] = true;
+                        }
+                    }
+
+                    setRuntimeValue(playerName, 'deathSaves', newSaves, campaignName);
+                    setRuntimeValue(playerName, 'deathFailures', newFailures, campaignName);
+
+                    addEntry(campaignName, {
+                        type: 'death_save',
+                        characterName: playerName,
+                        roll: dsResult.roll,
+                        isNatural20: dsResult.isNat20,
+                        isNatural1: dsResult.isNat1,
+                        success: dsResult.success || dsResult.result === 'nat20' || dsResult.result === 'stable',
+                    }).catch((e) => { console.error("[reactionSaveHeal] Error:", e); });
+                };
+
+                window.addEventListener('death-save-result', handleDeathSaveResult);
+            }
         }
 
         await setRuntimeValue(playerName, usesKey, currentUses + 1, campaignName);

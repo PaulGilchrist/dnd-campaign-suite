@@ -16,6 +16,7 @@ import { checkDarkOnesBlessing } from '../../rules/features/darkOnesBlessingServ
 import { checkUndyingSentinel } from '../../rules/features/undyingSentinelService.js';
 import { checkBoonOfRecoveryLastStand } from '../../rules/features/boonOfRecoveryService.js';
 import { checkRelentlessEndurance } from '../../rules/features/relentlessEnduranceService.js';
+import { checkRelentlessRage } from '../../rules/features/relentlessRageService.js';
 
 // Tracks which multi-attack sequences have already triggered Relentless Endurance.
 // Prevents follow-up hits in the same sequence from re-killing the character.
@@ -390,6 +391,12 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
           _reTriggeredSequenceIds.add(options.damageSequenceId);
         }
         return relentlessEnduranceResult;
+      }
+
+      // Check for Relentless Rage (Barbarian class feature)
+      const relentlessRageResult = checkRelentlessRage(creature, playerComputed, campaignName);
+      if (relentlessRageResult.intercepted) {
+        return relentlessRageResult;
       }
 
       const promptId = utils.guid();
