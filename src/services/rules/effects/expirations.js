@@ -186,7 +186,7 @@ export async function applyTurnStartEffects(activeName, playerStats, campaignNam
             });
             const hadRecklessAfter = cleanedTopple.some(te => te.effect === 'reckless_attack' && te.target === 'Thulgar');
             if (cleanedTopple.length !== allTargetEffectsTopple.length && hadRecklessBefore && !hadRecklessAfter) {
-                console.log('[Reckless] cleared by topple logic on turn of', activeName);
+                // Reckless Attack cleared by topple logic
             }
             if (cleanedTopple.length !== allTargetEffectsTopple.length) {
                 setRuntimeValue(campaignName, 'targetEffects', cleanedTopple, campaignName);
@@ -587,7 +587,7 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
                 currentRound > item.appliedRound;
             const isExpired = isRoundExpired || isCreatureExpired;
             if (isExpired) {
-                clearExpirationEffects(item.effects, item.target, targetOwner, campaignName, activeName, currentRound);
+                clearExpirationEffects(item.effects, item.target, targetOwner, campaignName);
                 expiredCount++;
                 changed = true;
             } else {
@@ -775,7 +775,7 @@ export async function applyAuraDamage(activeName, playerStats, campaignName, cha
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 }
 
-function clearExpirationEffects(effects, targetName, attackerName, campaignName, activeName, currentRound) {
+function clearExpirationEffects(effects, targetName, attackerName, campaignName) {
     if (!effects || !Array.isArray(effects)) return;
 
     for (const effect of effects) {
@@ -873,9 +873,6 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName,
             }
 
             case 'remove_active_buff': {
-                if (effect.buffName === 'Reckless Attack') {
-                    console.log('[Reckless] remove_active_buff triggered for', targetName, 'attacker:', attackerName, 'activeName:', activeName, 'round:', currentRound);
-                }
                 const allBuffs = Array.isArray(getRuntimeValue(targetName, 'activeBuffs')) ? getRuntimeValue(targetName, 'activeBuffs') : [];
                 const wasHaste = allBuffs.some(b => b.name === effect.buffName && b.effect === 'haste');
                 setRuntimeValue(

@@ -197,25 +197,16 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         if (!event.key.startsWith(`change-${campaignName}-`)) return
 
         const dataKey = event.key.slice(`change-${campaignName}-`.length)
-        const barbarianName = 'Thulgar'
         if (dataKey === 'combatSummary') {
             if (!event.data?.creatures) return
-            const prevRound = combatSummaryRef.current?.round ?? 1
             const merged = { ...event.data, activeCreatureName: event.data.activeCreatureName || activeCreatureName }
             combatSummaryRef.current = merged
-           setCombatSummaryCache(merged, campaignName)
-           setCombatSummaryG(merged)
-           if (merged.round !== prevRound) {
-               const te = getRuntimeValue(campaignName, 'targetEffects') || []
-               const hadReckless = te.some(t => t.effect === 'reckless_attack' && t.target === barbarianName)
-               expireStaleEffects(campaignName, merged.activeCreatureName || null)
-               const teAfter = getRuntimeValue(campaignName, 'targetEffects') || []
-               const hasRecklessAfter = teAfter.some(t => t.effect === 'reckless_attack' && t.target === barbarianName)
-               if (hadReckless && !hasRecklessAfter) {
-                   console.log('[Reckless] CLEAR on round', prevRound, '→', merged.round, 'active:', merged.activeCreatureName)
-               }
-           }
-             } else if (dataKey === 'activeCreatureName') {
+            setCombatSummaryCache(merged, campaignName)
+            setCombatSummaryG(merged)
+            if (merged.round !== (combatSummaryRef.current?.round ?? 1)) {
+                expireStaleEffects(campaignName, merged.activeCreatureName || null)
+            }
+        } else if (dataKey === 'activeCreatureName') {
                const prevActive = activeCreatureNameRef.current
                const newActive = event.data
                activeCreatureNameRef.current = newActive
@@ -405,17 +396,12 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
     React.useEffect(() => {
         if (!carouselRef.current || !activeCreatureName) return
-        const storeActive = getActiveCreatureName(campaignName)
-        const currentRound = combatSummaryRef.current?.round ?? 1
-        if (activeCreatureName !== activeCreatureNameRef.current) {
-            console.log('[Initiative] activeCreature changed:', activeCreatureName, 'round:', currentRound, 'store:', storeActive)
-        }
         activeCreatureNameRef.current = activeCreatureName
         const activeCard = carouselRef.current.querySelector('.creature-card.active')
         if (activeCard) {
             activeCard.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
         }
-    }, [activeCreatureName, campaignName])
+    }, [activeCreatureName])
 
     React.useEffect(() => {
         const handler = () => {

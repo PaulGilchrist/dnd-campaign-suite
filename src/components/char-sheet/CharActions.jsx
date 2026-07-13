@@ -408,23 +408,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         const currentCreature = getActiveCreatureName(campaignName);
         const isOfferedThisTurn = offeredValue && offeredValue.activeCreature === currentCreature;
 
-        if (playerStats.name === 'Thulgar') {
-            console.log('[Reckless] tracker check:', { offeredKey, offeredValue, currentCreature, isOfferedThisTurn });
-        }
-
-        const recklessAction = playerStats.automation?.specialActions?.find(a => a.name === 'Reckless Attack');
-        console.log('[handleAttackClick] Reckless Attack pre-conditions:', {
-            hasRecklessFeature,
-            isRecklessActive,
-            isOfferedThisTurn,
-            attackName: attack.name,
-            attackAbilityName: attack.abilityName,
-            attackWeaponType: attack.weaponType,
-            specialActionsCount: playerStats.automation?.specialActions?.length,
-            specialActionsNames: playerStats.automation?.specialActions?.map(a => a.name),
-            recklessAction: recklessAction ? { name: recklessAction.name, effect: recklessAction.effect, trigger: recklessAction.trigger } : null,
-        });
-
         if (hasRecklessFeature && !isRecklessActive && !isOfferedThisTurn) {
             setModalState({ recklessAttackModal: { attack } });
             return;
@@ -454,11 +437,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             setRuntimeValue(campaignName, 'targetEffects', newEffects, campaignName);
         }
         const currentCreature = getActiveCreatureName(campaignName);
-        const trackerValue = { round: 1, activeCreature: currentCreature };
-        setRuntimeValue(playerStats.name, '_recklessAttack_offeredThisTurn', trackerValue, campaignName);
-        if (playerStats.name === 'Thulgar') {
-            console.log('[Reckless] tracker SET (confirm):', trackerValue, 'storeKey:', playerStats.name);
-        }
+        setRuntimeValue(playerStats.name, '_recklessAttack_offeredThisTurn', { round: 1, activeCreature: currentCreature }, campaignName);
         setModalState({ recklessAttackModal: null });
         buildCtx(attack).then(ctx => {
             const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;
@@ -468,11 +447,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const handleRecklessAttackCancel = React.useCallback((attack) => {
         const currentCreature = getActiveCreatureName(campaignName);
-        const trackerValue = { round: 1, activeCreature: currentCreature };
-        setRuntimeValue(playerStats.name, '_recklessAttack_offeredThisTurn', trackerValue, campaignName);
-        if (playerStats.name === 'Thulgar') {
-            console.log('[Reckless] tracker SET (cancel):', trackerValue, 'storeKey:', playerStats.name);
-        }
+        setRuntimeValue(playerStats.name, '_recklessAttack_offeredThisTurn', { round: 1, activeCreature: currentCreature }, campaignName);
         setModalState({ recklessAttackModal: null });
         buildCtx(attack).then(ctx => {
             const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;

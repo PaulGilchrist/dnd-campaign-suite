@@ -54,14 +54,6 @@ function CreatureCard({
     const wrathOfTheSeaActive = creature.type === 'player' && getRuntimeValue(creature.name, 'wrathOfTheSeaActive', campaignName);
     const recklessAttackActive = myTargetEffects.some(te => te.effect === 'reckless_attack');
 
-    if (creature.name === 'Thulgar') {
-        const raw = getRuntimeValue(campaignName, 'targetEffects') ?? [];
-        const rawHasReckless = raw.some(te => te.effect === 'reckless_attack');
-        if (rawHasReckless !== recklessAttackActive) {
-            console.log('[Reckless] MISMATCH: rawStore has reckless:', rawHasReckless, 'useRuntimeValue filtered has reckless:', recklessAttackActive, 'hook value length:', allTargetEffects.length, 'raw length:', raw.length);
-        }
-    }
-
     const sanctuaryInfo = (() => {
         for (const other of allCreatures) {
             if (other.type !== 'player') continue;
