@@ -191,6 +191,8 @@ export default function CharActionModals({
     handleElderChampionRestore,
     handleRecklessAttackConfirm,
     handleRecklessAttackCancel,
+    handleBrutalStrikeConfirm,
+    handleBrutalStrikeCancel,
 }) {
     const [combatSummary, setCombatSummary] = React.useState(null);
 
@@ -946,8 +948,16 @@ export default function CharActionModals({
                     playerStats={playerStats}
                     campaignName={campaignName}
                     attack={modalState.recklessAttackModal.attack}
-                    onConfirm={() => handleRecklessAttackConfirm(modalState.recklessAttackModal.attack)}
-                    onCancel={() => handleRecklessAttackCancel(modalState.recklessAttackModal.attack)}
+                    mode={modalState.recklessAttackModal.mode || 'full'}
+                    hasBrutalStrike={modalState.recklessAttackModal.hasBrutalStrike || false}
+                    brutalStrikeOptions={modalState.recklessAttackModal.brutalStrikeOptions || []}
+                    maxEffects={modalState.recklessAttackModal.maxEffects || 1}
+                    onConfirm={modalState.recklessAttackModal.mode === 'brutalOnly'
+                        ? (choice) => handleBrutalStrikeConfirm(choice)
+                        : (attack, choice) => handleRecklessAttackConfirm(attack, choice)}
+                    onCancel={modalState.recklessAttackModal.mode === 'brutalOnly'
+                        ? (choice) => handleBrutalStrikeCancel(choice)
+                        : () => handleRecklessAttackCancel(modalState.recklessAttackModal.attack)}
                 />
             )}
         </>

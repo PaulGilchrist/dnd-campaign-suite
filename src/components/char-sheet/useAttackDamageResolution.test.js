@@ -636,6 +636,10 @@ describe('useAttackDamageResolution', () => {
 
     describe('attack_rider automations', () => {
         it('applies strength_attack_hit_after_reckless riders', async () => {
+            getRuntimeValue.mockImplementation((key, prop) => {
+                if (prop === '_brutalStrikeActive') return true;
+                return null;
+            });
             const stats = {
                 ...deps.playerStats,
                 automation: {

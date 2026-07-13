@@ -417,7 +417,7 @@ export function buildDamageSteps() {
       name: 'automationBonuses',
       subscribe: 'superiority:applied',
       emit: 'automation:applied',
-      condition: (ctx) => ctx.isMeleeOrUnarmed && !!ctx.playerStats.automation?.actions,
+      condition: (ctx) => ctx.isMeleeOrUnarmed && (!!ctx.playerStats.automation?.actions || !!ctx.playerStats.automation?.passives),
       handler: async (ctx) => {
         let formula = ctx.formula;
         let total = ctx.total;
@@ -505,10 +505,64 @@ export function buildDamageSteps() {
           }
         }
 
-        // attack_rider (Brutal Strike)
-        for (const a of actions.filter(x => x.type === 'attack_rider' && x.damageExpression && x.trigger === 'strength_attack_hit_after_reckless')) {
-          const r = rollExpression(a.damageExpression);
-          if (r) { formula += ` + ${a.damageExpression} [${a.damageType || 'same_as_weapon'}]`; total += r.total; rolls = [...rolls, ...r.rolls]; }
+        // attack_rider (Brutal Strike) — gated on _brutalStrikeActive
+        const brutalStrikeActive = getRuntimeValue(ctx.playerStats.name, '_brutalStrikeActive', ctx.campaignName);
+        if (brutalStrikeActive) {
+          const allAutomation = [...(ctx.playerStats.automation.actions || []), ...(ctx.playerStats.automation.passives || [])];
+          const matchingRiders = allAutomation.filter(
+            x => x.type === 'attack_rider' && x.damageExpression && x.trigger === 'strength_attack_hit_after_reckless'
+          );
+          const rider = matchingRiders[matchingRiders.length - 1];
+          if (rider) {
+            const r = rollExpression(rider.damageExpression);
+            if (r) {
+              formula += ` + ${rider.damageExpression} [${rider.damageType || 'same_as_weapon'}]`;
+              total += r.total;
+              rolls = [...rolls, ...r.rolls];
+            }
+
+            // Apply chosen effects to target via targetEffects
+            const effectChoices = getRuntimeValue(ctx.playerStats.name, '_brutalStrikeEffects', ctx.campaignName) || [];
+            const targetName = ctx.targetName;
+            if (effectChoices.length > 0 && targetName) {
+              const storedEffects = getRuntimeValue(ctx.campaignName, 'targetEffects') || [];
+              const riderOptions = rider.options || [];
+
+              for (const choiceName of effectChoices) {
+                const option = riderOptions.find(o => o.name === choiceName);
+                if (!option) continue;
+
+                // Staggering Blow and Sundering Blow are automated via targetEffects
+                // Forceful Blow and Hamstring Blow are logging only
+                if (option.effect === 'disadvantage_on_next_save' || option.effect === 'next_attack_bonus') {
+                  const newEffect = {
+                    target: targetName,
+                    source: ctx.playerStats.name,
+                    option: option.name,
+                    effect: option.effect,
+                    value: option.effect === 'next_attack_bonus' ? (option.value || 5) : (option.value || null),
+                    noOpportunityAttacks: option.noOpportunityAttacks || false,
+                    duration: 'until_start_of_next_turn',
+                  };
+                  storedEffects.push(newEffect);
+                }
+              }
+              setRuntimeValue(ctx.campaignName, 'targetEffects', storedEffects, ctx.campaignName);
+            }
+
+            // Log to campaign log
+            const effectNames = effectChoices.join(' + ') || 'no effect';
+            addEntry(ctx.campaignName, {
+              type: 'ability_use',
+              characterName: ctx.playerStats.name,
+              abilityName: rider.name,
+              description: `${rider.name}: ${rider.damageExpression} ${rider.damageType === 'same_as_weapon' ? (ctx.attack?.damageType || 'weapon') : (rider.damageType || 'weapon')} damage to ${targetName || 'target'} — ${effectNames}`,
+            }).catch(() => {});
+
+            // Clear active flags
+            setRuntimeValue(ctx.playerStats.name, '_brutalStrikeActive', null, ctx.campaignName);
+            setRuntimeValue(ctx.playerStats.name, '_brutalStrikeEffects', null, ctx.campaignName);
+          }
         }
 
         return { data: { formula, total, rolls } };

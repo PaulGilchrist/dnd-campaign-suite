@@ -550,6 +550,9 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
         effects.attackAdvantageCount = (effects.attackAdvantageCount || 0) + 1;
       }
     }
+    if (te.effect === 'next_attack_bonus') {
+      effects.attackBonus = (effects.attackBonus || 0) + (parseInt(te.value, 10) || 5);
+    }
     if (te.effect === 'distracting_strike_advantage') {
       effects.targetAdvantageCount = (effects.targetAdvantageCount || 0) + 1;
     }

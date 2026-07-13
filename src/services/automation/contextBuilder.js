@@ -58,6 +58,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
         const innateSorceryBonus = getInnateSorceryBonus(playerName, campaignName);
 
         let forcedMode = conditionAttackMode !== 'normal' ? conditionAttackMode : undefined;
+        let sunderingBonus = 0;
         if (forcedMode === undefined) {
             const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
             const goadEffect = storedEffects.find(
@@ -163,10 +164,11 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             ? `${attack.damage}+${stanceDamageBonus}`
             : attack.damage;
 
-        const effectiveHitBonus = attack.hitBonus + sacredWeaponBonus + blessedWarriorBonus;
+        const effectiveHitBonus = attack.hitBonus + sacredWeaponBonus + blessedWarriorBonus + sunderingBonus;
         const hitBonusFormulaParts = [attack.hitBonusFormula];
         if (sacredWeaponBonus > 0) hitBonusFormulaParts.push(`Charisma Bonus (${sacredWeaponBonus})`);
         if (blessedWarriorBonus > 0) hitBonusFormulaParts.push(`Blessed Warrior (${blessedWarriorBonus})`);
+        if (sunderingBonus > 0) hitBonusFormulaParts.push(`Sundering Blow (+${sunderingBonus})`);
         const hitBonusFormula = hitBonusFormulaParts.join(' + ');
 
         const isMelee = attack.weaponType === 'melee' || attack.weaponType === 'unarmed';
@@ -247,6 +249,23 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
                 forcedMode = 'advantage';
                 const cleanedEffects = storedEffects.filter(
                     te => !(te.effect === 'next_attack_advantage' && te.target === playerName && te.vexTarget === targetName)
+                );
+                if (cleanedEffects.length !== storedEffects.length) {
+                    setRuntimeValue(campaignName, 'targetEffects', cleanedEffects, campaignName);
+                }
+            }
+        }
+        if (targetName) {
+            const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+            const bonusEffects = storedEffects.filter(
+                te => te.effect === 'next_attack_bonus' && te.target === targetName
+            );
+            if (bonusEffects.length > 0) {
+                for (const be of bonusEffects) {
+                    sunderingBonus += (parseInt(be.value, 10) || 5);
+                }
+                const cleanedEffects = storedEffects.filter(
+                    te => !(te.effect === 'next_attack_bonus' && te.target === targetName)
                 );
                 if (cleanedEffects.length !== storedEffects.length) {
                     setRuntimeValue(campaignName, 'targetEffects', cleanedEffects, campaignName);

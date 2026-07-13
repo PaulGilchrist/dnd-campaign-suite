@@ -131,6 +131,7 @@ const { buildDamageSteps } = await import('./weaponDamageSteps.js');
 const { rollExpression } = await import('../../dice/diceRoller.js');
 const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
 const { loadCombatSummary } = await import('../../encounters/combatData.js');
+const { addEntry } = await import('../../ui/logService.js');
 
 // ── Helpers ───────────────────────────────────────────────────────
 
@@ -1034,6 +1035,10 @@ describe('buildDamageSteps - twoWeaponFighting, targetEffects, superiorityDieBon
       });
 
       it('applies attack_rider strength attacks after reckless', async () => {
+        getRuntimeValue.mockImplementation((_key, prop, _campaign) => {
+          if (prop === '_brutalStrikeActive') return true;
+          return null;
+        });
         const ctx = makeCtx({
           isMeleeOrUnarmed: true,
           playerStats: {
@@ -1055,6 +1060,121 @@ describe('buildDamageSteps - twoWeaponFighting, targetEffects, superiorityDieBon
         const result = await steps[10].handler(ctx);
 
         expect(result.data.formula).toContain('+ 1d6 [slashing]');
+      });
+
+      it('skips attack_rider when _brutalStrikeActive is not set', async () => {
+        getRuntimeValue.mockReturnValue(null);
+        const ctx = makeCtx({
+          isMeleeOrUnarmed: true,
+          playerStats: {
+            automation: {
+              actions: [
+                {
+                  type: 'attack_rider',
+                  trigger: 'strength_attack_hit_after_reckless',
+                  damageExpression: '1d6',
+                  damageType: 'slashing',
+                },
+              ],
+            },
+          },
+          formula: '1d8+3',
+          total: 11,
+          rolls: [8, 3],
+        });
+        const result = await steps[10].handler(ctx);
+
+        expect(result.data.formula).toBe('1d8+3');
+        expect(result.data.formula).not.toContain('+ 1d6 [slashing]');
+      });
+
+      it('stores Staggering Blow targetEffects and logs to campaign log', async () => {
+        getRuntimeValue.mockImplementation((_key, prop, _campaign) => {
+          if (prop === '_brutalStrikeActive') return true;
+          if (prop === '_brutalStrikeEffects') return ['Staggering Blow'];
+          if (prop === 'targetEffects') return [];
+          return null;
+        });
+        const ctx = makeCtx({
+          isMeleeOrUnarmed: true,
+          targetName: 'Goblin',
+          playerStats: {
+            automation: {
+              actions: [
+                {
+                  type: 'attack_rider',
+                  trigger: 'strength_attack_hit_after_reckless',
+                  effect: 'attack_rider',
+                  damageExpression: '1d6',
+                  damageType: 'slashing',
+                  name: "Brutal Strike (Level 13)",
+                  options: [
+                    {
+                      name: 'Staggering Blow',
+                      effect: 'disadvantage_on_next_save',
+                      value: '1 round',
+                      noOpportunityAttacks: true,
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+          formula: '1d8+3',
+          total: 11,
+          rolls: [8, 3],
+        });
+        const result = await steps[10].handler(ctx);
+
+        expect(result.data.formula).toContain('+ 1d6 [slashing]');
+        expect(setRuntimeValue).toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.any(Array), 'test-campaign');
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+          abilityName: "Brutal Strike (Level 13)",
+        }));
+      });
+
+      it('stores Sundering Blow targetEffects and applies bonus to formula', async () => {
+        getRuntimeValue.mockImplementation((_key, prop, _campaign) => {
+          if (prop === '_brutalStrikeActive') return true;
+          if (prop === '_brutalStrikeEffects') return ['Sundering Blow'];
+          if (prop === 'targetEffects') return [];
+          return null;
+        });
+        const ctx = makeCtx({
+          isMeleeOrUnarmed: true,
+          targetName: 'Orc',
+          playerStats: {
+            automation: {
+              actions: [
+                {
+                  type: 'attack_rider',
+                  trigger: 'strength_attack_hit_after_reckless',
+                  effect: 'attack_rider',
+                  damageExpression: '1d6',
+                  damageType: 'slashing',
+                  name: "Brutal Strike (Level 17)",
+                  options: [
+                    {
+                      name: 'Sundering Blow',
+                      effect: 'next_attack_bonus',
+                      value: 5,
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+          formula: '1d8+3',
+          total: 11,
+          rolls: [8, 3],
+        });
+        const result = await steps[10].handler(ctx);
+
+        expect(result.data.formula).toContain('+ 1d6 [slashing]');
+        expect(setRuntimeValue).toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.any(Array), 'test-campaign');
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+          abilityName: "Brutal Strike (Level 17)",
+        }));
       });
     });
   });
