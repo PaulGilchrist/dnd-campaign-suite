@@ -329,7 +329,7 @@ describe('contextBuilder: buildAttackContextSync', () => {
 
       const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
 
-      expect(result.autoDamageFormula).toBe('1d8+4+2');
+      expect(result.autoDamageFormula).toBe('1d8+4 plus 2');
     });
 
     it('accumulates stance damage from multiple rage buffs', async () => {
@@ -343,7 +343,7 @@ describe('contextBuilder: buildAttackContextSync', () => {
 
       const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
 
-      expect(result.autoDamageFormula).toBe('1d8+4+4');
+      expect(result.autoDamageFormula).toBe('1d8+4 plus 4');
     });
 
     it('uses rage_damage from class_levels when buff expression is rage_damage', async () => {
@@ -361,7 +361,7 @@ describe('contextBuilder: buildAttackContextSync', () => {
 
       const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal', {});
 
-      expect(result.autoDamageFormula).toBe('1d8+4+5');
+      expect(result.autoDamageFormula).toBe('1d8+4 plus 5');
     });
 
     it('defaults to 2 for rage_damage when class_levels entry is undefined', async () => {
@@ -379,7 +379,7 @@ describe('contextBuilder: buildAttackContextSync', () => {
 
       const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal', {});
 
-      expect(result.autoDamageFormula).toBe('1d8+4+2');
+      expect(result.autoDamageFormula).toBe('1d8+4 plus 2');
     });
 
     it('ignores non-rage_damage damageBonusExpression', async () => {

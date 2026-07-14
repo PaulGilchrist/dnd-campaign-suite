@@ -152,7 +152,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
         }
 
         // Brutal Strike: add extra damage dice when active
-        let brutalStrikeBonus = 0;
+        let brutalStrikeFormulaPart = null;
         const brutalStrikeActive = getRuntimeValue(playerName, '_brutalStrikeActive', campaignName);
         if (brutalStrikeActive) {
             const allAutomation = [...(playerStats.automation?.actions || []), ...(playerStats.automation?.passives || [])];
@@ -169,10 +169,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             if (rider) {
                 const diceMatch = rider.damageExpression.match(/^(\d+)d(\d+)/);
                 if (diceMatch) {
-                    const numDice = parseInt(diceMatch[1], 10);
-                    const dieSize = parseInt(diceMatch[2], 10);
-                    const avgDamage = Math.ceil((dieSize + 1) / 2) * numDice;
-                    brutalStrikeBonus = avgDamage;
+                    brutalStrikeFormulaPart = `${rider.damageExpression} [Brutal Strike]`;
                 }
             }
         }
@@ -203,9 +200,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             }
         }
 
-        const autoDamageFormula = [attack.damage, stanceDamageBonus > 0 ? stanceDamageBonus : null, brutalStrikeBonus > 0 ? brutalStrikeBonus : null]
-            .filter(v => v !== null)
-            .join('+');
+        const autoDamageFormula = [attack.damage, stanceDamageBonus > 0 ? stanceDamageBonus : null, brutalStrikeFormulaPart].filter(v => v !== null).join(' plus ');
 
         const effectiveHitBonus = attack.hitBonus + sacredWeaponBonus + blessedWarriorBonus + sunderingBonus;
         const hitBonusFormulaParts = [attack.hitBonusFormula];
