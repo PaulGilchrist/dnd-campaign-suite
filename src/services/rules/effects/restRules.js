@@ -139,7 +139,8 @@ export const LONG_REST_RESOURCES = [
    'moonlightStepUses',
    'dreadambushUses',
    'cosmicomenUses',
-   'relentlessrageUses'
+    'relentlessrageUses',
+    'persistentRageUsed'
 ]
 
 export function getLongRestResources() {

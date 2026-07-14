@@ -19,6 +19,7 @@ import { handle as handleHealingPool } from './handlers/healing/healingPoolHandl
 import { automationInfoPopup } from '../shared/popupResponse.js';
 import { handle as handleCombatStance } from './handlers/combat/combatStanceHandler.js';
 import { handle as handleReactionDamage } from './handlers/reactions/reactionDamageHandler.js';
+import { handle as handlePersistentRage } from './handlers/class-barbarian/persistentRageHandler.js';
 import { handle as handleReactionDebuff } from './handlers/reactions/reactionDebuffHandler.js';
 import { handle as handleReactionSpell } from './handlers/reactions/reactionSpellHandler.js';
 import { handle as handleInterception } from './handlers/reactions/interceptionHandler.js';
@@ -226,6 +227,7 @@ const PASSIVE_RULE_EFFECTS = {
     divination_savant: makeSavantHandler('divination_savant'),
     evocation_savant: makeSavantHandler('evocation_savant'),
     illusion_savant: makeSavantHandler('illusion_savant'),
+    persistent_rage: handlePersistentRage,
 };
 
 const HANDLER_MAP = {
@@ -251,7 +253,7 @@ const HANDLER_MAP = {
     font_of_magic: handleFontOfMagic,
     healing_pool: handleHealingPool,
     extra_action: handleExtraAction,
-    combat_stance: handleCombatStance,
+        combat_stance: handleCombatStance,
     attack_rider: handleAttackRider,
     spell_modifier: (action) => (action.name === 'Metamagic' ? null : automationInfoPopup(action)),
     temp_hp_buff: handleTempHpBuff,

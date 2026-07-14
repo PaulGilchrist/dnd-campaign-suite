@@ -33,6 +33,7 @@ const INTERACTIVE_PASSIVE_EFFECTS = new Set([
     'divination_savant',
     'evocation_savant',
     'illusion_savant',
+    'persistent_rage',
 ]);
 
 export function isInteractiveAutomation(feature) {
