@@ -57,6 +57,10 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
 
         const innateSorceryBonus = getInnateSorceryBonus(playerName, campaignName);
 
+        // Accumulate advantage/disadvantage counts so they cancel per rules
+        let adv = 0;
+        let dis = 0;
+
         let forcedMode = conditionAttackMode !== 'normal' ? conditionAttackMode : undefined;
         let sunderingBonus = 0;
         if (forcedMode === undefined) {
@@ -65,7 +69,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
                 te => te.effect === 'goad' && te.target === playerName
             );
             if (goadEffect) {
-                forcedMode = 'disadvantage';
+                dis++;
             }
         }
         if (forcedMode === undefined) {
@@ -74,7 +78,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
                 te => te.effect === 'disadvantage_next_attack' && te.target === playerName
             );
             if (sapEffect) {
-                forcedMode = 'disadvantage';
+                dis++;
             }
         }
         if (forcedMode === undefined && targetName) {
@@ -83,14 +87,14 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
                 te => te.effect === 'reckless_attack' && te.target === targetName
             );
             if (recklessEffect) {
-                forcedMode = 'advantage';
+                adv++;
             }
         }
         if (hasSaveAdvantage && forcedMode === undefined) {
-            forcedMode = 'advantage';
+            adv++;
         }
         if (innateSorceryBonus.spellAdvantage && forcedMode === undefined) {
-            forcedMode = 'advantage';
+            adv++;
         }
 
         // Add stance damage bonus (e.g. Rage) if an active combat buff provides one
@@ -109,16 +113,23 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
         let ramActive = false;
         for (const buff of activeBuffs) {
             if (buff.effect === 'advantage_attacks_advantage_against') {
-                if (forcedMode === undefined) {
-                    forcedMode = 'advantage';
-                }
+                adv++;
             }
             if (buff.optionName === 'Ram') {
                 ramActive = true;
             }
         }
 
-        // Brutal Strike: override advantage to normal when chosen
+        // Resolve accumulated adv/dis to forcedMode (they cancel per rules)
+        if (forcedMode === undefined) {
+            if (adv > dis) {
+                forcedMode = 'advantage';
+            } else if (dis > adv) {
+                forcedMode = 'disadvantage';
+            }
+        }
+
+        // Brutal Strike: override to normal when chosen
         const brutalStrikeNoAdvantage = getRuntimeValue(playerStats.name, '_brutalStrikeNoAdvantage', campaignName);
         if (brutalStrikeNoAdvantage) {
             forcedMode = 'normal';
@@ -501,6 +512,8 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
             }
 
             if (targetPos && base.forcedMode === undefined) {
+                let mapAdv = 0;
+                let mapDis = 0;
                 const wolfResult = getWolfAdvantageAgainst({
                     targetPos,
                     attackerName: playerStats.name,
@@ -508,18 +521,16 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                     mapData,
                 });
                 if (wolfResult.advantage) {
-                    base.forcedMode = 'advantage';
+                    mapAdv++;
                 }
-                if (base.forcedMode === undefined) {
-                    const duplicityResult = getDuplicityAdvantageAgainst({
-                        targetPos,
-                        attackerName: playerStats.name,
-                        campaignName,
-                        mapData,
-                    });
-                    if (duplicityResult.advantage) {
-                        base.forcedMode = 'advantage';
-                    }
+                const duplicityResult = getDuplicityAdvantageAgainst({
+                    targetPos,
+                    attackerName: playerStats.name,
+                    campaignName,
+                    mapData,
+                });
+                if (duplicityResult.advantage) {
+                    mapAdv++;
                 }
                 const lionResult = getLionDisadvantageAgainst({
                     attackerName: playerStats.name,
@@ -527,15 +538,15 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                     mapData,
                 });
                 if (lionResult.disadvantage) {
-                    base.forcedMode = 'disadvantage';
+                    mapDis++;
                 }
-                if (base.forcedMode === undefined && base.targetName) {
+                if (base.targetName) {
                     const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
                     const protectionEffect = storedEffects.find(
                         te => te.effect === 'protection' && te.target === base.targetName
                     );
                     if (protectionEffect) {
-                        base.forcedMode = 'disadvantage';
+                        mapDis++;
                     }
                 }
                 const coronaResult = getCoronaSaveDisadvantage({
@@ -544,13 +555,17 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                     mapData,
                     damageType: base.damageType,
                 });
-                if (coronaResult.disadvantage && base.forcedMode === undefined) {
-                    base.forcedMode = 'disadvantage';
+                if (coronaResult.disadvantage) {
+                    mapDis++;
                 }
+                base._mapAdv = mapAdv;
+                base._mapDis = mapDis;
             }
 
             // When map is active but target has no position, fall back to no-map aura checks
             if (!targetPos && base.forcedMode === undefined) {
+                let mapAdv = 0;
+                let mapDis = 0;
                 const noMapWolf = getWolfAdvantageAgainst({
                     attackerName: playerStats.name,
                     campaignName,
@@ -558,18 +573,16 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                     skipRangeCheck: true,
                 });
                 if (noMapWolf.advantage) {
-                    base.forcedMode = 'advantage';
+                    mapAdv++;
                 }
-                if (base.forcedMode === undefined) {
-                    const noMapDuplicity = getDuplicityAdvantageAgainst({
-                        attackerName: playerStats.name,
-                        campaignName,
-                        mapData,
-                        skipRangeCheck: true,
-                    });
-                    if (noMapDuplicity.advantage) {
-                        base.forcedMode = 'advantage';
-                    }
+                const noMapDuplicity = getDuplicityAdvantageAgainst({
+                    attackerName: playerStats.name,
+                    campaignName,
+                    mapData,
+                    skipRangeCheck: true,
+                });
+                if (noMapDuplicity.advantage) {
+                    mapAdv++;
                 }
                 const noMapLion = getLionDisadvantageAgainst({
                     attackerName: playerStats.name,
@@ -578,29 +591,29 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                     skipRangeCheck: true,
                 });
                 if (noMapLion.disadvantage) {
-                    base.forcedMode = 'disadvantage';
+                    mapDis++;
                 }
-                if (base.forcedMode === undefined && base.targetName) {
+                if (base.targetName) {
                     const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
                     const protectionEffect = storedEffects.find(
                         te => te.effect === 'protection' && te.target === base.targetName
                     );
                     if (protectionEffect) {
-                        base.forcedMode = 'disadvantage';
+                        mapDis++;
                     }
                 }
-                if (base.forcedMode === undefined) {
-                    const noMapCorona = getCoronaSaveDisadvantage({
-                        targetName: base.targetName,
-                        campaignName,
-                        mapData,
-                        damageType: base.damageType,
-                        skipRangeCheck: true,
-                    });
-                    if (noMapCorona.disadvantage) {
-                        base.forcedMode = 'disadvantage';
-                    }
+                const noMapCorona = getCoronaSaveDisadvantage({
+                    targetName: base.targetName,
+                    campaignName,
+                    mapData,
+                    damageType: base.damageType,
+                    skipRangeCheck: true,
+                });
+                if (noMapCorona.disadvantage) {
+                    mapDis++;
                 }
+                base._mapAdv = mapAdv;
+                base._mapDis = mapDis;
             }
 
             const numericRange = rangeToFeet(attack.range) || 0;
@@ -622,12 +635,11 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                 );
                 const rangeResult = computeRangeEffect(effectiveRange, distanceFt, feats);
                 if (rangeResult.mode === 'disadvantage') {
-                    base.forcedMode = 'disadvantage';
+                    base._rangeDis = (base._rangeDis || 0) + 1;
                     base.rangeReason = rangeResult.reason;
                 } else if (rangeResult.mode === 'miss') {
                     base.isAutoMiss = true;
                     base.rangeReason = rangeResult.reason;
-                    base.forcedMode = undefined;
                 }
             }
 
@@ -732,9 +744,20 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                     .map(i => ({ gridX: i.gridX, gridY: i.gridY, name: i.name }));
 
                 const meleeResult = computeMeleeProximityEffect(true, attackerPlayer, nearbyThreats, feats);
-                if (meleeResult.mode === 'disadvantage' && base.forcedMode !== 'disadvantage') {
-                    base.forcedMode = 'disadvantage';
+                if (meleeResult.mode === 'disadvantage') {
+                    base._meleeDis = (base._meleeDis || 0) + 1;
                     base.rangeReason = meleeResult.reason;
+                }
+            }
+
+            // Resolve accumulated map-based adv/dis counts
+            if (base.forcedMode === undefined && (base._mapAdv || base._mapDis || base._rangeDis || base._meleeDis)) {
+                const totalMapAdv = base._mapAdv || 0;
+                const totalMapDis = (base._mapDis || 0) + (base._rangeDis || 0) + (base._meleeDis || 0);
+                if (totalMapAdv > totalMapDis) {
+                    base.forcedMode = 'advantage';
+                } else if (totalMapDis > totalMapAdv) {
+                    base.forcedMode = 'disadvantage';
                 }
             }
 

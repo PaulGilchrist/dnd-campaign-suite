@@ -218,11 +218,11 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
                           />
                           Disadvantage
                       </label>
-                       {forcedMode && (
-                          <span className="badge-toggle forced-mode-badge" title={advantageReason || rangeReason || "Automatically set by active conditions"}>
-                            <i className="fa-solid fa-asterisk"></i> {forcedMode === 'advantage' ? 'Adv' : 'Disadv'} ({advantageReason || rangeReason || 'conditions'})
-                          </span>
-                        )}
+                        {forcedMode && forcedMode !== 'normal' && (
+                           <span className="badge-toggle forced-mode-badge" title={advantageReason || rangeReason || "Automatically set by active conditions"}>
+                             <i className="fa-solid fa-asterisk"></i> {forcedMode === 'advantage' ? 'Adv' : 'Disadv'} ({advantageReason || rangeReason || 'conditions'})
+                           </span>
+                         )}
                   </div>
               )}
 

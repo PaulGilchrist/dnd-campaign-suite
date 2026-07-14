@@ -325,7 +325,6 @@ export default function useAttackDamageResolution({
         // Set brutal strike flags for damage step processing
         await setRuntimeValue(playerStats.name, '_brutalStrikeActive', true, campaignName);
         await setRuntimeValue(playerStats.name, '_brutalStrikeEffects', [optionName], campaignName);
-        await setRuntimeValue(playerStats.name, '_brutalStrikeNoAdvantage', true, campaignName);
 
         // Apply immediate effects (push, speed reduction, etc.)
         const option = maneuver.automation.options.find(o => o.name === optionName);
