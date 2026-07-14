@@ -77,7 +77,7 @@ export default function CreatureSelectionModal({
                             );
                         })}
                         {targets.length === 0 && (
-                            <p className="sp-note">No creatures available.</p>
+                            <p className="sp-note">No targets available.</p>
                         )}
                     </div>
                 </div>

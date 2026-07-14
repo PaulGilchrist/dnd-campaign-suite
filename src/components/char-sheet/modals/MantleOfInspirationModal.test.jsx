@@ -140,9 +140,9 @@ describe('MantleOfInspirationModal', () => {
     // ── Empty targets ──
 
     describe('empty targets', () => {
-        it('shows "No creatures available." when creatureTargets is empty', () => {
+        it('shows "No targets available." when creatureTargets is empty', () => {
             render(<MantleOfInspirationModal {...makeProps({ creatureTargets: [] })} />);
-            expect(screen.getByText('No creatures available.')).toBeInTheDocument();
+            expect(screen.getByText('No targets available.')).toBeInTheDocument();
         });
     });
 

@@ -470,9 +470,9 @@ describe('CreatureSelectionModal', () => {
   // ── Empty targets ──
 
   describe('empty targets', () => {
-    it('shows "No creatures available." when targets is empty', () => {
+    it('shows "No targets available." when targets is empty', () => {
       render(<CreatureSelectionModal {...makeProps({ targets: [] })} />);
-      expect(screen.getByText('No creatures available.')).toBeInTheDocument();
+      expect(screen.getByText('No targets available.')).toBeInTheDocument();
     });
 
     it('still shows description when targets is empty', () => {
@@ -481,8 +481,8 @@ describe('CreatureSelectionModal', () => {
     });
 
     it('still shows note when targets is empty', () => {
-      render(<CreatureSelectionModal {...makeProps({ targets: [], note: 'No targets available.' })} />);
-      expect(screen.getByText('No targets available.')).toBeInTheDocument();
+      render(<CreatureSelectionModal {...makeProps({ targets: [], note: 'Select from available creatures.' })} />);
+      expect(screen.getByText('Select from available creatures.')).toBeInTheDocument();
     });
   });
 

@@ -62,9 +62,9 @@ describe('RadianceOfDawnModal', () => {
       expect(screen.getByText('Enemy2')).toBeInTheDocument();
     });
 
-    it('shows "No creatures available" when creatureTargets is empty', () => {
+    it('shows "No targets available." when creatureTargets is empty', () => {
       render(<RadianceOfDawnModal {...makeProps({ creatureTargets: [] })} />);
-      expect(screen.getByText('No creatures available.')).toBeInTheDocument();
+      expect(screen.getByText('No targets available.')).toBeInTheDocument();
     });
 
     it('disables confirm button when no targets are selected', () => {
