@@ -151,7 +151,13 @@ export function createLogAndShow(deps) {
                 }
             }
         }
-        const effectiveBonus = bonus + sunderingBlowBonus;
+        const effectiveBonus = bonus + cosmicOmenAppliedBonus + sunderingBlowBonus;
+
+        const bonusDetailParts = [];
+        if (bonus > 0) bonusDetailParts.push('+' + bonus + ' to hit');
+        if (sunderingBlowBonus > 0) bonusDetailParts.push(sunderingBlowBonus + ' [Sundering Blow]');
+        if (cosmicOmenAppliedBonus !== 0 && cosmicOmenDetail) bonusDetailParts.push(cosmicOmenDetail);
+        const finalBonusDetail = bonusDetailParts.length > 0 ? '(' + bonusDetailParts.join(', +') + ')' : undefined;
 
         let isAutoMiss = context?.isAutoMiss === true;
 
@@ -452,7 +458,7 @@ export function createLogAndShow(deps) {
             mode: context?.forcedMode || 'normal',
             total: effectiveD20Roll,
             bonus: bonus + cosmicOmenAppliedBonus + sunderingBlowBonus,
-            bonusDetail: cosmicOmenDetail,
+            bonusDetail: finalBonusDetail,
             isNatural20: effectiveD20Roll === 20,
             isNatural1: effectiveD20Roll === 1,
             targetName,
@@ -478,7 +484,7 @@ export function createLogAndShow(deps) {
                 name,
                 rolls: luckyRerolled ? [luckyRerollValue] : [r1, r2],
             bonus: bonus + cosmicOmenAppliedBonus + sunderingBlowBonus,
-                bonusDetail: cosmicOmenDetail || undefined,
+                bonusDetail: finalBonusDetail,
                 targetName,
                 targetAc,
                 hit,
