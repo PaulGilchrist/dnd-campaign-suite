@@ -397,7 +397,17 @@ function App() {
       return;
     }
     pendingPromptIdRef.current = null;
-    setRuntimeObject(campaignName, { [storeKey]: event.data }, campaignName, true);
+    // When characterKey === campaignName, the SSE event key is "change-{campaign}-{campaign}"
+    // and event.data contains the full store object. Extract targetEffects if present.
+    let actualData = event.data;
+    let effectiveStoreKey = storeKey;
+    if (actualData && typeof actualData === 'object' && !Array.isArray(actualData) && actualData.targetEffects !== undefined) {
+        actualData = actualData.targetEffects;
+        effectiveStoreKey = 'targetEffects';
+    } else if (storeKey === 'targetEffects' && actualData && typeof actualData === 'object' && !Array.isArray(actualData)) {
+        actualData = actualData[storeKey];
+    }
+    setRuntimeObject(campaignName, { [effectiveStoreKey]: actualData }, campaignName, true);
   }, [campaignName, setCharacters]);
 
   const handleDeleteCharacter = async (characterName) => {

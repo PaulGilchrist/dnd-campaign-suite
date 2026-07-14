@@ -329,12 +329,6 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
                 for (const be of bonusEffects) {
                     sunderingBonus += (parseInt(be.value, 10) || 5);
                 }
-                const cleanedEffects = storedEffects.filter(
-                    te => !(te.effect === 'next_attack_bonus' && te.target === targetName)
-                );
-                if (cleanedEffects.length !== storedEffects.length) {
-                    setRuntimeValue(campaignName, 'targetEffects', cleanedEffects, campaignName);
-                }
             }
         }
         if (forcedMode === undefined && targetName) {

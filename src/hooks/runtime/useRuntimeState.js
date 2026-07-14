@@ -67,26 +67,31 @@ export function getRuntimeValue(characterKey, propertyName) {
 }
 
 export function setRuntimeValue(characterKey, propertyName, value, campaignName) {
-  const store = getStore(characterKey);
-  const existing = store.get(propertyName);
-  if (valuesEqual(existing, value)) {
-    return;
-  }
-  store.set(propertyName, value);
-  const obj = Object.fromEntries(store);
+   const store = getStore(characterKey);
+   const existing = store.get(propertyName);
+   if (valuesEqual(existing, value)) {
+     return;
+   }
+   store.set(propertyName, value);
+   const obj = Object.fromEntries(store);
 
-  if (!campaignName) {
-    console.error('setRuntimeValue called with undefined campaignName', { characterKey, propertyName, value, stack: new Error().stack });
-  }
+   if (!campaignName) {
+     console.error('setRuntimeValue called with undefined campaignName', { characterKey, propertyName, value, stack: new Error().stack });
+   }
 
-  fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(characterKey)}`, {
-    method: 'POST',
-    mode: 'cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ value: obj })
-  }).catch((e) => { console.error("[useRuntimeState] Error:", e); });
+   // When characterKey === propertyName, the server would extract the wrong value
+   // from the full store object (it would get value[characterKey] instead of value[propertyName]).
+   // Send the value directly in this case.
+   const bodyValue = characterKey === propertyName ? { value } : { value: obj };
 
-  notify(characterKey);
+   fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(characterKey)}`, {
+     method: 'POST',
+     mode: 'cors',
+     headers: { 'Content-Type': 'application/json' },
+     body: JSON.stringify(bodyValue)
+   }).catch((e) => { console.error("[useRuntimeState] Error:", e); });
+
+   notify(characterKey);
 }
 
 export function setRuntimeObject(characterKey, fullObject, campaignName, skipSync = false) {
