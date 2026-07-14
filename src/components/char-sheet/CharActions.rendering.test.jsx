@@ -325,25 +325,21 @@ describe('CharActions rendering', () => {
   });
 
   describe('rage expendable / restore', () => {
-    it('shows Restore with Rage button when rage-expendable action is exhausted', async () => {
+    it('shows rage-expendable action as clickable even when exhausted', async () => {
       const { hasAutomation } = await import('../../services/combat/automation/automationService.js');
-      const { isExhausted } = await import('../../services/automation/handlers/combat/saveAttackHandler.js');
       hasAutomation.mockReturnValue(true);
-      isExhausted.mockReturnValue(true);
       const stats = createStats({
         actions: [{ name: 'Berserker Rage', description: 'You enter a rage.', automation: { type: 'combat_stance', recharge: 'long_rest_or_expend_rage' } }],
       });
       render(<CharActions playerStats={stats} />);
-      expect(screen.getByText(/Restore with Rage/)).toBeInTheDocument();
+      expect(screen.getByText(/Berserker Rage:/)).toHaveClass('clickable');
     });
 
-    it('does not show Restore with Rage when not rage-expendable or not exhausted', async () => {
+    it('does not show Restore with Rage button', async () => {
       const { hasAutomation } = await import('../../services/combat/automation/automationService.js');
-      const { isExhausted } = await import('../../services/automation/handlers/combat/saveAttackHandler.js');
       hasAutomation.mockReturnValue(true);
-      isExhausted.mockReturnValue(true);
       const stats = createStats({
-        actions: [{ name: 'Channel Divinity', description: 'Channel divine energy.', automation: { type: 'auto_effect', recharge: 'long_rest' } }],
+        actions: [{ name: 'Berserker Rage', description: 'You enter a rage.', automation: { type: 'combat_stance', recharge: 'long_rest_or_expend_rage' } }],
       });
       render(<CharActions playerStats={stats} />);
       expect(screen.queryByText(/Restore with Rage/)).not.toBeInTheDocument();

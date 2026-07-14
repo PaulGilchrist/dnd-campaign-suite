@@ -108,8 +108,7 @@ vi.mock('./char-spells/SpellDetailPopup.jsx', () => ({
 }));
 
 import { hasAutomation } from '../../services/combat/automation/automationService.js';
-import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../services/ui/logService.js';
 
 const basePlayerStats = {
@@ -155,23 +154,26 @@ describe('CharBonusActions - Interactive', () => {
       automation: { type: 'combat_stance', recharge: 'long_rest_or_expend_rage', resourceKey: 'ragePoints' },
     };
 
-    it('restores rage and updates runtime state when Restore with Rage is clicked', async () => {
+    it('shows rage-expendable bonus action as clickable even when exhausted', async () => {
       hasAutomation.mockReturnValue(true);
-      isExhausted.mockReturnValue(true);
+      render(<CharBonusActions playerStats={createStats({ bonusActions: [rageBonusAction] })} />);
+      expect(screen.getByText(/Berserker Rage:/)).toHaveClass('clickable');
+    });
+
+    it('dispatches automation on click when exhausted (handler manages rage)', async () => {
+      hasAutomation.mockReturnValue(true);
       vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
         if (key === 'ragePoints') return 1;
         return null;
       });
 
-      render(<CharBonusActions playerStats={createStats({ bonusActions: [rageBonusAction] })} />);
-      const restoreBtn = screen.getByText(/Restore with Rage/);
-      fireEvent.click(restoreBtn);
+      const mockOnAutomationAction = vi.fn();
+      render(<CharBonusActions playerStats={createStats({ bonusActions: [rageBonusAction] })} onAutomationAction={mockOnAutomationAction} />);
+      const actionName = screen.getByText(/Berserker Rage:/);
+      fireEvent.click(actionName);
 
-      await waitFor(() => {
-        expect(setRuntimeValue).toHaveBeenCalled();
-      });
+      expect(mockOnAutomationAction).toHaveBeenCalledWith(rageBonusAction);
     });
-
   });
 
   describe('attack and damage click handlers', () => {

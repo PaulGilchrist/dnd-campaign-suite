@@ -614,6 +614,8 @@
                             "duration": "1_minute_or_success_save",
                             "bonusAction": true,
                             "recharge": "long_rest_or_expend_rage",
+                            "uses": 1,
+                            "resourceKey": "intimidatingPresenceUses",
                             "casting_time": "1 bonus action"
                         }
                     }

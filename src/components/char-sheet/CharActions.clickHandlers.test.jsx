@@ -337,7 +337,7 @@ describe('CharActions click handlers', () => {
       });
     });
 
-    it('does not dispatch automation when rage action is exhausted', async () => {
+    it('dispatches automation when rage action is exhausted (handler shows popup)', async () => {
       hasAutomation.mockReturnValue(true);
       isExhausted.mockReturnValue(true);
 
@@ -348,7 +348,7 @@ describe('CharActions click handlers', () => {
       await renderWithFetch(<CharActions playerStats={stats} />);
       const actionName = screen.getByText(/Rage:/);
       await act(async () => { fireEvent.click(actionName); });
-      expect(executeHandler).not.toHaveBeenCalled();
+      expect(executeHandler).toHaveBeenCalled();
     });
   });
 });

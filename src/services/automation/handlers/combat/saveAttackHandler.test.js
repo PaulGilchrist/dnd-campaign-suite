@@ -517,16 +517,27 @@ describe('saveAttackHandler', () => {
       );
     });
 
-    it('should include recharge message when recharge flag is set', async () => {
-      runtimeState.getRuntimeValue.mockReturnValueOnce(0);
+    it('should auto-spend rage and continue when long_rest_or_expend_rage and rage available', async () => {
+      runtimeState.getRuntimeValue.mockReturnValueOnce(0).mockReturnValueOnce(6);
       diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
 
       const action = makeAction({ usesMax: 1, recharge: 'long_rest_or_expend_rage' });
 
       const result = await handle(action, makePlayerStats(), campaignName, null);
 
+      expect(result.type).toBe('roll');
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('TestCaster', 'ragePoints', 5, campaignName);
+    });
+
+    it('should show exhausted popup when long_rest_or_expend_rage and no rage available', async () => {
+      runtimeState.getRuntimeValue.mockReturnValueOnce(0);
+
+      const action = makeAction({ usesMax: 1, recharge: 'long_rest_or_expend_rage' });
+
+      const result = await handle(action, makePlayerStats(), campaignName, null);
+
       expect(result.payload.description).toBe(
-        'Breath Weapon has been used and cannot be used again until a long rest. You may expend one use of Rage to restore it.',
+        'Breath Weapon has been used and cannot be used again until a long rest.',
       );
     });
 

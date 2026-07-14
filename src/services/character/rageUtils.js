@@ -8,7 +8,7 @@ export async function handleRestoreRage(playerStats, campaignName, actionName, a
         return false;
     }
     await setRuntimeValue(playerStats.name, 'ragePoints', currentRage - 1, campaignName);
-    await setRuntimeValue(playerStats.name, rageKey, 0, campaignName);
+    await setRuntimeValue(playerStats.name, rageKey, 1, campaignName);
     setPopupHtml(`<b>${actionName}</b><br/>Expended 1 Rage to restore use.`);
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
     return true;

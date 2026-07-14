@@ -184,18 +184,35 @@ export async function handle(action, playerStats, campaignName, mapName) {
             const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
             const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? maxUses);
             if (currentUses <= 0) {
-                return {
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: action.name,
-                        description: `${action.name} has been used and cannot be used again until a long rest.` +
-                            (auto.recharge === 'long_rest_or_expend_rage' ? ' You may expend one use of Rage to restore it.' : ''),
-                        automation: auto,
-                    },
-                };
-             }
-            await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+                if (auto.recharge === 'long_rest_or_expend_rage') {
+                    const storedRage = getRuntimeValue(playerStats.name, 'ragePoints', campaignName);
+                    const currentRage = storedRage != null ? Number(storedRage) : (playerStats._trackedResources?.ragePoints?.current ?? 0);
+                    if (currentRage <= 0) {
+                        return {
+                            type: 'popup',
+                            payload: {
+                                type: 'automation_info',
+                                name: action.name,
+                                description: `${action.name} has been used and cannot be used again until a long rest.`,
+                                automation: auto,
+                            },
+                        };
+                    }
+                    await setRuntimeValue(playerStats.name, 'ragePoints', currentRage - 1, campaignName);
+                } else {
+                    return {
+                        type: 'popup',
+                        payload: {
+                            type: 'automation_info',
+                            name: action.name,
+                            description: `${action.name} has been used and cannot be used again until a long rest.`,
+                            automation: auto,
+                        },
+                    };
+                }
+            } else {
+                await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+            }
         }
     }
 

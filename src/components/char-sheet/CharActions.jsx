@@ -12,7 +12,6 @@ import { useSpellUpcastFlow } from '../../hooks/combat/useSpellUpcastFlow.js'
 import { rollExpression } from '../../services/dice/diceRoller.js';
 import { computeFeatRangeEffects } from '../../services/character/featRangeService.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js'
-import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { toggleBuff } from '../../services/automation/common/buffToggle.js';
 import { addExpiration } from '../../services/rules/effects/expirations.js';
@@ -47,7 +46,6 @@ import { useSimpleDamageRoll } from '../../hooks/combat/useSimpleDamageRoll.js';
 import { useSpellPositionResolver } from '../../hooks/combat/useSpellPositionResolver.js';
 import { useSpellCastExecutor } from '../../hooks/combat/useSpellCastExecutor.js';
 import { getWeaponMastery } from '../../services/combat/weaponMasteryUtils.js';
-import { handleRestoreRage } from '../../services/character/rageUtils.js';
 import useCharActionModals from './useCharActionModals.js';
 import useInitiativeEffects from './useInitiativeEffects.js';
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx';
@@ -1353,10 +1351,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     const auto = action.automation;
                     const isMetamagic = action.name === 'Metamagic' && auto?.type === 'spell_modifier';
                     const isClickable = action.details || hasAutomation(action);
-                    const isRageExpendable = auto?.recharge === 'long_rest_or_expend_rage';
-                    const exhausted = isRageExpendable && isExhausted(action, playerStats, campaignName);
                     const handleClick = () => {
-                        if (exhausted) return;
                         if (hasAutomation(action)) {
                             handleAutomationAction(action);
                         } else {
@@ -1365,15 +1360,11 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     };
                     const displayName = isMetamagic ? 'Empowered Spell' : action.name;
                     const displayDesc = isMetamagic ? getEmpoweredSpellDescription(action) : action.description;
-                    const renderRageRestore = async () => {
-                        await handleRestoreRage(playerStats, campaignName, action.name, auto, setPopupHtml);
-                    };
                     return <div key={action.name}>
-                        <b className={isClickable && !exhausted ? "clickable" : ""} onClick={handleClick}>{displayName}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayDesc) }}></span>
+                        <b className={isClickable ? "clickable" : ""} onClick={handleClick}>{displayName}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayDesc) }}></span>
                         {hasAutomation(action) && auto?.type === 'save_attack' && auto?.saveDc && <span className="automation-badge"> DC {auto.saveDc} {auto.saveType}</span>}
                         {hasAutomation(action) && auto?.type === 'healing_pool' && <span className="automation-badge"> Pool: {auto.pool} HP</span>}
                         {hasAutomation(action) && auto?.damage && <span className="automation-badge"> {auto.damage} {auto.damageType}</span>}
-                        {exhausted && isRageExpendable && <span className="automation-badge clickable" onClick={renderRageRestore}><i className="fa-solid fa-fire-flame-curved"></i> Restore with Rage</span>}
                     </div>
                 })}
                 <div><b>Base Actions:</b> {actions.map((actionName, idx) => {

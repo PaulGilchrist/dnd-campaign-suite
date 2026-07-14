@@ -111,6 +111,7 @@ export const LONG_REST_RESOURCES = [
   'innateSorceryUses',
   'sorcerousRestorationUses',
   'zealousPresenceUses',
+  'intimidatingPresenceUses',
   'rageOfTheGodsUses',
   'divineInterventionUses',
   'wholenessofbodyUses',
