@@ -153,6 +153,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
 
         // Brutal Strike: add extra damage dice when active
         let brutalStrikeFormulaPart = null;
+        let brutalStrikeRider = null;
         const brutalStrikeActive = getRuntimeValue(playerName, '_brutalStrikeActive', campaignName);
         if (brutalStrikeActive) {
             const allAutomation = [...(playerStats.automation?.actions || []), ...(playerStats.automation?.passives || [])];
@@ -165,12 +166,38 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
                 const countB = parseInt(exprB.match(/^(\d+)/)?.[1] || '0', 10);
                 return countB - countA;
             });
-            const rider = matchingRiders[0];
-            if (rider) {
-                const diceMatch = rider.damageExpression.match(/^(\d+)d(\d+)/);
+            brutalStrikeRider = matchingRiders[0];
+            if (brutalStrikeRider) {
+                const diceMatch = brutalStrikeRider.damageExpression.match(/^(\d+)d(\d+)/);
                 if (diceMatch) {
-                    brutalStrikeFormulaPart = `${rider.damageExpression} [Brutal Strike]`;
+                    brutalStrikeFormulaPart = `${brutalStrikeRider.damageExpression} [Brutal Strike]`;
                 }
+
+                // Apply chosen effects to targetEffects
+                const effectChoices = getRuntimeValue(playerName, '_brutalStrikeEffects', campaignName) || [];
+                if (effectChoices.length > 0) {
+                    let storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                    const riderOptions = brutalStrikeRider.options || [];
+                    for (const choiceName of effectChoices) {
+                        const option = riderOptions.find(o => o.name === choiceName);
+                        if (!option) continue;
+                        if (option.effect === 'disadvantage_on_next_save' || option.effect === 'next_attack_bonus') {
+                            const newEffect = {
+                                target: targetName,
+                                source: playerName,
+                                option: option.name,
+                                effect: option.effect,
+                                value: option.effect === 'next_attack_bonus' ? (option.value || 5) : (option.value || null),
+                                noOpportunityAttacks: option.noOpportunityAttacks || false,
+                                duration: 'until_start_of_next_turn',
+                            };
+                            storedEffects = [...storedEffects, newEffect];
+                        }
+                    }
+                    setRuntimeValue(campaignName, 'targetEffects', storedEffects, campaignName);
+                }
+                setRuntimeValue(playerName, '_brutalStrikeActive', null, campaignName);
+                setRuntimeValue(playerName, '_brutalStrikeEffects', null, campaignName);
             }
         }
 

@@ -531,7 +531,7 @@ export function buildDamageSteps() {
             const effectChoices = getRuntimeValue(ctx.playerStats.name, '_brutalStrikeEffects', ctx.campaignName) || [];
             const targetName = ctx.targetName;
             if (effectChoices.length > 0 && targetName) {
-              const storedEffects = getRuntimeValue(ctx.campaignName, 'targetEffects') || [];
+              let storedEffects = getRuntimeValue(ctx.campaignName, 'targetEffects') || [];
               const riderOptions = rider.options || [];
 
               for (const choiceName of effectChoices) {
@@ -550,7 +550,7 @@ export function buildDamageSteps() {
                     noOpportunityAttacks: option.noOpportunityAttacks || false,
                     duration: 'until_start_of_next_turn',
                   };
-                  storedEffects.push(newEffect);
+                  storedEffects = [...storedEffects, newEffect];
                 }
               }
               setRuntimeValue(ctx.campaignName, 'targetEffects', storedEffects, ctx.campaignName);

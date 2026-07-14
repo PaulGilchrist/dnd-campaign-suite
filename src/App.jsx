@@ -397,7 +397,7 @@ function App() {
       return;
     }
     pendingPromptIdRef.current = null;
-    setRuntimeObject(storeKey, event.data, campaignName, true);
+    setRuntimeObject(campaignName, { [storeKey]: event.data }, campaignName, true);
   }, [campaignName, setCharacters]);
 
   const handleDeleteCharacter = async (characterName) => {

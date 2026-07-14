@@ -69,11 +69,14 @@ router.post('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
         characterChangeData.set(campaign, {});
     }
 
-    characterChangeData.get(campaign)[key] = value;
+    // value may be the full store object { targetEffects: [...], hitPoints: 123, ... }
+    // or just the property value directly. Extract the property if value[key] exists.
+    const propertyValue = (value && typeof value === 'object' && key in value) ? value[key] : value;
+    characterChangeData.get(campaign)[key] = propertyValue;
     markDirty(campaign);
 
     // Broadcast change
-    publish(`change-${campaign}-${key}`, value);
+    publish(`change-${campaign}-${key}`, propertyValue);
 
     res.json({ message: 'Data saved successfully' });
 }));

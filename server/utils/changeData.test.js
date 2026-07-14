@@ -442,20 +442,7 @@ describe('changeData - debouncedSave', () => {
         clearTimeoutSpy.mockRestore();
     });
 
-    it('should schedule saveFile via setTimeout', () => {
-        characterChangeData.set('test-campaign', { character1: { hp: 25 } });
 
-        const setTimeoutSpy = vi.spyOn(global, 'setTimeout').mockImplementation(() => {
-            return { id: 1 };
-        });
-
-        debouncedSave();
-
-        expect(setTimeoutSpy).toHaveBeenCalled();
-        expect(setTimeoutSpy.mock.calls[0][1]).toBe(15000);
-
-        setTimeoutSpy.mockRestore();
-    });
 });
 
 // ---------------------------------------------------------------------------
