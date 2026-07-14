@@ -200,6 +200,7 @@ const categories2024 = {
 
     characterAdvancement: [
         "Additional Fighting Style",
+        "Animal Speaker",
         "Avatar of Battle",
         "Bonus Proficiencies",
         "Deft Explorer",
@@ -215,6 +216,7 @@ const categories2024 = {
         "Fiendish Legacies",
         "LightBearer",
         "Magical Secrets",
+        "Nature Speaker",
         "Otherworldly Presence",
         "Pact Magic",
         "Primal Order",

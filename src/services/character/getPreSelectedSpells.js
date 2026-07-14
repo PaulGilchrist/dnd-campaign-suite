@@ -244,7 +244,7 @@ export async function getPreSelectedSpells(formData) {
   const charLevel = parseInt(formData.level) || 1;
 
   const className = formData.class?.name;
-  const subclassName = formData.class?.subclass?.name;
+  const subclassName = formData.class?.subclass?.name || formData.class?.major?.name;
   const raceName = formData.race?.name;
   const subraceName = formData.race?.subrace?.name;
 

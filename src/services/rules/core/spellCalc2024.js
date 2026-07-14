@@ -419,6 +419,16 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
                 }
             });
         }
+
+        // Path of the Wild Heart: Animal Speaker overrides casting_time to "Ritual" for Beast Sense and Speak with Animals
+        // Nature Speaker overrides casting_time to "Ritual" for Commune with Nature
+        if (playerStats.class?.major?.name === 'Path of the Wild Heart') {
+            spellAbilities.spells.forEach(spell => {
+                if (spell.name === 'Beast Sense' || spell.name === 'Speak with Animals' || spell.name === 'Commune with Nature') {
+                    spell.casting_time = 'Ritual';
+                }
+            });
+        }
     }
 
     return spellAbilities;

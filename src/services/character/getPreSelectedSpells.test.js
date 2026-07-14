@@ -349,4 +349,75 @@ describe('getPreSelectedSpells', () => {
       expect(result).not.toContain('Speak with Animals');
     });
   });
+
+  describe('2024 Barbarian Path of the Wild Heart', () => {
+    it('extracts Animal Speaker spells from major spells array', async () => {
+      const classes = [
+        {
+          name: 'Barbarian',
+          majors: [
+            {
+              name: 'Path of the Wild Heart',
+              spells: [
+                { name: 'Speak with Animals', level: 1 },
+                { name: 'Beast Sense', level: 2 },
+                { name: 'Commune with Nature', level: 10 },
+              ],
+            },
+          ],
+        },
+      ];
+      vi.mocked(loadClassData).mockResolvedValue(classes);
+
+      const result = await getPreSelectedSpells({ rules: '2024', level: 3, class: { name: 'Barbarian', major: { name: 'Path of the Wild Heart' } } });
+      expect(result).toContain('Speak with Animals');
+      expect(result).toContain('Beast Sense');
+      expect(result).not.toContain('Commune with Nature');
+    });
+
+    it('includes Commune with Nature when level 10 or higher', async () => {
+      const classes = [
+        {
+          name: 'Barbarian',
+          majors: [
+            {
+              name: 'Path of the Wild Heart',
+              spells: [
+                { name: 'Speak with Animals', level: 1 },
+                { name: 'Beast Sense', level: 2 },
+                { name: 'Commune with Nature', level: 10 },
+              ],
+            },
+          ],
+        },
+      ];
+      vi.mocked(loadClassData).mockResolvedValue(classes);
+
+      const result = await getPreSelectedSpells({ rules: '2024', level: 10, class: { name: 'Barbarian', major: { name: 'Path of the Wild Heart' } } });
+      expect(result).toContain('Commune with Nature');
+    });
+
+    it('does not extract spells for non-Wild Heart Barbarian majors', async () => {
+      const classes = [
+        {
+          name: 'Barbarian',
+          majors: [
+            { name: 'Path of the Berserker' },
+            {
+              name: 'Path of the Wild Heart',
+              spells: [
+                { name: 'Speak with Animals', level: 1 },
+                { name: 'Beast Sense', level: 2 },
+              ],
+            },
+          ],
+        },
+      ];
+      vi.mocked(loadClassData).mockResolvedValue(classes);
+
+      const result = await getPreSelectedSpells({ rules: '2024', level: 3, class: { name: 'Barbarian', major: { name: 'Path of the Berserker' } } });
+      expect(result).not.toContain('Speak with Animals');
+      expect(result).not.toContain('Beast Sense');
+    });
+  });
 });
