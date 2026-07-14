@@ -15,6 +15,7 @@ import { featureModules } from './features/index.js';
 import { applyMasteryEffect } from '../../automation/handlers/combat/weaponMasteryHandler.js';
 import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
 import { createSaveListener } from '../../automation/common/savePrompt.js';
+import { resolveDiceExpression } from '../automation/automationExpressions.js';
 
 /**
  * Build the damage pipeline steps for a weapon-type action.
@@ -461,14 +462,22 @@ export function buildDamageSteps() {
             const buffs = getRuntimeValue(ctx.playerStats.name, 'activeBuffs', ctx.campaignName) || [];
             const isReckless = buffs.some(b => b.effect === 'advantage_attacks_advantage_against');
             const isRaging = buffs.some(b => b.damageBonusExpression);
-            const isStr = (ctx.attack?.abilityName || '').toLowerCase() === 'strength';
-            if (isReckless && isRaging && isStr) {
+            const attackAbilityName = ctx.attack?.abilityName;
+            const isStr = attackAbilityName ? attackAbilityName.toLowerCase() === 'strength' : null;
+            const strMod = ctx.playerStats.abilities?.find(a => a.name === 'Strength')?.bonus ?? 0;
+            const dexMod = ctx.playerStats.abilities?.find(a => a.name === 'Dexterity')?.bonus ?? 0;
+            const inferredIsStr = strMod >= dexMod;
+            const isStrFinal = isStr !== null ? isStr : inferredIsStr;
+            if (isReckless && isRaging && isStrFinal) {
               for (const a of frenzy) {
-                let expr = a.damageExpression || '';
-                const rd = ctx.playerStats.class?.class_levels?.[(ctx.playerStats.level || 1) - 1]?.rage_damage ?? 2;
-                expr = expr.replace(/rage_damage/g, rd);
-                const r = rollExpression(expr);
-                if (r) { formula += ` + ${expr} [${a.damageType}]`; total += r.total; rolls = [...rolls, ...r.rolls]; }
+                const resolvedExpr = resolveDiceExpression(a.damageExpression, ctx.playerStats);
+                const r = rollExpression(resolvedExpr);
+                if (r) {
+                  const dt = a.damageType === 'same_as_weapon' ? (ctx.attack?.damageType || 'Slashing') : a.damageType;
+                  formula += ` + ${resolvedExpr} [${dt}]`;
+                  total += r.total;
+                  rolls = [...rolls, ...r.rolls];
+                }
               }
               setRuntimeValue(ctx.playerStats.name, '_frenzyUsedRound', round, ctx.campaignName);
             }

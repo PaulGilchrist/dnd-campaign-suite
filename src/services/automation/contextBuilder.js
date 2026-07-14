@@ -14,6 +14,7 @@ import { getCoronaSaveDisadvantage } from '../combat/auras/coronaAuraUtils.js';
 import { hasAuraOfProtection } from '../combat/auras/auraOfProtection.js';
 import { isActive as isAvengingAngelActive, isAuraTarget } from '../automation/handlers/class-cleric-paladin/avengingAngelHandler.js';
 import { collectWeaponMastery } from '../combat/automation/automationService.js';
+import { resolveDiceExpression } from '../combat/automation/automationExpressions.js';
 
 export function buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, _featRangeEffects) {
     const playerName = playerStats.name;
@@ -106,6 +107,40 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
                     ? (playerStats.class?.class_levels?.[(playerStats.level || 1) - 1]?.rage_damage ?? 2)
                     : 0;
                 stanceDamageBonus += resolved;
+            }
+        }
+
+        // Frenzy: extra rage_damage_d6 when reckless, raging, strength-based (once per turn)
+        let frenzyDamageFormula = null;
+        const frenzyActions = (playerStats.automation?.actions || []).filter(x => x.type === 'damage_bonus' && x.trigger === 'reckless_attack_hit_while_raging');
+        if (frenzyActions.length > 0) {
+            const frenzyOncePerTurn = frenzyActions[0].oncePerTurn;
+            let skipFrenzy = false;
+            if (frenzyOncePerTurn) {
+                const usedRound = getRuntimeValue(playerName, '_frenzyUsedRound', campaignName);
+                const currentRound = getCurrentCombatRound();
+                if (usedRound === currentRound) {
+                    skipFrenzy = true;
+                }
+            }
+            if (!skipFrenzy) {
+                const isReckless = activeBuffs.some(b => b.effect === 'advantage_attacks_advantage_against');
+                const isRaging = activeBuffs.some(b => b.damageBonusExpression);
+                const attackAbilityName = attack?.abilityName;
+                const isStr = attackAbilityName ? attackAbilityName.toLowerCase() === 'strength' : null;
+                const strMod = playerStats.abilities?.find(a => a.name === 'Strength')?.bonus ?? 0;
+                const dexMod = playerStats.abilities?.find(a => a.name === 'Dexterity')?.bonus ?? 0;
+                const inferredIsStr = strMod >= dexMod;
+                const isStrFinal = isStr !== null ? isStr : inferredIsStr;
+                if (isReckless && isRaging && isStrFinal) {
+                    const frenzyResolved = resolveDiceExpression(frenzyActions[0].damageExpression, playerStats);
+                    if (frenzyResolved) {
+                        frenzyDamageFormula = frenzyResolved;
+                    }
+                    if (frenzyOncePerTurn && frenzyDamageFormula) {
+                        setRuntimeValue(playerName, '_frenzyUsedRound', getCurrentCombatRound(), campaignName);
+                    }
+                }
             }
         }
 
@@ -244,7 +279,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             }
         }
 
-        const autoDamageFormula = [attack.damage, stanceDamageBonus > 0 ? stanceDamageBonus : null, brutalStrikeFormulaPart].filter(v => v !== null).join(' plus ');
+        const autoDamageFormula = [attack.damage, stanceDamageBonus > 0 ? stanceDamageBonus : null, frenzyDamageFormula, brutalStrikeFormulaPart].filter(v => v !== null).join(' plus ');
 
         const effectiveHitBonus = attack.hitBonus + sacredWeaponBonus + blessedWarriorBonus + sunderingBonus;
         const hitBonusFormulaParts = [attack.hitBonusFormula];
