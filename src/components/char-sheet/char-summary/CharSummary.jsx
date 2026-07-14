@@ -171,7 +171,6 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const baseImmunities = playerStats.immunities || [];
     const auraImmunities = auraComboEffects?.immunities || [];
     const auraImmunitySources = auraComboEffects?.immunitySources || {};
-    const allImmunities = [...new Set([...baseImmunities, ...auraImmunities])];
 
     const baseResistances = playerStats.resistances || [];
     const auraResistances = auraComboEffects?.resistances || [];
@@ -189,6 +188,15 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const rageResistances = Array.isArray(activeBuffs)
         ? activeBuffs.filter(b => b.name === 'Rage').flatMap(b => b.resistanceTypes || [])
         : [];
+
+    const rageActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Rage');
+    const rageConditionalImmunities = rageActive
+        ? (playerStats.automationConditionalImmunities || [])
+            .filter(ci => ci.requiresActive === 'Rage')
+            .flatMap(ci => ci.immunities || [])
+        : [];
+
+    const allImmunities = [...new Set([...baseImmunities, ...auraImmunities, ...rageConditionalImmunities])];
 
     const allResistances = [...new Set([...baseResistances, ...auraResistances, ...stormbornResistancesActive, ...rageResistances])];
 
