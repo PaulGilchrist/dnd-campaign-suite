@@ -146,11 +146,11 @@ describe('CharClassFeatures', () => {
                     name: 'Barbarian',
                     class_levels: [{ level: 1 }, { level: 2 }, { level: 3 }, { level: 4 }, { level: 5, class_specific: { rage_count: 2, rage_damage_bonus: 2 } }],
                 },
-                automation: { passives: [{ effect: 'animal_aspect' }] },
+                automation: { specialActions: [{ type: 'animal_aspect' }] },
             });
             renderComponent(stats);
             expect(screen.getByText(/Aspect of the Wilds/)).toBeInTheDocument();
-            expect(document.querySelector('.automation-btn--active')).toBeInTheDocument();
+            expect(screen.getByText('Owl')).toBeInTheDocument();
         });
 
         it('renders 2024 ruleset barbarian with class_level-based rage values', () => {

@@ -207,6 +207,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
 
     let flySpeed = null;
     let swimSpeed = null;
+    let climbSpeed = null;
     let hasteAcBonus = 0;
     let shieldAcBonus = 0;
     let baitAndSwitchBonus = 0;
@@ -222,6 +223,9 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const thirdEyeBuff = Array.isArray(activeBuffs) ? (activeBuffs.find(b => b.name === 'The Third Eye') || null) : null;
     const thirdEyeEffect = thirdEyeBuff?.effect || null;
     const huntersMarkActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === "Hunter's Mark");
+    const aspectBuff = Array.isArray(activeBuffs) ? (activeBuffs.find(b => b.name === 'Aspect of the Wilds') || null) : null;
+    const aspectOption = aspectBuff?.optionName || null;
+    console.error('[AspectOfTheWilds] CharSummary: aspectBuff:', JSON.stringify(aspectBuff), 'aspectOption:', aspectOption, 'playerStats.race?.speed:', playerStats.race?.speed);
     activeBuffs.forEach(buff => {
         if (buff.effect === 'fly_speed_equals_walk_speed' || buff.flySpeed) flySpeed = speed;
         if (buff.effect === 'fly_speed_20_hover') flySpeed = 20;
@@ -240,6 +244,12 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         if (buff.effect === 'wormhole_movement') narrowSpaceActive = true;
         if (buff.effect === 'tremorsense_60ft') tremorsenseActive = true;
     });
+    if (aspectOption === 'Panther') {
+        climbSpeed = totalSpeed + buffSpeedBonus;
+    }
+    if (aspectOption === 'Salmon' && swimSpeed === null) {
+        swimSpeed = totalSpeed + buffSpeedBonus;
+    }
     const hasteActive = activeBuffs.some(b => b.effect === 'haste');
     if (hasteActive) {
         speed = speed * 2;
@@ -327,7 +337,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                 <div>
                     <div className='clickable' onClick={showArmorClassFormulaPopup}><b>Armor Class: </b>{circleFormsACOverride ?? (playerStats.armorClass + hasteAcBonus + shieldAcBonus + baitAndSwitchBonus + shieldOfFaithBonus + (conditionEffects?.wardingBondAcBonus || 0) - (conditionEffects?.acPenalty || 0))}{(hasteAcBonus > 0 || mageArmorActive || shieldAcBonus > 0 || shieldOfFaithBonus > 0) && <span className="aura-source" title={mageArmorActive ? "From Mage Armor" : undefined}>{hasteAcBonus > 0 && ` (+${hasteAcBonus} from Haste)`}{mageArmorActive && ' (+3 from Mage Armor)'}</span>}{shieldAcBonus > 0 && <span className="aura-source" title="From Shield"> (+5 from Shield)</span>}{shieldOfFaithBonus > 0 && <span className="aura-source" title="From Shield of Faith"> (+2 from Shield of Faith)</span>}{baitAndSwitchBonus > 0 && <span className="aura-source" title={`From ${baitAndSwitchSource || 'Bait and Switch'}`}> (+{baitAndSwitchBonus} from {baitAndSwitchSource || 'Bait and Switch'})</span>}{(conditionEffects?.wardingBondAcBonus || 0) > 0 && <span className="aura-source" title="From Warding Bond"> (+{conditionEffects.wardingBondAcBonus} from Warding Bond)</span>}{(conditionEffects?.acPenalty || 0) > 0 && <span className="stat--penalized" title="Slow spell penalty"> ({'−'}{conditionEffects.acPenalty} from Slow)</span>}</div>
                     <CharHitPoints playerStats={playerStats} campaignName={campaignName}></CharHitPoints>
-                      <b>Speed: </b><span className={exhaustionLevel > 0 || conditionEffects?.speedZero ? 'stat--penalized' : ''}>{totalSpeedWithBuff} ft.{playerStats.climbSpeed ? `, climb ${playerStats.climbSpeed} ft.` : ''}{swimSpeed !== null ? `, swim ${swimSpeed} ft.` : ''}{flySpeed !== null ? `, fly ${flySpeed + auraSpeedBonus} ft. ${(glisteningFlightHover || dragonWingsHover) ? ' (hover)' : ''}` : ''}{iceWalkActive ? ', ice walk' : ''}{acrobaticMovementActive ? ', acrobatic movement' : ''}</span> {auraSpeedBonus > 0 && auraSpeedSource && <span className="aura-source" title={`From ${auraSpeedSource}'s Aura of Alacrity`}> (+{auraSpeedBonus})</span>}<br />
+                      <b>Speed: </b><span className={exhaustionLevel > 0 || conditionEffects?.speedZero ? 'stat--penalized' : ''}>{totalSpeedWithBuff} ft.{climbSpeed ? `, climb ${climbSpeed} ft.` : ''}{swimSpeed !== null ? `, swim ${swimSpeed} ft.` : ''}{flySpeed !== null ? `, fly ${flySpeed + auraSpeedBonus} ft. ${(glisteningFlightHover || dragonWingsHover) ? ' (hover)' : ''}` : ''}{iceWalkActive ? ', ice walk' : ''}{acrobaticMovementActive ? ', acrobatic movement' : ''}</span> {auraSpeedBonus > 0 && auraSpeedSource && <span className="aura-source" title={`From ${auraSpeedSource}'s Aura of Alacrity`}> (+{auraSpeedBonus})</span>}<br />
                     <CharGold playerStats={playerStats} campaignName={campaignName}></CharGold>
                 </div>
                 <div>

@@ -41,6 +41,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
     const [naturalRecoveryModal, setNaturalRecoveryModal] = useState(null);
     const [circleOfTheLandSpellsModal, setCircleOfTheLandSpellsModal] = useState(null);
     const [featureChoiceModal, setFeatureChoiceModal] = useState(null);
+    const [aspectOfTheWildsModal, setAspectOfTheWildsModal] = useState(null);
     const [fightingStylesMap, setFightingStylesMap] = useState(null);
     const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats?.name, campaignName, {
@@ -115,6 +116,56 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
         setFeatureChoiceModal(null);
     }, []);
 
+    const handleAspectOfTheWildsConfirm = useCallback(async (choice) => {
+        const existingBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+        const currentBuffs = Array.isArray(existingBuffs) ? [...existingBuffs] : [];
+        const aspectBuffIndex = currentBuffs.findIndex(b => b.name === 'Aspect of the Wilds');
+        if (aspectBuffIndex !== -1) {
+            currentBuffs[aspectBuffIndex] = {
+                name: 'Aspect of the Wilds',
+                effect: choice === 'Owl' ? 'darkvision_aspect' : choice === 'Panther' ? 'climb_speed_aspect' : 'swim_speed_aspect',
+                duration: 'infinite',
+                optionName: choice,
+            };
+        } else {
+            currentBuffs.push({
+                name: 'Aspect of the Wilds',
+                effect: choice === 'Owl' ? 'darkvision_aspect' : choice === 'Panther' ? 'climb_speed_aspect' : 'swim_speed_aspect',
+                duration: 'infinite',
+                optionName: choice,
+            });
+        }
+        setRuntimeValue(playerStats.name, 'activeBuffs', currentBuffs, campaignName);
+        setRuntimeValue(playerStats.name, 'aspectOfTheWildsOption', choice, campaignName);
+        console.error('[AspectOfTheWilds] setRuntimeValue aspectOfTheWildsOption =', choice, 'playerStats.name:', playerStats.name, 'campaignName:', campaignName);
+        setRuntimeValue(playerStats.name, 'aspectOfTheWildsUsedThisRest', true, campaignName);
+        console.error('[AspectOfTheWilds] setRuntimeValue aspectOfTheWildsUsedThisRest = true');
+        setAspectOfTheWildsModal(null);
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: 'Aspect of the Wilds',
+            description: `Chose ${choice} aspect`,
+        }).catch(() => {});
+        const effects = {
+            Owl: 'Darkvision 60 ft.',
+            Panther: 'Climb speed equal to walking speed',
+            Salmon: 'Swim speed equal to walking speed',
+        };
+        const html = `<b>Aspect of the Wilds</b><br/>Chose <b>${choice}</b>: ${effects[choice]}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+        setPopupHtml(html);
+    }, [playerStats, campaignName, setPopupHtml]);
+
+    const handleAspectOfTheWildsSkip = useCallback(() => {
+        setAspectOfTheWildsModal(null);
+    }, []);
+
+    const aspectOptions = [
+        { name: 'Owl', description: 'You have Darkvision with a range of 60 feet. If you already have Darkvision, its range increases by 60 feet.', icon: 'eye' },
+        { name: 'Panther', description: 'You have a Climb Speed equal to your Speed.', icon: 'paw' },
+        { name: 'Salmon', description: 'You have a Swim Speed equal to your Speed.', icon: 'fish' },
+    ];
+
     const handleAutomationClick = useCallback(async (action) => {
         if (cannotAct) return;
         const auto = action.automation;
@@ -137,6 +188,17 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
         if (auto?.type === 'damage_bonus' && auto.options?.length > 0 && auto.options.every(o => typeof o === 'string')) {
             const optionKey = `_${action.name.replace(/\s+/g, '_')}_option`;
             setFeatureChoiceModal({ action, options: auto.options, optionKey });
+            return;
+        }
+        if (auto?.type === 'animal_aspect') {
+            const alreadyUsed = getRuntimeValue(playerStats.name, 'aspectOfTheWildsUsedThisRest', campaignName);
+            console.error('[AspectOfTheWilds] handleAutomationClick: type=animal_aspect, playerStats.name:', playerStats.name, 'campaignName:', campaignName, 'alreadyUsed:', alreadyUsed);
+            if (alreadyUsed) {
+                const html = `<b>Aspect of the Wilds</b><br/>Already chosen this rest. It can be changed after a Long Rest.<br/><span class="dice-roll-hint">click to dismiss</span>`;
+                setPopupHtml(html);
+                return;
+            }
+            setAspectOfTheWildsModal(true);
             return;
         }
         const result = await executeHandler(action, playerStats, campaignName, null);
@@ -393,6 +455,34 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                         </div>
                         <div className="sp-actions">
                             <button className="sp-dismiss-btn" onClick={handleFeatureChoiceSkip}>Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {aspectOfTheWildsModal && (
+                <div className="sp-overlay" onClick={handleAspectOfTheWildsSkip}>
+                    <div className="sp-modal" onClick={e => e.stopPropagation()}>
+                        <div className="sp-header">
+                            <i className="fa-solid fa-paw"></i> Aspect of the Wilds
+                        </div>
+                        <div className="sp-body">
+                            <p>Choose an animal aspect:</p>
+                            <div style={{ textAlign: 'left', marginTop: '12px' }}>
+                                {aspectOptions.map((opt, i) => (
+                                    <label key={i} style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: 'pointer', background: 'transparent', border: '1px solid transparent' }}>
+                                        <input
+                                            type="radio"
+                                            name="aspectOption"
+                                            onChange={() => handleAspectOfTheWildsConfirm(opt.name)}
+                                            style={{ marginRight: '8px' }}
+                                        />
+                                        <i className={`fas fa-${opt.icon}`}></i> <strong>{opt.name}</strong> — {opt.description}
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="sp-actions">
+                            <button className="sp-dismiss-btn" onClick={handleAspectOfTheWildsSkip}>Cancel</button>
                         </div>
                     </div>
                 </div>

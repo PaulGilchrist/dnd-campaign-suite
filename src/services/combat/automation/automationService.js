@@ -26,6 +26,7 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     'resource_pool',
     'natural_recovery',
     'circle_of_the_land_spells',
+    'animal_aspect',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([

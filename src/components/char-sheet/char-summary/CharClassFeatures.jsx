@@ -30,11 +30,11 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName
         ? (classLevel?.weapon_mastery ?? 'N/A')
         : 'N/A';
 
-    const aspectChoice = useRuntimeValue(playerStats.name, 'aspectOfTheWildsOption', campaignName);
-    const hasAspectOfTheWilds = (playerStats.automation?.passives ?? []).some(
-        p => p.effect === 'animal_aspect'
+    const hasAspectOfTheWilds = (playerStats.automation?.specialActions ?? []).some(
+        p => p.type === 'animal_aspect'
     );
-    const ASPECT_OPTIONS = ['Owl', 'Panther', 'Salmon'];
+    const aspectChoice = useRuntimeValue(playerStats.name, 'aspectOfTheWildsOption', campaignName);
+    console.error('[AspectOfTheWilds] CharClassFeatures render: playerStats.name:', playerStats.name, 'campaignName:', campaignName, 'aspectChoice:', aspectChoice, 'hasAspectOfTheWilds:', hasAspectOfTheWilds, 'specialActions:', JSON.stringify(playerStats.automation?.specialActions?.map(a => a.type)));
 
     const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
     const rageActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Rage');
@@ -42,28 +42,8 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName
     const wildHeartBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.name === 'Rage of the Wilds') : null;
     const wildHeartOption = wildHeartBuff?.optionName || null;
 
-    const handleAspectChoice = (option) => {
-        setRuntimeValue(playerStats.name, 'aspectOfTheWildsOption', option, campaignName);
-    };
-
     return (
           <div data-testid="char-class-barbarian">
-              {hasAspectOfTheWilds && (
-                  <div>
-                      <b>Aspect of the Wilds: </b>
-                      {ASPECT_OPTIONS.map(opt => (
-                          <button
-                              key={opt}
-                              className={'automation-btn' + (aspectChoice === opt ? ' automation-btn--active' : '')}
-                              onClick={() => handleAspectChoice(opt)}
-                              title={`Select ${opt}`}
-                          >
-                              <i className={`fas fa-${opt === 'Owl' ? 'eye' : opt === 'Panther' ? 'paw' : 'fish'}`}></i> {opt}{aspectChoice === opt ? ' ✓' : ''}
-                          </button>
-                      ))}
-                      {aspectChoice && <span className="automation-badge">{aspectChoice} active</span>}
-                  </div>
-              )}
                <div><b>Extra Attacks: </b>{extraAttacks}</div>
                <TrackedResourceInput label="Rage Points" resourceKey="ragePoints" playerName={playerStats.name} getMax={() => rageCount} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
                <div>
@@ -71,10 +51,19 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName
                    <span className={rageActive ? "stat--buffed" : ""}>{rageDamage}</span>
                    {rageActive && <span className="automation-badge">BPS Resist, STR Adv, +{rageDamage} dmg</span>}
                </div>
-               {recklessAttackActive && <span className="automation-badge">Reckless Attack — attacks against you have Advantage</span>}
-               {wildHeartOption && <span className="automation-badge">Rage of the Wilds: {wildHeartOption}</span>}
+                {recklessAttackActive && <span className="automation-badge">Reckless Attack — attacks against you have Advantage</span>}
+                {hasAspectOfTheWilds && aspectChoice && (
+                    <div>
+                        <span className="automation-badge">Aspect of the Wilds: {aspectChoice}</span>
+                    </div>
+                )}
+                {wildHeartOption && (
+                    <div>
+                        <span className="automation-badge">Rage of the Wilds: {wildHeartOption}</span>
+                    </div>
+                )}
                <div><b>Weapon Mastery: </b><span className="clickable" onClick={onWeaponMasteryClick}>{weaponMastery}</span></div>
-         </div>
+          </div>
     );
 };
 

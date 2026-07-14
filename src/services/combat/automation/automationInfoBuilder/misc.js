@@ -788,5 +788,16 @@ export const miscHandlers = {
             casting_time: auto.casting_time || '1 reaction',
             hasAutomation: true
         }
+    },
+
+    'animal_aspect': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'animal_aspect',
+            name: feature.name,
+            options: auto.options || [],
+            casting_time: auto.casting_time || '',
+            hasAutomation: true
+        }
     }
 }

@@ -63,17 +63,21 @@ export function getRuntimeValue(characterKey, propertyName) {
   const store = getStore(characterKey);
   const hasKey = store.has(propertyName);
   const value = hasKey ? store.get(propertyName) : null;
+  if (propertyName === 'aspectOfTheWildsOption') {
+    console.error('[useRuntimeValue] getRuntimeValue: characterKey:', characterKey, 'propertyName:', propertyName, 'hasKey:', hasKey, 'value:', value, 'storeKeys:', Array.from(store.keys()));
+  }
   return value;
 }
 
 export function setRuntimeValue(characterKey, propertyName, value, campaignName) {
-   const store = getStore(characterKey);
-   const existing = store.get(propertyName);
-   if (valuesEqual(existing, value)) {
-     return;
-   }
-   store.set(propertyName, value);
-   const obj = Object.fromEntries(store);
+    const store = getStore(characterKey);
+    const existing = store.get(propertyName);
+    if (valuesEqual(existing, value)) {
+      return;
+    }
+    store.set(propertyName, value);
+    console.error('[useRuntimeValue] setRuntimeValue: characterKey:', characterKey, 'propertyName:', propertyName, 'newValue:', value, 'oldValue:', existing, 'campaignName:', campaignName);
+    const obj = Object.fromEntries(store);
 
    if (!campaignName) {
      console.error('setRuntimeValue called with undefined campaignName', { characterKey, propertyName, value, stack: new Error().stack });
@@ -137,6 +141,9 @@ export function useRuntimeValue(characterKey, propertyName, campaignName) {
         if (!listeners.has(characterKey)) listeners.set(characterKey, new Set());
         const listener = () => {
             const newVal = getRuntimeValue(characterKey, propertyName);
+            if (propertyName === 'aspectOfTheWildsOption') {
+                console.error('[useRuntimeValue] listener fired: characterKey:', characterKey, 'propertyName:', propertyName, 'newVal:', newVal, 'currentValueRef:', currentValueRef.current);
+            }
             if (valuesEqual(currentValueRef.current, newVal)) return;
             currentValueRef.current = newVal;
             setValue(newVal);
