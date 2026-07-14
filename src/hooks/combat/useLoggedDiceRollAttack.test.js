@@ -77,6 +77,10 @@ vi.mock('./loggedDiceRollUtils.js', () => ({
     applyMinDamageAdjustment: vi.fn((d) => d),
 }));
 
+vi.mock('../../services/ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
+}));
+
 import { rollD20, rollExpression } from '../../services/dice/diceRoller.js';
 import utils from '../../services/ui/utils.js';
 import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
@@ -95,6 +99,7 @@ import {
     applyMinDamageAdjustment,
 } from './loggedDiceRollUtils.js';
 import { createLogAndShow } from './useLoggedDiceRollAttack.js';
+import { addEntry } from '../../services/ui/logService.js';
 
 describe('createLogAndShow (useLoggedDiceRollAttack)', () => {
     const deps = {
@@ -408,6 +413,54 @@ describe('createLogAndShow (useLoggedDiceRollAttack)', () => {
             expect(isUnbreakableMajestyActive).toHaveBeenCalledWith('Mage', 'test-campaign');
             expect(markAttackerTriggeredMajesty).toHaveBeenCalledWith('Mage', 'TestFighter', 'test-campaign');
             expect(dispatchUnbreakableMajestySave).toHaveBeenCalled();
+        });
+    });
+
+    describe('indomitable might', () => {
+        beforeEach(() => {
+            addEntry.mockClear();
+        });
+
+        it('logs Indomitable Might when strCheckReplace applies on ability check', async () => {
+            getTargetFromAttacker.mockReturnValue(null);
+            rollD20.mockReturnValueOnce(3).mockReturnValueOnce(8);
+            const fn = createFn();
+            await fn('Athletics', 1, 'check', { strCheckReplace: true, strScore: 18 });
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestFighter',
+                abilityName: 'Indomitable Might',
+                description: expect.stringContaining('Indomitable Might'),
+            }));
+        });
+
+        it('logs Indomitable Might when strSaveReplace applies on saving throw', async () => {
+            getTargetFromAttacker.mockReturnValue(null);
+            rollD20.mockReturnValueOnce(2).mockReturnValueOnce(5);
+            const fn = createFn();
+            await fn('Constitution', 2, 'save', { strSaveReplace: true, strScore: 16 });
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestFighter',
+                abilityName: 'Indomitable Might',
+                description: expect.stringContaining('Indomitable Might'),
+            }));
+        });
+
+        it('does not log Indomitable Might when total is higher than strScore', async () => {
+            getTargetFromAttacker.mockReturnValue(null);
+            rollD20.mockReturnValueOnce(18).mockReturnValueOnce(20);
+            const fn = createFn();
+            await fn('Athletics', 5, 'check', { strCheckReplace: true, strScore: 14 });
+            expect(addEntry).not.toHaveBeenCalled();
+        });
+
+        it('does not log Indomitable Might when strCheckReplace is not set', async () => {
+            getTargetFromAttacker.mockReturnValue(null);
+            rollD20.mockReturnValueOnce(3).mockReturnValueOnce(8);
+            const fn = createFn();
+            await fn('Athletics', 1, 'check', {});
+            expect(addEntry).not.toHaveBeenCalled();
         });
     });
 });

@@ -449,6 +449,19 @@ export function createLogAndShow(deps) {
             }).catch((e) => { console.error('[Lucky] Log error:', e); });
         }
 
+        // Log Indomitable Might to campaign log
+        const strReplaceApplied = (context?.strSaveReplace && rollType === 'save') || (context?.strCheckReplace && (rollType === 'check' || rollType === 'skill'));
+        const originalTotal = effectiveD20Roll + bonus + cosmicOmenAppliedBonus + sunderingBlowBonus;
+        if (strReplaceApplied && originalTotal < (context?.strScore || 10)) {
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName,
+                abilityName: 'Indomitable Might',
+                description: `${characterName} used Indomitable Might on ${name} ${rollType}: d20 ${effectiveD20Roll} + ${bonus} = ${originalTotal} → replaced by Strength ${context?.strScore}`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[Indomitable Might] Log error:', e); });
+        }
+
         logEntry({
             type: 'roll',
             characterName,

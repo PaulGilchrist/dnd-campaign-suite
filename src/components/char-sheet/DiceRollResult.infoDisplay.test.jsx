@@ -130,6 +130,36 @@ describe('DiceRollResult', () => {
             );
             expect(screen.getByText(expected)).toBeInTheDocument();
         });
+
+        it('shows Indomitable Might indicator in breakdown when replacement is applied', () => {
+            render(
+                <DiceRollResult
+                    name="Athletics"
+                    type="d20"
+                    rolls={[8]}
+                    bonus={11}
+                    rollType="check"
+                    strCheckReplace={true}
+                    strScore={21}
+                />
+            );
+            expect(screen.getByText(/Indomitable Might/)).toBeInTheDocument();
+        });
+
+        it('does not show Indomitable Might indicator when replacement is not applied', () => {
+            render(
+                <DiceRollResult
+                    name="Athletics"
+                    type="d20"
+                    rolls={[18]}
+                    bonus={5}
+                    rollType="check"
+                    strCheckReplace={true}
+                    strScore={14}
+                />
+            );
+            expect(screen.queryByText(/Indomitable Might/)).not.toBeInTheDocument();
+        });
     });
 
     describe('wis check replace', () => {

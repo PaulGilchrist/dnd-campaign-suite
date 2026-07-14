@@ -53,7 +53,8 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
     const displayRoll = luckyRerolled ? luckyRerollValue : (strokeResult !== null ? 20 : (rerollResult !== null ? rerollResult.roll : (bardicInspirationResult !== null ? bardicInspirationResult.d20Roll : finalRoll)));
     const displayTotal = luckyRerolled ? (luckyRerollValue + bonus + modifier) : (strokeResult !== null ? 20 + bonus + modifier : (rerollResult !== null ? rerollResult.total : (bardicInspirationResult !== null ? bardicInspirationResult.total : originalTotal)));
     const appliesReplace = (strSaveReplace && rollType === 'save') || (strCheckReplace && (rollType === 'check' || rollType === 'skill'));
-    const finalDisplayTotal = appliesReplace && displayTotal < (strScore || 10) ? strScore : displayTotal;
+    const strReplaceApplied = appliesReplace && displayTotal < (strScore || 10);
+    const finalDisplayTotal = strReplaceApplied ? strScore : displayTotal;
     const wisBonus = wisCheckReplace ? (wisCheckMinBonus || 1) : bonus;
     const wisDisplayTotal = wisCheckReplace && (rollType === 'check' || rollType === 'skill') ? finalRoll + wisBonus + modifier : displayTotal;
     const reliableTalentTotal = reliableTalent && (rollType === 'check' || rollType === 'skill') && displayRoll <= 9 ? 10 + bonus + modifier : null;
@@ -176,13 +177,15 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
                       </span>
                     )}
                     {strokeResult !== null ? (
-                      ` +${20 + bonus + modifier - 20}`
+                       ` +${20 + bonus + modifier - 20}`
                     ) : rerollResult !== null ? (
-                      ` +${rerollResult.total - rerollResult.roll}`
+                       ` +${rerollResult.total - rerollResult.roll}`
                     ) : bardicInspirationResult !== null ? (
-                      ` +${bardicInspirationResult.total - bardicInspirationResult.d20Roll}`
+                       ` +${bardicInspirationResult.total - bardicInspirationResult.d20Roll}`
+                    ) : strReplaceApplied ? (
+                       ` → ${strScore} (Indomitable Might)`
                     ) : isCritDamage ? ` +${modifier}${bonusDetail && bonus > 0 ? ' ' + bonusDetail : ''}` : (bonus + modifier) >= 0 && (bonus + modifier) !== 0 ? ` +${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` :
-                     (bonus + modifier) < 0 ? ` ${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` : ''}
+                      (bonus + modifier) < 0 ? ` ${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` : ''}
                 </div>
             )}
 
