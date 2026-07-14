@@ -26,7 +26,6 @@ vi.mock('../../common/targetResolver.js', () => ({
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
-    getTargetFromAttacker: vi.fn(),
 }));
 
 vi.mock('../../../combat/automation/automationService.js', () => ({
@@ -37,10 +36,15 @@ vi.mock('../../../combat/baseCombatActions.js', () => ({
     MELEE_REACH_FEET: 5,
 }));
 
+vi.mock('../../common/damageRollback.js', () => ({
+    findLastAttack: vi.fn(),
+}));
+
 const { getRuntimeValue, setRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js');
 const { addEntry } = await import('../../../ui/logService.js');
 const { resolveTarget } = await import('../../common/targetResolver.js');
-const { getCombatContext, getTargetFromAttacker } = await import('../../../rules/combat/damageUtils.js');
+const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+const { findLastAttack } = await import('../../common/damageRollback.js');
 const { createSaveListener } = await import('../../common/savePrompt.js');
 
 beforeEach(() => {
@@ -93,7 +97,7 @@ describe('reactionDamageHandler', () => {
             });
             const allEquipment1 = [{ name: 'Quarterstaff', properties: [] }];
             getCombatContext.mockResolvedValue({});
-            getTargetFromAttacker.mockReturnValue({ name: 'Enemy' });
+            findLastAttack.mockResolvedValue({ attackerName: 'Enemy' });
             let result = await handle(action, ps1, 'test-campaign', null, allEquipment1);
             expect(result.payload.attack.name).toBe('Shortsword');
 
@@ -124,7 +128,7 @@ describe('reactionDamageHandler', () => {
 
             let action = makeAction({ automation: { trigger: 'other_trigger' } });
             getCombatContext.mockResolvedValue({});
-            getTargetFromAttacker.mockReturnValue({ name: 'Enemy' });
+            findLastAttack.mockResolvedValue({ attackerName: 'Enemy' });
             let result = await handle(action, ps, 'test-campaign', null, []);
             expect(result.payload.attack.name).toBe('Longsword');
 
@@ -176,8 +180,7 @@ describe('reactionDamageHandler', () => {
             });
             const action = makeAction();
 
-            getCombatContext.mockResolvedValue({});
-            getTargetFromAttacker.mockReturnValue({ name: 'Enemy' });
+            findLastAttack.mockResolvedValue({ attackerName: 'Enemy' });
 
             let result = await handle(action, ps, 'test-campaign', null);
             expect(result.payload.attack.name).toBe('Shortsword');
@@ -220,11 +223,11 @@ describe('reactionDamageHandler', () => {
 
             // Missing combat context
             ps = makePlayerStats({ attacks: [{ name: 'Shortsword', type: 'Action', range: 5, damage: '1d6+3' }] });
-            getCombatContext.mockResolvedValue(null);
+            findLastAttack.mockResolvedValue({ attackerName: null });
             result = await handle(action, ps, 'test-campaign', null);
             expect(result.payload.targetName).toBeNull();
 
-            getTargetFromAttacker.mockReturnValue(null);
+            findLastAttack.mockResolvedValue({ attackerName: 'Enemy' });
             result = await handle(action, ps, 'test-campaign', null);
             expect(result.type).toBe('attack_roll');
         });
@@ -238,8 +241,7 @@ describe('reactionDamageHandler', () => {
             });
             const action = makeAction();
 
-            getCombatContext.mockResolvedValue({});
-            getTargetFromAttacker.mockReturnValue({ name: 'Enemy' });
+            findLastAttack.mockResolvedValue({ attackerName: 'Enemy' });
 
             const result = await handle(action, ps, 'test-campaign', null);
             expect(result.payload.attack.name).toBe('Shortsword');

@@ -3,7 +3,7 @@ import { rollExpression } from '../../../dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { resolveTarget } from '../../common/targetResolver.js';
-import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
+import { findLastAttack } from '../../common/damageRollback.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { MELEE_REACH_FEET } from '../../../combat/baseCombatActions.js';
 
@@ -102,9 +102,8 @@ export async function handle(action, playerStats, campaignName, mapName, allEqui
     }
 
     if (!auto.saveType) {
-        const cs = await getCombatContext(campaignName);
-        const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
-        const targetName = target?.name || null;
+        const lastAttackResult = await findLastAttack(campaignName);
+        const targetName = lastAttackResult.attackerName || null;
 
         const meleeAttacks = (playerStats.attacks || []).filter(
             a => a.type === 'Action' && a.range === MELEE_REACH_FEET

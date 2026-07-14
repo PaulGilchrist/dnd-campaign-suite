@@ -12,7 +12,8 @@ function AttackResultPopup({ popupHtml, onClose, campaignName, attackerName, set
         detail: { autoDamage: popupHtml.autoDamage, isCrit: popupHtml.isCrit, hit: popupHtml.hit },
       }));
     }
-  }, [popupHtml]);
+    if (onClose) onClose();
+  }, [popupHtml, onClose]);
 
   const handleBardicInspirationDefense = useCallback(async (dieValue, dieSize, newAc, willMiss) => {
     if (!popupHtml) return;

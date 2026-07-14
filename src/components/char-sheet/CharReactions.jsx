@@ -20,6 +20,7 @@ import { addEntry } from '../../services/ui/logService.js'
 import { addExpiration } from '../../services/rules/effects/expirations.js'
 import { applyWarCasterReaction } from '../../services/automation/handlers/reactions/reactionSpellHandler.js'
 import { applyInspiringMovement } from '../../services/automation/handlers/reactions/reactionBonusHandler.js'
+import { normalizeAutoDamage, resolveAttackDamageStandalone } from './useAttackDamageResolution.js'
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js'
 import { useSpellUpcastFlow } from '../../hooks/combat/useSpellUpcastFlow.js'
 import { useSpellPositionResolver } from '../../hooks/combat/useSpellPositionResolver.js';
@@ -30,7 +31,10 @@ import './CharActions.css'
 
 function CharReactions({ playerStats, campaignName, cannotAct, mapName, characters }) {
     const { setPopupHtml } = useDiceRollPopup();
-    const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, { characters });
+    const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, { characters, autoDamageSource: 'char-reactions', autoDamageRoll: async (autoDamage, isCrit) => {
+            const { attack, ctx: ctxOverrides } = normalizeAutoDamage(autoDamage, isCrit, playerStats);
+            await resolveAttackDamageStandalone(attack, ctxOverrides, { playerStats, campaignName, setPopupHtml, rollDamage, setModalState: () => {} });
+        } });
     const [selectedSpell, setSelectedSpell] = React.useState(null);
     const [reactiveSpellEligible, setReactiveSpellEligible] = React.useState(null);
     const [reactiveSpellWarnings, setReactiveSpellWarnings] = React.useState(false);
@@ -162,7 +166,10 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
 
         if (result.type === 'attack_roll') {
             const { attack, targetName } = result.payload;
-            rollAttack(attack.name, attack.hitBonus, { targetName, forcedMode: undefined, isOpportunityAttack: true });
+            const autoDamageFormula = attack.damage || null;
+            const autoDamageName = attack.name;
+            const damageType = attack.damageType || 'Slashing';
+            rollAttack(attack.name, attack.hitBonus, { targetName, forcedMode: undefined, isOpportunityAttack: true, autoDamageFormula, autoDamageName, damageType });
             return;
         }
 
