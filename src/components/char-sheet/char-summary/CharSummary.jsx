@@ -189,6 +189,11 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         ? activeBuffs.filter(b => b.name === 'Rage').flatMap(b => b.resistanceTypes || [])
         : [];
 
+    const wildHeartResistances = Array.isArray(activeBuffs)
+        ? activeBuffs.filter(b => b.name === 'Rage of the Wilds' && b.resistanceTypes?.length)
+            .flatMap(b => b.resistanceTypes || [])
+        : [];
+
     const rageActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Rage');
     const rageConditionalImmunities = rageActive
         ? (playerStats.automationConditionalImmunities || [])
@@ -198,7 +203,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
 
     const allImmunities = [...new Set([...baseImmunities, ...auraImmunities, ...rageConditionalImmunities])];
 
-    const allResistances = [...new Set([...baseResistances, ...auraResistances, ...stormbornResistancesActive, ...rageResistances])];
+    const allResistances = [...new Set([...baseResistances, ...auraResistances, ...stormbornResistancesActive, ...rageResistances, ...wildHeartResistances])];
 
     let flySpeed = null;
     let swimSpeed = null;

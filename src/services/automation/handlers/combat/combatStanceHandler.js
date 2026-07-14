@@ -1,6 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { grantTempHpOnRage } from '../buffs/tempHpBuffHandler.js';
 import { clearExtendedFlag } from '../class-warlock/tempTeleportHandler.js';
+import { addEntry } from '../../../ui/logService.js';
 
 function resolveResistanceTypes(resistanceTypes) {
     return resistanceTypes.flatMap(rt => {
@@ -29,7 +30,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
     const activeBuffs = Array.isArray(stored) ? stored : [];
     const wasActive = activeBuffs.some(b => b.name === action.name);
 
-    if (wasActive) {
+    if (wasActive && action.name !== 'Rage of the Wilds') {
         if (auto.effect === 'create_illusion' && playerStats.automation?.passives?.some(p => p.effect === 'enhanced_distraction_and_healing')) {
             return {
                 type: 'modal',
@@ -51,6 +52,14 @@ export async function handle(action, playerStats, campaignName, mapName) {
                 description: `${action.name} ended`,
                 automation: auto,
             },
+        };
+    }
+
+    if (action.name === 'Rage of the Wilds') {
+        return {
+            type: 'modal',
+            modalName: 'combatStance',
+            payload: { action, playerStats, campaignName },
         };
     }
 
@@ -91,7 +100,25 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
     const maxUses = auto.uses || 0;
     let currentUses = 0;
 
-    if (maxUses > 0) {
+    const isWildHeart = action.name === 'Rage of the Wilds';
+
+    if (isWildHeart) {
+        const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
+        const activeBuffs = Array.isArray(stored) ? stored : [];
+        const hasRageActive = activeBuffs.some(b => b.name === 'Rage');
+        if (!hasRageActive) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    automationType: auto.type,
+                    description: 'Rage of the Wilds requires Rage to be active.',
+                    automation: auto,
+                },
+            };
+        }
+    } else if (maxUses > 0) {
         const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
         currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? maxUses);
         if (currentUses <= 0) {
@@ -205,6 +232,15 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
     const activeBuffs = Array.isArray(stored) ? stored : [];
     const newBuffs = [...activeBuffs, buff];
     setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
+
+    if (isWildHeart && chosenOption) {
+        addEntry(campaignName, {
+            type: 'automation',
+            automationType: 'Rage of the Wilds',
+            creatureName: playerName,
+            description: `Selected ${chosenOption.name} wild form`,
+        }).catch(() => {});
+    }
 
     if (action.name === 'Rage') {
         const currentConditions = getRuntimeValue(playerName, 'activeConditions', campaignName) || [];

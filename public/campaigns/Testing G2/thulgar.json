@@ -50,7 +50,7 @@
   "class": {
     "name": "Barbarian",
     "subclass": {
-      "name": "Path of the Berserker",
+      "name": "Path of the Wild Heart",
       "type": ""
     },
     "divineOrder": "",
@@ -105,6 +105,5 @@
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
-  "originalFileName": "Thulgar.json",
   "imagePath": "images/Thulgar.png"
 }

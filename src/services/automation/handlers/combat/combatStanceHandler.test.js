@@ -997,3 +997,121 @@ describe('applyStanceOption - buff creation', () => {
         );
     });
 });
+
+// ─── Rage of the Wilds - special handling ───
+
+describe('combatStanceHandler - Rage of the Wilds', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('returns modal for Rage of the Wilds (options shown even if rage not active)', async () => {
+        setupRuntimeMocks({
+            'TestBarbarian:activeBuffs:TestCampaign': [],
+        });
+
+        const options = [
+            { name: 'Bear', resistanceTypes: ['all_except_force_necrotic_psychic_radiant'] },
+            { name: 'Eagle' },
+            { name: 'Wolf' },
+        ];
+        const action = { name: 'Rage of the Wilds', automation: { type: 'combat_stance', effect: 'animal_rage_option', options } };
+        const result = await handle(action, makePlayerStats(), campaignName);
+
+        expect(result.type).toBe('modal');
+        expect(result.modalName).toBe('combatStance');
+    });
+
+    it('returns error popup when rage is not active via applyStanceOption', async () => {
+        setupRuntimeMocks({
+            'TestBarbarian:activeBuffs:TestCampaign': [],
+        });
+
+        const options = [
+            { name: 'Bear', resistanceTypes: ['all_except_force_necrotic_psychic_radiant'] },
+            { name: 'Wolf' },
+        ];
+        const action = { name: 'Rage of the Wilds', automation: { type: 'combat_stance', effect: 'animal_rage_option', options } };
+        const result = await applyStanceOption(action, makePlayerStats(), campaignName, 'Bear');
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.description).toBe('Rage of the Wilds requires Rage to be active.');
+    });
+
+    it('does not deduct rage points when rage is active', async () => {
+        setupRuntimeMocks({
+            'TestBarbarian:activeBuffs:TestCampaign': [{ name: 'Rage', effect: 'stance' }],
+            'TestBarbarian:ragePoints:TestCampaign': 4,
+        });
+
+        const options = [
+            { name: 'Bear', resistanceTypes: ['all_except_force_necrotic_psychic_radiant'] },
+            { name: 'Wolf' },
+        ];
+        const action = { name: 'Rage of the Wilds', automation: { type: 'combat_stance', effect: 'animal_rage_option', options } };
+        const result = await handle(action, makePlayerStats(), campaignName);
+
+        expect(result.type).toBe('modal');
+        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+            'TestBarbarian',
+            'ragePoints',
+            expect.any(Number),
+            campaignName,
+        );
+    });
+
+    it('creates buff without deducting rage points when rage is active', async () => {
+        setupRuntimeMocks({
+            'TestBarbarian:activeBuffs:TestCampaign': [{ name: 'Rage', effect: 'stance' }],
+            'TestBarbarian:ragePoints:TestCampaign': 4,
+        });
+
+        const options = [{ name: 'Bear', resistanceTypes: ['all_except_force_necrotic_psychic_radiant'] }];
+        const action = { name: 'Rage of the Wilds', automation: { type: 'combat_stance', effect: 'animal_rage_option', options } };
+        const result = await applyStanceOption(action, makePlayerStats(), campaignName, 'Bear');
+
+        expect(result.type).toBe('popup');
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+            'TestBarbarian',
+            'activeBuffs',
+            expect.arrayContaining([
+                expect.objectContaining({
+                    name: 'Rage of the Wilds',
+                    optionName: 'Bear',
+                }),
+            ]),
+            campaignName,
+        );
+        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+            'TestBarbarian',
+            'ragePoints',
+            expect.any(Number),
+            campaignName,
+        );
+    });
+
+    it('logs wild selection to campaign log', async () => {
+        vi.mock('../../../ui/logService.js', () => ({
+            addEntry: vi.fn(() => Promise.resolve()),
+        }));
+
+        const { addEntry } = await import('../../../ui/logService.js');
+
+        setupRuntimeMocks({
+            'TestBarbarian:activeBuffs:TestCampaign': [{ name: 'Rage', effect: 'stance' }],
+            'TestBarbarian:ragePoints:TestCampaign': 4,
+        });
+
+        const options = [{ name: 'Wolf', effect: 'ally_advantage_on_nearby_enemies', range: '5 ft' }];
+        const action = { name: 'Rage of the Wilds', automation: { type: 'combat_stance', effect: 'animal_rage_option', options } };
+        await applyStanceOption(action, makePlayerStats(), campaignName, 'Wolf');
+
+        expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            type: 'automation',
+            automationType: 'Rage of the Wilds',
+            creatureName: 'TestBarbarian',
+            description: 'Selected Wolf wild form',
+        }));
+    });
+});

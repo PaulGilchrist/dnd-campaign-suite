@@ -502,6 +502,26 @@ describe('CharSummary - Aura Sources', () => {
         expect(screen.getByText('fire')).toBeInTheDocument();
         expect(screen.getByText(/cold/)).toBeInTheDocument();
     });
+
+    it('shows Rage of the Wilds Bear resistances', () => {
+        getActiveBuffs.mockReturnValue([
+            { name: 'Rage of the Wilds', optionName: 'Bear', resistanceTypes: ['acid', 'bludgeoning', 'cold', 'fire', 'lightning', 'piercing', 'poison', 'slashing', 'thunder'] }
+        ]);
+        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        expect(screen.getByText(/acid/)).toBeInTheDocument();
+        expect(screen.getByText(/bludgeoning/)).toBeInTheDocument();
+        expect(screen.getByText(/lightning/)).toBeInTheDocument();
+    });
+
+    it('merges Rage of the Wilds resistances with base resistances', () => {
+        const stats = { ...mockPlayerStats, resistances: ['fire'] };
+        getActiveBuffs.mockReturnValue([
+            { name: 'Rage of the Wilds', optionName: 'Bear', resistanceTypes: ['cold', 'poison'] }
+        ]);
+        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        expect(screen.getByText(/cold/)).toBeInTheDocument();
+        expect(screen.getByText(/poison/)).toBeInTheDocument();
+    });
 });
 
 // ---------------------------------------------------------------------------

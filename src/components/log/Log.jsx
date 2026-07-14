@@ -576,6 +576,22 @@ function RestEntry({ entry }) {
   );
 }
 
+function AutomationEntry({ entry }) {
+  return (
+    <div className="log-entry log-automation">
+      <div className="log-entry-header">
+        <span className="log-icon"><i className="fas fa-wand-sparkles"></i></span>
+        <span className="log-character">{entry.creatureName || entry.characterName || 'Automation'}</span>
+        <span className="log-name">{entry.automationType || 'Automation'}</span>
+        <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
+      </div>
+      <div className="log-automation-details">
+        {entry.description && <span>{entry.description}</span>}
+      </div>
+    </div>
+  );
+}
+
 export default function Log({ campaignName, characters }) {
   const { logEntries, initialized, addEntry } = useLog(campaignName);
   const [noteText, setNoteText] = useState('');
@@ -650,6 +666,7 @@ export default function Log({ campaignName, characters }) {
             {entry.type === 'ability_use' && <AbilityUseEntry entry={entry}/>}
             {entry.type === 'short_rest' && <RestEntry entry={entry}/>}
             {entry.type === 'long_rest' && <RestEntry entry={entry}/>}
+            {entry.type === 'automation' && <AutomationEntry entry={entry}/>}
           </div>
         ))}
       </div>

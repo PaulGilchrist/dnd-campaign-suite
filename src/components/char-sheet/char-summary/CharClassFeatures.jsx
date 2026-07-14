@@ -39,6 +39,8 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName
     const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
     const rageActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Rage');
     const recklessAttackActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'advantage_attacks_advantage_against');
+    const wildHeartBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.name === 'Rage of the Wilds') : null;
+    const wildHeartOption = wildHeartBuff?.optionName || null;
 
     const handleAspectChoice = (option) => {
         setRuntimeValue(playerStats.name, 'aspectOfTheWildsOption', option, campaignName);
@@ -70,6 +72,7 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName
                    {rageActive && <span className="automation-badge">BPS Resist, STR Adv, +{rageDamage} dmg</span>}
                </div>
                {recklessAttackActive && <span className="automation-badge">Reckless Attack — attacks against you have Advantage</span>}
+               {wildHeartOption && <span className="automation-badge">Rage of the Wilds: {wildHeartOption}</span>}
                <div><b>Weapon Mastery: </b><span className="clickable" onClick={onWeaponMasteryClick}>{weaponMastery}</span></div>
          </div>
     );
