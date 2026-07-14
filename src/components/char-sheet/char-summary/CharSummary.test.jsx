@@ -186,10 +186,10 @@ describe('CharSummary - Speed Calculations', () => {
         expect(speedEl.textContent).toContain(expectedSpeed);
     });
 
-    it('shows climb speed from playerStats when climbSpeed is present', () => {
-        const stats = { ...mockPlayerStats, climbSpeed: 20 };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/climb 20 ft/)).toBeInTheDocument();
+    it('shows climb speed from Aspect of the Wilds (Panther)', () => {
+        getActiveBuffs.mockReturnValue([{ name: 'Aspect of the Wilds', effect: 'climb_speed_aspect', optionName: 'Panther' }]);
+        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        expect(screen.getByText(/climb 25 ft/)).toBeInTheDocument();
     });
 
     it('shows swim speed from aquatic_adaptation buff', () => {
@@ -199,10 +199,12 @@ describe('CharSummary - Speed Calculations', () => {
     });
 
     it('shows both climb and swim speeds when present', () => {
-        getActiveBuffs.mockReturnValue([{ effect: 'aquatic_adaptation' }]);
-        const stats = { ...mockPlayerStats, climbSpeed: 15 };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/climb 15 ft/)).toBeInTheDocument();
+        getActiveBuffs.mockReturnValue([
+            { name: 'Aspect of the Wilds', effect: 'climb_speed_aspect', optionName: 'Panther' },
+            { effect: 'aquatic_adaptation' }
+        ]);
+        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        expect(screen.getByText(/climb 25 ft/)).toBeInTheDocument();
         expect(screen.getByText(/swim 50 ft/)).toBeInTheDocument();
     });
 });

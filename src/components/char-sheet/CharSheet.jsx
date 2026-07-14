@@ -118,7 +118,6 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
 
             // Apply Aspect of the Wilds passive effects
             const aspectOption = getRuntimeValue(playerSummary.name, 'aspectOfTheWildsOption');
-            console.error('[AspectOfTheWilds] CharSheet computePlayerStats: playerSummary.name:', playerSummary.name, 'aspectOption:', aspectOption, 'stats.rules:', stats.rules);
             if (aspectOption && stats.rules === '2024') {
                 if (aspectOption === 'Owl') {
                     const existingDv = stats.senses?.find(s => s.name === 'Darkvision');

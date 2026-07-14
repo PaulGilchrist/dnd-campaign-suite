@@ -137,9 +137,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
         }
         setRuntimeValue(playerStats.name, 'activeBuffs', currentBuffs, campaignName);
         setRuntimeValue(playerStats.name, 'aspectOfTheWildsOption', choice, campaignName);
-        console.error('[AspectOfTheWilds] setRuntimeValue aspectOfTheWildsOption =', choice, 'playerStats.name:', playerStats.name, 'campaignName:', campaignName);
         setRuntimeValue(playerStats.name, 'aspectOfTheWildsUsedThisRest', true, campaignName);
-        console.error('[AspectOfTheWilds] setRuntimeValue aspectOfTheWildsUsedThisRest = true');
         setAspectOfTheWildsModal(null);
         addEntry(campaignName, {
             type: 'ability_use',
@@ -192,7 +190,6 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
         }
         if (auto?.type === 'animal_aspect') {
             const alreadyUsed = getRuntimeValue(playerStats.name, 'aspectOfTheWildsUsedThisRest', campaignName);
-            console.error('[AspectOfTheWilds] handleAutomationClick: type=animal_aspect, playerStats.name:', playerStats.name, 'campaignName:', campaignName, 'alreadyUsed:', alreadyUsed);
             if (alreadyUsed) {
                 const html = `<b>Aspect of the Wilds</b><br/>Already chosen this rest. It can be changed after a Long Rest.<br/><span class="dice-roll-hint">click to dismiss</span>`;
                 setPopupHtml(html);

@@ -225,7 +225,6 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const huntersMarkActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === "Hunter's Mark");
     const aspectBuff = Array.isArray(activeBuffs) ? (activeBuffs.find(b => b.name === 'Aspect of the Wilds') || null) : null;
     const aspectOption = aspectBuff?.optionName || null;
-    console.error('[AspectOfTheWilds] CharSummary: aspectBuff:', JSON.stringify(aspectBuff), 'aspectOption:', aspectOption, 'playerStats.race?.speed:', playerStats.race?.speed);
     activeBuffs.forEach(buff => {
         if (buff.effect === 'fly_speed_equals_walk_speed' || buff.flySpeed) flySpeed = speed;
         if (buff.effect === 'fly_speed_20_hover') flySpeed = 20;

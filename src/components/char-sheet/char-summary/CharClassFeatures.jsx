@@ -34,7 +34,6 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName
         p => p.type === 'animal_aspect'
     );
     const aspectChoice = useRuntimeValue(playerStats.name, 'aspectOfTheWildsOption', campaignName);
-    console.error('[AspectOfTheWilds] CharClassFeatures render: playerStats.name:', playerStats.name, 'campaignName:', campaignName, 'aspectChoice:', aspectChoice, 'hasAspectOfTheWilds:', hasAspectOfTheWilds, 'specialActions:', JSON.stringify(playerStats.automation?.specialActions?.map(a => a.type)));
 
     const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
     const rageActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Rage');

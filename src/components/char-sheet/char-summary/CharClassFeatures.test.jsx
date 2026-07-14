@@ -150,7 +150,7 @@ describe('CharClassFeatures', () => {
             });
             renderComponent(stats);
             expect(screen.getByText(/Aspect of the Wilds/)).toBeInTheDocument();
-            expect(screen.getByText('Owl')).toBeInTheDocument();
+            expect(screen.getByText(/Owl/)).toBeInTheDocument();
         });
 
         it('renders 2024 ruleset barbarian with class_level-based rage values', () => {

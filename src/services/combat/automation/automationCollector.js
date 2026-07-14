@@ -314,9 +314,6 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 continue
             }
             const info = buildAttackInfo({ ...feature, automation: auto }, playerStats)
-            if (auto?.type === 'animal_aspect') {
-                console.error('[AspectOfTheWilds] collector: feature.name:', feature.name, 'auto.type:', auto.type, 'buildAttackInfo returned:', info ? info.type : 'null');
-            }
             if (!info) continue
 
             switch (info.type) {
