@@ -18,7 +18,7 @@ function getAvailableSpellSlotLevel(playerStats) {
 }
 
 export async function handle(action, playerStats, campaignName, _mapName) {
-    const auto = action.automation;
+    const auto = action?.automation || {};
 
     if (auto?.effect === 'moonlight_step_teleport') {
         const usesKey = 'moonlightStepUses';
@@ -59,7 +59,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 }
 
 export async function confirmTeleport(action, playerStats, campaignName, useExtended, consumedSlotLevel) {
-    const auto = action.automation;
+    const auto = action?.automation || {};
     const playerName = playerStats.name;
 
     if (consumedSlotLevel) {

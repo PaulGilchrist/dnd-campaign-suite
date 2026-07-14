@@ -3,7 +3,7 @@ import { confirmTeleport, isExtendedAvailable } from '../../../services/automati
 import '../CharSheet.css';
 
 function TeleportModal({ action, playerStats, campaignName, onClose, triggeredByElementalStride, isMoonlightStep }) {
-    const auto = action.automation;
+    const auto = action?.automation || {};
     const isSwap = auto?.effect === 'teleport_swap_with_illusion';
     const extendedAvailable = isExtendedAvailable(playerStats.name, campaignName);
     const [useExtended, setUseExtended] = useState(false);
