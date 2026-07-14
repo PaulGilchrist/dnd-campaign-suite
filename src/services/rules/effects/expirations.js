@@ -153,6 +153,14 @@ export async function applyTurnStartEffects(activeName, playerStats, campaignNam
         }
     }
 
+    // Clear Reckless Attack offered flag at start of each creature's turn
+    if (activeName) {
+        const recklessOffered = getRuntimeValue(activeName, '_recklessAttack_offeredThisTurn', campaignName);
+        if (recklessOffered) {
+            setRuntimeValue(activeName, '_recklessAttack_offeredThisTurn', null, campaignName);
+        }
+    }
+
     // Clean up Topple weapon mastery Prone condition at start of target's next turn
     const allTargetEffectsTopple = getRuntimeValue(campaignName, 'targetEffects') || [];
     if (allTargetEffectsTopple.length > 0) {
