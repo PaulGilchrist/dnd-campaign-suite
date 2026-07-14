@@ -173,6 +173,12 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
                     brutalStrikeFormulaPart = `${brutalStrikeRider.damageExpression} [Brutal Strike]`;
                 }
 
+                // Read pre-existing next_attack_bonus effects before adding new ones
+                const preExistingEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                const preExistingBonusKeys = preExistingEffects.filter(
+                    te => te.effect === 'next_attack_bonus' && te.target === targetName
+                ).map(te => JSON.stringify(te));
+
                 // Apply chosen effects to targetEffects
                 const effectChoices = getRuntimeValue(playerName, '_brutalStrikeEffects', campaignName) || [];
                 if (effectChoices.length > 0) {
@@ -195,6 +201,17 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
                         }
                     }
                     setRuntimeValue(campaignName, 'targetEffects', storedEffects, campaignName);
+                }
+
+                // Consume pre-existing next_attack_bonus effects (Sundering Blow consumed on this attack)
+                if (preExistingBonusKeys.length > 0) {
+                    const currentEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                    const cleanedEffects = currentEffects.filter(
+                        te => !(te.effect === 'next_attack_bonus' && te.target === targetName && preExistingBonusKeys.includes(JSON.stringify(te)))
+                    );
+                    if (cleanedEffects.length !== currentEffects.length) {
+                        setRuntimeValue(campaignName, 'targetEffects', cleanedEffects, campaignName);
+                    }
                 }
                 setRuntimeValue(playerName, '_brutalStrikeActive', null, campaignName);
                 setRuntimeValue(playerName, '_brutalStrikeEffects', null, campaignName);

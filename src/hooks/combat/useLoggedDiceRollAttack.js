@@ -142,21 +142,13 @@ export function createLogAndShow(deps) {
 
         // Sundering Blow: add +5 to hit bonus for next attack against the target
         let sunderingBlowBonus = 0;
-        let consumedEffectKeys = [];
         if (target && rollType === 'attack') {
             const allTargetEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
             const targetEffectsForTarget = allTargetEffects.filter(te => te.target === target.name);
             for (const te of targetEffectsForTarget) {
                 if (te.effect === 'next_attack_bonus') {
                     sunderingBlowBonus += parseInt(te.value, 10) || 5;
-                    consumedEffectKeys.push(JSON.stringify(te));
                 }
-            }
-            if (consumedEffectKeys.length > 0) {
-                const remainingEffects = allTargetEffects.filter(
-                    te => !(te.effect === 'next_attack_bonus' && consumedEffectKeys.includes(JSON.stringify(te)))
-                );
-                setRuntimeValue(campaignName, 'targetEffects', remainingEffects, campaignName);
             }
         }
         const effectiveBonus = bonus + cosmicOmenAppliedBonus + sunderingBlowBonus;

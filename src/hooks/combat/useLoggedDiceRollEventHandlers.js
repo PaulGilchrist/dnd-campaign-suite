@@ -215,7 +215,7 @@ export function setupEventListeners(deps) {
                 saveRoll: e.detail.roll,
                 saveBonus: e.detail.saveBonus,
                 saveRawRolls: e.detail.rawRolls,
-                mode: pending.metamagicHeighten ? 'disadvantage' : 'normal',
+                forcedMode: pending.metamagicHeighten ? 'disadvantage' : 'normal',
                 bonusDetail: e.detail.bonusDetail,
                 finalDamage: applyResult?.finalDamage ?? finalDamage,
                 isAoe: pending.isAoe || false,
