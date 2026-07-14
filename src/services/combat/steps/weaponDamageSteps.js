@@ -556,6 +556,9 @@ export function buildDamageSteps() {
               setRuntimeValue(ctx.campaignName, 'targetEffects', storedEffects, ctx.campaignName);
             }
 
+            // Log the brutal strike ability use
+            addEntry(ctx.campaignName, { type: 'ability_use', characterName: ctx.playerStats.name, abilityName: rider.name, description: `${ctx.playerStats.name} used ${rider.name} on ${targetName}`, targetName }).catch(() => {});
+
             // Clear active flags
             setRuntimeValue(ctx.playerStats.name, '_brutalStrikeActive', null, ctx.campaignName);
             setRuntimeValue(ctx.playerStats.name, '_brutalStrikeEffects', null, ctx.campaignName);

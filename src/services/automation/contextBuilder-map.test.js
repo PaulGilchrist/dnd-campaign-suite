@@ -679,7 +679,10 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       getWolfAdvantageAgainst.mockReturnValue({ advantage: false });
       getDuplicityAdvantageAgainst.mockReturnValue({ advantage: false });
       getLionDisadvantageAgainst.mockReturnValue({ disadvantage: false });
-      getRuntimeValue.mockReturnValue([{ effect: 'protection', target: 'Orc', source: 'Paladin' }]);
+      getRuntimeValue.mockImplementation((key, prop) => {
+        if (prop === 'targetEffects') return [{ effect: 'protection', target: 'Orc', source: 'Paladin' }];
+        return undefined;
+      });
 
       const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
 

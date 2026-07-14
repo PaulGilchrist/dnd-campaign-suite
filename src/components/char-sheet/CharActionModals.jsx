@@ -153,6 +153,7 @@ export default function CharActionModals({
     handleCombatSuperiorityConfirm,
     handleAttackRiderManeuverUse,
     handleAttackRiderManeuverSkip,
+    handleAttackRiderOptionSelect,
     handleSweepingAttackConfirm,
     handleBaitAndSwitchChoiceConfirm,
     handleCommanderStrikeChoiceConfirm,
@@ -684,6 +685,41 @@ export default function CharActionModals({
                     onUse={handleAttackRiderManeuverUse}
                     onSkip={handleAttackRiderManeuverSkip}
                 />
+            )}
+            {modalState.attackRiderOptionsModal && (
+                <div className="sp-overlay" onClick={() => setModalState({ attackRiderOptionsModal: null })}>
+                    <div className="sp-modal" onClick={e => e.stopPropagation()}>
+                        <div className="sp-header">
+                            <i className="fa-solid fa-bolt"></i> {modalState.attackRiderOptionsModal.maneuver.name} — Choose Effect
+                        </div>
+                        <div className="sp-body">
+                            <p>Select the effect to apply:</p>
+                            <div style={{ textAlign: 'left', marginTop: '12px' }}>
+                                {modalState.attackRiderOptionsModal.riderOptions.map((opt, i) => (
+                                    <label
+                                        key={i}
+                                        style={{
+                                            display: 'block', padding: '8px 12px', margin: '4px 0',
+                                            borderRadius: '6px', cursor: 'pointer',
+                                            background: 'transparent',
+                                            border: '1px solid var(--color-link)',
+                                        }}
+                                        onClick={() => handleAttackRiderOptionSelect(opt.name, modalState.attackRiderOptionsModal)}
+                                    >
+                                        <strong>{opt.name}</strong>
+                                        {opt.effect === 'disadvantage_on_next_save' && <span style={{ opacity: 0.7, marginLeft: '6px', fontSize: '0.85em' }}>— Target has Disadvantage on next saving throw</span>}
+                                        {opt.effect === 'next_attack_bonus' && <span style={{ opacity: 0.7, marginLeft: '6px', fontSize: '0.85em' }}>— Next attack against target gains +5 bonus</span>}
+                                        {opt.effect === 'push_15ft' && <span style={{ opacity: 0.7, marginLeft: '6px', fontSize: '0.85em' }}>— Push target 15 feet</span>}
+                                        {opt.effect === 'speed_reduction' && <span style={{ opacity: 0.7, marginLeft: '6px', fontSize: '0.85em' }}>— Reduce target's speed by 15 feet</span>}
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="sp-actions">
+                            <button className="sp-dismiss-btn" onClick={() => setModalState({ attackRiderOptionsModal: null })}>Skip</button>
+                        </div>
+                    </div>
+                </div>
             )}
             {modalState.sweepingAttackTargetModal && (
                 <SecondaryTargetModal

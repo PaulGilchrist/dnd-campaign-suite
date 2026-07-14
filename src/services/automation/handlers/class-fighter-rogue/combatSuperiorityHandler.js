@@ -541,6 +541,24 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
         description += ` Target: ${targetName}.`;
     }
 
+    // Handle attack_rider maneuvers with options (Brutal Strike)
+    const riderOptions = maneuver.automation?.options || [];
+    if (riderOptions.length > 0 && maneuver.automation?.type === 'attack_rider') {
+        // Show modal for option selection
+        return {
+            type: 'modal',
+            modalName: 'attackRiderOptions',
+            payload: {
+                maneuver,
+                riderOptions,
+                targetName,
+                playerStats,
+                campaignName,
+                description,
+            },
+        };
+    }
+
     if (maneuver.damageBonus) {
         description += ` Added ${dieValue} to the damage roll.`;
         if (targetName) {

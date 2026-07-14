@@ -99,6 +99,8 @@ router.put('/api/campaigns/:campaign/:file', asyncHandler((req, res, next) => {
     }
 
     // Write the updated character data
+    delete character.originalFileName;
+    delete character._fileName;
     fs.writeFileSync(filePath, JSON.stringify(character, null, 2));
 
     // Clean up stale change-data for renamed character (uses old name from file)
@@ -169,7 +171,6 @@ router.post('/api/campaigns/:campaign', asyncHandler((req, res) => {
     }
 
     // Write the character file
-    character._fileName = fileName;
     fs.writeFileSync(filePath, JSON.stringify(character, null, 2));
 
     // Broadcast character creation

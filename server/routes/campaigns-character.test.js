@@ -729,7 +729,7 @@ describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
             .send({ character: characterData });
 
         expect(res.status).toBe(201);
-        expect(res.body.character).toEqual({ name: 'Thorin', class: 'Fighter', level: 5, _fileName: 'Thorin.json' });
+        expect(res.body.character).toEqual({ name: 'Thorin', class: 'Fighter', level: 5 });
         expect(res.body.fileName).toBe('Thorin.json');
     });
 

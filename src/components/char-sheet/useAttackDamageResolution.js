@@ -3,6 +3,7 @@ import { evaluateAutoExpression } from '../../services/combat/automation/automat
 import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
 import { executeAttackRiderManeuver as executeAttackRiderManeuverService } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { buildPipelineForAction } from '../../services/combat/steps/index.js';
+import { setRuntimeValue, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 /**
  * Standalone resolveAttackDamage for use outside React hooks (e.g., CharSpells, MonsterCardModal).
@@ -285,6 +286,11 @@ export default function useAttackDamageResolution({
                 };
             }
         } else {
+            if (result?.type === 'modal' && result.modalName === 'attackRiderOptions') {
+                setModalState({ attackRiderOptionsModal: result.payload });
+                return { formula: updatedFormula, total: updatedTotal, rolls: updatedRolls, pendingOptions: true };
+            }
+
             if (result?.type === 'popup') {
                 if (maneuver?.damageBonus) {
                     const dieRoll = rollExpression(maneuver.dieExpression || 'superiority_die');
@@ -312,5 +318,48 @@ export default function useAttackDamageResolution({
         setModalState({ attackRiderManeuverPrompt: null });
     };
 
-    return { resolveAttackDamage, proceedWithDamage, handleAttackRiderManeuverUse, handleAttackRiderManeuverSkip };
+    const handleAttackRiderOptionSelect = async (optionName, modalPayload) => {
+        const { maneuver, targetName, description } = modalPayload;
+        setModalState({ attackRiderOptionsModal: null });
+
+        // Set brutal strike flags for damage step processing
+        await setRuntimeValue(playerStats.name, '_brutalStrikeActive', true, campaignName);
+        await setRuntimeValue(playerStats.name, '_brutalStrikeEffects', [optionName], campaignName);
+        await setRuntimeValue(playerStats.name, '_brutalStrikeNoAdvantage', true, campaignName);
+
+        // Apply immediate effects (push, speed reduction, etc.)
+        const option = maneuver.automation.options.find(o => o.name === optionName);
+        let logDescription = description;
+        if (option) {
+            if (option.effect === 'push_15ft' && targetName) {
+                const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                const newEffect = {
+                    target: targetName,
+                    source: playerStats.name,
+                    option: optionName,
+                    effect: 'push',
+                    value: 15,
+                    duration: 'instant',
+                };
+                setRuntimeValue(campaignName, 'targetEffects', [...storedEffects, newEffect], campaignName);
+                logDescription += ` ${targetName} pushed 15 feet.`;
+            } else if (option.effect === 'speed_reduction' && targetName) {
+                const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                const newEffect = {
+                    target: targetName,
+                    source: playerStats.name,
+                    option: optionName,
+                    effect: 'speed_reduction',
+                    value: option.value || '15_ft_until_start_of_next_turn',
+                    duration: 'until_start_of_next_turn',
+                };
+                setRuntimeValue(campaignName, 'targetEffects', [...storedEffects, newEffect], campaignName);
+                logDescription += ` ${targetName}'s speed reduced by 15 feet.`;
+            }
+        }
+
+        setPopupHtml({ type: 'automation_info', name: maneuver.name, description: `${logDescription} Selected: ${optionName}.` });
+    };
+
+    return { resolveAttackDamage, proceedWithDamage, handleAttackRiderManeuverUse, handleAttackRiderManeuverSkip, handleAttackRiderOptionSelect };
 }

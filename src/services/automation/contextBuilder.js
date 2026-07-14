@@ -529,6 +529,15 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                 if (lionResult.disadvantage) {
                     base.forcedMode = 'disadvantage';
                 }
+                if (base.forcedMode === undefined && base.targetName) {
+                    const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                    const protectionEffect = storedEffects.find(
+                        te => te.effect === 'protection' && te.target === base.targetName
+                    );
+                    if (protectionEffect) {
+                        base.forcedMode = 'disadvantage';
+                    }
+                }
                 const coronaResult = getCoronaSaveDisadvantage({
                     targetName: base.targetName,
                     campaignName,
