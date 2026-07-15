@@ -150,7 +150,8 @@
         "lootEntries": [],
         "totalEncounterXp": 0
       },
-      "encounterCompleted": false
+      "encounterCompleted": false,
+      "effectiveXP": 750
     }
   ]
 }

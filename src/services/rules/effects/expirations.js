@@ -577,7 +577,6 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
    export function addExpiration(attackerName, targetName, effects, campaignName, rounds, expireOnCreatureName) {
         let list = getRuntimeValue(attackerName, KEY);
         if (!Array.isArray(list)) {
-            console.warn('expirations: pendingExpirations not initialized for', attackerName, '— initializing empty array');
             list = [];
             setRuntimeValue(attackerName, KEY, list, campaignName);
         }
