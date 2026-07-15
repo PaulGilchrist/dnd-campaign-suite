@@ -57,6 +57,10 @@ export function collectWeaponMastery(weaponName, playerStats) {
     let replaceMasteryOptions = null;
     let hasKindMasteryMatch = false;
     const passives = playerStats.automation?.passives || [];
+    const passivesWithExtraMastery = passives.filter(p => p.extraMastery && Array.isArray(p.extraMastery) && p.extraMastery.length > 0);
+    if (passivesWithExtraMastery.length > 0) {
+        console.error('[collectWeaponMastery] Weapons with extraMastery passives:', weaponName, 'passives:', JSON.stringify(passivesWithExtraMastery.map(p => ({ name: p.name, extraMastery: p.extraMastery }))), 'baseMastery:', baseMastery);
+    }
     for (const passive of passives) {
         if (passive.extraMastery && Array.isArray(passive.extraMastery)) {
             extraMasteries.push(...passive.extraMastery);

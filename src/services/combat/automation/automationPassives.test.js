@@ -229,6 +229,28 @@ describe('collectWeaponMastery', () => {
     expect(result).toEqual({ baseMastery: 'push', extraMasteries: ['topple', 'push'], replaceMasteryOptions: null })
   })
 
+  it('collects extraMastery from Battering Roots-style passive (push and topple)', () => {
+    parseMagicItemName.mockReturnValue({ baseName: 'Greataxe', magicBonus: 0 })
+    getRuntimeValue.mockReturnValue(['Greataxe'])
+    const playerStats = {
+      equipment: [{ name: 'Greataxe', mastery: 'vex' }],
+      automation: {
+        passives: [
+          { type: 'weapon_kind_mastery' },
+          {
+            name: 'Battering Roots',
+            type: 'passive_buff',
+            effect: 'extra_reach',
+            extraMastery: ['Push', 'Topple'],
+          },
+        ],
+      },
+    }
+    const result = collectWeaponMastery('Greataxe', playerStats)
+    expect(result.baseMastery).toBe('vex')
+    expect(result.extraMasteries).toEqual(expect.arrayContaining(['Push', 'Topple']))
+  })
+
   it('adds replaceMastery to replaceMasteryOptions without clearing baseMastery', () => {
     parseMagicItemName.mockReturnValue({ baseName: 'Longsword', magicBonus: 0 })
     getRuntimeValue.mockReturnValue(['Longsword'])
