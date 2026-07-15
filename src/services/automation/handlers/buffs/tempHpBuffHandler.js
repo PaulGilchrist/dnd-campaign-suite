@@ -5,6 +5,7 @@ import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { getCurrentCombatRound } from '../../../encounters/combatData.js';
 
 function getBardicDieSize(playerStats) {
     const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
@@ -37,6 +38,10 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
     if (auto.multiTargetAlly && auto.tempHpExpression) {
         return handleMultiTargetAllyTempHp(action, playerStats, campaignName, mapName);
+    }
+
+    if (auto.ongoingHealingExpression && auto.healingStartOfTurn) {
+        return handleVitalityOfTheTree(action, playerStats, campaignName, mapName);
     }
 
     const tempHpExpression = auto.tempHpExpression || '';
@@ -274,6 +279,111 @@ export function grantTempHpOnRage(action, playerStats, campaignName) {
     setRuntimeValue(playerStats.name, 'tempHp', newTotal, campaignName);
 
     return true;
+}
+
+function rollDiceExpression(expr, playerStats) {
+    if (!expr) return null;
+    const resolved = evaluateAutoExpression(expr, playerStats);
+    if (typeof resolved === 'number') return resolved;
+    if (typeof resolved !== 'string') return null;
+    const match = resolved.match(/^(\d+)d(\d+)$/);
+    if (!match) return null;
+    const [, count, sides] = match;
+    let total = 0;
+    for (let i = 0; i < parseInt(count, 10); i++) {
+        total += rollDie(parseInt(sides, 10));
+    }
+    return total;
+}
+
+export async function handleVitalityOfTheTree(action, playerStats, campaignName, _mapName) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+
+    const currentRound = getCurrentCombatRound(campaignName);
+    const rageActivationRound = getRuntimeValue(playerName, 'vitalityOfTheTreeRageRound', campaignName);
+
+    const roundsElapsed = currentRound - (rageActivationRound ?? currentRound);
+    const maxTargets = Math.max(1, roundsElapsed);
+
+    const tempHpAmount = rollDiceExpression(auto.ongoingHealingExpression, playerStats);
+    if (typeof tempHpAmount !== 'number' || tempHpAmount <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description: `${action.name}: Could not calculate temp HP (${auto.ongoingHealingExpression}).`,
+                automation: auto,
+            },
+        };
+    }
+
+    const combatSummary = await getCombatContext(campaignName);
+    const creatureTargets = combatSummary?.creatures
+        ? combatSummary.creatures.map(c => ({ name: c.name }))
+        : [];
+
+    if (roundsElapsed <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description: `${action.name}: No creatures can be selected yet — this is the same round your Rage activated.`,
+                automation: auto,
+            },
+        };
+    }
+
+    return {
+        type: 'modal',
+        modalName: 'vitalityOfTheTreeTarget',
+        payload: {
+            action,
+            playerStats,
+            campaignName,
+            creatureTargets,
+            tempHp: tempHpAmount,
+            maxTargets,
+        },
+    };
+}
+
+export async function confirmVitalityOfTheTree(action, playerStats, campaignName, selectedTargets, tempHp, maxTargets) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+    const finalTargets = (selectedTargets || []).slice(0, maxTargets || 999);
+
+    for (const targetName of finalTargets) {
+        const existingTempHp = Number(getRuntimeValue(targetName, 'tempHp', campaignName) || 0);
+        const newTotal = Math.max(existingTempHp, tempHp);
+        setRuntimeValue(targetName, 'tempHp', newTotal, campaignName);
+    }
+
+    const targetList = finalTargets.length > 0 ? finalTargets.join(', ') : 'no targets selected';
+    const description = `${action.name}: Granted ${tempHp} temporary hit points to ${targetList}.`;
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: action.name,
+        description: `${playerName} used ${action.name}, granting ${tempHp} temporary hit points to ${targetList}.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[vitalityOfTheTree] Error logging to campaign log:', e); });
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            automationType: auto.type,
+            description,
+            automation: auto,
+        },
+    };
 }
 
 async function handleBolsteringTreats(action, playerStats, campaignName, _mapName) {

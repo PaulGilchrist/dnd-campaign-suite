@@ -53,6 +53,7 @@ import BulwarkOfForceModal from './modals/BulwarkOfForceModal.jsx'
 import CoronaEnemySelectionModal from './modals/CoronaEnemySelectionModal.jsx'
 import RadianceOfDawnModal from './modals/RadianceOfDawnModal.jsx'
 import MantleOfInspirationModal from './modals/MantleOfInspirationModal.jsx'
+import VitalityOfTheTreeModal from './modals/VitalityOfTheTreeModal.jsx'
 import RecklessAttackModal from './modals/shared/RecklessAttackModal.jsx'
 import { handleClearWard, handleSpendDice, handleApply } from '../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js'
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js'
@@ -163,6 +164,7 @@ export default function CharActionModals({
     handleCoronaEnemySelectionConfirm,
     handleRadianceOfDawnConfirm,
     handleMantleOfInspirationConfirm,
+    handleVitalityOfTheTreeConfirm,
     handleTricksterBlessingConfirm,
     handleBardicInspirationConfirm,
     handleInspiringMovementConfirm,
@@ -929,6 +931,15 @@ export default function CharActionModals({
                     maxTargets={modalState.mantleOfInspirationTarget.maxTargets}
                     onConfirm={handleMantleOfInspirationConfirm}
                     onSkip={() => setModalState({ mantleOfInspirationTarget: null })}
+                />
+            )}
+            {modalState.vitalityOfTheTreeTarget && (
+                <VitalityOfTheTreeModal
+                    creatureTargets={modalState.vitalityOfTheTreeTarget.creatureTargets}
+                    tempHp={modalState.vitalityOfTheTreeTarget.tempHp}
+                    maxTargets={modalState.vitalityOfTheTreeTarget.maxTargets}
+                    onConfirm={handleVitalityOfTheTreeConfirm}
+                    onSkip={() => setModalState({ vitalityOfTheTreeTarget: null })}
                 />
             )}
             {modalState.tricksterBlessingModal && (

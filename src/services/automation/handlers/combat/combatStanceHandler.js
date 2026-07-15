@@ -2,6 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { grantTempHpOnRage } from '../buffs/tempHpBuffHandler.js';
 import { clearExtendedFlag } from '../class-warlock/tempTeleportHandler.js';
 import { addEntry } from '../../../ui/logService.js';
+import { getCurrentCombatRound } from '../../../encounters/combatData.js';
 
 function resolveResistanceTypes(resistanceTypes) {
     return resistanceTypes.flatMap(rt => {
@@ -243,6 +244,9 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
     }
 
     if (action.name === 'Rage') {
+        const currentRound = getCurrentCombatRound(campaignName);
+        await setRuntimeValue(playerName, 'vitalityOfTheTreeRageRound', currentRound, campaignName);
+
         const currentConditions = getRuntimeValue(playerName, 'activeConditions', campaignName) || [];
         if (Array.isArray(currentConditions)) {
             const filtered = currentConditions.filter(c => {

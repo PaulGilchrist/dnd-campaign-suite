@@ -34,7 +34,7 @@ import { activateCoronaOfLight } from '../../services/automation/handlers/class-
 import { confirmRadianceOfDawn } from '../../services/automation/handlers/class-cleric-paladin/radianceOfDawnHandler.js';
 import { applyBardicInspiration } from '../../services/automation/handlers/class-bard/bardicInspirationHandler.js';
 import { applyInspiringMovement } from '../../services/automation/handlers/reactions/reactionBonusHandler.js';
-import { confirmMantleOfInspiration } from '../../services/automation/handlers/buffs/tempHpBuffHandler.js';
+import { confirmMantleOfInspiration, confirmVitalityOfTheTree } from '../../services/automation/handlers/buffs/tempHpBuffHandler.js';
 import { confirmOceanicGift } from '../../services/automation/handlers/class-druid/oceanicGiftHandler.js';
 import { endFriendsOnHostileAction } from '../../services/rules/features/friendsService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
@@ -753,6 +753,22 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         setModalState({ mantleOfInspirationTarget: null });
     }, [setPopupHtml, modalState.mantleOfInspirationTarget, setModalState]);
 
+    const handleVitalityOfTheTreeConfirm = React.useCallback(async (selectedTargets) => {
+        if (!selectedTargets || !modalState.vitalityOfTheTreeTarget) return;
+        const result = await confirmVitalityOfTheTree(
+            modalState.vitalityOfTheTreeTarget.action,
+            modalState.vitalityOfTheTreeTarget.playerStats,
+            modalState.vitalityOfTheTreeTarget.campaignName,
+            selectedTargets,
+            modalState.vitalityOfTheTreeTarget.tempHp,
+            modalState.vitalityOfTheTreeTarget.maxTargets
+        );
+        if (result?.payload) {
+            setPopupHtml(result.payload);
+        }
+        setModalState({ vitalityOfTheTreeTarget: null });
+    }, [setPopupHtml, modalState.vitalityOfTheTreeTarget, setModalState]);
+
     const handleTricksterBlessingConfirm = React.useCallback(async (targetName) => {
         if (!modalState.tricksterBlessingModal) return;
         const { action, playerStats, campaignName: evtCampaignName } = modalState.tricksterBlessingModal;
@@ -1038,6 +1054,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'mantleOfInspirationTarget':
                         setModalState({ mantleOfInspirationTarget: result.payload });
                         break;
+                    case 'vitalityOfTheTreeTarget':
+                        setModalState({ vitalityOfTheTreeTarget: result.payload });
+                        break;
                     case 'tricksterBlessing':
                         setModalState({ tricksterBlessingModal: result.payload });
                         break;
@@ -1289,6 +1308,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleCoronaEnemySelectionConfirm={handleCoronaEnemySelectionConfirm}
                     handleRadianceOfDawnConfirm={handleRadianceOfDawnConfirm}
                     handleMantleOfInspirationConfirm={handleMantleOfInspirationConfirm}
+                    handleVitalityOfTheTreeConfirm={handleVitalityOfTheTreeConfirm}
                     handleTricksterBlessingConfirm={handleTricksterBlessingConfirm}
                     handleBardicInspirationConfirm={handleBardicInspirationConfirm}
                     handleInspiringMovementConfirm={handleInspiringMovementConfirm}

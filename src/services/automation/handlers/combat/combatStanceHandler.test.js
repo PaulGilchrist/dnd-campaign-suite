@@ -13,6 +13,8 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('../buffs/tempHpBuffHandler.js', () => ({
     grantTempHpOnRage: vi.fn(),
+    handle: vi.fn(),
+    confirmVitalityOfTheTree: vi.fn(),
 }));
 
 vi.mock('../class-warlock/tempTeleportHandler.js', () => ({

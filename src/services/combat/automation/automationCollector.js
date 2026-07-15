@@ -124,6 +124,14 @@ export function collectTurnStartEffects(features) {
                     range: auto.range || '10_ft',
                 })
             }
+            if (auto?.type === 'temp_hp_buff' && auto?.healingStartOfTurn) {
+                effects.push({
+                    type: 'vitalityOfTheTree_turn_start',
+                    name: feature.name,
+                    ongoingHealingExpression: auto.ongoingHealingExpression || '',
+                    healingRange: auto.healingRange || '10 ft',
+                })
+            }
             if (auto?.type === 'precise_hunter') {
                 effects.push({
                     type: 'precise_hunter',

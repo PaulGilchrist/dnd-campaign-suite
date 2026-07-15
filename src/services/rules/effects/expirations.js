@@ -127,6 +127,9 @@ export async function applyTurnStartEffects(activeName, playerStats, campaignNam
         if (effect.type === 'resistance_clear_turn') {
             setRuntimeValue(activeName, 'resistanceUsedThisTurn', false, campaignName);
         }
+        if (effect.type === 'vitalityOfTheTree_turn_start') {
+            applyVitalityOfTheTreeTurnStart(activeName, playerStats, effect, campaignName);
+        }
     }
 
     // Check for regenerate buff (not tied to turnStartEffects - it's a spell buff)
@@ -478,6 +481,18 @@ async function applySurvivorTurnStartHeal(activeName, playerStats, effect, campa
         abilityName: 'Survivor',
         description: `${activeName} uses Survivor to heal ${healAmount} HP (bloodied)`,
     }).catch(() => {});
+}
+
+async function applyVitalityOfTheTreeTurnStart(activeName, playerStats, effect, campaignName) {
+    const activeBuffs = Array.isArray(getRuntimeValue(activeName, 'activeBuffs', campaignName))
+        ? getRuntimeValue(activeName, 'activeBuffs', campaignName)
+        : [];
+    const rageActive = activeBuffs.some(b => b.name === 'Rage');
+    if (!rageActive) {
+        setRuntimeValue(activeName, 'vitalityOfTheTreeAvailable', false, campaignName);
+        return;
+    }
+    setRuntimeValue(activeName, 'vitalityOfTheTreeAvailable', true, campaignName);
 }
 
 async function applyRegenerateBuffHeal(activeName, playerStats, campaignName) {
