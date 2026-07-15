@@ -588,12 +588,12 @@ describe('buildDamageSteps - twoWeaponFighting, targetEffects, superiorityDieBon
         expect(steps[10].condition(ctx)).toBe(true);
       });
 
-      it('returns false when ctx.isMeleeOrUnarmed is false', () => {
+      it('returns true when isMeleeOrUnarmed is false but automation exists', () => {
         const ctx = makeCtx({
           isMeleeOrUnarmed: false,
           playerStats: { automation: { actions: [] } },
         });
-        expect(steps[10].condition(ctx)).toBe(false);
+        expect(steps[10].condition(ctx)).toBe(true);
       });
 
       it('returns false when automation.actions is missing', () => {

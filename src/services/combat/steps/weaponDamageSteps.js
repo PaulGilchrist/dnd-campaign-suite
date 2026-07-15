@@ -418,7 +418,7 @@ export function buildDamageSteps() {
       name: 'automationBonuses',
       subscribe: 'superiority:applied',
       emit: 'automation:applied',
-      condition: (ctx) => ctx.isMeleeOrUnarmed && (!!ctx.playerStats.automation?.actions || !!ctx.playerStats.automation?.passives),
+      condition: (ctx) => (!!ctx.playerStats.automation?.actions || !!ctx.playerStats.automation?.passives),
       handler: async (ctx) => {
         let formula = ctx.formula;
         let total = ctx.total;
