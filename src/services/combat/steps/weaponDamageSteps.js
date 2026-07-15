@@ -1020,8 +1020,6 @@ export function buildDamageSteps() {
         const allMasteries = [available.baseMastery, ...(available.extraMasteries || [])].filter(Boolean);
         const autoApplyMasteries = allMasteries.filter(m => !['Graze', 'Topple', 'Nick', ...choiceMasteries, ...replaceOptions].includes(m));
 
-        console.error('[tacticalMaster] attack=%s available=%o modalOptions=%o allMasteries=%o autoApply=%o', lastAttack.attackName, available, modalOptions, allMasteries, autoApplyMasteries);
-
         const targetName = lastAttack.targetName;
 
         for (const masteryName of autoApplyMasteries) {

@@ -26,7 +26,7 @@ function TacticalMasterModal({ attackName, baseMastery, replaceOptions, targetNa
     for (const name of (replaceOptions || [])) {
         if (name === 'Graze') continue;
         if (!allOptions.find(m => m.name === name)) {
-            allOptions.push({ name, source: isChoiceMode ? 'feature' : 'weapon' });
+            allOptions.push({ name, source: 'feature' });
         }
     }
 
