@@ -159,6 +159,39 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
+    // Handle plain uses + recharge (fixed counter-based free casts, e.g. Paladin's Smite uses: 1, recharge: long_rest)
+    if (auto.uses != null && auto.recharge && !auto.uses_expression) {
+        const freeCastKey = `_${action.name.replace(/\s+/g, '_')}_freeCastCount`;
+        const currentCount = Number(getRuntimeValue(playerStats.name, freeCastKey, campaignName) ?? auto.uses);
+
+        if (currentCount <= 0) {
+            const rechargeText = auto.recharge === 'short_rest'
+                ? 'Finish a Short Rest to regain them.'
+                : auto.recharge === 'short_or_long_rest'
+                    ? 'Finish a Short or Long Rest to regain them.'
+                    : 'Finish a Long Rest to regain them.';
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    description: `No free casts remaining. ${rechargeText}`,
+                    automation: auto,
+                },
+            };
+        }
+
+        const newCount = currentCount - 1;
+        await setRuntimeValue(playerStats.name, freeCastKey, newCount, campaignName);
+
+        return {
+            type: 'popup',
+            payload: {
+                html: `<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Free cast of:</b> ${spellName} (${newCount} remaining).${noConcLabel}${durLabel}<br/><br/><em>Open your spell sheet and cast ${spellName} normally — no spell slot will be consumed.</em>`,
+            },
+        };
+    }
+
     if (spellNames.length > 1) {
         if (auto.perSpellTracking) {
             const availableSpells = [];

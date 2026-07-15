@@ -75,6 +75,13 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
       if (featureLevel !== null) continue;
     }
 
+    // Fixed counter-based free casts (uses + recharge, e.g. Paladin's Smite uses: 1, recharge: long_rest)
+    if (entry.uses != null && entry.recharge && !entry.uses_expression) {
+      const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
+      const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.uses);
+      if (count > 0) return true;
+    }
+
     const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
     if (!spells.includes(spellName)) continue;
 
@@ -116,6 +123,13 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
         }
       }
       if (featureLevel !== null) continue;
+    }
+
+    // Fixed counter-based free casts (uses + recharge, e.g. Paladin's Smite uses: 1, recharge: long_rest)
+    if (entry.uses != null && entry.recharge && !entry.uses_expression) {
+      const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
+      const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.uses);
+      if (count > 0) return true;
     }
 
     const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
@@ -160,6 +174,13 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
         }
       }
       if (featureLevel !== null) continue;
+    }
+
+    // Fixed counter-based free casts (uses + recharge, e.g. Paladin's Smite uses: 1, recharge: long_rest)
+    if (entry.uses != null && entry.recharge && !entry.uses_expression) {
+      const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
+      const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.uses);
+      if (count > 0) return true;
     }
 
     const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
@@ -345,8 +366,20 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
             }
             if (featureLevel !== null) continue;
           }
+
           const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
           if (!spells.includes(spell.name)) continue;
+
+          // Fixed counter-based free casts (uses + recharge, e.g. Paladin's Smite)
+          if (entry.uses != null && entry.recharge && !entry.uses_expression) {
+            const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
+            const count = Number(getRuntimeValue(playerStats.name, freeCastCountKey) ?? entry.uses);
+            if (count > 0) {
+              setRuntimeValue(playerStats.name, freeCastCountKey, count - 1, campaignName);
+            }
+            break;
+          }
+
           if (entry.perSpellTracking) {
             const usedKey = `_${entry.name.replace(/\s+/g, '_')}_${spell.name.replace(/\s+/g, '_')}_used`;
             setRuntimeValue(playerStats.name, usedKey, true, campaignName);

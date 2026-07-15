@@ -214,6 +214,105 @@ describe('spellCastHandler', () => {
     });
   });
 
+  describe('Uses + recharge (fixed counter-based free casts)', () => {
+    it('blocks when free casts are 0 or negative', async () => {
+      const action = {
+        name: 'Paladin\'s Smite',
+        automation: {
+          type: 'free_spell',
+          spell: 'Divine Smite',
+          uses: 1,
+          recharge: 'long_rest',
+        },
+      };
+
+      runtimeState.getRuntimeValue.mockReturnValue(0);
+      let result = await handle(action, makePlayerStats(), campaignName, null);
+      expect(result.payload.description).toBe('No free casts remaining. Finish a Long Rest to regain them.');
+
+      runtimeState.getRuntimeValue.mockReturnValue(-1);
+      result = await handle(action, makePlayerStats(), campaignName, null);
+      expect(result.payload.description).toBe('No free casts remaining. Finish a Long Rest to regain them.');
+    });
+
+    it('defaults to uses when stored is null, decrements on use', async () => {
+      runtimeState.getRuntimeValue.mockReturnValue(null);
+      const action = {
+        name: 'Paladin\'s Smite',
+        automation: {
+          type: 'free_spell',
+          spell: 'Divine Smite',
+          uses: 1,
+          recharge: 'long_rest',
+        },
+      };
+      let result = await handle(action, makePlayerStats(), campaignName, null);
+      expect(result.payload.html).toContain('Free cast of');
+      expect(result.payload.html).toContain('Divine Smite');
+      expect(result.payload.html).toContain('0 remaining');
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'TestWizard', "_Paladin's_Smite_freeCastCount", 0, campaignName,
+      );
+
+      // Reset mock for fresh action
+      vi.clearAllMocks();
+      runtimeState.getRuntimeValue.mockReturnValue(null);
+      const action2 = {
+        name: 'Paladin\'s Smite',
+        automation: {
+          type: 'free_spell',
+          spell: 'Divine Smite',
+          uses: 2,
+          recharge: 'long_rest',
+        },
+      };
+      result = await handle(action2, makePlayerStats(), campaignName, null);
+      expect(result.payload.html).toContain('1 remaining');
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'TestWizard', "_Paladin's_Smite_freeCastCount", 1, campaignName,
+      );
+    });
+
+    it('uses correct recharge text based on recharge type', async () => {
+      const actionShort = {
+        name: 'Paladin\'s Smite',
+        automation: { spell: 'Divine Smite', uses: 0, recharge: 'short_rest' },
+      };
+      runtimeState.getRuntimeValue.mockReturnValue(0);
+      let result = await handle(actionShort, makePlayerStats(), campaignName, null);
+      expect(result.payload.description).toBe('No free casts remaining. Finish a Short Rest to regain them.');
+
+      const actionShortOrLong = {
+        name: 'Paladin\'s Smite',
+        automation: { spell: 'Divine Smite', uses: 0, recharge: 'short_or_long_rest' },
+      };
+      result = await handle(actionShortOrLong, makePlayerStats(), campaignName, null);
+      expect(result.payload.description).toBe('No free casts remaining. Finish a Short or Long Rest to regain them.');
+
+      const actionLong = {
+        name: 'Paladin\'s Smite',
+        automation: { spell: 'Divine Smite', uses: 0, recharge: 'long_rest' },
+      };
+      result = await handle(actionLong, makePlayerStats(), campaignName, null);
+      expect(result.payload.description).toBe('No free casts remaining. Finish a Long Rest to regain them.');
+    });
+
+    it('does not interfere with uses_expression pattern', async () => {
+      runtimeState.getRuntimeValue.mockReturnValue(null);
+      const action = makeAction({
+        spell: 'Fire Bolt',
+        uses: 1,
+        uses_expression: 'WIS modifier_min_1',
+        usesMax: 3,
+      });
+      const result = await handle(action, makePlayerStats(), campaignName, null);
+      expect(result.payload.html).toContain('2 remaining');
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'TestWizard', '_Magic_Initiate_freeCastCount', 2, campaignName,
+      );
+    });
+  });
+
   describe('Multi-spell automation', () => {
     it('shows available spells when perSpellTracking is true, marks spells as used', async () => {
       runtimeState.getRuntimeValue.mockReturnValue(null);

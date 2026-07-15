@@ -272,6 +272,171 @@ describe('SpellDetailPopup - Free Cast Authorization', () => {
     });
   });
 
+  describe('fixed counter-based free_spell (uses + recharge)', () => {
+    it('authorizes via actions when uses > 0 and spell matches', () => {
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+        if (key === "_Paladin's_Smite_freeCastCount") return 1;
+        return null;
+      });
+
+      const stats = {
+        ...baseMockPlayerStats,
+        automation: {
+          passives: [],
+          actions: [
+            {
+              name: "Paladin's Smite",
+              type: 'free_spell',
+              spell: 'Divine Smite',
+              uses: 1,
+              recharge: 'long_rest',
+            },
+          ],
+        },
+      };
+      const spell = {
+        ...baseMockSpell,
+        name: 'Divine Smite',
+        level: 1,
+        damage: { damage_at_slot_level: { '1': '2d8' } },
+      };
+      renderPopup(spell, stats);
+      expect(
+        screen.getByText('Free Cast — no spell slot consumed')
+      ).toBeInTheDocument();
+    });
+
+    it('does not authorize when uses count is 0', () => {
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+        if (key === "_Paladin's_Smite_freeCastCount") return 0;
+        return null;
+      });
+
+      const stats = {
+        ...baseMockPlayerStats,
+        automation: {
+          passives: [],
+          actions: [
+            {
+              name: "Paladin's Smite",
+              type: 'free_spell',
+              spell: 'Divine Smite',
+              uses: 1,
+              recharge: 'long_rest',
+            },
+          ],
+        },
+      };
+      const spell = {
+        ...baseMockSpell,
+        name: 'Divine Smite',
+        level: 1,
+        damage: { damage_at_slot_level: { '1': '2d8' } },
+      };
+      renderPopup(spell, stats);
+      expect(
+        screen.queryByText('Free Cast — no spell slot consumed')
+      ).not.toBeInTheDocument();
+    });
+
+    it('defaults to uses value when count is not in runtime state', () => {
+      vi.mocked(getRuntimeValue).mockReturnValue(null);
+
+      const stats = {
+        ...baseMockPlayerStats,
+        automation: {
+          passives: [],
+          actions: [
+            {
+              name: "Paladin's Smite",
+              type: 'free_spell',
+              spell: 'Divine Smite',
+              uses: 1,
+              recharge: 'long_rest',
+            },
+          ],
+        },
+      };
+      const spell = {
+        ...baseMockSpell,
+        name: 'Divine Smite',
+        level: 1,
+        damage: { damage_at_slot_level: { '1': '2d8' } },
+      };
+      renderPopup(spell, stats);
+      expect(
+        screen.getByText('Free Cast — no spell slot consumed')
+      ).toBeInTheDocument();
+    });
+
+    it('authorizes via bonusActions with uses + recharge', () => {
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+        if (key === '_Test_Feature_freeCastCount') return 2;
+        return null;
+      });
+
+      const stats = {
+        ...baseMockPlayerStats,
+        automation: {
+          passives: [],
+          actions: [],
+          bonusActions: [
+            {
+              name: 'Test Feature',
+              type: 'free_spell',
+              spell: 'Test Spell',
+              uses: 2,
+              recharge: 'long_rest',
+            },
+          ],
+        },
+      };
+      const spell = {
+        ...baseMockSpell,
+        name: 'Test Spell',
+        level: 1,
+        damage: { damage_at_slot_level: { '1': '1d6' } },
+      };
+      renderPopup(spell, stats);
+      expect(
+        screen.getByText('Free Cast — no spell slot consumed')
+      ).toBeInTheDocument();
+    });
+
+    it('does not interfere with uses_expression pattern', () => {
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+        if (key === '_Mystic_Arcanum_freeCastCount') return 1;
+        return null;
+      });
+
+      const spell = {
+        ...baseMockSpell,
+        name: 'a level 9 Warlock spell (your choice)',
+        level: 9,
+        damage: { damage_at_slot_level: { '9': '10d6' } },
+      };
+      const stats = {
+        ...baseMockPlayerStats,
+        automation: {
+          passives: [],
+          actions: [
+            {
+              name: 'Mystic Arcanum',
+              type: 'free_spell',
+              spell: 'a level 9 Warlock spell (your choice)',
+              uses_expression: '1/rest',
+              usesMax: 1,
+            },
+          ],
+        },
+      };
+      renderPopup(spell, stats);
+      expect(
+        screen.getByText('Free Cast — no spell slot consumed')
+      ).toBeInTheDocument();
+    });
+  });
+
   describe('bonusActions free_spell entries', () => {
     it('authorizes via bonusActions free_spell by spell name', () => {
       vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
