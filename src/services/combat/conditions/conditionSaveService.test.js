@@ -25,6 +25,7 @@ vi.mock('../automation/automationService.js', () => ({
 }));
 
 vi.mock('../../../services/automation/handlers/buffs/auraOfPurityHandler.js', () => ({
+  handle: vi.fn(),
   isAuraOfPurityActive: vi.fn(),
   getAuraOfPuritySaveAdvantageConditions: vi.fn(),
 }));

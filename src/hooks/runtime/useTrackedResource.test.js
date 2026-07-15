@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
-import { getRuntimeValue, setRuntimeValue, addStorageChangeListener } from './useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, addStorageChangeListener, hasRuntimeValue } from './useRuntimeState.js';
 import useTrackedResource from './useTrackedResource.js';
 
 vi.mock('../../services/ui/storage.js', () => ({
@@ -16,6 +16,7 @@ vi.mock('./useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
   addStorageChangeListener: vi.fn().mockImplementation(() => () => {}),
+  hasRuntimeValue: vi.fn(),
 }));
 
 describe('useTrackedResource', () => {
@@ -26,6 +27,7 @@ describe('useTrackedResource', () => {
   describe('initialization', () => {
     it('returns { current, max, update } with current from runtime storage', () => {
       getRuntimeValue.mockReturnValue(5);
+      hasRuntimeValue.mockReturnValue(true);
 
       const maxGetter = vi.fn(() => 10);
       const { result } = renderHook(() =>
@@ -38,8 +40,22 @@ describe('useTrackedResource', () => {
       expect(getRuntimeValue).toHaveBeenCalledWith('Gandalf', 'hp');
     });
 
-    it('falls through to maxGetter when storage returns null', () => {
+    it('falls through to maxGetter when storage returns null and key does not exist', () => {
       getRuntimeValue.mockReturnValue(null);
+      hasRuntimeValue.mockReturnValue(false);
+
+      const maxGetter = vi.fn(() => 20);
+      const { result } = renderHook(() =>
+        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
+      );
+
+      expect(result.current.current).toBe(20);
+      expect(result.current.max).toBe(20);
+    });
+
+    it('falls through to maxGetter when storage value is null but key exists (explicitly reset)', () => {
+      getRuntimeValue.mockReturnValue(null);
+      hasRuntimeValue.mockReturnValue(true);
 
       const maxGetter = vi.fn(() => 20);
       const { result } = renderHook(() =>
@@ -52,6 +68,7 @@ describe('useTrackedResource', () => {
 
     it('treats storage value of 0 as a valid stored value', () => {
       getRuntimeValue.mockReturnValue(0);
+      hasRuntimeValue.mockReturnValue(true);
 
       const maxGetter = vi.fn(() => 10);
       const { result } = renderHook(() =>
@@ -62,8 +79,9 @@ describe('useTrackedResource', () => {
       expect(result.current.max).toBe(10);
     });
 
-    it('falls back to playerStats._trackedResources when storage is null', () => {
+    it('falls back to playerStats._trackedResources when storage is null and key does not exist', () => {
       getRuntimeValue.mockReturnValue(null);
+      hasRuntimeValue.mockReturnValue(false);
 
       const playerStats = {
         _trackedResources: {
@@ -82,6 +100,7 @@ describe('useTrackedResource', () => {
 
     it('falls through to maxGetter when playerStats._trackedResources lacks the key', () => {
       getRuntimeValue.mockReturnValue(null);
+      hasRuntimeValue.mockReturnValue(false);
 
       const playerStats = {
         _trackedResources: {
@@ -119,6 +138,7 @@ describe('useTrackedResource', () => {
   describe('update', () => {
     it('updates current and calls setRuntimeValue', async () => {
       getRuntimeValue.mockReturnValue(10);
+      hasRuntimeValue.mockReturnValue(true);
       setRuntimeValue.mockResolvedValue(undefined);
 
       const maxGetter = vi.fn(() => 20);
@@ -138,6 +158,7 @@ describe('useTrackedResource', () => {
 
     it('passes campaignName to setRuntimeValue', async () => {
       getRuntimeValue.mockReturnValue(10);
+      hasRuntimeValue.mockReturnValue(true);
       setRuntimeValue.mockResolvedValue(undefined);
 
       const maxGetter = vi.fn(() => 20);
@@ -155,6 +176,7 @@ describe('useTrackedResource', () => {
 
     it('allows updating to any value including 0, negative, and values exceeding max', async () => {
       getRuntimeValue.mockReturnValue(10);
+      hasRuntimeValue.mockReturnValue(true);
       setRuntimeValue.mockResolvedValue(undefined);
 
       const maxGetter = vi.fn(() => 20);
@@ -180,6 +202,7 @@ describe('useTrackedResource', () => {
 
     it('rejects when setRuntimeValue rejects', async () => {
       getRuntimeValue.mockReturnValue(10);
+      hasRuntimeValue.mockReturnValue(true);
       setRuntimeValue.mockRejectedValue(new Error('network error'));
 
       const maxGetter = vi.fn(() => 20);
@@ -199,6 +222,7 @@ describe('useTrackedResource', () => {
         .mockReturnValueOnce(10)
         .mockReturnValueOnce(8)
         .mockReturnValueOnce(6);
+      hasRuntimeValue.mockReturnValue(true);
 
       const maxGetter = vi.fn(() => 20);
       const { result, rerender } = renderHook(
@@ -218,6 +242,7 @@ describe('useTrackedResource', () => {
         .mockReturnValueOnce(1)
         .mockReturnValueOnce(2)
         .mockReturnValueOnce(3);
+      hasRuntimeValue.mockReturnValue(true);
 
       const maxGetter = vi.fn(() => 20);
       const { result, rerender } = renderHook(
@@ -234,6 +259,7 @@ describe('useTrackedResource', () => {
 
     it('re-reads when playerStats changes', () => {
       getRuntimeValue.mockReturnValue(null);
+      hasRuntimeValue.mockReturnValue(false);
 
       const maxGetter = vi.fn(() => 5);
 
@@ -280,6 +306,7 @@ describe('useTrackedResource', () => {
         .mockReturnValueOnce(10)
         .mockReturnValueOnce(10)
         .mockReturnValueOnce(15);
+      hasRuntimeValue.mockReturnValue(true);
 
       const maxGetter = vi.fn(() => 20);
       const { result } = renderHook(() =>
@@ -300,6 +327,7 @@ describe('useTrackedResource', () => {
         .mockReturnValueOnce(null)
         .mockReturnValueOnce(null)
         .mockReturnValueOnce(null);
+      hasRuntimeValue.mockReturnValue(false);
 
       const playerStats1 = {
         _trackedResources: { hp: { current: 50 } },

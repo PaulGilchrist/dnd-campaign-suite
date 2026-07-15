@@ -134,7 +134,7 @@ export const LONG_REST_RESOURCES = [
    '_Fey_Reinforcements_freeCastCount',
    '_Misty_Wanderer_freeCastCount',
    "_Paladin's_Smite_freeCastCount",
-     'breathweaponuses',
+      'breathweaponUses',
   'stonecunningUses',
   'naturesVeilUses',
   'favoredEnemyUses',
@@ -382,9 +382,9 @@ export async function applyLongRest(playerStats, campaignName) {
        }
      }
 
-   charData.shortRestHitDice = playerStats.level
+    charData.shortRestHitDice = playerStats.level
 
-    getLongRestResources().forEach((key) => {
+     getLongRestResources().forEach((key) => {
       charData[key] = null
        })
 

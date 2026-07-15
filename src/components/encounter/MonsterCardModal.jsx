@@ -400,8 +400,8 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         );
       })()}
       <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(action.description) }} />
-      {action.usage && <em> ({action.usage})</em>}
-      {action.recharge && <em> ({action.recharge})</em>}
+      {action.usage && <em> ({String(action.usage)})</em>}
+      {action.recharge && <em> ({String(action.recharge)})</em>}
     </div>
   );
   };
@@ -523,7 +523,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
             <div className="mc-conditions-section">
               <div className="mc-conditions-labels">
                 {monsterConditions.map(cond => (
-                  <span key={cond.id || cond.key} className="mc-condition-label-badge">{cond.label}</span>
+                  <span key={cond.id || cond.key} className="mc-condition-label-badge">{cond.label || String(cond)}</span>
                 ))}
               </div>
               <div className="mc-conditions-effects">

@@ -148,6 +148,7 @@ function CreatureCard({
             </div>
             <div className='creature-conditions'>
                 {creature.conditions?.map(cond => {
+                    if (!cond || typeof cond !== 'object') return null;
                     const canRoll = creature.type === 'player' || isLocalhost
                     return (
                         <div key={cond.id} className='condition-badge-wrapper'>
@@ -173,7 +174,7 @@ function CreatureCard({
                         </div>
                     )
                 })}
-                <ConditionEffectBadges conditions={creature.conditions} targetEffects={myTargetEffects} creatureName={creature.name} campaignName={campaignName} hasTacticalShift={hasTacticalShift} hasSpeedyOpportunityDisadvantage={hasSpeedyOpportunityDisadvantage} hasSpeedyDifficultTerrainIgnore={hasSpeedyDifficultTerrainIgnore} isLocalhost={isLocalhost} coronaDisadvantage={coronaDisadvantage} />
+                <ConditionEffectBadges conditions={creature.conditions?.filter(c => c && typeof c === 'object' && c.key) || []} targetEffects={myTargetEffects} creatureName={creature.name} campaignName={campaignName} hasTacticalShift={hasTacticalShift} hasSpeedyOpportunityDisadvantage={hasSpeedyOpportunityDisadvantage} hasSpeedyDifficultTerrainIgnore={hasSpeedyDifficultTerrainIgnore} isLocalhost={isLocalhost} coronaDisadvantage={coronaDisadvantage} />
                 {isLocalhost && (
                     <button
                         className='condition-add-btn'

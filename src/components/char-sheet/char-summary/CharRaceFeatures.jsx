@@ -12,7 +12,7 @@ function CharRaceFeatures({ playerStats, campaignName }) {
         <div className="race-features">
             <TrackedResourceInput 
                 label="Breath Weapon" 
-                resourceKey="breathweaponuses" 
+                resourceKey="breathweaponUses" 
                 playerName={playerStats.name}
                 getMax={() => maxUses}
                 deps={[playerStats.level]}

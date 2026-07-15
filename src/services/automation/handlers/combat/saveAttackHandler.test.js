@@ -35,6 +35,7 @@ vi.mock('../../../rules/effects/expirations.js', () => ({
 
 vi.mock('../../../combat/automation/automationExpressions.js', () => ({
   resolveUses: vi.fn(),
+  resolveScaling: vi.fn(),
 }));
 
 // ── Imports ────────────────────────────────────────────────────
@@ -262,7 +263,7 @@ describe('saveAttackHandler', () => {
   });
 
   describe('handle - variable shape resolution', () => {
-    it('should return breathWeaponShape modal when shape is variable with options and no choice made', async () => {
+    it('should default to cone shape when variable with options and no choice made', async () => {
       runtimeState.getRuntimeValue.mockReturnValue(null);
 
       const action = makeAction({
@@ -272,13 +273,14 @@ describe('saveAttackHandler', () => {
           cone: { shape: 'cone' },
           line: { shape: 'line' },
         },
+        damage: '1d8',
       });
 
       const result = await handle(action, makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('modal');
-      expect(result.modalName).toBe('breathWeaponShape');
-      expect(result.payload.options).toEqual(['cone', 'line']);
+      expect(result.modalName).toBe('saveAttackAoe');
+      expect(result.payload.shape).toBe('cone');
     });
 
     it('should resolve shape to cone fallback when variable but no optionDetails', async () => {

@@ -233,8 +233,8 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
        if (options?.damageSequenceId && _reTriggeredSequenceIds.has(options.damageSequenceId) && newHp <= 0 && oldHp > 0) {
            newHp = 1;
        }
-       setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
-     } else {
+        setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
+      } else {
         oldHp = creature.currentHp;
         newHp = Math.max(0, oldHp - wardDamage);
         actualDamageTaken = oldHp - newHp;

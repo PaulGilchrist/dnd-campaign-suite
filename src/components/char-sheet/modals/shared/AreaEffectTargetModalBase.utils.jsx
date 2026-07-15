@@ -1,5 +1,6 @@
 import { addEntry } from '../../../../services/ui/logService.js';
 import storage from '../../../../services/ui/storage.js';
+import { setCombatSummaryCache } from '../../../../services/encounters/combatData.js';
 
 export function renderTargetList({ eligibleTargets, selected, toggleTarget }) {
   return (
@@ -65,6 +66,7 @@ export function logSaveEntry(campaignName, featureName, attackerName, targetName
 }
 
 export function persistAndNotify(combatSummary, campaignName) {
+  setCombatSummaryCache(combatSummary, campaignName);
   storage.set('combatSummary', combatSummary, campaignName);
   window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 }

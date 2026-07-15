@@ -1,10 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { rollExpression } from '../../../../services/dice/diceRoller.js';
+import { resolveScaling } from '../../../../services/combat/automation/automationExpressions.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { sendSavePrompt, sendSaveResult } from '../../../../services/combat/conditions/savePromptService.js';
-import { applyDamageToTarget, computeDamageAfterSave } from '../../../../services/rules/combat/applyDamage.js';
+import { applyDamageToTarget, computeDamageAfterSave, computeDamageAfterResistancesWithDetails } from '../../../../services/rules/combat/applyDamage.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
-import storage from '../../../../services/ui/storage.js';
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { renderTargetList, persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
@@ -26,14 +27,23 @@ function SaveAttackAoeModal({
     const [summary, setSummary] = useState(null);
     const [selected, setSelected] = useState(new Set());
     const [pendingPrompts, setPendingPrompts] = useState([]);
+    const [results, setResults] = useState([]);
 
     useEffect(() => {
         return () => {
             setSummary(null);
             setSelected(new Set());
             setPendingPrompts([]);
+            setResults([]);
         };
     }, []);
+
+    useEffect(() => {
+        if (pendingPrompts.length === 0 && results.length > 0 && !summary) {
+            const selectedNames = results.map(r => r.targetName);
+            setSummary({ results, selected: new Set(selectedNames) });
+        }
+    }, [pendingPrompts.length, results, summary]);
 
     const resolveAllSavesAndDamage = useCallback(async (selectedNames) => {
         const combatSummary = getCombatSummary(campaignName);
@@ -42,6 +52,8 @@ function SaveAttackAoeModal({
         const results = [];
         const prompts = [];
         const characters = combatSummary?.creatures?.filter(c => c.type === 'player') || [];
+        const scalingEntry = resolveScaling(playerStats, action.automation?.scaling);
+        const resolvedDamage = scalingEntry?.damage || damage;
 
         for (const targetName of selectedNames) {
             const target = combatSummary.creatures.find(c => c.name === targetName);
@@ -54,9 +66,15 @@ function SaveAttackAoeModal({
                 const saveRoll = Math.floor(Math.random() * 20) + 1;
                 const saveTotal = saveRoll + saveBonus;
                 const success = saveTotal >= saveDc;
-                const damageRoll = rollExpression(damage);
+                const damageRoll = rollExpression(resolvedDamage);
                 const rawDamage = damageRoll?.total ?? 0;
-                const finalDamage = computeDamageAfterSave(rawDamage, success, dcSuccess);
+                const damageAfterSave = computeDamageAfterSave(rawDamage, success, dcSuccess);
+
+                const targetCreature = combatSummary.creatures.find(c => c.name === targetName);
+                const resistances = targetCreature?.resistances || [];
+                const immunities = targetCreature?.immunities || [];
+                const resResult = computeDamageAfterResistancesWithDetails(damageAfterSave, [damageType], resistances, immunities, false);
+                const finalDamage = resResult.finalDamage;
 
                 sendSaveResult(campaignName, targetName, {
                     promptId: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
@@ -72,7 +90,7 @@ function SaveAttackAoeModal({
                     characterName: playerStats.name,
                     rollType: 'save-damage',
                     name: action.name,
-                    formula: damage,
+                    formula: resolvedDamage,
                     rolls: damageRoll?.rolls ?? [],
                     total: rawDamage,
                     modifier: damageRoll?.modifier ?? 0,
@@ -92,7 +110,7 @@ function SaveAttackAoeModal({
                 if (finalDamage > 0) {
                     applyDamageToTarget(
                         combatSummary, targetName, finalDamage, [damageType],
-                        campaignName, characters, false, playerStats.name, false
+                        campaignName, characters, true, playerStats.name, false
                     );
                 }
 
@@ -107,20 +125,31 @@ function SaveAttackAoeModal({
                 });
             } else {
                 const promptId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+                const scalingEntry = resolveScaling(playerStats, action.automation?.scaling);
+                const resolvedDamage = scalingEntry?.damage || damage;
+                const damageRoll = rollExpression(resolvedDamage);
+                const rawDamage = damageRoll?.total ?? 0;
+
                 sendSavePrompt(campaignName, {
                     promptId,
                     targetName,
                     saveType: saveType,
                     saveDc: saveDc,
                     sourceName: playerStats.name,
+                    rawDamage,
                 });
+
+                const existingPrompts = getRuntimeValue(campaignName, 'pendingSaveListenerPrompts') || new Set();
+                existingPrompts.add(promptId);
+                setRuntimeValue(campaignName, 'pendingSaveListenerPrompts', existingPrompts, campaignName);
+
                 prompts.push({ promptId, targetName });
             }
         }
 
         persistAndNotify(combatSummary, campaignName);
         return { results, prompts };
-    }, [campaignName, action.name, playerStats.name, damage, damageType, dcSuccess, saveDc, saveType]);
+    }, [campaignName, action.name, action.automation?.scaling, playerStats, damage, damageType, dcSuccess, saveDc, saveType]);
 
     const handleSaveResult = useCallback((event, ctx) => {
         const detail = event.detail;
@@ -132,6 +161,13 @@ function SaveAttackAoeModal({
         const targetName = pendingPrompts[pendingIndex].targetName;
         const success = detail.success;
         const saveBonus = detail.saveBonus ?? 0;
+
+        const rawDamage = detail.rawDamage ?? 0;
+        const finalDamage = computeDamageAfterSave(rawDamage, success, dcSuccess);
+
+        const scalingEntry = resolveScaling(playerStats, action.automation?.scaling);
+        const resolvedDamage = scalingEntry?.damage || damage;
+        const damageRoll = rollExpression(resolvedDamage);
 
         addEntry(campaignName, {
             type: 'roll',
@@ -149,64 +185,69 @@ function SaveAttackAoeModal({
             timestamp: Date.now(),
         }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging player save:', e); });
 
-        if (!success) {
-            const damageRoll = rollExpression(damage);
-            const rawDamage = damageRoll?.total ?? 0;
-            const finalDamage = computeDamageAfterSave(rawDamage, success, dcSuccess);
+        if (finalDamage > 0) {
+            const combatSummary = getCombatSummary(campaignName);
+            const characters = combatSummary?.creatures?.filter(c => c.type === 'player') || [];
+            applyDamageToTarget(
+                combatSummary, targetName, finalDamage, [damageType],
+                campaignName, characters, false, playerStats.name, false
+            );
 
-            if (finalDamage > 0) {
-                const combatSummary = getCombatSummary(campaignName);
-                const characters = combatSummary?.creatures?.filter(c => c.type === 'player') || [];
-                applyDamageToTarget(
-                    combatSummary, targetName, finalDamage, [damageType],
-                    campaignName, characters, false, playerStats.name, false
-                );
-
-                addEntry(campaignName, {
-                    type: 'roll',
-                    characterName: playerStats.name,
-                    rollType: 'save-damage',
-                    name: action.name,
-                    formula: damage,
-                    rolls: damageRoll?.rolls ?? [],
-                    total: rawDamage,
-                    modifier: damageRoll?.modifier ?? 0,
-                    damageType: damageType,
-                    targetName,
-                    saveType: saveType,
-                    saveDc: saveDc,
-                    dcSuccess: dcSuccess,
-                    saveResult: 'failure',
-                    saveRoll: detail.roll ?? 0,
-                    saveBonus,
-                    saveRawRolls: [detail.roll ?? 0, detail.roll ?? 0],
-                    finalDamage: finalDamage,
-                    timestamp: Date.now(),
-                }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging player damage:', e); });
-
-                storage.set('combatSummary', combatSummary, campaignName);
-                window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-            }
-        } else {
-            const damageRoll = rollExpression(damage);
-            computeDamageAfterSave(damageRoll?.total ?? 0, success, dcSuccess);
+            addEntry(campaignName, {
+                type: 'roll',
+                characterName: playerStats.name,
+                rollType: 'save-damage',
+                name: action.name,
+                formula: resolvedDamage,
+                rolls: damageRoll?.rolls ?? [],
+                total: rawDamage,
+                modifier: damageRoll?.modifier ?? 0,
+                damageType: damageType,
+                targetName,
+                saveType: saveType,
+                saveDc: saveDc,
+                dcSuccess: dcSuccess,
+                saveResult: success ? 'success' : 'failure',
+                saveRoll: detail.roll ?? 0,
+                saveBonus,
+                saveRawRolls: [detail.roll ?? 0, detail.roll ?? 0],
+                finalDamage: finalDamage,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging player damage:', e); });
         }
 
         persistAndNotify(getCombatSummary(campaignName), campaignName);
-        ctx.setResults(prev => [...prev, {
+        const targetResult = {
             targetName,
             success,
             roll: detail.roll ?? 0,
             total: detail.total ?? 0,
             saveBonus,
-        }]);
-        ctx.setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
-    }, [campaignName, damage, damageType, dcSuccess, action.name, playerStats.name, saveDc, saveType, pendingPrompts]);
+            rawDamage,
+            finalDamage,
+        };
+        if (ctx) {
+            ctx.setResults(prev => {
+                if (prev.some(r => r.targetName === targetName)) return prev;
+                return [...prev, targetResult];
+            });
+            ctx.setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
+        } else {
+            setResults(prev => {
+                if (prev.some(r => r.targetName === targetName)) return prev;
+                return [...prev, targetResult];
+            });
+            setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
+        }
+    }, [campaignName, damage, damageType, dcSuccess, action.name, action.automation?.scaling, playerStats, saveDc, saveType, pendingPrompts]);
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;
-        window.addEventListener('save-result', handleSaveResult);
-        return () => window.removeEventListener('save-result', handleSaveResult);
+        const handleSaveEvent = (event) => {
+            handleSaveResult(event, null);
+        };
+        window.addEventListener('save-result', handleSaveEvent);
+        return () => window.removeEventListener('save-result', handleSaveEvent);
     }, [pendingPrompts.length, handleSaveResult]);
 
     const handleApply = useCallback(async (ctx) => {
@@ -271,6 +312,7 @@ function SaveAttackAoeModal({
 
         const { results, prompts } = await resolveAllSavesAndDamage(selectedNames);
 
+        setResults(results);
         setPendingPrompts(prompts);
 
         if (prompts.length === 0 && results.length > 0) {
@@ -302,8 +344,8 @@ function SaveAttackAoeModal({
                         {ctx.results.map(r => (
                             <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
                                 <strong>{r.targetName}</strong>: {r.success
-                                    ? `Saved — takes ${r.finalDamage ?? 0} ${damageType} damage (rolled ${r.rawDamage ?? 0}, halved)`
-                                    : `Failed — takes ${r.finalDamage ?? 0} ${damageType} damage (rolled ${r.rawDamage ?? 0})`}
+                                    ? `Saved — takes ${r.finalDamage ?? 0} ${damageType} damage (rolled ${r.roll ?? 0}, halved)`
+                                    : `Failed — takes ${r.finalDamage ?? 0} ${damageType} damage (rolled ${r.roll ?? 0})`}
                             </div>
                         ))}
                         {ctx.pendingPrompts.map(p => (
@@ -358,8 +400,8 @@ function SaveAttackAoeModal({
                             {summary.results.map(r => (
                                 <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
                                     <strong>{r.targetName}</strong>: {r.success
-                                        ? `Saved — takes ${r.finalDamage ?? 0} ${damageType} damage (rolled ${r.rawDamage ?? 0}, halved)`
-                                        : `Failed — takes ${r.finalDamage ?? 0} ${damageType} damage (rolled ${r.rawDamage ?? 0})`}
+                                        ? `Saved — takes ${r.finalDamage ?? 0} ${damageType} damage (rolled ${r.roll ?? 0}, halved)`
+                                        : `Failed — takes ${r.finalDamage ?? 0} ${damageType} damage (rolled ${r.roll ?? 0})`}
                                 </div>
                             ))}
                         </div>

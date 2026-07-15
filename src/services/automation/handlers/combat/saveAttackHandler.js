@@ -5,7 +5,7 @@ import * as mapsService from '../../../maps/mapsService.js';
 import { getCombatContext, getAttackerTargetName } from '../../../rules/combat/damageUtils.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
-import { resolveUses } from '../../../combat/automation/automationExpressions.js';
+import { resolveUses, resolveScaling } from '../../../combat/automation/automationExpressions.js';
 import { parseDurationRounds } from '../../../rules/effects/durationParser.js';
 
 const AREA_SHAPES = new Set(['emanation', 'cone', 'line', 'sphere', 'cube', 'cylinder', 'square', 'circle', 'wall', 'cage', 'floor', 'area']);
@@ -97,26 +97,9 @@ export async function handle(action, playerStats, campaignName, mapName) {
         }
     }
 
-    // Resolve variable shape — show shape selection modal if no option chosen yet
+    // Resolve variable shape — default to cone if variable
     let resolvedShape = auto.shape || '';
-    if (resolvedShape === 'variable' && auto.hasOptions && auto.optionDetails) {
-        const optionKey = `_${action.name.replace(/\s+/g, '_')}_option`;
-        const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
-        if (!chosenOption) {
-            const optionKeys = Object.keys(auto.optionDetails);
-            return {
-                type: 'modal',
-                modalName: 'breathWeaponShape',
-                payload: {
-                    action,
-                    playerStats,
-                    campaignName,
-                    options: optionKeys,
-                },
-            };
-        }
-        resolvedShape = auto.shape || 'cone';
-    } else if (resolvedShape === 'variable') {
+    if (resolvedShape === 'variable') {
         resolvedShape = 'cone';
     }
 
@@ -180,10 +163,11 @@ export async function handle(action, playerStats, campaignName, mapName) {
     const resolvedUses = auto.usesMax ?? resolveUses(playerStats, auto.uses) ?? playerStats.level;
     const maxUses = resolvedUses > 0 ? resolvedUses : 0;
 
-        if (maxUses > 0) {
-            const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
-            const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? maxUses);
-            if (currentUses <= 0) {
+    if (maxUses > 0) {
+        const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
+        const storedValue = getRuntimeValue(playerStats.name, usesKey);
+        const currentUses = Number(storedValue ?? maxUses);
+        if (currentUses <= 0) {
                 if (auto.recharge === 'long_rest_or_expend_rage') {
                     const storedRage = getRuntimeValue(playerStats.name, 'ragePoints', campaignName);
                     const currentRage = storedRage != null ? Number(storedRage) : (playerStats._trackedResources?.ragePoints?.current ?? 0);
@@ -351,6 +335,10 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
         const rangeFeet = auto.range ? rangeToFeet(auto.range) : getEmanationRange({ ...auto, shape: resolvedShape }, playerStats, playerStats.name, campaignName);
 
+        const resolvedDamageExpression = auto.damage;
+        const scalingEntry = resolveScaling(playerStats, auto.scaling);
+        const resolvedDamageForModal = scalingEntry?.damage || resolvedDamageExpression;
+
         return {
             type: 'modal',
             modalName: 'saveAttackAoe',
@@ -360,7 +348,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
                 campaignName,
                 shape: resolvedShape,
                 range: rangeFeet,
-                damage: auto.damage,
+                damage: resolvedDamageForModal,
                 damageType: resolvedDamageType,
                 saveType: auto.saveType || 'DEX',
                 saveDc: saveDcValue,
@@ -370,7 +358,10 @@ export async function handle(action, playerStats, campaignName, mapName) {
         };
     }
 
-    const damageResult = rollExpression(auto.damage);
+    const resolvedDamageExpression = auto.damage;
+    const scalingEntry = resolveScaling(playerStats, auto.scaling);
+    const damageExpression = scalingEntry?.damage || resolvedDamageExpression;
+    const damageResult = rollExpression(damageExpression);
     if (!damageResult) return null;
 
     const notes = [];
