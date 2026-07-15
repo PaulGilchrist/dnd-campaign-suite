@@ -187,7 +187,7 @@ export async function applyShortRest(playerStats, campaignName) {
     }
   }
 
-  const hasImprovedWardingFlare = playerStats.characterAdvancement?.some(f => f.name === 'Improved Warding Flare')
+  const hasImprovedWardingFlare = playerStats.specialActions?.some(f => f.name === 'Improved Warding Flare')
   if (hasImprovedWardingFlare) {
     updates.wardingflareUses = null
   }
@@ -321,8 +321,8 @@ export async function applyShortRest(playerStats, campaignName) {
 
    // Celestial Resilience: Grant temp HP on short rest for Celestial Patron
    if (playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron') {
-     const features = playerStats.characterAdvancement || []
-     const feature = features.find(f => f.name === 'Celestial Resilience')
+      const features = playerStats.specialActions || []
+      const feature = features.find(f => f.name === 'Celestial Resilience')
      if (feature) {
         if (playerStats.level == null) {
           console.error('[restRules] applyShortRest: playerStats.level is missing for celestial patron temp HP')
@@ -411,7 +411,7 @@ export async function applyLongRest(playerStats, campaignName) {
          }
 
       // Grant Heroic Inspiration from Resourceful trait (Human 2024)
-   const hasResourceful = playerStats.characterAdvancement?.some(f => f.name === 'Resourceful')
+    const hasResourceful = playerStats.specialActions?.some(f => f.name === 'Resourceful')
    if (hasResourceful) {
      charData.hasInspiration = true
          }
@@ -515,8 +515,8 @@ export async function applyLongRest(playerStats, campaignName) {
 
     // Celestial Resilience: Grant temp HP on long rest for Celestial Patron
      if (playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron') {
-       const features = playerStats.characterAdvancement || []
-       const feature = features.find(f => f.name === 'Celestial Resilience')
+      const features = playerStats.specialActions || []
+        const feature = features.find(f => f.name === 'Celestial Resilience')
        if (feature) {
           if (playerStats.level == null) {
             console.error('[restRules] applyLongRest: playerStats.level is missing for celestial patron temp HP')
@@ -603,7 +603,7 @@ export async function applyLongRest(playerStats, campaignName) {
     if (hasPortent) resources.push('Portent dice');
     if (hasBolsteringTreats) resources.push('Bolstering Treats');
     const hasCelestialResilience = playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron';
-    if (hasCelestialResilience && playerStats.characterAdvancement?.some(f => f.name === 'Celestial Resilience')) resources.push('Celestial Resilience (temp HP)');
+    if (hasCelestialResilience && playerStats.specialActions?.some(f => f.name === 'Celestial Resilience')) resources.push('Celestial Resilience (temp HP)');
     if (hasNaturalRecovery) resources.push('Natural Recovery (spell slots)');
     if (resources.length > 0) {
         logEntries.push(`Resources restored: ${resources.join(', ')}`);

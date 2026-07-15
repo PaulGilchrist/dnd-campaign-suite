@@ -57,7 +57,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             healingName: action.name,
           });
 
-        const hasPhysiciansTouch = playerStats.characterAdvancement?.some(f => f.name === "Physician's Touch");
+        const hasPhysiciansTouch = playerStats.specialActions?.some(f => f.name === "Physician's Touch");
 
         return {
             type: 'modal',

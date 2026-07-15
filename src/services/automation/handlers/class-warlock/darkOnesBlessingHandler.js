@@ -8,7 +8,7 @@ export async function grantDarkOnesBlessing(playerStats, campaignName, attackerN
     const isFiend = playerStats.class?.subclass?.name === 'Fiend Patron';
     if (!isFiend) return null;
 
-    const features = playerStats.characterAdvancement || [];
+    const features = playerStats.specialActions || [];
     const feature = features.find(f => f.name === "Dark One's Blessing");
     if (!feature) return null;
 

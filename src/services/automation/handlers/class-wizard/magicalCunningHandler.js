@@ -25,7 +25,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // Determine if Eldritch Master (level 20) applies
     // Check both direct automation flag and passive character advancement feature
     const isEldritchMaster = action.automation?.eldritchMaster === true
-        || playerStats.characterAdvancement?.some(f => f.name === 'Eldritch Master');
+        || playerStats.specialActions?.some(f => f.name === 'Eldritch Master');
 
     // Get max Pact Magic slots
     const maxPactMagic = playerStats.resources?.warlockPactMagic?.max ?? 0;

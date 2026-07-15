@@ -45,7 +45,7 @@ function makeCelestialStats(overrides = {}) {
         name: 'TestHero',
         proficiency: 3,
         class: { major: { name: 'Celestial Patron' }, subclass: { name: 'Celestial Patron' } },
-        characterAdvancement: [
+        specialActions: [
             {
                 name: 'Celestial Resilience',
                 automation: {
@@ -115,7 +115,7 @@ describe('celestialResilienceHandler', () => {
         it('returns null when Celestial Resilience feature is missing or has no automation', async () => {
             // missing feature entirely
             let result = await grantCelestialResilience(
-                makeCelestialStats({ characterAdvancement: [] }),
+                makeCelestialStats({ specialActions: [] }),
                 CAMPAIGN,
                 'magical_cunning',
                 MAP,
@@ -124,7 +124,7 @@ describe('celestialResilienceHandler', () => {
 
             // feature exists but automation is null
             result = await grantCelestialResilience(
-                makeCelestialStats({ characterAdvancement: [{ name: 'Celestial Resilience', automation: null }] }),
+                makeCelestialStats({ specialActions: [{ name: 'Celestial Resilience', automation: null }] }),
                 CAMPAIGN,
                 'magical_cunning',
                 MAP,
@@ -133,7 +133,7 @@ describe('celestialResilienceHandler', () => {
 
             // feature exists but automation is undefined
             result = await grantCelestialResilience(
-                makeCelestialStats({ characterAdvancement: [{ name: 'Celestial Resilience' }] }),
+                makeCelestialStats({ specialActions: [{ name: 'Celestial Resilience' }] }),
                 CAMPAIGN,
                 'magical_cunning',
                 MAP,
@@ -266,7 +266,7 @@ describe('celestialResilienceHandler', () => {
             getDistanceFeet.mockReturnValue(10);
 
             const stats = makeCelestialStats({
-                characterAdvancement: [
+                specialActions: [
                     {
                         name: 'Celestial Resilience',
                         automation: {
@@ -374,7 +374,7 @@ describe('celestialResilienceHandler', () => {
             getRuntimeValue.mockReturnValue(0);
 
             const stats = makeCelestialStats({
-                characterAdvancement: [
+                specialActions: [
                     {
                         name: 'Celestial Resilience',
                         automation: {
@@ -409,7 +409,7 @@ describe('celestialResilienceHandler', () => {
             getDistanceFeet.mockReturnValue(10);
 
             const stats = makeCelestialStats({
-                characterAdvancement: [
+                specialActions: [
                     {
                         name: 'Celestial Resilience',
                         automation: {

@@ -37,7 +37,7 @@ function getRuntimeUsesKey(featureName) {
 async function consumeResourceCost(auto, playerStats, campaignName, actionName) {
     if (auto.resourceCost === 'focus_point') {
         const isHandOfHarm = actionName === 'Hand of Harm';
-        const hasFlurryHealingHarm = playerStats.characterAdvancement?.some(f => f.name === "Flurry of Healing and Harm");
+        const hasFlurryHealingHarm = playerStats.specialActions?.some(f => f.name === "Flurry of Healing and Harm");
         const skipFP = isHandOfHarm && hasFlurryHealingHarm;
 
         if (!skipFP) {
@@ -205,7 +205,7 @@ export async function handle(action, playerStats, campaignName, mapName, allEqui
         }
 
         if (!event.detail.success) {
-            const hasPhysiciansTouch = playerStats.characterAdvancement?.some(f => f.name === "Physician's Touch");
+            const hasPhysiciansTouch = playerStats.specialActions?.some(f => f.name === "Physician's Touch");
             if (hasPhysiciansTouch) {
                 const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
                 const condArray = Array.isArray(conditions) ? conditions : [];

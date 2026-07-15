@@ -170,7 +170,7 @@ describe('CharActions monk ki', () => {
         const stats = createStats({
           class: { class_levels: [{ level: 5, focus_points: 2 }] },
           level: 5,
-          ...(tc.flurryHarm ? { characterAdvancement: [{ name: 'Flurry of Healing and Harm' }] } : {}),
+          ...(tc.flurryHarm ? { specialActions: [{ name: 'Flurry of Healing and Harm' }] } : {}),
           actions: [{ name: tc.actionName, description: 'Test action.', automation: { type: 'auto_effect' } }],
         });
 

@@ -322,7 +322,7 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
             const currentRage = storedRage != null ? Number(storedRage) : (trackedRage?.current ?? maxRage);
             if (currentRage < maxRage) restoredResources.push('Rage (2024)');
         }
-        const hasImprovedWardingFlare = playerStats.characterAdvancement?.some(f => f.name === 'Improved Warding Flare');
+        const hasImprovedWardingFlare = playerStats.specialActions?.some(f => f.name === 'Improved Warding Flare');
         if (hasImprovedWardingFlare) restoredResources.push('Warding Flare');
         if (hasFontOfInspiration) restoredResources.push('Bardic Inspiration (Font of Inspiration)');
         const hasArcaneRecovery = (playerStats.automation?.passives ?? []).some(p => p.type === 'resource_restoration' && p.resourceKey === 'arcaneRecoveryLevels');
@@ -331,7 +331,7 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         if (hasBolsteringTreats) restoredResources.push('Bolstering Treats');
         if (playerStats.class?.name === 'Warlock') restoredResources.push('Pact Magic (Warlock spell slots)');
         const hasCelestialResilience = playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron';
-        if (hasCelestialResilience && playerStats.characterAdvancement?.some(f => f.name === 'Celestial Resilience')) restoredResources.push('Celestial Resilience (temp HP)');
+        if (hasCelestialResilience && playerStats.specialActions?.some(f => f.name === 'Celestial Resilience')) restoredResources.push('Celestial Resilience (temp HP)');
         const hasTireless = playerStats.class?.name === 'Ranger' && playerStats.level >= 10;
         if (hasTireless) {
             const currentExhaustion = getRuntimeValue(playerStats.name, 'exhaustionLevel', campaignName);

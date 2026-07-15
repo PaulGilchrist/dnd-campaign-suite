@@ -10,7 +10,7 @@ export async function grantCelestialResilience(playerStats, campaignName, source
 
     if (!isCelestial) return null;
 
-    const features = playerStats.characterAdvancement || [];
+    const features = playerStats.specialActions || [];
     const feature = features.find(f => f.name === 'Celestial Resilience');
     if (!feature) return null;
 

@@ -8,7 +8,7 @@ export function checkDarkOnesBlessing(characters, creature, finalDamage, isPlaye
             if (!computed) continue;
             const isFiendPatron = computed.class?.subclass?.name === 'Fiend Patron';
             if (!isFiendPatron) continue;
-            const rawFeatures = computed.characterAdvancement;
+            const rawFeatures = computed.specialActions;
             if (rawFeatures == null || !Array.isArray(rawFeatures)) { console.error('[applyDamage] characterAdvancement is not an array'); throw new Error('characterAdvancement must be an array'); }
             const features = rawFeatures;
             const feature = features.find(f => f.name === "Dark One's Blessing");

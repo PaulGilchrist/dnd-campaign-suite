@@ -286,24 +286,23 @@ describe('restRules', () => {
         class: { name: 'Warlock', subclass: { name: 'Celestial Patron' }, major: { name: 'Celestial Patron' } },
         level: 6,
         abilities: [{ name: 'Strength', bonus: 3 }, { name: 'Charisma', bonus: 4 }],
-        characterAdvancement: [{ name: 'Celestial Resilience' }],
+        specialActions: [{ name: 'Celestial Resilience' }],
       })
       await applyShortRest(celestialStats, CAMPAIGN)
       expect(getBatchUpdates().tempHp).toBe(15)
 
       // Improved Warding Flare
       vi.clearAllMocks()
-      const flareStats = makeStats({ characterAdvancement: [{ name: 'Improved Warding Flare' }] })
+      const flareStats = makeStats({ specialActions: [{ name: 'Improved Warding Flare' }] })
       await applyShortRest(flareStats, CAMPAIGN)
       expect(getBatchUpdates().wardingflareUses).toBeNull()
     })
 
     it('throws when level is missing for Celestial Resilience and Arcane Recovery', async () => {
-      const missingLevelStats = (automation) => makeStats({
+      const missingLevelStats = (_automation) => makeStats({
         class: { name: 'Warlock', subclass: { name: 'Celestial Patron' } },
         level: null,
-        characterAdvancement: [{ name: 'Celestial Resilience' }],
-        automation,
+        specialActions: [{ name: 'Celestial Resilience' }],
       })
 
       await expect(applyShortRest(missingLevelStats({}), CAMPAIGN)).rejects.toThrow('playerStats.level is required')
@@ -372,7 +371,7 @@ describe('restRules', () => {
 
     it('grants feature-specific benefits on long rest', async () => {
       // Heroic Inspiration from Resourceful
-      const stats1 = makeStats({ characterAdvancement: [{ name: 'Resourceful' }] })
+      const stats1 = makeStats({ specialActions: [{ name: 'Resourceful' }] })
       await applyLongRest(stats1, CAMPAIGN)
       expect(getBatchUpdates().hasInspiration).toBe(true)
 
@@ -397,7 +396,7 @@ describe('restRules', () => {
         class: { name: 'Warlock', subclass: { name: 'Celestial Patron' }, major: { name: 'Celestial Patron' } },
         level: 6,
         abilities: [{ name: 'Strength', bonus: 3 }, { name: 'Charisma', bonus: 4 }],
-        characterAdvancement: [{ name: 'Celestial Resilience' }],
+        specialActions: [{ name: 'Celestial Resilience' }],
       })
       await applyLongRest(celestialStats, CAMPAIGN)
       expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -406,7 +405,7 @@ describe('restRules', () => {
 
       // Improved Warding Flare
       vi.clearAllMocks()
-      const flareStats = makeStats({ characterAdvancement: [{ name: 'Improved Warding Flare' }] })
+      const flareStats = makeStats({ specialActions: [{ name: 'Improved Warding Flare' }] })
       await applyLongRest(flareStats, CAMPAIGN)
       expect(getBatchUpdates().wardingflareUses).toBeNull()
     })

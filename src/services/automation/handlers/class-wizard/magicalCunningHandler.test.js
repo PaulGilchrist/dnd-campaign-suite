@@ -139,7 +139,7 @@ describe('magicalCunningHandler', () => {
             expect(result.payload.description).toContain('Eldritch Master')
         })
 
-        it('regains all expended slots for Eldritch Master via characterAdvancement', async () => {
+        it('regains all expended slots for Eldritch Master via specialActions', async () => {
             getRuntimeValue.mockImplementation((_name, key, _campaign) => {
                 if (key === 'spell_slots_level_1') return 0
                 return null
@@ -150,7 +150,7 @@ describe('magicalCunningHandler', () => {
                 makePlayerStats({
                     resources: { warlockPactMagic: { max: 2 } },
                     spellAbilities: { spell_slots_level_1: 2 },
-                    characterAdvancement: [{ name: 'Eldritch Master' }],
+                    specialActions: [{ name: 'Eldritch Master' }],
                 }),
                 campaignName,
                 null,
@@ -195,7 +195,7 @@ describe('magicalCunningHandler', () => {
                 defaultAction,
                 makePlayerStats({
                     class: { name: 'Warlock', major: { name: 'Celestial Patron' } },
-                    characterAdvancement: [{ name: 'Celestial Resilience' }],
+                    specialActions: [{ name: 'Celestial Resilience' }],
                 }),
                 campaignName,
                 null,

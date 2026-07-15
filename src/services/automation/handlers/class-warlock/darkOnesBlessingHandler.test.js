@@ -40,7 +40,7 @@ function makeFiendWarlockStats(overrides = {}) {
     return {
         name: 'TestWarlock',
         class: { subclass: { name: 'Fiend Patron' } },
-        characterAdvancement: [{ name: "Dark One's Blessing", automation: { tempHpExpression: 'CHA modifier + warlock level', range: '10_ft' } }],
+        specialActions: [{ name: "Dark One's Blessing", automation: { tempHpExpression: 'CHA modifier + warlock level', range: '10_ft' } }],
         abilities: [{ name: 'Charisma', bonus: 5 }],
         level: 1,
         ...overrides,
@@ -51,7 +51,7 @@ function makeOtherWarlockStats(overrides = {}) {
     return {
         name: 'TestWarlock',
         class: { subclass: { name: 'Other Patron' } },
-        characterAdvancement: [{ name: "Dark One's Blessing" }],
+        specialActions: [{ name: "Dark One's Blessing" }],
         ...overrides,
     };
 }
@@ -72,12 +72,12 @@ describe('darkOnesBlessingHandler', () => {
                 ['Fiend patron without automation', {
                     name: 'TestWarlock',
                     class: { subclass: { name: 'Fiend Patron' } },
-                    characterAdvancement: [{ name: "Dark One's Blessing" }],
+                    specialActions: [{ name: "Dark One's Blessing" }],
                 }],
                 ['Fiend patron with feature but no automation property', {
                     name: 'TestWarlock',
                     class: { subclass: { name: 'Fiend Patron' } },
-                    characterAdvancement: [{ name: "Dark One's Blessing", automation: null }],
+                    specialActions: [{ name: "Dark One's Blessing", automation: null }],
                 }],
             ])('returns null when %s', async (_, playerStats) => {
                 const result = await grantDarkOnesBlessing(playerStats, 'campaign', null, null);

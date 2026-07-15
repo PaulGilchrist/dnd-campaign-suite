@@ -304,7 +304,7 @@ describe('reactionDamageHandler', () => {
                 return undefined;
             });
             const ps = makePlayerStats({
-                characterAdvancement: [{ name: "Flurry of Healing and Harm" }],
+                specialActions: [{ name: "Flurry of Healing and Harm" }],
             });
             const action = makeAction({
                 name: 'Hand of Harm',
@@ -468,7 +468,7 @@ describe('reactionDamageHandler', () => {
             const action = makeAction({ automation: { saveType: 'CON' } });
             resolveTarget.mockResolvedValue({ target: { name: 'Enemy' } });
             const statsWithPhysiciansTouch = makePlayerStats({
-                characterAdvancement: [{ name: "Physician's Touch" }],
+                specialActions: [{ name: "Physician's Touch" }],
             });
 
             await handle(action, statsWithPhysiciansTouch, 'test-campaign', null);

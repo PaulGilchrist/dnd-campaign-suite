@@ -89,7 +89,7 @@ function createFiendWarlock(name, level, chaScore, warlockLevel) {
       },
       class_levels: [{ level: warlockLevel ?? level }],
       abilities: [{ name: 'Charisma', score: chaScore }],
-      characterAdvancement: [{
+      specialActions: [{
         name: "Dark One's Blessing",
         automation: {
           type: 'dark_ones_blessing',
@@ -117,7 +117,7 @@ function createNonFiendWarlock(name, level, chaScore, patronName) {
       },
       class_levels: [{ level }],
       abilities: [{ name: 'Charisma', score: chaScore }],
-      characterAdvancement: [{
+      specialActions: [{
         name: "Dark One's Blessing",
         automation: {
           type: 'dark_ones_blessing',
@@ -206,12 +206,12 @@ describe('Dark One\'s Blessing', () => {
     const goblin = createCreature('Goblin', 5, 5);
     const cs = makeCombatSummary([goblin]);
 
-    // Test: no characterAdvancement
+    // Test: no specialActions
     const warlockNoFeature = {
       ...createFiendWarlock('NoFeatureWarlock', 5, 16, 5),
       computedStats: {
         ...createFiendWarlock('NoFeatureWarlock', 5, 16, 5).computedStats,
-        characterAdvancement: [],
+        specialActions: [],
       },
     };
     stubPlayerRuntime(0);
@@ -225,7 +225,7 @@ describe('Dark One\'s Blessing', () => {
       ...createFiendWarlock('NoAutomationWarlock', 5, 16, 5),
       computedStats: {
         ...createFiendWarlock('NoAutomationWarlock', 5, 16, 5).computedStats,
-        characterAdvancement: [{
+        specialActions: [{
           name: "Dark One's Blessing",
           automation: null,
         }],

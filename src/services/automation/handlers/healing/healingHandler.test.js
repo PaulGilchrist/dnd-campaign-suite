@@ -711,7 +711,7 @@ describe('healingHandler', () => {
     it('should include hasPhysiciansTouch in modal payload when feature exists', async () => {
       const ps = makePlayerStats({
         abilities: [{ name: 'Wisdom', bonus: 2 }],
-        characterAdvancement: [{ name: "Physician's Touch" }],
+        specialActions: [{ name: "Physician's Touch" }],
       });
       const action = makeAction({ healExpression: 'martial_arts_die + WIS' });
 

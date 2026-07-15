@@ -107,11 +107,11 @@ describe('healingPoolHandler.handle', () => {
     });
   });
 
-  describe('restoringTouchConditions from characterAdvancement', () => {
+  describe('restoringTouchConditions from specialActions', () => {
     it('extracts cureConditions when Restoring Touch feature exists, returns empty array otherwise', async () => {
       // positive case: feature found with cureConditions
       const playerStats = {
-        characterAdvancement: [
+        specialActions: [
           {
             name: 'Restoring Touch',
             automation: { cureConditions: ['Bloodied', 'Unconscious'] },
@@ -134,12 +134,12 @@ describe('healingPoolHandler.handle', () => {
 
       // negative cases: none of these produce cureConditions
       const negativeCases = [
-        { characterAdvancement: [{ name: 'Other Feature' }] },
-        { characterAdvancement: [{ name: 'Restoring Touch' }] },
-        { characterAdvancement: [{ name: 'Restoring Touch', automation: {} }] },
-        { characterAdvancement: [{ name: 'Restoring Touch', automation: null }] },
+        { specialActions: [{ name: 'Other Feature' }] },
+        { specialActions: [{ name: 'Restoring Touch' }] },
+        { specialActions: [{ name: 'Restoring Touch', automation: {} }] },
+        { specialActions: [{ name: 'Restoring Touch', automation: null }] },
         {},
-        { characterAdvancement: null },
+        { specialActions: null },
       ];
 
       for (const stats of negativeCases) {

@@ -3,9 +3,9 @@ import { resolveHealingPoolExpression } from '../../../combat/automation/automat
 export async function handle(action, playerStats, _campaignName, _mapName) {
     const auto = action.automation;
 
-    const restoringTouchData = playerStats.characterAdvancement?.find(
-         f => f.name === 'Restoring Touch'
-         );
+    const restoringTouchData = playerStats.specialActions?.find(
+          f => f.name === 'Restoring Touch'
+          );
 
     const baseExpression = auto.poolExpression || '';
     const resolvedExpression = resolveHealingPoolExpression(baseExpression, auto.scaling, playerStats);
