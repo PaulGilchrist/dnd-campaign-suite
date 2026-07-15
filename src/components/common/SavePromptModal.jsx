@@ -218,18 +218,50 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
     return name && utils.getName(name) === utils.getName(current.targetName);
   });
 
-  const hasStrokeOfLuck = targetCharacter && targetCharacter.computedStats?.automation?.passives?.some(
-    p => p.type === 'stroke_of_luck'
-  );
-  const strokeOfLuckUsed = current && hasStrokeOfLuck ? getRuntimeValue(current.targetName, 'strokeOfLuckUsed', campaignName) : false;
-  const strokeOfLuckAvailable = hasStrokeOfLuck && !strokeOfLuckUsed;
+  const rageDamageBonus = targetCharacter?.class?.class_levels?.[(targetCharacter.level || 1) - 1]?.rage_damage ?? 2;
+  const fanaticalFocusUsed = current ? getRuntimeValue(current.targetName, 'fanaticalFocusUsed', campaignName) : false;
+  const activeBuffsForSave = getRuntimeValue(current?.targetName, 'activeBuffs', campaignName) || [];
+  const isRagingForSave = Array.isArray(activeBuffsForSave) && activeBuffsForSave.some(b => b.damageBonusExpression);
+  const fanaticalFocusAvailable = isRagingForSave && !fanaticalFocusUsed;
 
-  const handleStrokeOfLuck = useCallback(async () => {
-    if (!strokeOfLuckAvailable || !current) return;
-    forceRollTo20Ref.current = true;
-    await handleRollSave();
-    setRuntimeValue(current.targetName, 'strokeOfLuckUsed', true, campaignName);
-  }, [strokeOfLuckAvailable, handleRollSave, current, campaignName]);
+  const handleFanaticalFocus = useCallback(async () => {
+    if (!fanaticalFocusAvailable || !current) return;
+    setRuntimeValue(current.targetName, 'fanaticalFocusUsed', true, campaignName);
+    const rerollBonus = rageDamageBonus;
+    let saveBonus = 0;
+    let character = null;
+    try {
+      character = (characters || []).find(c => {
+        const name = typeof c === 'string' ? c : c.name;
+        return name && utils.getName(name) === utils.getName(current.targetName);
+      });
+      if (character && typeof character !== 'string') {
+        saveBonus = getAbilitySaveBonus(character.computedStats || character, current.saveType);
+      }
+    } catch { /* ignore */ }
+    const aura = await computeAuraBonus({ targetName: current.targetName, characters, campaignName, activeMapName });
+    const roll1 = rollD20();
+    const roll2 = current.disadvantage ? rollD20() : roll1;
+    const finalRoll = current.disadvantage ? Math.min(roll1, roll2) : roll1;
+    const total = finalRoll + saveBonus + aura.bonus + rerollBonus;
+    const success = total >= current.saveDc;
+    sendSaveResult(campaignName, current.targetName, {
+      promptId: current.promptId,
+      success,
+      roll: finalRoll,
+      total,
+      saveBonus: saveBonus + aura.bonus + rerollBonus,
+      rawRolls: [roll1, roll2],
+      mode: current.disadvantage ? 'disadvantage' : 'normal',
+      bonusDetail: `(+${rerollBonus} Fanatical Focus)`,
+    });
+    setPrompts(prev => prev.map((p, i) =>
+      i === 0
+        ? { ...p, result: { success, roll: finalRoll, total, saveBonus: saveBonus + aura.bonus + rerollBonus, bonusDetail: `(+${rerollBonus} Fanatical Focus)`, rawRolls: [roll1, roll2], mode: current.disadvantage ? 'disadvantage' : 'normal' } }
+        : p
+    ));
+    clearSavePrompt(campaignName, current.targetName);
+  }, [fanaticalFocusAvailable, rageDamageBonus, current, campaignName, characters, activeMapName]);
 
   return (
     <>
@@ -279,6 +311,11 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
                   <p className="sp-result-label">{current.result.success ? 'SAVE SUCCESS' : 'SAVE FAILURE'}</p>
                   <p className="sp-result-total">Total: <strong>{current.result.total}</strong> vs DC {current.saveDc}</p>
                   <p className="sp-result-breakdown">d20 ({current.result.roll}) + {current.result.saveBonus}{current.result.bonusDetail ? ' ' + current.result.bonusDetail : ''}{current.result.mode === 'advantage' ? ' (Advantage)' : current.result.mode === 'disadvantage' ? ' (Disadvantage)' : ''}</p>
+                  {!current.result.success && fanaticalFocusAvailable && (
+                    <button className="sp-stroke-btn" onClick={handleFanaticalFocus} type="button">
+                      <i className="fa-solid fa-rotate"></i> Reroll Save (+{rageDamageBonus})
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -288,11 +325,6 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
                   <button className="sp-roll-btn" onClick={handleRollSave} type="button">
                     <i className="fa-solid fa-dice-d20"></i> Roll Save
                   </button>
-                  {strokeOfLuckAvailable && (
-                    <button className="sp-stroke-btn" onClick={handleStrokeOfLuck} type="button">
-                      <i className="fa-solid fa-star"></i> Stroke of Luck
-                    </button>
-                  )}
                   <button className="sp-dismiss-btn" onClick={handleDismiss} type="button">
                     Dismiss
                   </button>

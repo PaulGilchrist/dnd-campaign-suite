@@ -178,7 +178,11 @@ describe('SavePromptModal', () => {
     vi.clearAllMocks();
     setupGlobalEventSource();
     rollD20.mockReturnValue(15);
-    getRuntimeValue.mockReturnValue(null);
+    computeAuraBonus.mockResolvedValue({ bonus: 0, sourceName: null });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -608,30 +612,11 @@ describe('SavePromptModal', () => {
     });
   });
 
-  // ── Stroke of Luck ──
+  // ── Fanatical Focus ──
 
-  it('does not show Stroke of Luck button when target has no stroke_of_luck passive', async () => {
-    const targetChar = createCharacter('testTarget');
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[targetChar]}
-        activeMapName={null}
-      />
-    );
-
-    const trigger = screen.getByTestId('subscriber-trigger');
-    fireEvent.click(trigger);
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-    });
-
-    expect(screen.queryByRole('button', { name: 'Stroke of Luck' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Roll Save' })).toBeInTheDocument();
-  });
-
-  it('shows Stroke of Luck button when available, rolls 20 and marks as used', async () => {
+  it('does not show Fanatical Focus reroll button when not raging', async () => {
+    rollD20.mockReturnValue(1);
+    getRuntimeValue.mockReturnValue(null);
     const targetChar = {
       name: 'testTarget',
       computedStats: {
@@ -639,14 +624,13 @@ describe('SavePromptModal', () => {
           { name: 'Constitution', bonus: 3 },
         ],
         evasionEffects: [],
-        automation: { passives: [{ type: 'stroke_of_luck' }] },
+        automation: { passives: [] },
+        class: { class_levels: [{ rage_damage: 2 }] },
+        level: 6,
       },
       saveModifiers: [],
+      level: 6,
     };
-    getRuntimeValue.mockImplementation((key, prop, _campaign) => {
-      if (key === 'testTarget' && prop === 'strokeOfLuckUsed') return false;
-      return null;
-    });
 
     render(
       <SavePromptModal
@@ -663,26 +647,172 @@ describe('SavePromptModal', () => {
       expect(screen.getByText(/must make a/i)).toBeInTheDocument();
     });
 
-    expect(screen.getByRole('button', { name: 'Stroke of Luck' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Reroll Save/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Roll Save' })).toBeInTheDocument();
+  });
 
-    const strokeBtn = screen.getByRole('button', { name: 'Stroke of Luck' });
-    fireEvent.click(strokeBtn);
+  it('does not show Fanatical Focus reroll button before the save is rolled', async () => {
+    rollD20.mockReturnValue(1);
+    getRuntimeValue.mockImplementation((key, prop) => {
+      if (prop === 'activeBuffs') return [{ damageBonusExpression: 'rage_damage' }];
+      if (prop === 'fanaticalFocusUsed') return false;
+      if (prop === 'activeConditions') return [];
+      return null;
+    });
+    const targetChar = {
+      name: 'testTarget',
+      computedStats: {
+        abilities: [
+          { name: 'Constitution', bonus: 3 },
+        ],
+        evasionEffects: [],
+        automation: { passives: [] },
+        class: { class_levels: [{ rage_damage: 3 }] },
+        level: 6,
+      },
+      saveModifiers: [],
+      level: 6,
+    };
+
+    render(
+      <SavePromptModal
+        campaignName="test-campaign"
+        characters={[targetChar]}
+        activeMapName={null}
+      />
+    );
+
+    const trigger = screen.getByTestId('subscriber-trigger');
+    fireEvent.click(trigger);
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: /Reroll Save/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Roll Save' })).toBeInTheDocument();
+  });
+
+  it('shows Fanatical Focus reroll button after a failed save while raging', async () => {
+    rollD20.mockReturnValue(1);
+    getRuntimeValue.mockImplementation((key, prop) => {
+      if (prop === 'activeBuffs') return [{ damageBonusExpression: 'rage_damage' }];
+      if (prop === 'fanaticalFocusUsed') return false;
+      if (prop === 'activeConditions') return [];
+      return null;
+    });
+    const targetChar = {
+      name: 'testTarget',
+      computedStats: {
+        abilities: [
+          { name: 'Constitution', bonus: 3 },
+        ],
+        evasionEffects: [],
+        automation: { passives: [] },
+        class: { class_levels: [{ rage_damage: 2 }] },
+        level: 1,
+      },
+      saveModifiers: [],
+      level: 1,
+    };
+
+    render(
+      <SavePromptModal
+        campaignName="test-campaign"
+        characters={[targetChar]}
+        activeMapName={null}
+      />
+    );
+
+    const trigger = screen.getByTestId('subscriber-trigger');
+    fireEvent.click(trigger);
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: /Reroll Save/ })).not.toBeInTheDocument();
+
+    const rollBtn = screen.getByRole('button', { name: 'Roll Save' });
+    fireEvent.click(rollBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/SAVE FAILURE/)).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('button', { name: /Reroll Save \(\+2\)/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Done' })).toBeInTheDocument();
+  });
+
+  it('rerolls save with rage damage bonus when Fanatical Focus is used', async () => {
+    rollD20
+      .mockReturnValueOnce(1)
+      .mockReturnValue(15);
+    getRuntimeValue.mockImplementation((key, prop) => {
+      if (prop === 'activeBuffs') return [{ damageBonusExpression: 'rage_damage' }];
+      if (prop === 'fanaticalFocusUsed') return false;
+      if (prop === 'activeConditions') return [];
+      return null;
+    });
+    const targetChar = {
+      name: 'testTarget',
+      computedStats: {
+        abilities: [
+          { name: 'Constitution', bonus: 3 },
+        ],
+        evasionEffects: [],
+        automation: { passives: [] },
+        class: { class_levels: [{ rage_damage: 2 }] },
+        level: 1,
+      },
+      saveModifiers: [],
+      level: 1,
+    };
+
+    render(
+      <SavePromptModal
+        campaignName="test-campaign"
+        characters={[targetChar]}
+        activeMapName={null}
+      />
+    );
+
+    const trigger = screen.getByTestId('subscriber-trigger');
+    fireEvent.click(trigger);
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
+    });
+
+    const rollBtn = screen.getByRole('button', { name: 'Roll Save' });
+    fireEvent.click(rollBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/SAVE FAILURE/)).toBeInTheDocument();
+    });
+
+    const rerollBtn = screen.getByRole('button', { name: /Reroll Save \(\+2\)/ });
+    fireEvent.click(rerollBtn);
 
     await waitFor(() => {
       expect(screen.getByText(/SAVE SUCCESS/)).toBeInTheDocument();
     });
 
-    expect(rollD20).not.toHaveBeenCalled();
-    expect(setRuntimeValue).toHaveBeenCalledWith('testTarget', 'strokeOfLuckUsed', true, 'test-campaign');
+    expect(setRuntimeValue).toHaveBeenCalledWith('testTarget', 'fanaticalFocusUsed', true, 'test-campaign');
     expect(sendSaveResult).toHaveBeenCalledWith('test-campaign', 'testTarget', expect.objectContaining({
       promptId: 'test-prompt-1',
-      roll: 20,
-      success: true,
+      bonusDetail: expect.stringContaining('Fanatical Focus'),
     }));
   });
 
-  it('does not show Stroke of Luck button when already used', async () => {
+  it('does not show Fanatical Focus reroll button after it has been used', async () => {
+    rollD20.mockReturnValue(1);
+    getRuntimeValue.mockImplementation((key, prop) => {
+      if (prop === 'activeBuffs') return [{ damageBonusExpression: 'rage_damage' }];
+      if (prop === 'fanaticalFocusUsed') return true;
+      if (prop === 'activeConditions') return [];
+      return null;
+    });
     const targetChar = {
       name: 'testTarget',
       computedStats: {
@@ -690,14 +820,13 @@ describe('SavePromptModal', () => {
           { name: 'Constitution', bonus: 3 },
         ],
         evasionEffects: [],
-        automation: { passives: [{ type: 'stroke_of_luck' }] },
+        automation: { passives: [] },
+        class: { class_levels: [{ rage_damage: 2 }] },
+        level: 6,
       },
       saveModifiers: [],
+      level: 6,
     };
-    getRuntimeValue.mockImplementation((key, prop, _campaign) => {
-      if (key === 'testTarget' && prop === 'strokeOfLuckUsed') return true;
-      return null;
-    });
 
     render(
       <SavePromptModal
@@ -714,7 +843,13 @@ describe('SavePromptModal', () => {
       expect(screen.getByText(/must make a/i)).toBeInTheDocument();
     });
 
-    expect(screen.queryByRole('button', { name: 'Stroke of Luck' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Roll Save' })).toBeInTheDocument();
+    const rollBtn = screen.getByRole('button', { name: 'Roll Save' });
+    fireEvent.click(rollBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/SAVE FAILURE/)).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: /Reroll Save/ })).not.toBeInTheDocument();
   });
 });
