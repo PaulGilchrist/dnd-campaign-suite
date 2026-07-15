@@ -631,6 +631,8 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                     if (creature) {
                         creature.initiative = String(newTotal);
                         cs.creatures.sort((a, b) => b.initiative - a.initiative);
+                        cs.activeCreatureName = cs.creatures[0]?.name;
+                        console.error('[CharSheet initiative adjust] set activeCreatureName:', cs.activeCreatureName);
                         storageService.default.set('combatSummary', cs, campaignName);
                     }
                 }

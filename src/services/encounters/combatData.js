@@ -24,6 +24,9 @@ export async function loadCombatSummary(campaignName) {
     try {
       const fromApi = await getCombatContext(campaignName)
       if (fromApi) {
+        if (fromApi.creatures?.length > 0 && !fromApi.activeCreatureName) {
+          fromApi.activeCreatureName = fromApi.creatures[0].name
+        }
         setCombatSummaryCache(fromApi, campaignName)
         return fromApi
       }

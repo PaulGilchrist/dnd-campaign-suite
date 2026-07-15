@@ -45,7 +45,11 @@ export async function getCombatContext(campaignName) {
       return null;
     }
     const data = await response.json();
-    return data.combatSummary || null;
+    const combatSummary = data.combatSummary || null;
+    if (combatSummary && !combatSummary.activeCreatureName && data.activeCreatureName) {
+      combatSummary.activeCreatureName = data.activeCreatureName;
+    }
+    return combatSummary;
    } catch (err) {
     console.error('[getCombatContext] Error fetching change-data:', err.message);
     return null;

@@ -94,6 +94,7 @@ function setInitiative(combatSummary, creatureName, value) {
     if (index === -1) return
     combatSummary.creatures[index].initiative = value
     combatSummary.creatures.sort((a, b) => b.initiative - a.initiative)
+    combatSummary.activeCreatureName = combatSummary.creatures[0]?.name
 }
 
 function rollNpcInitiative(combatSummary, creatureName) {
@@ -104,6 +105,7 @@ function rollNpcInitiative(combatSummary, creatureName) {
     const total = roll + bonus
     creature.initiative = String(total)
     combatSummary.creatures.sort((a, b) => b.initiative - a.initiative)
+    combatSummary.activeCreatureName = combatSummary.creatures[0]?.name
     return { roll, bonus, total }
 }
 

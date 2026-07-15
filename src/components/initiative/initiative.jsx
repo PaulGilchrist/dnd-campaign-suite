@@ -210,8 +210,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                const prevActive = activeCreatureNameRef.current
                const newActive = event.data
                activeCreatureNameRef.current = newActive
-               const cs = combatSummaryRef.current
+               const cs = combatSummaryRef.current || getCombatSummary(campaignName)
                if (cs) {
+                   cs.activeCreatureName = newActive
                    setCombatSummaryCache(cs, campaignName)
                }
                setActiveCreatureNameG(newActive)
@@ -282,18 +283,22 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     const isPrevDisabled = isPreviousDisabled(combatSummary, activeCreatureName)
 
       const handleNextCreature = React.useCallback(() => {
-           const cs = combatSummaryRef.current
-           if (!cs) return
-           const { newActiveName, roundIncrement } = getNextCreatureName(cs, activeCreatureName)
-           if (!roundIncrement) {
-              storage.set('activeCreatureName', newActiveName, campaignName)
-              setActiveCreatureName(newActiveName)
-             } else {
-               cs.round++
-               storage.set('combatSummary', cs, campaignName)
-               setCombatSummary(cloneDeep(cs))
+            const cs = combatSummaryRef.current
+            if (!cs) return
+            const { newActiveName, roundIncrement } = getNextCreatureName(cs, activeCreatureName)
+            if (!roundIncrement) {
+               cs.activeCreatureName = newActiveName
+               console.error('[handleNextCreature] set activeCreatureName:', newActiveName);
                storage.set('activeCreatureName', newActiveName, campaignName)
-                setActiveCreatureName(newActiveName)
+               setActiveCreatureName(newActiveName)
+              } else {
+                cs.round++
+                cs.activeCreatureName = newActiveName
+                console.error('[handleNextCreature+round] set activeCreatureName:', newActiveName);
+                storage.set('combatSummary', cs, campaignName)
+                setCombatSummary(cloneDeep(cs))
+                storage.set('activeCreatureName', newActiveName, campaignName)
+                 setActiveCreatureName(newActiveName)
                  for (const creature of cs.creatures) {
                      clearPerRoundMajestyTrackers(creature.name, campaignName)
                      if (creature.type === 'player') {
@@ -344,21 +349,28 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 if (!activeCreatureNameRef.current) {
                     const activeName = getActiveCreatureName(campaignName)
                     if (activeName) {
+                        merged.activeCreatureName = activeName
+                        console.error('[initial load] loaded activeCreatureName from cache:', activeName);
                         setActiveCreatureName(activeName)
                         activeCreatureNameRef.current = activeName
                     } else {
-                        setActiveCreatureName(merged.creatures[0]?.name || null)
-                        activeCreatureNameRef.current = merged.creatures[0]?.name || null
+                        const firstCreature = merged.creatures[0]?.name || null
+                        merged.activeCreatureName = firstCreature
+                        console.error('[initial load] set activeCreatureName from first creature:', firstCreature);
+                        setActiveCreatureName(firstCreature)
+                        activeCreatureNameRef.current = firstCreature
                     }
                 }
             } else {
                 if (cancelled) return
                 const creatures = setupCreatures(characters, numOfNpc, utils.getName)
                 const newSummary = { round: 1, creatures }
+                const firstName = creatures[0]?.name
+                newSummary.activeCreatureName = firstName
+                console.error('[initial load new] set activeCreatureName:', firstName);
                 storage.set('combatSummary', newSummary, campaignName)
                 setCombatSummary(newSummary)
                 combatSummaryRef.current = newSummary
-                const firstName = creatures[0]?.name
                 storage.set('activeCreatureName', firstName, campaignName)
                 setActiveCreatureName(firstName)
                 activeCreatureNameRef.current = firstName
@@ -422,6 +434,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             const summary = getCombatSummary(campaignName)
             if (!summary) return
             combatSummaryRef.current = summary
+            summary.activeCreatureName = summary.creatures[0]?.name
             let clearedHuntersMark = false
             for (const creature of (summary?.creatures || [])) {
                 if (creature.type === 'player') {

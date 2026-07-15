@@ -7,6 +7,10 @@ import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { infoPopup } from '../../common/infoPopup.js';
+import { getActiveCreatureName, getCombatSummary, loadCombatSummary } from '../../../encounters/combatData.js';
+import { getAbilityModifier } from '../../../shared/abilityLookup.js';
+import { createSaveListener } from '../../common/savePrompt.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
 
 function getRuntimeUsesKey(featureName) {
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
@@ -143,6 +147,130 @@ async function handleDisadvantageDebuff(action, _playerStats, campaignName, atta
     }
 
     return infoPopup(action.name, description, auto, { defenderHp, defenderName, healedAmount });
+}
+
+async function handleTeleportAndSlow(action, playerStats, campaignName, mapName) {
+    const auto = action.automation;
+    const featureName = action.name || 'Branches of the Tree';
+    const playerName = playerStats.name;
+
+    await loadCombatSummary(campaignName);
+    const activeCreatureName = getActiveCreatureName(campaignName);
+    if (!activeCreatureName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: `No active creature found. ${featureName} triggers when a creature starts its turn within 30 feet.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const rangeFt = rangeToFeet(auto.range || '30_ft');
+    const activeMapName = getRuntimeValue('__map__', 'activeMapName');
+
+    if (activeMapName && mapName) {
+        const combatSummary = getCombatSummary(campaignName);
+        if (combatSummary) {
+            const playerCreature = combatSummary.players?.find(p => p.name === playerName);
+            const targetCreature = combatSummary.creatures?.find(c => c.name === activeCreatureName);
+
+            if (playerCreature?.gridX != null && playerCreature?.gridY != null &&
+                targetCreature?.gridX != null && targetCreature?.gridY != null) {
+                const dist = getDistanceFeet(
+                    { gridX: playerCreature.gridX, gridY: playerCreature.gridY },
+                    { gridX: targetCreature.gridX, gridY: targetCreature.gridY }
+                );
+                if (dist != null && dist > rangeFt) {
+                    return {
+                        type: 'popup',
+                        payload: {
+                            type: 'automation_info',
+                            name: featureName,
+                            description: `${activeCreatureName} is out of range (${Math.round(dist)} ft > ${rangeFt} ft).`,
+                            automation: auto,
+                        },
+                    };
+                }
+            }
+        }
+    }
+
+    const strMod = getAbilityModifier(playerStats.abilities, 'STR');
+    const prof = playerStats.proficiency || 0;
+    const saveDc = 8 + strMod + prof;
+
+    const { promptId } = createSaveListener(campaignName, {
+        targetName: activeCreatureName,
+        saveType: 'STR',
+        saveDc,
+    });
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: featureName,
+        description: `${playerName} used ${featureName} — ${activeCreatureName} must make STR save (DC ${saveDc}) or be teleported and have speed reduced to 0.`,
+        promptId,
+    }).catch((e) => { console.error("[branchesOfTheTree] Error:", e); });
+
+    const handleSaveResult = async (event) => {
+        if (event.detail.promptId !== promptId) return;
+
+        const isSuccessful = event.detail.success;
+
+        if (!isSuccessful) {
+            const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+            const effects = Array.isArray(storedEffects) ? storedEffects : [];
+            effects.push({
+                effect: 'speed_reduction',
+                target: activeCreatureName,
+                source: featureName,
+                value: 1000,
+            });
+            await setRuntimeValue(campaignName, 'targetEffects', effects, campaignName);
+
+            addExpiration(playerName, activeCreatureName, [
+                { type: 'remove_target_effect', effectKey: 'speed_reduction', source: featureName, target: activeCreatureName }
+            ], campaignName, 1);
+
+            addEntry(campaignName, {
+                type: 'save_result',
+                characterName: playerName,
+                targetName: activeCreatureName,
+                saveDc,
+                saveType: 'STR',
+                success: false,
+                description: `${activeCreatureName} failed STR save. ${activeCreatureName} is teleported and speed reduced to 0 until end of current turn.`,
+            }).catch((e) => { console.error("[branchesOfTheTree] Error:", e); });
+        } else {
+            addEntry(campaignName, {
+                type: 'save_result',
+                characterName: playerName,
+                targetName: activeCreatureName,
+                saveDc,
+                saveType: 'STR',
+                success: true,
+                description: `${activeCreatureName} succeeded on STR save. ${featureName} has no effect.`,
+            }).catch((e) => { console.error("[branchesOfTheTree] Error:", e); });
+        }
+
+        window.removeEventListener('save-result', handleSaveResult);
+    };
+
+    window.addEventListener('save-result', handleSaveResult);
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: featureName,
+            targetName: activeCreatureName,
+            description: `${activeCreatureName} must make a STR saving throw (DC ${saveDc}) or be teleported and have speed reduced to 0.`,
+        },
+    };
 }
 
 async function applyImprovedWardingFlare(playerStats, defenderName, campaignName) {
@@ -323,6 +451,8 @@ export async function handle(action, playerStats, campaignName, mapName) {
         }
 
         result = await handleDisadvantageDebuff(action, playerStats, campaignName, attackerName, combatSummary);
+    } else if (effect === 'teleport_and_slow') {
+        result = await handleTeleportAndSlow(action, playerStats, campaignName, mapName);
     } else {
         const targetInfo = await resolveTarget(campaignName, playerName);
         if (!targetInfo?.target) {

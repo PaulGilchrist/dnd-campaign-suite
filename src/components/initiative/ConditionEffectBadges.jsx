@@ -17,7 +17,10 @@ function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, c
     if (stealthAttackCost > 0) {
         badges.push({ label: 'Stealth Attack', cls: 'effect-stealth-attack', icon: 'fa-eye-slash', removable: false })
     }
-    if (effects.speedReduction) badges.push({ label: `Speed -${effects.speedReduction}`, cls: 'effect-speed-zero', icon: 'fa-minus', removable: false })
+    if (effects.speedReduction) {
+        const label = effects.speedReduction >= 1000 ? 'Speed 0' : `Speed -${effects.speedReduction}`
+        badges.push({ label, cls: 'effect-speed-zero', icon: 'fa-minus', removable: false })
+    }
     if (effects.noAdvantageAgainst) badges.push({ label: 'No Adv vs', cls: 'effect-target-disadv', icon: 'fa-arrow-down', removable: false })
     if (effects.targetDisadvantageCount > 0 && !effects.noAdvantageAgainst) badges.push({ label: 'Disadv vs', cls: 'effect-target-disadv', icon: 'fa-arrow-down', removable: false })
     if (effects.riderSaveDisadvantage) badges.push({ label: 'Save Disadv', cls: 'effect-disadvantage', icon: 'fa-shield', removable: false })

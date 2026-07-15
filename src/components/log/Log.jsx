@@ -592,6 +592,31 @@ function AutomationEntry({ entry }) {
   );
 }
 
+function SaveResultEntry({ entry }) {
+  const isSuccess = entry.success;
+  return (
+    <div className={`log-entry log-save-result ${isSuccess ? 'log-save-result-success' : 'log-save-result-failure'}`}>
+      <div className="log-entry-header">
+        <span className="log-icon"><i className="fas fa-shield-halved"></i></span>
+        <span className="log-character">{entry.characterName}</span>
+        <span className="log-name">Saving Throw — {entry.targetName}</span>
+        <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
+      </div>
+      <div className="log-save-result-details">
+        <span className="log-save-info">
+          {entry.saveType?.toUpperCase()} save DC {entry.saveDc}
+        </span>
+        <span className={`log-save-result ${isSuccess ? 'log-condition-success' : 'log-condition-failure'}`}>
+          {isSuccess ? 'SAVE SUCCESS' : 'SAVE FAILURE'}
+        </span>
+        {entry.description && (
+          <span className="log-save-result-description" dangerouslySetInnerHTML={{ __html: entry.description }} />
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Log({ campaignName, characters }) {
   const { logEntries, initialized, addEntry } = useLog(campaignName);
   const [noteText, setNoteText] = useState('');
@@ -667,6 +692,7 @@ export default function Log({ campaignName, characters }) {
             {entry.type === 'short_rest' && <RestEntry entry={entry}/>}
             {entry.type === 'long_rest' && <RestEntry entry={entry}/>}
             {entry.type === 'automation' && <AutomationEntry entry={entry}/>}
+            {entry.type === 'save_result' && <SaveResultEntry entry={entry}/>}
           </div>
         ))}
       </div>

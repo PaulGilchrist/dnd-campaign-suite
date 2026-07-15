@@ -64,9 +64,9 @@ describe('combatData', () => {
 
   describe('loadCombatSummary', () => {
     it('returns the combat summary from the API and caches it', async () => {
-      stubFetchCombatSummary({ round: 5, creatures: [{ name: 'Orc' }] });
+      stubFetchCombatSummary({ round: 5, creatures: [{ name: 'Orc' }], activeCreatureName: 'Orc' });
       const result = await combatData.loadCombatSummary('testCampaign');
-      expect(result).toEqual({ round: 5, creatures: [{ name: 'Orc' }] });
+      expect(result).toEqual({ round: 5, creatures: [{ name: 'Orc' }], activeCreatureName: 'Orc' });
       expect(combatData.getCombatSummary('testCampaign')).toEqual(result);
     });
 

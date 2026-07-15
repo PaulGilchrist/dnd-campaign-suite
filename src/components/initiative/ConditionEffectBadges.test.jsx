@@ -73,6 +73,7 @@ describe('ConditionEffectBadges', () => {
     describe('badges from conditions and target effects', () => {
         it.each([
             ['Speed -15', { speedReduction: 15 }, 'Speed -15'],
+            ['Speed 0', { speedReduction: 1000 }, 'Speed 0'],
             ['Disadv vs', { targetDisadvantageCount: 2 }, 'Disadv vs'],
             ['No Adv vs', { noAdvantageAgainst: true }, 'No Adv vs'],
             ['Save Disadv', { riderSaveDisadvantage: true }, 'Save Disadv'],

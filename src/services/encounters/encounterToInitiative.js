@@ -120,6 +120,7 @@ export async function loadEncounterToInitiative(selectedMonsters, characters, ca
     storage.set('combatSummary', cloneDeep(combatSummary), campaignName);
 
     const firstName = creatures[0]?.name;
+    combatSummary.activeCreatureName = firstName;
     storage.set('activeCreatureName', firstName, campaignName);
 
     window.dispatchEvent(new CustomEvent('initiative-rolled'));
