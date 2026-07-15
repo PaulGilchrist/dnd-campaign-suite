@@ -1272,13 +1272,24 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     {actionAttacks.map((attack) => {
                         const attackLevel = getAttackSpellLevel(playerStats.spellAbilities, attack.name);
                         const attackItem = { ...attack };
+                        const sacredWeaponBonus = (() => {
+                            const buffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || [];
+                            if (!Array.isArray(buffs) || !buffs.some(b => b.effect === 'sacred_weapon')) return 0;
+                            if (attack.weaponType !== 'melee' && attack.weaponType !== 'unarmed') return 0;
+                            const cha = playerStats.abilities?.find(a => a.name === 'Charisma');
+                            return Math.max(1, cha?.bonus || 0);
+                        })();
+                        const effectiveHit = attack.hitBonus + sacredWeaponBonus;
+                        const hitTitle = sacredWeaponBonus > 0
+                            ? `Base: +${attack.hitBonus}, Sacred Weapon: +${sacredWeaponBonus}`
+                            : undefined;
                         return <React.Fragment key={attack.name}>
                             <div className='left clickable' onClick={() => handleAttackClick(attackItem)}>{attack.name}</div>
                             <div>{attackLevel != null ? (attackLevel === 0 ? 'Cantrip' : attackLevel) : ''}</div>
                             <div>{formatRange(attack.range)}</div>
                             {attack.saveDc
                                 ? <div className="save-dc-display">DC {attack.saveDc + displaySaveDcBonus} {attack.saveType}</div>
-                                : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => handleSpellAttackClick(attackItem)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
+                                : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} title={hitTitle} onClick={() => handleSpellAttackClick(attackItem)}>{signFormatter.format(effectiveHit - exhaustionPenalty)}</div>}
                             <div className={attack.damage ? "clickable" : ""} onClick={() => {
                                 if (cannotAct) return;
                                 if (attack.saveDc) { resolveSpellDamage(attackItem); return; }

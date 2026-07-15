@@ -286,7 +286,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
 
         const effectiveHitBonus = attack.hitBonus + sacredWeaponBonus + blessedWarriorBonus + sunderingBonus;
         const hitBonusFormulaParts = [attack.hitBonusFormula];
-        if (sacredWeaponBonus > 0) hitBonusFormulaParts.push(`Charisma Bonus (${sacredWeaponBonus})`);
+        if (sacredWeaponBonus > 0) hitBonusFormulaParts.push(`Sacred Weapon (${sacredWeaponBonus})`);
         if (blessedWarriorBonus > 0) hitBonusFormulaParts.push(`Blessed Warrior (${blessedWarriorBonus})`);
         if (sunderingBonus > 0) hitBonusFormulaParts.push(`Sundering Blow (+${sunderingBonus})`);
         const hitBonusFormula = hitBonusFormulaParts.join(' + ');

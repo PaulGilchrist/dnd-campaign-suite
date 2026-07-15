@@ -288,13 +288,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             const { newActiveName, roundIncrement } = getNextCreatureName(cs, activeCreatureName)
             if (!roundIncrement) {
                cs.activeCreatureName = newActiveName
-               console.error('[handleNextCreature] set activeCreatureName:', newActiveName);
-               storage.set('activeCreatureName', newActiveName, campaignName)
+                storage.set('activeCreatureName', newActiveName, campaignName)
                setActiveCreatureName(newActiveName)
               } else {
                 cs.round++
                 cs.activeCreatureName = newActiveName
-                console.error('[handleNextCreature+round] set activeCreatureName:', newActiveName);
                 storage.set('combatSummary', cs, campaignName)
                 setCombatSummary(cloneDeep(cs))
                 storage.set('activeCreatureName', newActiveName, campaignName)

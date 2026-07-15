@@ -153,8 +153,18 @@ export function createLogAndShow(deps) {
         }
         const effectiveBonus = bonus + cosmicOmenAppliedBonus + sunderingBlowBonus;
 
+        const sacredWeaponBonus = context?.sacredWeaponBonus || 0;
+
         const bonusDetailParts = [];
-        if (bonus > 0) bonusDetailParts.push('+' + bonus + ' to hit');
+        if (sacredWeaponBonus > 0) {
+            const baseBonus = bonus - sacredWeaponBonus;
+            if (baseBonus !== 0) {
+                bonusDetailParts.push((baseBonus > 0 ? '+' : '') + baseBonus + ' to hit');
+            }
+            bonusDetailParts.push(sacredWeaponBonus + ' Sacred Weapon');
+        } else {
+            if (bonus > 0) bonusDetailParts.push('+' + bonus + ' to hit');
+        }
         if (sunderingBlowBonus > 0) bonusDetailParts.push(sunderingBlowBonus + ' [Sundering Blow]');
         if (cosmicOmenAppliedBonus !== 0 && cosmicOmenDetail) bonusDetailParts.push(cosmicOmenDetail);
         const finalBonusDetail = bonusDetailParts.length > 0 ? '(' + bonusDetailParts.join(', +') + ')' : undefined;

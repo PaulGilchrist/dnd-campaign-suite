@@ -1,3 +1,4 @@
+import { confirmTeleport } from '../../services/automation/handlers/class-warlock/tempTeleportHandler.js';
 import React, { useEffect } from 'react';
 import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import { setSkipFlag } from '../../services/automation/common/oncePerTurn.js';
@@ -455,7 +456,6 @@ export default function CharActionModals({
                             <button className="sp-roll-btn" onClick={async () => {
                                 const { action, playerStats: fallbackStats, campaignName: fallbackCampaign, slotLevel } = modalState.moonlightStepFallbackModal;
                                 setModalState({ moonlightStepFallbackModal: null });
-                                const { confirmTeleport } = await import('../../services/automation/handlers/class-warlock/tempTeleportHandler.js');
                                 const res = await confirmTeleport(action, fallbackStats, fallbackCampaign, false, slotLevel);
                                 if (res?.type === 'popup') {
                                     const payload = res.payload;

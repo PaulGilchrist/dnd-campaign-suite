@@ -1,6 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { addEntry } from '../../../ui/logService.js';
+import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 
 function getRuntimeUsesKey(featureName) {
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
@@ -15,7 +16,6 @@ export async function handle(action, playerStats, campaignName) {
     let usesMax = auto.usesMax ?? 0;
 
     if (!usesMax && auto.uses_expression) {
-        const { evaluateAutoExpression } = await import('../../../combat/automation/automationService.js');
         usesMax = evaluateAutoExpression(auto.uses_expression, playerStats) || 0;
     }
 

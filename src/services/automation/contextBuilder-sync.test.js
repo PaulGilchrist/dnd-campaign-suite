@@ -454,7 +454,7 @@ describe('contextBuilder: buildAttackContextSync', () => {
 
       const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
 
-      expect(result.hitBonusFormula).toBe('To Hit = 4 + 2 + 1 + Charisma Bonus (2)');
+      expect(result.hitBonusFormula).toBe('To Hit = 4 + 2 + 1 + Sacred Weapon (2)');
     });
 
     it('does not add sacred weapon bonus for ranged attacks', async () => {
