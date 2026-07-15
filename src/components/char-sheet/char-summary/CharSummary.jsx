@@ -81,7 +81,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
 
     const storedBuffs = getActiveBuffs(playerStats.name, campaignName);
     const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName) ?? storedBuffs;
-    const flyBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.effect === 'fly_speed_equals_walk_speed') : null;
+    const flyBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.effect === 'fly_speed_equals_walk_speed' || (b.flySpeed && !['fly_speed_20_hover', 'telekinetic_leap', 'avenging_angel_flight', 'dragon_wings'].includes(b.effect))) : null;
     const flyBuffActive = !!flyBuff;
     const flyBuffName = flyBuff?.name || '';
 
@@ -194,6 +194,11 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
             .flatMap(b => b.resistanceTypes || [])
         : [];
 
+    const rageOfTheGodsResistances = Array.isArray(activeBuffs)
+        ? activeBuffs.filter(b => b.name === 'Rage of the Gods' && b.resistanceTypes?.length)
+            .flatMap(b => b.resistanceTypes || [])
+        : [];
+
     const rageActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Rage');
     const rageConditionalImmunities = rageActive
         ? (playerStats.automationConditionalImmunities || [])
@@ -203,9 +208,10 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
 
     const allImmunities = [...new Set([...baseImmunities, ...auraImmunities, ...rageConditionalImmunities])];
 
-    const allResistances = [...new Set([...baseResistances, ...auraResistances, ...stormbornResistancesActive, ...rageResistances, ...wildHeartResistances])];
+    const allResistances = [...new Set([...baseResistances, ...auraResistances, ...stormbornResistancesActive, ...rageResistances, ...wildHeartResistances, ...rageOfTheGodsResistances])];
 
     let flySpeed = null;
+    let hasFlySpeedBuff = false;
     let swimSpeed = null;
     let climbSpeed = null;
     let hasteAcBonus = 0;
@@ -226,7 +232,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const aspectBuff = Array.isArray(activeBuffs) ? (activeBuffs.find(b => b.name === 'Aspect of the Wilds') || null) : null;
     const aspectOption = aspectBuff?.optionName || null;
     activeBuffs.forEach(buff => {
-        if (buff.effect === 'fly_speed_equals_walk_speed' || buff.flySpeed) flySpeed = speed;
+        if (buff.effect === 'fly_speed_equals_walk_speed') hasFlySpeedBuff = true;
         if (buff.effect === 'fly_speed_20_hover') flySpeed = 20;
         if (buff.effect === 'telekinetic_leap') flySpeed = buff.flySpeed;
         if (buff.effect === 'avenging_angel_flight') flySpeed = buff.flySpeed || 60;
@@ -235,8 +241,9 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         if (buff.effect === 'mage_armor') mageArmorActive = true;
         if (buff.effect === 'shield') shieldAcBonus = 5;
         if (buff.effect === 'ice_walk') iceWalkActive = true;
-        if (buff.effect === 'glistening_flight') { flySpeed = speed; glisteningFlightHover = true; }
+        if (buff.effect === 'glistening_flight') { hasFlySpeedBuff = true; glisteningFlightHover = true; }
         if (buff.effect === 'dragon_wings') { flySpeed = buff.flySpeed || 60; dragonWingsHover = true; }
+        if (buff.flySpeed && !['fly_speed_20_hover', 'telekinetic_leap', 'avenging_angel_flight', 'dragon_wings'].includes(buff.effect)) hasFlySpeedBuff = true;
         if (buff.effect === 'aquatic_adaptation') swimSpeed = speed * 2;
         if (buff.effect === 'see_the_invisible') seeInvisibleRange = 60;
         if (buff.effect === 'see_invisibility') seeInvisibleRange = 120;
@@ -270,7 +277,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     }
     const elementalMovementPassive = (playerStats.passives || []).find(p => p.effect === 'elemental_attunement_movement');
     if (elementalMovementPassive) {
-        flySpeed = speed;
+        hasFlySpeedBuff = true;
         swimSpeed = speed;
     }
     const aquaticAffinityPassive = (playerStats.automation?.passives || []).find(p => p.effect === 'aquatic_affinity');
@@ -279,9 +286,10 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     }
     const stormbornPassive = (playerStats.automation?.passives || []).find(p => p.effect === 'fly_speed_equals_walk_speed');
     if (stormbornPassive && flySpeed === null && wrathOfTheSeaActive) {
-        flySpeed = speed;
+        hasFlySpeedBuff = true;
     }
     const totalSpeedWithBuff = totalSpeed + buffSpeedBonus;
+    if (hasFlySpeedBuff) flySpeed = totalSpeedWithBuff;
 
     const exhaustionPenalty = 2 * exhaustionLevel;
     const effectiveInitiative = playerStats.initiative - exhaustionPenalty;

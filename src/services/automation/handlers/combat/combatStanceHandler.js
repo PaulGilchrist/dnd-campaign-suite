@@ -43,6 +43,10 @@ export async function handle(action, playerStats, campaignName, mapName) {
         setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
         if (action.name === 'Rage') {
             clearExtendedFlag(playerName, campaignName);
+            const remainingBuffs = activeBuffs.filter(b => b.name !== 'Rage of the Gods');
+            if (remainingBuffs.length !== activeBuffs.length) {
+                setRuntimeValue(playerName, 'activeBuffs', remainingBuffs, campaignName);
+            }
         }
         return {
             type: 'popup',

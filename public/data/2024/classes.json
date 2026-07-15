@@ -1179,7 +1179,7 @@
                             "uses": 1,
                             "resourceKey": "rageOfTheGodsUses",
                             "recharge": "long_rest",
-                            "casting_time": "1 bonus action"
+                            "casting_time": "passive"
                         }
                     }
                 ],
