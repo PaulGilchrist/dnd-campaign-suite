@@ -6667,7 +6667,7 @@
                             "uses": 1,
                             "recharge": "long_rest",
                             "level": 1,
-                            "casting_time": "1 action"
+                            "casting_time": "passive"
                         }
                     }
                 ],
