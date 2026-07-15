@@ -12,6 +12,7 @@ import Popup from '../../common/popup.jsx'
 import DiceRollResult from '../DiceRollResult.jsx'
 import { computeAuraBonus } from '../../../services/combat/auras/auraOfProtection.js'
 import { clearUnbreakableMajesty } from '../../../services/combat/auras/unbreakableMajesty.js'
+import { getCombatSummary } from '../../../services/encounters/combatData.js'
 import './CharConditions.css'
 
 const STORAGE_KEY = 'activeConditions'
@@ -77,7 +78,7 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
       mode = 'normal'
     }
 
-    const aura = await computeAuraBonus({ targetName: playerStats.name, characters, campaignName, activeMapName })
+    const aura = await computeAuraBonus({ targetName: playerStats.name, characters, campaignName, activeMapName, allCreatures: getCombatSummary(campaignName)?.creatures })
     const auraBonus = aura.bonus
     const total = finalRoll + saveBonus + auraBonus
     const success = total >= CONDITION_SAVE_DC

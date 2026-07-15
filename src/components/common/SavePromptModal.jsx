@@ -7,6 +7,7 @@ import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.j
 import { getAbilitySaveBonus } from '../../services/combat/conditions/conditionUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { normalizeSaveType } from '../../services/rules/combat/applyDamage.js';
+import { getCombatSummary } from '../../services/encounters/combatData.js';
 import './savePromptModal.css';
 
 function SavePromptModal({ campaignName, characters, activeMapName }) {
@@ -100,7 +101,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
       }
     } catch { /* ignore */ }
 
-    const aura = await computeAuraBonus({ targetName: current.targetName, characters, campaignName, activeMapName });
+    const aura = await computeAuraBonus({ targetName: current.targetName, characters, campaignName, activeMapName, allCreatures: getCombatSummary(campaignName)?.creatures });
     const auraBonus = aura.bonus;
 
     const targetConditions = getRuntimeValue(current.targetName, 'activeConditions', campaignName) || [];
@@ -239,7 +240,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
         saveBonus = getAbilitySaveBonus(character.computedStats || character, current.saveType);
       }
     } catch { /* ignore */ }
-    const aura = await computeAuraBonus({ targetName: current.targetName, characters, campaignName, activeMapName });
+    const aura = await computeAuraBonus({ targetName: current.targetName, characters, campaignName, activeMapName, allCreatures: getCombatSummary(campaignName)?.creatures });
     const roll1 = rollD20();
     const roll2 = current.disadvantage ? rollD20() : roll1;
     const finalRoll = current.disadvantage ? Math.min(roll1, roll2) : roll1;

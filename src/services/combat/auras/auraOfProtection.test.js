@@ -582,4 +582,113 @@ describe('computeAuraBonus', () => {
     expect(result).toEqual({ bonus: 2, sourceName: 'Paladin' });
     expect(loadMapData).toHaveBeenCalledTimes(1);
   });
+
+  describe('ally filtering', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      getRuntimeValue.mockReturnValue([]);
+    });
+
+    it('returns { bonus: 0, sourceName: null } when selectedAllies excludes the target', async () => {
+      getRuntimeValue.mockReturnValue(['OtherPlayer']);
+      const paladin = makeSourceEntry('Paladin', {
+        automation: { passives: [makePassive('Aura of Protection')] },
+        abilities: [{ name: 'Charisma', bonus: 5 }],
+      });
+      const result = await computeAuraBonus({
+        targetName: 'Cleric',
+        characters: [paladin],
+        campaignName: 'C',
+        activeMapName: '',
+      });
+      expect(result).toEqual({ bonus: 0, sourceName: null });
+    });
+
+    it('returns the bonus when selectedAllies includes the target', async () => {
+      getRuntimeValue.mockReturnValue(['Cleric']);
+      const paladin = makeSourceEntry('Paladin', {
+        automation: { passives: [makePassive('Aura of Protection')] },
+        abilities: [{ name: 'Charisma', bonus: 5 }],
+      });
+      const result = await computeAuraBonus({
+        targetName: 'Cleric',
+        characters: [paladin],
+        campaignName: 'C',
+        activeMapName: '',
+      });
+      expect(result).toEqual({ bonus: 5, sourceName: 'Paladin' });
+    });
+
+    it('selects the highest bonus source whose allies include the target', async () => {
+      getRuntimeValue.mockReturnValue(['Cleric']).mockReturnValue(['Cleric']);
+      const p1 = makeSourceEntry('Paladin1', {
+        automation: { passives: [makePassive('Aura of Protection')] },
+        abilities: [{ name: 'Charisma', bonus: 2 }],
+      });
+      const p2 = makeSourceEntry('Paladin2', {
+        automation: { passives: [makePassive('Aura of Protection')] },
+        abilities: [{ name: 'Charisma', bonus: 5 }],
+      });
+      const result = await computeAuraBonus({
+        targetName: 'Cleric',
+        characters: [p1, p2],
+        campaignName: 'C',
+        activeMapName: '',
+      });
+      expect(result).toEqual({ bonus: 5, sourceName: 'Paladin2' });
+    });
+
+    it('skips sources where allies list excludes the target but includes others', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (name === 'Paladin1' && key === 'selectedAllies') return ['Wizard'];
+        if (name === 'Paladin2' && key === 'selectedAllies') return ['Cleric'];
+        return undefined;
+      });
+      const p1 = makeSourceEntry('Paladin1', {
+        automation: { passives: [makePassive('Aura of Protection')] },
+        abilities: [{ name: 'Charisma', bonus: 5 }],
+      });
+      const p2 = makeSourceEntry('Paladin2', {
+        automation: { passives: [makePassive('Aura of Protection')] },
+        abilities: [{ name: 'Charisma', bonus: 3 }],
+      });
+      const result = await computeAuraBonus({
+        targetName: 'Cleric',
+        characters: [p1, p2],
+        campaignName: 'C',
+        activeMapName: '',
+      });
+      expect(result).toEqual({ bonus: 3, sourceName: 'Paladin2' });
+    });
+
+    it('falls back to no ally filtering when selectedAllies is null', async () => {
+      getRuntimeValue.mockReturnValue(null);
+      const paladin = makeSourceEntry('Paladin', {
+        automation: { passives: [makePassive('Aura of Protection')] },
+        abilities: [{ name: 'Charisma', bonus: 5 }],
+      });
+      const result = await computeAuraBonus({
+        targetName: 'Cleric',
+        characters: [paladin],
+        campaignName: 'C',
+        activeMapName: '',
+      });
+      expect(result).toEqual({ bonus: 5, sourceName: 'Paladin' });
+    });
+
+    it('falls back to no ally filtering when selectedAllies is empty', async () => {
+      getRuntimeValue.mockReturnValue([]);
+      const paladin = makeSourceEntry('Paladin', {
+        automation: { passives: [makePassive('Aura of Protection')] },
+        abilities: [{ name: 'Charisma', bonus: 5 }],
+      });
+      const result = await computeAuraBonus({
+        targetName: 'Cleric',
+        characters: [paladin],
+        campaignName: 'C',
+        activeMapName: '',
+      });
+      expect(result).toEqual({ bonus: 5, sourceName: 'Paladin' });
+    });
+  });
 });

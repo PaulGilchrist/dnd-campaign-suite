@@ -20,7 +20,11 @@ import ShortRestButton from '../ShortRestButton.jsx'
 import ShortRestModal from '../ShortRestModal.jsx'
 import { setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
+import { getCombatSummary } from '../../../services/encounters/combatData.js';
+import { hasAuraOfProtection } from '../../../services/combat/auras/auraOfProtection.js';
+import { addEntry } from '../../../services/ui/logService.js';
 import CharConditions from './CharConditions.jsx'
+import AllySelectionModal from '../modals/AllySelectionModal.jsx';
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
@@ -33,6 +37,8 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const [displayXp, setDisplayXp] = React.useState(playerStats?.xp ?? 0);
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const [showAvatarModal, setShowAvatarModal] = React.useState(false);
+    const [showAllySelectionModal, setShowAllySelectionModal] = React.useState(false);
+    const [allyTargets, setAllyTargets] = React.useState([]);
     React.useEffect(() => {
         setDisplayXp(playerStats?.xp ?? 0);
     }, [playerStats?.xp]);
@@ -309,6 +315,40 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         onLongRest && onLongRest();
     };
 
+    const handleInitiative = () => {
+        if (hasAuraOfProtection(playerStats)) {
+            const combatSummary = getCombatSummary(campaignName);
+            const targets = combatSummary?.creatures?.map(c => ({
+                name: c.name,
+                type: c.type,
+                currentHp: c.currentHp,
+                maxHp: c.maxHp,
+            })) || characters.map(c => ({ name: c.name, type: c.type }));
+            setAllyTargets(targets);
+            setShowAllySelectionModal(true);
+        } else {
+            rollInitiative(effectiveInitiative, playerStats.initiativeAdvantage ? { forcedMode: 'advantage' } : undefined);
+        }
+    };
+
+    const handleAllySelectionConfirm = async (selectedAllies) => {
+        setShowAllySelectionModal(false);
+        setRuntimeValue(playerStats.name, 'selectedAllies', selectedAllies, campaignName);
+        await addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: 'Aura Ally Selection',
+            description: `${playerStats.name} selected allies: ${selectedAllies.join(', ')}`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[CharSummary] Error logging ally selection:', e); });
+        rollInitiative(effectiveInitiative, playerStats.initiativeAdvantage ? { forcedMode: 'advantage' } : undefined);
+    };
+
+    const handleAllySelectionSkip = () => {
+        setShowAllySelectionModal(false);
+        rollInitiative(effectiveInitiative, playerStats.initiativeAdvantage ? { forcedMode: 'advantage' } : undefined);
+    };
+
     const levelSuffix = isInXpMode
         ? ` (${displayXp.toLocaleString()} XP)`
         : ' (milestone)';
@@ -349,7 +389,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                 </div>
                 <div>
                     <b>Proficiency: </b>+{playerStats.proficiency}<br />
-                    <span className={'clickable' + (exhaustionLevel > 0 ? ' stat--penalized' : '')} onClick={() => rollInitiative(effectiveInitiative, playerStats.initiativeAdvantage ? { forcedMode: 'advantage' } : undefined)}><b>Initiative: </b>{signFormatter.format(effectiveInitiative)}</span><br />
+                    <span className={'clickable' + (exhaustionLevel > 0 ? ' stat--penalized' : '')} onClick={handleInitiative}><b>Initiative: </b>{signFormatter.format(effectiveInitiative)}</span><br />
                     <b>Inspiration: </b><input tabIndex={0} type="checkbox" checked={hasInspiration} onChange={handleToggleInspiration} /><br />
                     {playerStats.background && <div><b>Background: </b><span className="clickable" onClick={() => showBackgroundPopup(playerStats.background, setPopupHtml, playerStats.rules || '5e')}>{playerStats.background}</span></div>}
                     <CharFeats playerStats={playerStats} showPopup={(feat) => {
@@ -485,8 +525,16 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                     onClose={() => setShowAvatarModal(false)}
                 />
             )}
-              <CharConditions playerStats={playerStats} campaignName={campaignName} activeMapName={activeMapName} characters={characters} exhaustionLevel={exhaustionLevel} onConditionsChange={onConditionsChange} conditionEffects={conditionEffects} />
-            </div>
+               <CharConditions playerStats={playerStats} campaignName={campaignName} activeMapName={activeMapName} characters={characters} exhaustionLevel={exhaustionLevel} onConditionsChange={onConditionsChange} conditionEffects={conditionEffects} />
+             </div>
+             {showAllySelectionModal && (
+                 <AllySelectionModal
+                     creatureTargets={allyTargets}
+                     defaultSelected={[playerStats.name]}
+                     onConfirm={handleAllySelectionConfirm}
+                     onSkip={handleAllySelectionSkip}
+                 />
+             )}
   </div>
 )
 }

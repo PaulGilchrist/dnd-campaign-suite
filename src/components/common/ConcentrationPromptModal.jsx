@@ -6,6 +6,7 @@ import Subscriber from './Subscriber.jsx';
 import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.js';
 import { getAbilitySaveBonus } from '../../services/combat/conditions/conditionUtils.js';
 import { hasSaveModifier } from '../../services/combat/conditions/conditionEffects.js';
+import { getCombatSummary } from '../../services/encounters/combatData.js';
 import './concentrationPromptModal.css';
 
 function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
@@ -50,7 +51,7 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
       }
     } catch { /* ignore */ }
 
-    const aura = await computeAuraBonus({ targetName: current.targetName, characters, campaignName, activeMapName });
+    const aura = await computeAuraBonus({ targetName: current.targetName, characters, campaignName, activeMapName, allCreatures: getCombatSummary(campaignName)?.creatures });
     const auraBonus = aura.bonus;
 
     const hasAdvantage = hasSaveModifier(saveModifiers, 'concentration_saving_throws', 'CON') ||

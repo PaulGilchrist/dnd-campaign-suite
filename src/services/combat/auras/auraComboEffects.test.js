@@ -9,10 +9,16 @@ vi.mock('./auraOfProtection.js', () => ({
   isWithinRange: vi.fn(),
 }));
 
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn(),
+  setRuntimeValue: vi.fn(),
+}));
+
 // ── Imports ─────────────────────────────────────────────────────
 
 import { computeAuraComboEffects } from './auraComboEffects.js';
 import { hasAuraOfProtection, hasCannotActCondition, isWithinRange } from './auraOfProtection.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -506,6 +512,106 @@ describe('computeAuraComboEffects', () => {
         activeMapName: null,
       });
       expect(isWithinRange).toHaveBeenCalled();
+    });
+  });
+
+  describe('ally filtering', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      setupDefaults();
+      getRuntimeValue.mockReturnValue([]);
+    });
+
+    it('returns defaults when selectedAllies excludes the target', async () => {
+      getRuntimeValue.mockReturnValue(['OtherPlayer']);
+
+      const chars = [
+        makeCharacter('Paladin', [AURA_OF_PROTECTION, AURA_OF_COURAGE, AURA_OF_WARDING]),
+      ];
+      const result = await computeAuraComboEffects({
+        targetName: 'Alice',
+        characters: chars,
+        campaignName: 'test',
+        activeMapName: null,
+      });
+      expect(result).toEqual({
+        speedBonus: 0,
+        speedSource: null,
+        immunities: [],
+        immunitySources: {},
+        resistances: [],
+        resistanceSource: null,
+      });
+    });
+
+    it('applies effects when selectedAllies includes the target', async () => {
+      getRuntimeValue.mockReturnValue(['Alice']);
+
+      const chars = [
+        makeCharacter('Paladin', [AURA_OF_PROTECTION, AURA_OF_COURAGE, AURA_OF_WARDING]),
+      ];
+      const result = await computeAuraComboEffects({
+        targetName: 'Alice',
+        characters: chars,
+        campaignName: 'test',
+        activeMapName: null,
+      });
+      expect(result.immunities).toContain('frightened');
+      expect(result.immunitySources.frightened).toBe('Paladin');
+      expect(result.resistances).toContain('Necrotic');
+      expect(result.resistanceSource).toBe('Paladin');
+    });
+
+    it('skips sources where selectedAllies excludes the target', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (name === 'Paladin1' && key === 'selectedAllies') return ['Wizard'];
+        if (name === 'Paladin2' && key === 'selectedAllies') return ['Alice'];
+        return undefined;
+      });
+
+      const chars = [
+        makeCharacter('Paladin1', [AURA_OF_PROTECTION, AURA_OF_COURAGE]),
+        makeCharacter('Paladin2', [AURA_OF_PROTECTION, AURA_OF_WARDING]),
+      ];
+      const result = await computeAuraComboEffects({
+        targetName: 'Alice',
+        characters: chars,
+        campaignName: 'test',
+        activeMapName: null,
+      });
+      expect(result.immunities).toEqual([]);
+      expect(result.resistances).toContain('Necrotic');
+      expect(result.resistanceSource).toBe('Paladin2');
+    });
+
+    it('falls back to no ally filtering when selectedAllies is null', async () => {
+      getRuntimeValue.mockReturnValue(null);
+
+      const chars = [
+        makeCharacter('Paladin', [AURA_OF_PROTECTION, AURA_OF_COURAGE]),
+      ];
+      const result = await computeAuraComboEffects({
+        targetName: 'Alice',
+        characters: chars,
+        campaignName: 'test',
+        activeMapName: null,
+      });
+      expect(result.immunities).toContain('frightened');
+    });
+
+    it('falls back to no ally filtering when selectedAllies is empty', async () => {
+      getRuntimeValue.mockReturnValue([]);
+
+      const chars = [
+        makeCharacter('Paladin', [AURA_OF_PROTECTION, AURA_OF_COURAGE]),
+      ];
+      const result = await computeAuraComboEffects({
+        targetName: 'Alice',
+        characters: chars,
+        campaignName: 'test',
+        activeMapName: null,
+      });
+      expect(result.immunities).toContain('frightened');
     });
   });
 });

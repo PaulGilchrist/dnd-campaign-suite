@@ -4,6 +4,7 @@ import { getAbilitySaveBonus } from './conditionUtils.js'
 import { computeAuraBonus } from '../auras/auraOfProtection.js'
 import { playerIsImmuneToCondition } from '../automation/automationService.js'
 import { getAuraOfPuritySaveAdvantageConditions, isAuraOfPurityActive } from '../../automation/handlers/buffs/auraOfPurityHandler.js'
+import { getCombatSummary } from '../../encounters/combatData.js'
 
 async function getCreatureSaveBonus(creature, abilityAbbr, characters, campaignNpcs, getName) {
     if (creature.type === 'player') {
@@ -23,7 +24,7 @@ async function getCreatureSaveBonus(creature, abilityAbbr, characters, campaignN
 
 async function rollConditionSave(creature, condition, characters, campaignNpcs, campaignName, mapName, getName) {
     const saveBonus = await getCreatureSaveBonus(creature, condition.ability, characters, campaignNpcs, getName)
-    const aura = await computeAuraBonus({ targetName: creature.name, characters, campaignName, activeMapName: mapName })
+    const aura = await computeAuraBonus({ targetName: creature.name, characters, campaignName, activeMapName: mapName, allCreatures: getCombatSummary(campaignName)?.creatures })
     const auraBonus = aura.bonus
     const conditionKey = String(condition.key || condition.label || '').toLowerCase()
     const hasAuraOfPurityAdvantage = isAuraOfPurityActive(creature.name, campaignName)

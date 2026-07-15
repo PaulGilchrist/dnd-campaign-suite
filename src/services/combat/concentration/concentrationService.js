@@ -3,6 +3,7 @@ import { computeAuraBonus } from '../auras/auraOfProtection.js'
 import { getCreatureSaveBonus } from '../conditions/conditionSaveService.js'
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import storage from '../../../services/ui/storage.js'
+import { getCombatSummary } from '../../encounters/combatData.js'
 
 function hasDragonConstellation(creature, characters) {
     if (!creature || !creature.name) return false;
@@ -17,7 +18,7 @@ function hasDragonConstellation(creature, characters) {
 
 async function rollConcentrationSave(creature, concentration, characters, campaignNpcs, campaignName, mapName, getName) {
     const saveBonus = await getCreatureSaveBonus(creature, 'con', characters, campaignNpcs, getName)
-    const aura = await computeAuraBonus({ targetName: creature.name, characters, campaignName, activeMapName: mapName })
+    const aura = await computeAuraBonus({ targetName: creature.name, characters, campaignName, activeMapName: mapName, allCreatures: getCombatSummary(campaignName)?.creatures })
     const auraBonus = aura.bonus
     const effectiveSaveBonus = saveBonus + auraBonus
     const dragonConstellationActive = hasDragonConstellation(creature, characters)

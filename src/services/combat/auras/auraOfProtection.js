@@ -64,6 +64,10 @@ export async function computeAuraBonus({ targetName, characters, campaignName, a
     if (!name) continue;
     if (!stats || !hasAuraOfProtection(stats)) continue;
     if (hasCannotActCondition(name, campaignName)) continue;
+    const storedAllies = getRuntimeValue(name, 'selectedAllies', campaignName);
+    if (Array.isArray(storedAllies) && storedAllies.length > 0) {
+      if (!storedAllies.includes(targetName)) continue;
+    }
     const chaMod = getChaModifier(stats);
     const bonus = Math.max(1, chaMod);
     const inRange = await isWithinRange(name, targetName, campaignName, activeMapName, characters);

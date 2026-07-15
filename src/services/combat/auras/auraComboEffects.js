@@ -1,4 +1,5 @@
 import { hasAuraOfProtection, hasCannotActCondition, isWithinRange } from './auraOfProtection.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 export async function computeAuraComboEffects({ targetName, characters, campaignName, activeMapName }) {
   let speedBonus = 0;
@@ -14,6 +15,10 @@ export async function computeAuraComboEffects({ targetName, characters, campaign
     if (!name) continue;
     if (!stats || !hasAuraOfProtection(stats)) continue;
     if (hasCannotActCondition(name, campaignName)) continue;
+    const storedAllies = getRuntimeValue(name, 'selectedAllies', campaignName);
+    if (Array.isArray(storedAllies) && storedAllies.length > 0) {
+      if (!storedAllies.includes(targetName)) continue;
+    }
     const inRange = await isWithinRange(name, targetName, campaignName, activeMapName, characters);
     if (!inRange) continue;
 

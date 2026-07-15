@@ -704,11 +704,13 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const [auraComboEffects, setAuraComboEffects] = React.useState(null);
     React.useEffect(() => {
         if (!playerStats || !characters?.length) { setAuraComboEffects(null); return; }
+        const combatSummary = getCombatSummary(campaignName);
         computeAuraComboEffects({
             targetName: playerStats.name,
             characters,
             campaignName,
             activeMapName,
+            allCreatures: combatSummary?.creatures,
         }).then(setAuraComboEffects);
     }, [playerStats, characters, campaignName, activeMapName]);
 
