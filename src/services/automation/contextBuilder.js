@@ -150,6 +150,9 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             if (buff.effect === 'advantage_attacks_advantage_against') {
                 adv++;
             }
+            if (buff.effect === 'advantage_attacks_and_saves') {
+                adv++;
+            }
             if (buff.optionName === 'Ram') {
                 ramActive = true;
             }

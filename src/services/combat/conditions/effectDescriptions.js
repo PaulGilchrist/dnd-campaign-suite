@@ -39,6 +39,7 @@ export const EFFECT_DESCRIPTIONS = {
     'No Difficult Terrain on Dash': 'Can ignore difficult terrain when taking the Dash action.',
     'Disadv Fire/Radiant': 'Has disadvantage on saving throws against Fire and Radiant damage.',
     'Stealth Attack': 'Supreme Sneak active — next attack costs Sneak Attack dice, Invisible condition is preserved with cover.',
+    'Zealous Presence': 'Advantage on attack rolls and saving throws until the start of the barbarian\'s next turn.',
 }
 
 // HP status descriptions

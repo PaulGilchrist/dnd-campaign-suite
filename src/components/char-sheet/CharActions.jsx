@@ -22,6 +22,7 @@ import CharActionSpellPopups from './CharActionSpellPopups.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
 import { onSpellSelected as onDivineInterventionSpellSelected } from '../../services/automation/handlers/class-cleric-paladin/divineInterventionHandler.js';
+import { confirmZealousPresence } from '../../services/automation/handlers/class-barbarian/zealousPresenceHandler.js';
 import { getClassFeatures } from '../../services/character/classFeatures.js';
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js'
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
@@ -731,6 +732,20 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         setModalState({ bulwarkOfForceModal: null });
     }, [setPopupHtml, modalState.bulwarkOfForceModal, setModalState]);
 
+    const handleZealousPresenceConfirm = React.useCallback(async (targetNames) => {
+        if (!targetNames || !modalState.zealousPresenceModal) return;
+        const result = await confirmZealousPresence(
+            modalState.zealousPresenceModal.action,
+            modalState.zealousPresenceModal.playerStats,
+            modalState.zealousPresenceModal.campaignName,
+            targetNames
+        );
+        if (result?.payload) {
+            setPopupHtml(result.payload);
+        }
+        setModalState({ zealousPresenceModal: null });
+    }, [setPopupHtml, modalState.zealousPresenceModal, setModalState]);
+
     const handleNaturesSanctuaryConfirm = React.useCallback(async (targetNames) => {
         if (!targetNames || !modalState.naturesSanctuaryCreaturesModal) return;
         const { action, isMove } = modalState.naturesSanctuaryCreaturesModal;
@@ -1091,6 +1106,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'bulwarkOfForceTarget':
                         setModalState({ bulwarkOfForceModal: result.payload });
                         break;
+                    case 'zealousPresenceTarget':
+                        setModalState({ zealousPresenceModal: result.payload });
+                        break;
                     case 'naturesSanctuaryCreatures':
                         setModalState({ naturesSanctuaryCreaturesModal: result.payload });
                         break;
@@ -1353,6 +1371,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleCommanderStrikeChoiceConfirm={handleCommanderStrikeChoiceConfirm}
                     handleRallyChoiceConfirm={handleRallyChoiceConfirm}
                     handleBulwarkOfForceConfirm={handleBulwarkOfForceConfirm}
+                    handleZealousPresenceConfirm={handleZealousPresenceConfirm}
                     handleNaturesSanctuaryConfirm={handleNaturesSanctuaryConfirm}
                     handleCoronaEnemySelectionConfirm={handleCoronaEnemySelectionConfirm}
                     handleRadianceOfDawnConfirm={handleRadianceOfDawnConfirm}

@@ -50,6 +50,7 @@ import AttackRiderManeuverPrompt from './modals/AttackRiderManeuverPrompt.jsx'
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx'
 import CreatureSelectionModal from './modals/shared/CreatureSelectionModal.jsx'
 import BulwarkOfForceModal from './modals/BulwarkOfForceModal.jsx'
+import ZealousPresenceModal from './modals/ZealousPresenceModal.jsx'
 import CoronaEnemySelectionModal from './modals/CoronaEnemySelectionModal.jsx'
 import RadianceOfDawnModal from './modals/RadianceOfDawnModal.jsx'
 import MantleOfInspirationModal from './modals/MantleOfInspirationModal.jsx'
@@ -160,6 +161,7 @@ export default function CharActionModals({
     handleCommanderStrikeChoiceConfirm,
     handleRallyChoiceConfirm,
     handleBulwarkOfForceConfirm,
+    handleZealousPresenceConfirm,
     handleNaturesSanctuaryConfirm,
     handleCoronaEnemySelectionConfirm,
     handleRadianceOfDawnConfirm,
@@ -887,6 +889,14 @@ export default function CharActionModals({
                     maxTargets={modalState.bulwarkOfForceModal.maxTargets}
                     onConfirm={handleBulwarkOfForceConfirm}
                     onSkip={() => setModalState({ bulwarkOfForceModal: null })}
+                />
+            )}
+            {modalState.zealousPresenceModal && (
+                <ZealousPresenceModal
+                    targets={modalState.zealousPresenceModal.creatureTargets}
+                    maxTargets={modalState.zealousPresenceModal.maxTargets}
+                    onConfirm={handleZealousPresenceConfirm}
+                    onSkip={() => setModalState({ zealousPresenceModal: null })}
                 />
             )}
             {modalState.naturesSanctuaryCreaturesModal && (

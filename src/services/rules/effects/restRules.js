@@ -353,6 +353,9 @@ export async function applyShortRest(playerStats, campaignName) {
     updates.wrathOfTheSeaWisMod = null;
     updates.wrathOfTheSeaSource = null;
 
+    // Clear Zealous Presence buff marker on short rest (lasts until start of barbarian's next turn)
+    updates.zealousPresenceActive = null;
+
     setRuntimeBatch(name, updates, campaignName)
 
   clearAllExpirationEffects(name, campaignName)
@@ -397,6 +400,9 @@ export async function applyLongRest(playerStats, campaignName) {
     // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
     charData.activeBuffs = [];
     charData.activeConditions = [];
+
+    // Clear Zealous Presence buff marker on long rest (recharges on long rest or rage expenditure)
+    charData.zealousPresenceActive = null;
 
     const currentExhaustion = getRuntimeValue(name, 'exhaustionLevel')
    if (typeof currentExhaustion === 'number' && currentExhaustion > 0) {

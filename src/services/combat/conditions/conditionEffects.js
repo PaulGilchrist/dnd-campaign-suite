@@ -302,6 +302,7 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
 function computeConditionEffects(conditions = [], saveModifiers = [], targetEffects = [], isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, seeInvisibilityActive = false, attackerName = null) {
   const effects = {
     attackAdvantageCount: 0,
+    attackAdvantageReasons: [],
     attackDisadvantageCount: 0,
     abilityCheckDisadvantage: false,
     abilityCheckAdvantage: false,
@@ -314,6 +315,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     speedReduction: 0,
     concentrationBroken: false,
     targetAdvantageCount: 0,
+    targetAdvantageReasons: [],
     targetDisadvantageCount: 0,
     targetAdvantageIfWithin5ft: false,
     targetDisadvantageIfBeyond5ft: false,
@@ -322,6 +324,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     poisonImmune: false,
     saveAdvantage: [],
     saveAdvantageCount: 0,
+    saveAdvantageReasons: [],
     saveDisadvantageCount: 0,
     saveDisadvantageAbilities: null,
     autoReroll: false,
@@ -424,16 +427,18 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
 
   for (const key of conditionSet) {
     switch (key) {
-       case 'blinded':
-        effects.attackDisadvantageCount++
-        effects.targetAdvantageCount++
-        break
-
-        case 'charmed':
+        case 'blinded':
          effects.attackDisadvantageCount++
          effects.targetAdvantageCount++
-         effects.saveDisadvantage.push('dex')
+         effects.targetAdvantageReasons.push('Blinded')
          break
+
+        case 'charmed':
+          effects.attackDisadvantageCount++
+          effects.targetAdvantageCount++
+          effects.targetAdvantageReasons.push('Charmed')
+          effects.saveDisadvantage.push('dex')
+          break
 
         case 'frightened':
         effects.attackDisadvantageCount++
@@ -451,28 +456,31 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
         break
 
         case 'invisible':
-         if (!seeInvisibilityActive) {
-           effects.attackAdvantageCount++
-           effects.targetDisadvantageCount++
-         }
+          if (!seeInvisibilityActive) {
+            effects.attackAdvantageCount++
+            effects.attackAdvantageReasons.push('Invisible')
+            effects.targetDisadvantageCount++
+          }
+          break
+
+        case 'paralyzed':
+         effects.cannotAct = true
+         effects.speedZero = true
+         effects.autoFailSaves.push('str', 'dex')
+         effects.targetAdvantageCount++
+         effects.targetAdvantageReasons.push('Paralyzed')
+         effects.autoCritWithin5ft = true
          break
 
-       case 'paralyzed':
-        effects.cannotAct = true
-        effects.speedZero = true
-        effects.autoFailSaves.push('str', 'dex')
-        effects.targetAdvantageCount++
-        effects.autoCritWithin5ft = true
-        break
-
-       case 'petrified':
-        effects.cannotAct = true
-        effects.speedZero = true
-        effects.targetAdvantageCount++
-        effects.autoFailSaves.push('str', 'dex')
-        effects.resistantToAll = true
-        effects.poisonImmune = true
-        break
+        case 'petrified':
+         effects.cannotAct = true
+         effects.speedZero = true
+         effects.targetAdvantageCount++
+         effects.targetAdvantageReasons.push('Petrified')
+         effects.autoFailSaves.push('str', 'dex')
+         effects.resistantToAll = true
+         effects.poisonImmune = true
+         break
 
        case 'poisoned':
         effects.attackDisadvantageCount++
@@ -489,39 +497,38 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
         effects.speedZero = true
         break
 
-       case 'restrained':
-        effects.speedZero = true
-        effects.attackDisadvantageCount++
-        effects.targetAdvantageCount++
-        effects.saveDisadvantage.push('dex')
-        break
-
-       case 'stunned':
-        effects.cannotAct = true
-        effects.speedZero = true
-        effects.autoFailSaves.push('str', 'dex')
-        effects.targetAdvantageCount++
-        break
-
-       case 'unconscious':
-         effects.cannotAct = true
+        case 'restrained':
          effects.speedZero = true
+         effects.attackDisadvantageCount++
          effects.targetAdvantageCount++
-         effects.autoFailSaves.push('str', 'dex')
-         effects.autoCritWithin5ft = true
+         effects.targetAdvantageReasons.push('Restrained')
+         effects.saveDisadvantage.push('dex')
          break
 
+        case 'stunned':
+         effects.cannotAct = true
+         effects.speedZero = true
+         effects.autoFailSaves.push('str', 'dex')
+         effects.targetAdvantageCount++
+         effects.targetAdvantageReasons.push('Stunned')
+         break
+
+        case 'unconscious':
+          effects.cannotAct = true
+          effects.speedZero = true
+          effects.targetAdvantageCount++
+          effects.targetAdvantageReasons.push('Unconscious')
+          effects.autoFailSaves.push('str', 'dex')
+          effects.autoCritWithin5ft = true
+          break
+
         case 'dazed':
-          // Dazed: on next turn can only do one of: move OR action OR Bonus Action
-          // We represent this as partial incapacitation — no attack advantage for target,
-          // but the creature can still move. The UI will enforce the restriction.
           effects.dazed = true
           effects.targetAdvantageCount++
+          effects.targetAdvantageReasons.push('Dazed')
           break
 
         case 'slow':
-          // Slow: Speed halved, -2 AC, disadvantage on DEX saves, no reactions,
-          // action OR bonus action (not both), one attack max, 25% somatic failure
           effects.speedHalved = true;
           effects.speedReduction = (effects.speedReduction || 0) + 50;
           effects.acPenalty = (effects.acPenalty || 0) + 2;
@@ -530,6 +537,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
           effects.slowSingleAttackLimit = true;
           effects.slowSomaticFailure = true;
           effects.targetAdvantageCount++;
+          effects.targetAdvantageReasons.push('Slow');
           // DEX save disadvantage from Slow
           if (!effects.saveDisadvantage.includes('dex')) {
             effects.saveDisadvantage.push('dex');
@@ -548,6 +556,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
         effects.vexAdvantageTargets = [...(effects.vexAdvantageTargets || []), te.vexTarget];
       } else {
         effects.attackAdvantageCount = (effects.attackAdvantageCount || 0) + 1;
+        effects.attackAdvantageReasons.push(te.source || 'next_attack_advantage');
       }
     }
     if (te.effect === 'next_attack_bonus') {
@@ -555,6 +564,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     }
     if (te.effect === 'distracting_strike_advantage') {
       effects.targetAdvantageCount = (effects.targetAdvantageCount || 0) + 1;
+      effects.targetAdvantageReasons.push(te.source || 'Distracting Strike');
     }
     if (te.effect === 'crusher_enhanced_critical') {
       effects.targetAdvantageCount = (effects.targetAdvantageCount || 0) + 1;
@@ -567,6 +577,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     }
     if (te.effect === 'reckless_attack') {
       effects.targetAdvantageCount = (effects.targetAdvantageCount || 0) + 1;
+      effects.targetAdvantageReasons.push('Reckless Attack');
     }
     if (te.effect === 'disadvantage_perception_checks') {
       effects.abilityCheckDisadvantage = true;
@@ -695,6 +706,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     if (te.effect === 'clairvoyant_combatant') {
       if (te.attackerAdvantage) {
         effects.targetAdvantageCount = (effects.targetAdvantageCount || 0) + 1;
+        effects.targetAdvantageReasons.push('Clairvoyant Combatant');
       }
       if (te.defenderDisadvantage) {
         effects.attackDisadvantageCount = (effects.attackDisadvantageCount || 0) + 1;
@@ -703,7 +715,9 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     // Handle Foresight — the target has Advantage on D20 Tests, and other creatures have Disadvantage on attack rolls against it
     if (te.effect === 'foresight') {
       effects.attackAdvantageCount = (effects.attackAdvantageCount || 0) + 1;
+      effects.attackAdvantageReasons.push('Foresight');
       effects.saveAdvantageCount = (effects.saveAdvantageCount || 0) + 1;
+      effects.saveAdvantageReasons.push('Foresight');
       effects.abilityCheckAdvantage = true;
       effects.targetDisadvantageCount = (effects.targetDisadvantageCount || 0) + 1;
     }

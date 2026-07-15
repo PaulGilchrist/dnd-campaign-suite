@@ -20,6 +20,7 @@ import { automationInfoPopup } from '../shared/popupResponse.js';
 import { handle as handleCombatStance } from './handlers/combat/combatStanceHandler.js';
 import { handle as handleReactionDamage } from './handlers/reactions/reactionDamageHandler.js';
 import { handle as handlePersistentRage } from './handlers/class-barbarian/persistentRageHandler.js';
+import { handle as handleZealousPresence } from './handlers/class-barbarian/zealousPresenceHandler.js';
 import { handle as handleReactionDebuff } from './handlers/reactions/reactionDebuffHandler.js';
 import { handle as handleReactionSpell } from './handlers/reactions/reactionSpellHandler.js';
 import { handle as handleInterception } from './handlers/reactions/interceptionHandler.js';
@@ -243,6 +244,7 @@ const HANDLER_MAP = {
     initiative_action: handleInitiative,
     bonus_action_attack: handleBonusActionAttack,
     buff_ally: handleBuffAlly,
+    zealous_presence: handleZealousPresence,
     resource_pool: handleResourcePool,
     natural_recovery: handleNaturalRecovery,
     circle_of_the_land_spells: handleCircleOfTheLandSpells,

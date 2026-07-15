@@ -607,7 +607,7 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
             const isRoundExpired = currentRound >= expirationRound;
             const isCreatureExpired = item.expireOnCreatureName && activeName &&
                 utils.getName(item.expireOnCreatureName) === utils.getName(activeName) &&
-                currentRound > item.appliedRound;
+                currentRound >= item.appliedRound;
             const isExpired = isRoundExpired || isCreatureExpired;
             if (isExpired) {
                 clearExpirationEffects(item.effects, item.target, targetOwner, campaignName);
@@ -1134,6 +1134,11 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                     setRuntimeValue(targetName, 'baitAndSwitchBonus', null, campaignName);
                     setRuntimeValue(targetName, 'baitAndSwitchSource', null, campaignName);
                 }
+                break;
+            }
+
+            case 'clear_runtime_value': {
+                setRuntimeValue(effect.creatureName, effect.key, null, campaignName);
                 break;
             }
 
