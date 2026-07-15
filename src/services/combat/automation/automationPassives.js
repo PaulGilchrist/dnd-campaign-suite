@@ -55,15 +55,23 @@ export function collectWeaponMastery(weaponName, playerStats) {
     const extraMasteries = [];
     let replaceMastery = null;
     let replaceMasteryOptions = null;
+    let choiceMasteries = [];
     let hasKindMasteryMatch = false;
     const passives = playerStats.automation?.passives || [];
-    const passivesWithExtraMastery = passives.filter(p => p.extraMastery && Array.isArray(p.extraMastery) && p.extraMastery.length > 0);
-    if (passivesWithExtraMastery.length > 0) {
-        console.error('[collectWeaponMastery] Weapons with extraMastery passives:', weaponName, 'passives:', JSON.stringify(passivesWithExtraMastery.map(p => ({ name: p.name, extraMastery: p.extraMastery }))), 'baseMastery:', baseMastery);
-    }
     for (const passive of passives) {
         if (passive.extraMastery && Array.isArray(passive.extraMastery)) {
-            extraMasteries.push(...passive.extraMastery);
+            const choiceMasteryNames = ['Push', 'Topple'];
+            for (const m of passive.extraMastery) {
+                if (choiceMasteryNames.includes(m)) {
+                    if (!choiceMasteries.includes(m)) {
+                        choiceMasteries.push(m);
+                    }
+                } else {
+                    if (!extraMasteries.includes(m)) {
+                        extraMasteries.push(m);
+                    }
+                }
+            }
         }
         if (passive.replaceMastery && Array.isArray(passive.replaceMastery) && passive.replaceMastery.length > 0) {
             replaceMastery = passive.replaceMastery;
@@ -90,6 +98,8 @@ export function collectWeaponMastery(weaponName, playerStats) {
             // Tactical Master: only offer replacement when weapon has a usable mastery
             replaceMasteryOptions = replaceMastery;
         }
+    } else if (choiceMasteries.length > 0) {
+        replaceMasteryOptions = choiceMasteries;
     } else if (!hasKindMasteryMatch) {
         baseMastery = null;
     }
@@ -98,6 +108,7 @@ export function collectWeaponMastery(weaponName, playerStats) {
         baseMastery,
         extraMasteries: [...new Set(extraMasteries)],
         replaceMasteryOptions: replaceMasteryOptions || null,
+        choiceMasteries: choiceMasteries.length > 0 ? choiceMasteries : null,
     };
 }
 

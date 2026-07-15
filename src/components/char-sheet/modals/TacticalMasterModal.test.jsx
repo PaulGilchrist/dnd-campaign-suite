@@ -34,6 +34,7 @@ function makeProps(overrides) {
     campaignName: 'test-campaign',
     onConfirm: vi.fn(),
     onClose: vi.fn(),
+    isChoiceMode: false,
     ...(overrides || {}),
   };
 }

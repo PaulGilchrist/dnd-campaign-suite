@@ -46,6 +46,7 @@ import { useSimpleDamageRoll } from '../../hooks/combat/useSimpleDamageRoll.js';
 import { useSpellPositionResolver } from '../../hooks/combat/useSpellPositionResolver.js';
 import { useSpellCastExecutor } from '../../hooks/combat/useSpellCastExecutor.js';
 import { getWeaponMastery } from '../../services/combat/weaponMasteryUtils.js';
+import { createSaveListener } from '../../services/automation/common/savePrompt.js';
 import useCharActionModals from './useCharActionModals.js';
 import useInitiativeEffects from './useInitiativeEffects.js';
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx';
@@ -290,7 +291,55 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         const combatSummary = await getCombatContext(campaignName);
         const actualTargetName = combatSummary?.lastAttack?.targetName;
         if (!actualTargetName) return;
-        await applyMasteryEffect(chosenMastery, playerStats, campaignName, actualTargetName);
+        if (chosenMastery === 'Topple') {
+            const weaponAttack = playerStats.attacks?.find(a => a.name === attackName);
+            const abilityName = weaponAttack?.abilityName || 'Strength';
+            const ability = playerStats.abilities?.find(a => a.name === abilityName);
+            const abilityMod = ability?.bonus || 0;
+            const prof = playerStats.proficiency || 0;
+            const saveDc = 8 + abilityMod + prof;
+            const { promptId, promise } = createSaveListener(campaignName, {
+                targetName: actualTargetName,
+                saveType: 'CON',
+                saveDc,
+            });
+            await addEntry(campaignName, {
+                type: 'save_triggered',
+                characterName: playerStats.name,
+                targetName: actualTargetName,
+                saveType: 'CON',
+                saveDc,
+                description: `Topple: ${actualTargetName} must make a DC ${saveDc} CON save (weapon ${abilityName}) or fall Prone.`,
+                promptId,
+            }).catch(() => {});
+            const result = await promise;
+            if (result && !result.success) {
+                const storedConditions = getRuntimeValue(actualTargetName, 'activeConditions') || [];
+                const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+                if (!conditions.includes('prone')) {
+                    await setRuntimeValue(actualTargetName, 'activeConditions', [...conditions, 'prone'], campaignName);
+                }
+                await addEntry(campaignName, {
+                    type: 'save_result',
+                    characterName: playerStats.name,
+                    rollType: 'save-topple',
+                    targetName: actualTargetName,
+                    saveDc,
+                    saveType: 'CON',
+                    success: false,
+                    description: `${actualTargetName} failed CON save vs Topple. Gains Prone condition.`,
+                }).catch(() => {});
+                await addEntry(campaignName, {
+                    type: 'ability_use',
+                    characterName: playerStats.name,
+                    abilityName: 'Topple',
+                    description: `${playerStats.name} used Topple on ${actualTargetName} — target failed CON save (DC ${saveDc}, weapon ${abilityName}), fell Prone.`,
+                    targetName: actualTargetName,
+                }).catch(() => {});
+            }
+        } else {
+            await applyMasteryEffect(chosenMastery, playerStats, campaignName, actualTargetName);
+        }
     }, [campaignName, playerStats, tacticalMasterModal, setTacticalMasterModal]);
 
     const handleTacticalMasterDismiss = () => {

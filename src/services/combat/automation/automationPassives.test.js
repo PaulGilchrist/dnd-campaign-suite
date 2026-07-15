@@ -198,7 +198,7 @@ describe('collectWeaponMastery', () => {
     }
     const result = collectWeaponMastery('+1 Longsword', playerStats)
     expect(parseMagicItemName).toHaveBeenCalledWith('+1 Longsword')
-    expect(result).toEqual({ baseMastery: 'push', extraMasteries: [], replaceMasteryOptions: null })
+    expect(result).toEqual({ baseMastery: 'push', extraMasteries: [], replaceMasteryOptions: null, choiceMasteries: null })
   })
 
   it('returns null baseMastery when weapon not found or kind mastery does not match', () => {
@@ -226,7 +226,7 @@ describe('collectWeaponMastery', () => {
       },
     }
     const result = collectWeaponMastery('Longsword', playerStats)
-    expect(result).toEqual({ baseMastery: 'push', extraMasteries: ['topple', 'push'], replaceMasteryOptions: null })
+    expect(result).toEqual({ baseMastery: 'push', extraMasteries: ['topple', 'push'], replaceMasteryOptions: null, choiceMasteries: null })
   })
 
   it('collects extraMastery from Battering Roots-style passive (push and topple)', () => {
@@ -248,7 +248,9 @@ describe('collectWeaponMastery', () => {
     }
     const result = collectWeaponMastery('Greataxe', playerStats)
     expect(result.baseMastery).toBe('vex')
-    expect(result.extraMasteries).toEqual(expect.arrayContaining(['Push', 'Topple']))
+    expect(result.choiceMasteries).toEqual(['Push', 'Topple'])
+    expect(result.extraMasteries).toEqual([])
+    expect(result.replaceMasteryOptions).toEqual(['Push', 'Topple'])
   })
 
   it('adds replaceMastery to replaceMasteryOptions without clearing baseMastery', () => {
@@ -259,7 +261,7 @@ describe('collectWeaponMastery', () => {
       automation: { passives: [{ replaceMastery: ['topple', 'shove'] }] },
     }
     const result = collectWeaponMastery('Longsword', playerStats)
-    expect(result).toEqual({ baseMastery: 'push', extraMasteries: [], replaceMasteryOptions: ['topple', 'shove'] })
+    expect(result).toEqual({ baseMastery: 'push', extraMasteries: [], replaceMasteryOptions: ['topple', 'shove'], choiceMasteries: null })
   })
 
   it('handles null passives, equipment, or automation', () => {

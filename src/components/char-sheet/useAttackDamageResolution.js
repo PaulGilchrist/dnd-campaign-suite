@@ -1,9 +1,9 @@
+import { getRuntimeValue, setRuntimeObject, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { rollExpression } from '../../services/dice/diceRoller.js';
 import { evaluateAutoExpression } from '../../services/combat/automation/automationService.js';
 import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
 import { executeAttackRiderManeuver as executeAttackRiderManeuverService } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { buildPipelineForAction } from '../../services/combat/steps/index.js';
-import { setRuntimeValue, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 /**
  * Standalone resolveAttackDamage for use outside React hooks (e.g., CharSpells, MonsterCardModal).
@@ -188,6 +188,7 @@ export default function useAttackDamageResolution({
             setAttackRiderManeuverPrompt: (v) => setModalState({ attackRiderManeuverPrompt: v }),
             setSweepingAttackTargetModal: (v) => setModalState({ sweepingAttackTargetModal: v }),
             setSecondaryTargetModal: (v) => setModalState({ secondaryTargetModal: v }),
+            setModalState,
             buildCtx,
             buildCtxSync,
             proceedWithDamage,
@@ -202,6 +203,7 @@ export default function useAttackDamageResolution({
         await pipeline.run('housekeeping:do', ctx, resumeRef);
         if (resumeRef.current?._pausedStep) {
             const paused = resumeRef.current;
+            console.error('[useAttackDamageResolution] pausedStep=%s modalType=%s', paused._pausedStep, paused._modalType);
             if (paused._modalType === 'damageTypeChoice') {
                 setModalState({ damageTypeChoice: paused._modalProps });
                 setPendingDamage({
@@ -229,6 +231,9 @@ export default function useAttackDamageResolution({
                 });
             } else if (paused._modalType === 'secondaryTarget') {
                 setModalState({ secondaryTargetModal: paused._modalProps });
+            } else if (paused._modalType === 'tacticalMaster') {
+                console.error('[useAttackDamageResolution] setting tacticalMasterPending via runtime');
+                setRuntimeObject(campaignName, { tacticalMasterPending: paused._modalProps }, campaignName, true);
             }
         }
     };

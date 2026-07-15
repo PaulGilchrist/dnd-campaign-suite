@@ -1009,44 +1009,47 @@ export function buildDamageSteps() {
       handler: async (ctx) => {
         const cs = await loadCombatSummary(ctx.campaignName);
         const lastAttack = cs?.lastAttack;
-        console.error('[tacticalMaster] Handler called', 'lastAttack:', JSON.stringify(lastAttack));
         if (!lastAttack?.hit) return { data: {} };
 
         const available = collectWeaponMastery(lastAttack.attackName, ctx.playerStats);
         if (!available) return { data: {} };
-        if (!available.replaceMasteryOptions || available.replaceMasteryOptions.length === 0) {
-          // Auto-apply mastery effects (Push, Sap, Slow, Vex, etc.)
-          const allMasteries = [available.baseMastery, ...(available.extraMasteries || [])].filter(Boolean);
-          console.error('[tacticalMaster] allMasteries:', allMasteries, 'replaceMasteryOptions:', available.replaceMasteryOptions);
-          const targetName = lastAttack.targetName;
-          if (targetName) {
-            for (const masteryName of allMasteries) {
-              if (['Graze', 'Topple', 'Nick'].includes(masteryName)) continue;
-              const alreadyApplied = getRuntimeValue(ctx.campaignName, `_${masteryName}_appliedTarget`, ctx.campaignName);
-              console.error('[tacticalMaster] Applying mastery:', masteryName, 'alreadyApplied:', alreadyApplied, 'targetName:', targetName);
-              if (alreadyApplied === targetName) continue;
-              if (masteryName !== 'Slow') {
-                setRuntimeValue(ctx.campaignName, `_${masteryName}_appliedTarget`, targetName, ctx.campaignName);
-              }
-              await applyMasteryEffect(masteryName, ctx.playerStats, ctx.campaignName, targetName).catch((e) => { console.error('[Mastery] Error:', e); });
-            }
+
+        const choiceMasteries = available.choiceMasteries || [];
+        const replaceOptions = available.replaceMasteryOptions || [];
+        const modalOptions = replaceOptions.length > 0 ? replaceOptions : choiceMasteries;
+        const allMasteries = [available.baseMastery, ...(available.extraMasteries || [])].filter(Boolean);
+        const autoApplyMasteries = allMasteries.filter(m => !['Graze', 'Topple', 'Nick', ...choiceMasteries, ...replaceOptions].includes(m));
+
+        console.error('[tacticalMaster] attack=%s available=%o modalOptions=%o allMasteries=%o autoApply=%o', lastAttack.attackName, available, modalOptions, allMasteries, autoApplyMasteries);
+
+        const targetName = lastAttack.targetName;
+
+        for (const masteryName of autoApplyMasteries) {
+          const alreadyApplied = getRuntimeValue(ctx.campaignName, `_${masteryName}_appliedTarget`, ctx.campaignName);
+          if (alreadyApplied === targetName) continue;
+          if (masteryName !== 'Slow') {
+            setRuntimeValue(ctx.campaignName, `_${masteryName}_appliedTarget`, targetName, ctx.campaignName);
           }
-          return { data: {} };
+          await applyMasteryEffect(masteryName, ctx.playerStats, ctx.campaignName, targetName).catch((e) => { console.error('[Mastery] Error:', e); });
         }
 
-        ctx.setModalState?.({
-          tacticalMasterPending: {
-            attackName: lastAttack.attackName,
-            baseMastery: available.baseMastery,
-            replaceOptions: available.replaceMasteryOptions,
-            targetName: lastAttack.targetName,
-          },
-        });
-
-        return {
-          data: { _tacticalMasterPending: true },
-          modal: { type: 'tacticalMaster', props: { attackName: lastAttack.attackName, baseMastery: available.baseMastery, replaceOptions: available.replaceMasteryOptions, targetName: lastAttack.targetName } },
-        };
+        if (modalOptions.length > 0) {
+          const isChoiceMode = !!available.choiceMasteries && available.choiceMasteries.length > 0;
+          ctx.setModalState?.({
+            tacticalMasterPending: {
+              attackName: lastAttack.attackName,
+              baseMastery: available.baseMastery,
+              replaceOptions: modalOptions,
+              targetName,
+              isChoiceMode,
+            },
+          });
+          return {
+            data: { _tacticalMasterPending: true },
+            modal: { type: 'tacticalMaster', props: { attackName: lastAttack.attackName, baseMastery: available.baseMastery, replaceOptions: modalOptions, targetName, isChoiceMode } },
+          };
+        }
+        return { data: {} };
       },
     },
 
@@ -1061,30 +1064,17 @@ export function buildDamageSteps() {
       handler: async (ctx) => {
         const cs = await loadCombatSummary(ctx.campaignName);
         const lastAttack = cs?.lastAttack;
-        console.error('[toppleMastery] Handler called', 'lastAttack:', JSON.stringify(lastAttack));
-        if (!lastAttack?.hit) {
-          console.error('[toppleMastery] Returning early: lastAttack not hit', JSON.stringify(lastAttack));
-          return { data: {} };
-        }
+        if (!lastAttack?.hit) return { data: {} };
 
         const available = collectWeaponMastery(lastAttack.attackName, ctx.playerStats);
-        if (!available) {
-          console.error('[toppleMastery] Returning early: collectWeaponMastery returned null');
-          return { data: {} };
-        }
+        if (!available) return { data: {} };
         const allMasteries = [available.baseMastery, ...(available.extraMasteries || [])].filter(Boolean);
-        console.error('[toppleMastery] allMasteries:', allMasteries);
-        if (!allMasteries.includes('Topple')) {
-          console.error('[toppleMastery] Returning early: Topple not in masteries', 'allMasteries:', allMasteries, 'available:', JSON.stringify(available));
-          return { data: {} };
-        }
+        const choiceMast = available.choiceMasteries || [];
+        const hasTopple = allMasteries.includes('Topple') || choiceMast.includes('Topple');
+        if (!hasTopple) return { data: {} };
+        if (available.baseMastery !== 'Topple') return { data: {} };
 
         const toppleTargetName = lastAttack.targetName;
-        if (!toppleTargetName) {
-          console.error('[toppleMastery] Returning early: no target name');
-          return { data: {} };
-        }
-
         const weaponAttack = ctx.playerStats.attacks?.find(a => a.name === lastAttack.attackName);
         const abilityName = weaponAttack?.abilityName || 'Strength';
         const ability = ctx.playerStats.abilities?.find(a => a.name === abilityName);
