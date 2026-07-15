@@ -117,6 +117,7 @@ export const LONG_REST_RESOURCES = [
   'wholenessofbodyUses',
   'wildResurgenceReversedThisRest',
   'indomitableUses',
+  'warriorofthegodsPool',
   'naturalRecoveryFreeCast',
   'naturalRecoveryFreeCastUsed',
   'naturalRecoverySlots',

@@ -45,12 +45,12 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
         playerStats
     );
     const [healAmount, setHealAmount] = React.useState(isDicePool ? 1 : 1);
-    const [rollCount, setRollCount] = React.useState(1);
     const [log, setLog] = React.useState([]);
-    const [lastRoll, setLastRoll] = React.useState(null);
     const [selectedConditions, setSelectedConditions] = React.useState([]);
     const [combatSummary, setCombatSummary] = React.useState(null);
     const [loading, setLoading] = React.useState(true);
+    const [accumulatedTotal, setAccumulatedTotal] = React.useState(0);
+    const [rolledFaces, setRolledFaces] = React.useState([]);
 
     const chaMod = (() => {
         const chaScore = playerStats.abilities?.CHA || 10;
@@ -173,59 +173,51 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
     };
 
     const applyDiceHeal = () => {
-        const diceToRoll = Math.max(1, Math.min(rollCount, safePool, effectiveMaxDicePerUse));
-        if (diceToRoll <= 0 || safePool <= 0) return;
+        if (safePool <= 0) return;
 
-        const faces = [];
-        let total = 0;
-        for (let i = 0; i < diceToRoll; i++) {
-            const roll = Math.floor(Math.random() * dieType) + 1;
-            faces.push(roll);
-            total += roll;
-        }
-
-        const newPool = safePool - diceToRoll;
+        const roll = Math.floor(Math.random() * dieType) + 1;
+        const newPool = safePool - 1;
         setPoolRemaining(newPool);
-        setLastRoll({ faces, total, count: diceToRoll });
 
-        if (target && combatSummary) {
-            const result = applyHealingToTarget(combatSummary, target.name, total, campaignName);
-            if (result) {
-                addEntry(campaignName, {
-                    type: 'healing_pool',
-                    sourceName: playerStats.name,
-                    featureName,
-                    targetName: target.name,
-                    amount: result.actualHeal,
-                    poolAfter: newPool,
-                }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
-                setLog(prev => [...prev, {
-                    action: `Roll ${diceToRoll}d${dieType}`,
-                    target: target.name,
-                    amount: result.actualHeal,
-                    poolAfter: newPool
-                }]);
-            }
-        } else {
-            const newHp = Math.min(playerStats.hitPoints, targetCurrentHp + total);
-            setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
-            addEntry(campaignName, {
-                type: 'healing_pool',
-                sourceName: playerStats.name,
-                featureName,
-                targetName: playerStats.name,
-                amount: total,
-                poolAfter: newPool,
-            }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
-            setLog(prev => [...prev, {
-                action: `Roll ${diceToRoll}d${dieType}`,
-                target: playerStats.name,
-                amount: total,
-                poolAfter: newPool
-            }]);
+        const newFaces = [...rolledFaces, roll];
+        const newTotal = accumulatedTotal + roll;
+        setRolledFaces(newFaces);
+        setAccumulatedTotal(newTotal);
+    };
+
+    const applyAccumulatedHealing = React.useCallback(() => {
+        if (accumulatedTotal <= 0) return;
+
+        const newPool = safePool;
+
+        const newHp = Math.min(playerStats.hitPoints, targetCurrentHp + accumulatedTotal);
+        setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
+        addEntry(campaignName, {
+            type: 'healing_pool',
+            sourceName: playerStats.name,
+            featureName,
+            targetName: playerStats.name,
+            amount: accumulatedTotal,
+            diceUsed: rolledFaces.length,
+            rolls: rolledFaces,
+            poolAfter: newPool,
+        }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
+        setLog(prev => [...prev, {
+            action: `Roll ${rolledFaces.length}d${dieType}`,
+            target: playerStats.name,
+            amount: accumulatedTotal,
+            poolAfter: newPool,
+            rolls: rolledFaces.join(' + ')
+        }]);
+        setAccumulatedTotal(0);
+        setRolledFaces([]);
+    }, [accumulatedTotal, safePool, rolledFaces, playerStats.hitPoints, targetCurrentHp, playerStats.name, campaignName, featureName, dieType]);
+
+    const handleClose = () => {
+        if (isDicePool && accumulatedTotal > 0) {
+            applyAccumulatedHealing();
         }
-
-        setRollCount(Math.min(Math.min(rollCount, newPool), effectiveMaxDicePerUse));
+        onClose();
     };
 
     const applyCure = (condition) => {
@@ -299,16 +291,21 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
 
     React.useEffect(() => {
         const handleKey = (e) => {
-            if (e.key === 'Escape') onClose();
+            if (e.key === 'Escape') {
+                if (isDicePool && accumulatedTotal > 0) {
+                    applyAccumulatedHealing();
+                }
+                onClose();
+            }
         };
         document.addEventListener('keydown', handleKey);
         return () => document.removeEventListener('keydown', handleKey);
-    }, [onClose]);
+    }, [onClose, accumulatedTotal, isDicePool, applyAccumulatedHealing]);
 
     const batchTotalCost = selectedConditions.length * cureCost;
 
     return (
-        <div className="short-rest-overlay no-print" onClick={onClose}>
+        <div className="short-rest-overlay no-print" onClick={handleClose}>
             <div className="short-rest-modal" onClick={(e) => e.stopPropagation()}>
                 <h3><i className="fas fa-hands-helping"></i> {featureName}</h3>
 
@@ -353,35 +350,20 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
 
                 {isDicePool && (
                     <div className="short-rest-section">
-                        <h4>Roll Dice — {targetName} ({targetCurrentHp} / {targetMaxHp} HP){bloodiedOnly && <span className="bloodied-badge"> (Bloodied only)</span>}{effectiveMaxDicePerUse < Infinity && <span className="bloodied-badge"> (Max {effectiveMaxDicePerUse} dice)</span>}</h4>
+                        <h4>Roll Dice — {playerStats.name} ({targetCurrentHp} / {targetMaxHp} HP){effectiveMaxDicePerUse < Infinity && <span className="bloodied-badge"> (Max {effectiveMaxDicePerUse} dice)</span>}</h4>
                         <div className="short-rest-dice-row">
-                            <label>
-                                Dice:
-                                <input
-                                    type="number"
-                                    min="1"
-                                    max={Math.min(safePool, effectiveMaxDicePerUse)}
-                                    value={Math.max(1, Math.min(rollCount, safePool, effectiveMaxDicePerUse))}
-                                    onChange={(e) => {
-                                        const raw = Number(e.target.value);
-                                        setRollCount(raw >= 1 ? Math.min(Math.min(raw, safePool), effectiveMaxDicePerUse) : 1);
-                                    }}
-                                    style={{ width: '62px', marginLeft: '6px' }}
-                                />
-                            </label>
-                            <span> of {safePool} d{dieType}</span>
-                            <button className="char-btn" onClick={applyDiceHeal} disabled={safePool <= 0 || (bloodiedOnly && !isTargetBloodied)}>
-                                <i className="fas fa-dice-d12"></i> Roll & Heal
+                            <button className="char-btn" onClick={applyDiceHeal} disabled={safePool <= 0}>
+                                <i className="fas fa-dice-d12"></i> Roll a d{dieType}
                             </button>
                         </div>
-                        {bloodiedOnly && !isTargetBloodied && (
-                            <p className="healing-restriction-note">This feature can only heal Bloodied creatures (at half HP or less).</p>
-                        )}
-                        {lastRoll && (
+                        {rolledFaces.length > 0 && (
                             <div className="healing-roll-details" style={{ marginTop: '8px' }}>
-                                <span className="healing-formula">Rolled {lastRoll.count}d{dieType}: </span>
-                                <span className="healing-dice-rolled">{lastRoll.faces.join(' + ')}</span>
-                                <span className="healing-total"> = <strong>{lastRoll.total}</strong> HP restored</span>
+                                <span className="healing-formula">Rolled {rolledFaces.length}d{dieType}: </span>
+                                <span className="healing-dice-rolled">{rolledFaces.join(' + ')}</span>
+                                <span className="healing-total"> = <strong>{accumulatedTotal}</strong> HP to restore</span>
+                                <div style={{ marginTop: '4px', fontSize: '0.9em', color: '#888' }}>
+                                    Remaining: {safePool} dice
+                                </div>
                             </div>
                         )}
                     </div>
@@ -464,7 +446,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                 )}
 
                 <div className="short-rest-actions">
-                    <button className="char-btn" onClick={onClose}>
+                    <button className="char-btn" onClick={handleClose}>
                         <i className="fa-solid fa-check"></i> Done
                     </button>
                 </div>

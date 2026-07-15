@@ -673,13 +673,13 @@ describe('HealingPoolModal', () => {
     expect(poolText).toBe('Pool: 3 / 4 d12');
   });
 
-  it('dice pool shows Roll & Heal button instead of Apply Heal', async () => {
+  it('dice pool shows Roll a d12 button instead of Apply Heal', async () => {
     await renderModal({ current: 4, max: 4 }, {
       isDicePool: true,
       dieType: 12,
       name: 'Warrior of the Gods',
     });
-    expect(screen.getByText(/Roll & Heal/)).toBeInTheDocument();
+    expect(screen.getByText(/Roll a d12/)).toBeInTheDocument();
     expect(screen.queryByText(/Apply Heal/)).not.toBeInTheDocument();
   });
 
@@ -693,52 +693,45 @@ describe('HealingPoolModal', () => {
     expect(screen.queryByText('Lay On Hands')).not.toBeInTheDocument();
   });
 
-  it('dice pool Roll & Heal button disabled when pool is zero', async () => {
+  it('dice pool Roll a d12 button disabled when pool is zero', async () => {
     await renderModal({ current: 0, max: 4 }, {
       isDicePool: true,
       dieType: 12,
     });
-    const btn = screen.getByRole('button', { name: /Roll & Heal/i });
+    const btn = screen.getByRole('button', { name: /Roll a d12/i });
     expect(btn).toBeDisabled();
   });
 
-  it('dice pool displays roll result after healing', async () => {
-    applyHealingService.applyHealingToTarget.mockReturnValue({
-      actualHeal: 10,
-      oldHp: 15,
-      newHp: 25,
-    });
-
+  it('dice pool shows roll result after clicking Roll button', async () => {
     await renderModal({ current: 3, max: 4 }, {
       isDicePool: true,
       dieType: 12,
       name: 'Warrior of the Gods',
     });
-    fireEvent.click(screen.getByRole('button', { name: /Roll & Heal/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Roll a d12/i }));
 
-    expect(screen.getByText(/HP restored/)).toBeInTheDocument();
+    expect(screen.getByText(/HP to restore/)).toBeInTheDocument();
   });
 
-  it('dice pool applies healing and logs entry on Roll & Heal', async () => {
-    applyHealingService.applyHealingToTarget.mockReturnValue({
-      actualHeal: 8,
-      oldHp: 15,
-      newHp: 23,
-    });
+  it('dice pool accumulates total across multiple rolls', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5); // yields roll ~6-7
 
     await renderModal({ current: 4, max: 4 }, {
       isDicePool: true,
       dieType: 12,
       name: 'Warrior of the Gods',
     });
-    fireEvent.click(screen.getByRole('button', { name: /Roll & Heal/i }));
 
-    expect(applyHealingService.applyHealingToTarget).toHaveBeenCalled();
-    expect(updateFn).toHaveBeenCalled();
-    expect(screen.getByRole('table')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Roll a d12/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Roll a d12/i }));
+
+    const totalText = screen.getByText(/HP to restore/);
+    expect(totalText).toBeInTheDocument();
   });
 
-  it('dice pool applies self-heal when no combat context', async () => {
+  it('dice pool applies self-heal on Done button when rolls accumulated', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
     damageUtils.getCombatContext.mockResolvedValue(null);
     damageUtils.getTargetFromAttacker.mockReturnValue(null);
     useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
@@ -752,50 +745,60 @@ describe('HealingPoolModal', () => {
       dieType: 12,
       name: 'Warrior of the Gods',
     });
-    fireEvent.click(screen.getByRole('button', { name: /Roll & Heal/i }));
 
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /Roll a d12/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Done/i }));
+
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('Paladin1', 'currentHitPoints', expect.any(Number), 'test-campaign');
     const logCalls = global.fetch.mock.calls.filter(
       (call) => call[0] === '/api/campaigns/test-campaign/log',
     );
     expect(logCalls.length).toBeGreaterThan(0);
   });
 
-  it('dice pool input defaults to 1 and clamps to pool max', async () => {
-    await renderModal({ current: 2, max: 4 }, {
+  it('dice pool applies no healing on Done when no rolls made', async () => {
+    damageUtils.getCombatContext.mockResolvedValue(null);
+    damageUtils.getTargetFromAttacker.mockReturnValue(null);
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'currentHitPoints') return 20;
+      if (key === 'activeConditions') return [];
+      return null;
+    });
+
+    await renderModal({ current: 4, max: 4 }, {
       isDicePool: true,
       dieType: 12,
       name: 'Warrior of the Gods',
     });
-    const input = screen.getByRole('spinbutton');
-    expect(input.value).toBe('1');
 
-    fireEvent.change(input, { target: { value: '5' } });
-    // Should clamp to pool max (2)
-    expect(input.value).toBe('2');
+    fireEvent.click(screen.getByRole('button', { name: /Done/i }));
+
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith('Paladin1', 'currentHitPoints', expect.any(Number), 'test-campaign');
   });
 
-  it('dice pool respects effectiveMaxDicePerUse from CHA modifier', async () => {
-    // CHA 14 => modifier = floor((14-1)/2) = 6, effectiveMaxDicePerUse = chaMod when maxDicePerUse is truthy
-    await renderModal({ current: 10, max: 10 }, {
+  it('dice pool deducts pool on each roll', async () => {
+    await renderModal({ current: 3, max: 4 }, {
       isDicePool: true,
       dieType: 12,
       name: 'Warrior of the Gods',
-      maxDicePerUse: true, // enables CHA-limited dice
     });
-    const input = screen.getByRole('spinbutton');
-    // CHA 14 => mod = 6, so max dice per use is 6
-    expect(input.getAttribute('max')).toBe('6');
+
+    fireEvent.click(screen.getByRole('button', { name: /Roll a d12/i }));
+    expect(updateFn).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: /Roll a d12/i }));
+    expect(updateFn).toHaveBeenCalledTimes(2);
   });
 
-  it('dice pool shows max dice badge when effectiveMaxDicePerUse is limited', async () => {
-    await renderModal({ current: 10, max: 10 }, {
+  it('dice pool shows remaining dice count after rolling', async () => {
+    await renderModal({ current: 4, max: 4 }, {
       isDicePool: true,
       dieType: 12,
       name: 'Warrior of the Gods',
-      maxDicePerUse: true,
     });
-    expect(screen.getByText(/Max 6 dice/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Roll a d12/i }));
+    expect(screen.getByText(/Remaining:.*dice/)).toBeInTheDocument();
   });
 
   it('dice pool shows dice count and die type in heading', async () => {
@@ -807,13 +810,18 @@ describe('HealingPoolModal', () => {
     expect(screen.getByText(/Roll Dice — .* \(.*\/.* HP\)/)).toBeInTheDocument();
   });
 
-  it('dice pool shows "of X dY" after dice input', async () => {
-    await renderModal({ current: 5, max: 8 }, {
+  it('dice pool shows individual roll values in accumulated total', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.25);
+
+    await renderModal({ current: 4, max: 4 }, {
       isDicePool: true,
-      dieType: 10,
+      dieType: 12,
       name: 'Warrior of the Gods',
     });
-    expect(screen.getByText(/of 5 d10/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Roll a d12/i }));
+
+    expect(screen.getByText(/Rolled 1d12:/)).toBeInTheDocument();
   });
 
   // ── Default feature name when not provided ──

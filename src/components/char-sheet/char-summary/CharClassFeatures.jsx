@@ -41,6 +41,9 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName
     const wildHeartBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.name === 'Rage of the Wilds') : null;
     const wildHeartOption = wildHeartBuff?.optionName || null;
 
+    const warriorOfTheGodsFeature = (playerStats.bonusActions || []).find(f => f.name === 'Warrior of the Gods');
+    const maxDice = playerStats.level >= 17 ? 7 : playerStats.level >= 12 ? 6 : playerStats.level >= 6 ? 5 : 4;
+
     return (
           <div data-testid="char-class-barbarian">
                <div><b>Extra Attacks: </b>{extraAttacks}</div>
@@ -62,6 +65,17 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName
                     </div>
                 )}
                <div><b>Weapon Mastery: </b><span className="clickable" onClick={onWeaponMasteryClick}>{weaponMastery}</span></div>
+               {warriorOfTheGodsFeature && (
+                   <TrackedResourceInput 
+                       label="Warrior of the Gods" 
+                       resourceKey="warriorofthegodsPool" 
+                       playerName={playerStats.name} 
+                       getMax={() => maxDice} 
+                       deps={[playerStats]} 
+                       campaignName={campaignName} 
+                       playerStats={playerStats} 
+                   />
+               )}
           </div>
     );
 };

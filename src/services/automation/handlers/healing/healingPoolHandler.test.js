@@ -40,9 +40,70 @@ describe('healingPoolHandler.handle', () => {
 
       expect(result.payload.poolExpression).toBe('level + 2');
       expect(result.payload.isDicePool).toBe(true);
-      expect(result.payload.dieType).toBe('d6');
-      expect(result.payload.maxDicePerUse).toBe('3');
       expect(result.payload.resourceKey).toBe('spell_slot');
+    });
+
+    it('detects isDicePool from poolExpression matching dice pattern', async () => {
+      const result = await handle(
+        makeAction({
+          poolExpression: '4d12',
+        }),
+        {},
+        campaignName,
+        mapName,
+      );
+
+      expect(result.payload.isDicePool).toBe(true);
+      expect(result.payload.pool).toBe(4);
+      expect(result.payload.dieType).toBe(12);
+    });
+
+    it('resolves pool scaling from poolExpression', async () => {
+      const playerStats = { level: 10 };
+
+      const result = await handle(
+        makeAction({
+          poolExpression: '4d12',
+          scaling: {
+            '6': '5d12',
+            '12': '6d12',
+            '17': '7d12',
+          },
+        }),
+        playerStats,
+        campaignName,
+        mapName,
+      );
+
+      expect(result.payload.isDicePool).toBe(true);
+      expect(result.payload.pool).toBe(5);
+      expect(result.payload.poolExpression).toBe('5d12');
+    });
+
+    it('generates resourceKey from feature name for dice pools', async () => {
+      const result = await handle(
+        makeAction({
+          poolExpression: '4d12',
+        }),
+        {},
+        campaignName,
+        mapName,
+      );
+
+      expect(result.payload.resourceKey).toBe('healingtouchPool');
+    });
+
+    it('does not detect isDicePool when poolExpression is not a dice pattern', async () => {
+      const result = await handle(
+        makeAction({
+          poolExpression: '5 * level',
+        }),
+        { level: 3 },
+        campaignName,
+        mapName,
+      );
+
+      expect(result.payload.isDicePool).toBe(false);
     });
   });
 
