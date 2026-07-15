@@ -27,6 +27,11 @@ function ensureArray(value, name) {
 }
 
 export async function applyTurnStartEffects(activeName, playerStats, campaignName, characters = []) {
+
+    // Holy Nimbus: radiant damage to enemies in aura when they start their turn
+    // Must run before the playerStats check since active creature may be an NPC
+    await applyHolyNimbusDamage(activeName, characters, campaignName);
+
     if (!activeName || !playerStats) {
         return;
     }
@@ -64,17 +69,6 @@ export async function applyTurnStartEffects(activeName, playerStats, campaignNam
         }
         if (effect.type === 'flurry_healing_harm') {
             applyFlurryHealingHarmTurnStart(activeName, playerStats, effect, campaignName);
-        }
-        if (effect.type === 'holy_nimbus_radiant_damage') {
-            const chaMod = playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0;
-            const prof = playerStats.proficiency || 0;
-            await applyAuraDamage(activeName, playerStats, campaignName, characters, {
-                activeKey: 'holyNimbusActive',
-                damageValue: prof + chaMod,
-                range: 10,
-                damageType: 'Radiant',
-                targetFilter: (c) => c.type === 'fiend' || c.type === 'undead',
-            });
         }
         if (effect.type === 'living_legend_turn_start') {
             setRuntimeValue(activeName, 'unerringStrikeUsed', false, campaignName);
@@ -747,8 +741,8 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
            } catch (_e) { /* ignore */ }
    }
 
-export async function applyAuraDamage(activeName, playerStats, campaignName, characters = [], options = {}) {
-    const { activeKey, damageValue, range, damageType = 'Radiant', targetFilter } = options;
+ export async function applyAuraDamage(activeName, playerStats, campaignName, characters = [], options = {}) {
+    const { activeKey, damageValue, range, damageType = 'Radiant', targetFilter, allyFilter } = options;
 
     const isActive = getRuntimeValue(activeName, activeKey, campaignName);
     if (!isActive) return;
@@ -767,6 +761,9 @@ export async function applyAuraDamage(activeName, playerStats, campaignName, cha
 
     if (typeof damageValue !== 'number' || isNaN(damageValue) || damageValue <= 0) return;
 
+    const storedAllies = allyFilter ? getRuntimeValue(activeName, 'selectedAllies', campaignName) : null;
+    const allyList = Array.isArray(storedAllies) && storedAllies.length > 0 ? storedAllies : null;
+
     const activeMapName = getRuntimeValue('__map__', 'activeMapName');
     const playerCreature = combatSummary.players?.find(p => p.name === activeName);
 
@@ -775,6 +772,8 @@ export async function applyAuraDamage(activeName, playerStats, campaignName, cha
         if (creatureName === utils.getName(activeName)) continue;
 
         if (targetFilter && !targetFilter(creature)) continue;
+
+        if (allyList && allyList.includes(creatureName)) continue;
 
         const hasMap = !!activeMapName;
         const hasPlayerPos = playerCreature?.gridX != null && playerCreature?.gridY != null;
@@ -794,6 +793,62 @@ export async function applyAuraDamage(activeName, playerStats, campaignName, cha
     }
 
     storage.set('combatSummary', combatSummary, campaignName);
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+}
+
+async function applyHolyNimbusDamage(activeName, characters, campaignName) {
+    const combatSummary = getCombatSummary(campaignName);
+    if (!combatSummary) {
+        const loaded = await loadCombatSummary(campaignName);
+        if (!loaded) return;
+    }
+    const summary = getCombatSummary(campaignName) || await loadCombatSummary(campaignName);
+    if (!summary) return;
+
+    const activeMapName = getRuntimeValue('__map__', 'activeMapName');
+    const activeCreature = summary.creatures?.find(c => utils.getName(c.name) === utils.getName(activeName));
+    if (!activeCreature) return;
+
+    for (const character of characters) {
+        const charName = utils.getName(character.name);
+        const holyNimbusActive = getRuntimeValue(charName, 'holyNimbusActive', campaignName);
+        if (!holyNimbusActive) continue;
+
+        const storedAllies = getRuntimeValue(charName, 'selectedAllies', campaignName);
+        const allyList = Array.isArray(storedAllies) && storedAllies.length > 0 ? storedAllies : null;
+        if (allyList && allyList.includes(activeName)) continue;
+
+        const chaMod = character.computedStats?.abilities?.find(a => a.name === 'Charisma')?.bonus ?? character.abilities?.find(a => a.name === 'Charisma')?.bonus ?? 0;
+        const prof = character.computedStats?.proficiency ?? character.proficiency ?? 0;
+        const damageValue = prof + chaMod;
+        if (damageValue <= 0) continue;
+
+        const range = 10;
+        if (activeMapName) {
+            const playerCreature = summary.players?.find(p => utils.getName(p.name) === utils.getName(charName));
+            const hasPlayerPos = playerCreature?.gridX != null && playerCreature?.gridY != null;
+            const hasCreaturePos = activeCreature.gridX != null && activeCreature.gridY != null;
+            if (hasPlayerPos && hasCreaturePos) {
+                const dist = getDistanceFeet(
+                    { gridX: playerCreature.gridX, gridY: playerCreature.gridY },
+                    { gridX: activeCreature.gridX, gridY: activeCreature.gridY }
+                );
+                if (dist === null || dist > range) continue;
+            }
+        }
+
+        try {
+            applyDamageToTarget(summary, activeName, damageValue, ['Radiant'], campaignName, characters, false, charName);
+        } catch { /* ignore per-creature errors */ }
+    }
+
+    storage.set('combatSummary', summary, campaignName);
+    fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/combatSummary`, {
+      method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(summary)
+    }).catch((e) => { console.error('[HolyNimbus] Failed to sync combatSummary to server:', e); });
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 }
 

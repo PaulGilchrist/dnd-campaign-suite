@@ -132,6 +132,34 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
       }
     }
 
+    // Source-restricted save advantage (e.g. Holy Nimbus: advantage against Fiends/Undead for allies)
+    if (!hasAdvantage && !current.disadvantage && current.attackerName) {
+      const targetName = current.targetName;
+      const attackerName = current.attackerName;
+      const combatSummary = getCombatSummary(campaignName);
+      const attackerCreature = combatSummary?.creatures?.find(c => utils.getName(c.name) === utils.getName(attackerName));
+      if (attackerCreature) {
+        const attackerType = (attackerCreature.type || '').toLowerCase();
+        if (attackerType === 'fiend' || attackerType === 'undead') {
+          for (const character of (characters || [])) {
+            const charName = character.name;
+            const holyNimbusActive = getRuntimeValue(charName, 'holyNimbusActive', campaignName);
+            if (!holyNimbusActive) continue;
+            const storedAllies = getRuntimeValue(charName, 'selectedAllies', campaignName);
+            const allyList = Array.isArray(storedAllies) && storedAllies.length > 0 ? storedAllies : null;
+            if (allyList && allyList.includes(targetName)) {
+              hasAdvantage = true;
+              break;
+            }
+            if (!allyList) {
+              hasAdvantage = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+
     const roll1 = forceRollTo20Ref.current ? 20 : rollD20();
     const roll2 = current.disadvantage ? rollD20() : roll1;
     const finalRoll = current.disadvantage ? Math.min(roll1, roll2) : hasAdvantage ? Math.max(roll1, roll2) : roll1;

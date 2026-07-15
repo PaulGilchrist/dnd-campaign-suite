@@ -32,7 +32,7 @@ function makeMapData(players) {
   return { players }
 }
 
-function makeCoronaBuff(distance, enemiesDisadvantageSaves = []) {
+function makeCoronaBuff(distance, enemiesDisadvantageSaves = ['Fire', 'Radiant']) {
   const buff = { effect: 'sunlight_aura', enemiesDisadvantageSaves }
   if (distance !== undefined) buff.distance = distance
   return buff
@@ -230,15 +230,17 @@ describe('getCoronaSaveDisadvantage', () => {
     })
 
     it.each([
-      ['empty saves array grants disadvantage for any damage type', { damageType: 'Fire', saves: [], expected: true }],
+      ['empty saves array grants no disadvantage for any damage type', { damageType: 'Fire', saves: [], expected: false }],
       ['damage type matches saves array', { damageType: 'Fire', saves: ['Fire'], expected: true }],
       ['damage type casing is normalized to match saves', { damageType: 'fire', saves: ['Fire'], expected: true }],
       ['uppercase damage type casing is normalized', { damageType: 'FIRE', saves: ['Fire'], expected: true }],
       ['damage type does not match saves array', { damageType: 'Fire', saves: ['Lightning'], expected: false }],
       ['cold not in multi-entry saves array', { damageType: 'Cold', saves: ['Fire', 'Lightning'], expected: false }],
       ['cold matches one of many saves', { damageType: 'Cold', saves: ['Fire', 'Cold', 'Lightning'], expected: true }],
-      ['null damage type ignores saves filter', { damageType: null, saves: ['Fire'], expected: true }],
-      ['undefined damage type ignores saves filter', { damageType: undefined, saves: ['Fire'], expected: true }],
+      ['null damage type with empty saves still no disadvantage', { damageType: null, saves: [], expected: false }],
+      ['null damage type with saves matches', { damageType: null, saves: ['Fire'], expected: true }],
+      ['undefined damage type with empty saves still no disadvantage', { damageType: undefined, saves: [], expected: false }],
+      ['undefined damage type with saves matches', { damageType: undefined, saves: ['Fire'], expected: true }],
     ])('damage type filtering: %s', (_, { damageType, saves, expected }) => {
       getRuntimeValue.mockReturnValue([makeCoronaBuff(null, saves)])
 
@@ -273,7 +275,7 @@ describe('getCoronaSaveDisadvantage', () => {
       expect(result).toEqual({ disadvantage: true, source: 'Paladin2' })
     })
 
-    it('handles a buff object missing enemiesDisadvantageSaves (defaults to empty array)', () => {
+    it('handles a buff object missing enemiesDisadvantageSaves (defaults to empty array, no disadvantage)', () => {
       getRuntimeValue.mockReturnValue([{ effect: 'sunlight_aura' }])
 
       const result = getCoronaSaveDisadvantage({
@@ -283,7 +285,7 @@ describe('getCoronaSaveDisadvantage', () => {
         damageType: 'Fire',
         skipRangeCheck: true,
       })
-      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
+      expect(result).toEqual({ disadvantage: false })
     })
   })
 
@@ -495,12 +497,13 @@ describe('getCoronaSaveDisadvantage', () => {
     })
 
     it.each([
-      ['empty saves array grants disadvantage for any damage type', { damageType: 'Fire', saves: [], expected: true }],
+      ['empty saves array grants no disadvantage for any damage type', { damageType: 'Fire', saves: [], expected: false }],
       ['damage type matches saves array', { damageType: 'Fire', saves: ['Fire'], expected: true }],
       ['damage type casing is normalized', { damageType: 'fire', saves: ['Fire'], expected: true }],
       ['uppercase damage type casing is normalized', { damageType: 'FIRE', saves: ['Fire'], expected: true }],
       ['damage type does not match saves array', { damageType: 'Fire', saves: ['Lightning'], expected: false }],
-      ['null damage type ignores saves filter', { damageType: null, saves: ['Fire'], expected: true }],
+      ['null damage type with saves matches', { damageType: null, saves: ['Fire'], expected: true }],
+      ['null damage type with empty saves grants no disadvantage', { damageType: null, saves: [], expected: false }],
     ])('damage type filtering in range mode: %s', (_, { damageType, saves, expected }) => {
       getRuntimeValue.mockReturnValue([makeCoronaBuff(null, saves)])
       getDistanceFeet.mockReturnValue(30)

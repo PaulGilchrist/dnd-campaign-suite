@@ -211,21 +211,6 @@ describe('collectTurnStartEffects', () => {
             })
         })
 
-        it('maps holy_nimbus type to holy_nimbus_radiant_damage with fixed fields', () => {
-            const features = [{
-                name: 'Holy Nimbus',
-                automation: { type: 'holy_nimbus' }
-            }]
-            const result = collectTurnStartEffects(features)
-            expect(result).toHaveLength(1)
-            expect(result[0]).toEqual({
-                type: 'holy_nimbus_radiant_damage',
-                name: 'Holy Nimbus',
-                damageExpression: 'CHA modifier + proficiency_bonus',
-                range: '10_ft',
-            })
-        })
-
         it('maps living_legend type to living_legend_turn_start', () => {
             const features = [{
                 name: 'Living Legend',
@@ -502,23 +487,22 @@ describe('collectTurnStartEffects', () => {
                 automation: [
                     { type: 'passive_rule', effect: 'superior_defense' },
                     { type: 'passive_rule', effect: 'naturally_stealthy' },
-                    { type: 'holy_nimbus' },
+                    { type: 'naturally_stealthy' },
                 ]
             }])
-            expect(result).toHaveLength(3)
+            expect(result).toHaveLength(2)
             expect(result[0].type).toBe('superior_defense')
             expect(result[1].type).toBe('naturally_stealthy')
-            expect(result[2].type).toBe('holy_nimbus_radiant_damage')
         })
 
         it('merges effects from multiple features', () => {
             const result = collectTurnStartEffects([
                 { name: 'Supreme Sneak', automation: { type: 'passive_rule', effect: 'supreme_sneak' } },
-                { name: 'Holy Nimbus', automation: { type: 'holy_nimbus' } },
+                { name: 'Naturally Stealthy', automation: { type: 'passive_rule', effect: 'naturally_stealthy' } },
             ])
             expect(result).toHaveLength(2)
             expect(result[0].type).toBe('supreme_sneak')
-            expect(result[1].type).toBe('holy_nimbus_radiant_damage')
+            expect(result[1].type).toBe('naturally_stealthy')
         })
     })
 
@@ -540,8 +524,8 @@ describe('collectTurnStartEffects', () => {
         })
 
         it('skips null and undefined entries in features array', () => {
-            expect(collectTurnStartEffects([null, { name: 'Valid', automation: { type: 'holy_nimbus' } }])).toHaveLength(1)
-            expect(collectTurnStartEffects([undefined, { name: 'Valid', automation: { type: 'holy_nimbus' } }])).toHaveLength(1)
+            expect(collectTurnStartEffects([null, { name: 'Valid', automation: { type: 'passive_rule', effect: 'naturally_stealthy' } }])).toHaveLength(1)
+            expect(collectTurnStartEffects([undefined, { name: 'Valid', automation: { type: 'passive_rule', effect: 'naturally_stealthy' } }])).toHaveLength(1)
         })
 
         it('ignores unknown automation types', () => {
@@ -572,7 +556,7 @@ describe('collectTurnStartEffects', () => {
         it('handles feature with empty name', () => {
             const result = collectTurnStartEffects([{
                 name: '',
-                automation: { type: 'holy_nimbus' }
+                automation: { type: 'passive_rule', effect: 'naturally_stealthy' }
             }])
             expect(result).toHaveLength(1)
             expect(result[0].name).toBe('')

@@ -26,7 +26,7 @@ export async function addNPCToInitiative(campaignName, npc, onViewInitiative) {
 
   combatSummary.creatures.push({
     name: npc.name,
-    type: 'npc',
+    type: npc.type || 'npc',
     initiative: String(total),
     targetName: null,
     ac: typeof npc.armorClass === 'number'

@@ -135,12 +135,13 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
     timestamp: Date.now(),
   };
 
-    const isPlayer = creature.type === 'player';
-    if (!Array.isArray(characters)) { console.error('[applyDamage] characters is not an array'); throw new Error('characters must be an array'); }
-    const playerStats = isPlayer ? characters.find(c => c.name === targetName || c.name.startsWith(targetName + ' ')) : null;
-   const playerComputed = playerStats?.computedStats || playerStats;
-    let resistances = isPlayer ? (playerComputed?.resistances || []) : (creature.resistances || []);
-    const immunities = isPlayer ? (playerComputed?.immunities || []) : (creature.immunities || []);
+  const isPlayer = creature.type === 'player';
+  if (!Array.isArray(characters)) { console.error('[applyDamage] characters is not an array'); throw new Error('characters must be an array'); }
+  const playerStats = isPlayer ? characters.find(c => c.name === targetName || c.name.startsWith(targetName + ' ')) : null;
+  const playerComputed = playerStats?.computedStats || playerStats;
+  let resistances = isPlayer ? (playerComputed?.resistances || []) : (creature.resistances || []);
+  const immunities = isPlayer ? (playerComputed?.immunities || []) : (creature.immunities || []);
+
     if (isPlayer) {
         const rawBuffs = getRuntimeValue(creature.name, 'activeBuffs', campaignName);
         const activeBuffs = Array.isArray(rawBuffs) ? rawBuffs : [];

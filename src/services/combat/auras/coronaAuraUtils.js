@@ -48,7 +48,8 @@ export function getCoronaSaveDisadvantage({ targetName, campaignName, mapData, d
             const dist = getDistanceFeet(playerPos, targetPos);
             if (dist !== null && dist <= rangeNum) {
                 const applicableTypes = coronaBuff.enemiesDisadvantageSaves || [];
-                if (damageType && applicableTypes.length > 0) {
+                if (applicableTypes.length === 0) continue;
+                if (damageType) {
                     const normalizedType = damageType.charAt(0).toUpperCase() + damageType.slice(1).toLowerCase();
                     if (!applicableTypes.includes(normalizedType)) continue;
                 }
@@ -66,7 +67,8 @@ export function getCoronaSaveDisadvantage({ targetName, campaignName, mapData, d
             if (!inList) continue;
 
             const applicableTypes = coronaBuff.enemiesDisadvantageSaves || [];
-            if (damageType && applicableTypes.length > 0) {
+            if (applicableTypes.length === 0) continue;
+            if (damageType) {
                 const normalizedType = damageType.charAt(0).toUpperCase() + damageType.slice(1).toLowerCase();
                 if (!applicableTypes.includes(normalizedType)) continue;
             }

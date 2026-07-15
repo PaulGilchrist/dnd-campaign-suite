@@ -51,14 +51,9 @@ vi.mock('../../automation/handlers/spells/tashasLaughterHandler.js', () => ({
   handle: vi.fn(),
 }));
 
-vi.mock('../../rules/combat/applyDamage.js', () => ({
-  applyDamageToTarget: vi.fn(),
-}));
-
 import { applyTurnStartEffects, expireStaleEffects } from './expirations.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getCombatSummary, getCurrentCombatRound, getActiveCreatureName } from '../../encounters/combatData.js';
-import { applyDamageToTarget } from '../../rules/combat/applyDamage.js';
 import utils from '../../ui/utils.js';
 
 function resetMocks() {
@@ -219,33 +214,6 @@ describe('applyTurnStartEffects — additional effect types', () => {
         1,
         'TestCampaign',
       );
-    });
-  });
-
-  describe('holy_nimbus_radiant_damage effect', () => {
-    it('applies radiant damage to fiends and undead in range', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'holyNimbusActive') return true;
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-      getCombatSummary.mockReturnValue({
-        creatures: [
-          { name: 'Demon', type: 'fiend', hit_points: { current: 20 } },
-          { name: 'Skeleton', type: 'undead', hit_points: { current: 15 } },
-          { name: 'Goblin', type: 'humanoid', hit_points: { current: 7 } },
-        ],
-      });
-      applyDamageToTarget.mockReturnValue(undefined);
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{ type: 'holy_nimbus_radiant_damage' }],
-        abilities: [{ name: 'Charisma', bonus: 2 }],
-        proficiency: 2,
-      }, 'TestCampaign');
-
-      // Should only damage fiends and undead
-      expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
     });
   });
 

@@ -457,13 +457,8 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         conditionEffects.saveAdvantageCount = (conditionEffects.saveAdvantageCount || 0) + 1;
     }
 
-    // Holy Nimbus: Holy Ward grants advantage on saving throws against Fiends/Undead
-    if (playerStats) {
-        const holyNimbusActive = getRuntimeValue(playerStats.name, 'holyNimbusActive', campaignName);
-        if (holyNimbusActive) {
-            conditionEffects.saveAdvantageCount = (conditionEffects.saveAdvantageCount || 0) + 1;
-        }
-    }
+    // Holy Nimbus: Holy Ward grants advantage on saving throws against Fiends/Undead for allies
+    // (handled in SavePromptModal.jsx where attacker type and ally list are known)
 
     // Elusive: No attack roll can have Advantage against you unless you have the Incapacitated condition
     if (playerStats) {

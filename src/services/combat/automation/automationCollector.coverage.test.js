@@ -187,11 +187,11 @@ describe('collectTurnStartEffects – null/undefined safety', () => {
     it('handles array automation with null/undefined entries', () => {
         const features = [{
             name: 'Mixed',
-            automation: [null, { type: 'holy_nimbus' }, undefined]
+            automation: [null, { type: 'passive_rule', effect: 'naturally_stealthy' }, undefined]
         }]
         const result = collectTurnStartEffects(features)
         expect(result).toHaveLength(1)
-        expect(result[0].type).toBe('holy_nimbus_radiant_damage')
+        expect(result[0].type).toBe('naturally_stealthy')
     })
 })
 
@@ -338,11 +338,11 @@ describe('collectTurnStartEffects – behavioral routing', () => {
             automation: [
                 { type: 'passive_rule', effect: 'superior_defense' },
                 { type: 'passive_rule', effect: 'naturally_stealthy' },
-                { type: 'holy_nimbus' },
+                { type: 'passive_rule', effect: 'umbral_sight' },
             ]
         }])
         expect(result).toHaveLength(3)
-        expect(result.map(r => r.type)).toEqual(['superior_defense', 'naturally_stealthy', 'holy_nimbus_radiant_damage'])
+        expect(result.map(r => r.type)).toEqual(['superior_defense', 'naturally_stealthy', 'umbral_sight'])
     })
 })
 

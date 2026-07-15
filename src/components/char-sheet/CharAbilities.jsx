@@ -208,8 +208,8 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
       }
 
         const hasSaveAdvantage = (abilityName) => {
-          return (conditionEffects?.saveAdvantageCount || 0) > 0 || conditionEffects?.saveAdvantageAbilities?.includes(abilityName.substring(0, 3).toUpperCase());
-         }
+           return (conditionEffects?.saveAdvantageCount || 0) > 0 || conditionEffects?.saveAdvantageAbilities?.includes(abilityName.substring(0, 3).toUpperCase());
+          }
 
         const getSaveAdvantageSource = () => {
           if (conditionEffects?.saveAdvantage?.includes('against_spell')) {

@@ -88,14 +88,6 @@ export function collectTurnStartEffects(features) {
                     name: feature.name,
                 })
             }
-            if (auto?.type === 'holy_nimbus') {
-                effects.push({
-                    type: 'holy_nimbus_radiant_damage',
-                    name: feature.name,
-                    damageExpression: 'CHA modifier + proficiency_bonus',
-                    range: '10_ft',
-                })
-            }
             if (auto?.type === 'living_legend') {
                 effects.push({
                     type: 'living_legend_turn_start',

@@ -308,7 +308,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                  }
               }
               expireStaleEffects(campaignName, newActiveName)
-            }, [activeCreatureName, campaignName])
+              const newActiveChar = characters.find(ch => utils.getName(ch.name) === utils.getName(newActiveName))
+              applyTurnStartEffects(newActiveName, newActiveChar?.computedStats || newActiveChar, campaignName, characters)
+            }, [activeCreatureName, campaignName, characters])
 
     const handlePreviousCreature = React.useCallback(() => {
           if (isPrevDisabled) return
@@ -327,8 +329,10 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                storage.set('activeCreatureName', newActiveName, campaignName)
               setActiveCreatureName(newActiveName)
              }
-              expireStaleEffects(campaignName, newActiveName)
-             }, [activeCreatureName, campaignName, isPrevDisabled])
+               expireStaleEffects(campaignName, newActiveName)
+              const newActiveChar = characters.find(ch => utils.getName(ch.name) === utils.getName(newActiveName))
+              applyTurnStartEffects(newActiveName, newActiveChar?.computedStats || newActiveChar, campaignName, characters)
+             }, [activeCreatureName, campaignName, isPrevDisabled, characters])
 
     React.useEffect(() => {
         let cancelled = false
@@ -725,6 +729,8 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                             const buffs = getRuntimeValue(playerName, 'activeBuffs', campaignName) || []
                             const coronaBuff = Array.isArray(buffs) ? buffs.find(b => b.effect === 'sunlight_aura') : null
                             if (!coronaBuff) continue
+                            const applicableTypes = coronaBuff.enemiesDisadvantageSaves || []
+                            if (applicableTypes.length === 0) continue
                             const storedEnemies = getRuntimeValue(playerName, 'coronaOfLightEnemies', campaignName) || []
                             if (storedEnemies.length === 0) {
                                 result = true
