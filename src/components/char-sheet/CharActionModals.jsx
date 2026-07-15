@@ -18,6 +18,7 @@ import BastionOfLawModal from './modals/divine/BastionOfLawModal.jsx'
 import CombatStanceModal from './modals/shared/CombatStanceModal.jsx'
 import TeleportModal from './modals/TeleportModal.jsx'
 import SaveAttackHealModal from './modals/shared/SaveAttackHealModal.jsx'
+import SaveAttackAoeModal from './modals/shared/SaveAttackAoeModal.jsx'
 import DivineSparkModal from './modals/divine/DivineSparkModal.jsx'
 import DivineInterventionModal from './modals/divine/DivineInterventionModal.jsx'
 import ArcaneChargeModal from './modals/arcane/ArcaneChargeModal.jsx'
@@ -501,6 +502,12 @@ export default function CharActionModals({
                 <SaveAttackHealModal
                     {...modalState.saveAttackHealModal}
                     onClose={() => setModalState({ saveAttackHealModal: null })}
+                />
+            )}
+            {modalState.saveAttackAoeModal && (
+                <SaveAttackAoeModal
+                    {...modalState.saveAttackAoeModal}
+                    onClose={() => setModalState({ saveAttackAoeModal: null })}
                 />
             )}
             {modalState.divineSparkModal && (

@@ -7202,7 +7202,7 @@
                                     "damageType": "Radiant"
                                 }
                             ],
-                            "casting_time": "1_action"
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -7228,13 +7228,13 @@
                     },
                     {
                         "name": "Holy Nimbus",
-                        "description": "Bonus Action to imbue Aura of Protection with holy power for 10 minutes. Holy Ward: Advantage on saving throws by Fiends/Undead. Radiant Damage: enemies in aura take Radiant damage (Charisma modifier + Proficiency Bonus) when they start turn. Sunlight: aura filled with Bright Light that is sunlight.",
+                        "description": "Bonus Action to imbue Aura of Protection with holy power for 10 minutes.<ul><li><b>Holy Ward:</b> Advantage on saving throws by Fiends/Undead.</li><li><b>Radiant Damage:</b> Enemies in aura take Radiant damage (Charisma modifier + Proficiency Bonus) when they start turn.</li><li><b>Sunlight:</b> Aura filled with Bright Light that is sunlight.</li></ul>",
                         "level": 20,
                         "automation": [
                             {
                                 "type": "holy_nimbus",
                                 "duration": "10_minutes",
-                                "casting_time": "1_bonus_action",
+                                "casting_time": "1 bonus action",
                                 "resourceCost": "channel_divinity"
                             },
                             {
@@ -7321,7 +7321,7 @@
                             {
                                 "type": "peerless_athlete",
                                 "duration": "1_hour",
-                                "casting_time": "1_bonus_action",
+                                "casting_time": "1 bonus action",
                                 "resourceCost": "channel_divinity"
                             },
                             {

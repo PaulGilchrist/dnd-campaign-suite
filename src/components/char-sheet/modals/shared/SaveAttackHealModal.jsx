@@ -9,7 +9,7 @@ import storage from '../../../../services/ui/storage.js';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { renderTargetList, logSaveEntry, persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 
-function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc, campaignName, mapData, featureName, saveType, rangeFeet, damageExpression, damageType, healExpression, onClose }) {
+function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc, campaignName, mapData, featureName, saveType, rangeFeet, damageExpression, damageType, healExpression, onClose, shape, attackerGridX, attackerGridY }) {
     const [healedTarget, setHealedTarget] = useState(null);
     const [healResult, setHealResult] = useState(null);
 
@@ -262,6 +262,7 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
             onClose={onClose} icon="fa-solid fa-dice-d20"
             handleApplyOverride={handleApplyOverride} handleSaveResultOverride={handleSaveResultOverride}
             extraState={extraState} renderBody={renderBody} renderActions={renderActions}
+            shape={shape} attackerGridX={attackerGridX} attackerGridY={attackerGridY}
         />
     );
 }

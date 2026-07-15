@@ -14,7 +14,6 @@ function CharFeats({ playerStats, showPopup }) {
             const featsData = await loadFeatData(rulesVersion);
 
             if (!featsData || featsData.length === 0) {
-                console.warn(`[CharFeats] No feat data loaded for version: ${rulesVersion}`);
                 setPopupHtml(`<b>${featName}</b><br/><br/>Feat details not found in database.`);
                 return;
             }
@@ -32,7 +31,6 @@ function CharFeats({ playerStats, showPopup }) {
             if (feat) {
                 showPopup(feat);
             } else {
-                console.warn(`[CharFeats] Feat not found: ${featName} (normalized: ${normalizedInput})`);
                 setPopupHtml(`<b>${featName}</b><br/><br/>Feat details not found in database.`);
             }
         } catch (error) {

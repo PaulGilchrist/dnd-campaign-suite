@@ -21,7 +21,6 @@ function CharInventory({ playerStats }) {
             const equipmentData = await loadEquipment();
             
             if (!equipmentData || equipmentData.length === 0) {
-                console.warn(`[CharInventory] Item not found: ${itemName} (lookup: ${lookupName})`);
                 setPopupHtml(`<b>${itemName}</b><br/><br/>Item details not found in database.`);
                 return;
             }
@@ -90,7 +89,6 @@ function CharInventory({ playerStats }) {
                 
                 setPopupHtml(html);
             } else {
-                console.warn(`[CharInventory] Item not found: ${itemName} (lookup: ${lookupName})`);
                 setPopupHtml(`<b>${itemName}</b><br/><br/>Item details not found in database.`);
             }
         } catch (error) {

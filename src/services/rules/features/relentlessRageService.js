@@ -41,7 +41,6 @@ function evaluateHealExpression(expression, playerComputed) {
 export function checkRelentlessRage(creature, playerComputed, campaignName) {
     const rawAllFeatures = playerComputed?.allFeatures;
     if (rawAllFeatures == null || !Array.isArray(rawAllFeatures)) {
-        console.warn(`[Relentless Rage] allFeatures is null or not array for ${creature.name}:`, rawAllFeatures);
         return { intercepted: false };
     }
     const allFeatures = rawAllFeatures;
@@ -55,14 +54,12 @@ export function checkRelentlessRage(creature, playerComputed, campaignName) {
     }
 
     if (!featureAutomation) {
-        console.warn(`[Relentless Rage] Feature not found or missing automation for ${creature.name}. Features:`, allFeatures.map(f => f?.name));
         return { intercepted: false };
     }
 
     const storedRage = getRuntimeValue(creature.name, 'ragePoints', campaignName);
     const currentRage = storedRage != null ? Number(storedRage) : 0;
     if (currentRage <= 0) {
-        console.warn(`[Relentless Rage] No active rage for ${creature.name}. ragePoints:`, storedRage);
         return { intercepted: false };
     }
 

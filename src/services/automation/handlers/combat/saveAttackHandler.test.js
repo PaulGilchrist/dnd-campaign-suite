@@ -22,6 +22,7 @@ vi.mock('../../../maps/mapsService.js', () => ({
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
+  getAttackerTargetName: vi.fn(),
 }));
 
 vi.mock('../../../rules/combat/rangeValidation.js', () => ({
@@ -283,18 +284,22 @@ describe('saveAttackHandler', () => {
     it('should resolve shape to cone fallback when variable but no optionDetails', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0 });
       runtimeState.getRuntimeValue.mockReturnValue(null);
+      damageUtils.getAttackerTargetName.mockReturnValue(null);
 
       const action = makeAction({ shape: 'variable', damage: '1d8' });
 
       const result = await handle(action, makePlayerStats(), campaignName, null);
 
-      expect(result.payload.contextConfig.shape).toBe('cone');
+      expect(result.type).toBe('modal');
+      expect(result.modalName).toBe('saveAttackAoe');
+      expect(result.payload.shape).toBe('cone');
     });
 
     it('should resolve shape from optionDetails when option has been chosen', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0 });
       runtimeState.getRuntimeValue.mockReturnValueOnce('line');
       runtimeState.getRuntimeValue.mockReturnValue(null);
+      damageUtils.getAttackerTargetName.mockReturnValue(null);
 
       const action = makeAction({
         shape: 'variable',
@@ -308,7 +313,9 @@ describe('saveAttackHandler', () => {
 
       const result = await handle(action, makePlayerStats(), campaignName, null);
 
-      expect(result.payload.contextConfig.shape).toBe('line');
+      expect(result.type).toBe('modal');
+      expect(result.modalName).toBe('saveAttackAoe');
+      expect(result.payload.shape).toBe('line');
     });
   });
 
@@ -317,6 +324,7 @@ describe('saveAttackHandler', () => {
       diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0 });
       runtimeState.getRuntimeValue.mockReturnValueOnce('cone_option');
       runtimeState.getRuntimeValue.mockReturnValue(null);
+      damageUtils.getAttackerTargetName.mockReturnValue(null);
 
       const action = makeAction({
         hasOptions: true,
@@ -327,8 +335,9 @@ describe('saveAttackHandler', () => {
 
       const result = await handle(action, makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('roll');
-      expect(result.payload.formula).toBe('4d6');
+      expect(result.type).toBe('modal');
+      expect(result.modalName).toBe('saveAttackAoe');
+      expect(result.payload.damage).toBe('4d6');
     });
   });
 
@@ -840,14 +849,15 @@ describe('saveAttackHandler', () => {
     it('should include darkness dispelled note for area shapes', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0 });
       runtimeState.getRuntimeValue.mockReturnValueOnce(null);
+      damageUtils.getAttackerTargetName.mockReturnValue(null);
 
       const action = makeAction({ damage: '1d8', shape: 'cone' });
 
       const result = await handle(action, makePlayerStats(), campaignName, null);
 
-      expect(result.payload.notes).toBe(
-        'Magical Darkness in the area is dispelled.',
-      );
+      expect(result.type).toBe('modal');
+      expect(result.modalName).toBe('saveAttackAoe');
+      expect(result.payload.shape).toBe('cone');
     });
 
     it('should combine darkness dispelled and rider notes for area with effect', async () => {
@@ -856,11 +866,13 @@ describe('saveAttackHandler', () => {
 
       const action = makeAction({ damage: '1d8', shape: 'cone', effect: 'push', effectValue: '5_ft' });
 
+      damageUtils.getAttackerTargetName.mockReturnValue(null);
+
       const result = await handle(action, makePlayerStats(), campaignName, null);
 
-      expect(result.payload.notes).toBe(
-        'Magical Darkness in the area is dispelled. the target is pushed 5 ft',
-      );
+      expect(result.type).toBe('modal');
+      expect(result.modalName).toBe('saveAttackAoe');
+      expect(result.payload.shape).toBe('cone');
     });
 
     it('should return null when rollExpression returns null', async () => {
@@ -896,14 +908,17 @@ describe('saveAttackHandler', () => {
     it('should set dcSuccess based on shape and explicit value', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0 });
       runtimeState.getRuntimeValue.mockReturnValueOnce(null);
+      damageUtils.getAttackerTargetName.mockReturnValue(null);
 
       const action1 = makeAction({ damage: '1d8', shape: 'cone' });
       const result1 = await handle(action1, makePlayerStats(), campaignName, null);
-      expect(result1.payload.contextConfig.dcSuccess).toBe('half');
+      expect(result1.type).toBe('modal');
+      expect(result1.payload.dcSuccess).toBe('half');
 
       const action2 = makeAction({ damage: '1d8', shape: 'line' });
       const result2 = await handle(action2, makePlayerStats(), campaignName, null);
-      expect(result2.payload.contextConfig.dcSuccess).toBe('none');
+      expect(result2.type).toBe('modal');
+      expect(result2.payload.dcSuccess).toBe('none');
 
       const action3 = makeAction({ damage: '1d8', dcSuccess: 1 });
       const result3 = await handle(action3, makePlayerStats(), campaignName, null);

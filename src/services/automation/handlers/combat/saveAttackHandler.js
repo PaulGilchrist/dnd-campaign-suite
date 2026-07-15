@@ -2,7 +2,7 @@ import { rollExpression } from '../../../dice/diceRoller.js';
 import { buildSaveDc } from '../../common/savePrompt.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import * as mapsService from '../../../maps/mapsService.js';
-import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { getCombatContext, getAttackerTargetName } from '../../../rules/combat/damageUtils.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { resolveUses } from '../../../combat/automation/automationExpressions.js';
@@ -228,10 +228,11 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
         let attackerPos = null;
         let mapData = null;
+        let attackerPlayer = null;
         if (mapName) {
             try {
                 mapData = await mapsService.loadMapData(campaignName, mapName);
-                const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
+                attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
                 if (attackerPlayer) {
                     attackerPos = { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY };
                  }
@@ -240,26 +241,29 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
          const rangeFeet = getEmanationRange({ ...auto, shape: resolvedShape }, playerStats, playerStats.name, campaignName);
 
-         return {
-             type: 'modal',
-             modalName: 'saveAttackHeal',
-             payload: {
-                 combatSummary: cs,
-                 attackerName: playerStats.name,
-                 attackerPos,
-                 saveDc: saveDcValue,
-                 campaignName,
-                 mapData,
-                 featureName: action.name,
-                 saveType: auto.saveType || 'CON',
-                 rangeFeet,
-                 damageExpression: auto.damage || '',
-                 damageType: resolvedDamageType,
-                 healExpression: auto.healExpression,
-                 dcSuccess: dcSuccess === 0 ? 'none' : (dcSuccess === 0.5 ? 'half' : dcSuccess),
-             },
-         };
-     }
+          return {
+              type: 'modal',
+              modalName: 'saveAttackHeal',
+              payload: {
+                  combatSummary: cs,
+                  attackerName: playerStats.name,
+                  attackerPos,
+                  saveDc: saveDcValue,
+                  campaignName,
+                  mapData,
+                  featureName: action.name,
+                  saveType: auto.saveType || 'CON',
+                  rangeFeet,
+                  damageExpression: auto.damage || '',
+                  damageType: resolvedDamageType,
+                  healExpression: auto.healExpression,
+                  dcSuccess: dcSuccess === 0 ? 'none' : (dcSuccess === 0.5 ? 'half' : dcSuccess),
+                  shape: resolvedShape,
+                  attackerGridX: attackerPlayer?.gridX,
+                  attackerGridY: attackerPlayer?.gridY,
+              },
+          };
+      }
 
     if (auto.conditionInflicted && !auto.damage) {
         if (isAreaShape(resolvedShape)) {
@@ -267,10 +271,11 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
             let attackerPos = null;
             let mapData = null;
+            let attackerPlayer = null;
             if (mapName) {
                 try {
                     mapData = await mapsService.loadMapData(campaignName, mapName);
-                    const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
+                    attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
                     if (attackerPlayer) {
                         attackerPos = { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY };
                      }
@@ -279,24 +284,27 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
              const rangeFeet = getEmanationRange({ ...auto, shape: resolvedShape }, playerStats, playerStats.name, campaignName);
 
-             return {
-                 type: 'modal',
-                 modalName: 'setCondition',
-                 payload: {
-                     combatSummary: cs,
-                     attackerName: playerStats.name,
-                     attackerPos,
-                     saveDc: saveDcValue,
-                     campaignName,
-                     mapData,
-                     featureName: action.name,
-                     conditionName: auto.conditionInflicted.toLowerCase(),
-                     saveType: auto.saveType || 'WIS',
-                     rangeFeet,
-                     durationRounds: parseDurationRounds(auto.duration),
-                 },
-             };
-         }
+               return {
+                   type: 'modal',
+                   modalName: 'setCondition',
+                   payload: {
+                       combatSummary: cs,
+                       attackerName: playerStats.name,
+                       attackerPos,
+                       saveDc: saveDcValue,
+                       campaignName,
+                       mapData,
+                       featureName: action.name,
+                       conditionName: auto.conditionInflicted.toLowerCase(),
+                       saveType: auto.saveType || 'WIS',
+                       rangeFeet,
+                       durationRounds: parseDurationRounds(auto.duration),
+                       shape: resolvedShape,
+                       attackerGridX: attackerPlayer?.gridX,
+                       attackerGridY: attackerPlayer?.gridY,
+                   },
+               };
+          }
 
         return {
             type: 'popup',
@@ -319,6 +327,45 @@ export async function handle(action, playerStats, campaignName, mapName) {
                 name: action.name,
                 description: `${action.name} — ${auto.saveType || 'DEX'} save DC ${saveDcValue}. On a failed save, ${riderDesc}.`,
                 automation: auto,
+            },
+        };
+    }
+
+    // Handle AoE damage (not heal, not condition-only)
+    if (isAreaShape(resolvedShape) && auto.damage && !auto.healExpression && !auto.conditionInflicted) {
+        const cs = getCombatContext(campaignName);
+        const attackerTargetName = getAttackerTargetName(cs, playerStats.name);
+        const isOverlayTargeted = attackerTargetName?.startsWith('overlay-');
+
+        let activeOverlay = null;
+        if (isOverlayTargeted) {
+            const overlayId = attackerTargetName.slice('overlay-'.length);
+            try {
+                const response = await fetch(`/api/campaigns/${campaignName}/spell-overlays`);
+                const overlays = await response.json();
+                activeOverlay = overlays.find(o => o.id === overlayId) || null;
+            } catch (error) {
+                console.error('Error fetching overlay:', error);
+            }
+        }
+
+        const rangeFeet = auto.range ? rangeToFeet(auto.range) : getEmanationRange({ ...auto, shape: resolvedShape }, playerStats, playerStats.name, campaignName);
+
+        return {
+            type: 'modal',
+            modalName: 'saveAttackAoe',
+            payload: {
+                action,
+                playerStats,
+                campaignName,
+                shape: resolvedShape,
+                range: rangeFeet,
+                damage: auto.damage,
+                damageType: resolvedDamageType,
+                saveType: auto.saveType || 'DEX',
+                saveDc: saveDcValue,
+                dcSuccess: dcSuccess === 0 ? 'none' : (dcSuccess === 0.5 ? 'half' : dcSuccess),
+                activeOverlay,
             },
         };
     }

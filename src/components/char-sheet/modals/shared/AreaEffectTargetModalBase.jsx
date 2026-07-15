@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { getDistanceFeet } from '../../../../services/rules/combat/rangeValidation.js';
 import { isApplyBusy, setApplyBusy } from './areaEffectModalInstances.js';
+import { createOverlay, hitTestOverlay } from '../../../../models/SpellOverlay.js';
 
 function AreaEffectTargetModalBase({
   combatSummary,
@@ -23,6 +24,11 @@ function AreaEffectTargetModalBase({
   renderBody,
   renderActions,
   turnUndead = false,
+  shape,
+  coneAngle,
+  widthFt,
+  attackerGridX,
+  attackerGridY,
 }) {
   const [selected, setSelected] = useState(new Set());
   const [processing, setProcessing] = useState(false);
@@ -40,10 +46,22 @@ function AreaEffectTargetModalBase({
       if (!mapData || !attackerPos) return true;
       const targetPos = mapData.players?.find(p => p.name === c.name) || mapData.placedItems?.find(i => i.name === c.name);
       if (!targetPos) return true;
+      
+      if (shape && attackerGridX != null && attackerGridY != null) {
+        const tempOverlay = createOverlay(shape, attackerGridX, attackerGridY, 0, {
+          radiusFt: rangeFeet,
+          sizeFt: rangeFeet,
+          distanceFt: rangeFeet,
+          coneAngle: coneAngle || 53,
+          widthFt: widthFt || 5,
+        });
+        return hitTestOverlay(tempOverlay, targetPos.gridX, targetPos.gridY);
+      }
+      
       const dist = getDistanceFeet(attackerPos, { gridX: targetPos.gridX, gridY: targetPos.gridY });
       return dist != null && dist <= rangeFeet;
     });
-  }, [combatSummary, attackerName, mapData, attackerPos, rangeFeet, turnUndead, monsters]);
+  }, [combatSummary, attackerName, mapData, attackerPos, rangeFeet, turnUndead, monsters, shape, coneAngle, widthFt, attackerGridX, attackerGridY]);
 
   const toggleTarget = useCallback((name) => {
     setSelected(prev => {

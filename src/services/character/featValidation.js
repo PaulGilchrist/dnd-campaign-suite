@@ -274,7 +274,6 @@ export function normalizeFeatDescription(feat) {
                 } else if (firstItem.description) {
                     descriptionData = { text: firstItem.description, isHtml: true };
                 } else if (firstItem.level !== undefined) {
-                    console.warn('Unexpected description object structure:', firstItem);
                     descriptionData = { text: '', isHtml: false };
                 }
             }

@@ -1,9 +1,10 @@
 import React from 'react';
-import { getRuntimeValue, setRuntimeValue, addStorageChangeListener } from './useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, addStorageChangeListener, hasRuntimeValue } from './useRuntimeState.js';
 
 function resolveCurrent(storageKey, playerName, playerStats, maxGetter) {
+  const hasKey = hasRuntimeValue(playerName, storageKey);
   const storedValue = getRuntimeValue(playerName, storageKey);
-  if (storedValue != null) return storedValue;
+  if (hasKey && storedValue != null) return storedValue;
   if (playerStats?._trackedResources?.[storageKey]) {
     return playerStats._trackedResources[storageKey].current;
   }

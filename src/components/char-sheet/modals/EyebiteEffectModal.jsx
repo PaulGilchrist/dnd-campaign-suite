@@ -10,7 +10,7 @@ import { getEffectOptions } from '../../../services/automation/handlers/spells/e
 import AreaEffectTargetModalBase from './shared/AreaEffectTargetModalBase.jsx';
 import { renderTargetList, logSaveEntry, persistAndNotify } from './shared/AreaEffectTargetModalBase.utils.jsx';
 
-function EyebiteEffectModal({ combatSummary, attackerName, attackerPos, saveDc, campaignName, mapData, onClose, characters, featureName = 'Eyebite', rangeFeet = 60, durationRounds = 10 }) {
+function EyebiteEffectModal({ combatSummary, attackerName, attackerPos, saveDc, campaignName, mapData, onClose, characters, featureName = 'Eyebite', rangeFeet = 60, durationRounds = 10, shape, attackerGridX, attackerGridY }) {
     const [selectedEffect, setSelectedEffect] = useState(null);
 
     const effectOptions = getEffectOptions();
@@ -247,6 +247,9 @@ function EyebiteEffectModal({ combatSummary, attackerName, attackerPos, saveDc, 
             extraState={extraState}
             renderBody={renderBody}
             renderActions={renderActions}
+            shape={shape}
+            attackerGridX={attackerGridX}
+            attackerGridY={attackerGridY}
         />
     );
 }

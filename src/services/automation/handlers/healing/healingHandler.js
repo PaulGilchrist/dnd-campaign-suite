@@ -83,7 +83,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         if (isHitDieRoll && hitDiceCost > 0) {
             const storedHitDice = Number(getRuntimeValue(playerStats.name, 'shortRestHitDice', campaignName) ?? playerStats.level);
             if (storedHitDice < hitDiceCost) {
-                console.warn(`[healingHandler] ${action.name}: insufficient hit dice (need ${hitDiceCost}, have ${storedHitDice})`);
                 return {
                     type: 'popup',
                     payload: {

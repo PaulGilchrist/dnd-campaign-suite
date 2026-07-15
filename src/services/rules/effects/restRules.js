@@ -134,7 +134,7 @@ export const LONG_REST_RESOURCES = [
    '_Fey_Reinforcements_freeCastCount',
    '_Misty_Wanderer_freeCastCount',
    "_Paladin's_Smite_freeCastCount",
-    'breathWeaponUses',
+     'breathweaponuses',
   'stonecunningUses',
   'naturesVeilUses',
   'favoredEnemyUses',

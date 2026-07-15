@@ -99,7 +99,6 @@ function applyEldritchHex(spell, playerStats, campaignName, targetName) {
 
 export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, featEffects, campaignName, mapName, characters }) {
     if (getActiveBuffs(playerStats.name, campaignName).some(b => b.blocksSpellcasting)) {
-        console.warn(`[spellCast] ${playerStats.name} cannot cast spells (blocked by active buff)`);
         return;
     }
 
@@ -107,7 +106,6 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     if (spell.components && spell.components.includes('V')) {
         const silenceCaster = getSilenceSource(playerStats.name, campaignName);
         if (silenceCaster && isCreatureInSilenceZone(playerStats.name, silenceCaster, campaignName)) {
-            console.warn(`[spellCast] ${playerStats.name} cannot cast ${spell.name} — Verbal components blocked by Silence`);
             return;
         }
     }
@@ -1289,7 +1287,6 @@ async function executeMagicMissile(spell, metaCtx, { rollDamage: _rollDamage, pl
     const damageType = spell.damage?.damage_type || 'Force';
     const distribution = metaCtx?.magicMissileDistribution;
     if (!distribution || Object.keys(distribution).length === 0) {
-        console.warn(`[MM] executeMagicMissile: distribution is empty — returning early, no damage applied`);
         return;
     }
 
@@ -1385,7 +1382,5 @@ async function executeMagicMissile(spell, metaCtx, { rollDamage: _rollDamage, pl
             totalFinalDamage: allFinalDamage,
             timestamp: Date.now(),
         });
-    } else {
-        console.warn(`[MM] executeMagicMissile: no log entries — damage may not have been applied`);
     }
 }

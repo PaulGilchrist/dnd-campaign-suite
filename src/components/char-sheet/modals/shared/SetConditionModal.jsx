@@ -9,7 +9,7 @@ import { sendSavePrompt, sendSaveResult } from '../../../../services/combat/cond
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { renderTargetList, logSaveEntry, persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 
-function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, campaignName, mapData, monsters, channelDivinityCharges, onClose, characters, featureName = 'Abjure Foes', conditionName = 'frightened', additionalCondition = null, saveType = 'WIS', rangeFeet = 60, durationRounds }) {
+function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, campaignName, mapData, monsters, channelDivinityCharges, onClose, characters, featureName = 'Abjure Foes', conditionName = 'frightened', additionalCondition = null, saveType = 'WIS', rangeFeet = 60, durationRounds, shape, attackerGridX, attackerGridY }) {
     const applyConditionToCreature = useCallback((targetName, saveDcValue, condName, ctx) => {
         const creature = ctx.combatSummary.creatures.find(c => c.name === targetName);
         if (!creature) return;
@@ -258,6 +258,9 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
             renderBody={renderBody}
             renderActions={renderActions}
             turnUndead={isTurnUndead}
+            shape={shape}
+            attackerGridX={attackerGridX}
+            attackerGridY={attackerGridY}
         />
     );
 }

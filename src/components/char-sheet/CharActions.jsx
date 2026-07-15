@@ -1003,7 +1003,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'teleport': setModalState({ teleportModal: result.payload }); break;
                     case 'healingIllusion': setModalState({ healingIllusionModal: result.payload }); break;
                     case 'invokeDuplicity': setModalState({ invokeDuplicityModal: result.payload }); break;
-                    case 'saveAttackHeal': setModalState({ saveAttackHealModal: result.payload }); break;
+                    case 'saveAttackHeal':
+                        setModalState({ saveAttackHealModal: result.payload });
+                        break;
+                    case 'saveAttackAoe':
+                        setModalState({ saveAttackAoeModal: result.payload });
+                        break;
                     case 'divineSpark': setModalState({ divineSparkModal: result.payload }); break;
                     case 'divineIntervention':
                         setModalState({ divineInterventionAction: action, divineInterventionModal: result.payload });

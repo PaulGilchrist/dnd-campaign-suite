@@ -7860,7 +7860,7 @@
                   {
                     "type": "holy_nimbus",
                     "duration": "10_minutes",
-                    "casting_time": "1_bonus_action",
+                    "casting_time": "1 bonus action",
                     "resourceCost": "channel_divinity"
                   },
                   {

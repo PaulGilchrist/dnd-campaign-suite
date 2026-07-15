@@ -10,7 +10,6 @@ const classRules = {
          // Dependencies: None
         let characterClass = allClasses.find((characterClass) => characterClass.name === playerSummary.class.name);
         if (!characterClass) {
-            console.warn(`Could not find class: ${playerSummary.class.name}`);
             return { class_levels: [] };
          }
         characterClass = merge(cloneDeep(characterClass), cloneDeep(playerSummary.class));

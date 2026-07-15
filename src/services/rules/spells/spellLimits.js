@@ -64,7 +64,6 @@ export async function getSpellLimits(className, level, version = '5e', majorName
     const classData = await fetchClassData(className, version);
     
     if (!classData || !classData.class_levels) {
-      console.warn(`Could not find class data for ${className} (${version})`);
       return getDefaultSpellLimits(className);
     }
 

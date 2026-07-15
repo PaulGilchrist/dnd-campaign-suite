@@ -7,6 +7,7 @@ import { parseMagicItemName } from '../../../services/rules/core/attackCalc.js'
 import CharGold from './CharGold.jsx'
 import CharHitPoints from './CharHitPoints.jsx'
 import CharClassFeatures from './CharClassFeatures.jsx'
+import CharRaceFeatures from './CharRaceFeatures.jsx'
 import CharFeats from '../char-feats/CharFeats.jsx'
 import AvatarImage from '../../common/AvatarImage.jsx'
 import AvatarModal from '../../common/AvatarModal.jsx';
@@ -437,6 +438,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                 </div>
                 <div>
                       <CharClassFeatures playerStats={playerStats} campaignName={campaignName} />
+                      <CharRaceFeatures playerStats={playerStats} campaignName={campaignName} />
                 </div>
       </div>
           {allResistances.length > 0 && <div>
