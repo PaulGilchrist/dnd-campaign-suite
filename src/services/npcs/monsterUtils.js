@@ -32,7 +32,7 @@ export async function getMonsterImageUrl(npcName, npcs, campaignName) {
         }
     }
 
-    if (!monstersCache) {
+    if (!monstersCache || !monstersCache.length) {
         monstersCache = await loadMonsters();
     }
     const baseName = stripTrailingNumber(npcName);

@@ -1,4 +1,4 @@
-
+import AvatarImage from '../common/AvatarImage.jsx'
 
 function NpcAvatar({ name, imageUrl, imagePath, onClick, campaignName }) {
     const src = imagePath || imageUrl
@@ -16,7 +16,5 @@ function NpcAvatar({ name, imageUrl, imagePath, onClick, campaignName }) {
         </div>
     )
 }
-
-import AvatarImage from '../common/AvatarImage.jsx'
 
 export default NpcAvatar

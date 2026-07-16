@@ -241,17 +241,20 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
     React.useEffect(() => {
         if (!combatSummary) return
-        const npcs = combatSummary.creatures.filter(c => c.type === 'npc')
+        let cancelled = false
+        const npcs = combatSummary.creatures.filter(c => c.type !== 'player')
         const promises = npcs.map(async (creature) => {
             if (creature.imagePath) return { name: creature.name, url: null }
             const url = await getMonsterImageUrl(creature.name, campaignNpcs, campaignName)
             return { name: creature.name, url }
         })
         Promise.all(promises).then(results => {
+            if (cancelled) return
             const newImages = {}
             results.forEach(({ name, url }) => { newImages[name] = url })
             setNpcImages(newImages)
         })
+        return () => { cancelled = true }
     }, [combatSummary, campaignNpcs, campaignName])
 
     const handleAddNpc = React.useCallback(() => {
