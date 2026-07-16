@@ -6,7 +6,10 @@ function CharRaceFeatures({ playerStats, campaignName }) {
     
     if (!breathWeaponTrait) return null;
     
-    const maxUses = breathWeaponTrait.automation?.uses || 1;
+    const rawUses = breathWeaponTrait.automation?.uses;
+    const maxUses = rawUses === 'proficiency_bonus'
+        ? (playerStats.proficiency || 0)
+        : (rawUses || 1);
     
     return (
         <div className="race-features">
