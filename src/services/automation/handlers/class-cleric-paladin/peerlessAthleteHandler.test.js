@@ -74,24 +74,19 @@ describe('peerlessAthleteHandler', () => {
         vi.clearAllMocks();
     });
 
-    describe('toggle off when already active', () => {
-        it('returns popup indicating ability ended and clears state', async () => {
+    describe('already active', () => {
+        it('returns popup indicating ability is already active without clearing state', async () => {
             mockActive();
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toBe('Peerless Athlete ended.');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestCleric',
-                'peerlessAthleteActive',
-                false,
-                campaignName,
-            );
+            expect(result.payload.description).toBe('Peerless Athlete is already active.');
+            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('removes the buff from activeBuffs keeping other buffs', async () => {
+        it('does not modify activeBuffs when already active', async () => {
             getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === 'peerlessAthleteActive') return true;
                 if (key === 'activeBuffs') return [
@@ -103,12 +98,7 @@ describe('peerlessAthleteHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestCleric',
-                'activeBuffs',
-                [{ name: 'Other Buff', effect: 'other' }],
-                campaignName,
-            );
+            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
     });

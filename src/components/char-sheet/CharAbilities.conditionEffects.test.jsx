@@ -279,4 +279,28 @@ describe('CharAbilities condition effects on rendering', () => {
       });
     });
   });
+
+  describe('peerlessAthleteAdvantageSkills', () => {
+    it('applies advantage to Athletics and Acrobatics only when peerlessAthleteAdvantageSkills is set', () => {
+      const stats = createPlayerStats({
+        abilities: [
+          { name: 'Strength', bonus: 3, save: 5, totalScore: 16, skills: [{ name: 'Athletics', bonus: 8 }] },
+          { name: 'Dexterity', bonus: 0, save: 2, totalScore: 10, skills: [{ name: 'Acrobatics', bonus: 5 }, { name: 'Sleight of Hand', bonus: 5 }, { name: 'Stealth', bonus: 5 }] },
+          { name: 'Constitution', bonus: 1, save: 3, totalScore: 12, skills: [] },
+          { name: 'Intelligence', bonus: -1, save: 1, totalScore: 9, skills: [{ name: 'Arcana', bonus: 3 }] },
+          { name: 'Wisdom', bonus: 1, save: 3, totalScore: 13, skills: [{ name: 'Perception', bonus: 6 }] },
+          { name: 'Charisma', bonus: 2, save: 4, totalScore: 14, skills: [] },
+        ],
+        skillProficiencies: ['Athletics', 'Arcana', 'Perception'],
+        expertise: [],
+      });
+      const { container } = render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ peerlessAthleteAdvantageSkills: ['Athletics', 'Acrobatics'] }} />);
+      const skillSpans = container.querySelectorAll('.clickable');
+      const skillTexts = Array.from(skillSpans).map(span => span.textContent);
+      expect(skillTexts).toContain('Athletics (+8)');
+      expect(skillTexts).toContain('Acrobatics (+5)');
+      expect(skillTexts).toContain('Sleight of Hand (+5)');
+      expect(skillTexts).toContain('Stealth (+5)');
+    });
+  });
 });

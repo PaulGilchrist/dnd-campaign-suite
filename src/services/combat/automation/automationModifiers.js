@@ -13,7 +13,8 @@ export function collectSaveModifiers(features) {
                     target: auto.target,
                     condition: auto.condition,
                     effect: auto.effect,
-                    abilities
+                    abilities,
+                    skills: auto.skills || [],
                 })
             }
             if (auto.type === 'combat_stance' && auto.advantages) {

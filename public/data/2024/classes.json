@@ -7329,18 +7329,9 @@
                                 "target": "ability_check",
                                 "condition": "peerless_athlete",
                                 "effect": "advantage",
-                                "abilities": [
-                                    "STR"
-                                ],
-                                "casting_time": "passive"
-                            },
-                            {
-                                "type": "conditional_advantage",
-                                "target": "ability_check",
-                                "condition": "peerless_athlete",
-                                "effect": "advantage",
-                                "abilities": [
-                                    "DEX"
+                                "skills": [
+                                    "Athletics",
+                                    "Acrobatics"
                                 ],
                                 "casting_time": "passive"
                             },

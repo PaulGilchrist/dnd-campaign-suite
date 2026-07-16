@@ -96,25 +96,31 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
             return bonus;
         }, [exhaustionPenalty, isRaging, playerStats, conditionEffects?.passWithoutTraceBonus, conditionEffects?.wisCheckReplace]);
 
-           const makeCheckContext = useCallback((checkName) => {
-              let forcedMode = undefined
-              if (conditionEffects?.abilityCheckDisadvantage) forcedMode = 'disadvantage'
-              if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === checkName)) {
-                forcedMode = forcedMode === 'disadvantage' ? undefined : 'advantage'
-              }
-                 // Check per-ability check advantage (e.g., Remarkable Athlete for STR)
+            const makeCheckContext = useCallback((checkName) => {
+               let forcedMode = undefined
+               if (conditionEffects?.abilityCheckDisadvantage) forcedMode = 'disadvantage'
+               if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === checkName)) {
+                 forcedMode = forcedMode === 'disadvantage' ? undefined : 'advantage'
+               }
+                  // Peerless Athlete: skill-specific advantage (like expertise uses .includes(skill.name))
+                  if (!forcedMode && conditionEffects?.peerlessAthleteAdvantageSkills) {
+                      if (conditionEffects.peerlessAthleteAdvantageSkills.includes(checkName)) {
+                          forcedMode = 'advantage'
+                      }
+                  }
+                  // Check per-ability check advantage (e.g., Remarkable Athlete for STR)
                   if (!forcedMode && conditionEffects?.abilityCheckAdvantageAbilities) {
-                    const skillToAbility = {
-                      'Athletics': 'STR', 'Acrobatics': 'DEX', 'Sleight of Hand': 'DEX', 'Stealth': 'DEX',
-                      'Arcana': 'INT', 'History': 'INT', 'Investigation': 'INT', 'Nature': 'INT', 'Religion': 'INT',
-                      'Animal Handling': 'WIS', 'Insight': 'WIS', 'Medicine': 'WIS', 'Perception': 'WIS', 'Survival': 'WIS',
-                      'Deception': 'CHA', 'Intimidation': 'CHA', 'Performance': 'CHA', 'Persuasion': 'CHA',
-                      'Strength': 'STR', 'Dexterity': 'DEX', 'Constitution': 'CON', 'Intelligence': 'INT', 'Wisdom': 'WIS', 'Charisma': 'CHA',
-                    };
-                    const abilityForCheck = skillToAbility[checkName];
-                    if (abilityForCheck && conditionEffects.abilityCheckAdvantageAbilities.includes(abilityForCheck)) {
-                      forcedMode = 'advantage'
-                    }
+                      const skillToAbility = {
+                          'Athletics': 'STR', 'Acrobatics': 'DEX', 'Sleight of Hand': 'DEX', 'Stealth': 'DEX',
+                          'Arcana': 'INT', 'History': 'INT', 'Investigation': 'INT', 'Nature': 'INT', 'Religion': 'INT',
+                          'Animal Handling': 'WIS', 'Insight': 'WIS', 'Medicine': 'WIS', 'Perception': 'WIS', 'Survival': 'WIS',
+                          'Deception': 'CHA', 'Intimidation': 'CHA', 'Performance': 'CHA', 'Persuasion': 'CHA',
+                          'Strength': 'STR', 'Dexterity': 'DEX', 'Constitution': 'CON', 'Intelligence': 'INT', 'Wisdom': 'WIS', 'Charisma': 'CHA',
+                      };
+                      const abilityForCheck = skillToAbility[checkName];
+                      if (abilityForCheck && conditionEffects.abilityCheckAdvantageAbilities.includes(abilityForCheck)) {
+                          forcedMode = 'advantage'
+                      }
                   }
               // Ray of Enfeeblement: STR-based d20 tests have disadvantage
               if (!forcedMode && conditionEffects?.strCheckDisadvantage) {
@@ -282,22 +288,22 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                               rollSavingThrow(ability.name, ability.save + saveBonus - exhaustionPenalty, saveCtx);
                             }
                           }} title={getSaveAdvantageSource()}>{autoFailSave ? 'AUTO FAIL' : signFormatter.format(ability.save + getSaveBonus(ability.name) - exhaustionPenalty)}{hasSaveAdvantage(ability.name) ? ' (Adv)' : ''}</div>
-                     <div className='left'>{ability.skills.map((skill) => {
-                          const skillBonus = getSkillBonus(skill);
-                          const isExpert = playerStats.expertise?.includes(skill.name);
-                          return <span key={skill.name}>
-                                <span className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage ? ' stat--penalized' : '')} onClick={() => {
-                                   const checkCtx = { ...makeCheckContext(skill.name) };
-                                   const biDie = getRuntimeValue(playerStats.name, 'bardicInspirationDie', campaignName);
-                                   if (biDie) {
-                                     checkCtx.bardicInspiration = true;
-                                     checkCtx.bardicInspirationDie = biDie;
-                                   }
-                                    rollSkillCheck(skill.name, skillBonus, checkCtx);
-                                  }}>{skill.name}{isExpert ? ' (Expert)' : ''} ({signFormatter.format(skillBonus)})</span>
-                              {ability.skills.indexOf(skill) < ability.skills.length - 1 ? ', ' : ''}
-                          </span>;
-                      })}</div>
+                      <div className='left'>{ability.skills.map((skill) => {
+                           const skillBonus = getSkillBonus(skill);
+                           const isExpert = playerStats.expertise?.includes(skill.name);
+                           return <span key={skill.name}>
+                                 <span className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage ? ' stat--penalized' : '')} onClick={() => {
+                                    const checkCtx = { ...makeCheckContext(skill.name) };
+                                    const biDie = getRuntimeValue(playerStats.name, 'bardicInspirationDie', campaignName);
+                                    if (biDie) {
+                                      checkCtx.bardicInspiration = true;
+                                      checkCtx.bardicInspirationDie = biDie;
+                                    }
+                                     rollSkillCheck(skill.name, skillBonus, checkCtx);
+                                   }}>{skill.name}{isExpert ? ' (Expert)' : ''} ({signFormatter.format(skillBonus)})</span>
+                               {ability.skills.indexOf(skill) < ability.skills.length - 1 ? ', ' : ''}
+                           </span>;
+                       })}</div>
                 </div>;
             })}
         </div>

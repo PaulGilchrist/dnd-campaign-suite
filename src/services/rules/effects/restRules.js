@@ -359,9 +359,12 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
   updates.holyNimbusActive = null;
 
   // Clear Elder Champion active state on short rest
-  updates.elderChampionActive = null;
+   updates.elderChampionActive = null;
 
-  setRuntimeBatch(name, updates, campaignName)
+   // Clear Peerless Athlete active state on short rest
+   updates.peerlessAthleteActive = null;
+
+   setRuntimeBatch(name, updates, campaignName)
 
   clearAllExpirationEffects(name, campaignName)
   clearHuntersMarkConcentration(name, campaignName)
@@ -417,9 +420,12 @@ export async function applyLongRest(playerStats, campaignName) {
     charData.holyNimbusActive = null;
 
     // Clear Elder Champion active state on long rest
-    charData.elderChampionActive = null;
+     charData.elderChampionActive = null;
 
-    const currentExhaustion = getRuntimeValue(name, 'exhaustionLevel')
+     // Clear Peerless Athlete active state on long rest
+     charData.peerlessAthleteActive = null;
+
+     const currentExhaustion = getRuntimeValue(name, 'exhaustionLevel')
    if (typeof currentExhaustion === 'number' && currentExhaustion > 0) {
      charData.exhaustionLevel = getLevelAfterLongRest(currentExhaustion)
          }

@@ -341,6 +341,24 @@ describe('saveModifierApplies — condition-based boolean checks', () => {
     expect(saveModifierApplies({ target: 'saving_throw', condition: 'peerless_athlete' }, 'saving_throw', 'STR', false, false, false, false, null, [])).toBe(false);
   });
 
+  it('populates peerlessAthleteAdvantageSkills from conditional_advantage with skills field', () => {
+    const modifiers = [
+      { target: 'ability_check', condition: 'peerless_athlete', effect: 'advantage', abilities: ['STR'], skills: ['Athletics'] },
+      { target: 'ability_check', condition: 'peerless_athlete', effect: 'advantage', abilities: ['DEX'], skills: ['Acrobatics'] },
+    ];
+    const effects = computeConditionEffects([], modifiers, [], false, false, true);
+    expect(effects.peerlessAthleteAdvantageSkills).toEqual(['Athletics', 'Acrobatics']);
+  });
+
+  it('does not populate abilityCheckAdvantageAbilities for peerless_athlete with skills field', () => {
+    const modifiers = [
+      { target: 'ability_check', condition: 'peerless_athlete', effect: 'advantage', abilities: ['STR'], skills: ['Athletics'] },
+      { target: 'ability_check', condition: 'peerless_athlete', effect: 'advantage', abilities: ['DEX'], skills: ['Acrobatics'] },
+    ];
+    const effects = computeConditionEffects([], modifiers, [], false, false, true);
+    expect(effects.abilityCheckAdvantageAbilities).toBeNull();
+  });
+
   it('returns isLargeFormActive when condition is large_form_active', () => {
     expect(saveModifierApplies({ target: 'saving_throw', condition: 'large_form_active' }, 'saving_throw', 'STR', false, false, false, true, null, [])).toBe(true);
     expect(saveModifierApplies({ target: 'saving_throw', condition: 'large_form_active' }, 'saving_throw', 'STR', false, false, false, false, null, [])).toBe(false);

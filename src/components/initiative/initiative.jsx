@@ -448,6 +448,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                     setRuntimeValue(creature.name, 'wrathOfTheSeaDc', null, campaignName)
                     setRuntimeValue(creature.name, 'wrathOfTheSeaWisMod', null, campaignName)
                     setRuntimeValue(creature.name, 'wrathOfTheSeaSource', null, campaignName)
+                    setRuntimeValue(creature.name, 'peerlessAthleteActive', null, campaignName)
                 }
                 if (creature.concentration?.spell === "Hunter's Mark") {
                     creature.concentration = null

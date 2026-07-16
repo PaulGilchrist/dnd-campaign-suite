@@ -66,7 +66,13 @@ function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, 
   if (modifier.target !== 'saving_throw' && modifier.target !== 'save' && modifier.target !== 'attack_roll' && modifier.target !== 'attack_rolls' && modifier.target !== 'attack_rolls_vs_unmounted_near_mount' && modifier.target !== 'concentration_saving_throws' && modifier.target !== 'death_saving_throws' && modifier.target !== 'ability_check' && modifier.target !== 'check' && modifier.target !== 'd20' && modifier.target !== 'performance_checks' && modifier.target !== 'deception_performance_checks') return false;
   if (modifier.condition === 'raging') return isRaging;
   if (modifier.condition === 'shape_shift') return shapeShiftActive;
-  if (modifier.condition === 'peerless_athlete') return isPeerlessAthlete;
+  if (modifier.condition === 'peerless_athlete') {
+      if (!isPeerlessAthlete) return false;
+      if (!modifier.abilities || modifier.abilities.length === 0) return true;
+      if (!abilityName) return true;
+      if (abilityName && modifier.abilities.includes(abilityName)) return true;
+      return false;
+  }
   if (modifier.condition === 'charmed' && saveType === 'charmed') return true;
   if (modifier.condition === 'frightened' && saveType === 'frightened') return true;
   if (modifier.condition === 'poison' && saveType === 'poison') return true;
@@ -127,9 +133,18 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
     if (!saveModifierApplies(mod, saveType, abilityName, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, conditions, attackerName, isLivingLegendActive, isElderChampionActive, isHolyAuraActive, isProtectionFromPoisonActive)) continue;
     if (mod.target === 'ability_check' || mod.target === 'check' || mod.target === 'performance_checks' || mod.target === 'deception_performance_checks') {
       if (mod.effect === 'advantage') {
-        if (mod.abilities && mod.abilities.length > 0) {
-          // Per-ability check advantage (e.g., Remarkable Athlete for STR)
+        // Skill-specific advantage (e.g., Peerless Athlete) — check before abilities
+        if (mod.skills && mod.skills.length > 0) {
+          if (!effects.peerlessAthleteAdvantageSkills) {
+            effects.peerlessAthleteAdvantageSkills = [];
+          }
+          effects.peerlessAthleteAdvantageSkills = [...new Set([
+            ...(effects.peerlessAthleteAdvantageSkills || []),
+            ...mod.skills
+          ])];
+        } else if (mod.abilities && mod.abilities.length > 0) {
           if (!abilityName) {
+            // Per-ability check advantage (e.g., Remarkable Athlete for STR)
             // General computation: store abilities list for UI to match against
             effects.abilityCheckAdvantageAbilities = [...new Set([
               ...(effects.abilityCheckAdvantageAbilities || []),

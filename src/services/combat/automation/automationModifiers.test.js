@@ -35,7 +35,8 @@ describe('collectSaveModifiers', () => {
         target: 'saving_throw',
         condition: 'invisible',
         effect: 'advantage',
-        abilities: ['DEX']
+        abilities: ['DEX'],
+        skills: [],
       }])
     })
 

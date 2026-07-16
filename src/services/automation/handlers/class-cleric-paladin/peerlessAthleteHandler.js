@@ -11,19 +11,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // Check if already active
     const isActive = getRuntimeValue(playerName, PEERLESS_ATHLETE_KEY, campaignName);
     if (isActive) {
-        // Toggle off
-        const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
-        const activeBuffs = Array.isArray(stored) ? stored : [];
-        const newBuffs = activeBuffs.filter(b => b.name !== action.name);
-        await setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
-        await setRuntimeValue(playerName, PEERLESS_ATHLETE_KEY, false, campaignName);
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: action.name,
                 automationType: auto.type,
-                description: `${action.name} ended.`,
+                description: `${action.name} is already active.`,
                 automation: auto,
             },
         };
