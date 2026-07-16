@@ -269,7 +269,7 @@ describe('conditionEffects', () => {
 
       it('handles reroll effect with and without bonusExpression', () => {
         const withBonus = computeConditionEffects(['rage'], [{ target: 'saving_throw', effect: 'reroll', condition: 'rage', bonusExpression: '1d4' }]);
-        expect(withBonus.autoReroll).toBe(true);
+        expect(withBonus.autoRerollForSaves).toBe(true);
         expect(withBonus.autoRerollCondition).toBe('rage');
         expect(withBonus.autoRerollBonus).toBe('1d4');
 

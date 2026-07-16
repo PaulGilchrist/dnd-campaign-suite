@@ -157,11 +157,11 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                if (conditionEffects?.d20Floor10) {
                   ctx.d20Floor10 = true
                 }
-               if (conditionEffects?.autoReroll) {
-                  ctx.autoReroll = true;
-                  ctx.autoRerollCondition = conditionEffects.autoRerollCondition;
-                  ctx.autoRerollBonus = conditionEffects.autoRerollBonus || null;
-                }
+                if (conditionEffects?.autoRerollForChecks) {
+                   ctx.autoReroll = true;
+                   ctx.autoRerollCondition = conditionEffects.autoRerollCondition;
+                   ctx.autoRerollBonus = conditionEffects.autoRerollBonus || null;
+                 }
                 const isSoulknife = playerStats?.class?.name === 'Rogue' && playerStats?.class?.major?.name === 'Soulknife';
                 const hasPsiBolsteredKnack = isSoulknife && (playerStats?.level || 0) >= 3;
                 if (hasPsiBolsteredKnack) {
@@ -185,9 +185,9 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
            if (!autoFail && !forcedMode && conditionEffects?.saveAdvantageAbilities?.includes(abilityName.substring(0, 3).toUpperCase())) {
             forcedMode = 'advantage'
            }
-           if (conditionEffects?.autoReroll) {
-             return { forcedMode, autoFail: autoFail || undefined, autoReroll: true, autoRerollCondition: conditionEffects.autoRerollCondition, autoRerollBonus: conditionEffects.autoRerollBonus || null }
-           }
+            if (conditionEffects?.autoRerollForSaves) {
+              return { forcedMode, autoFail: autoFail || undefined, autoReroll: true, autoRerollCondition: conditionEffects.autoRerollCondition, autoRerollBonus: conditionEffects.autoRerollBonus || null }
+            }
              if (conditionEffects?.strokeOfLuck) {
                return { forcedMode, autoFail: autoFail || undefined, strokeOfLuck: true }
              }

@@ -8,7 +8,7 @@ const CONDITIONS_THAT_SPEED_ZERO = new Set([
 
 const CONDITION_KEYWORDS = new Set(['charmed', 'frightened', 'poison', 'magic'])
 
-function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, conditions = [], attackerName = null) {
+function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, conditions = [], attackerName = null, isLivingLegendActive = false, isElderChampionActive = false, isHolyAuraActive = false, isProtectionFromPoisonActive = false) {
   const conditionSet = new Set(conditions);
   if (modifier.effect === 'replacement') return true;
   if (modifier.effect === 'reliable_talent') return true;
@@ -76,10 +76,9 @@ function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, 
     return false;
     }
   if (modifier.condition === 'fiend_undead') return true;
-  if (modifier.condition === 'holy_nimbus_active') return true;
-  if (modifier.condition === 'holy_aura_active') return true;
-  if (modifier.condition === 'living_legend_active') return true;
-  if (modifier.condition === 'elder_champion_active') return true;
+  if (modifier.condition === 'holy_aura_active') return isHolyAuraActive;
+  if (modifier.condition === 'living_legend_active') return isLivingLegendActive;
+  if (modifier.condition === 'elder_champion_active') return isElderChampionActive;
   if (modifier.condition === 'large_form_active') return isLargeFormActive;
   if (CONDITION_KEYWORDS.has(modifier.condition)) return false;
   if (modifier.condition === 'first_round_target_no_turn') {
@@ -110,7 +109,7 @@ function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, 
   }
   if (modifier.condition === 'concentration_breaker') return true;
   if (modifier.condition === 'pfeag_save_advantage') return true;
-  if (modifier.condition === 'protection_from_poison_active') return true;
+  if (modifier.condition === 'protection_from_poison_active') return isProtectionFromPoisonActive;
   if (modifier.condition === 'remarkable_athlete_athletics') {
     return true;
   }
@@ -122,10 +121,10 @@ function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, 
   return true;
 }
 
-function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, conditions = [], attackerName = null) {
+function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, conditions = [], attackerName = null, isLivingLegendActive = false, isElderChampionActive = false, isHolyAuraActive = false, isProtectionFromPoisonActive = false) {
   if (!modifiers || modifiers.length === 0) return;
   for (const mod of modifiers) {
-    if (!saveModifierApplies(mod, saveType, abilityName, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, conditions, attackerName)) continue;
+    if (!saveModifierApplies(mod, saveType, abilityName, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, conditions, attackerName, isLivingLegendActive, isElderChampionActive, isHolyAuraActive, isProtectionFromPoisonActive)) continue;
     if (mod.target === 'ability_check' || mod.target === 'check' || mod.target === 'performance_checks' || mod.target === 'deception_performance_checks') {
       if (mod.effect === 'advantage') {
         if (mod.abilities && mod.abilities.length > 0) {
@@ -215,7 +214,11 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
       }
     }
     if (mod.effect === 'reroll') {
-      effects.autoReroll = true;
+      if (mod.target === 'saving_throw' || mod.target === 'save' || mod.target === 'concentration_saving_throws' || mod.target === 'death_saving_throws') {
+        effects.autoRerollForSaves = true;
+      } else if (mod.target === 'ability_check' || mod.target === 'check' || mod.target === 'd20') {
+        effects.autoRerollForChecks = true;
+      }
       effects.autoRerollCondition = mod.condition;
       if (mod.bonusExpression) {
         effects.autoRerollBonus = mod.bonusExpression;
@@ -299,7 +302,7 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
   }
 }
 
-function computeConditionEffects(conditions = [], saveModifiers = [], targetEffects = [], isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, seeInvisibilityActive = false, attackerName = null) {
+function computeConditionEffects(conditions = [], saveModifiers = [], targetEffects = [], isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, seeInvisibilityActive = false, attackerName = null, isLivingLegendActive = false, isElderChampionActive = false, isHolyAuraActive = false, isProtectionFromPoisonActive = false) {
   const effects = {
     attackAdvantageCount: 0,
     attackAdvantageReasons: [],
@@ -328,6 +331,8 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     saveDisadvantageCount: 0,
     saveDisadvantageAbilities: null,
     autoReroll: false,
+    autoRerollForSaves: false,
+    autoRerollForChecks: false,
     autoRerollCondition: null,
     autoRerollBonus: null,
     strSaveReplace: false,
@@ -423,7 +428,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
   const activeSaveModifiers = isIncapacitated
     ? saveModifiers.filter(mod => mod.condition !== 'visible_effect')
     : saveModifiers;
-  applySaveModifiers(effects, activeSaveModifiers, null, null, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, conditions, attackerName);
+  applySaveModifiers(effects, activeSaveModifiers, null, null, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, conditions, attackerName, isLivingLegendActive, isElderChampionActive, isHolyAuraActive, isProtectionFromPoisonActive);
 
   for (const key of conditionSet) {
     switch (key) {

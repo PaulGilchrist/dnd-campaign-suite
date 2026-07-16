@@ -331,8 +331,12 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const isPeerlessAthlete = getRuntimeValue(playerStats?.name, 'peerlessAthleteActive', campaignName);
     const isLargeFormActive = getRuntimeValue(playerStats?.name, 'largeFormActive', campaignName);
     const seeInvisibilityActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'see_invisibility');
+    const isLivingLegendActive = getRuntimeValue(playerStats?.name, 'livingLegendActive', campaignName) === true;
+    const isElderChampionActive = getRuntimeValue(playerStats?.name, 'elderChampionActive', campaignName) === true;
+    const isHolyAuraActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Holy Aura' && b.effect === 'holy_aura');
+    const isProtectionFromPoisonActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Protection from Poison' && b.effect === 'protection_from_poison');
     const combatContext = getCombatSummary(campaignName);
-    const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers, myTargetEffects, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, seeInvisibilityActive, playerStats?.name);
+    const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers, myTargetEffects, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, seeInvisibilityActive, playerStats?.name, isLivingLegendActive, isElderChampionActive, isHolyAuraActive, isProtectionFromPoisonActive);
     if (playerStats) {
         const speedHalvedTime = getRuntimeValue(playerStats.name, 'stunned_speedHalved', campaignName);
         if (speedHalvedTime) conditionEffects.speedHalved = true;
@@ -342,19 +346,19 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     }
     if (playerStats) {
         const fanaticalFocusUsed = getRuntimeValue(playerStats.name, 'fanaticalFocusUsed', campaignName);
-        if (fanaticalFocusUsed && conditionEffects.autoReroll) {
-            conditionEffects.autoReroll = false;
+        if (fanaticalFocusUsed && conditionEffects.autoRerollForSaves) {
+            conditionEffects.autoRerollForSaves = false;
             conditionEffects.autoRerollBonus = null;
         }
         const indomitableUses = Number(getRuntimeValue(playerStats.name, 'indomitableUses', campaignName) ?? 0);
         const indomitableMax = playerStats.level >= 17 ? 3 : playerStats.level >= 13 ? 2 : 1;
-        if (indomitableUses >= indomitableMax && conditionEffects.autoReroll) {
-            conditionEffects.autoReroll = false;
+        if (indomitableUses >= indomitableMax && conditionEffects.autoRerollForSaves) {
+            conditionEffects.autoRerollForSaves = false;
             conditionEffects.autoRerollBonus = null;
         }
         const disciplinedSurvivorUsed = getRuntimeValue(playerStats.name, 'disciplinedSurvivorUsed', campaignName);
-        if (disciplinedSurvivorUsed && conditionEffects.autoReroll) {
-            conditionEffects.autoReroll = false;
+        if (disciplinedSurvivorUsed && conditionEffects.autoRerollForSaves) {
+            conditionEffects.autoRerollForSaves = false;
             conditionEffects.autoRerollBonus = null;
         }
         const strokeOfLuckUsed = getRuntimeValue(playerStats.name, 'strokeOfLuckUsed', campaignName);

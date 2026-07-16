@@ -13,6 +13,7 @@ import './savePromptModal.css';
 function SavePromptModal({ campaignName, characters, activeMapName }) {
   const [prompts, setPrompts] = useState([]);
   const [evasionSelection, setEvasionSelection] = useState(null);
+  const [rerollUsedForSave, setRerollUsedForSave] = useState(false);
   const forceRollTo20Ref = useRef(false);
   const selectedAlliesRef = useRef(new Set());
 
@@ -242,6 +243,10 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
   const queueCount = prompts.length;
   const hasResult = current?.result != null;
 
+  useEffect(() => {
+    setRerollUsedForSave(false);
+  }, [current?.promptId]);
+
   const targetCharacter = current && (characters || []).find(c => {
     const name = typeof c === 'string' ? c : c.name;
     return name && utils.getName(name) === utils.getName(current.targetName);
@@ -253,8 +258,15 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
   const isRagingForSave = Array.isArray(activeBuffsForSave) && activeBuffsForSave.some(b => b.damageBonusExpression);
   const fanaticalFocusAvailable = isRagingForSave && !fanaticalFocusUsed;
 
+  const livingLegendActive = current ? getRuntimeValue(current.targetName, 'livingLegendActive', campaignName) === true : false;
+  const indomitableUses = current ? Number(getRuntimeValue(current?.targetName, 'indomitableUses', campaignName) ?? 0) : 0;
+  const indomitableMax = 1;
+  const disciplinedSurvivorUsed = current ? getRuntimeValue(current?.targetName, 'disciplinedSurvivorUsed', campaignName) : false;
+  const livingLegendAvailable = livingLegendActive && !fanaticalFocusUsed && indomitableUses < indomitableMax && !disciplinedSurvivorUsed;
+
   const handleFanaticalFocus = useCallback(async () => {
     if (!fanaticalFocusAvailable || !current) return;
+    setRerollUsedForSave(true);
     setRuntimeValue(current.targetName, 'fanaticalFocusUsed', true, campaignName);
     const rerollBonus = rageDamageBonus;
     let saveBonus = 0;
@@ -340,9 +352,46 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
                   <p className="sp-result-label">{current.result.success ? 'SAVE SUCCESS' : 'SAVE FAILURE'}</p>
                   <p className="sp-result-total">Total: <strong>{current.result.total}</strong> vs DC {current.saveDc}</p>
                   <p className="sp-result-breakdown">d20 ({current.result.roll}) + {current.result.saveBonus}{current.result.bonusDetail ? ' ' + current.result.bonusDetail : ''}{current.result.mode === 'advantage' ? ' (Advantage)' : current.result.mode === 'disadvantage' ? ' (Disadvantage)' : ''}</p>
-                  {!current.result.success && fanaticalFocusAvailable && (
+                  {!current.result.success && !rerollUsedForSave && fanaticalFocusAvailable && (
                     <button className="sp-stroke-btn" onClick={handleFanaticalFocus} type="button">
                       <i className="fa-solid fa-rotate"></i> Reroll Save (+{rageDamageBonus})
+                    </button>
+                  )}
+                  {!current.result.success && !rerollUsedForSave && livingLegendAvailable && (
+                    <button className="sp-stroke-btn" onClick={async () => {
+                      if (!current) return;
+                      setRerollUsedForSave(true);
+                      let localSaveBonus = 0;
+                      const localChar = (characters || []).find(c => {
+                        const name = typeof c === 'string' ? c : c.name;
+                        return name && utils.getName(name) === utils.getName(current.targetName);
+                      });
+                      if (localChar && typeof localChar !== 'string') {
+                        localSaveBonus = getAbilitySaveBonus(localChar.computedStats || localChar, current.saveType);
+                      }
+                      const aura = await computeAuraBonus({ targetName: current.targetName, characters, campaignName, activeMapName, allCreatures: getCombatSummary(campaignName)?.creatures });
+                      const roll1 = rollD20();
+                      const roll2 = current.disadvantage ? rollD20() : roll1;
+                      const finalRoll = current.disadvantage ? Math.min(roll1, roll2) : roll1;
+                      const total = finalRoll + localSaveBonus + aura.bonus;
+                      const success = total >= current.saveDc;
+                      sendSaveResult(campaignName, current.targetName, {
+                        promptId: current.promptId,
+                        success,
+                        roll: finalRoll,
+                        total,
+                        saveBonus: localSaveBonus + aura.bonus,
+                        rawRolls: [roll1, roll2],
+                        mode: current.disadvantage ? 'disadvantage' : 'normal',
+                      });
+                      setPrompts(prev => prev.map((p, i) =>
+                        i === 0
+                          ? { ...p, result: { success, roll: finalRoll, total, saveBonus: localSaveBonus + aura.bonus, rawRolls: [roll1, roll2], mode: current.disadvantage ? 'disadvantage' : 'normal' } }
+                          : p
+                      ));
+                      clearSavePrompt(campaignName, current.targetName);
+                    }} type="button">
+                      <i className="fa-solid fa-rotate"></i> Reroll Save
                     </button>
                   )}
                 </div>

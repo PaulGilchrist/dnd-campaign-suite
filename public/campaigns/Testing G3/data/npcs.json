@@ -1,6 +1,5 @@
 [
   {
-    "id": "b1a2c3d4-e5f6-7890-abcd-ef1234567890",
     "name": "Kaelen Ironoak",
     "race": "Half-Elf",
     "classRole": "Scholar of Feywild Lore",
@@ -11,8 +10,10 @@
     "notes": "Quest giver. Can provide the party with 2 Potions of Healing and a Scroll of Detect Magic before they enter. He waits at the entrance camp outside Thornfast Keep.",
     "tags": "Quest Giver, Scholar, Ally",
     "attitude": "positive",
+    "image": "",
+    "imageName": "",
     "imagePath": "images/Kaelen Ironoak.png",
-    "armorClass": 16,
+    "armorClass": 30,
     "hitPoints": "",
     "hitDice": "",
     "initiativeBonus": "",
@@ -34,7 +35,8 @@
     "conditionImmunities": [],
     "actions": [],
     "traits": "",
-    "reactions": ""
+    "reactions": "",
+    "id": "b1a2c3d4-e5f6-7890-abcd-ef1234567890"
   },
   {
     "id": "c2b3d4e5-f6a7-8901- bcde-f12345678901",

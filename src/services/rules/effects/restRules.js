@@ -358,6 +358,9 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
   // Clear Holy Nimbus active state on short rest
   updates.holyNimbusActive = null;
 
+  // Clear Elder Champion active state on short rest
+  updates.elderChampionActive = null;
+
   setRuntimeBatch(name, updates, campaignName)
 
   clearAllExpirationEffects(name, campaignName)
@@ -412,6 +415,9 @@ export async function applyLongRest(playerStats, campaignName) {
 
     // Clear Holy Nimbus active state on long rest
     charData.holyNimbusActive = null;
+
+    // Clear Elder Champion active state on long rest
+    charData.elderChampionActive = null;
 
     const currentExhaustion = getRuntimeValue(name, 'exhaustionLevel')
    if (typeof currentExhaustion === 'number' && currentExhaustion > 0) {

@@ -79,6 +79,7 @@ describe('Player save damage edge cases', () => {
         characters: [
             { name: 'Ally1', computedStats: { armorClass: 14, saveBonuses: { DEX: 2 } } },
         ],
+        charactersRef: { current: [] },
         setPopupHtml: vi.fn(),
         logEntry: vi.fn(),
         pendingSaves: {},

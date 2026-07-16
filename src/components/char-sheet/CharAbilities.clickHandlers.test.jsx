@@ -137,7 +137,7 @@ describe('CharAbilities click handlers', () => {
       { name: 'd20Floor10', effect: { d20Floor10: true }, expected: { d20Floor10: true } },
       { name: 'reliableTalent', effect: { reliableTalent: true }, expected: { reliableTalent: true } },
       { name: 'tacticalMind', effect: { tacticalMind: true, tacticalMindBonus: 5 }, expected: { tacticalMind: true, tacticalMindBonus: 5 } },
-      { name: 'autoReroll', effect: { autoReroll: true, autoRerollCondition: 'roll_equals_1', autoRerollBonus: null }, expected: { autoReroll: true, autoRerollCondition: 'roll_equals_1', autoRerollBonus: null } },
+      { name: 'autoReroll', effect: { autoRerollForChecks: true, autoRerollCondition: 'roll_equals_1', autoRerollBonus: null }, expected: { autoReroll: true, autoRerollCondition: 'roll_equals_1', autoRerollBonus: null } },
     ];
 
     for (const { name, effect, expected } of checkEffectTests) {
@@ -258,7 +258,7 @@ describe('CharAbilities click handlers', () => {
 
   describe('makeSaveContext - condition effects pass context', () => {
     it('passes autoReroll context when save is clicked', () => {
-      render(<CharAbilities {...defaultProps} conditionEffects={{ autoReroll: true, autoRerollCondition: 'frightened', autoRerollBonus: 3 }} />);
+      render(<CharAbilities {...defaultProps} conditionEffects={{ autoRerollForSaves: true, autoRerollCondition: 'frightened', autoRerollBonus: 3 }} />);
       const saveCell = findClickableByText('+6');
       if (saveCell) {
         fireEvent.click(saveCell);
@@ -333,7 +333,7 @@ describe('CharAbilities click handlers', () => {
     });
 
     it('combines forcedMode with autoReroll when both are set', () => {
-      render(<CharAbilities {...defaultProps} conditionEffects={{ saveDisadvantage: ['str'], autoReroll: true, autoRerollCondition: 'frightened', autoRerollBonus: 2 }} />);
+      render(<CharAbilities {...defaultProps} conditionEffects={{ saveDisadvantage: ['str'], autoRerollForSaves: true, autoRerollCondition: 'frightened', autoRerollBonus: 2 }} />);
       const saveCell = findClickableByText('+6');
       if (saveCell) {
         fireEvent.click(saveCell);

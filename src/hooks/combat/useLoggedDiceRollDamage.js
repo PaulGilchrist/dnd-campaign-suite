@@ -24,6 +24,7 @@ import {
 } from './loggedDiceRollUtils.js';
 import { getCoronaSaveDisadvantage } from '../../services/combat/auras/coronaAuraUtils.js';
 import { hasBardicInspirationOffense, getBardicInspirationDieSize, getBardicInspirationDieSizeFromClass } from '../../services/combat/auras/bardicInspirationState.js';
+import { computeConditionEffects } from '../../services/combat/conditions/conditionEffects.js';
 
 function handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters) {
     if (context?.overchannelActive) {
@@ -56,7 +57,7 @@ function handleOverchannelSelfDamage(characterName, campaignName, context, logEn
 }
 
 export function createLogDamageAndShow(deps) {
-    const { characterName, campaignName, characters, setPopupHtml, logEntry, pendingSaves } = deps;
+    const { characterName, campaignName, characters, charactersRef, setPopupHtml, logEntry, pendingSaves } = deps;
 
     async function applyMagicMissileShieldImmunity(name, formula, total, rolls, modifier, context) {
         const combatSummary = await loadCombatSummary(campaignName);
@@ -778,6 +779,39 @@ export function createLogDamageAndShow(deps) {
         if (!target || target.type !== 'player') return;
         const targetMaxHp = getRuntimeValue(target.name, 'hitPoints') ?? 0;
 
+        const targetChar = (charactersRef.current || []).find(c => c.name === target.name);
+        const targetConditions = getRuntimeValue(target.name, 'activeConditions', campaignName) || [];
+        const targetSaveModifiers = targetChar?.computedStats?.saveModifiers || [];
+        const targetEffects = (getRuntimeValue(campaignName, 'targetEffects') || []).filter(te => te.target === target.name);
+        const targetBuffs = getRuntimeValue(target.name, 'activeBuffs', campaignName) || [];
+        const isRaging = Array.isArray(targetBuffs) && targetBuffs.some(b => b.damageBonusExpression);
+        const shapeShiftActive = Array.isArray(targetBuffs) && targetBuffs.some(b => b.effect === 'shape_shift');
+        const seeInvisibilityActive = Array.isArray(targetBuffs) && targetBuffs.some(b => b.effect === 'see_invisibility');
+        const isLivingLegendActive = getRuntimeValue(target.name, 'livingLegendActive', campaignName) === true;
+        const isElderChampionActive = getRuntimeValue(target.name, 'elderChampionActive', campaignName) === true;
+        const isHolyAuraActive = Array.isArray(targetBuffs) && targetBuffs.some(b => b.name === 'Holy Aura' && b.effect === 'holy_aura');
+        const isProtectionFromPoisonActive = Array.isArray(targetBuffs) && targetBuffs.some(b => b.name === 'Protection from Poison' && b.effect === 'protection_from_poison');
+        const combatContext = getCombatSummary(campaignName);
+        const targetConditionEffects = computeConditionEffects(targetConditions, targetSaveModifiers, targetEffects, isRaging, shapeShiftActive, false, false, combatContext, seeInvisibilityActive, target.name, isLivingLegendActive, isElderChampionActive, isHolyAuraActive, isProtectionFromPoisonActive);
+        const fanaticalFocusUsed = getRuntimeValue(target.name, 'fanaticalFocusUsed', campaignName);
+        const indomitableUses = Number(getRuntimeValue(target.name, 'indomitableUses', campaignName) ?? 0);
+        const indomitableMax = (targetChar?.computedStats?.level || 0) >= 17 ? 3 : (targetChar?.computedStats?.level || 0) >= 13 ? 2 : 1;
+        const disciplinedSurvivorUsed = getRuntimeValue(target.name, 'disciplinedSurvivorUsed', campaignName);
+        let autoRerollForSaves = targetConditionEffects.autoRerollForSaves;
+        if (fanaticalFocusUsed && autoRerollForSaves) {
+            autoRerollForSaves = false;
+        }
+        if (indomitableUses >= indomitableMax && autoRerollForSaves) {
+            autoRerollForSaves = false;
+        }
+        if (disciplinedSurvivorUsed && autoRerollForSaves) {
+            autoRerollForSaves = false;
+        }
+        let autoRerollBonus = targetConditionEffects.autoRerollBonus;
+        if (autoRerollBonus && targetChar?.computedStats) {
+            autoRerollBonus = evaluateAutoExpression(autoRerollBonus, targetChar.computedStats);
+        }
+
         const isCarefulAlly = context?.metamagicCareful || false;
         if (isCarefulAlly) {
             const carefulDamage = computeDamageAfterSave(adjustedTotal, true, dcSuccess);
@@ -979,6 +1013,9 @@ export function createLogDamageAndShow(deps) {
             attackerName: attackerName || characterName,
             gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
             gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
+            autoReroll: autoRerollForSaves,
+            autoRerollBonus: autoRerollBonus,
+            autoRerollCondition: targetConditionEffects.autoRerollCondition,
         });
 
         handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);

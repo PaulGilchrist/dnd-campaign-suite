@@ -43,6 +43,9 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
             // Clear Holy Nimbus active state on initiative roll (new combat)
             setRuntimeValue(playerStats.name, 'holyNimbusActive', null, campaignName);
 
+            // Clear Elder Champion active state on initiative roll (new combat)
+            setRuntimeValue(playerStats.name, 'elderChampionActive', false, campaignName);
+
             // Clear concentration on initiative roll (new combat round)
             const cs = getCombatSummary(campaignName);
             if (cs && cs.creatures) {

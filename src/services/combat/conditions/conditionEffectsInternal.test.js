@@ -348,13 +348,8 @@ describe('saveModifierApplies — condition-based boolean checks', () => {
 
   const alwaysTrueConditions = [
     'fiend_undead',
-    'holy_nimbus_active',
-    'holy_aura_active',
-    'living_legend_active',
-    'elder_champion_active',
     'concentration_breaker',
     'pfeag_save_advantage',
-    'protection_from_poison_active',
   ];
 
   for (const condition of alwaysTrueConditions) {
@@ -362,6 +357,26 @@ describe('saveModifierApplies — condition-based boolean checks', () => {
       expect(saveModifierApplies({ target: 'saving_throw', condition }, ...fnArgs)).toBe(true);
     });
   }
+
+  it('returns isLivingLegendActive when condition is living_legend_active', () => {
+    expect(saveModifierApplies({ target: 'saving_throw', condition: 'living_legend_active' }, ...fnArgs, null, true, false, false, false)).toBe(true);
+    expect(saveModifierApplies({ target: 'saving_throw', condition: 'living_legend_active' }, ...fnArgs, null, false, false, false, false)).toBe(false);
+  });
+
+  it('returns isElderChampionActive when condition is elder_champion_active', () => {
+    expect(saveModifierApplies({ target: 'saving_throw', condition: 'elder_champion_active' }, ...fnArgs, null, false, true, false, false)).toBe(true);
+    expect(saveModifierApplies({ target: 'saving_throw', condition: 'elder_champion_active' }, ...fnArgs, null, false, false, false, false)).toBe(false);
+  });
+
+  it('returns isHolyAuraActive when condition is holy_aura_active', () => {
+    expect(saveModifierApplies({ target: 'attack_roll', condition: 'holy_aura_active' }, ...fnArgs, null, false, false, true, false)).toBe(true);
+    expect(saveModifierApplies({ target: 'attack_roll', condition: 'holy_aura_active' }, ...fnArgs, null, false, false, false, false)).toBe(false);
+  });
+
+  it('returns isProtectionFromPoisonActive when condition is protection_from_poison_active', () => {
+    expect(saveModifierApplies({ target: 'saving_throw', condition: 'protection_from_poison_active' }, ...fnArgs, null, false, false, false, true)).toBe(true);
+    expect(saveModifierApplies({ target: 'saving_throw', condition: 'protection_from_poison_active' }, ...fnArgs, null, false, false, false, false)).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -853,11 +868,20 @@ describe('computeConditionEffects — applied modifier effects', () => {
     expect(result.attackDisadvantageCount).toBe(1);
   });
 
-  it('sets autoReroll and autoRerollCondition for reroll effect', () => {
+  it('sets autoRerollForSaves for reroll effect on saving_throw', () => {
     const modifiers = [{ target: 'saving_throw', effect: 'reroll', condition: 'favored_enemy' }];
     const result = computeConditionEffects([], modifiers);
-    expect(result.autoReroll).toBe(true);
+    expect(result.autoRerollForSaves).toBe(true);
+    expect(result.autoRerollForChecks).toBe(false);
     expect(result.autoRerollCondition).toBe('favored_enemy');
+  });
+
+  it('sets autoRerollForChecks for reroll effect on d20 target', () => {
+    const modifiers = [{ target: 'd20', effect: 'reroll', condition: 'halfling_lucky' }];
+    const result = computeConditionEffects([], modifiers);
+    expect(result.autoRerollForSaves).toBe(false);
+    expect(result.autoRerollForChecks).toBe(true);
+    expect(result.autoRerollCondition).toBe('halfling_lucky');
   });
 
   it('sets autoRerollBonus when bonusExpression is provided', () => {

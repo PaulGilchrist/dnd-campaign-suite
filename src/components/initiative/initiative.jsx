@@ -355,13 +355,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                     const activeName = getActiveCreatureName(campaignName)
                     if (activeName) {
                         merged.activeCreatureName = activeName
-                        console.error('[initial load] loaded activeCreatureName from cache:', activeName);
                         setActiveCreatureName(activeName)
                         activeCreatureNameRef.current = activeName
                     } else {
                         const firstCreature = merged.creatures[0]?.name || null
                         merged.activeCreatureName = firstCreature
-                        console.error('[initial load] set activeCreatureName from first creature:', firstCreature);
                         setActiveCreatureName(firstCreature)
                         activeCreatureNameRef.current = firstCreature
                     }
@@ -372,7 +370,6 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 const newSummary = { round: 1, creatures }
                 const firstName = creatures[0]?.name
                 newSummary.activeCreatureName = firstName
-                console.error('[initial load new] set activeCreatureName:', firstName);
                 storage.set('combatSummary', newSummary, campaignName)
                 setCombatSummary(newSummary)
                 combatSummaryRef.current = newSummary
