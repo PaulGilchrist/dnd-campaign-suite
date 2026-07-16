@@ -1,10 +1,8 @@
 
 import React from 'react'
-import { getRuntimeValue, setRuntimeValue, setRuntimeBatch } from '../../hooks/runtime/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { rollDice } from '../../services/dice/diceRoller.js'
-import { getHitDieSize, computeHitDieRecovery, SHORT_REST_RESOURCES, getShortRestResourceLabels } from '../../services/rules/effects/restRules.js'
-import { clearAllExpirationEffects } from '../../services/rules/effects/expirations.js'
-import { clearHuntersMarkConcentration } from '../../services/rules/effects/restRules.js'
+import { getHitDieSize, computeHitDieRecovery, SHORT_REST_RESOURCES, getShortRestResourceLabels, applyShortRest } from '../../services/rules/effects/restRules.js'
 import { getClassFeatures } from '../../services/character/classFeatures.js'
 import { evaluateAutoExpression } from '../../services/combat/automation/automationService.js'
 import { addEntry } from '../../services/ui/logService.js'
@@ -186,55 +184,26 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         setBolsteringTreatsCrafted(true);
        };
 
-    const handleComplete = () => {
-        const updates = {};
+    const handleComplete = async () => {
+        const hpBeforeRest = Number(getRuntimeValue(playerStats.name, 'currentHitPoints') ?? playerStats.hitPoints);
 
-        updates.shortRestHitDice = remainingHitDice;
+        // Apply base short rest logic (resource clearing, feature clearing, expiration)
+        await applyShortRest(playerStats, campaignName, { skipAutoRecovery: true });
 
-        let storedHp = getRuntimeValue(playerStats.name, 'currentHitPoints');
-        if (storedHp == null || storedHp === '') {
-            storedHp = playerStats.hitPoints;
-        }
-        const hpBeforeRest = Number(storedHp);
+        // Layer on UI-driven updates: hit dice healing
         let currentHp = hpBeforeRest + recoveredHp;
-        updates.currentHitPoints = Math.min(playerStats.hitPoints, currentHp);
+        setRuntimeValue(playerStats.name, 'currentHitPoints', Math.min(playerStats.hitPoints, currentHp), campaignName);
+        setRuntimeValue(playerStats.name, 'shortRestHitDice', remainingHitDice, campaignName);
 
-        SHORT_REST_RESOURCES.forEach((key) => {
-            updates[key] = null;
-            });
-
-        if (playerStats.class?.name === 'Fighter') {
-            const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-            const maxSW = classLevel?.second_wind || 0;
-            const currentSW = Number(getRuntimeValue(playerStats.name, 'secondWindUses', campaignName) ?? 0);
-            if (currentSW < maxSW) {
-                updates.secondWindUses = Math.min(maxSW, currentSW + 1);
-            }
-        }
-
-        // Barbarian 2024: Rage recharges 1 use on short rest
-        if (playerStats.class?.name === 'Barbarian' && playerStats.rules === '2024') {
-            const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-            const maxRage = classLevel?.rages || 0;
-            const trackedRage = playerStats._trackedResources?.ragePoints;
-            const storedRage = getRuntimeValue(playerStats.name, 'ragePoints', campaignName);
-            const currentRage = storedRage != null ? Number(storedRage) : (trackedRage?.current ?? maxRage);
-            if (currentRage < maxRage) {
-                updates.ragePoints = Math.min(maxRage, currentRage + 1);
-            }
-        }
-
+        // UI-driven: Sorcerous Restoration
         if (sorcRestoration && restorationAvailable && restorationRequested) {
             let curSorcery = getRuntimeValue(playerStats.name, 'sorceryPoints');
             const maxSp = getClassFeatures(playerStats)?.maxSorceryPoints || 0;
-            updates.sorceryPoints = Math.min(maxSp, (curSorcery != null ? Number(curSorcery) : 0) + restoreAmount);
-            updates.sorcerousRestorationUses = 0;
-            }
+            setRuntimeValue(playerStats.name, 'sorceryPoints', Math.min(maxSp, (curSorcery != null ? Number(curSorcery) : 0) + restoreAmount), campaignName);
+            setRuntimeValue(playerStats.name, 'sorcerousRestorationUses', 0, campaignName);
+        }
 
-        if (hasFontOfInspiration && fontOfInspirationAvailable) {
-            updates.bardicInspirationUses = bardicInspirationMax;
-            }
-
+        // UI-driven: Arcane Recovery
         if (arcaneRecovery && arcaneRecoveryAvailable && arcaneRecoveryRequested) {
             const maxSlotsToRecover = Math.ceil(playerStats.level / 2);
             let slotsRecovered = 0;
@@ -246,48 +215,23 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
                 const available = max - current;
                 if (available > 0) {
                     const toRecover = Math.min(available, maxSlotsToRecover - slotsRecovered);
-                    updates[slotKey] = current + toRecover;
+                    setRuntimeValue(playerStats.name, slotKey, current + toRecover, campaignName);
                     slotsRecovered += toRecover;
                 }
             }
-            updates.arcaneRecoveryLevels = null;
-            }
+        }
 
+        // UI-driven: Natural Recovery
         if (naturalRecovery && naturalRecoveryAvailable && Object.keys(naturalRecoverySelections).some(k => naturalRecoverySelections[k] > 0)) {
             for (const [levelStr, count] of Object.entries(naturalRecoverySelections)) {
                 if (count > 0) {
                     const slotKey = `spell_slots_level_${levelStr}`;
                     const max = playerStats.spellAbilities?.[slotKey] || 0;
                     const current = Number(getRuntimeValue(playerStats.name, slotKey) ?? max);
-                    updates[slotKey] = Math.min(max, current + count);
-                }
-            }
-            updates.naturalRecoverySlots = null;
-            }
-
-        const hasSignatureSpells = (playerStats.automation?.specialActions ?? []).some(
-            a => a.type === 'signature_spells'
-        )
-        if (hasSignatureSpells) {
-            const selection = getRuntimeValue(playerStats.name, 'SignatureSpells_selection', campaignName)
-            if (selection && Array.isArray(selection)) {
-                for (const spell of selection) {
-                    const usedKey = `SignatureSpells_${spell.replace(/\s+/g, '_')}_used`
-                    updates[usedKey] = null
+                    setRuntimeValue(playerStats.name, slotKey, Math.min(max, current + count), campaignName);
                 }
             }
         }
-
-        updates['_Defensive_Tactics_choice'] = null;
-        updates["_Hunter's_Prey_choice"] = null;
-
-        // Clear Wrath of the Sea badge on short rest
-        updates.wrathOfTheSeaActive = null;
-        updates.wrathOfTheSeaDc = null;
-        updates.wrathOfTheSeaWisMod = null;
-        updates.wrathOfTheSeaSource = null;
-
-        setRuntimeBatch(playerStats.name, updates, campaignName);
 
         const logEntries = [];
         logEntries.push(`${playerStats.name} takes a short rest.`);
@@ -310,7 +254,7 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         });
         if (playerStats.class?.name === 'Fighter') {
             const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-            const maxSW = classLevel?.secondWind || 0;
+            const maxSW = classLevel?.second_wind || 0;
             const currentSW = Number(getRuntimeValue(playerStats.name, 'secondWindUses', campaignName) ?? 0);
             if (currentSW < maxSW) restoredResources.push('Second Wind');
         }
@@ -326,7 +270,7 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         if (hasImprovedWardingFlare) restoredResources.push('Warding Flare');
         if (hasFontOfInspiration) restoredResources.push('Bardic Inspiration (Font of Inspiration)');
         const hasArcaneRecovery = (playerStats.automation?.passives ?? []).some(p => p.type === 'resource_restoration' && p.resourceKey === 'arcaneRecoveryLevels');
-        if (hasArcaneRecovery) restoredResources.push('Arcane Recovery');
+        if (hasArcaneRecovery && arcaneRecoveryRequested) restoredResources.push('Arcane Recovery');
         const hasBolsteringTreats = (playerStats.automation?.passives ?? []).some(p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats');
         if (hasBolsteringTreats) restoredResources.push('Bolstering Treats');
         if (playerStats.class?.name === 'Warlock') restoredResources.push('Pact Magic (Warlock spell slots)');
@@ -355,11 +299,8 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
             console.error('[ShortRestModal] Failed to log short rest:', err);
         });
 
-        clearAllExpirationEffects(playerStats.name, campaignName);
-        clearHuntersMarkConcentration(playerStats.name, campaignName);
-
         onComplete && onComplete();
-       };
+    };
 
     React.useEffect(() => {
         const handleKey = (e) => {

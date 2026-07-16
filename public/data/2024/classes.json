@@ -7377,7 +7377,7 @@
                     },
                     {
                         "name": "Living Legend",
-                        "description": "Bonus Action for 10 minutes. Charismatic: Advantage on all Charisma checks. Saving Throw Reroll: Reaction to reroll failed save. Unerring Strike: once per turn, cause missed weapon attack to hit.",
+                        "description": "Bonus Action for 10 minutes.<ul><li><b>Charismatic:</b> Advantage on all Charisma checks.</li><li><b>Saving Throw Reroll:</b> Reaction to reroll failed save.</li><li><b>Unerring Strike:</b> once per turn, cause missed weapon attack to hit.</li><ul>",
                         "level": 20,
                         "automation": {
                             "type": "living_legend",

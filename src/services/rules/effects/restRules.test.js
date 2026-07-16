@@ -268,13 +268,7 @@ describe('restRules', () => {
     })
 
     it('grants feature-specific benefits on short rest', async () => {
-      // Chef Bolstering Treats
-      const chefStats = makeStats({
-        proficiency: 4,
-        automation: { passives: [{ type: 'temp_hp_buff', name: 'Bolstering Treats' }] },
-      })
-      await applyShortRest(chefStats, CAMPAIGN)
-      expect(getBatchUpdates().chefBolsteringTreats).toBe(4)
+      // Bolstering Treats is now user-choice in modal (not auto-applied)
 
       // Celestial Resilience temp HP
       vi.clearAllMocks()

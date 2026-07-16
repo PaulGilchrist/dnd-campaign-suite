@@ -346,11 +346,13 @@ const PaladinFeatures = function PaladinFeatures({ playerStats, campaignName }) 
         }
     };
     const holyNimbusActive = useRuntimeValue(playerStats.name, 'holyNimbusActive', campaignName);
+    const livingLegendActive = useRuntimeValue(playerStats.name, 'livingLegendActive', campaignName);
     return (
          <div data-testid="char-class-paladin">
              {cha && <div><b>Aura of Protection: </b>+{cha.bonus} to saves {playerStats.level >= 6 ? `(${getAuraRangeFromStats(playerStats)} ft.)` : '(locked)'}</div>}
              {paladinFeatures?.auraRange !== null && <div><b>Aura Range: </b>{paladinFeatures.auraRange}</div>}
              {holyNimbusActive && <span className="automation-badge">Holy Nimbus</span>}
+             {livingLegendActive && <span className="automation-badge">Living Legend</span>}
              <TrackedResourceInput label="Channel Divinity Charges" resourceKey="channelDivinityCharges" playerName={playerStats.name} getMax={() => paladinFeatures?.maxChannelDivinity || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
              <div><b>Extra Attacks: </b>{paladinFeatures?.extraAttacks || 0}</div>
               {playerStats.class.fightingStyles && <div><b>Fighting Styles: </b>{(

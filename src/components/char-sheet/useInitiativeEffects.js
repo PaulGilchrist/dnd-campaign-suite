@@ -36,6 +36,13 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
             // Clear War God's Blessing active state on new combat
             setRuntimeValue(playerStats.name, '_War_Gods_Blessing_active', null, campaignName);
 
+            // Clear Living Legend active state on initiative roll (new combat)
+            setRuntimeValue(playerStats.name, 'livingLegendActive', null, campaignName);
+            setRuntimeValue(playerStats.name, 'unerringStrikeUsed', null, campaignName);
+
+            // Clear Holy Nimbus active state on initiative roll (new combat)
+            setRuntimeValue(playerStats.name, 'holyNimbusActive', null, campaignName);
+
             // Clear concentration on initiative roll (new combat round)
             const cs = getCombatSummary(campaignName);
             if (cs && cs.creatures) {

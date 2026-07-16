@@ -2,8 +2,8 @@
   "encounters": [
     {
       "name": "Crypt Guardians",
-      "description": "**Location:** Small Crypt — Entrance Level\n\nAs the party descends the ancient stone stairs into the crypt, the air grows cold and still. The faint glow of torches reveals burial niches lining the walls, their contents long since pilfered — but the guardians remain. These elven dead were animated by the Thorned One's corrupting influence seeping through the foundations. They lurch to unlife as the party enters the central chamber.\n\n**Terrain Features:** The crypt has scattered rubble (difficult terrain) in the western corridor. The central chamber contains two stone pillars that provide half cover. The eastern sarcophagus (hard, AC 15, HP 20) can be pushed over to create a barrier or crush enemies.\n\n**Tactics:** Zombies advance slowly, attempting to grapple while Skeletons use shortbows from behind pillars. If reduced to 2 or fewer monsters, the remaining undead fight mindlessly to the end.\n\n**Development:** The party finds Kaelen's first clue here — a fragment of an elven wardstone etched with instructions for navigating the deeper levels.",
       "savedAt": "2026-05-23T00:00:00Z",
+      "description": "**Location:** Small Crypt — Entrance Level\n\nAs the party descends the ancient stone stairs into the crypt, the air grows cold and still. The faint glow of torches reveals burial niches lining the walls, their contents long since pilfered — but the guardians remain. These elven dead were animated by the Thorned One's corrupting influence seeping through the foundations. They lurch to unlife as the party enters the central chamber.\n\n**Terrain Features:** The crypt has scattered rubble (difficult terrain) in the western corridor. The central chamber contains two stone pillars that provide half cover. The eastern sarcophagus (hard, AC 15, HP 20) can be pushed over to create a barrier or crush enemies.\n\n**Tactics:** Zombies advance slowly, attempting to grapple while Skeletons use shortbows from behind pillars. If reduced to 2 or fewer monsters, the remaining undead fight mindlessly to the end.\n\n**Development:** The party finds Kaelen's first clue here — a fragment of an elven wardstone etched with instructions for navigating the deeper levels.",
       "rulesVersion": "2024",
       "difficulty": 1,
       "playerLevels": [
@@ -23,7 +23,8 @@
           "name": "Skeleton",
           "qty": 2
         }
-      ]
+      ],
+      "effectiveXP": 500
     },
     {
       "name": "Twisted Growth",

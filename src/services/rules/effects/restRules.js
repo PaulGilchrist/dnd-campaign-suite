@@ -156,7 +156,8 @@ export function spellSlotLevels() {
   return [1, 2, 3, 4, 5, 6, 7, 8, 9]
 }
 
-export async function applyShortRest(playerStats, campaignName) {
+export async function applyShortRest(playerStats, campaignName, options = {}) {
+  const { skipAutoRecovery = false } = options;
   const name = playerStats.name
   const storedHp = getRuntimeValue(name, 'currentHitPoints')
   const currentHp = computeShortRestHpNewCurrent(storedHp, playerStats.hitPoints, 0)
@@ -192,16 +193,17 @@ export async function applyShortRest(playerStats, campaignName) {
     updates.wardingflareUses = null
   }
 
-  const hasFontOfInspiration = (playerStats.automation?.passives ?? []).some(p => p.type === 'font_of_inspiration')
-  if (hasFontOfInspiration) {
-    const charisma = playerStats.abilities?.find(a => a.name === 'Charisma')
-    const maxBI = charisma?.bonus || 0
-    const storedBI = getRuntimeValue(name, 'bardicInspirationUses', campaignName)
-    const currentBI = storedBI != null ? Number(storedBI) : maxBI
-    if (storedBI == null || currentBI < maxBI) {
-      updates.bardicInspirationUses = maxBI
+  if (!skipAutoRecovery) {
+    const hasFontOfInspiration = (playerStats.automation?.passives ?? []).some(p => p.type === 'font_of_inspiration')
+    if (hasFontOfInspiration) {
+      const charisma = playerStats.abilities?.find(a => a.name === 'Charisma')
+      const maxBI = charisma?.bonus || 0
+      const storedBI = getRuntimeValue(name, 'bardicInspirationUses', campaignName)
+      const currentBI = storedBI != null ? Number(storedBI) : maxBI
+      if (storedBI == null || currentBI < maxBI) {
+        updates.bardicInspirationUses = maxBI
+      }
     }
-  }
 
     // Arcane Recovery: Wizard spell slot recovery on short rest
     const hasArcaneRecovery = (playerStats.automation?.passives ?? []).some(
@@ -230,134 +232,133 @@ export async function applyShortRest(playerStats, campaignName) {
         }
       }
     }
+  }
 
-    // Signature Spells: Reset per-spell used flags on short or long rest
-    const hasSignatureSpells = (playerStats.automation?.specialActions ?? []).some(
-      a => a.type === 'signature_spells'
-    )
-    if (hasSignatureSpells) {
-      const selection = getRuntimeValue(name, 'SignatureSpells_selection', campaignName)
-      if (selection && Array.isArray(selection)) {
-        for (const spell of selection) {
-          const usedKey = `SignatureSpells_${spell.replace(/\s+/g, '_')}_used`
-          updates[usedKey] = null
+  // Signature Spells: Reset per-spell used flags on short or long rest
+  const hasSignatureSpells = (playerStats.automation?.specialActions ?? []).some(
+    a => a.type === 'signature_spells'
+  )
+  if (hasSignatureSpells) {
+    const selection = getRuntimeValue(name, 'SignatureSpells_selection', campaignName)
+    if (selection && Array.isArray(selection)) {
+      for (const spell of selection) {
+        const usedKey = `SignatureSpells_${spell.replace(/\s+/g, '_')}_used`
+        updates[usedKey] = null
+      }
+    }
+  }
+
+  // Divination Savant: Reset free cast tracking on short or long rest
+  const hasDivinationSavant = (playerStats.automation?.passives ?? []).some(
+    p => p.type === 'passive_rule' && p.effect === 'divination_savant'
+  )
+  if (hasDivinationSavant) {
+    const divSelection = getRuntimeValue(name, '_Divination_Savant_selection', campaignName)
+    if (divSelection && Array.isArray(divSelection)) {
+      for (const spell of divSelection) {
+        const usedKey = `_Divination_Savant_${spell.replace(/\s+/g, '_')}_used`
+        updates[usedKey] = null
+      }
+    }
+  }
+
+  // Evocation Savant: Reset free cast tracking on short or long rest
+  const hasEvocationSavant = (playerStats.automation?.passives ?? []).some(
+    p => p.type === 'passive_rule' && p.effect === 'evocation_savant'
+  )
+  if (hasEvocationSavant) {
+    const evocSelection = getRuntimeValue(name, '_Evocation_Savant_selection', campaignName)
+    if (evocSelection && Array.isArray(evocSelection)) {
+      for (const spell of evocSelection) {
+        const usedKey = `_Evocation_Savant_${spell.replace(/\s+/g, '_')}_used`
+        updates[usedKey] = null
+      }
+    }
+  }
+
+  // Illusion Savant: Reset free cast tracking on short or long rest
+  const hasIllusionSavant = (playerStats.automation?.passives ?? []).some(
+    p => p.type === 'passive_rule' && p.effect === 'illusion_savant'
+  )
+  if (hasIllusionSavant) {
+    const illusionSelection = getRuntimeValue(name, '_Illusion_Savant_selection', campaignName)
+    if (illusionSelection && Array.isArray(illusionSelection)) {
+      for (const spell of illusionSelection) {
+        const usedKey = `_Illusion_Savant_${spell.replace(/\s+/g, '_')}_used`
+        updates[usedKey] = null
+      }
+    }
+  }
+
+  // Pact Magic: Warlock spell slot recovery on short rest
+  if (playerStats.class?.name === 'Warlock') {
+    const slotLevels = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    for (const level of slotLevels) {
+      const slotKey = `spell_slots_level_${level}`
+      const max = playerStats.spellAbilities?.[slotKey] || 0
+      if (max > 0) {
+        const current = Number(getRuntimeValue(name, slotKey) ?? max)
+        if (current < max) {
+          updates[slotKey] = max
         }
       }
     }
+  }
 
-    // Divination Savant: Reset free cast tracking on short or long rest
-    const hasDivinationSavant = (playerStats.automation?.passives ?? []).some(
-      p => p.type === 'passive_rule' && p.effect === 'divination_savant'
-    )
-    if (hasDivinationSavant) {
-      const divSelection = getRuntimeValue(name, '_Divination_Savant_selection', campaignName)
-      if (divSelection && Array.isArray(divSelection)) {
-        for (const spell of divSelection) {
-          const usedKey = `_Divination_Savant_${spell.replace(/\s+/g, '_')}_used`
-          updates[usedKey] = null
-        }
+  // Tireless: decrease exhaustion by 1 on short rest
+  if (playerStats.class?.name === 'Ranger' && playerStats.level >= 10) {
+    const currentExhaustion = getRuntimeValue(name, 'exhaustionLevel', campaignName)
+    if (typeof currentExhaustion === 'number' && currentExhaustion > 0) {
+      updates.exhaustionLevel = currentExhaustion - 1
+    }
+  }
+
+ // Celestial Resilience: Grant temp HP on short rest for Celestial Patron
+ if (playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron') {
+    const features = playerStats.specialActions || []
+    const feature = features.find(f => f.name === 'Celestial Resilience')
+   if (feature) {
+      if (playerStats.level == null) {
+        console.error('[restRules] applyShortRest: playerStats.level is missing for celestial patron temp HP')
+        throw new Error('playerStats.level is required for celestial patron temp HP')
       }
-    }
-
-    // Evocation Savant: Reset free cast tracking on short or long rest
-    const hasEvocationSavant = (playerStats.automation?.passives ?? []).some(
-      p => p.type === 'passive_rule' && p.effect === 'evocation_savant'
-    )
-    if (hasEvocationSavant) {
-      const evocSelection = getRuntimeValue(name, '_Evocation_Savant_selection', campaignName)
-      if (evocSelection && Array.isArray(evocSelection)) {
-        for (const spell of evocSelection) {
-          const usedKey = `_Evocation_Savant_${spell.replace(/\s+/g, '_')}_used`
-          updates[usedKey] = null
-        }
-      }
-    }
-
-    // Illusion Savant: Reset free cast tracking on short or long rest
-    const hasIllusionSavant = (playerStats.automation?.passives ?? []).some(
-      p => p.type === 'passive_rule' && p.effect === 'illusion_savant'
-    )
-    if (hasIllusionSavant) {
-      const illusionSelection = getRuntimeValue(name, '_Illusion_Savant_selection', campaignName)
-      if (illusionSelection && Array.isArray(illusionSelection)) {
-        for (const spell of illusionSelection) {
-          const usedKey = `_Illusion_Savant_${spell.replace(/\s+/g, '_')}_used`
-          updates[usedKey] = null
-        }
-      }
-    }
-
-    // Pact Magic: Warlock spell slot recovery on short rest
-    if (playerStats.class?.name === 'Warlock') {
-      const slotLevels = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-      for (const level of slotLevels) {
-        const slotKey = `spell_slots_level_${level}`
-        const max = playerStats.spellAbilities?.[slotKey] || 0
-        if (max > 0) {
-          const current = Number(getRuntimeValue(name, slotKey) ?? max)
-          if (current < max) {
-            updates[slotKey] = max
-          }
-        }
-      }
-    }
-
-    // Chef: Bolstering Treats crafted on Short Rest (1 hour of work)
-    const hasBolsteringTreats = (playerStats.automation?.passives ?? []).some(
-        p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats'
-    )
-    if (hasBolsteringTreats) {
-      const craftCount = playerStats.proficiency || 0
-      updates.chefBolsteringTreats = craftCount
-    }
-
-    // Tireless: decrease exhaustion by 1 on short rest
-    if (playerStats.class?.name === 'Ranger' && playerStats.level >= 10) {
-      const currentExhaustion = getRuntimeValue(name, 'exhaustionLevel', campaignName)
-      if (typeof currentExhaustion === 'number' && currentExhaustion > 0) {
-        updates.exhaustionLevel = currentExhaustion - 1
-      }
-    }
-
-   // Celestial Resilience: Grant temp HP on short rest for Celestial Patron
-   if (playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron') {
-      const features = playerStats.specialActions || []
-      const feature = features.find(f => f.name === 'Celestial Resilience')
-     if (feature) {
-        if (playerStats.level == null) {
-          console.error('[restRules] applyShortRest: playerStats.level is missing for celestial patron temp HP')
-          throw new Error('playerStats.level is required for celestial patron temp HP')
-        }
-        const warlockLevel = playerStats.level
-        const chaMod = (playerStats.abilities || []).find(a => a.name === 'Charisma')?.bonus || 0
-        const selfTempHp = warlockLevel + chaMod
-        if (selfTempHp > 0) {
-          const existingTempHp = Number(getRuntimeValue(name, 'tempHp', campaignName) || 0)
-          updates.tempHp = existingTempHp + selfTempHp
-       }
+      const warlockLevel = playerStats.level
+      const chaMod = (playerStats.abilities || []).find(a => a.name === 'Charisma')?.bonus || 0
+      const selfTempHp = warlockLevel + chaMod
+      if (selfTempHp > 0) {
+        const existingTempHp = Number(getRuntimeValue(name, 'tempHp', campaignName) || 0)
+        updates.tempHp = existingTempHp + selfTempHp
      }
    }
+ }
 
-    // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
-    updates.activeBuffs = [];
-    updates.activeConditions = [];
+  // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
+  updates.activeBuffs = [];
+  updates.activeConditions = [];
 
-    // Reset Psionic Strike once-per-turn flag on short rest
-    updates.psionicStrikeUsedThisTurn = null;
+  // Reset Psionic Strike once-per-turn flag on short rest
+  updates.psionicStrikeUsedThisTurn = null;
 
-    // Reset Hunter's Prey choice on short rest
-    updates["_Hunter's_Prey_choice"] = null;
+  // Reset Hunter's Prey choice on short rest
+  updates["_Hunter's_Prey_choice"] = null;
 
-    // Clear Wrath of the Sea badge on short rest
-    updates.wrathOfTheSeaActive = null;
-    updates.wrathOfTheSeaDc = null;
-    updates.wrathOfTheSeaWisMod = null;
-    updates.wrathOfTheSeaSource = null;
+  // Clear Wrath of the Sea badge on short rest
+  updates.wrathOfTheSeaActive = null;
+  updates.wrathOfTheSeaDc = null;
+  updates.wrathOfTheSeaWisMod = null;
+  updates.wrathOfTheSeaSource = null;
 
-    // Clear Zealous Presence buff marker on short rest (lasts until start of barbarian's next turn)
-    updates.zealousPresenceActive = null;
+  // Clear Zealous Presence buff marker on short rest (lasts until start of barbarian's next turn)
+  updates.zealousPresenceActive = null;
 
-    setRuntimeBatch(name, updates, campaignName)
+  // Clear Living Legend active state on short rest
+  updates.livingLegendActive = null;
+  updates.unerringStrikeUsed = null;
+
+  // Clear Holy Nimbus active state on short rest
+  updates.holyNimbusActive = null;
+
+  setRuntimeBatch(name, updates, campaignName)
 
   clearAllExpirationEffects(name, campaignName)
   clearHuntersMarkConcentration(name, campaignName)
@@ -404,6 +405,13 @@ export async function applyLongRest(playerStats, campaignName) {
 
     // Clear Zealous Presence buff marker on long rest (recharges on long rest or rage expenditure)
     charData.zealousPresenceActive = null;
+
+    // Clear Living Legend active state on long rest
+    charData.livingLegendActive = null;
+    charData.unerringStrikeUsed = null;
+
+    // Clear Holy Nimbus active state on long rest
+    charData.holyNimbusActive = null;
 
     const currentExhaustion = getRuntimeValue(name, 'exhaustionLevel')
    if (typeof currentExhaustion === 'number' && currentExhaustion > 0) {

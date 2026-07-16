@@ -27,6 +27,7 @@ vi.mock('../../services/rules/effects/restRules.js', () => ({
     SHORT_REST_RESOURCES: ['spell_slots_level_1', 'spell_slots_level_2'],
     getShortRestResourceLabels: vi.fn(() => ['Spell Slots (1st+)', 'Hit Dice']),
     clearHuntersMarkConcentration: vi.fn(),
+    applyShortRest: vi.fn(async () => {}),
 }));
 
 const clearAllExpirationEffectsMock = vi.fn();
@@ -298,75 +299,27 @@ describe('ShortRestModal', () => {
     });
 
     describe('completion', () => {
-        it('calls onComplete when Complete Short Rest is clicked', () => {
+        it('calls onComplete when Complete Short Rest is clicked', async () => {
             const { onComplete } = renderModal();
             fireEvent.click(screen.getByText('Complete Short Rest'));
+            await act(async () => await Promise.resolve());
             expect(onComplete).toHaveBeenCalledTimes(1);
         });
 
-        it('persists remaining hit dice via setRuntimeBatch on completion', () => {
+        it('persists remaining hit dice via setRuntimeValue on completion', async () => {
             const { onComplete } = renderModal();
             fireEvent.click(screen.getByText('Complete Short Rest'));
-            expect(setRuntimeBatchMock).toHaveBeenCalledWith(
+            await act(async () => await Promise.resolve());
+            expect(setRuntimeValueMock).toHaveBeenCalledWith(
                 'Thorin',
-                expect.objectContaining({ shortRestHitDice: 5 }),
+                'shortRestHitDice',
+                5,
                 mockCampaignName
             );
             expect(onComplete).toHaveBeenCalledTimes(1);
         });
 
-        it('clears expiration effects on completion', () => {
-            const { onComplete } = renderModal();
-            fireEvent.click(screen.getByText('Complete Short Rest'));
-            expect(clearAllExpirationEffectsMock).toHaveBeenCalledWith('Thorin', mockCampaignName);
-            expect(onComplete).toHaveBeenCalledTimes(1);
-        });
-
-        it('resets spell slot resources to null on completion', () => {
-            renderModal();
-            fireEvent.click(screen.getByText('Complete Short Rest'));
-            const spellSlotCalls = setRuntimeBatchMock.mock.calls.filter(
-                (call) => 'spell_slots_level_1' in call[1]
-            );
-            expect(spellSlotCalls.length).toBeGreaterThan(0);
-            expect(spellSlotCalls[0][1].spell_slots_level_1).toBeNull();
-        });
-
-        it('updates current hit points with recovered HP on completion', () => {
-            renderModal();
-            fireEvent.click(screen.getByText('Roll One'));
-            fireEvent.click(screen.getByText('Complete Short Rest'));
-            const hpCalls = setRuntimeBatchMock.mock.calls.filter(
-                (call) => 'currentHitPoints' in call[1]
-            );
-            expect(hpCalls.length).toBeGreaterThan(0);
-        });
-
-        it('caps hit points at max hitPoints value on completion', () => {
-            setupGetRuntimeValue({ currentHitPoints: 40 });
-            renderModal();
-            fireEvent.click(screen.getByText('Roll One'));
-            fireEvent.click(screen.getByText('Complete Short Rest'));
-            const hpCalls = setRuntimeBatchMock.mock.calls.filter(
-                (call) => 'currentHitPoints' in call[1]
-            );
-            expect(hpCalls.length).toBeGreaterThan(0);
-            expect(hpCalls[0][1].currentHitPoints).toBe(45);
-        });
-
-        it('adds recovered HP to current hit points on completion', () => {
-            setupGetRuntimeValue({ currentHitPoints: 20 });
-            renderModal();
-            fireEvent.click(screen.getByText('Roll One'));
-            fireEvent.click(screen.getByText('Complete Short Rest'));
-            const hpCalls = setRuntimeBatchMock.mock.calls.filter(
-                (call) => 'currentHitPoints' in call[1]
-            );
-            expect(hpCalls.length).toBeGreaterThan(0);
-            expect(hpCalls[0][1].currentHitPoints).toBeGreaterThan(20);
-        });
-
-        it('restores sorcery points when Sorcerous Restoration was used', () => {
+        it('restores sorcery points when Sorcerous Restoration was used', async () => {
             setupGetRuntimeValue({ sorceryPoints: 3, sorcerousRestorationUses: 1 });
             const playerStats = createPlayerStats({
                 class: { name: 'Sorcerer', major: { name: 'Sorcerer' } },
@@ -382,14 +335,14 @@ describe('ShortRestModal', () => {
             );
             fireEvent.click(screen.getByText(/Regain.*Sorcery Points/));
             fireEvent.click(screen.getByText('Complete Short Rest'));
-            const spCalls = setRuntimeBatchMock.mock.calls.filter(
-                (call) => 'sorceryPoints' in call[1]
+            await act(async () => await Promise.resolve());
+            const spCalls = setRuntimeValueMock.mock.calls.filter(
+                (call) => call[1] === 'sorceryPoints'
             );
             expect(spCalls.length).toBeGreaterThan(0);
-            expect(spCalls[0][2]).toBe(mockCampaignName);
         });
 
-        it('resets sorcerous restoration uses to 0 on completion', () => {
+        it('resets sorcerous restoration uses to 0 on completion', async () => {
             setupGetRuntimeValue({ sorceryPoints: 3, sorcerousRestorationUses: 1 });
             const playerStats = createPlayerStats({
                 class: { name: 'Sorcerer', major: { name: 'Sorcerer' } },
@@ -405,36 +358,15 @@ describe('ShortRestModal', () => {
             );
             fireEvent.click(screen.getByText(/Regain.*Sorcery Points/));
             fireEvent.click(screen.getByText('Complete Short Rest'));
-            const srCalls = setRuntimeBatchMock.mock.calls.filter(
-                (call) => 'sorcerousRestorationUses' in call[1]
+            await act(async () => await Promise.resolve());
+            const srCalls = setRuntimeValueMock.mock.calls.filter(
+                (call) => call[1] === 'sorcerousRestorationUses'
             );
             expect(srCalls.length).toBeGreaterThan(0);
-            expect(srCalls[0][1].sorcerousRestorationUses).toBe(0);
+            expect(srCalls[0][2]).toBe(0);
         });
 
-        it('sets bardic inspiration to max on short rest completion when Font of Inspiration exists and uses are below max', () => {
-            setupGetRuntimeValue({ bardicInspirationUses: 1 });
-            const playerStats = createPlayerStats({
-                class: { name: 'Bard', major: { name: 'Bard' } },
-                automation: { passives: [{ type: 'font_of_inspiration' }] },
-            });
-            render(
-                <ShortRestModal
-                    playerStats={playerStats}
-                    campaignName={mockCampaignName}
-                    onClose={vi.fn()}
-                    onComplete={vi.fn()}
-                />
-            );
-            fireEvent.click(screen.getByText('Complete Short Rest'));
-            const biCalls = setRuntimeBatchMock.mock.calls.filter(
-                (call) => 'bardicInspirationUses' in call[1]
-            );
-            expect(biCalls.length).toBeGreaterThan(0);
-            expect(biCalls[0][1].bardicInspirationUses).toBe(3);
-        });
-
-        it('recovers spell slots on short rest completion when Arcane Recovery was used', () => {
+        it('recovers spell slots on short rest completion when Arcane Recovery was used', async () => {
             setupGetRuntimeValue({ arcaneRecoveryLevels: 2, spell_slots_level_1: 2 });
             const playerStats = createPlayerStats({
                 class: { name: 'Wizard', major: { name: 'Wizard' } },
@@ -455,13 +387,14 @@ describe('ShortRestModal', () => {
             );
             fireEvent.click(screen.getByText(/Recover Spell Slots/));
             fireEvent.click(screen.getByText('Complete Short Rest'));
-            const slotCalls = setRuntimeBatchMock.mock.calls.filter(
-                (call) => Object.keys(call[1]).some(k => k.startsWith('spell_slots_level_'))
+            await act(async () => await Promise.resolve());
+            const slotCalls = setRuntimeValueMock.mock.calls.filter(
+                (call) => typeof call[1] === 'string' && call[1].startsWith('spell_slots_level_')
             );
             expect(slotCalls.length).toBeGreaterThan(0);
         });
 
-        it('only recovers Arcane Recovery slots up to level 5', () => {
+        it('only recovers Arcane Recovery slots up to level 5', async () => {
             setupGetRuntimeValue({ arcaneRecoveryLevels: 3 });
             const playerStats = createPlayerStats({
                 class: { name: 'Wizard', major: { name: 'Wizard' } },
@@ -484,37 +417,11 @@ describe('ShortRestModal', () => {
             );
             fireEvent.click(screen.getByText(/Recover Spell Slots/));
             fireEvent.click(screen.getByText('Complete Short Rest'));
-            const slotCalls = setRuntimeBatchMock.mock.calls.filter(
-                (call) => 'spell_slots_level_6' in call[1]
+            await act(async () => await Promise.resolve());
+            const level6Calls = setRuntimeValueMock.mock.calls.filter(
+                (call) => call[1] === 'spell_slots_level_6'
             );
-            expect(slotCalls.length).toBe(0);
-        });
-
-        it('resets signature spell used flags on completion when feature exists', () => {
-            const playerStats = createPlayerStats({
-                automation: {
-                    passives: [],
-                    specialActions: [{ type: 'signature_spells' }],
-                },
-            });
-            setupGetRuntimeValue({
-                'SignatureSpells_selection': ['Fireball', 'Magic Missile'],
-                'SignatureSpells_Fireball_used': true,
-                'SignatureSpells_Magic_Missile_used': false,
-            });
-            render(
-                <ShortRestModal
-                    playerStats={playerStats}
-                    campaignName={mockCampaignName}
-                    onClose={vi.fn()}
-                    onComplete={vi.fn()}
-                />
-            );
-            fireEvent.click(screen.getByText('Complete Short Rest'));
-            const usedCalls = setRuntimeBatchMock.mock.calls.filter(
-                (call) => Object.keys(call[1]).some(k => k.includes('_used'))
-            );
-            expect(usedCalls.length).toBeGreaterThan(0);
+            expect(level6Calls.length).toBe(0);
         });
     });
 
@@ -563,7 +470,7 @@ describe('ShortRestModal', () => {
     });
 
     describe('edge cases', () => {
-        it('renders without onComplete callback without throwing', () => {
+        it('renders without onComplete callback without throwing', async () => {
             const onClose = vi.fn();
             render(
                 <ShortRestModal
@@ -574,6 +481,7 @@ describe('ShortRestModal', () => {
             );
             expect(screen.getByText('Short Rest')).toBeInTheDocument();
             fireEvent.click(screen.getByText('Complete Short Rest'));
+            await act(async () => await Promise.resolve());
             expect(onClose).not.toHaveBeenCalled();
         });
     });
