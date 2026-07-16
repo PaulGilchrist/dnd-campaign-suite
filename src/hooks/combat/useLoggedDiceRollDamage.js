@@ -508,8 +508,6 @@ export function createLogDamageAndShow(deps) {
         }
         logEntry(logEntryData);
 
-        await new Promise(resolve => setTimeout(resolve, 500));
-
         const totalDamageDealt = (primaryApplyResult?.finalDamage ?? 0) + secondaryFinalDamage;
         const newHp = primaryApplyResult?.newHp ?? target.currentHp;
         const oldHp = newHp + totalDamageDealt;
@@ -701,8 +699,6 @@ export function createLogDamageAndShow(deps) {
                     gwfDisplayRolls: displayRolls,
                 });
 
-                await new Promise(resolve => setTimeout(resolve, 500));
-
                 const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, twinFinalDamage, [damageType], campaignName, null, ignoreResistance, characterName);
 
                 if (twinApplyResult && twinApplyResult.finalDamage > 0) {
@@ -759,8 +755,6 @@ export function createLogDamageAndShow(deps) {
                         gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
                     });
 
-                    await new Promise(resolve => setTimeout(resolve, 500));
-
                     const multiApplyResult = applyDamageToTarget(combatSummary, multiTarget.name, multiFinalDamage, [damageType], campaignName, null);
 
                     setPopupHtml(prev => ({
@@ -792,8 +786,6 @@ export function createLogDamageAndShow(deps) {
                         note: 'multi_plain_damage_roll_before_apply',
                         isCrit,
                     });
-
-                    await new Promise(resolve => setTimeout(resolve, 500));
 
                     const multiApplyResult = applyDamageToTarget(combatSummary, multiTarget.name, total, [damageType], campaignName, null, ignoreResistance, characterName);
 
@@ -874,8 +866,6 @@ export function createLogDamageAndShow(deps) {
                 gwfDisplayRolls: gwfDisplayRolls,
             });
 
-            await new Promise(resolve => setTimeout(resolve, 500));
-
             const applyResult = applyDamageToTarget(combatSummary, target.name, carefulDamage, [damageType], campaignName, null, ignoreResistance, characterName);
 
             if (applyResult && applyResult.finalDamage > 0) {
@@ -936,8 +926,6 @@ export function createLogDamageAndShow(deps) {
                 gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
                 gwfDisplayRolls: gwfDisplayRolls,
             });
-
-            await new Promise(resolve => setTimeout(resolve, 500));
 
             const applyResult = applyDamageToTarget(combatSummary, target.name, successfulSave, [damageType], campaignName, null, ignoreResistance, characterName);
 
@@ -1154,18 +1142,18 @@ export function createLogDamageAndShow(deps) {
             }
         }
 
-        if (applyResult?.intercepted) {
-            return;
-        }
+        const isIntercepted = applyResult?.intercepted;
+        const appliedDamage = isIntercepted ? (applyResult.damageDealt ?? 0) : (applyResult?.finalDamage ?? 0);
 
-        if (applyResult && applyResult.finalDamage > 0) {
+        if (appliedDamage > 0) {
             endInvisibilityOnHostileAction(characterName, campaignName);
         }
 
-        const totalDamageDealt = (applyResult?.finalDamage ?? 0) + secondaryFinalDamage;
+        const totalDamageDealt = appliedDamage + secondaryFinalDamage;
         const newHp = applyResult?.newHp ?? (target ? (target.type === 'player' ? getRuntimeValue(target.name, 'currentHitPoints') ?? target.currentHp : target.currentHp) : 0);
-        const oldHp = newHp + totalDamageDealt;
-        const isDead = newHp <= 0;
+        const hpAfterDamage = isIntercepted ? 0 : newHp;
+        const oldHp = isIntercepted ? applyResult.oldHp : (newHp + totalDamageDealt);
+        const isUnconscious = hpAfterDamage <= 0;
         const maxHp = target?.type === 'player'
             ? (getRuntimeValue(target.name, 'hitPoints') ?? newHp)
             : target?.maxHp;
@@ -1173,7 +1161,7 @@ export function createLogDamageAndShow(deps) {
         const wasBloodied = oldHp > 0 && oldHp <= Math.floor(maxHp / 2);
         const isBloodied = newHp > 0 && newHp <= Math.floor(maxHp / 2);
         let threshold;
-        if (!wasAlive && isDead) threshold = 'dead';
+        if (!wasAlive && isUnconscious) threshold = 'dead';
         else if (!wasBloodied && isBloodied) threshold = 'bloodied';
         else if (wasBloodied && !isBloodied && newHp > 0) threshold = 'recovering';
 
@@ -1191,7 +1179,7 @@ export function createLogDamageAndShow(deps) {
             modifier,
             damageType,
             targetName: target?.name,
-            finalDamage: applyResult?.finalDamage ?? reducedTotal,
+            finalDamage: appliedDamage || reducedTotal,
             note: 'combined_damage_roll',
             isCrit,
             gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
@@ -1209,11 +1197,9 @@ export function createLogDamageAndShow(deps) {
         }
         logEntry(logEntryData);
 
-        await new Promise(resolve => setTimeout(resolve, 500));
-
         const damageBreakdown = [{
             damageType,
-            amount: applyResult?.finalDamage ?? reducedTotal,
+            amount: appliedDamage || reducedTotal,
             resisted: applyResult?.resistanceDetails?.some(rd => rd.status === 'resistant') ?? false,
             status: applyResult?.resistanceDetails?.[0]?.status || null,
         }];
@@ -1230,10 +1216,10 @@ export function createLogDamageAndShow(deps) {
             type: 'hp_change',
             targetName: target?.name,
             delta: -(totalDamageDealt),
-            currentHp: newHp,
+            currentHp: hpAfterDamage,
             maxHp,
             isHealing: false,
-            isUnconscious: isDead,
+            isUnconscious: isUnconscious,
             damageBreakdown,
         };
         if (threshold) hpEntry.threshold = threshold;
@@ -1241,7 +1227,7 @@ export function createLogDamageAndShow(deps) {
 
         if (target?.type === 'player') {
             setRuntimeValue(target.name, 'currentHitPoints', newHp, campaignName);
-            if (oldHp > 0 && isDead) {
+            if (oldHp > 0 && isUnconscious) {
                 setRuntimeValue(target.name, 'deathSaves', [false, false, false], campaignName);
                 setRuntimeValue(target.name, 'deathFailures', [false, false, false], campaignName);
             }
@@ -1296,8 +1282,6 @@ export function createLogDamageAndShow(deps) {
                         finalDamage: null,
                         note: 'death_strike_damage_roll_before_apply',
                     });
-
-                    await new Promise(resolve => setTimeout(resolve, 500));
 
                     const dsApplyResult = applyDamageToTarget(combatSummary, target.name, doubledTotal, [damageType], campaignName, characters, ignoreResistance || false, characterName);
 
@@ -1384,8 +1368,11 @@ export function createLogDamageAndShow(deps) {
             popupData.targetCurrentHp = applyResult.newHp;
             popupData.targetMaxHp = targetMaxHp;
             popupData.damageApplied = true;
-            popupData.finalDamage = applyResult.finalDamage;
+            popupData.finalDamage = appliedDamage || applyResult.finalDamage;
             popupData.damageReduced = applyResult.damageReduced;
+            if (isIntercepted) {
+                popupData.interceptedFeature = applyResult.interceptedFeature;
+            }
         }
 
         popupData.bardicInspirationOffense = context?.bardicInspirationOffense || (context?.playerStats ? hasBardicInspirationOffense(context.playerStats, campaignName) : false);
@@ -1413,8 +1400,6 @@ export function createLogDamageAndShow(deps) {
                     gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
                     gwfDisplayRolls: gwfDisplayRolls,
                 });
-
-                await new Promise(resolve => setTimeout(resolve, 500));
 
                 const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, adjustedTotal, [damageType], campaignName, null, false, characterName);
 
@@ -1453,8 +1438,6 @@ export function createLogDamageAndShow(deps) {
                     gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
                     gwfDisplayRolls: gwfDisplayRolls,
                 });
-
-                await new Promise(resolve => setTimeout(resolve, 500));
 
                 const multiApplyResult = applyDamageToTarget(combatSummary, multiTarget.name, adjustedTotal, [damageType], campaignName, null, false, characterName);
 
@@ -1509,7 +1492,7 @@ export function createLogDamageAndShow(deps) {
         }
 
         const { saveDc, saveType, damageType, isAutoMiss } = context || {};
-        const isCrit = context?.isAutoCrit || false;
+        const isCrit = context?.isAutoCrit || context?.isCrit || false;
         const gwfBaseRolls = isCrit && context?.doubledRolls ? context.doubledRolls.slice(0, context.doubledRolls.length / 2) : rolls;
         const rollsForMin = isCrit && context?.doubledRolls ? context.doubledRolls : rolls;
         let adjustedTotal = applyMinDamageAdjustment(total, rollsForMin, context?.playerStats, damageType);

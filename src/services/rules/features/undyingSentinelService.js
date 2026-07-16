@@ -53,14 +53,15 @@ export function checkUndyingSentinel(creature, playerComputed, campaignName) {
     }
 
     addEntry(campaignName, {
-        type: 'heal',
+        type: 'healing',
         targetName: creature.name,
         delta: newHp,
+        amount: newHp,
         currentHp: newHp,
         maxHp: maxHp,
         isHealing: true,
         isUnconscious: false,
-        abilityName: 'Undying Sentinel',
+        sourceName: 'Undying Sentinel',
     }).catch((e) => { console.error("[undyingSentinelService] Error:", e); });
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));

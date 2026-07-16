@@ -84,11 +84,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 
     addEntry(campaignName, {
-        type: 'heal',
+        type: 'healing',
         characterName: playerName,
         targetName: target.name,
         amount: newHp,
-        abilityName: action.name,
+        sourceName: action.name,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[undyingSentinel] Error:", e); });
 

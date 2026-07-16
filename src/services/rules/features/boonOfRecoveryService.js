@@ -50,14 +50,15 @@ export function checkBoonOfRecoveryLastStand(creature, playerComputed, campaignN
     }
 
     addEntry(campaignName, {
-        type: 'heal',
+        type: 'healing',
         targetName: creature.name,
         delta: newHp,
+        amount: newHp,
         currentHp: newHp,
         maxHp,
         isHealing: true,
         isUnconscious: false,
-        abilityName: 'Boon Of Recovery - Last Stand',
+        sourceName: 'Boon Of Recovery - Last Stand',
     }).catch((e) => { console.error("[boonOfRecovery] Error:", e); });
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));

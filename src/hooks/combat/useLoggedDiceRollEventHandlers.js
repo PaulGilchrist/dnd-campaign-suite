@@ -98,11 +98,10 @@ export function setupEventListeners(deps) {
                 ? applyDamageToTarget(combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, charactersRef.current, ignoreResistance, attacker, true, { concentrationTotalDamage: finalDamage + secondaryData.total })
                 : applyDamageToTarget(combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, charactersRef.current, ignoreResistance, attacker, true);
 
-            if (applyResult?.intercepted) {
-                return;
-            }
+            const isIntercepted = applyResult?.intercepted;
+            const appliedDamage = isIntercepted ? (applyResult.damageDealt ?? 0) : (applyResult?.finalDamage ?? 0);
 
-            if (applyResult && applyResult.finalDamage > 0) {
+            if (appliedDamage > 0) {
                 endInvisibilityOnHostileAction(attacker, pending.campaignName);
             }
 
@@ -127,22 +126,23 @@ export function setupEventListeners(deps) {
                 };
             }
 
-            const totalDamageDealt = (applyResult?.finalDamage ?? 0) + secondaryFinalDamage;
+            const totalDamageDealt = appliedDamage + secondaryFinalDamage;
             const newHp = applyResult?.newHp ?? (combatSummary?.creatures?.find(c => c.name === pendingTargetName)?.currentHp ?? 0);
             const maxHp = targetMaxHp;
-            const oldHp = newHp + totalDamageDealt;
-            const isDead = newHp <= 0;
+            const hpAfterDamage = isIntercepted ? 0 : newHp;
+            const oldHp = isIntercepted ? applyResult.oldHp : (newHp + totalDamageDealt);
+            const isUnconscious = hpAfterDamage <= 0;
             const wasAlive = oldHp > 0;
             const wasBloodied = oldHp > 0 && oldHp <= Math.floor(maxHp / 2);
             const isBloodied = newHp > 0 && newHp <= Math.floor(maxHp / 2);
             let threshold;
-            if (!wasAlive && isDead) threshold = 'dead';
+            if (!wasAlive && isUnconscious) threshold = 'dead';
             else if (!wasBloodied && isBloodied) threshold = 'bloodied';
             else if (wasBloodied && !isBloodied && newHp > 0) threshold = 'recovering';
 
             const damageBreakdown = [{
                 damageType: pending.damageType,
-                amount: applyResult?.finalDamage ?? finalDamage,
+                amount: appliedDamage || finalDamage,
                 resisted: applyResult?.resistanceDetails?.some(rd => rd.status === 'resistant') ?? false,
                 status: applyResult?.resistanceDetails?.[0]?.status || null,
             }];
@@ -159,10 +159,10 @@ export function setupEventListeners(deps) {
                 type: 'hp_change',
                 targetName: pendingTargetName,
                 delta: -(totalDamageDealt),
-                currentHp: newHp,
+                currentHp: hpAfterDamage,
                 maxHp,
                 isHealing: false,
-                isUnconscious: isDead,
+                isUnconscious: isUnconscious,
                 damageBreakdown,
             };
             if (threshold) hpEntry.threshold = threshold;
@@ -170,7 +170,7 @@ export function setupEventListeners(deps) {
 
             if (pendingTargetName.startsWith('player-')) {
                 setRuntimeValue(pendingTargetName, 'currentHitPoints', newHp, pending.campaignName);
-                if (oldHp > 0 && isDead) {
+                if (oldHp > 0 && isUnconscious) {
                     setRuntimeValue(pendingTargetName, 'deathSaves', [false, false, false], pending.campaignName);
                     setRuntimeValue(pendingTargetName, 'deathFailures', [false, false, false], pending.campaignName);
                 }
@@ -217,7 +217,7 @@ export function setupEventListeners(deps) {
                 saveRawRolls: e.detail.rawRolls,
                 forcedMode: pending.metamagicHeighten ? 'disadvantage' : 'normal',
                 bonusDetail: e.detail.bonusDetail,
-                finalDamage: applyResult?.finalDamage ?? finalDamage,
+                finalDamage: appliedDamage || finalDamage,
                 isAoe: pending.isAoe || false,
                 aoeAffectedCount: pending.isAoe ? (e.detail.aoeAffectedCount || null) : null,
                 soulstitchProtected: isSoulstitchProtected,
@@ -305,7 +305,7 @@ export function setupEventListeners(deps) {
                 name: pending.name,
                 formula: pending.formula,
                 rolls: pending.rolls,
-                total: applyResult?.finalDamage ?? finalDamage,
+                total: appliedDamage || finalDamage,
                 bonus: 0,
                 modifier: pending.modifier,
                 damageType: pending.damageType,
@@ -316,10 +316,13 @@ export function setupEventListeners(deps) {
                 saveType: e.detail.saveType,
                 dcSuccess: e.detail.dcSuccess,
                 saveResult: { roll: e.detail.roll, total: e.detail.total, bonus: e.detail.saveBonus, success: e.detail.success },
-                finalDamage: applyResult?.finalDamage ?? finalDamage,
+                finalDamage: appliedDamage || finalDamage,
                 damageApplied: true,
                 damageReduced: applyResult?.damageReduced,
             };
+            if (applyResult?.interceptedFeature) {
+                popupData.interceptedFeature = applyResult.interceptedFeature;
+            }
             if (secondaryResult) {
                 popupData.secondaryName = secondaryResult.name;
                 popupData.secondaryFormula = secondaryResult.formula;

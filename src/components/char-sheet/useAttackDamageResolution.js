@@ -101,6 +101,7 @@ export function normalizeAutoDamage(autoDamage, isCrit, playerStats) {
   const ctx = {
     hit: true,
     isCrit: isCrit || autoDamage.isAutoCrit || false,
+    isAutoCrit: isCrit || autoDamage.isAutoCrit || false,
     isNatural20: isCrit || false,
     targetName: autoDamage.targetName || null,
     isBonusActionAttack: false,

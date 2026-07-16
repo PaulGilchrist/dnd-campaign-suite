@@ -128,6 +128,11 @@ function RollEntry({ entry }) {
           {(isDamage || isSaveDamage || isAoeDamage || isOverchannelDamage || isGrazeDamage) && entry.formula && (
             <span className="log-dice-formula">{entry.formula}</span>
           )}
+          {!isSave && (isDamage || isSaveDamage || isAoeDamage || isOverchannelDamage || isGrazeDamage) && entry.rolls && entry.rolls.length > 0 && (
+            <span className="log-dice-values-inline">
+              ({entry.rolls.join(', ')})
+            </span>
+          )}
           <span className="log-total"><b>{entry.total}{(isDamage || isSaveDamage || isAoeDamage || isOverchannelDamage || isGrazeDamage) ? '' : (entry.bonus != null && entry.bonus >= 0 ? `+${entry.bonus}` : (entry.bonus != null ? `${entry.bonus}` : ''))}{entry.bonusDetail ? ' ' + entry.bonusDetail : ''}</b></span>
           {entry.gwfApplied && entry.gwfOriginalRolls && (
             <span className="log-gwf">
@@ -410,6 +415,7 @@ function HealingEntry({ entry }) {
       </div>
       <div className="log-hp-details">
         {entry.popupText && <span>{entry.popupText}</span>}
+        {entry.amount !== undefined && <span>Healed for {entry.amount} HP ({entry.currentHp}/{entry.maxHp})</span>}
       </div>
     </div>
   );

@@ -376,13 +376,13 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
       // Check for Undying Sentinel (Oath of Glory level 15)
       const undyingResult = checkUndyingSentinel(creature, playerComputed, campaignName);
       if (undyingResult.intercepted) {
-        return undyingResult;
+        return { ...undyingResult, damageDealt: finalDamage, oldHp, interceptedFeature: 'Undying Sentinel' };
       }
 
       // Check for Boon of Recovery - Last Stand
       const boonOfRecoveryResult = checkBoonOfRecoveryLastStand(creature, playerComputed, campaignName);
       if (boonOfRecoveryResult.intercepted) {
-        return boonOfRecoveryResult;
+        return { ...boonOfRecoveryResult, damageDealt: finalDamage, oldHp, interceptedFeature: 'Boon of Recovery' };
       }
 
       // Check for Relentless Endurance (Orc race trait)
@@ -391,13 +391,13 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
         if (options?.damageSequenceId) {
           _reTriggeredSequenceIds.add(options.damageSequenceId);
         }
-        return relentlessEnduranceResult;
+        return { ...relentlessEnduranceResult, damageDealt: finalDamage, oldHp, interceptedFeature: 'Relentless Endurance' };
       }
 
       // Check for Relentless Rage (Barbarian class feature)
       const relentlessRageResult = checkRelentlessRage(creature, playerComputed, campaignName);
       if (relentlessRageResult.intercepted) {
-        return relentlessRageResult;
+        return { ...relentlessRageResult, damageDealt: finalDamage, oldHp, interceptedFeature: 'Relentless Rage' };
       }
 
       const promptId = utils.guid();

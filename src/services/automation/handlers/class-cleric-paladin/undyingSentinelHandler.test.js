@@ -213,11 +213,11 @@ describe('undyingSentinelHandler', () => {
         await handle(makeAction(), makePlayerStats(), campaignName, null);
 
         expect(addEntry).toHaveBeenCalledWith(campaignName, {
-          type: 'heal',
+          type: 'healing',
           characterName: 'TestCleric',
           targetName: 'DownedAlly',
           amount: 16,
-          abilityName: 'Undying Sentinel',
+          sourceName: 'Undying Sentinel',
           timestamp: 1700000000000,
         });
         expect(dispatchEventSpy).toHaveBeenCalledWith(
@@ -241,11 +241,11 @@ describe('undyingSentinelHandler', () => {
         expect(target.currentHp).toBe(16);
         expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, campaignName);
         expect(addEntry).toHaveBeenCalledWith(campaignName, {
-          type: 'heal',
+          type: 'healing',
           characterName: 'TestCleric',
           targetName: 'Goblin',
           amount: 16,
-          abilityName: 'Undying Sentinel',
+          sourceName: 'Undying Sentinel',
           timestamp: 1700000000000,
         });
         expect(dispatchEventSpy).toHaveBeenCalledWith(

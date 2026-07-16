@@ -347,9 +347,9 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
       );
 
       expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'heal',
+        type: 'healing',
         targetName: 'GloryPaladin',
-        abilityName: 'Undying Sentinel',
+        sourceName: 'Undying Sentinel',
         isHealing: true,
       }));
     });
