@@ -46,6 +46,9 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
             // Clear Elder Champion active state on initiative roll (new combat)
             setRuntimeValue(playerStats.name, 'elderChampionActive', false, campaignName);
 
+            // Clear Avenging Angel active state on initiative roll (new combat)
+            setRuntimeValue(playerStats.name, 'avengingAngelActive', false, campaignName);
+
             // Clear concentration on initiative roll (new combat round)
             const cs = getCombatSummary(campaignName);
             if (cs && cs.creatures) {

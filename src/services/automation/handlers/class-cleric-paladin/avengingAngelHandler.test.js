@@ -81,8 +81,8 @@ describe('avengingAngelHandler.handle', () => {
     vi.clearAllMocks();
   });
 
-  describe('deactivation (toggle off)', () => {
-    it('should return popup and clear state when already active', async () => {
+  describe('already active popup', () => {
+    it('should return popup and NOT change state when already active', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'avengingAngelActive') return true;
         if (key === 'activeBuffs') return [
@@ -93,19 +93,46 @@ describe('avengingAngelHandler.handle', () => {
         return null;
       });
 
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toBe('Avenging Angel is already active.');
+      expect(result.payload.automationType).toBe('avenging_angel');
+      expect(result.payload.automation).toEqual(makeAction().automation);
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(addEntry).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('second use with spell slot consumption', () => {
+    it('should consume a level 5 spell slot and reactivate when already used this rest period', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'avengingAngelActive') return false;
+        if (key === 'avengingAngelRestUsed') return true;
+        if (key === 'spell_slots_level_5') return 2;
+        if (key === 'activeBuffs') return [];
+        return null;
+      });
+      getCombatContext.mockResolvedValue({ creatures: [] });
+      rollD20.mockReturnValue(20);
+      getAbilityModifier.mockReturnValue(3);
+      utils.guid.mockReturnValue('test-guid');
+
       const now = Date.now();
       vi.spyOn(Date, 'now').mockReturnValue(now);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.description).toBe('Avenging Angel ended.');
-      expect(result.payload.automationType).toBe('avenging_angel');
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelActive', false, campaignName);
+      expect(result.payload.description).toBe('Avenging Angel activated by expending a level 5 spell slot!');
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'spell_slots_level_5', 1, campaignName);
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelActive', true, campaignName);
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'TestPaladin',
         'activeBuffs',
-        [{ name: 'Other Buff', effect: 'other' }],
+        expect.arrayContaining([
+          expect.objectContaining({ effect: 'avenging_angel_flight', flySpeed: 60, hover: false }),
+        ]),
         campaignName,
       );
       expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
@@ -113,7 +140,52 @@ describe('avengingAngelHandler.handle', () => {
         type: 'ability_use',
         characterName: 'TestPaladin',
         abilityName: 'Avenging Angel',
-        description: 'Avenging Angel ended.',
+        description: 'TestPaladin reactivated Avenging Angel by expending a level 5 spell slot.',
+        timestamp: now,
+      }));
+    });
+
+    it('should show cannot be used popup when already used and no level 5 slots available', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'avengingAngelActive') return false;
+        if (key === 'avengingAngelRestUsed') return true;
+        if (key === 'spell_slots_level_5') return 0;
+        if (key === 'activeBuffs') return [];
+        return null;
+      });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toBe('Avenging Angel cannot be used again until a long rest or level 5 spell slot becomes available.');
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(addEntry).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('first use', () => {
+    it('should set restUsed flag on first use', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'avengingAngelActive') return false;
+        if (key === 'activeBuffs') return [];
+        return null;
+      });
+      getCombatContext.mockResolvedValue({ creatures: [] });
+      rollD20.mockReturnValue(20);
+      getAbilityModifier.mockReturnValue(3);
+      utils.guid.mockReturnValue('test-guid');
+
+      const now = Date.now();
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelRestUsed', true, campaignName);
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'ability_use',
+        characterName: 'TestPaladin',
+        abilityName: 'Avenging Angel',
+        description: 'Avenging Angel activated — Flight 60 ft (hover), Frightful Aura active for 10 minutes.',
         timestamp: now,
       }));
     });
@@ -131,6 +203,9 @@ describe('avengingAngelHandler.handle', () => {
       getAbilityModifier.mockReturnValue(3);
       utils.guid.mockReturnValue('test-guid');
 
+      const now = Date.now();
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
@@ -141,6 +216,7 @@ describe('avengingAngelHandler.handle', () => {
       expect(result.payload.automationType).toBe('avenging_angel');
       expect(result.payload.automation).toEqual(makeAction().automation);
       expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelActive', true, campaignName);
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelRestUsed', true, campaignName);
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'TestPaladin',
         'activeBuffs',

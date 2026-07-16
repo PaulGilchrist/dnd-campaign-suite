@@ -147,7 +147,8 @@ export const LONG_REST_RESOURCES = [
       'persistentRageUsed',
        'aspectOfTheWildsUsedThisRest',
        'aspectOfTheWildsOption',
-   'elderChampionRestUsed'
+    'elderChampionRestUsed',
+    'avengingAngelRestUsed'
 ]
 
 export function getLongRestResources() {
@@ -360,8 +361,11 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
   // Clear Holy Nimbus active state on short rest
   updates.holyNimbusActive = null;
 
-  // Clear Elder Champion active state on short rest
-   updates.elderChampionActive = null;
+   // Clear Elder Champion active state on short rest
+    updates.elderChampionActive = null;
+
+    // Clear Avenging Angel active state on short rest
+    updates.avengingAngelActive = null;
 
    // Clear Peerless Athlete active state on short rest
    updates.peerlessAthleteActive = null;
@@ -423,6 +427,9 @@ export async function applyLongRest(playerStats, campaignName) {
 
     // Clear Elder Champion active state on long rest
      charData.elderChampionActive = null;
+
+    // Clear Avenging Angel active state on long rest
+     charData.avengingAngelActive = null;
 
      // Clear Peerless Athlete active state on long rest
      charData.peerlessAthleteActive = null;

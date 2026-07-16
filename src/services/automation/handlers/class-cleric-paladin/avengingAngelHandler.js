@@ -10,6 +10,7 @@ import utils from '../../../ui/utils.js';
 
 const AVENGING_ANGEL_KEY = 'avengingAngelActive';
 const AVENGING_ANGEL_AURA_KEY = 'avengingAngelAuraTargets';
+const AVENGING_ANGEL_REST_KEY = 'avengingAngelRestUsed';
 
 function buildSaveDc(playerStats) {
     const chaBonus = getAbilityModifier(playerStats.abilities, 'Charisma');
@@ -21,26 +22,65 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
 
-    // Check if already active
+    // Check if already active — show popup, do NOT toggle off
     const isActive = getRuntimeValue(playerName, AVENGING_ANGEL_KEY, campaignName);
     if (isActive) {
-        // Toggle off - remove all avenging angel effects
-        await setRuntimeValue(playerName, AVENGING_ANGEL_KEY, false, campaignName);
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description: `${action.name} is already active.`,
+                automation: auto,
+            },
+        };
+    }
 
-        // Remove fly speed buff
-        const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
-        const activeBuffs = Array.isArray(stored) ? stored : [];
-        const newBuffs = activeBuffs.filter(b => b.name !== action.name && b.effect !== 'avenging_angel_flight');
+    // Check if already used this rest period — if so, consume level 5 spell slot
+    const alreadyUsed = getRuntimeValue(playerName, AVENGING_ANGEL_REST_KEY, campaignName);
+    if (alreadyUsed) {
+        const slotKey = 'spell_slots_level_5';
+        const currentSlots = Number(getRuntimeValue(playerName, slotKey, campaignName) ?? 0);
+        if (currentSlots <= 0) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    automationType: auto.type,
+                    description: `${action.name} cannot be used again until a long rest or level 5 spell slot becomes available.`,
+                    automation: auto,
+                },
+            };
+        }
+
+        await setRuntimeValue(playerName, slotKey, currentSlots - 1, campaignName);
+        await setRuntimeValue(playerName, AVENGING_ANGEL_KEY, true, campaignName);
+
+        const storedBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName);
+        const activeBuffList = Array.isArray(storedBuffs) ? storedBuffs : [];
+        const buffEntry = {
+            name: action.name,
+            effect: 'avenging_angel_flight',
+            duration: '10_minutes',
+            flySpeed: auto.flySpeed || 60,
+            hover: auto.hover || false,
+        };
+        const newBuffs = activeBuffList.some(b => b.name === action.name)
+            ? activeBuffList
+            : [...activeBuffList, buffEntry];
         await setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
 
-        // Clear aura targets
         await setRuntimeValue(playerName, AVENGING_ANGEL_AURA_KEY, [], campaignName);
+
+        await resolveFrightfulAura(action, playerStats, campaignName);
 
         await addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerName,
             abilityName: action.name,
-            description: `${action.name} ended.`,
+            description: `${playerName} reactivated Avenging Angel by expending a level 5 spell slot.`,
             timestamp: Date.now(),
         }).catch((e) => { console.error("[avengingAngel] Error:", e); });
 
@@ -50,7 +90,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 type: 'automation_info',
                 name: action.name,
                 automationType: auto.type,
-                description: `${action.name} ended.`,
+                description: `${action.name} activated by expending a level 5 spell slot!`,
                 automation: auto,
             },
         };
@@ -58,6 +98,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     // Activate
     await setRuntimeValue(playerName, AVENGING_ANGEL_KEY, true, campaignName);
+    await setRuntimeValue(playerName, AVENGING_ANGEL_REST_KEY, true, campaignName);
 
     // Add flight buff: Fly Speed 60 feet, hover
     const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);

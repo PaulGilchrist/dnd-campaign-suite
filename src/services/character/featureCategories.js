@@ -24,7 +24,7 @@ const categories5e = {
 
     actions: [
         // "Arcane Charge",
-        // "Avenging Angel",
+        "Avenging Angel",
         // "Bestial Fury",
         // "Channel Divinity: Abjure Enemy",
         // "Channel Divinity: Charm Animals and Plants",

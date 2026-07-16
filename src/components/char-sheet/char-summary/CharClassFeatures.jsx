@@ -350,6 +350,7 @@ const PaladinFeatures = function PaladinFeatures({ playerStats, campaignName }) 
     const livingLegendActive = useRuntimeValue(playerStats.name, 'livingLegendActive', campaignName);
     const peerlessAthleteActive = useRuntimeValue(playerStats.name, 'peerlessAthleteActive', campaignName);
     const elderChampionActive = useRuntimeValue(playerStats.name, 'elderChampionActive', campaignName);
+    const avengingAngelActive = useRuntimeValue(playerStats.name, 'avengingAngelActive', campaignName);
     return (
          <div data-testid="char-class-paladin">
              {cha && <div><b>Aura of Protection: </b>+{cha.bonus} to saves {playerStats.level >= 6 ? `(${getAuraRangeFromStats(playerStats)} ft.)` : '(locked)'}</div>}
@@ -372,7 +373,8 @@ const PaladinFeatures = function PaladinFeatures({ playerStats, campaignName }) 
               {holyNimbusActive && <span className="automation-badge">Holy Nimbus</span>}
              {livingLegendActive && <span className="automation-badge">Living Legend</span>}
               {peerlessAthleteActive === true && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-person-running"></i> Peerless Athlete</span>}
-              {elderChampionActive && <span className="automation-badge">Elder Champion</span>}
+               {elderChampionActive && <span className="automation-badge">Elder Champion</span>}
+               {avengingAngelActive && <span className="automation-badge">Avenging Angel</span>}
           </div>
     );
 };
