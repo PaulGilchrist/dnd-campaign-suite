@@ -72,6 +72,10 @@ vi.mock('./loggedDiceRollUtils.js', () => ({
     applyMinDamageAdjustment: vi.fn((d) => d),
 }));
 
+vi.mock('../../services/ui/logService.js', () => ({
+    addEntry: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { rollD20, rollExpression } from '../../services/dice/diceRoller.js';
 import utils from '../../services/ui/utils.js';
 import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
@@ -87,6 +91,7 @@ import {
     applyMinDamageAdjustment,
 } from './loggedDiceRollUtils.js';
 import { createLogAndShow } from './useLoggedDiceRollAttack.js';
+import { addEntry } from '../../services/ui/logService.js';
 
 describe('createLogAndShow - Living Legend & Veer', () => {
     const deps = {
@@ -131,6 +136,7 @@ describe('createLogAndShow - Living Legend & Veer', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'unerringStrikeUsed', true, 'test-campaign');
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
                 hit: true,
+                unerringStrikeApplied: true,
             }));
         });
 
@@ -157,6 +163,25 @@ describe('createLogAndShow - Living Legend & Veer', () => {
             await fn('Longsword', 5, 'attack', { targetName: 'Goblin', isWeaponAttack: false });
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
                 hit: false,
+            }));
+        });
+
+        it('logs Unerring Strike to campaign log when converting miss to hit', async () => {
+            rollD20.mockReturnValueOnce(5);
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
+            getRuntimeValue.mockImplementation((name, prop) => {
+                if (name === 'TestFighter' && prop === 'livingLegendActive') return true;
+                if (name === 'TestFighter' && prop === 'unerringStrikeUsed') return false;
+                return null;
+            });
+            const fn = createFn();
+            await fn('Longsword', 5, 'attack', { targetName: 'Goblin', isWeaponAttack: true });
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestFighter',
+                abilityName: 'Living Legend',
+                description: expect.stringContaining('Unerring Strike'),
+                timestamp: expect.any(Number),
             }));
         });
     });

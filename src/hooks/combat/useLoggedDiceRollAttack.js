@@ -193,6 +193,7 @@ export function createLogAndShow(deps) {
         const targetName = (rollType === 'attack' || rollType === 'save') ? (target?.name || context?.targetName) : undefined;
         const attackerName = context?.attackerName || characterName;
 
+        let unerringStrikeApplied = false;
         if (!hit && !isAutoMiss && rollType === 'attack' && context?.isWeaponAttack) {
             const livingLegendActive = getRuntimeValue(characterName, 'livingLegendActive', campaignName);
             if (livingLegendActive) {
@@ -200,7 +201,15 @@ export function createLogAndShow(deps) {
                 if (!unerringStrikeUsed) {
                     hit = true;
                     isAutoMiss = false;
+                    unerringStrikeApplied = true;
                     await setRuntimeValue(characterName, 'unerringStrikeUsed', true, campaignName);
+                    addEntry(campaignName, {
+                        type: 'ability_use',
+                        characterName,
+                        abilityName: 'Living Legend',
+                        description: `${characterName} used Unerring Strike on ${name} against ${targetName}: missed roll of ${effectiveD20Roll} + ${bonus} = ${effectiveD20Roll + bonus} vs AC ${targetAc} → turned into a hit.`,
+                        timestamp: Date.now(),
+                    }).catch((e) => { console.error('[unerringStrike] Log error:', e); });
                 }
             }
         }
@@ -553,6 +562,7 @@ export function createLogAndShow(deps) {
                 cosmicOmenAppliedBonus,
                 luckyRerolled,
                 luckyRerollValue,
+                unerringStrikeApplied,
                 characterName,
                 campaignName,
                 availableSuperiorityManeuvers,
