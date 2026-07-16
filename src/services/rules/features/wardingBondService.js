@@ -1,6 +1,7 @@
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
 import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
+import { isDistanceInRange } from '../../rules/combat/rangeCheck.js';
 
 export function applyWardingBond(creature, combatSummary, campaignName, wardDamage) {
     const targetBondSource = getRuntimeValue(creature.name, 'activeBuffs', campaignName);
@@ -11,7 +12,7 @@ export function applyWardingBond(creature, combatSummary, campaignName, wardDama
         const casterCreature = combatSummary.creatures.find(c => c.name === casterName);
         const targetCreature = combatSummary.creatures.find(c => c.name === creature.name);
         const distance = casterCreature && targetCreature ? getDistanceFeet(casterCreature.position, targetCreature.position) : null;
-        if (distance === null || distance <= 60) {
+        if (isDistanceInRange(distance, 60)) {
             if (casterCreature && casterCreature.currentHp > 0) {
                 const sharedDamage = wardDamage;
                 casterCreature.currentHp = Math.max(0, casterCreature.currentHp - sharedDamage);

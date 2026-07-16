@@ -2,6 +2,7 @@ import { resolveTarget, resolveMapPositions } from '../../common/targetResolver.
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { findLastAttack } from '../../common/damageRollback.js';
@@ -183,7 +184,11 @@ async function handleTeleportAndSlow(action, playerStats, campaignName, mapName)
                     { gridX: playerCreature.gridX, gridY: playerCreature.gridY },
                     { gridX: targetCreature.gridX, gridY: targetCreature.gridY }
                 );
-                if (dist != null && dist > rangeFt) {
+                if (!isWithinRange(
+                    { gridX: playerCreature.gridX, gridY: playerCreature.gridY },
+                    { gridX: targetCreature.gridX, gridY: targetCreature.gridY },
+                    rangeFt
+                )) {
                     return {
                         type: 'popup',
                         payload: {
@@ -402,7 +407,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
             const positions = await resolveMapPositions(campaignName, mapName, playerName);
             if (positions?.attackerPos && positions?.targetPos) {
                 const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
-                if (dist != null && dist > rangeFt) {
+                if (!isWithinRange(positions.attackerPos, positions.targetPos, rangeFt)) {
                     return infoPopup(action.name, `${lastAttackerName} is out of range (${Math.round(dist)} ft > ${rangeFt} ft).`, auto);
                 }
             }
@@ -444,7 +449,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
             const positions = await resolveMapPositions(campaignName, mapName, playerName);
             if (positions?.attackerPos && positions?.targetPos) {
                 const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
-                if (dist != null && dist > rangeFt) {
+                if (!isWithinRange(positions.attackerPos, positions.targetPos, rangeFt)) {
                     return infoPopup(action.name, `${attackerName} is out of range (${Math.round(dist)} ft > ${rangeFt} ft).`, auto);
                 }
             }
@@ -474,7 +479,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
             const positions = await resolveMapPositions(campaignName, mapName, playerName);
             if (positions?.attackerPos && positions?.targetPos) {
                 const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
-                if (dist != null && dist > rangeFt) {
+                if (!isWithinRange(positions.attackerPos, positions.targetPos, rangeFt)) {
                     return {
                         type: 'popup',
                         payload: {

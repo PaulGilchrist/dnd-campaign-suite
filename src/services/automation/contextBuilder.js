@@ -3,6 +3,7 @@ import { getCombatContext, getTargetFromAttacker } from '../rules/combat/damageU
 import { getCurrentCombatRound } from '../encounters/combatData.js';
 import * as mapsService from '../maps/mapsService.js';
 import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHostileNPC, getNearestPlacedItem, rangeToFeet } from '../rules/combat/rangeValidation.js';
+import { isDistanceInRange } from '../rules/combat/rangeCheck.js';
 import { computeCover } from '../rules/combat/coverService.js';
 import { loadNPCs } from '../npcs/npcsService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -834,8 +835,6 @@ function checkInAuraOfProtectionSync(auraSource, targetName, mapData, playerStat
     if (!targetPlayer) return true;
 
     const dist = getDistanceFeet(sourcePlayer, targetPlayer);
-    if (dist == null) return true;
-
     const auraRange = hasAuraOfProtection(playerStats) ? 30 : 10;
-    return dist <= auraRange;
+    return isDistanceInRange(dist, auraRange);
 }

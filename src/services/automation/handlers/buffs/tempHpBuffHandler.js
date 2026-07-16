@@ -2,7 +2,8 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { loadMapData } from '../../../maps/mapsService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
-import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getCurrentCombatRound } from '../../../encounters/combatData.js';
@@ -127,8 +128,7 @@ async function handleMultiTargetAllyTempHp(action, playerStats, campaignName, ma
                 }
                 if (p.name === playerName) continue;
                 const pos = { gridX: p.gridX, gridY: p.gridY };
-                const dist = getDistanceFeet(attackerPos, pos);
-                if (dist != null && dist <= rangeFt) {
+                if (isWithinRange(attackerPos, pos, rangeFt)) {
                     allies.push(p.name);
                     if (allies.length >= maxTargets) break;
                 }

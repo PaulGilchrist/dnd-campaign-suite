@@ -1,6 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { isDistanceInRange } from '../../../rules/combat/rangeCheck.js';
 import { loadMapData } from '../../../maps/mapsService.js';
 import { addEntry } from '../../../ui/logService.js';
 
@@ -38,7 +39,7 @@ export async function grantDarkOnesBlessing(playerStats, campaignName, attackerN
                 if (playerPlayer) {
                     const playerPos = { gridX: playerPlayer.gridX, gridY: playerPlayer.gridY };
                     const dist = getDistanceFeet(attackerPos, playerPos);
-                    if (dist == null || dist > rangeFt) {
+                    if (!isDistanceInRange(dist, rangeFt)) {
                         result.outOfRange = true;
                     }
                 }

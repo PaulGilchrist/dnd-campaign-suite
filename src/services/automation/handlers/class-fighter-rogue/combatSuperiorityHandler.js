@@ -9,6 +9,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { isDistanceInRange } from '../../../rules/combat/rangeCheck.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 
 function applyConditionToTarget(targetName, conditionKey, campaignName, combatSummary) {
@@ -710,7 +711,7 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
                         creature: c,
                         distance: getDistanceFeet(cs.creatures[targetIndex].position, c.position),
                     }))
-                    .filter(t => t.distance != null && t.distance <= rangeFt)
+                    .filter(t => isDistanceInRange(t.distance, rangeFt))
                     .map(t => t.creature);
 
                 if (secondaryTargets.length === 0) {

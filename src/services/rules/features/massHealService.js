@@ -3,6 +3,7 @@ import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
 import { getDistanceFeet, rangeToFeet } from '../combat/rangeValidation.js';
+import { isDistanceInRange } from '../combat/rangeCheck.js';
 import { resolveHealingBonusesWithDetails } from '../../combat/automation/automationService.js';
 
 const MASS_HEAL_NAME = 'Mass Heal';
@@ -75,7 +76,7 @@ export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName,
                     : null;
                 return { creature: c, dist, gridX: targetGridX, gridY: targetGridY };
             })
-            .filter(item => item.dist != null && item.dist <= rangeFt)
+            .filter(item => isDistanceInRange(item.dist, rangeFt))
             .sort((a, b) => a.dist - b.dist)
             .slice(0, maxTargets);
 

@@ -219,7 +219,10 @@ describe('prayerOfHealingService', () => {
         it('filters creatures outside spell range', async () => {
             getDistanceFeet.mockReturnValue(50);
             getCombatContext.mockResolvedValue({
-                players: [{ name: 'Cleric', ...CLIC_POS }],
+                players: [
+                    { name: 'Cleric', ...CLIC_POS },
+                    { name: 'Ally1', gridX: 11, gridY: 1 },
+                ],
                 creatures: [{ name: 'Ally1', maxHp: 50 }],
                 placedItems: [],
             });
@@ -292,7 +295,7 @@ describe('prayerOfHealingService', () => {
             expect(result.targets[0].targetName).toBe('PlacedCreature');
         });
 
-        it('skips targets with null grid coordinates when caster has grid position', async () => {
+        it('includes targets with null grid coordinates when caster has grid position', async () => {
             getDistanceFeet.mockReturnValue(null);
             getCombatContext.mockResolvedValue({
                 players: [{ name: 'Cleric', ...CLIC_POS }],
@@ -308,7 +311,8 @@ describe('prayerOfHealingService', () => {
                 MAP_NAME,
             );
 
-            expect(result).toEqual({ noTargets: true });
+            expect(result.targets.length).toBe(1);
+            expect(result.targets[0].targetName).toBe('Ally1');
         });
     });
 

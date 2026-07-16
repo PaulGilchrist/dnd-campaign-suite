@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { getDistanceFeet } from '../../../../services/rules/combat/rangeValidation.js';
+import { isDistanceInRange } from '../../../../services/rules/combat/rangeCheck.js';
 import { isApplyBusy, setApplyBusy } from './areaEffectModalInstances.js';
 import { createOverlay, hitTestOverlay } from '../../../../models/SpellOverlay.js';
 
@@ -58,8 +59,7 @@ function AreaEffectTargetModalBase({
         return hitTestOverlay(tempOverlay, targetPos.gridX, targetPos.gridY);
       }
       
-      const dist = getDistanceFeet(attackerPos, { gridX: targetPos.gridX, gridY: targetPos.gridY });
-      return dist != null && dist <= rangeFeet;
+      return isDistanceInRange(getDistanceFeet(attackerPos, { gridX: targetPos.gridX, gridY: targetPos.gridY }), rangeFeet);
     });
   }, [combatSummary, attackerName, mapData, attackerPos, rangeFeet, turnUndead, monsters, shape, coneAngle, widthFt, attackerGridX, attackerGridY]);
 

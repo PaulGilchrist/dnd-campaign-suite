@@ -4,6 +4,7 @@ import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
 import { getDistanceFeet } from '../combat/rangeValidation.js';
+import { isDistanceInRange } from '../combat/rangeCheck.js';
 import { resolveHealingBonusesWithDetails, hasHealingMaximization } from '../../combat/automation/automationService.js';
 
 const MASS_CURE_WOUNDS_NAME = 'Mass Cure Wounds';
@@ -101,7 +102,7 @@ export async function triggerMassCureWounds(spell, metaCtx, playerStats, campaig
                     : null;
                 return { creature: c, dist, gridX: targetGridX, gridY: targetGridY };
             })
-            .filter(item => item.dist != null && item.dist <= aoeRadius)
+            .filter(item => isDistanceInRange(item.dist, aoeRadius))
             .sort((a, b) => a.dist - b.dist)
             .slice(0, maxTargets);
 

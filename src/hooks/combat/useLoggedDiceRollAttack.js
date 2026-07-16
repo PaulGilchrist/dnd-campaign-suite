@@ -607,6 +607,7 @@ export function createLogAndShow(deps) {
                     damageType: context?.damageType || null,
                     damageFormula: context?.autoDamageFormula || null,
                     damageName: context?.autoDamageName || null,
+                    spellName: context?.spellName || null,
                     damageSchool: context?.autoDamageSchool || null,
                     saveDc: context?.saveDc || null,
                     saveType: context?.saveType || null,

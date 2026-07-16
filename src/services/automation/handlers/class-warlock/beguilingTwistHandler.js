@@ -1,6 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
 import { createSaveListener } from '../../common/savePrompt.js';
@@ -39,8 +40,7 @@ async function findRecentSuccessfulSave(playerStats, campaignName, mapName, rang
             if (mapName && rangeFt != null) {
                 const positions = await resolveMapPositions(campaignName, mapName, playerName);
                 if (positions?.attackerPos && positions?.targetPos) {
-                    const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
-                    if (dist != null && dist > rangeFt) return null;
+                    if (!isWithinRange(positions.attackerPos, positions.targetPos, rangeFt)) return null;
                 }
             }
             return { name: attackResult.attackerName, event: attackEvent, type: 'attack_roll', success: true };

@@ -1,3 +1,5 @@
+import { isDistanceInRange } from './rangeCheck.js';
+
 const FEET_PER_CELL = 5
 const MELEE_RANGE_FT = 8 // 8 vs 5 to handle attacking a diagonal square
 
@@ -116,8 +118,7 @@ export function computeMeleeProximityEffect(isRanged, attackerPos, nearbyThreats
   }
 
   for (const threat of nearbyThreats) {
-    const dist = getDistanceFeet(attackerPos, threat)
-    if (dist != null && dist <= MELEE_RANGE_FT) {
+    if (isDistanceInRange(getDistanceFeet(attackerPos, threat), MELEE_RANGE_FT)) {
       return {
         mode: 'disadvantage',
         reason: `Firing in melee range of ${threat.name || 'hostile creature'}`,

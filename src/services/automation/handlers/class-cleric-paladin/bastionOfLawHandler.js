@@ -2,6 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { addEntry } from '../../../ui/logService.js';
 import { rangeToFeet, getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { resolveMapPositions, resolveTarget } from '../../common/targetResolver.js';
 
 const WARD_DICE_KEY = 'bastionOfLawWardDice';
@@ -34,7 +35,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
         const positions = await resolveMapPositions(campaignName, mapName, playerName);
         if (positions?.attackerPos && positions?.targetPos) {
             const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
-            if (dist != null && dist > rangeFt) {
+            if (!isWithinRange(positions.attackerPos, positions.targetPos, rangeFt)) {
                 return {
                     type: 'popup',
                     payload: {

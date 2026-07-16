@@ -35,7 +35,7 @@ import { activateCoronaOfLight } from '../../services/automation/handlers/class-
 import { confirmRadianceOfDawn } from '../../services/automation/handlers/class-cleric-paladin/radianceOfDawnHandler.js';
 import { applyBardicInspiration } from '../../services/automation/handlers/class-bard/bardicInspirationHandler.js';
 import { applyInspiringMovement } from '../../services/automation/handlers/reactions/reactionBonusHandler.js';
-import { confirmMantleOfInspiration, confirmVitalityOfTheTree } from '../../services/automation/handlers/buffs/tempHpBuffHandler.js';
+ import { confirmMantleOfInspiration, confirmVitalityOfTheTree } from '../../services/automation/handlers/buffs/tempHpBuffHandler.js';
 import { confirmOceanicGift } from '../../services/automation/handlers/class-druid/oceanicGiftHandler.js';
 import { endFriendsOnHostileAction } from '../../services/rules/features/friendsService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
@@ -106,64 +106,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         },
     });
 
-    // Handle damage type choice popup (e.g. Blessed Strikes: Necrotic or Radiant)
-    useEffect(() => {
-        const handleHealingPopup = (e) => {
-            const { targetName, healingName, rollInfo, maximizeHealingDice, popupText } = e.detail || {};
-            const diceRoll = rollInfo ? ` [${rollInfo}]` : '';
-            const maximizeNote = maximizeHealingDice ? ' (maximized)' : '';
-            setPopupHtml(`<b>${healingName}</b> on ${targetName}${diceRoll}${maximizeNote}<br/><br/>${popupText}`);
-        };
-        const handleDamagePopup = (e) => {
-            const { targetName, spellName, popupText, rollInfo } = e.detail || {};
-            const diceRoll = rollInfo ? ` [${rollInfo}]` : '';
-            setPopupHtml(`<b>${spellName}</b> on ${targetName}${diceRoll}<br/><br/>${popupText}`);
-        };
-        window.addEventListener('healing-popup', handleHealingPopup);
-        window.addEventListener('damage-popup', handleDamagePopup);
-        return () => {
-            window.removeEventListener('healing-popup', handleHealingPopup);
-            window.removeEventListener('damage-popup', handleDamagePopup);
-        };
-    }, [setPopupHtml]);
-
-    useEffect(() => {
-        if (popupHtml?.type === 'damage_type_choice') {
-            const handleChoice = (chosenType) => {
-                const { bonusFormula, bonusRolls, bonusTotal, usedKey, currentRound, targetName, attackerName, name } = popupHtml;
-                const context = {
-                    damageType: chosenType,
-                    targetName,
-                    attackerName,
-                };
-                rollDamage(name, bonusFormula, bonusTotal, bonusRolls, 0, context);
-                if (usedKey) {
-                    setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
-                }
-                setPopupHtml(null);
-            };
-            const handleSkip = () => {
-                setPopupHtml(null);
-            };
-            window.addEventListener('damage-type-choice', (e) => {
-                handleChoice(e.detail.chosenType);
-            });
-            window.addEventListener('damage-type-skip', handleSkip);
-        }
-    }, [popupHtml, playerStats.name, campaignName, rollDamage, setPopupHtml]);
-
-    useInitiativeEffects(playerStats, campaignName, rollDamage);
-
-    const getTargetInfo = React.useCallback(async () => {
-        const cs = await getCombatContext(campaignName);
-        if (!cs) return null;
-        const target = getTargetFromAttacker(cs, playerStats.name);
-        if (target) return target;
-        const overlayTargetName = getAttackerTargetName(cs, playerStats.name);
-        if (overlayTargetName) return { name: overlayTargetName };
-        return null;
-    }, [playerStats.name, campaignName]);
-
     const buildCtxSync = React.useCallback(async (attack) => {
         return await buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, featRangeEffects || null);
     }, [playerStats, campaignName, conditionAttackMode, featRangeEffects]);
@@ -201,6 +143,69 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects,
         popupHtml, setPopupHtml, rollDamage, rollAttack, buildCtx, buildCtxSync,
     });
+
+    // Handle damage type choice popup (e.g. Blessed Strikes: Necrotic or Radiant)
+    useEffect(() => {
+        const handleHealingPopup = (e) => {
+            const { targetName, healingName, rollInfo, maximizeHealingDice, popupText } = e.detail || {};
+            const diceRoll = rollInfo ? ` [${rollInfo}]` : '';
+            const maximizeNote = maximizeHealingDice ? ' (maximized)' : '';
+            setPopupHtml(`<b>${healingName}</b> on ${targetName}${diceRoll}${maximizeNote}<br/><br/>${popupText}`);
+        };
+        const handleDamagePopup = (e) => {
+            const { targetName, spellName, popupText, rollInfo } = e.detail || {};
+            const diceRoll = rollInfo ? ` [${rollInfo}]` : '';
+            setPopupHtml(`<b>${spellName}</b> on ${targetName}${diceRoll}<br/><br/>${popupText}`);
+        };
+        const handleInspiringSmite = (e) => {
+            setModalState({ inspiringSmiteModal: e.detail });
+        };
+        window.addEventListener('healing-popup', handleHealingPopup);
+        window.addEventListener('damage-popup', handleDamagePopup);
+        window.addEventListener('inspiring-smite-pending', handleInspiringSmite);
+        return () => {
+            window.removeEventListener('healing-popup', handleHealingPopup);
+            window.removeEventListener('damage-popup', handleDamagePopup);
+            window.removeEventListener('inspiring-smite-pending', handleInspiringSmite);
+        };
+    }, [setPopupHtml, setModalState]);
+
+    useEffect(() => {
+        if (popupHtml?.type === 'damage_type_choice') {
+            const handleChoice = (chosenType) => {
+                const { bonusFormula, bonusRolls, bonusTotal, usedKey, currentRound, targetName, attackerName, name } = popupHtml;
+                const context = {
+                    damageType: chosenType,
+                    targetName,
+                    attackerName,
+                };
+                rollDamage(name, bonusFormula, bonusTotal, bonusRolls, 0, context);
+                if (usedKey) {
+                    setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
+                }
+                setPopupHtml(null);
+            };
+            const handleSkip = () => {
+                setPopupHtml(null);
+            };
+            window.addEventListener('damage-type-choice', (e) => {
+                handleChoice(e.detail.chosenType);
+            });
+            window.addEventListener('damage-type-skip', handleSkip);
+        }
+    }, [popupHtml, playerStats.name, campaignName, rollDamage, setPopupHtml]);
+
+    useInitiativeEffects(playerStats, campaignName, rollDamage);
+
+    const getTargetInfo = React.useCallback(async () => {
+        const cs = await getCombatContext(campaignName);
+        if (!cs) return null;
+        const target = getTargetFromAttacker(cs, playerStats.name);
+        if (target) return target;
+        const overlayTargetName = getAttackerTargetName(cs, playerStats.name);
+        if (overlayTargetName) return { name: overlayTargetName };
+        return null;
+    }, [playerStats.name, campaignName]);
 
     const [showCleaveTargetSelection, setShowCleaveTargetSelection] = useSyncedState(campaignName, 'cleavePending', false, campaignName);
     const [cleaveSecondTargets, setCleaveSecondTargets] = useSyncedState(campaignName, 'cleaveSecondTargets', [], campaignName);
@@ -817,6 +822,36 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         setModalState({ mantleOfInspirationTarget: null });
     }, [setPopupHtml, modalState.mantleOfInspirationTarget, setModalState]);
 
+    const handleInspiringSmiteConfirm = React.useCallback(async (distribution) => {
+        if (!distribution || !modalState.inspiringSmiteModal) return;
+        const { action, playerStats: ps, campaignName: cn, channelDivinityCharges } = modalState.inspiringSmiteModal;
+        const playerName = ps.name;
+
+        const targetNames = Object.keys(distribution);
+        if (targetNames.length === 0) return;
+
+        for (const targetName of targetNames) {
+            const amount = distribution[targetName];
+            const existing = Number(getRuntimeValue(targetName, 'tempHp', cn) || 0);
+            setRuntimeValue(targetName, 'tempHp', Math.max(existing, amount), cn);
+        }
+
+        setRuntimeValue(playerName, 'channelDivinityCharges', channelDivinityCharges - 1, cn);
+
+        const totalDistributed = Object.values(distribution).reduce((sum, v) => sum + v, 0);
+        addEntry(cn, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: action.name,
+            description: `${playerName} used ${action.name} (${totalDistributed} temp HP). Distribution: ${targetNames.map(n => `${n}=${distribution[n]}`).join(', ')}`,
+        }).catch(() => {});
+
+        const distributionStr = targetNames.map(n => `${n} (${distribution[n]} HP)`).join(', ');
+        const html = `<b>${action.name}</b><br/>Granted ${totalDistributed} temporary hit points: ${distributionStr}.`;
+        setPopupHtml(html);
+        setModalState({ inspiringSmiteModal: null });
+    }, [setPopupHtml, setModalState, modalState.inspiringSmiteModal]);
+
     const handleVitalityOfTheTreeConfirm = React.useCallback(async (selectedTargets) => {
         if (!selectedTargets || !modalState.vitalityOfTheTreeTarget) return;
         const result = await confirmVitalityOfTheTree(
@@ -1392,6 +1427,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleCoronaEnemySelectionConfirm={handleCoronaEnemySelectionConfirm}
                     handleRadianceOfDawnConfirm={handleRadianceOfDawnConfirm}
                     handleMantleOfInspirationConfirm={handleMantleOfInspirationConfirm}
+                    handleInspiringSmiteConfirm={handleInspiringSmiteConfirm}
                     handleVitalityOfTheTreeConfirm={handleVitalityOfTheTreeConfirm}
                     handleTricksterBlessingConfirm={handleTricksterBlessingConfirm}
                     handleBardicInspirationConfirm={handleBardicInspirationConfirm}

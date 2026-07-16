@@ -2,7 +2,8 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { addEntry } from '../../../ui/logService.js';
 import { loadMapData } from '../../../maps/mapsService.js';
-import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 
 export async function grantCelestialResilience(playerStats, campaignName, source, mapName) {
     const isCelestial = playerStats.class?.major?.name === 'Celestial Patron'
@@ -44,8 +45,7 @@ export async function grantCelestialResilience(playerStats, campaignName, source
                         if (p.name === playerStats.name) continue;
                         if (targets.length >= maxAllies) break;
                         const pos = { gridX: p.gridX, gridY: p.gridY };
-                        const dist = getDistanceFeet(attackerPos, pos);
-                        if (dist != null && dist <= rangeFt) {
+                        if (isWithinRange(attackerPos, pos, rangeFt)) {
                             targets.push(p.name);
                         }
                     }

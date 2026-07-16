@@ -1,7 +1,8 @@
 import { addEntry } from '../../../ui/logService.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { getDistanceFeet, rangeToFeet, getNearestPlacedItem } from '../../../rules/combat/rangeValidation.js';
+import { rangeToFeet, getNearestPlacedItem } from '../../../rules/combat/rangeValidation.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import * as mapsService from '../../../maps/mapsService.js';
 import { infoPopup } from '../../common/infoPopup.js';
 import { removeCondition } from '../../../combat/conditions/conditionSaveService.js';
@@ -30,9 +31,7 @@ async function checkRange(campaignName, mapName, rangeFt, sourceName, targetName
 
         if (!targetPos) return true;
 
-        const dist = getDistanceFeet(sourcePos, targetPos);
-        if (dist == null) return true;
-        return dist <= rangeFt;
+        return isWithinRange(sourcePos, targetPos, rangeFt);
     } catch {
         return true;
     }

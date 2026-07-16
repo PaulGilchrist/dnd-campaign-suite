@@ -1,4 +1,4 @@
-import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
+import { isWithinRange } from '../../rules/combat/rangeCheck.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
 
@@ -25,11 +25,11 @@ export function getLionDisadvantageAgainst({ attackerName, campaignName, mapData
             const range = lionBuff.range || '5 ft';
             const rangeNum = parseInt(range) || 5;
 
-            const dist = getDistanceFeet(
+            if (isWithinRange(
                 { gridX: player.gridX, gridY: player.gridY },
-                { gridX: attacker.gridX, gridY: attacker.gridY }
-            );
-            if (dist !== null && dist <= rangeNum) {
+                { gridX: attacker.gridX, gridY: attacker.gridY },
+                rangeNum
+            )) {
                 return { disadvantage: true, source: player.name };
             }
         }

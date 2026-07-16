@@ -432,7 +432,7 @@ describe('massHealService', () => {
                 expect(result.targets.length).toBe(3);
             });
 
-            it('returns noTargets when rangeToFeet returns null (self/touch)', async () => {
+            it('includes all targets when rangeToFeet returns null (assumes in range)', async () => {
                 rangeToFeet.mockReturnValue(null);
 
                 const result = await triggerMassHeal(
@@ -443,7 +443,8 @@ describe('massHealService', () => {
                     mapName,
                 );
 
-                expect(result.noTargets).toBe(true);
+                expect(result.noTargets).toBeUndefined();
+                expect(result.targets.length).toBe(3);
             });
         });
 

@@ -1,5 +1,6 @@
 import { loadMapData } from '../../maps/mapsService.js';
 import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
+import { isDistanceInRange } from '../../rules/combat/rangeCheck.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 export const CANNOT_ACT_CONDITIONS = ['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious'];
@@ -48,7 +49,7 @@ export async function isWithinRange(sourceName, targetName, campaignName, active
     if (dist == null) return true;
     const sourceEntry = computedCharacters?.find(c => c.name === sourceName);
     const range = sourceEntry?.computedStats ? getAuraRangeFromStats(sourceEntry.computedStats) : DEFAULT_AURA_RANGE_FT;
-    return dist <= range;
+    return isDistanceInRange(dist, range);
   } catch {
     return true;
   }

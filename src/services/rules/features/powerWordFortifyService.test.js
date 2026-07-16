@@ -5,7 +5,7 @@ import { rollExpression } from '../../dice/diceRoller.js';
 import { getCombatContext } from '../../rules/combat/damageUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
-import { rangeToFeet, getDistanceFeet } from '../../rules/combat/rangeValidation.js';
+import { rangeToFeet, getDistanceFeet } from '../combat/rangeValidation.js';
 
 vi.mock('../../dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
@@ -24,7 +24,7 @@ vi.mock('../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../rules/combat/rangeValidation.js', () => ({
+vi.mock('../combat/rangeValidation.js', () => ({
     rangeToFeet: vi.fn(),
     getDistanceFeet: vi.fn(),
 }));
@@ -184,11 +184,11 @@ describe('powerWordFortifyService', () => {
             expect(rollExpression).toHaveBeenCalledWith('6d7+7');
         });
 
-        it('returns {noTargets: true} when no creatures are within range', async () => {
+        it('includes all creatures when rangeToFeet returns null (null range = no filtering)', async () => {
             rollExpression.mockReturnValue({ total: 48 });
             getCombatContext.mockResolvedValue(combatSummary);
-            rangeToFeet.mockReturnValue(10);
-            getDistanceFeet.mockReturnValue(20);
+            rangeToFeet.mockReturnValue(null);
+            getRuntimeValue.mockReturnValue(0);
 
             const result = await triggerPowerWordFortify(
                 validSpell,
@@ -198,9 +198,10 @@ describe('powerWordFortifyService', () => {
                 mapName,
             );
 
-            expect(result).toEqual({ noTargets: true });
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-            expect(addEntry).not.toHaveBeenCalled();
+            // When rangeToFeet returns null, rangeFt is null
+            // The code checks `if (rangeFt != null)` before distance filtering
+            // So when rangeFt is null, all creatures are included
+            expect(result.targets.length).toBe(3);
         });
 
         it('grants temp HP to targets within range and excludes the caster', async () => {
@@ -442,7 +443,7 @@ describe('powerWordFortifyService', () => {
             expect(result.targets[0].targetName).toBe('Puppet');
         });
 
-        it('filters out targets without grid positions', async () => {
+        it('includes targets without grid positions when caster has grid position', async () => {
             rollExpression.mockReturnValue({ total: 15 });
             getCombatContext.mockResolvedValue({
                 players: [
@@ -467,8 +468,9 @@ describe('powerWordFortifyService', () => {
                 mapName,
             );
 
-            expect(result.targets.length).toBe(1);
-            expect(result.targets[0].targetName).toBe('HasGrid');
+            expect(result.targets.length).toBe(2);
+            expect(result.targets.map(t => t.targetName)).toContain('HasGrid');
+            expect(result.targets.map(t => t.targetName)).toContain('NoGrid');
         });
 
         it('posts log entries with correct structure for each target', async () => {

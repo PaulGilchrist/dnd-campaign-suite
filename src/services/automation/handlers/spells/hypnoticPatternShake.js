@@ -2,6 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { isDistanceInRange } from '../../../rules/combat/rangeCheck.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
 
 
@@ -40,7 +41,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
             })();
             if (targetPosData) {
                 const dist = getDistanceFeet(attackerPos, targetPosData);
-                if (dist == null || dist > rangeFt) return false;
+                if (!isDistanceInRange(dist, rangeFt)) return false;
             }
         }
         return true;

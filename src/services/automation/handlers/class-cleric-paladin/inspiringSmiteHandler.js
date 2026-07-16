@@ -1,8 +1,9 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { resolveDiceExpression } from '../../../combat/automation/automationService.js';
 import { loadMapData } from '../../../maps/mapsService.js';
-import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
-import { addEntry } from '../../../ui/logService.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 
 export async function handle(action, playerStats, campaignName, mapName) {
@@ -27,6 +28,24 @@ export async function handle(action, playerStats, campaignName, mapName) {
         };
     }
 
+    // Check lastAttack for Divine Smite
+    const combatSummary = await getCombatContext(campaignName);
+    const lastAttack = combatSummary?.lastAttack || null;
+    const isDivineSmiteCast = lastAttack?.spellName?.toLowerCase() === 'divine smite';
+    const isPlayerAttack = lastAttack?.attackerName === playerName;
+
+    if (!isDivineSmiteCast || !isPlayerAttack) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${action.name} can only be used immediately after casting Divine Smite.`,
+                automation: auto,
+            },
+        };
+    }
+
     // Calculate temp HP: 2d8 + paladin level
     const expression = '2d8 + paladin level';
     const resolved = resolveDiceExpression(expression, playerStats);
@@ -45,57 +64,67 @@ export async function handle(action, playerStats, campaignName, mapName) {
         };
     }
 
-    // Find all creatures within range
+    // Get ally list from selectedAllies
+    const storedAllies = getRuntimeValue(playerName, 'selectedAllies', campaignName);
+    const allyList = Array.isArray(storedAllies) && storedAllies.length > 0 ? storedAllies : null;
+
+    // Build target list using allies within range
     const rangeFt = rangeToFeet(auto.range || '30 ft');
-    const targets = [];
+    const creatureTargets = [];
 
     if (mapName && rangeFt != null) {
         const attackerPlayer = await loadMapData(campaignName, mapName).then(md => md?.players?.find(p => p.name === playerName));
         if (attackerPlayer) {
             const attackerPos = { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY };
             const mapPlayers = (await loadMapData(campaignName, mapName))?.players || [];
-            for (const p of mapPlayers) {
-                if (p.name === playerName) continue;
-                if (targets.length >= 10) break; // cap at reasonable number
-                const pos = { gridX: p.gridX, gridY: p.gridY };
-                const dist = getDistanceFeet(attackerPos, pos);
-                if (dist != null && dist <= rangeFt) {
-                    targets.push(p.name);
+
+            if (allyList) {
+                for (const allyName of allyList) {
+                    if (allyName === playerName) continue;
+                    const ally = mapPlayers.find(p => p.name === allyName);
+                    if (!ally) continue;
+                    const allyPos = { gridX: ally.gridX, gridY: ally.gridY };
+                    if (isWithinRange(attackerPos, allyPos, rangeFt)) {
+                        creatureTargets.push({ name: allyName, type: 'player' });
+                    }
+                }
+            } else {
+                for (const p of mapPlayers) {
+                    if (p.name === playerName) continue;
+                    if (creatureTargets.length >= 10) break;
+                    const pos = { gridX: p.gridX, gridY: p.gridY };
+                    if (isWithinRange(attackerPos, pos, rangeFt)) {
+                        creatureTargets.push({ name: p.name, type: 'player' });
+                    }
                 }
             }
+
+            // Include self
+            creatureTargets.push({ name: playerName, type: 'player' });
         }
+    } else {
+        // No map: include all allies + self (assume in range)
+        if (allyList) {
+            for (const allyName of allyList) {
+                if (allyName === playerName) continue;
+                creatureTargets.push({ name: allyName, type: 'player' });
+            }
+        }
+        creatureTargets.push({ name: playerName, type: 'player' });
     }
 
-    // Distribute temp HP: divide among targets, each gets tempHpAmount
-    // "distribute" means each creature within range gets the full amount (2d8 + paladin level)
-    // This is consistent with how "distribute Temporary Hit Points" works in 5e
-    for (const targetName of targets) {
-        setRuntimeValue(targetName, 'tempHp', tempHpAmount, campaignName);
-    }
-
-    // Expend Channel Divinity
-    const newCharges = currentCharges - 1;
-    await setRuntimeValue(playerName, 'channelDivinityCharges', newCharges, campaignName);
-
-    const targetList = targets.length > 0 ? targets.join(', ') : 'no targets in range';
-    const description = `${action.name}: Expend Channel Divinity to grant ${tempHpAmount} temporary hit points to ${targetList}.`;
-
-    addEntry(campaignName, {
-        type: 'ability_use',
-        characterName: playerName,
-        abilityName: action.name,
-        description: `${playerName} used ${action.name} (2d8 + ${playerStats.level} = ${tempHpAmount} temp HP). Targets: ${targetList}`,
-    }).catch(() => {});
-
-    return {
-        type: 'roll',
-        payload: {
-            roll: `2d8 + ${playerStats.level}`,
-            result: tempHpAmount,
-            name: action.name,
+    // Dispatch CustomEvent to show modal
+    window.dispatchEvent(new CustomEvent('inspiring-smite-pending', {
+        detail: {
+            action,
+            playerStats,
+            campaignName,
+            creatureTargets,
             tempHp: tempHpAmount,
-            targets,
-            description,
+            roll: `2d8 + ${playerStats.level}`,
+            channelDivinityCharges: currentCharges,
         },
-    };
+    }));
+
+    return null;
 }

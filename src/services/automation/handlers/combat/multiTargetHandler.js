@@ -2,6 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { isWithinRange, isDistanceInRange } from '../../../rules/combat/rangeCheck.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
@@ -21,7 +22,7 @@ function getCreatureTargets(excludeName, withinRangeFt, campaignName, mapName, a
             const targetPlayer = cs.players?.find(p => p.name === c.name);
             if (targetPlayer) {
                 const dist = getDistanceFeet(attackerPos, { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY });
-                return dist != null && dist <= withinRangeFt;
+                return isDistanceInRange(dist, withinRangeFt);
             }
             return true;
         })
@@ -116,23 +117,22 @@ export async function applyMultiTarget(
     if (rangeFt != null && firstTarget && secondTarget) {
         const positions = mapName ? await resolveMapPositions(campaignName, mapName, playerStats.name) : null;
         if (positions?.attackerPos) {
-            const firstDist = getDistanceFeet(positions.attackerPos, {
+
+            if (!isWithinRange(positions.attackerPos, {
                 gridX: firstTarget.type === 'player'
                     ? (combatSummary.players?.find(p => p.name === firstTarget.name)?.gridX)
                     : (combatSummary.placedItems?.find(i => i.name === firstTarget.name)?.gridX),
                 gridY: firstTarget.type === 'player'
                     ? (combatSummary.players?.find(p => p.name === firstTarget.name)?.gridY)
                     : (combatSummary.placedItems?.find(i => i.name === firstTarget.name)?.gridY),
-            });
-            const secondDist = getDistanceFeet(positions.attackerPos, {
+            }, rangeFt) || !isWithinRange(positions.attackerPos, {
                 gridX: secondTarget.type === 'player'
                     ? (combatSummary.players?.find(p => p.name === secondTarget.name)?.gridX)
                     : (combatSummary.placedItems?.find(i => i.name === secondTarget.name)?.gridX),
                 gridY: secondTarget.type === 'player'
                     ? (combatSummary.players?.find(p => p.name === secondTarget.name)?.gridY)
                     : (combatSummary.placedItems?.find(i => i.name === secondTarget.name)?.gridY),
-            });
-            if ((firstDist != null && firstDist > rangeFt) || (secondDist != null && secondDist > rangeFt)) {
+            }, rangeFt)) {
                 return {
                     type: 'popup',
                     payload: {

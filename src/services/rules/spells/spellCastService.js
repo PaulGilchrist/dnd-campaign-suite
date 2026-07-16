@@ -764,6 +764,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
             const attackCtx = {
                 autoDamageFormula: finalFormula,
                 autoDamageName: spell.name,
+                spellName: spell.name,
                 autoDamageSchool: spell.school,
                 overchannelActive,
                 overchannelUseCount,

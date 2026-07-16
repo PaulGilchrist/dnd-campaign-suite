@@ -382,7 +382,7 @@ describe('getCoronaSaveDisadvantage', () => {
       expect(result).toEqual(expected ? { disadvantage: true, source: 'Paladin' } : { disadvantage: false })
     })
 
-    it('returns false when getDistanceFeet returns null', () => {
+    it('returns disadvantage when getDistanceFeet returns null (assumes in range)', () => {
       getRuntimeValue.mockReturnValue([makeCoronaBuff()])
       getDistanceFeet.mockReturnValue(null)
 
@@ -396,7 +396,7 @@ describe('getCoronaSaveDisadvantage', () => {
         damageType: null,
         skipRangeCheck: false,
       })
-      expect(result).toEqual({ disadvantage: false })
+      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
     })
 
     it('returns false when buffs is a non-array', () => {

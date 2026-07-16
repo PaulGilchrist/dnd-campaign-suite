@@ -1,6 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { resolveMapPositions, resolveTarget } from '../../common/targetResolver.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
@@ -35,7 +36,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
         const positions = await resolveMapPositions(campaignName, mapName, playerName);
         if (positions?.attackerPos && positions?.targetPos) {
             const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
-            if (dist != null && dist > rangeFt) {
+            if (!isWithinRange(positions.attackerPos, positions.targetPos, rangeFt)) {
                 return {
                     type: 'popup',
                     payload: {

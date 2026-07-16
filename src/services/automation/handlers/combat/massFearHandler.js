@@ -1,6 +1,7 @@
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
+import { isDistanceInRange } from '../../../rules/combat/rangeCheck.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
@@ -42,8 +43,7 @@ export async function resolveMassFear(campaignName, casterName, primaryTargetNam
         if (c.name === primaryTargetName) return true;
         if (!hasMap) return true;
         if (!primaryTarget?.position || !c.position) return true;
-        const dist = getDistanceFeet(primaryTarget.position, c.position);
-        return dist !== null && dist <= range;
+        return isDistanceInRange(getDistanceFeet(primaryTarget.position, c.position), range);
     });
 
     if (targets.length === 0) {

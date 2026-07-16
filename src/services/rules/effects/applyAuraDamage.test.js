@@ -132,7 +132,7 @@ describe('applyAuraDamage — damage application', () => {
     expect(applyDamageToTarget.mock.calls[0][1]).toBe('Orc');
   });
 
-  it('skips creatures outside range when map is active', async () => {
+  it('includes creatures with null distance when map is active', async () => {
     getRuntimeValue.mockImplementation((name, prop) => {
       if (prop === 'innerRadianceActive') return true;
       if (name === '__map__' && prop === 'activeMapName') return 'TestMap';
@@ -159,8 +159,10 @@ describe('applyAuraDamage — damage application', () => {
       damageType: 'Radiant',
     });
 
-    expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-    expect(applyDamageToTarget.mock.calls[0][1]).toBe('Orc');
+    expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
+    const targetNames = applyDamageToTarget.mock.calls.map(c => c[1]);
+    expect(targetNames).toContain('Orc');
+    expect(targetNames).toContain('Goblin');
   });
 
   it('applies targetFilter to exclude creatures', async () => {

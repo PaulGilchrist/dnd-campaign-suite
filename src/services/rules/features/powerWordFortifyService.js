@@ -4,6 +4,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
 import { addEntry } from '../../ui/logService.js';
 import { rangeToFeet } from '../combat/rangeValidation.js';
 import { getDistanceFeet } from '../combat/rangeValidation.js';
+import { isDistanceInRange } from '../combat/rangeCheck.js';
 
 const POWER_WORD_FORTIFY_NAME = 'Power Word Fortify';
 
@@ -67,7 +68,7 @@ export async function triggerPowerWordFortify(spell, metaCtx, playerStats, campa
                         : null;
                     return { creature: c, dist };
                 })
-                .filter(item => item.dist != null && item.dist <= rangeFt)
+                .filter(item => isDistanceInRange(item.dist, rangeFt))
                 .sort((a, b) => a.dist - b.dist)
                 .slice(0, maxTargets)
                 .map(item => item.creature);

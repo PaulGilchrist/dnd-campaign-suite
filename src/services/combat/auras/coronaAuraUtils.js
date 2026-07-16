@@ -1,4 +1,4 @@
-import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
+import { isWithinRange } from '../../rules/combat/rangeCheck.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
 
@@ -45,8 +45,7 @@ export function getCoronaSaveDisadvantage({ targetName, campaignName, mapData, d
                 continue;
             }
 
-            const dist = getDistanceFeet(playerPos, targetPos);
-            if (dist !== null && dist <= rangeNum) {
+            if (isWithinRange(playerPos, targetPos, rangeNum)) {
                 const applicableTypes = coronaBuff.enemiesDisadvantageSaves || [];
                 if (applicableTypes.length === 0) continue;
                 if (damageType) {

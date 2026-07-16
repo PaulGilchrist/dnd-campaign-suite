@@ -3,7 +3,8 @@ import { addEntry } from '../../../ui/logService.js';
 import { automationInfoPopup } from '../../../shared/popupResponse.js';
 import { infoPopup } from '../../common/infoPopup.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
 import { getClassFeatures } from '../../../../services/character/classFeatures.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
@@ -145,8 +146,7 @@ async function findAllyMissedAttack(playerStats, campaignName, mapName, rangeFt)
     if (mapName && rangeFt != null) {
         const positions = await resolveMapPositions(campaignName, mapName, playerStats.name);
         if (positions?.attackerPos && positions?.targetPos) {
-            const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
-            if (dist != null && dist > rangeFt) return null;
+            if (!isWithinRange(positions.attackerPos, positions.targetPos, rangeFt)) return null;
         }
     }
 

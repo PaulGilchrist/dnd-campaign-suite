@@ -5,6 +5,7 @@ import storage from '../../ui/storage.js';
 import { getCurrentCombatRound, getActiveCreatureName, getCombatSummary, loadCombatSummary } from '../../encounters/combatData.js';
 import { addEntry } from '../../ui/logService.js';
 import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
+import { isDistanceInRange } from '../../rules/combat/rangeCheck.js';
 import { applyDamageToTarget } from '../../rules/combat/applyDamage.js';
 import { processSlowRepeatSave } from '../../automation/handlers/spells/slowHandler.js';
 import { processTashasLaughterRepeatSave } from '../../automation/handlers/spells/tashasLaughterHandler.js';
@@ -797,7 +798,7 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
                 { gridX: playerCreature.gridX, gridY: playerCreature.gridY },
                 { gridX: creature.gridX, gridY: creature.gridY }
             );
-            if (dist === null || dist > range) continue;
+            if (!isDistanceInRange(dist, range)) continue;
         }
 
         try {
@@ -846,7 +847,7 @@ async function applyHolyNimbusDamage(activeName, characters, campaignName) {
                     { gridX: playerCreature.gridX, gridY: playerCreature.gridY },
                     { gridX: activeCreature.gridX, gridY: activeCreature.gridY }
                 );
-                if (dist === null || dist > range) continue;
+            if (!isDistanceInRange(dist, range)) continue;
             }
         }
 

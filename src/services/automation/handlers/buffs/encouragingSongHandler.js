@@ -1,6 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
-import { rangeToFeet, getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { loadMapData } from '../../../maps/mapsService.js';
 import { addEntry } from '../../../ui/logService.js';
 
@@ -40,8 +41,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
             for (const p of mapPlayers) {
                 if (p.name === playerName) continue;
                 const pos = { gridX: p.gridX, gridY: p.gridY };
-                const dist = getDistanceFeet(attackerPos, pos);
-                if (dist != null && dist <= rangeFt) {
+                if (isWithinRange(attackerPos, pos, rangeFt)) {
                     allies.push(p.name);
                 }
             }

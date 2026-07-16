@@ -435,7 +435,7 @@ describe('massCureWoundsService', () => {
                 expect(result.targets[0].targetName).toBe('Goblin');
             });
 
-            it('skips creatures without grid position when caster has grid position', async () => {
+            it('includes creatures without grid position when caster has grid position', async () => {
                 rollExpression.mockReturnValue({ total: 20, rolls: [10, 10] });
                 getCombatContext.mockResolvedValue({
                     players: [
@@ -458,8 +458,9 @@ describe('massCureWoundsService', () => {
                     mapName,
                 );
 
-                expect(result.targets).toHaveLength(1);
-                expect(result.targets[0].targetName).toBe('Goblin');
+                expect(result.targets).toHaveLength(2);
+                expect(result.targets.map(t => t.targetName)).toContain('Goblin');
+                expect(result.targets.map(t => t.targetName)).toContain('Ghost');
             });
 
             it('takes first N creatures without distance filtering when caster has no grid position', async () => {

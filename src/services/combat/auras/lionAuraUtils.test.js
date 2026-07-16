@@ -298,7 +298,7 @@ describe('getLionDisadvantageAgainst', () => {
       expect(result4).toEqual({ disadvantage: false })
     })
 
-    it('returns false when getDistanceFeet returns null', () => {
+    it('returns disadvantage when getDistanceFeet returns null (assumes in range)', () => {
       getRuntimeValue.mockImplementation(() => [makeLionBuff()])
       getDistanceFeet.mockReturnValue(null)
 
@@ -311,7 +311,7 @@ describe('getLionDisadvantageAgainst', () => {
         skipRangeCheck: false,
       })
 
-      expect(result).toEqual({ disadvantage: false })
+      expect(result).toEqual({ disadvantage: true, source: 'Barbarian' })
     })
 
     it('passes correct grid coordinates to getDistanceFeet', () => {

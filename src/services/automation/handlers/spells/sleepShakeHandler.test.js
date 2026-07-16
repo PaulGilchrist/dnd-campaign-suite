@@ -259,7 +259,7 @@ describe('sleepShakeHandler', () => {
         expect(result.payload.targets).toEqual(['Goblin', 'Orc']);
       });
 
-      it('excludes target when distance is null', async () => {
+      it('includes target when distance is null (assumes in range)', async () => {
         const ctx = {
           creatures: [
             { name: 'Goblin', type: 'monster' },
@@ -281,8 +281,9 @@ describe('sleepShakeHandler', () => {
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
-        // Code returns false when dist == null, so Goblin is excluded, no targets -> popup
-        expect(result.type).toBe('popup');
+        // Code returns true when dist == null, so Goblin is included
+        expect(result.type).toBe('modal');
+        expect(result.payload.targets).toEqual(['Goblin']);
       });
     });
 

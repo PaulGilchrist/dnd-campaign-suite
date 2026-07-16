@@ -1,7 +1,9 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
+
 import { getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
+import { isDistanceInRange } from '../../../rules/combat/rangeCheck.js';
 import { buildSaveDc, createSaveListener } from '../../../automation/common/savePrompt.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
@@ -141,7 +143,7 @@ export async function applyRiderOption(action, playerStats, campaignName, target
                             creature: c,
                             distance: getDistanceFeet(primaryTarget.position, c.position),
                         }))
-                        .filter(t => t.distance !== null && t.distance <= 5);
+                        .filter(t => isDistanceInRange(t.distance, 5));
                     if (secondaryTargets.length > 0) {
                         versatileTricksterSecondaryTarget = secondaryTargets.map(t => t.creature);
                     }
@@ -171,7 +173,7 @@ export async function applyRiderOption(action, playerStats, campaignName, target
                         creature: c,
                         distance: getDistanceFeet(primaryTarget.position, c.position),
                     }))
-                    .filter(t => t.distance !== null && t.distance <= 5);
+                    .filter(t => isDistanceInRange(t.distance, 5));
             } else {
                 stalkersFlurrySecondaryTarget = cs.creatures
                     .filter(c => c.name !== targetName)
