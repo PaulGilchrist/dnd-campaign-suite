@@ -108,9 +108,8 @@ describe('DiceRollResult', () => {
         });
     });
 
-    describe('glorious defense counter-attack', () => {
-        it('shows counter-attack button and calls onCounterAttack when clicked', () => {
-            const onCounter = vi.fn();
+    describe('glorious defense', () => {
+        it('does not render counterattack button (handled by automation handler)', () => {
             render(
                 <DiceRollResult
                     name="Longsword"
@@ -120,20 +119,18 @@ describe('DiceRollResult', () => {
                     targetName="Goblin"
                     hit={false}
                     rollType="attack"
-                    gloriousDefenseBonus={2}
-                    onCounterAttack={onCounter}
                 />
             );
-            expect(screen.getByText(/Glorious Defense Counter-Attack/)).toBeInTheDocument();
-            fireEvent.click(screen.getByText(/Glorious Defense Counter-Attack/));
-            expect(onCounter).toHaveBeenCalled();
+            expect(screen.queryByText(/Glorious Defense/)).not.toBeInTheDocument();
         });
 
         it.each`
-            hit            | isAutoMiss     | gloriousDefenseBonus | shouldShow
-            ${false}       | ${true}        | ${2}                 | ${false}
-            ${false}       | ${false}       | ${0}                 | ${false}
-        `('does not show counter-attack when hit: $hit, isAutoMiss: $isAutoMiss, gloriousDefenseBonus: $gloriousDefenseBonus', ({ hit, isAutoMiss, gloriousDefenseBonus }) => {
+            hit            | isAutoMiss     | defensiveDuelistBonus | baitAndSwitchBonus | showReaction
+            ${false}       | ${true}        | ${2}                  | ${0}               | ${false}
+            ${false}       | ${false}       | ${2}                  | ${0}               | ${true}
+            ${false}       | ${false}       | ${0}                  | ${2}               | ${true}
+            ${false}       | ${false}       | ${0}                  | ${0}               | ${false}
+        `('shows reaction bonus in miss text when defensiveDuelistBonus or baitAndSwitchBonus active: $showReaction', ({ hit, isAutoMiss, defensiveDuelistBonus, baitAndSwitchBonus, showReaction }) => {
             render(
                 <DiceRollResult
                     name="Longsword"
@@ -144,11 +141,15 @@ describe('DiceRollResult', () => {
                     hit={hit}
                     rollType="attack"
                     isAutoMiss={isAutoMiss}
-                    gloriousDefenseBonus={gloriousDefenseBonus}
-                    onCounterAttack={vi.fn()}
+                    defensiveDuelistBonus={defensiveDuelistBonus}
+                    baitAndSwitchBonus={baitAndSwitchBonus}
                 />
             );
-            expect(screen.queryByText(/Glorious Defense/)).not.toBeInTheDocument();
+            if (showReaction) {
+                expect(screen.getByText(/reaction/)).toBeInTheDocument();
+            } else {
+                expect(screen.queryByText(/reaction/)).not.toBeInTheDocument();
+            }
         });
     });
 
@@ -385,11 +386,11 @@ describe('DiceRollResult', () => {
 
     describe('target AC and reaction bonus display', () => {
         it.each`
-            baitAndSwitch | gloriousDefense | defensiveDuelist | expectedReaction
-            ${3}          | ${0}            | ${0}             | ${'3 reaction'}
-            ${0}          | ${0}            | ${0}             | ${null}
-            ${3}          | ${2}            | ${0}             | ${'5 reaction'}
-        `('shows reaction bonus $expectedReaction when baitAndSwitch: $baitAndSwitch, gloriousDefense: $gloriousDefense, defensiveDuelist: $defensiveDuelist', ({ baitAndSwitch, gloriousDefense, defensiveDuelist, expectedReaction }) => {
+            baitAndSwitch | defensiveDuelist | expectedReaction
+            ${3}          | ${0}             | ${'3 reaction'}
+            ${0}          | ${0}             | ${null}
+            ${3}          | ${2}             | ${'5 reaction'}
+        `('shows reaction bonus $expectedReaction when baitAndSwitch: $baitAndSwitch, defensiveDuelist: $defensiveDuelist', ({ baitAndSwitch, defensiveDuelist, expectedReaction }) => {
             const { container } = render(
                 <DiceRollResult
                     name="Longsword"
@@ -401,7 +402,6 @@ describe('DiceRollResult', () => {
                     hit={true}
                     rollType="attack"
                     baitAndSwitchBonus={baitAndSwitch}
-                    gloriousDefenseBonus={gloriousDefense}
                     defensiveDuelistBonus={defensiveDuelist}
                 />
             );

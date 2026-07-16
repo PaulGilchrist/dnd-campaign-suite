@@ -19,6 +19,7 @@ export const ALL_TRACKED_RESOURCES = [
   'ragePoints',
   'layOnHandsPool',
   'preserveLifePool',
+  'gloriousDefenseUses',
   'superiorityDice',
   'psionicEnergy',
   'arcaneRecoveryLevels',
@@ -124,6 +125,9 @@ export function computeTrackedResources(playerStats) {
   const isPaladin = playerStats.class?.name === 'Paladin'
   const maxLoH = isPaladin ? (5 * (playerStats.level || 0)) : 0
   resources.layOnHandsPool = { current: maxLoH, max: maxLoH }
+
+  const maxGD = isPaladin ? Math.max(charisma?.bonus || 0, 1) : 0
+  resources.gloriousDefenseUses = { current: maxGD, max: maxGD }
 
   let maxSD = 0
   if (isFighter) {

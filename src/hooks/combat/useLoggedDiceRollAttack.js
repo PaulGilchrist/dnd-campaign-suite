@@ -188,7 +188,7 @@ export function createLogAndShow(deps) {
             }
         }
 
-        const effectiveAc = target ? targetAc + coverAcBonus + (context?.gloriousDefenseBonus || 0) + (context?.defensiveDuelistBonus || 0) + (context?.baitAndSwitchBonus || 0) + getShieldAcBonus(target.name, campaignName) + getShieldOfFaithAcBonus(target.name, campaignName) : undefined;
+        const effectiveAc = target ? targetAc + coverAcBonus + (context?.defensiveDuelistBonus || 0) + (context?.baitAndSwitchBonus || 0) + getShieldAcBonus(target.name, campaignName) + getShieldOfFaithAcBonus(target.name, campaignName) : undefined;
         let hit = isAutoMiss ? false : (target ? (effectiveD20Roll + effectiveBonus >= effectiveAc) : undefined);
         const targetName = (rollType === 'attack' || rollType === 'save') ? (target?.name || context?.targetName) : undefined;
         const attackerName = context?.attackerName || characterName;
@@ -543,7 +543,6 @@ export function createLogAndShow(deps) {
                 reliableTalent: context?.reliableTalent,
                 wisCheckReplace: context?.wisCheckReplace,
                 wisCheckMinBonus: context?.wisCheckMinBonus,
-                gloriousDefenseBonus: context?.gloriousDefenseBonus || 0,
                 defensiveDuelistBonus: context?.defensiveDuelistBonus || 0,
                 baitAndSwitchBonus: context?.baitAndSwitchBonus || 0,
                 d20Floor10: context?.d20Floor10,
@@ -630,7 +629,7 @@ export function createLogAndShow(deps) {
                     autoReroll: context?.autoReroll || null,
                     autoRerollBonus: context?.autoRerollBonus || null,
                     defensiveDuelistBonus: context?.defensiveDuelistBonus || 0,
-                    gloriousDefenseBonus: context?.gloriousDefenseBonus || 0,
+
                     baitAndSwitchBonus: context?.baitAndSwitchBonus || 0,
                 };
                 storage.set('combatSummary', combatSummary, campaignName);

@@ -217,7 +217,7 @@ describe('DiceRollResult', () => {
             expect(screen.getByText(/Save DC 16 DEX/)).toBeInTheDocument();
         });
 
-        it('shows hit with glorious defense bonus in text', () => {
+        it('shows hit with reaction bonus in text', () => {
             const { container } = render(
                 <DiceRollResult
                     name="Longsword"
@@ -228,8 +228,8 @@ describe('DiceRollResult', () => {
                     targetAc={14}
                     hit={true}
                     rollType="attack"
-                    gloriousDefenseBonus={2}
                     defensiveDuelistBonus={1}
+                    baitAndSwitchBonus={2}
                 />
             );
             const hitMiss = container.querySelector('.dice-roll-hit-miss.hit');

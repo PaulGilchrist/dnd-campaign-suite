@@ -202,12 +202,12 @@ describe('createLogAndShow (useLoggedDiceRollAttack)', () => {
             }));
         });
 
-        it('adds gloriousDefenseBonus to effectiveAc', async () => {
+        it('does not include gloriousDefenseBonus in effectiveAc (handled retroactively by handler)', async () => {
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
             const fn = createFn();
             await fn('Longsword', 5, 'attack', { targetName: 'Goblin', gloriousDefenseBonus: 2 });
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-                gloriousDefenseBonus: 2,
+            expect(deps.setPopupHtml).not.toHaveBeenCalledWith(expect.objectContaining({
+                gloriousDefenseBonus: expect.any(Number),
             }));
         });
 

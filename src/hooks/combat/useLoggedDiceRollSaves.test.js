@@ -57,7 +57,7 @@ vi.mock('./loggedDiceRollUtils.js', () => ({
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { computeDamageAfterEvasion, rollSaveForCreature, applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { sendSaveResult } from '../../services/combat/conditions/savePromptService.js';
-import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
+import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
 import { hasPotentCantrip } from './loggedDiceRollUtils.js';
@@ -299,9 +299,73 @@ describe('createSaves (useLoggedDiceRollSaves) - Core', () => {
             }));
         });
 
-        it('decrements uses on counter attack', async () => {
+        it('returns popup when no attack event exists', async () => {
             getRuntimeValue.mockReturnValue(2);
             getCombatContext.mockResolvedValue({
+                lastAttack: null,
+            });
+            const { triggerGloriousDefenseCounterAttack } = createFn();
+            await triggerGloriousDefenseCounterAttack();
+            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+                popupMessage: expect.stringContaining('The last attack did not target you'),
+            }));
+        });
+
+        it('returns popup when attack did not target this player', async () => {
+            getRuntimeValue.mockReturnValue(2);
+            getCombatContext.mockResolvedValue({
+                lastAttack: {
+                    targetName: 'SomeOtherCharacter',
+                    d20: 12,
+                    bonus: 7,
+                    targetAc: 16,
+                    hit: true,
+                },
+            });
+            const { triggerGloriousDefenseCounterAttack } = createFn();
+            await triggerGloriousDefenseCounterAttack();
+            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+                popupMessage: expect.stringContaining('did not target you'),
+            }));
+        });
+
+        it('returns popup when attack still hits with CHA bonus', async () => {
+            getRuntimeValue.mockReturnValue(2);
+            getCombatContext.mockResolvedValue({
+                lastAttack: {
+                    targetName: 'TestFighter',
+                    d20: 15,
+                    bonus: 7,
+                    targetAc: 16,
+                    hit: true,
+                    attackerName: 'Goblin',
+                },
+            });
+            loadCombatSummary.mockResolvedValue({
+                creatures: [
+                    { type: 'player', name: 'TestFighter', attacks: [{ name: 'Longsword', hitBonus: 5, range: 5 }] },
+                ],
+            });
+            const { triggerGloriousDefenseCounterAttack } = createFn();
+            await triggerGloriousDefenseCounterAttack();
+            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+                popupMessage: expect.stringContaining('not enough to change the outcome'),
+            }));
+        });
+
+        it('calls logAndShow when attack becomes miss', async () => {
+            getRuntimeValue.mockReturnValue(2);
+            getCombatContext.mockResolvedValue({
+                lastAttack: {
+                    targetName: 'TestFighter',
+                    d20: 9,
+                    bonus: 7,
+                    targetAc: 16,
+                    hit: true,
+                    attackerName: 'Goblin',
+                },
+            });
+            loadCombatSummary.mockResolvedValue({
                 creatures: [
                     { type: 'player', name: 'TestFighter', attacks: [{ name: 'Longsword', hitBonus: 5, range: 5 }] },
                 ],
@@ -309,113 +373,49 @@ describe('createSaves (useLoggedDiceRollSaves) - Core', () => {
             const { triggerGloriousDefenseCounterAttack } = createFn();
             await triggerGloriousDefenseCounterAttack();
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'gloriousDefenseUses', 1, 'test-campaign');
-        });
-
-        it('returns popup when no melee attack available', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { type: 'player', name: 'TestFighter', attacks: [{ name: 'Fire Bolt', hitBonus: 5, range: 120 }] },
-                ],
-            });
-            const { triggerGloriousDefenseCounterAttack } = createFn();
-            await triggerGloriousDefenseCounterAttack();
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-                popupMessage: expect.stringContaining('no melee attack'),
+            expect(deps.logAndShow).toHaveBeenCalledWith('Longsword', 5, 'attack', expect.objectContaining({
+                targetName: 'Goblin',
             }));
-        });
-
-        it('restores uses when no attack available', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { type: 'player', name: 'TestFighter', attacks: [{ name: 'Fire Bolt', hitBonus: 5, range: 120 }] },
-                ],
-            });
-            const { triggerGloriousDefenseCounterAttack } = createFn();
-            await triggerGloriousDefenseCounterAttack();
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'gloriousDefenseUses', 2, 'test-campaign');
-        });
-
-        it('logs ability_use entry when counter attack triggers', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            loadCombatSummary.mockResolvedValue({
-                creatures: [
-                    { type: 'player', name: 'TestFighter', attacks: [{ name: 'Longsword', hitBonus: 5, range: 5 }] },
-                ],
-            });
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { type: 'player', name: 'TestFighter', attacks: [{ name: 'Longsword', hitBonus: 5, range: 5 }] },
-                    { type: 'npc', name: 'Orc', targetName: 'TestFighter' },
-                ],
-            });
-            const { triggerGloriousDefenseCounterAttack } = createFn();
-            await triggerGloriousDefenseCounterAttack();
             expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
                 type: 'ability_use',
                 abilityName: 'Glorious Defense',
-            }));
-        });
-
-        it('calls logAndShow with attack info', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            loadCombatSummary.mockResolvedValue({
-                creatures: [
-                    { type: 'player', name: 'TestFighter', attacks: [{ name: 'Longsword', hitBonus: 5, range: 5 }] },
-                ],
-            });
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { type: 'player', name: 'TestFighter', attacks: [{ name: 'Longsword', hitBonus: 5, range: 5 }], targetName: 'Orc' },
-                    { type: 'npc', name: 'Orc' },
-                ],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
-            const { triggerGloriousDefenseCounterAttack } = createFn();
-            await triggerGloriousDefenseCounterAttack();
-            expect(deps.logAndShow).toHaveBeenCalledWith('Longsword', 5, 'attack', expect.objectContaining({
-                targetName: 'Orc',
+                targetName: 'Goblin',
             }));
         });
 
         it('handles no combat context gracefully', async () => {
             getRuntimeValue.mockReturnValue(2);
-            getCombatContext.mockResolvedValue(null);
+            getCombatContext.mockResolvedValue({
+                lastAttack: null,
+            });
             const { triggerGloriousDefenseCounterAttack } = createFn();
             await triggerGloriousDefenseCounterAttack();
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-                popupMessage: expect.stringContaining('no melee attack'),
-            }));
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'gloriousDefenseUses', 2, 'test-campaign');
-        });
-
-        it('recharges on long rest - sets uses to chaBonus+1 max', async () => {
-            getRuntimeValue.mockReturnValue(0);
-            const { triggerGloriousDefenseCounterAttack } = createFn();
-            await triggerGloriousDefenseCounterAttack();
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-                popupMessage: expect.stringContaining('Recharges on a Long Rest'),
+                popupMessage: expect.stringContaining('did not target you'),
             }));
         });
 
-        it('targets "attacker" when no targetName on attacker', async () => {
+        it('targets attacker from lastAttack instead of current target', async () => {
             getRuntimeValue.mockReturnValue(2);
+            getCombatContext.mockResolvedValue({
+                lastAttack: {
+                    targetName: 'TestFighter',
+                    d20: 9,
+                    bonus: 7,
+                    targetAc: 16,
+                    hit: true,
+                    attackerName: 'Red Dragon',
+                },
+            });
             loadCombatSummary.mockResolvedValue({
                 creatures: [
                     { type: 'player', name: 'TestFighter', attacks: [{ name: 'Longsword', hitBonus: 5, range: 5 }] },
                 ],
             });
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { type: 'player', name: 'TestFighter', attacks: [{ name: 'Longsword', hitBonus: 5, range: 5 }] },
-                ],
-            });
-            getTargetFromAttacker.mockReturnValue(null);
             const { triggerGloriousDefenseCounterAttack } = createFn();
             await triggerGloriousDefenseCounterAttack();
             expect(deps.logAndShow).toHaveBeenCalledWith('Longsword', 5, 'attack', expect.objectContaining({
-                targetName: null,
+                targetName: 'Red Dragon',
             }));
         });
     });

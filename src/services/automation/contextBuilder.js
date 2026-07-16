@@ -416,13 +416,6 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             }
         }
 
-        // Compute Glorious Defense AC bonus (on the attacker when they are the Paladin being attacked)
-        let gloriousDefenseBonus = 0;
-        const gloriousDefenseActive = getRuntimeValue(playerName, 'gloriousDefenseActive', campaignName);
-        if (gloriousDefenseActive) {
-            gloriousDefenseBonus = Number(getRuntimeValue(playerName, 'gloriousDefenseBonus', campaignName) || 1);
-        }
-
         // Compute Defensive Duelist AC bonus (2024 rules)
         let defensiveDuelistBonus = 0;
         const defensiveDuelistActive = getRuntimeValue(playerName, 'defensiveDuelistActive', campaignName);
@@ -533,7 +526,6 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             hitBonus: effectiveHitBonus,
             hitBonusFormula,
             sacredWeaponBonus,
-            gloriousDefenseBonus,
             defensiveDuelistBonus,
             baitAndSwitchBonus,
             strokeOfLuck: strokeOfLuckAvailable,
@@ -762,20 +754,6 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                         if (inAura) {
                             coverResult = { level: 'half', acBonus: 2 };
                             base.coverReason = 'Smite of Protection';
-                        }
-                    }
-                }
-
-                // Check Glorious Defense AC bonus (target Paladin has active buff)
-                const gloriousDefenseActive = getRuntimeValue(base.targetName, 'gloriousDefenseActive', campaignName);
-                if (gloriousDefenseActive && coverResult.acBonus < 2) {
-                    const targetChar = mapData?.players?.find(p => p.name === base.targetName);
-                    const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
-                    if (targetChar && attackerPlayer) {
-                        const dist = getDistanceFeet(attackerPlayer, targetChar);
-                        if (dist <= 10) {
-                            const gloriousDefenseBonus = Number(getRuntimeValue(base.targetName, 'gloriousDefenseBonus', campaignName) || 1);
-                            coverResult.acBonus = Math.max(coverResult.acBonus, gloriousDefenseBonus);
                         }
                     }
                 }

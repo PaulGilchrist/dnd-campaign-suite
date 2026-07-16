@@ -6,7 +6,7 @@ import {
     normalizeSaveType,
 } from '../../services/rules/combat/applyDamage.js';
 import { sendSaveResult } from '../../services/combat/conditions/savePromptService.js';
-import { getTargetFromAttacker, getCombatContext } from '../../services/rules/combat/damageUtils.js';
+import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js';
 import { hasIgnoreResistance, evaluateAutoExpression } from '../../services/combat/automation/automationService.js';
@@ -16,7 +16,7 @@ export function createSaves(deps) {
 
     async function triggerGloriousDefenseCounterAttack() {
         const playerName = characterName;
-        const chaBonus = 0;
+        const chaBonus = charactersRef?.current?.find(c => c.name === playerName)?.abilities?.find(a => a.name === 'Charisma')?.bonus || 0;
 
         const usesKey = 'gloriousDefenseUses';
         const usesMax = Math.max(1, chaBonus);
@@ -36,27 +36,16 @@ export function createSaves(deps) {
                 forcedMode: undefined,
                 isCrit: false,
                 isAutoCrit: false,
-                gloriousDefenseBonus: 0,
                 defensiveDuelistBonus: 0,
                 popupMessage: `${characterName} has no uses remaining for Glorious Defense. Recharges on a Long Rest.`,
             });
             return;
         }
 
-        await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
-
         const cs = await getCombatContext(campaignName);
-        const target = cs ? getTargetFromAttacker(cs, playerName) : null;
-        const targetName = target?.name || null;
+        const lastAttack = cs?.lastAttack;
 
-        const combatSummary = await loadCombatSummary(campaignName);
-        const playerCreature = combatSummary?.creatures?.find(c => c.type === 'player' && c.name === playerName);
-        const attacks = playerCreature?.attacks || [];
-        const meleeAttacks = attacks.filter(a => a.range === MELEE_REACH_FEET);
-        const attack = meleeAttacks.length > 0 ? meleeAttacks[0] : attacks[0];
-
-        if (!attack) {
-            await setRuntimeValue(playerName, usesKey, currentUses, campaignName);
+        if (!lastAttack || lastAttack.targetName !== playerName) {
             setPopupHtml({
                 type: 'd20',
                 rollType: 'attack',
@@ -70,21 +59,75 @@ export function createSaves(deps) {
                 forcedMode: undefined,
                 isCrit: false,
                 isAutoCrit: false,
-                gloriousDefenseBonus: 0,
+                defensiveDuelistBonus: 0,
+                popupMessage: `${characterName}: The last attack did not target you.`,
+            });
+            return;
+        }
+
+        const chaMod = Math.max(1, chaBonus);
+        const newAc = lastAttack.targetAc != null ? lastAttack.targetAc + chaMod : null;
+        const wouldHit = newAc != null ? (lastAttack.d20 + lastAttack.bonus >= newAc) : null;
+        const attackerName = lastAttack.attackerName || 'Unknown creature';
+
+        if (wouldHit === true) {
+            setPopupHtml({
+                type: 'd20',
+                rollType: 'attack',
+                name: 'Glorious Defense',
+                rolls: [],
+                bonus: 0,
+                targetName: null,
+                targetAc: null,
+                hit: undefined,
+                isAutoMiss: false,
+                forcedMode: undefined,
+                isCrit: false,
+                isAutoCrit: false,
+                defensiveDuelistBonus: 0,
+                popupMessage: `The CHA bonus (+${chaMod}) was not enough to change the outcome.`,
+            });
+            return;
+        }
+
+        // Attack becomes a miss — use the counterattack
+        const combatSummary = await loadCombatSummary(campaignName);
+        const playerCreature = combatSummary?.creatures?.find(c => c.type === 'player' && c.name === playerName);
+        const attacks = playerCreature?.attacks || [];
+        const meleeAttacks = attacks.filter(a => a.range === MELEE_REACH_FEET);
+        const attack = meleeAttacks.length > 0 ? meleeAttacks[0] : attacks[0];
+
+        if (!attack) {
+            setPopupHtml({
+                type: 'd20',
+                rollType: 'attack',
+                name: 'Glorious Defense',
+                rolls: [],
+                bonus: 0,
+                targetName: null,
+                targetAc: null,
+                hit: undefined,
+                isAutoMiss: false,
+                forcedMode: undefined,
+                isCrit: false,
+                isAutoCrit: false,
                 defensiveDuelistBonus: 0,
                 popupMessage: `${characterName} has no melee attack available.`,
             });
             return;
         }
 
+        await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
+
         logEntry({
             type: 'ability_use',
             characterName: playerName,
             abilityName: 'Glorious Defense',
-            description: `${playerName} used Glorious Defense counter-attack against ${targetName || 'attacker'}.`,
+            description: `${playerName} used Glorious Defense against ${attackerName} — the attack misses due to the CHA modifier (${chaMod}) and ${playerName} makes a melee counterattack.`,
+            targetName: attackerName,
         }).catch((e) => { console.error("[useLoggedDiceRollSaves] Error:", e); });
 
-        logAndShow(attack.name, attack.hitBonus, 'attack', { targetName, forcedMode: undefined });
+        logAndShow(attack.name, attack.hitBonus, 'attack', { targetName: attackerName, forcedMode: undefined });
     }
     async function quickRollPlayerSave(promptId, targetName, saveType, saveDc, selectedAllies) {
         const pending = pendingSaves[promptId];

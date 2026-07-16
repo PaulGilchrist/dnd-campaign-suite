@@ -4,6 +4,7 @@ import TrackedResourceInput from './TrackedResourceInput.jsx';
 import { getClassFeatures } from '../../../services/character/classFeatures.js';
 import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { executeHandler } from '../../../services/automation/index.js';
+import { hasGloriousDefenseActive } from '../../../services/automation/handlers/class-cleric-paladin/gloriousDefenseHandler.js';
 import { applyPortentChoice } from '../../../services/automation/handlers/class-wizard/portentHandler.js';
 import Popup from '../../common/popup.jsx';
 import WeaponKindMasteryModal from '../modals/WeaponKindMasteryModal.jsx';
@@ -365,8 +366,9 @@ const PaladinFeatures = function PaladinFeatures({ playerStats, campaignName }) 
                   ))}</span>
               )}</div>}
               {fightingStylePopup && <Popup html={fightingStylePopup} onClickOrKeyDown={() => setFightingStylePopup(null)} />}
-             <TrackedResourceInput label="Lay On Hands Pool" resourceKey="layOnHandsPool" playerName={playerStats.name} getMax={() => layOnHandsPoolMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-             {holyNimbusActive && <span className="automation-badge">Holy Nimbus</span>}
+              <TrackedResourceInput label="Lay On Hands Pool" resourceKey="layOnHandsPool" playerName={playerStats.name} getMax={() => layOnHandsPoolMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+              {hasGloriousDefenseActive(playerStats) && <TrackedResourceInput label="Glorious Defense Uses" resourceKey="gloriousDefenseUses" playerName={playerStats.name} getMax={() => Math.max(cha?.bonus || 0, 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />}
+              {holyNimbusActive && <span className="automation-badge">Holy Nimbus</span>}
              {livingLegendActive && <span className="automation-badge">Living Legend</span>}
              {peerlessAthleteActive === true && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-person-running"></i> Peerless Athlete</span>}
          </div>

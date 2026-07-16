@@ -804,7 +804,7 @@ describe('contextBuilder: buildAttackContextSync', () => {
   });
 
   describe('glorious defense', () => {
-    it('includes gloriousDefenseBonus when active', async () => {
+    it('does not include gloriousDefenseBonus in context (handled retroactively by handler)', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'gloriousDefenseActive') return true;
         if (key === 'gloriousDefenseBonus') return 2;
@@ -813,25 +813,7 @@ describe('contextBuilder: buildAttackContextSync', () => {
 
       const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
 
-      expect(result.gloriousDefenseBonus).toBe(2);
-    });
-
-    it('defaults gloriousDefenseBonus to 1 when active but bonus is falsy', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'gloriousDefenseActive') return true;
-        if (key === 'gloriousDefenseBonus') return 0;
-        return undefined;
-      });
-
-      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
-
-      expect(result.gloriousDefenseBonus).toBe(1);
-    });
-
-    it('returns 0 when glorious defense not active', async () => {
-      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
-
-      expect(result.gloriousDefenseBonus).toBe(0);
+      expect(result.gloriousDefenseBonus).toBeUndefined();
     });
   });
 
