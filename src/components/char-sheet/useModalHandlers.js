@@ -3,7 +3,6 @@ import { getCurrentCombatRound } from '../../services/encounters/combatData.js';
 import { setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { applyConstellationOption } from '../../services/automation/handlers/class-sorcerer/starryFormHandler.js';
 import { applyConstellationOption as twinklingApply } from '../../services/automation/handlers/class-sorcerer/twinklingConstellationHandler.js';
-import { handleRestore } from '../../services/automation/handlers/class-cleric-paladin/elderChampionHandler.js';
 
 export default function useModalHandlers({
     playerStats, campaignName,
@@ -194,14 +193,6 @@ export default function useModalHandlers({
         setModalState({ starryFormConstellationModal: null, twinklingConstellationModal: null });
     };
 
-    const handleElderChampionRestore = async (payload) => {
-        const { action, playerStats: ps, campaignName: cn } = payload;
-        const result = await handleRestore(action, ps, cn);
-        if (result) {
-            setPopupHtml(result.payload);
-        }
-    };
-
     const handleWeaponKindMasteryClose = () => {
         setModalState({ weaponKindMasteryModal: null });
     };
@@ -220,7 +211,6 @@ export default function useModalHandlers({
         handleFeatureChoiceConfirm,
         handleFeatureChoiceSkip,
         handleConstellationSelect,
-        handleElderChampionRestore,
         handleWeaponKindMasteryClose,
     };
 }

@@ -78,7 +78,6 @@ describe('createBaseProps', () => {
       'handleFeatureChoiceConfirm',
       'handleFeatureChoiceSkip',
       'handleConstellationSelect',
-      'handleElderChampionRestore',
       'handleCombatSuperiorityConfirm',
       'handleAttackRiderManeuverUse',
       'handleAttackRiderManeuverSkip',

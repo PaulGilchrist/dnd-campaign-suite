@@ -107,16 +107,6 @@ vi.mock('./modals/WarMagicSpellModal.jsx', () => ({
 vi.mock('./modals/divine/SacredWeaponModal.jsx', () => ({
   default: function TestModal() { return <div data-testid="sacred-weapon-modal">SacredWeaponModal</div>; },
 }));
-vi.mock('./modals/ElderChampionRestoreModal.jsx', () => ({
-  default: function TestModal({ onClose, onConfirm }) {
-    return (
-      <div data-testid="elder-champion-restore-modal">
-        <button data-testid="elder-close" onClick={onClose}>Close</button>
-        <button data-testid="elder-confirm" onClick={onConfirm}>Confirm</button>
-      </div>
-    );
-  },
-}));
 vi.mock('./modals/PrimalCompanionBonusActionModal.jsx', () => ({
   default: function TestModal() { return <div data-testid="primal-companion-bonus-action-modal">PrimalCompanionBonusActionModal</div>; },
 }));
@@ -280,7 +270,6 @@ describe('CharActionModals', () => {
       { name: 'war-magic-cantrip', prop: 'warMagicCantripModal', payload: {}, testid: 'war-magic-cantrip-modal' },
       { name: 'war-magic-spell', prop: 'warMagicSpellModal', payload: {}, testid: 'war-magic-spell-modal' },
       { name: 'sacred-weapon', prop: 'sacredWeaponModal', payload: {}, testid: 'sacred-weapon-modal' },
-      { name: 'elder-champion-restore', prop: 'elderChampionRestoreModal', payload: { payload: { action: {}, playerStats: {}, campaignName: 'test' } }, testid: 'elder-champion-restore-modal' },
       { name: 'primal-companion-bonus-action', prop: 'primalCompanionBonusActionModal', payload: {}, testid: 'primal-companion-bonus-action-modal' },
       { name: 'misty-wanderer', prop: 'mistyWandererModal', payload: {}, testid: 'misty-wanderer-modal' },
       { name: 'bonus-action-choice', prop: 'bonusActionChoiceModal', payload: {}, testid: 'bonus-action-choice-modal' },

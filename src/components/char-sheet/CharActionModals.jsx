@@ -26,7 +26,6 @@ import ArcaneChargeModal from './modals/arcane/ArcaneChargeModal.jsx'
 import WarMagicCantripModal from './modals/WarMagicCantripModal.jsx'
 import WarMagicSpellModal from './modals/WarMagicSpellModal.jsx'
 import SacredWeaponModal from './modals/divine/SacredWeaponModal.jsx'
-import ElderChampionRestoreModal from './modals/ElderChampionRestoreModal.jsx'
 import PrimalCompanionBonusActionModal from './modals/PrimalCompanionBonusActionModal.jsx'
 import MistyWandererModal from './modals/MistyWandererModal.jsx'
 import FeyReinforcementsModal from './modals/FeyReinforcementsModal.jsx'
@@ -197,7 +196,6 @@ export default function CharActionModals({
     handleFeatureChoiceConfirm,
     handleFeatureChoiceSkip,
     handleConstellationSelect,
-    handleElderChampionRestore,
     handleRecklessAttackConfirm,
     handleRecklessAttackCancel,
     handleBrutalStrikeConfirm,
@@ -550,18 +548,6 @@ export default function CharActionModals({
                 <SacredWeaponModal
                     {...modalState.sacredWeaponModal}
                     onClose={() => setModalState({ sacredWeaponModal: null })}
-                />
-            )}
-            {modalState.elderChampionRestoreModal && (
-                <ElderChampionRestoreModal
-                    action={modalState.elderChampionRestoreModal.payload.action}
-                    playerStats={modalState.elderChampionRestoreModal.payload.playerStats}
-                    campaignName={modalState.elderChampionRestoreModal.payload.campaignName}
-                    onConfirm={() => {
-                        handleElderChampionRestore(modalState.elderChampionRestoreModal.payload);
-                        setModalState({ elderChampionRestoreModal: null });
-                    }}
-                    onClose={() => setModalState({ elderChampionRestoreModal: null })}
                 />
             )}
             {modalState.primalCompanionBonusActionModal && (

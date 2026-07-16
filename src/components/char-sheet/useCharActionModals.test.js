@@ -57,7 +57,6 @@ const mockModalHandlersResult = {
   handleFeatureChoiceConfirm: vi.fn(),
   handleFeatureChoiceSkip: vi.fn(),
   handleConstellationSelect: vi.fn(),
-  handleElderChampionRestore: vi.fn(),
 };
 
 const baseArgs = {
@@ -103,7 +102,6 @@ describe('useCharActionModals', () => {
     expect(result.current.handleFeatureChoiceConfirm).toBe(mockModalHandlersResult.handleFeatureChoiceConfirm);
     expect(result.current.handleFeatureChoiceSkip).toBe(mockModalHandlersResult.handleFeatureChoiceSkip);
     expect(result.current.handleConstellationSelect).toBe(mockModalHandlersResult.handleConstellationSelect);
-    expect(result.current.handleElderChampionRestore).toBe(mockModalHandlersResult.handleElderChampionRestore);
 
     // Delegated handlers from useCombatSuperiorityModal
     expect(typeof result.current.handleCombatSuperiorityConfirm).toBe('function');

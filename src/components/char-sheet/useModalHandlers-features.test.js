@@ -32,10 +32,6 @@ vi.mock('../../services/automation/handlers/class-sorcerer/twinklingConstellatio
     applyConstellationOption: vi.fn(),
 }));
 
-vi.mock('../../services/automation/handlers/class-cleric-paladin/elderChampionHandler.js', () => ({
-    handleRestore: vi.fn(),
-}));
-
 import { rollExpression } from '../../services/dice/diceRoller.js';
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import { getDistanceFeet } from '../../services/rules/combat/rangeValidation.js';
@@ -43,7 +39,6 @@ import { getCurrentCombatRound } from '../../services/encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { applyConstellationOption } from '../../services/automation/handlers/class-sorcerer/starryFormHandler.js';
 import { applyConstellationOption as twinklingApply } from '../../services/automation/handlers/class-sorcerer/twinklingConstellationHandler.js';
-import { handleRestore } from '../../services/automation/handlers/class-cleric-paladin/elderChampionHandler.js';
 
 function createDeps(overrides = {}) {
     const playerStats = {
@@ -356,40 +351,11 @@ describe('useModalHandlers - features & constellation', () => {
         });
     });
 
-    describe('handleElderChampionRestore', () => {
-        it('calls handleRestore and sets popup', async () => {
-            const deps = createDeps();
-            const payload = {
-                action: { name: 'Elder Champion' },
-                playerStats: { level: 10 },
-                campaignName: 'test-campaign',
-            };
-            handleRestore.mockResolvedValue({ payload: 'Restored!' });
-            const { handleElderChampionRestore } = useModalHandlers(deps);
-            await handleElderChampionRestore(payload);
-            expect(handleRestore).toHaveBeenCalled();
-            expect(deps.setPopupHtml).toHaveBeenCalledWith('Restored!');
-        });
-
-        it('does not set popup when result is null', async () => {
-            const payload = {
-                action: { name: 'Elder Champion' },
-                playerStats: { level: 10 },
-                campaignName: 'test-campaign',
-            };
-            const deps = createDeps();
-            handleRestore.mockResolvedValue(null);
-            const { handleElderChampionRestore } = useModalHandlers(deps);
-            await handleElderChampionRestore(payload);
-            expect(deps.setPopupHtml).not.toHaveBeenCalled();
-        });
-    });
-
     describe('return value', () => {
         it('returns all expected handler functions', () => {
             const deps = createDeps();
             const handlers = useModalHandlers(deps);
-            expect(Object.keys(handlers)).toHaveLength(15);
+            expect(Object.keys(handlers)).toHaveLength(14);
             expect(Object.keys(handlers)).toEqual([
                 'handleMasteryClose',
                 'handleWeaponMasteryChoice',
@@ -404,7 +370,6 @@ describe('useModalHandlers - features & constellation', () => {
                 'handleFeatureChoiceConfirm',
                 'handleFeatureChoiceSkip',
                 'handleConstellationSelect',
-                'handleElderChampionRestore',
                 'handleWeaponKindMasteryClose',
             ]);
             for (const handler of Object.values(handlers)) {

@@ -113,16 +113,6 @@ vi.mock('./modals/WarMagicSpellModal.jsx', () => ({
 vi.mock('./modals/divine/SacredWeaponModal.jsx', () => ({
   default: function TestModal() { return <div data-testid="sacred-weapon-modal">SacredWeaponModal</div>; },
 }));
-vi.mock('./modals/ElderChampionRestoreModal.jsx', () => ({
-  default: function TestModal({ onClose, onConfirm }) {
-    return (
-      <div data-testid="elder-champion-restore-modal">
-        <button data-testid="elder-close" onClick={onClose}>Close</button>
-        <button data-testid="elder-confirm" onClick={onConfirm}>Confirm</button>
-      </div>
-    );
-  },
-}));
 vi.mock('./modals/PrimalCompanionBonusActionModal.jsx', () => ({
   default: function TestModal() { return <div data-testid="primal-companion-bonus-action-modal">PrimalCompanionBonusActionModal</div>; },
 }));

@@ -107,16 +107,6 @@ vi.mock('./modals/WarMagicSpellModal.jsx', () => ({
 vi.mock('./modals/divine/SacredWeaponModal.jsx', () => ({
   default: function TestModal() { return <div data-testid="sacred-weapon-modal">SacredWeaponModal</div>; },
 }));
-vi.mock('./modals/ElderChampionRestoreModal.jsx', () => ({
-  default: function TestModal({ onClose, onConfirm }) {
-    return (
-      <div data-testid="elder-champion-restore-modal">
-        <button data-testid="elder-close" onClick={onClose}>Close</button>
-        <button data-testid="elder-confirm" onClick={onConfirm}>Confirm</button>
-      </div>
-    );
-  },
-}));
 vi.mock('./modals/PrimalCompanionBonusActionModal.jsx', () => ({
   default: function TestModal() { return <div data-testid="primal-companion-bonus-action-modal">PrimalCompanionBonusActionModal</div>; },
 }));
@@ -350,33 +340,6 @@ describe('CharActionModals handlers', () => {
       />);
       fireEvent.click(screen.getByTestId('divine-intervention-close'));
       expect(setModalState).toHaveBeenCalledWith({ divineInterventionModal: null, divineInterventionAction: null });
-    });
-
-    it('ElderChampionRestoreModal: confirm calls handler and dismisses', () => {
-      const handleElderChampionRestore = vi.fn();
-      const setModalState = vi.fn();
-      const payload = { action: {}, playerStats: {}, campaignName: 'test' };
-      render(<CharActionModals
-        {...createBaseProps({ handleElderChampionRestore, setModalState })}
-        modalState={{ elderChampionRestoreModal: { payload } }}
-        setModalState={setModalState}
-      />);
-      fireEvent.click(screen.getByTestId('elder-confirm'));
-      expect(handleElderChampionRestore).toHaveBeenCalledWith(payload);
-      expect(setModalState).toHaveBeenCalledWith({ elderChampionRestoreModal: null });
-    });
-
-    it('ElderChampionRestoreModal: close dismisses without calling handler', () => {
-      const handleElderChampionRestore = vi.fn();
-      const setModalState = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleElderChampionRestore, setModalState })}
-        modalState={{ elderChampionRestoreModal: { payload: { action: {}, playerStats: {}, campaignName: 'test' } } }}
-        setModalState={setModalState}
-      />);
-      fireEvent.click(screen.getByTestId('elder-close'));
-      expect(handleElderChampionRestore).not.toHaveBeenCalled();
-      expect(setModalState).toHaveBeenCalledWith({ elderChampionRestoreModal: null });
     });
   });
 });

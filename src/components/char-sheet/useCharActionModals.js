@@ -47,7 +47,6 @@ export default function useCharActionModals({
         handleFeatureChoiceConfirm,
         handleFeatureChoiceSkip,
         handleConstellationSelect,
-        handleElderChampionRestore,
     } = useModalHandlers({
         playerStats, campaignName,
         rollDamage, proceedWithDamage,
@@ -81,6 +80,5 @@ export default function useCharActionModals({
         handleFeatureChoiceConfirm,
         handleFeatureChoiceSkip,
         handleConstellationSelect,
-        handleElderChampionRestore,
     };
 }

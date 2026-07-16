@@ -36,7 +36,6 @@ export function createBaseProps(overrides) {
     handleFeatureChoiceConfirm: vi.fn(),
     handleFeatureChoiceSkip: vi.fn(),
     handleConstellationSelect: vi.fn(),
-    handleElderChampionRestore: vi.fn(),
     handleCombatSuperiorityConfirm: vi.fn(),
     handleAttackRiderManeuverUse: vi.fn(),
     handleAttackRiderManeuverSkip: vi.fn(),

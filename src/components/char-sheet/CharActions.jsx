@@ -133,7 +133,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         handleFeatureChoiceConfirm,
         handleFeatureChoiceSkip,
         handleConstellationSelect,
-        handleElderChampionRestore,
         combatSuperiorityModal,
         setCombatSuperiorityModal,
         handleAttackRiderManeuverUse,
@@ -1056,7 +1055,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'warMagicCantrip': setModalState({ warMagicCantripModal: result.payload }); break;
                     case 'warMagicSpell': setModalState({ warMagicSpellModal: result.payload }); break;
                     case 'sacredWeaponDamageType': setModalState({ sacredWeaponModal: result.payload }); break;
-                    case 'elderChampionRestore': setModalState({ elderChampionRestoreModal: result.payload }); break;
                     case 'primalCompanionBonusActionCommand': setModalState({ primalCompanionBonusActionModal: result.payload }); break;
                     case 'mistyWanderer': setModalState({ mistyWandererModal: result.payload }); break;
                     case 'feyReinforcements': setModalState({ feyReinforcementsModal: result.payload }); break;
@@ -1455,7 +1453,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleFeatureChoiceConfirm={handleFeatureChoiceConfirm}
                     handleFeatureChoiceSkip={handleFeatureChoiceSkip}
                     handleConstellationSelect={handleConstellationSelect}
-                    handleElderChampionRestore={handleElderChampionRestore}
                     handleRecklessAttackConfirm={handleRecklessAttackConfirm}
                     handleRecklessAttackCancel={handleRecklessAttackCancel}
                     handleBrutalStrikeConfirm={handleBrutalStrikeConfirm}

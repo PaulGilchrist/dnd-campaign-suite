@@ -148,7 +148,7 @@ vi.mock('./useCharActionModals.js', () => ({
     handleDamageTypeModifierChoice: vi.fn(), handleDamageTypeModifierSkip: vi.fn(),
     handleEnhancedUnarmedChoice: vi.fn(), handleEnhancedUnarmedSkip: vi.fn(),
     handleFeatureChoiceConfirm: vi.fn(), handleFeatureChoiceSkip: vi.fn(),
-    handleConstellationSelect: vi.fn(), handleElderChampionRestore: vi.fn(),
+    handleConstellationSelect: vi.fn(),
     combatSuperiorityModal: null, setCombatSuperiorityModal: vi.fn(),
     handleCombatSuperiorityConfirm: vi.fn(), handleAttackRiderManeuverUse: vi.fn(), handleAttackRiderManeuverSkip: vi.fn(),
   })),

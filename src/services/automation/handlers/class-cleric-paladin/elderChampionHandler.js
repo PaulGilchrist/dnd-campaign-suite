@@ -19,32 +19,74 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const wasActive = activeBuffs.some(b => b.name === action.name);
 
     if (wasActive) {
-        const newBuffs = activeBuffs.filter(b => b.name !== action.name);
-        await setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
-        await setRuntimeValue(playerName, ELDER_CHAMPION_KEY, false, campaignName);
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: action.name,
                 automationType: auto.type,
-                description: `${action.name} ended.`,
+                description: `${action.name} is already active.`,
                 automation: auto,
             },
         };
     }
 
-    // Check long rest
+    // Check long rest - if already used, try to expend a level 5 spell slot
     const alreadyUsed = getRuntimeValue(playerName, ELDER_CHAMPION_REST_KEY, campaignName);
     if (alreadyUsed) {
+        const slotKey = 'spell_slots_level_5';
+        const currentSlots = Number(getRuntimeValue(playerName, slotKey, campaignName) ?? 0);
+        if (currentSlots <= 0) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    automationType: auto.type,
+                    description: `${action.name} cannot be used again until a long rest or level 5 spell slot becomes available.`,
+                    automation: auto,
+                },
+            };
+        }
+
+        await setRuntimeValue(playerName, slotKey, currentSlots - 1, campaignName);
+        await setRuntimeValue(playerName, ELDER_CHAMPION_KEY, true, campaignName);
+
+        const storedBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName);
+        const activeBuffList = Array.isArray(storedBuffs) ? storedBuffs : [];
+        const buffEntry = {
+            name: action.name,
+            effect: 'elder_champion',
+            duration: auto.duration || '1_minute',
+            hasAutomation: true,
+        };
+        const newBuffs = activeBuffList.some(b => b.name === action.name)
+            ? activeBuffList
+            : [...activeBuffList, buffEntry];
+        await setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
+
+        await addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: action.name,
+            description: `${playerName} activated Elder Champion by expending a level 5 spell slot.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[elderChampion] Error:", e); });
+
         return {
-            type: 'modal',
-            modalName: 'elderChampionRestore',
-            payload: { action, playerStats, campaignName },
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description: `${action.name} activated by expending a level 5 spell slot.`,
+                automation: auto,
+            },
         };
     }
 
     await setRuntimeValue(playerName, ELDER_CHAMPION_KEY, true, campaignName);
+    await setRuntimeValue(playerName, ELDER_CHAMPION_REST_KEY, true, campaignName);
 
     const storedBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName);
     const activeBuffList = Array.isArray(storedBuffs) ? storedBuffs : [];
@@ -75,36 +117,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             automationType: auto.type,
             description: `${action.name} activated! Aura of Protection is imbued with primal power for 1 minute.`,
             automation: auto,
-        },
-    };
-}
-
-export async function handleRestore(action, playerStats, campaignName) {
-    const playerName = playerStats.name;
-
-    // Try to expend a level 5 spell slot
-    const slotKey = 'spellSlotLevel5';
-    const currentSlots = Number(getRuntimeValue(playerName, slotKey, campaignName) ?? 0);
-    if (currentSlots <= 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: 'No level 5 spell slots available to restore Elder Champion.',
-            },
-        };
-    }
-
-    await setRuntimeValue(playerName, slotKey, currentSlots - 1, campaignName);
-    await setRuntimeValue(playerName, ELDER_CHAMPION_REST_KEY, false, campaignName);
-
-    return {
-        type: 'popup',
-        payload: {
-            type: 'automation_info',
-            name: action.name,
-            description: `Elder Champion restored by expending a level 5 spell slot.`,
         },
     };
 }
