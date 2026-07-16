@@ -1,0 +1,28 @@
+.ally-selection-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.ally-select-btn {
+    background: transparent;
+    border: 1px solid var(--color-link);
+    color: var(--color-link);
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: background 0.2s;
+}
+
+.ally-select-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.ally-count {
+    margin-left: auto;
+    opacity: 0.7;
+    font-size: 0.85em;
+}

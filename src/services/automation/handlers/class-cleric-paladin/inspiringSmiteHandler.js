@@ -1,4 +1,5 @@
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { resolveDiceExpression } from '../../../combat/automation/automationService.js';
 import { loadMapData } from '../../../maps/mapsService.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
@@ -65,8 +66,8 @@ export async function handle(action, playerStats, campaignName, mapName) {
     }
 
     // Get ally list from selectedAllies
-    const storedAllies = getRuntimeValue(playerName, 'selectedAllies');
-    const allyList = Array.isArray(storedAllies) && storedAllies.length > 0 ? storedAllies : null;
+    const allyList = getAllyList(playerName);
+    const hasAllyList = allyList.length > 1;
 
     // Build target list using allies within range
     const rangeFt = rangeToFeet(auto.range || '30 ft');
@@ -75,7 +76,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
     if (mapName && rangeFt != null) {
         const mapPlayers = (await loadMapData(campaignName, mapName))?.players || [];
 
-        if (allyList) {
+        if (hasAllyList) {
             for (const allyName of allyList) {
                 if (allyName === playerName) continue;
                 const inRange = await isWithinRange(playerName, allyName, rangeFt);
@@ -98,7 +99,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
         creatureTargets.push({ name: playerName, type: 'player' });
     } else {
         // No map: include all allies + self (assume in range)
-        if (allyList) {
+        if (hasAllyList) {
             for (const allyName of allyList) {
                 if (allyName === playerName) continue;
                 creatureTargets.push({ name: allyName, type: 'player' });

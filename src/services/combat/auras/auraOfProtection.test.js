@@ -5,6 +5,10 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
+vi.mock('../../../hooks/useAllySelection.js', () => ({
+  getAllyList: vi.fn(() => ['Cleric']),
+}));
+
 vi.mock('../../rules/combat/rangeCheck.js', () => ({
   isWithinRange: vi.fn(),
 }));
@@ -23,6 +27,7 @@ import {
 
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { isWithinRange } from '../../rules/combat/rangeCheck.js';
+import { getAllyList } from '../../../hooks/useAllySelection.js';
 
 function makeStats(extra = {}) {
   return { automation: extra.automation ?? null };
@@ -299,10 +304,10 @@ describe('computeAuraBonus', () => {
   });
 
   describe('ally filtering', () => {
-    beforeEach(() => { vi.clearAllMocks(); getRuntimeValue.mockReturnValue([]); });
+    beforeEach(() => { vi.clearAllMocks(); });
 
     it('returns { bonus: 0, sourceName: null } when selectedAllies excludes the target', async () => {
-      getRuntimeValue.mockReturnValue(['OtherPlayer']);
+      getAllyList.mockReturnValue(['OtherPlayer']);
       const paladin = makeSourceEntry('Paladin', {
         automation: { passives: [makePassive('Aura of Protection')] },
         abilities: [{ name: 'Charisma', bonus: 5 }],
@@ -312,7 +317,7 @@ describe('computeAuraBonus', () => {
     });
 
     it('returns the bonus when selectedAllies includes the target', async () => {
-      getRuntimeValue.mockReturnValue(['Cleric']);
+      getAllyList.mockReturnValue(['Cleric']);
       isWithinRange.mockResolvedValue(true);
       const paladin = makeSourceEntry('Paladin', {
         automation: { passives: [makePassive('Aura of Protection')] },
@@ -323,7 +328,7 @@ describe('computeAuraBonus', () => {
     });
 
     it('selects the highest bonus source whose allies include the target', async () => {
-      getRuntimeValue.mockReturnValue(['Cleric']).mockReturnValue(['Cleric']);
+      getAllyList.mockReturnValue(['Cleric']);
       isWithinRange.mockResolvedValue(true);
       const p1 = makeSourceEntry('Paladin1', {
         automation: { passives: [makePassive('Aura of Protection')] },
@@ -338,10 +343,10 @@ describe('computeAuraBonus', () => {
     });
 
     it('skips sources where allies list excludes the target but includes others', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (name === 'Paladin1' && key === 'selectedAllies') return ['Wizard'];
-        if (name === 'Paladin2' && key === 'selectedAllies') return ['Cleric'];
-        return undefined;
+      getAllyList.mockImplementation((name) => {
+        if (name === 'Paladin1') return ['Wizard'];
+        if (name === 'Paladin2') return ['Cleric'];
+        return ['Cleric'];
       });
       isWithinRange.mockResolvedValue(true);
       const p1 = makeSourceEntry('Paladin1', {
@@ -357,7 +362,7 @@ describe('computeAuraBonus', () => {
     });
 
     it('falls back to no ally filtering when selectedAllies is null', async () => {
-      getRuntimeValue.mockReturnValue(null);
+      getAllyList.mockReturnValue(['Cleric']);
       isWithinRange.mockResolvedValue(true);
       const paladin = makeSourceEntry('Paladin', {
         automation: { passives: [makePassive('Aura of Protection')] },
@@ -368,7 +373,7 @@ describe('computeAuraBonus', () => {
     });
 
     it('falls back to no ally filtering when selectedAllies is empty', async () => {
-      getRuntimeValue.mockReturnValue([]);
+      getAllyList.mockReturnValue(['Cleric']);
       isWithinRange.mockResolvedValue(true);
       const paladin = makeSourceEntry('Paladin', {
         automation: { passives: [makePassive('Aura of Protection')] },

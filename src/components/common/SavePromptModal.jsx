@@ -6,6 +6,7 @@ import Subscriber from './Subscriber.jsx';
 import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.js';
 import { getAbilitySaveBonus } from '../../services/combat/conditions/conditionUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getAllyList } from '../../hooks/useAllySelection.js';
 import { normalizeSaveType } from '../../services/rules/combat/applyDamage.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
 import './savePromptModal.css';
@@ -148,15 +149,32 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
             const charName = character.name;
             const holyNimbusActive = getRuntimeValue(charName, 'holyNimbusActive', campaignName);
             if (!holyNimbusActive) continue;
-            const storedAllies = getRuntimeValue(charName, 'selectedAllies', campaignName);
-            const allyList = Array.isArray(storedAllies) && storedAllies.length > 0 ? storedAllies : null;
-            if (allyList && allyList.includes(targetName)) {
+            const allyList = getAllyList(charName);
+            if (allyList.includes(targetName)) {
               hasAdvantage = true;
               break;
             }
-            if (!allyList) {
+            if (allyList.length === 1) {
               hasAdvantage = true;
               break;
+            }
+          }
+          // Also check NPCs with Holy Nimbus
+          if (!hasAdvantage) {
+            for (const creature of (combatSummary?.creatures || [])) {
+              const creatureName = utils.getName(creature.name);
+              if (creature.type === 'player') continue;
+              const holyNimbusActive = getRuntimeValue(creatureName, 'holyNimbusActive', campaignName);
+              if (!holyNimbusActive) continue;
+              const allyList = getAllyList(creatureName);
+              if (allyList.includes(targetName)) {
+                hasAdvantage = true;
+                break;
+              }
+              if (allyList.length === 1) {
+                hasAdvantage = true;
+                break;
+              }
             }
           }
         }

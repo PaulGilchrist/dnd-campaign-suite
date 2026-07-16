@@ -1,4 +1,5 @@
 import { getRuntimeValue, setRuntimeValue, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
+import { getAllyList } from '../../../hooks/useAllySelection.js';
 import { evaluateAutoExpression } from '../../combat/automation/automationExpressions.js';
 import utils from '../../ui/utils.js';
 import storage from '../../ui/storage.js';
@@ -775,7 +776,7 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
 
     if (typeof damageValue !== 'number' || isNaN(damageValue) || damageValue <= 0) return;
 
-    const storedAllies = allyFilter ? getRuntimeValue(activeName, 'selectedAllies', campaignName) : null;
+    const storedAllies = allyFilter ? getAllyList(activeName) : null;
     const allyList = Array.isArray(storedAllies) && storedAllies.length > 0 ? storedAllies : null;
 
     const activeMapName = getRuntimeValue('__map__', 'activeMapName');
@@ -828,7 +829,7 @@ async function applyHolyNimbusDamage(activeName, characters, campaignName) {
         const holyNimbusActive = getRuntimeValue(charName, 'holyNimbusActive', campaignName);
         if (!holyNimbusActive) continue;
 
-        const storedAllies = getRuntimeValue(charName, 'selectedAllies', campaignName);
+        const storedAllies = getAllyList(charName);
         const allyList = Array.isArray(storedAllies) && storedAllies.length > 0 ? storedAllies : null;
         if (allyList && allyList.includes(activeName)) continue;
 

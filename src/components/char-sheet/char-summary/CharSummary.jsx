@@ -23,10 +23,9 @@ import { setRuntimeValue, useRuntimeValue, getRuntimeValue } from '../../../hook
 import { useSyncedState } from '../../../hooks/runtime/useSyncedState.js';
 import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
-import { hasAuraOfProtection } from '../../../services/combat/auras/auraOfProtection.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import CharConditions from './CharConditions.jsx'
-import AllySelectionModal from '../modals/AllySelectionModal.jsx';
+import AllySelectionModal from '../../common/AllySelectionModal.jsx';
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
@@ -39,8 +38,10 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const [displayXp, setDisplayXp] = React.useState(playerStats?.xp ?? 0);
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const [showAvatarModal, setShowAvatarModal] = React.useState(false);
-    const [showAllySelectionModal, setShowAllySelectionModal] = React.useState(false);
-    const [allyTargets, setAllyTargets] = React.useState([]);
+    const [showAllyModal, setShowAllyModal] = React.useState(false);
+    const [allyModalCreatures, setAllyModalCreatures] = React.useState([]);
+    const storedAllies = useRuntimeValue(playerStats.name, 'selectedAllies', campaignName);
+    const currentAllies = Array.isArray(storedAllies) && storedAllies.length > 0 ? storedAllies : [playerStats.name];
     React.useEffect(() => {
         setDisplayXp(playerStats?.xp ?? 0);
     }, [playerStats?.xp]);
@@ -371,37 +372,35 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     };
 
     const handleInitiative = () => {
-        if (hasAuraOfProtection(playerStats)) {
-            const combatSummary = getCombatSummary(campaignName);
-            const targets = combatSummary?.creatures?.map(c => ({
-                name: c.name,
-                type: c.type,
-                currentHp: c.currentHp,
-                maxHp: c.maxHp,
-            })) || characters.map(c => ({ name: c.name, type: c.type }));
-            setAllyTargets(targets);
-            setShowAllySelectionModal(true);
-        } else {
-            rollInitiative(effectiveInitiative, playerStats.initiativeAdvantage ? { forcedMode: 'advantage' } : undefined);
-        }
+        rollInitiative(effectiveInitiative, playerStats.initiativeAdvantage ? { forcedMode: 'advantage' } : undefined);
     };
 
-    const handleAllySelectionConfirm = async (selectedAllies) => {
-        setShowAllySelectionModal(false);
+    const handleAllyModalOpen = () => {
+        const combatSummary = getCombatSummary(campaignName);
+        const targets = combatSummary?.creatures?.map(c => ({
+            name: c.name,
+            type: c.type,
+            currentHp: c.currentHp,
+            maxHp: c.maxHp,
+        })) || characters.map(c => ({ name: c.name, type: c.type }));
+        setAllyModalCreatures(targets);
+        setShowAllyModal(true);
+    };
+
+    const handleAllyModalConfirm = async (selectedAllies) => {
+        setShowAllyModal(false);
         setRuntimeValue(playerStats.name, 'selectedAllies', selectedAllies, campaignName);
         await addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerStats.name,
-            abilityName: 'Aura Ally Selection',
+            abilityName: 'Ally Selection',
             description: `${playerStats.name} selected allies: ${selectedAllies.join(', ')}`,
             timestamp: Date.now(),
         }).catch((e) => { console.error('[CharSummary] Error logging ally selection:', e); });
-        rollInitiative(effectiveInitiative, playerStats.initiativeAdvantage ? { forcedMode: 'advantage' } : undefined);
     };
 
-    const handleAllySelectionSkip = () => {
-        setShowAllySelectionModal(false);
-        rollInitiative(effectiveInitiative, playerStats.initiativeAdvantage ? { forcedMode: 'advantage' } : undefined);
+    const handleAllyModalCancel = () => {
+        setShowAllyModal(false);
     };
 
     const levelSuffix = isInXpMode
@@ -490,6 +489,9 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                     {thirdEyeEffect === 'greater_comprehension' && <span className="automation-badge">Greater Comprehension (read any language)</span>}
                     {narrowSpaceActive && <span className="automation-badge">Narrow Space</span>}
                     {tremorsenseActive && <span className="automation-badge">Tremorsense 60 ft.</span>}
+                    <span className="ally-badge clickable no-print" onClick={handleAllyModalOpen} title="Manage allies">
+                        <i className="fa-solid fa-users"></i> Allies ({currentAllies.length})
+                    </span>
                 </div>
                 <div>
                       <CharClassFeatures playerStats={playerStats} campaignName={campaignName} />
@@ -583,14 +585,14 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
             )}
                <CharConditions playerStats={playerStats} campaignName={campaignName} activeMapName={activeMapName} characters={characters} exhaustionLevel={exhaustionLevel} onConditionsChange={onConditionsChange} conditionEffects={conditionEffects} />
              </div>
-             {showAllySelectionModal && (
-                 <AllySelectionModal
-                     creatureTargets={allyTargets}
-                     defaultSelected={[playerStats.name]}
-                     onConfirm={handleAllySelectionConfirm}
-                     onSkip={handleAllySelectionSkip}
-                 />
-             )}
+              {showAllyModal && (
+                  <AllySelectionModal
+                      creatures={allyModalCreatures}
+                      currentAllies={currentAllies}
+                      onConfirm={handleAllyModalConfirm}
+                      onCancel={handleAllyModalCancel}
+                  />
+              )}
   </div>
 )
 }

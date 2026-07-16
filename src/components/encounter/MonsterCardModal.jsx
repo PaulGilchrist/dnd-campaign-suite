@@ -11,8 +11,11 @@ import { computeConditionEffects, combineAttackModes, CONDITIONS_THAT_CANNOT_ACT
 import { computeRangeEffect, getDistanceFeet, getNearestPlacedItem, rangeToFeet } from '../../services/rules/combat/rangeValidation.js';
 import { isDistanceInRange } from '../../services/rules/combat/rangeCheck.js';
 import * as mapsService from '../../services/maps/mapsService.js';
-import { useRuntimeValue, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import AttackResultPopup from '../common/AttackResultPopup.jsx';
+import AllySelectionModal from '../common/AllySelectionModal.jsx';
+import { getCombatSummary } from '../../services/encounters/combatData.js';
+import { addEntry } from '../../services/ui/logService.js';
 import { EFFECT_DESCRIPTIONS } from '../../services/combat/conditions/effectDescriptions.js';
 import './MonsterCardModal.css';
 
@@ -49,6 +52,10 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   const fallbackCsRef = useRef(null);
   const [mapData, setMapData] = useState(null);
   const [evasionSelection, setEvasionSelection] = useState(null);
+  const [showAllyModal, setShowAllyModal] = useState(false);
+  const [allyModalCreatures, setAllyModalCreatures] = useState([]);
+  const storedAllies = useRuntimeValue(monsterName, 'selectedAllies', campaignName);
+  const currentAllies = Array.isArray(storedAllies) && storedAllies.length > 0 ? storedAllies : [monsterName];
   const pendingSaveRef = useRef(null);
 
   useEffect(() => {
@@ -79,6 +86,34 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   const speedyDifficultTerrainIgnore = monsterCharacter?.computedStats?.automation?.passives?.some(p => p.type === 'passive_rule' && p.effect === 'ignore_difficult_terrain_on_dash');
   const monsterActiveBuffs = getRuntimeValue(monsterName, 'activeBuffs') || [];
   const shieldOfFaithBonus = Array.isArray(monsterActiveBuffs) && monsterActiveBuffs.some(b => b.effect === 'shield_of_faith') ? 2 : 0;
+
+  const handleAllyModalOpen = () => {
+    const combatSummary = getCombatSummary(campaignName);
+    const targets = combatSummary?.creatures?.map(c => ({
+      name: c.name,
+      type: c.type,
+      currentHp: c.currentHp,
+      maxHp: c.maxHp,
+    })) || [];
+    setAllyModalCreatures(targets);
+    setShowAllyModal(true);
+  };
+
+  const handleAllyModalConfirm = async (selectedAllies) => {
+    setShowAllyModal(false);
+    setRuntimeValue(monsterName, 'selectedAllies', selectedAllies, campaignName);
+    await addEntry(campaignName, {
+      type: 'ability_use',
+      characterName: monsterName,
+      abilityName: 'Ally Selection',
+      description: `${monsterName} selected allies: ${selectedAllies.join(', ')}`,
+      timestamp: Date.now(),
+    }).catch((e) => { console.error('[MonsterCardModal] Error logging ally selection:', e); });
+  };
+
+  const handleAllyModalCancel = () => {
+    setShowAllyModal(false);
+  };
 
   const { popupHtml, setPopupHtml, rollAttack, rollDamage, rollAbilityCheck, rollSavingThrow, rollSkillCheck, rollInitiative, quickRollPlayerSave } = useLoggedDiceRoll(
     monsterName,
@@ -773,6 +808,11 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
             </>
           )}
         </div>
+        <div className="mc-footer no-print">
+          <span className="mc-ally-badge clickable" onClick={(e) => { e.stopPropagation(); handleAllyModalOpen(); }} title="Manage allies">
+            <i className="fa-solid fa-users"></i> Allies ({currentAllies.length})
+          </span>
+        </div>
       </div>
     );
       }, [monster, onClose, handleAttack, handleDamage, handleAbilityCheck, handleSaveThrow, handleSkillCheck, handleInitiative, attackerCannotAct, monsterTargetEffects]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -850,6 +890,14 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
             </div>
           </div>
         </div>
+      )}
+      {showAllyModal && (
+        <AllySelectionModal
+          creatures={allyModalCreatures}
+          currentAllies={currentAllies}
+          onConfirm={handleAllyModalConfirm}
+          onCancel={handleAllyModalCancel}
+        />
       )}
     </>
   );

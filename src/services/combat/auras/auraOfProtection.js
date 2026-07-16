@@ -1,5 +1,6 @@
 import { isWithinRange } from '../../rules/combat/rangeCheck.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getAllyList } from '../../../hooks/useAllySelection.js';
 
 export const CANNOT_ACT_CONDITIONS = ['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious'];
 export const DEFAULT_AURA_RANGE_FT = 10;
@@ -45,10 +46,8 @@ export async function computeAuraBonus({ targetName, characters }) {
     if (!name) continue;
     if (!stats || !hasAuraOfProtection(stats)) continue;
     if (hasCannotActCondition(name)) continue;
-    const storedAllies = getRuntimeValue(name, 'selectedAllies');
-    if (Array.isArray(storedAllies) && storedAllies.length > 0) {
-      if (!storedAllies.includes(targetName)) continue;
-    }
+    const allies = getAllyList(name);
+    if (!allies.includes(targetName)) continue;
     const chaMod = getChaModifier(stats);
     const bonus = Math.max(1, chaMod);
     const range = getAuraRangeFromStats(stats);

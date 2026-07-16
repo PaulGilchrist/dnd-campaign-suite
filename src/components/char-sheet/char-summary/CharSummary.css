@@ -373,3 +373,26 @@
     font-size: 0.75em;
     white-space: nowrap;
 }
+
+.ally-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 8px;
+    border: 1px solid var(--color-link);
+    border-radius: 4px;
+    background-color: transparent;
+    color: var(--color-link);
+    font-size: 0.8em;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+    white-space: nowrap;
+}
+
+.ally-badge:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.ally-badge .fa-users {
+    font-size: 0.85em;
+}
