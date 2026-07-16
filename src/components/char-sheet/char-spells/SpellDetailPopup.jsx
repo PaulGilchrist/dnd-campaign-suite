@@ -76,14 +76,12 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
     }
 
     // Fixed counter-based free casts (uses + recharge, e.g. Paladin's Smite uses: 1, recharge: long_rest)
-    if (entry.uses != null && entry.recharge && !entry.uses_expression) {
+    const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
+    if (spells.includes(spellName) && entry.uses != null && entry.recharge && !entry.uses_expression) {
       const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
       const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.uses);
       if (count > 0) return true;
     }
-
-    const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
-    if (!spells.includes(spellName)) continue;
 
     if (entry.perSpellTracking) {
       const freeKey = `_${entry.name.replace(/\s+/g, '_')}_${spellName.replace(/\s+/g, '_')}_freeCast`;
@@ -126,14 +124,12 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
     }
 
     // Fixed counter-based free casts (uses + recharge, e.g. Paladin's Smite uses: 1, recharge: long_rest)
-    if (entry.uses != null && entry.recharge && !entry.uses_expression) {
+    const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
+    if (spells.includes(spellName) && entry.uses != null && entry.recharge && !entry.uses_expression) {
       const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
       const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.uses);
       if (count > 0) return true;
     }
-
-    const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
-    if (!spells.includes(spellName)) continue;
 
     if (entry.perSpellTracking) {
       const freeKey = `_${entry.name.replace(/\s+/g, '_')}_${spellName.replace(/\s+/g, '_')}_freeCast`;
@@ -177,14 +173,12 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
     }
 
     // Fixed counter-based free casts (uses + recharge, e.g. Paladin's Smite uses: 1, recharge: long_rest)
-    if (entry.uses != null && entry.recharge && !entry.uses_expression) {
+    const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
+    if (spells.includes(spellName) && entry.uses != null && entry.recharge && !entry.uses_expression) {
       const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
       const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.uses);
       if (count > 0) return true;
     }
-
-    const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
-    if (!spells.includes(spellName)) continue;
 
     if (entry.perSpellTracking) {
       const freeKey = `_${entry.name.replace(/\s+/g, '_')}_${spellName.replace(/\s+/g, '_')}_freeCast`;
