@@ -735,6 +735,7 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                 const sanctuaryCreatures = getRuntimeValue(playerStats.name, 'naturesSanctuaryCreatures', campaignName);
                 if (sanctuaryCreatures?.includes(base.targetName) && coverResult.acBonus < 2) {
                     coverResult = { level: 'half', acBonus: 2 };
+                    base.coverReason = 'Nature\'s Sanctuary';
                 }
 
                 // Check Bulwark of Force half cover — any PC with the buff can grant cover to the target
@@ -745,6 +746,7 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                             const bulwarkTargets = getRuntimeValue(player.name, 'bulwarkOfForceTargets') || [];
                             if (bulwarkTargets.includes(base.targetName)) {
                                 coverResult = { level: 'half', acBonus: 2 };
+                                base.coverReason = 'Bulwark of Force';
                                 break;
                             }
                         }
@@ -759,6 +761,7 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                         const inAura = checkInAuraOfProtectionSync(auraSource, base.targetName, mapData, playerStats);
                         if (inAura) {
                             coverResult = { level: 'half', acBonus: 2 };
+                            base.coverReason = 'Smite of Protection';
                         }
                     }
                 }

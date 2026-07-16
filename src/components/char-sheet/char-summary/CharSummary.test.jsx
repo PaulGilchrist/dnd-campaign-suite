@@ -26,6 +26,11 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
     useRuntimeValue: vi.fn((_name, _key, _campaign) => null),
     getRuntimeValue: vi.fn(),
+    getStore: vi.fn(() => new Map()),
+}));
+
+vi.mock('../../../hooks/runtime/useSyncedState.js', () => ({
+    useSyncedState: vi.fn((_name, _key, defaultValue) => defaultValue),
 }));
 
 vi.mock('../../../hooks/combat/useActionPopup.js', () => ({

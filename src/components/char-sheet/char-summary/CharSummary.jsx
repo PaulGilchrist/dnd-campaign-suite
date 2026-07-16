@@ -19,7 +19,8 @@ import { useDiceRollPopup } from '../../../hooks/combat/DiceRollContext.js';
 import LongRestButton from '../LongRestButton.jsx'
 import ShortRestButton from '../ShortRestButton.jsx'
 import ShortRestModal from '../ShortRestModal.jsx'
-import { setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { setRuntimeValue, useRuntimeValue, getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { useSyncedState } from '../../../hooks/runtime/useSyncedState.js';
 import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { hasAuraOfProtection } from '../../../services/combat/auras/auraOfProtection.js';
@@ -45,6 +46,24 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     }, [playerStats?.xp]);
 
     const isInXpMode = (playerStats?.xpMode || 'milestone') === 'experience';
+
+    // Reactive cover refresh — triggers re-render when any cover-relevant runtime value changes
+    // Subscribe to all character stores that might have cover-relevant values
+    const _coverRefresh = useSyncedState(playerStats.name, 'smiteOfProtectionActive', null, campaignName);
+    const _bulwarkOfForceActive = useSyncedState(playerStats.name, 'bulwarkOfForceActive', null, campaignName);
+    const _naturesSanctuaryActive = useSyncedState(playerStats.name, 'naturesSanctuaryActive', null, campaignName);
+    const _bulwarkOfForceTargets = useSyncedState(playerStats.name, 'bulwarkOfForceTargets', null, campaignName);
+    const _naturesSanctuaryCreatures = useSyncedState(playerStats.name, 'naturesSanctuaryCreatures', null, campaignName);
+    const _wrathOfTheSeaActive = useSyncedState(playerStats.name, 'wrathOfTheSeaActive', null, campaignName);
+    const _mantleOfMajestyActive = useSyncedState(playerStats.name, 'mantleOfMajestyActive', null, campaignName);
+    const _innerRadianceActive = useSyncedState(playerStats.name, 'innerRadianceActive', null, campaignName);
+    const _unbreakableMajestyActive = useSyncedState(playerStats.name, 'unbreakableMajestyActive', null, campaignName);
+    const _baitAndSwitchActive = useSyncedState(playerStats.name, 'baitAndSwitchActive', null, campaignName);
+    const _baitAndSwitchBonus = useSyncedState(playerStats.name, 'baitAndSwitchBonus', null, campaignName);
+    const _activeBuffs = useSyncedState(playerStats.name, 'activeBuffs', null, campaignName);
+    // Also subscribe to campaign-level cover refresh to catch changes from other characters
+    const _coverRefreshCampaign = useSyncedState(campaignName, 'coverRefresh', 0, campaignName);
+    void [_coverRefresh, _bulwarkOfForceActive, _naturesSanctuaryActive, _bulwarkOfForceTargets, _naturesSanctuaryCreatures, _wrathOfTheSeaActive, _mantleOfMajestyActive, _innerRadianceActive, _unbreakableMajestyActive, _baitAndSwitchActive, _baitAndSwitchBonus, _activeBuffs, _coverRefreshCampaign];
 
     const { current: hasInspiration, update: setHasInspiration } = useTrackedResource(
         'hasInspiration',
@@ -277,6 +296,42 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     if (baitAndSwitchActive && baitAndSwitchBonusValue) {
         baitAndSwitchBonus = Number(baitAndSwitchBonusValue);
     }
+
+    // Cover source badges — buff-based cover that applies against all attackers
+    let smiteOfProtectionCoverActive = false;
+    if (characters) {
+        for (const other of characters) {
+            const smiteActive = getRuntimeValue(other.name, 'smiteOfProtectionActive', campaignName);
+            if (!smiteActive) continue;
+            const hasAura = other.computedStats?.automation?.passives?.some(p => p.name === 'Aura of Protection');
+            if (!hasAura) continue;
+            smiteOfProtectionCoverActive = true;
+            break;
+        }
+    }
+    let bulwarkOfForceCoverActive = false;
+    let naturesSanctuaryCoverActive = false;
+    if (characters) {
+        for (const other of characters) {
+            if (other.name === playerStats.name) continue;
+            if (!bulwarkOfForceCoverActive) {
+                const bulwarkActive = getRuntimeValue(other.name, 'bulwarkOfForceActive');
+                if (bulwarkActive) {
+                    const bulwarkTargets = getRuntimeValue(other.name, 'bulwarkOfForceTargets') || [];
+                    if (bulwarkTargets.includes(playerStats.name)) {
+                        bulwarkOfForceCoverActive = true;
+                    }
+                }
+            }
+            if (!naturesSanctuaryCoverActive) {
+                const sanctuaryCreatures = getRuntimeValue(other.name, 'naturesSanctuaryCreatures', campaignName) || [];
+                if (sanctuaryCreatures.includes(playerStats.name)) {
+                    naturesSanctuaryCoverActive = true;
+                }
+            }
+            if (bulwarkOfForceCoverActive && naturesSanctuaryCoverActive) break;
+        }
+    }
     const acrobaticMovementPassive = (playerStats.automation?.passives || []).find(p => p.effect === 'acrobatic_movement');
     if (acrobaticMovementPassive && !hasArmorOrShield) {
         acrobaticMovementActive = true;
@@ -382,7 +437,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
             </div>
             <div className='summaryGrid'>
                 <div>
-                    <div className='clickable' onClick={showArmorClassFormulaPopup}><b>Armor Class: </b>{circleFormsACOverride ?? (playerStats.armorClass + hasteAcBonus + shieldAcBonus + baitAndSwitchBonus + shieldOfFaithBonus + (conditionEffects?.wardingBondAcBonus || 0) - (conditionEffects?.acPenalty || 0))}{(hasteAcBonus > 0 || mageArmorActive || shieldAcBonus > 0 || shieldOfFaithBonus > 0) && <span className="aura-source" title={mageArmorActive ? "From Mage Armor" : undefined}>{hasteAcBonus > 0 && ` (+${hasteAcBonus} from Haste)`}{mageArmorActive && ' (+3 from Mage Armor)'}</span>}{shieldAcBonus > 0 && <span className="aura-source" title="From Shield"> (+5 from Shield)</span>}{shieldOfFaithBonus > 0 && <span className="aura-source" title="From Shield of Faith"> (+2 from Shield of Faith)</span>}{baitAndSwitchBonus > 0 && <span className="aura-source" title={`From ${baitAndSwitchSource || 'Bait and Switch'}`}> (+{baitAndSwitchBonus} from {baitAndSwitchSource || 'Bait and Switch'})</span>}{(conditionEffects?.wardingBondAcBonus || 0) > 0 && <span className="aura-source" title="From Warding Bond"> (+{conditionEffects.wardingBondAcBonus} from Warding Bond)</span>}{(conditionEffects?.acPenalty || 0) > 0 && <span className="stat--penalized" title="Slow spell penalty"> ({'−'}{conditionEffects.acPenalty} from Slow)</span>}</div>
+                    <div className='clickable' onClick={showArmorClassFormulaPopup}><b>Armor Class: </b>{circleFormsACOverride ?? (playerStats.armorClass + hasteAcBonus + shieldAcBonus + baitAndSwitchBonus + shieldOfFaithBonus + (conditionEffects?.wardingBondAcBonus || 0) - (conditionEffects?.acPenalty || 0))}{(hasteAcBonus > 0 || mageArmorActive || shieldAcBonus > 0 || shieldOfFaithBonus > 0) && <span className="aura-source" title={mageArmorActive ? "From Mage Armor" : undefined}>{hasteAcBonus > 0 && ` (+${hasteAcBonus} from Haste)`}{mageArmorActive && ' (+3 from Mage Armor)'}</span>}{shieldAcBonus > 0 && <span className="aura-source" title="From Shield"> (+5 from Shield)</span>}{shieldOfFaithBonus > 0 && <span className="aura-source" title="From Shield of Faith"> (+2 from Shield of Faith)</span>}{baitAndSwitchBonus > 0 && <span className="aura-source" title={`From ${baitAndSwitchSource || 'Bait and Switch'}`}> (+{baitAndSwitchBonus} from {baitAndSwitchSource || 'Bait and Switch'})</span>}{(conditionEffects?.wardingBondAcBonus || 0) > 0 && <span className="aura-source" title="From Warding Bond"> (+{conditionEffects.wardingBondAcBonus} from Warding Bond)</span>}{(conditionEffects?.acPenalty || 0) > 0 && <span className="stat--penalized" title="Slow spell penalty"> ({'−'}{conditionEffects.acPenalty} from Slow)</span>}{smiteOfProtectionCoverActive && <span className="aura-source cover-badge" title="Half Cover from Smite of Protection — applies to all attackers while in Aura of Protection"> (+2 Cover: Smite of Protection)</span>}{bulwarkOfForceCoverActive && <span className="aura-source cover-badge" title="Half Cover from Bulwark of Force — applies to all attackers"> (+2 Cover: Bulwark of Force)</span>}{naturesSanctuaryCoverActive && <span className="aura-source cover-badge" title="Half Cover from Nature's Sanctuary — applies to all attackers"> (+2 Cover: Nature's Sanctuary)</span>}</div>
                     <CharHitPoints playerStats={playerStats} campaignName={campaignName}></CharHitPoints>
                       <b>Speed: </b><span className={exhaustionLevel > 0 || conditionEffects?.speedZero ? 'stat--penalized' : ''}>{totalSpeedWithBuff} ft.{climbSpeed ? `, climb ${climbSpeed} ft.` : ''}{swimSpeed !== null ? `, swim ${swimSpeed} ft.` : ''}{flySpeed !== null ? `, fly ${flySpeed + auraSpeedBonus} ft. ${(glisteningFlightHover || dragonWingsHover) ? ' (hover)' : ''}` : ''}{iceWalkActive ? ', ice walk' : ''}{acrobaticMovementActive ? ', acrobatic movement' : ''}</span> {auraSpeedBonus > 0 && auraSpeedSource && <span className="aura-source" title={`From ${auraSpeedSource}'s Aura of Alacrity`}> (+{auraSpeedBonus})</span>}<br />
                     <CharGold playerStats={playerStats} campaignName={campaignName}></CharGold>

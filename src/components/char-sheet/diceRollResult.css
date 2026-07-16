@@ -101,6 +101,17 @@
     margin: 4px 0;
 }
 
+.dice-roll-cover {
+    text-align: center;
+    font-size: 0.85em;
+    font-weight: bold;
+    color: #9C27B0;
+    background: rgba(156, 39, 176, 0.15);
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin: 4px 0;
+}
+
 .dice-roll-hunter-lore {
     text-align: center;
     font-size: 0.85em;

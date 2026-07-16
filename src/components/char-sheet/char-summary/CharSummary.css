@@ -366,3 +366,10 @@
 .majesty-badge .fa-shield-halved {
     font-size: 0.85em;
 }
+
+.cover-badge {
+    color: #9C27B0;
+    font-weight: 600;
+    font-size: 0.75em;
+    white-space: nowrap;
+}

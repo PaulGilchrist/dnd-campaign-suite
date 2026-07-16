@@ -274,8 +274,44 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           if (bulwarkTargets.includes(target?.name) && coverAcBonus < 2) {
             coverAcBonus = 2;
             coverLevel = 'half';
+            coverReason = 'Bulwark of Force';
             break;
           }
+        }
+      }
+    }
+
+    // Check Nature's Sanctuary half cover — any creature in the sanctuary list
+    if (!isAutoMiss && coverAcBonus < 2 && characters && target) {
+      for (const player of characters) {
+        const sanctuaryCreatures = getRuntimeValue(player.name, 'naturesSanctuaryCreatures', campaignName) || [];
+        if (sanctuaryCreatures.includes(target.name)) {
+          coverAcBonus = 2;
+          coverLevel = 'half';
+          coverReason = 'Nature\'s Sanctuary';
+          break;
+        }
+      }
+    }
+
+    // Check Smite of Protection half cover — allies within Aura of Protection of a paladin with the buff
+    if (!isAutoMiss && coverAcBonus < 2 && characters && target && mapData) {
+      for (const player of characters) {
+        const smiteCoverActive = getRuntimeValue(player.name, 'smiteOfProtectionActive', campaignName);
+        if (!smiteCoverActive) continue;
+        const playerStats = player.computedStats;
+        const hasAura = playerStats?.automation?.passives?.some(p => p.name === 'Aura of Protection');
+        if (!hasAura) continue;
+        const paladinPos = mapData.players?.find(p => p.name === player.name);
+        const targetPlayer = mapData.players?.find(p => p.name === target.name);
+        if (!paladinPos || !targetPlayer) continue;
+        const dist = getDistanceFeet(paladinPos, targetPlayer);
+        const auraRange = playerStats?.automation?.passives?.some(p => p.name === 'Aura Expansion') ? 30 : 10;
+        if (dist != null && dist <= auraRange) {
+          coverAcBonus = 2;
+          coverLevel = 'half';
+          coverReason = 'Smite of Protection';
+          break;
         }
       }
     }

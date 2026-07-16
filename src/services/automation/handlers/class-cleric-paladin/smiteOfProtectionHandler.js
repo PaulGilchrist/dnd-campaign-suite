@@ -24,6 +24,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     // Activate the smite cover buff
     await setRuntimeValue(playerName, SMITE_COVER_KEY, true, campaignName);
+    // Force cover badge refresh on all clients
+    const refreshCount = getRuntimeValue(campaignName, 'coverRefresh') || 0;
+    await setRuntimeValue(campaignName, 'coverRefresh', refreshCount + 1, campaignName);
 
     // Set up expiration for start of next turn
     addExpiration(playerName, playerName, [

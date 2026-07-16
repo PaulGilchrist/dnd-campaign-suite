@@ -600,7 +600,7 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
             const isRoundExpired = currentRound >= expirationRound;
             const isCreatureExpired = item.expireOnCreatureName && activeName &&
                 utils.getName(item.expireOnCreatureName) === utils.getName(activeName) &&
-                currentRound >= item.appliedRound;
+                currentRound > item.appliedRound;
             const isExpired = isRoundExpired || isCreatureExpired;
             if (isExpired) {
                 clearExpirationEffects(item.effects, item.target, targetOwner, campaignName);
@@ -676,6 +676,16 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
           setRuntimeValue(characterName, 'baitAndSwitchSource', null, campaignName);
       }
 
+      // Clear Smite of Protection cover
+      setRuntimeValue(characterName, 'smiteOfProtectionActive', null, campaignName);
+      // Clear Bulwark of Force cover
+      setRuntimeValue(characterName, 'bulwarkOfForceActive', null, campaignName);
+      setRuntimeValue(characterName, 'bulwarkOfForceTargets', null, campaignName);
+      // Clear Nature's Sanctuary cover
+      setRuntimeValue(characterName, 'naturesSanctuaryActive', null, campaignName);
+      setRuntimeValue(characterName, 'naturesSanctuaryCreatures', null, campaignName);
+      setRuntimeValue(characterName, 'naturesSanctuaryRange', null, campaignName);
+
      const charLower = characterName.toLowerCase();
 
      // --- "From me": clear all effects I have on other targets ---
@@ -714,6 +724,9 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
 
         setRuntimeValue(key, KEY, kept, campaignName);
       }
+      // Force cover badge refresh on all clients
+      const refreshCount = getRuntimeValue(campaignName, 'coverRefresh') || 0;
+      setRuntimeValue(campaignName, 'coverRefresh', refreshCount + 1, campaignName);
 }
 
     export function expireStaleEffects(campaignName, overrideActiveName) {
@@ -1193,6 +1206,13 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
 
             case 'clear_runtime_value': {
                 setRuntimeValue(effect.creatureName, effect.key, null, campaignName);
+                break;
+            }
+
+            case 'remove_smite_of_protection': {
+                setRuntimeValue(targetName, 'smiteOfProtectionActive', null, campaignName);
+                const refreshCount = getRuntimeValue(campaignName, 'coverRefresh') || 0;
+                setRuntimeValue(campaignName, 'coverRefresh', refreshCount + 1, campaignName);
                 break;
             }
 
