@@ -29,6 +29,10 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+  isDistanceInRange: vi.fn((dist, rangeFt) => rangeFt == null || dist == null || dist <= rangeFt),
+}));
+
 vi.mock('../../../maps/mapsService.js', () => ({
   loadMapData: vi.fn(),
 }));

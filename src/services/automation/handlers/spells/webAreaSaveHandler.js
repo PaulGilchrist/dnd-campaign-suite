@@ -5,6 +5,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { playerIsImmuneToCondition } from '../../../combat/automation/automationImmunities.js';
 import * as mapsService from '../../../maps/mapsService.js';
 import { getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
+import { isDistanceInRange } from '../../../rules/combat/rangeCheck.js';
 
 /**
  * Web spell area save handler for 2024 ruleset.
@@ -43,7 +44,7 @@ export async function processWebAreaSave(casterName, targetName, campaignName, m
             });
 
             // Allow some tolerance for cube area
-            const inArea = dist <= tracking.radius;
+            const inArea = isDistanceInRange(dist, tracking.radius);
 
             if (!inArea) return null;
         } catch {

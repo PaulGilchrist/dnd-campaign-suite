@@ -19,6 +19,10 @@ vi.mock('../combat/rangeValidation.js', () => ({
     getDistanceFeet: vi.fn(),
 }));
 
+vi.mock('../combat/rangeCheck.js', () => ({
+    isDistanceInRange: vi.fn((dist, rangeFt) => rangeFt == null || dist == null || dist <= rangeFt),
+}));
+
 const { executeHandler } = await import('../../automation/index.js');
 const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
 const { getDistanceFeet } = await import('../combat/rangeValidation.js');

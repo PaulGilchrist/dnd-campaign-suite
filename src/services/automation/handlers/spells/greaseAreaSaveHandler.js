@@ -4,6 +4,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
+import { isDistanceInRange } from '../../../rules/combat/rangeCheck.js';
 import * as mapsService from '../../../maps/mapsService.js';
 import { playerIsImmuneToCondition } from '../../../combat/automation/automationImmunities.js';
 
@@ -118,7 +119,7 @@ export async function processGreaseAreaSave(casterName, targetName, campaignName
         });
 
         // Allow some tolerance for square area (check if within radius in either axis)
-        const inArea = dist <= tracking.radius;
+        const inArea = isDistanceInRange(dist, tracking.radius);
 
         if (!inArea) return null;
 

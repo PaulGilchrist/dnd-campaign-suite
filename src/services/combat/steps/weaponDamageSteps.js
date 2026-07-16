@@ -14,6 +14,7 @@ import utils from '../../ui/utils.js';
 import { featureModules } from './features/index.js';
 import { applyMasteryEffect } from '../../automation/handlers/combat/weaponMasteryHandler.js';
 import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
+import { isDistanceInRange } from '../../rules/combat/rangeCheck.js';
 import { createSaveListener } from '../../automation/common/savePrompt.js';
 import { resolveDiceExpression } from '../automation/automationExpressions.js';
 
@@ -910,7 +911,7 @@ export function buildDamageSteps() {
                 distanceFromFirst: getDistanceFeet(firstTarget.position, c.position),
                 distanceFromAttacker: getDistanceFeet(attackerPos, c.position),
               }))
-              .filter(t => t.distanceFromFirst !== null && t.distanceFromFirst <= 5 && t.distanceFromAttacker !== null && t.distanceFromAttacker <= reach);
+               .filter(t => t.distanceFromFirst !== null && isDistanceInRange(t.distanceFromFirst, 5) && t.distanceFromAttacker !== null && isDistanceInRange(t.distanceFromAttacker, reach));
           }
         }
 

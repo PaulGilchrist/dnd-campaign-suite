@@ -491,7 +491,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
                                     const allyPos = c.position;
                                     if (targetPos && allyPos) {
                                         const distance = getDistanceFeet(targetPos, allyPos);
-                                        return distance <= 5;
+                                        return isDistanceInRange(distance, 5);
                                     } else {
                                         return true;
                                     }

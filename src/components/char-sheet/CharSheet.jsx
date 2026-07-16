@@ -19,7 +19,7 @@ import CharSummary from './char-summary/CharSummary.jsx'
 import { computeAuraComboEffects } from '../../services/combat/auras/auraComboEffects.js';
 import { computeConditionEffects, getNetAttackMode, CONDITIONS_THAT_CANNOT_ACT } from '../../services/combat/conditions/conditionEffects.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
-import { getDistanceFeet } from '../../services/rules/combat/rangeValidation.js';
+import { getDistanceFeet, isDistanceInRange } from '../../services/rules/combat/rangeValidation.js';
 import { evaluateAutoExpression } from '../../services/combat/automation/automationService.js';
 import { EXHAUSTION_LEVELS } from '../../services/combat/conditions/exhaustionRules.js';
 import { isCreatureWarded } from '../../services/automation/handlers/buffs/protectionFromEvilAndGoodHandler.js';
@@ -415,7 +415,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             const casterCreature = combatContext?.creatures?.find(c => c.name === casterName);
             const targetCreature = combatContext?.creatures?.find(c => c.name === playerSummary?.name);
             const distance = casterCreature && targetCreature ? getDistanceFeet(casterCreature.position, targetCreature.position) : null;
-            if (distance === null || distance <= 60) {
+            if (distance === null || isDistanceInRange(distance, 60)) {
                 if (buff.acBonus) {
                     wardingBondAcBonus += buff.acBonus;
                 }

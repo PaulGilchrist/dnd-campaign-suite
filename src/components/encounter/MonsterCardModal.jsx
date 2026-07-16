@@ -8,8 +8,7 @@ import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import { findCreatureByName } from '../../services/rules/combat/damageUtils.js';
 import { getAbilitySaveModifier } from '../../services/shared/abilityLookup.js';
 import { computeConditionEffects, combineAttackModes, CONDITIONS_THAT_CANNOT_ACT } from '../../services/combat/conditions/conditionEffects.js';
-import { computeRangeEffect, getDistanceFeet, getNearestPlacedItem, rangeToFeet } from '../../services/rules/combat/rangeValidation.js';
-import { isWithinRange } from '../../services/rules/combat/rangeCheck.js';
+import { computeRangeEffect, getDistanceFeet, getNearestPlacedItem, isDistanceInRange, rangeToFeet } from '../../services/rules/combat/rangeValidation.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import { useRuntimeValue, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import AttackResultPopup from '../common/AttackResultPopup.jsx';
@@ -307,7 +306,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         const targetPlayer = mapData.players?.find(p => p.name === target.name);
         if (!paladinPos || !targetPlayer) continue;
         const auraRange = playerStats?.automation?.passives?.some(p => p.name === 'Aura Expansion') ? 30 : 10;
-        if (isWithinRange(paladinPos, targetPlayer, auraRange)) {
+        if (isDistanceInRange(getDistanceFeet(paladinPos, targetPlayer), auraRange)) {
           coverAcBonus = 2;
           coverLevel = 'half';
           coverReason = 'Smite of Protection';

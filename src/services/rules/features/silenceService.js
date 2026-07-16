@@ -1,5 +1,6 @@
 import { executeHandler } from '../../automation/index.js';
 import { getDistanceFeet } from '../combat/rangeValidation.js';
+import { isDistanceInRange } from '../combat/rangeCheck.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 const SILENCE_NAME = 'Silence';
@@ -89,7 +90,7 @@ export function isCreatureInSilenceZone(targetName, casterName, campaignName) {
     if (!targetCreature || targetCreature.gridX == null || targetCreature.gridY == null) return false;
 
     const dist = getDistanceFeet(center, { gridX: targetCreature.gridX, gridY: targetCreature.gridY });
-    return dist <= radiusNum;
+    return isDistanceInRange(dist, radiusNum);
 }
 
 function getCombatContextSync(campaignName) {

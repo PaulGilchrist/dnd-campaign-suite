@@ -116,6 +116,10 @@ vi.mock('../../rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(() => 3),
 }));
 
+vi.mock('../../rules/combat/rangeCheck.js', () => ({
+  isDistanceInRange: vi.fn((dist, rangeFt) => rangeFt == null || dist == null || dist <= rangeFt),
+}));
+
 vi.mock('../../automation/common/savePrompt.js', () => ({
   createSaveListener: vi.fn(() => ({ promptId: 'test-prompt-id', promise: Promise.resolve({ success: true }) })),
 }));

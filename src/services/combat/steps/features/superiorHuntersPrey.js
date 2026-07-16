@@ -1,7 +1,7 @@
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
+import { getDistanceFeet, isDistanceInRange } from '../../../rules/combat/rangeValidation.js';
 import { getCurrentCombatRound, loadCombatSummary } from '../../../encounters/combatData.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { addEntry } from '../../../ui/logService.js';
@@ -50,7 +50,7 @@ export const superiorHuntersPrey = {
       targets = targets
         .filter(c => c.position)
         .map(c => ({ ...c, distance: getDistanceFeet(markedTarget.position, c.position) }))
-        .filter(c => c.distance !== null && c.distance <= MAX_RANGE_FEET);
+        .filter(c => c.distance !== null && isDistanceInRange(c.distance, MAX_RANGE_FEET));
     }
 
     targets = targets.map(c => ({ ...c, ...resolveHp(c) }));
