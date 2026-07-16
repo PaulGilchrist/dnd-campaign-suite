@@ -1,7 +1,8 @@
-import { hasAuraOfProtection, hasCannotActCondition, isWithinRange } from './auraOfProtection.js';
+import { hasAuraOfProtection, hasCannotActCondition, getAuraRangeFromStats } from './auraOfProtection.js';
+import { isWithinRange } from '../../rules/combat/rangeCheck.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
-export async function computeAuraComboEffects({ targetName, characters, campaignName, activeMapName }) {
+export async function computeAuraComboEffects({ targetName, characters }) {
   let speedBonus = 0;
   let speedSource = null;
   const immunities = new Set();
@@ -14,12 +15,13 @@ export async function computeAuraComboEffects({ targetName, characters, campaign
     const stats = entry.computedStats;
     if (!name) continue;
     if (!stats || !hasAuraOfProtection(stats)) continue;
-    if (hasCannotActCondition(name, campaignName)) continue;
-    const storedAllies = getRuntimeValue(name, 'selectedAllies', campaignName);
+    if (hasCannotActCondition(name)) continue;
+    const storedAllies = getRuntimeValue(name, 'selectedAllies');
     if (Array.isArray(storedAllies) && storedAllies.length > 0) {
       if (!storedAllies.includes(targetName)) continue;
     }
-    const inRange = await isWithinRange(name, targetName, campaignName, activeMapName, characters);
+    const range = getAuraRangeFromStats(stats);
+    const inRange = await isWithinRange(name, targetName, range);
     if (!inRange) continue;
 
     const passives = stats.automation?.passives || [];

@@ -22,6 +22,10 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
   rangeToFeet: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+  isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
@@ -72,6 +76,7 @@ import * as targetResolver from '../../common/targetResolver.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
 import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
+import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as applyHealing from '../../../rules/combat/applyHealing.js';
 import * as damageRollback from '../../common/damageRollback.js';
@@ -159,6 +164,7 @@ describe('reactionDebuffHandler.handle', () => {
     vi.clearAllMocks();
     rangeValidation.rangeToFeet.mockReset();
     rangeValidation.getDistanceFeet.mockReset();
+    rangeCheck.isWithinRange.mockReset().mockResolvedValue(true);
   });
 
   // ── Early exit: requires shield ─────────────────────────────
@@ -315,6 +321,7 @@ describe('reactionDebuffHandler.handle', () => {
         targetPos: { gridX: 20, gridY: 0 },
       });
       rangeValidation.getDistanceFeet.mockReturnValue(50);
+      rangeCheck.isWithinRange.mockResolvedValue(false);
 
       const result = await handle(action, ps, campaignName, mapName);
 
@@ -341,7 +348,7 @@ describe('reactionDebuffHandler.handle', () => {
 
       await handle(action, ps, campaignName, mapName);
 
-      expect(targetResolver.resolveMapPositions).not.toHaveBeenCalled();
+      expect(targetResolver.resolveMapPositions).toHaveBeenCalledWith(campaignName, 'Bard');
     });
 
     it('skips range check when mapName is falsy', async () => {
@@ -711,6 +718,7 @@ describe('reactionDebuffHandler.handle', () => {
         targetPos: { gridX: 20, gridY: 0 },
       });
       rangeValidation.getDistanceFeet.mockReturnValue(50);
+      rangeCheck.isWithinRange.mockResolvedValue(false);
 
       const result = await handle(action, ps, campaignName, mapName);
 

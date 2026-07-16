@@ -1,28 +1,32 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
-import { isWithinRange, isDistanceInRange } from '../../../rules/combat/rangeCheck.js';
-import { resolveMapPositions } from '../../common/targetResolver.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { endInvisibilityOnHostileAction } from '../../../rules/features/invisibilityService.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
+import { resolveMapPositions } from '../../common/targetResolver.js';
 
 
-function getCreatureTargets(excludeName, withinRangeFt, campaignName, mapName, attackerPos) {
+async function getCreatureTargets(excludeName, withinRangeFt, campaignName, mapName, attackerName) {
     const cs = getCombatSummary(campaignName);
     if (!cs?.creatures) return [];
+
+    const inRangeFilter = withinRangeFt != null && mapName && attackerName ? async (name) => {
+        return await isWithinRange(attackerName, name, withinRangeFt);
+    } : null;
 
     return cs.creatures
         .filter(c => {
             if (c.name === excludeName) return false;
-            if (withinRangeFt == null) return true;
-            if (!attackerPos) return true;
-            const targetPlayer = cs.players?.find(p => p.name === c.name);
-            if (targetPlayer) {
-                const dist = getDistanceFeet(attackerPos, { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY });
-                return isDistanceInRange(dist, withinRangeFt);
+            if (inRangeFilter) {
+                const targetPlayer = cs.players?.find(p => p.name === c.name);
+                if (targetPlayer) {
+                    return true;
+                }
+                return true;
             }
             return true;
         })
@@ -35,9 +39,6 @@ export async function handle(action, playerStats, campaignName, mapName) {
     const featureName = action.name || 'Words of Creation';
 
     const rangeFt = rangeToFeet(auto.range || '10 ft');
-
-    const positions = mapName ? await resolveMapPositions(campaignName, mapName, playerName) : null;
-    const attackerPos = positions?.attackerPos || null;
 
     const combatSummary = await getCombatContext(campaignName);
     if (!combatSummary) {
@@ -67,12 +68,16 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
     const firstTargetName = targetInfo.name;
 
-    const creatureTargets = getCreatureTargets(
+    if (mapName) {
+        await resolveMapPositions(campaignName, mapName, playerName);
+    }
+
+    const creatureTargets = await getCreatureTargets(
         firstTargetName,
         rangeFt,
         campaignName,
         mapName,
-        attackerPos
+        playerName
     );
 
     return {
@@ -100,6 +105,7 @@ export async function applyMultiTarget(
     metaCtx
 ) {
     const auto = action.automation;
+    const playerName = playerStats.name;
     const rangeFt = rangeToFeet(auto.range || '10 ft');
 
     if (!secondTargetName) {
@@ -115,24 +121,10 @@ export async function applyMultiTarget(
     if (!firstTarget || !secondTarget) return null;
 
     if (rangeFt != null && firstTarget && secondTarget) {
-        const positions = mapName ? await resolveMapPositions(campaignName, mapName, playerStats.name) : null;
-        if (positions?.attackerPos) {
-
-            if (!isWithinRange(positions.attackerPos, {
-                gridX: firstTarget.type === 'player'
-                    ? (combatSummary.players?.find(p => p.name === firstTarget.name)?.gridX)
-                    : (combatSummary.placedItems?.find(i => i.name === firstTarget.name)?.gridX),
-                gridY: firstTarget.type === 'player'
-                    ? (combatSummary.players?.find(p => p.name === firstTarget.name)?.gridY)
-                    : (combatSummary.placedItems?.find(i => i.name === firstTarget.name)?.gridY),
-            }, rangeFt) || !isWithinRange(positions.attackerPos, {
-                gridX: secondTarget.type === 'player'
-                    ? (combatSummary.players?.find(p => p.name === secondTarget.name)?.gridX)
-                    : (combatSummary.placedItems?.find(i => i.name === secondTarget.name)?.gridX),
-                gridY: secondTarget.type === 'player'
-                    ? (combatSummary.players?.find(p => p.name === secondTarget.name)?.gridY)
-                    : (combatSummary.placedItems?.find(i => i.name === secondTarget.name)?.gridY),
-            }, rangeFt)) {
+        if (mapName) {
+            const firstInRange = await isWithinRange(playerName, firstTarget.name, rangeFt);
+            const secondInRange = await isWithinRange(playerName, secondTarget.name, rangeFt);
+            if (!firstInRange || !secondInRange) {
                 return {
                     type: 'popup',
                     payload: {
@@ -191,7 +183,7 @@ export async function applyMultiTarget(
             }
         }
 
-        const storedConditions = getRuntimeValue(secondTargetName, 'activeConditions', campaignName) || [];
+        const storedConditions = getRuntimeValue(secondTargetName, 'activeConditions') || [];
         const conditions = Array.isArray(storedConditions) ? storedConditions : [];
         const hasProne = conditions.some(c => String(c).toLowerCase() === 'prone');
 
@@ -216,7 +208,7 @@ export async function applyMultiTarget(
         }
 
         if (hasProne) {
-            const existingStance = getRuntimeValue(secondTargetName, 'powerWordHealStandPermission', campaignName);
+            const existingStance = getRuntimeValue(secondTargetName, 'powerWordHealStandPermission');
             if (!existingStance) {
                 setRuntimeValue(secondTargetName, 'powerWordHealStandPermission', true, campaignName);
             }

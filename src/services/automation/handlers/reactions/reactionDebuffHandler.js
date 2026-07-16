@@ -1,8 +1,8 @@
 import { resolveTarget, resolveMapPositions } from '../../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { findLastAttack } from '../../common/damageRollback.js';
@@ -17,7 +17,7 @@ function getRuntimeUsesKey(featureName) {
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
 }
 
-async function handleAttackRollDebuff(action, _playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary) {
+async function handleAttackRollDebuff(action, _playerStats, campaignName, mapName, attackerName, bardicDieSize, biDieRoll, combatSummary) {
     const auto = action.automation;
 
     const attackResult = await findLastAttack(campaignName);
@@ -46,7 +46,7 @@ async function handleAttackRollDebuff(action, _playerStats, campaignName, attack
     if (hit === true && reducedHit === false && defenderName) {
         const healAmount = attackResult.totalDamage || attackResult.primaryDamage || 0;
         if (healAmount > 0) {
-            const healResult = applyHealingToTarget(combatSummary, defenderName, healAmount, campaignName);
+            const healResult = applyHealingToTarget(combatSummary, defenderName, healAmount);
             defenderHp = healResult?.newHp ?? null;
             healedAmount = healResult?.actualHeal ?? 0;
         }
@@ -72,7 +72,7 @@ async function handleAttackRollDebuff(action, _playerStats, campaignName, attack
     return infoPopup(action.name, description, auto, { defenderHp });
 }
 
-async function handleDamageDebuff(action, _playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary) {
+async function handleDamageDebuff(action, _playerStats, campaignName, mapName, attackerName, bardicDieSize, biDieRoll, combatSummary) {
     const auto = action.automation;
 
     const attackResult = await findLastAttack(campaignName);
@@ -92,7 +92,7 @@ async function handleDamageDebuff(action, _playerStats, campaignName, attackerNa
 
     let defenderHp = null;
     if (healAmount > 0) {
-        const healResult = applyHealingToTarget(combatSummary, defenderName, healAmount, campaignName);
+        const healResult = applyHealingToTarget(combatSummary, defenderName, healAmount);
         defenderHp = healResult?.newHp ?? null;
     }
 
@@ -101,7 +101,7 @@ async function handleDamageDebuff(action, _playerStats, campaignName, attackerNa
     return infoPopup(action.name, description, auto, { defenderHp });
 }
 
-async function handleDisadvantageDebuff(action, _playerStats, campaignName, attackerName, combatSummary) {
+async function handleDisadvantageDebuff(action, _playerStats, campaignName, mapName, attackerName, combatSummary) {
     const auto = action.automation;
 
     const attackResult = await findLastAttack(campaignName);
@@ -124,7 +124,7 @@ async function handleDisadvantageDebuff(action, _playerStats, campaignName, atta
     if (hit === true && finalHit === false && defenderName) {
         const healAmount = attackResult.totalDamage || attackResult.primaryDamage || 0;
         if (healAmount > 0) {
-            const healResult = applyHealingToTarget(combatSummary, defenderName, healAmount, campaignName);
+            const healResult = applyHealingToTarget(combatSummary, defenderName, healAmount);
             defenderHp = healResult?.newHp ?? null;
             healedAmount = healResult?.actualHeal ?? 0;
         }
@@ -180,21 +180,14 @@ async function handleTeleportAndSlow(action, playerStats, campaignName, mapName)
 
             if (playerCreature?.gridX != null && playerCreature?.gridY != null &&
                 targetCreature?.gridX != null && targetCreature?.gridY != null) {
-                const dist = getDistanceFeet(
-                    { gridX: playerCreature.gridX, gridY: playerCreature.gridY },
-                    { gridX: targetCreature.gridX, gridY: targetCreature.gridY }
-                );
-                if (!isWithinRange(
-                    { gridX: playerCreature.gridX, gridY: playerCreature.gridY },
-                    { gridX: targetCreature.gridX, gridY: targetCreature.gridY },
-                    rangeFt
-                )) {
+                const inRange = await isWithinRange(playerName, activeCreatureName, rangeFt);
+                if (!inRange) {
                     return {
                         type: 'popup',
                         payload: {
                             type: 'automation_info',
                             name: featureName,
-                            description: `${activeCreatureName} is out of range (${Math.round(dist)} ft > ${rangeFt} ft).`,
+                            description: `${activeCreatureName} is out of range.`,
                             automation: auto,
                         },
                     };
@@ -278,7 +271,7 @@ async function handleTeleportAndSlow(action, playerStats, campaignName, mapName)
     };
 }
 
-async function applyImprovedWardingFlare(playerStats, defenderName, campaignName) {
+async function applyImprovedWardingFlare(playerStats, campaignName, defenderName) {
     const allFeatures = [
         ...(playerStats.characterAdvancement || []),
         ...(playerStats.specialActions || []),
@@ -357,7 +350,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
     if (effectiveUsesMax > 0) {
         const effectiveUsesKey = bardicUsesMax > 0 ? 'bardicInspirationUses' : usesKey;
-        const currentUses = Number(getRuntimeValue(playerName, effectiveUsesKey, campaignName) ?? effectiveUsesMax);
+        const currentUses = Number(getRuntimeValue(playerName, effectiveUsesKey) ?? effectiveUsesMax);
         if (currentUses <= 0) {
             return {
                 type: 'popup',
@@ -402,13 +395,13 @@ export async function handle(action, playerStats, campaignName, mapName) {
             return infoPopup(action.name, `Could not determine who was attacked. Cannot apply ${action.name}.`, auto);
         }
 
-        const rangeFt = rangeToFeet(auto.range || '5_ft');
+        const rangeFt = auto.range ? parseInt(auto.range.replace(/[^0-9]/g, '')) || 5 : 5;
         if (mapName && rangeFt != null) {
-            const positions = await resolveMapPositions(campaignName, mapName, playerName);
+            const positions = await resolveMapPositions(campaignName, playerName);
             if (positions?.attackerPos && positions?.targetPos) {
-                const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
-                if (!isWithinRange(positions.attackerPos, positions.targetPos, rangeFt)) {
-                    return infoPopup(action.name, `${lastAttackerName} is out of range (${Math.round(dist)} ft > ${rangeFt} ft).`, auto);
+                const inRange = await isWithinRange(playerName, lastAttackerName, rangeFt);
+                if (!inRange) {
+                    return infoPopup(action.name, `${lastAttackerName} is out of range.`, auto);
                 }
             }
         }
@@ -433,7 +426,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
         }
         await setRuntimeValue(campaignName, 'targetEffects', storedEffects, campaignName);
 
-        result = await handleDisadvantageDebuff(action, playerStats, campaignName, lastAttackerName, combatSummary);
+        result = await handleDisadvantageDebuff(action, playerStats, campaignName, mapName, lastAttackerName, combatSummary);
     } else if (effect === 'disadvantage_on_attack_roll') {
         const attackResult = await findLastAttack(campaignName);
         const attackEvent = attackResult.attackEvent;
@@ -443,19 +436,19 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
         const attackerName = attackResult.attackerName;
 
-        const rangeFt = rangeToFeet(auto.range || '30_ft');
+        const rangeFt = auto.range ? parseInt(auto.range.replace(/[^0-9]/g, '')) || 30 : 30;
 
         if (mapName && rangeFt != null) {
-            const positions = await resolveMapPositions(campaignName, mapName, playerName);
+            const positions = await resolveMapPositions(campaignName, playerName);
             if (positions?.attackerPos && positions?.targetPos) {
-                const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
-                if (!isWithinRange(positions.attackerPos, positions.targetPos, rangeFt)) {
-                    return infoPopup(action.name, `${attackerName} is out of range (${Math.round(dist)} ft > ${rangeFt} ft).`, auto);
+                const inRange = await isWithinRange(playerName, attackerName, rangeFt);
+                if (!inRange) {
+                    return infoPopup(action.name, `${attackerName} is out of range.`, auto);
                 }
             }
         }
 
-        result = await handleDisadvantageDebuff(action, playerStats, campaignName, attackerName, combatSummary);
+        result = await handleDisadvantageDebuff(action, playerStats, campaignName, mapName, attackerName, combatSummary);
     } else if (effect === 'teleport_and_slow') {
         result = await handleTeleportAndSlow(action, playerStats, campaignName, mapName);
     } else {
@@ -473,19 +466,19 @@ export async function handle(action, playerStats, campaignName, mapName) {
         }
 
         attackerName = targetInfo.target.name;
-        const rangeFt = rangeToFeet(auto.range || '60_ft');
+        const rangeFt = auto.range ? parseInt(auto.range.replace(/[^0-9]/g, '')) || 60 : 60;
 
         if (mapName && rangeFt != null) {
-            const positions = await resolveMapPositions(campaignName, mapName, playerName);
+            const positions = await resolveMapPositions(campaignName, playerName);
             if (positions?.attackerPos && positions?.targetPos) {
-                const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
-                if (!isWithinRange(positions.attackerPos, positions.targetPos, rangeFt)) {
+                const inRange = await isWithinRange(playerName, attackerName, rangeFt);
+                if (!inRange) {
                     return {
                         type: 'popup',
                         payload: {
                             type: 'automation_info',
                             name: featureName,
-                            description: `${attackerName} is out of range (${Math.round(dist)} ft > ${rangeFt} ft).`,
+                            description: `${attackerName} is out of range.`,
                             automation: auto,
                         },
                     };
@@ -514,15 +507,15 @@ export async function handle(action, playerStats, campaignName, mapName) {
         }
 
         if (attackEvent?.damageTypes?.length || attackResult.totalDamage > 0) {
-            result = await handleDamageDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary);
+            result = await handleDamageDebuff(action, playerStats, campaignName, mapName, attackerName, bardicDieSize, biDieRoll, combatSummary);
         } else {
-            result = await handleAttackRollDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary);
+            result = await handleAttackRollDebuff(action, playerStats, campaignName, mapName, attackerName, bardicDieSize, biDieRoll, combatSummary);
         }
     }
 
     if (effectiveUsesMax > 0) {
         const effectiveUsesKey = bardicUsesMax > 0 ? 'bardicInspirationUses' : usesKey;
-        const currentUses = Number(getRuntimeValue(playerName, effectiveUsesKey, campaignName) ?? effectiveUsesMax);
+        const currentUses = Number(getRuntimeValue(playerName, effectiveUsesKey) ?? effectiveUsesMax);
         await setRuntimeValue(playerName, effectiveUsesKey, currentUses - 1, campaignName);
     }
 
@@ -542,7 +535,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
     if (effect === 'disadvantage_on_attack_roll') {
         const defenderName = result?.defenderName;
         if (defenderName) {
-            const tempHpAmount = await applyImprovedWardingFlare(playerStats, defenderName, campaignName);
+            const tempHpAmount = await applyImprovedWardingFlare(playerStats, campaignName, defenderName);
             if (tempHpAmount) {
                 result.payload.description += `<br/><br/>${defenderName} gains ${tempHpAmount} Temporary Hit Points from Improved Warding Flare.`;
             }

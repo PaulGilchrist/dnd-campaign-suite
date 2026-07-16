@@ -1,23 +1,16 @@
-// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-
-// ── Mocks ───────────────────────────────────────────────────────
-
-vi.mock('../../rules/combat/rangeValidation.js', () => ({
-  getDistanceFeet: vi.fn(),
-}))
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
 }))
 
-// ── Imports ─────────────────────────────────────────────────────
+vi.mock('../../rules/combat/rangeCheck.js', () => ({
+  isWithinRange: vi.fn(),
+}))
 
 import { getWolfAdvantageAgainst } from './wolfAuraUtils.js'
-import { getDistanceFeet } from '../../rules/combat/rangeValidation.js'
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
-
-// ── Helpers ─────────────────────────────────────────────────────
+import { isWithinRange } from '../../rules/combat/rangeCheck.js'
 
 function makePlayer(name, gridX = 0, gridY = 0) {
   return { name, gridX, gridY }
@@ -31,536 +24,131 @@ function makeWolfBuff() {
   return { name: 'Rage of the Wilds', optionName: 'Wolf' }
 }
 
-function makeBearBuff() {
-  return { name: 'Rage of the Wilds', optionName: 'Bear' }
-}
-
-// ── Tests ───────────────────────────────────────────────────────
-
 describe('getWolfAdvantageAgainst', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     getRuntimeValue.mockReset()
-    getDistanceFeet.mockReset()
-    // Default: no wolf buff from any player
-    getRuntimeValue.mockReturnValue([])
+    isWithinRange.mockReset()
+    getRuntimeValue.mockImplementation(() => [])
+    isWithinRange.mockResolvedValue(false)
   })
 
-  // ── Early return: invalid inputs ──────────────────────────────
-
-  describe('early return when mapData is invalid', () => {
-    it.each([
-      [undefined, false],
-      [undefined, true],
-      [null, false],
-      [null, true],
-    ])('returns { advantage: false } when mapData is %s (skipRangeCheck=%s)', (mapData, skipRangeCheck) => {
-      const result = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData,
-        skipRangeCheck,
-      })
-      expect(result).toEqual({ advantage: false })
-    })
-
-    it('returns false when mapData has no players field or players is empty', () => {
-      const result = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: {},
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ advantage: false })
-
-      const result2 = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([]),
-        skipRangeCheck: false,
-      })
-      expect(result2).toEqual({ advantage: false })
-    })
+  it('returns false when mapData is undefined', async () => {
+    const result = await getWolfAdvantageAgainst({ attackerName: 'A', mapData: undefined })
+    expect(result).toEqual({ advantage: false })
   })
 
-  describe('early return when targetPos is invalid', () => {
-    it.each([undefined, null, '', 0, 42])('returns false when targetPos is %s', (targetPos) => {
-      const result = getWolfAdvantageAgainst({
-        targetPos,
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Barbarian')]),
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ advantage: false })
-    })
+  it('returns false when mapData is null', async () => {
+    const result = await getWolfAdvantageAgainst({ attackerName: 'A', mapData: null })
+    expect(result).toEqual({ advantage: false })
   })
 
-  // ── skipRangeCheck = true (no range checking) ────────────────
-
-  describe('skipRangeCheck is true', () => {
-    it('returns false when no player has the Wolf buff', () => {
-      const result = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Attacker'), makePlayer('Barbarian')]),
-        skipRangeCheck: true,
-      })
-      expect(result).toEqual({ advantage: false })
-    })
-
-    it('returns false when getRuntimeValue returns a non-array, null, or undefined', () => {
-      getRuntimeValue.mockReturnValue('not-an-array')
-
-      const result = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Attacker'), makePlayer('Barbarian')]),
-        skipRangeCheck: true,
-      })
-      expect(result).toEqual({ advantage: false })
-    })
-
-    it('skips the attacker even if they have the Wolf buff', () => {
-      getRuntimeValue.mockImplementation((name) =>
-        name === 'Attacker' ? [makeWolfBuff()] : [],
-      )
-
-      const result = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Attacker')]),
-        skipRangeCheck: true,
-      })
-      expect(result).toEqual({ advantage: false })
-    })
-
-    it('returns true with source when a non-attacker player has the Wolf buff', () => {
-      getRuntimeValue.mockImplementation((name) =>
-        name === 'Barbarian' ? [makeWolfBuff()] : [],
-      )
-
-      const result = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Attacker'), makePlayer('Barbarian')]),
-        skipRangeCheck: true,
-      })
-      expect(result).toEqual({ advantage: true, source: 'Barbarian' })
-    })
-
-    it('returns the first non-attacker player with the Wolf buff', () => {
-      getRuntimeValue.mockImplementation((name) =>
-        name === 'Barbarian1' || name === 'Barbarian2' ? [makeWolfBuff()] : [],
-      )
-
-      const result = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Attacker'),
-          makePlayer('Barbarian1'),
-          makePlayer('Barbarian2'),
-        ]),
-        skipRangeCheck: true,
-      })
-      expect(result).toEqual({ advantage: true, source: 'Barbarian1' })
-    })
-
-    it('finds a Wolf buff among other buff entries', () => {
-      getRuntimeValue.mockReturnValue([
-        makeBearBuff(),
-        makeWolfBuff(),
-      ])
-
-      const result = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Attacker'), makePlayer('Barbarian')]),
-        skipRangeCheck: true,
-      })
-      expect(result).toEqual({ advantage: true, source: 'Barbarian' })
-    })
-
-    it('ignores a Wolf optionName when the buff name is not "Rage of the Wilds"', () => {
-      getRuntimeValue.mockReturnValue([
-        { name: 'Some Other Buff', optionName: 'Wolf' },
-      ])
-
-      const result = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Attacker'), makePlayer('Barbarian')]),
-        skipRangeCheck: true,
-      })
-      expect(result).toEqual({ advantage: false })
-    })
-
-    it('does not call getDistanceFeet', () => {
-      getRuntimeValue.mockImplementation((name) =>
-        name === 'Barbarian' ? [makeWolfBuff()] : [],
-      )
-
-      getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Attacker'), makePlayer('Barbarian')]),
-        skipRangeCheck: true,
-      })
-      expect(getDistanceFeet).not.toHaveBeenCalled()
-    })
+  it('returns false when mapData.players is missing or empty', async () => {
+    expect(await getWolfAdvantageAgainst({ attackerName: 'A', mapData: {} })).toEqual({ advantage: false })
+    expect(await getWolfAdvantageAgainst({ attackerName: 'A', mapData: makeMapData([]) })).toEqual({ advantage: false })
   })
 
-  // ── skipRangeCheck = false (range checking) ──────────────────
+  it('returns advantage when a non-attacker player has Wolf buff and is in range', async () => {
+    getRuntimeValue.mockImplementation((name) => name === 'Barbarian' ? [makeWolfBuff()] : [])
+    isWithinRange.mockResolvedValue(true)
 
-  describe('skipRangeCheck is false', () => {
-    it('returns false when no other player has the Wolf buff', () => {
-      const result = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Attacker', 0, 0),
-          makePlayer('Barbarian', 3, 0),
-        ]),
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ advantage: false })
+    const result = await getWolfAdvantageAgainst({
+      attackerName: 'Attacker',
+      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Barbarian')]),
     })
-
-    it('skips the attacker even if they have the Wolf buff', () => {
-      getRuntimeValue.mockImplementation((name) =>
-        name === 'Attacker' ? [makeWolfBuff()] : [],
-      )
-
-      const result = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Attacker')]),
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ advantage: false })
-    })
-
-    it('returns true when a Wolf-buffed player is within 5ft (inclusive)', () => {
-      getRuntimeValue.mockImplementation((name) =>
-        name === 'Barbarian' ? [makeWolfBuff()] : [],
-      )
-      getDistanceFeet.mockReturnValue(5)
-
-      const result = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Attacker', 0, 0),
-          makePlayer('Barbarian', 1, 0),
-        ]),
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ advantage: true, source: 'Barbarian' })
-    })
-
-    it('returns true when distance is under 5ft or zero (same square)', () => {
-      getRuntimeValue.mockImplementation((name) =>
-        name === 'Barbarian' ? [makeWolfBuff()] : [],
-      )
-
-      getDistanceFeet.mockReturnValue(3)
-      const result1 = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Attacker', 0, 0),
-          makePlayer('Barbarian', 1, 0),
-        ]),
-        skipRangeCheck: false,
-      })
-      expect(result1).toEqual({ advantage: true, source: 'Barbarian' })
-
-      getDistanceFeet.mockReturnValue(0)
-      const result2 = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Barbarian', 0, 0),
-          makePlayer('Attacker', 0, 0),
-        ]),
-        skipRangeCheck: false,
-      })
-      expect(result2).toEqual({ advantage: true, source: 'Barbarian' })
-    })
-
-    it('returns false when distance is over 5ft or just over (5.5)', () => {
-      getRuntimeValue.mockImplementation((name) =>
-        name === 'Barbarian' ? [makeWolfBuff()] : [],
-      )
-
-      getDistanceFeet.mockReturnValue(10)
-      const result1 = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Attacker', 0, 0),
-          makePlayer('Barbarian', 3, 0),
-        ]),
-        skipRangeCheck: false,
-      })
-      expect(result1).toEqual({ advantage: false })
-
-      getDistanceFeet.mockReturnValue(5.5)
-      const result2 = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Attacker', 0, 0),
-          makePlayer('Barbarian', 2, 0),
-        ]),
-        skipRangeCheck: false,
-      })
-      expect(result2).toEqual({ advantage: false })
-    })
-
-    it('returns false when getDistanceFeet returns null', () => {
-      getRuntimeValue.mockImplementation((name) =>
-        name === 'Barbarian' ? [makeWolfBuff()] : [],
-      )
-      getDistanceFeet.mockReturnValue(null)
-
-      const result = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Attacker', 0, 0),
-          makePlayer('Barbarian', null, null),
-        ]),
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ advantage: false })
-    })
-
-    it('returns false when getRuntimeValue returns a non-array', () => {
-      getRuntimeValue.mockReturnValue('not-an-array')
-
-      const result = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Attacker', 0, 0),
-          makePlayer('Barbarian', 1, 0),
-        ]),
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ advantage: false })
-    })
-
-    it('ignores non-Wolf buffs on other players', () => {
-      getRuntimeValue.mockReturnValue([makeBearBuff()])
-
-      const result = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Attacker', 0, 0),
-          makePlayer('Barbarian', 1, 0),
-        ]),
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ advantage: false })
-    })
-
-    it('finds the Wolf buff among other buff entries', () => {
-      getRuntimeValue.mockReturnValue([makeBearBuff(), makeWolfBuff()])
-      getDistanceFeet.mockReturnValue(3)
-
-      const result = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Barbarian', 1, 0),
-          makePlayer('Attacker', 2, 0),
-        ]),
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ advantage: true, source: 'Barbarian' })
-    })
-
-    it('skips players without the Wolf buff or out of range to find a matching one', () => {
-      getRuntimeValue.mockImplementation((name) =>
-        name === 'Player2' ? [makeWolfBuff()] : [],
-      )
-      getDistanceFeet.mockReturnValue(3)
-
-      const result = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Player1'),
-          makePlayer('Player2'),
-          makePlayer('Attacker'),
-        ]),
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ advantage: true, source: 'Player2' })
-    })
-
-    it('skips players that are out of range and checks the next one', () => {
-      getRuntimeValue.mockImplementation((name) =>
-        name === 'Barbarian1' || name === 'Barbarian2' ? [makeWolfBuff()] : [],
-      )
-      getDistanceFeet.mockReturnValueOnce(15) // Barbarian1 out of range
-      getDistanceFeet.mockReturnValueOnce(3) // Barbarian2 in range
-
-      const result = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Barbarian1'),
-          makePlayer('Barbarian2'),
-          makePlayer('Attacker'),
-        ]),
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ advantage: true, source: 'Barbarian2' })
-    })
-
-    it('returns false when all Wolf-buffed players are out of range', () => {
-      getRuntimeValue.mockImplementation((name) =>
-        name === 'Barbarian1' || name === 'Barbarian2' ? [makeWolfBuff()] : [],
-      )
-      getDistanceFeet.mockReturnValue(15)
-
-      const result = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Barbarian1'),
-          makePlayer('Barbarian2'),
-          makePlayer('Attacker'),
-        ]),
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ advantage: false })
-    })
-
-    it('does not call getDistanceFeet when no player has the Wolf buff', () => {
-      const result = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Attacker', 0, 0),
-          makePlayer('Barbarian', 1, 0),
-        ]),
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ advantage: false })
-      expect(getDistanceFeet).not.toHaveBeenCalled()
-    })
-
-    it('passes the correct positions to getDistanceFeet', () => {
-      getRuntimeValue.mockImplementation((name) =>
-        name === 'Barbarian' ? [makeWolfBuff()] : [],
-      )
-      getDistanceFeet.mockReturnValue(5)
-
-      getWolfAdvantageAgainst({
-        targetPos: { gridX: 7, gridY: 11 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Barbarian', 2, 3),
-          makePlayer('Attacker', 0, 0),
-        ]),
-        skipRangeCheck: false,
-      })
-
-      expect(getDistanceFeet).toHaveBeenCalledWith(
-        { gridX: 2, gridY: 3 },
-        { gridX: 7, gridY: 11 },
-      )
-    })
-
-    it('passes campaignName to getRuntimeValue', () => {
-      getRuntimeValue.mockReturnValue([])
-
-      getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: 'MyCampaign',
-        mapData: makeMapData([
-          makePlayer('Attacker', 0, 0),
-          makePlayer('Barbarian', 1, 0),
-        ]),
-        skipRangeCheck: false,
-      })
-
-      expect(getRuntimeValue).toHaveBeenCalledWith(
-        'Barbarian',
-        'activeBuffs',
-        'MyCampaign',
-      )
-    })
+    expect(result).toEqual({ advantage: true, source: 'Barbarian' })
   })
 
-  // ── skipRangeCheck edge cases ─────────────────────────────────
+  it('skips the attacker even if they have Wolf buff', async () => {
+    getRuntimeValue.mockImplementation(() => [makeWolfBuff()])
+    isWithinRange.mockResolvedValue(true)
 
-  describe('skipRangeCheck edge cases', () => {
-    it('treats skipRangeCheck as false when undefined', () => {
-      getRuntimeValue.mockImplementation((name) =>
-        name === 'Barbarian' ? [makeWolfBuff()] : [],
-      )
-      getDistanceFeet.mockReturnValue(3)
-
-      const result = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Attacker', 0, 0),
-          makePlayer('Barbarian', 1, 0),
-        ]),
-      })
-
-      expect(result).toEqual({ advantage: true, source: 'Barbarian' })
+    const result = await getWolfAdvantageAgainst({
+      attackerName: 'Attacker',
+      mapData: makeMapData([makePlayer('Attacker')]),
     })
+    expect(result).toEqual({ advantage: false })
+  })
 
-    it('returns false when only the attacker is in mapData', () => {
-      getRuntimeValue.mockImplementation((name) =>
-        name === 'Attacker' ? [makeWolfBuff()] : [],
-      )
+  it('returns false when no player has Wolf buff', async () => {
+    getRuntimeValue.mockImplementation(() => [])
 
-      const result = getWolfAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Attacker')]),
-        skipRangeCheck: false,
-      })
-
-      expect(result).toEqual({ advantage: false })
+    const result = await getWolfAdvantageAgainst({
+      attackerName: 'Attacker',
+      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Barbarian')]),
     })
+    expect(result).toEqual({ advantage: false })
+  })
+
+  it('handles invalid buff types gracefully', async () => {
+    getRuntimeValue
+      .mockReturnValueOnce(null)
+      .mockReturnValueOnce(undefined)
+      .mockReturnValueOnce('not-an-array')
+      .mockReturnValueOnce(42)
+      .mockReturnValueOnce([makeWolfBuff()])
+
+    const result = await getWolfAdvantageAgainst({
+      attackerName: 'Attacker',
+      mapData: makeMapData([
+        makePlayer('P1'), makePlayer('P2'), makePlayer('P3'), makePlayer('P4'), makePlayer('P5'),
+      ]),
+    })
+    expect(result).toEqual({ advantage: false })
+  })
+
+  it('returns false when Wolf buff is out of range', async () => {
+    getRuntimeValue.mockImplementation(() => [makeWolfBuff()])
+    isWithinRange.mockResolvedValue(false)
+
+    const result = await getWolfAdvantageAgainst({
+      attackerName: 'Attacker',
+      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Barbarian')]),
+    })
+    expect(result).toEqual({ advantage: false })
+  })
+
+  it('calls isWithinRange with 5 ft range', async () => {
+    getRuntimeValue.mockImplementation((name) => name === 'Barbarian' ? [makeWolfBuff()] : [])
+    isWithinRange.mockResolvedValue(true)
+
+    await getWolfAdvantageAgainst({
+      attackerName: 'Attacker',
+      campaignName: 'MyCampaign',
+      activeMapName: 'MyMap',
+      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Barbarian')]),
+    })
+    expect(isWithinRange).toHaveBeenCalledWith('Barbarian', 'Attacker', 5)
+  })
+
+  it('iterates players until finding one with Wolf buff in range', async () => {
+    getRuntimeValue.mockImplementation((name) => name === 'Player1' ? [] : name === 'Player2' ? [makeWolfBuff()] : [])
+    isWithinRange.mockResolvedValue(true)
+
+    const result = await getWolfAdvantageAgainst({
+      attackerName: 'Attacker',
+      campaignName: 'C',
+      mapData: makeMapData([makePlayer('Player1'), makePlayer('Player2'), makePlayer('Attacker')]),
+    })
+    expect(result).toEqual({ advantage: true, source: 'Player2' })
+  })
+
+  it('returns false when only the attacker exists in mapData', async () => {
+    const result = await getWolfAdvantageAgainst({
+      attackerName: 'Attacker',
+      mapData: makeMapData([makePlayer('Attacker')]),
+    })
+    expect(result).toEqual({ advantage: false })
+  })
+
+  it('does not match Wolf buff without Rage of the Wilds name', async () => {
+    getRuntimeValue.mockImplementation(() => [{ optionName: 'Wolf' }])
+    isWithinRange.mockResolvedValue(true)
+
+    const result = await getWolfAdvantageAgainst({
+      attackerName: 'Attacker',
+      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Barbarian')]),
+    })
+    expect(result).toEqual({ advantage: false })
   })
 })

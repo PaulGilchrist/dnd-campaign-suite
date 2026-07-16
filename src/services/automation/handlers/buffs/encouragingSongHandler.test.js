@@ -25,6 +25,10 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+  isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './encouragingSongHandler.js';
@@ -33,6 +37,7 @@ import * as automationService from '../../../combat/automation/automationService
 import * as mapsService from '../../../maps/mapsService.js';
 import * as logService from '../../../ui/logService.js';
 import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
+import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -82,6 +87,7 @@ describe('encouragingSongHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     runtimeState.getRuntimeValue.mockReturnValue(null);
+    rangeCheck.isWithinRange.mockResolvedValue(true);
   });
 
   // ── No map / no map data / no targets ───────────────────────
@@ -123,6 +129,7 @@ describe('encouragingSongHandler', () => {
       rangeValidation.rangeToFeet.mockReturnValue(15);
       rangeValidation.getDistanceFeet.mockReturnValue(30);
       mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
+      rangeCheck.isWithinRange.mockResolvedValue(false);
 
       const action = makeAction();
       const ps = makePlayerStats();

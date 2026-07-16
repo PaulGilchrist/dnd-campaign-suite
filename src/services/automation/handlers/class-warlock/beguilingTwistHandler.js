@@ -1,15 +1,13 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { resolveMapPositions } from '../../common/targetResolver.js';
 import { createSaveListener } from '../../common/savePrompt.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 
-async function findRecentSuccessfulSave(playerStats, campaignName, mapName, rangeFt, isSelf) {
+async function findRecentSuccessfulSave(playerStats, campaignName, rangeFt, isSelf) {
     const playerName = playerStats.name;
 
     if (isSelf) {
@@ -26,41 +24,31 @@ async function findRecentSuccessfulSave(playerStats, campaignName, mapName, rang
 
     if (!rangeFt) return null;
 
-    const combatSummary = await getCombatContext(campaignName);
-    if (!combatSummary?.creatures) return null;
-
     const attackResult = await findLastAttack(campaignName);
     const attackEvent = attackResult.attackEvent;
     if (!attackEvent) return null;
 
     // Check if the last attack was from an ally (not the player)
     if (attackResult.attackerName && attackResult.attackerName !== playerName) {
-        const attackerCreature = combatSummary.creatures.find(c => c.name === attackResult.attackerName);
-        if (attackerCreature && attackerCreature.name !== playerName) {
-            if (mapName && rangeFt != null) {
-                const positions = await resolveMapPositions(campaignName, mapName, playerName);
-                if (positions?.attackerPos && positions?.targetPos) {
-                    if (!isWithinRange(positions.attackerPos, positions.targetPos, rangeFt)) return null;
-                }
-            }
-            return { name: attackResult.attackerName, event: attackEvent, type: 'attack_roll', success: true };
-        }
+        const inRange = await isWithinRange(playerName, attackResult.attackerName, rangeFt);
+        if (!inRange) return null;
+        return { name: attackResult.attackerName, event: attackEvent, type: 'attack_roll', success: true };
     }
 
     return null;
 }
 
-export async function handle(action, playerStats, campaignName, mapName) {
+export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
     const featureName = action.name || 'Beguiling Twist';
 
-    const rangeFt = rangeToFeet(auto.range || '120_ft');
+    const rangeFt = auto.range ? parseInt(auto.range.replace(/[^0-9]/g, '')) || 120 : 120;
 
     const isSelf = auto.target === 'self';
     const differentCreature = auto.target === 'different_creature';
 
-    const result = await findRecentSuccessfulSave(playerStats, campaignName, mapName, rangeFt, isSelf);
+    const result = await findRecentSuccessfulSave(playerStats, campaignName, rangeFt, isSelf);
 
     if (!result) {
         return {
@@ -158,7 +146,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
             addExpiration(playerName, targetName, [
                 { type: 'condition', condition: condKey }
-            ], campaignName);
+            ]);
         } else {
             addEntry(campaignName, {
                 type: 'save_result',

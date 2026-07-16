@@ -25,6 +25,10 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
   rangeToFeet: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+  isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn().mockResolvedValue(undefined),
 }));
@@ -47,6 +51,7 @@ import * as automationService from '../../../combat/automation/automationService
 import * as diceRoller from '../../../dice/diceRoller.js';
 import * as mapsService from '../../../maps/mapsService.js';
 import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
+import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 
 const campaignName = 'TestCampaign';
@@ -109,6 +114,7 @@ describe('inspiringSmiteHandler.handle', () => {
     rangeValidation.rangeToFeet.mockReset();
     rangeValidation.getDistanceFeet.mockReset();
     automationService.resolveDiceExpression.mockReset();
+    rangeCheck.isWithinRange.mockReset().mockResolvedValue(true);
   });
 
   // ── Divine Smite check ──────────────────────────────────────
@@ -278,15 +284,18 @@ describe('inspiringSmiteHandler.handle', () => {
 
       let event;
 
-      // Attacker not found in map data - no creature targets since attacker not on map
+      // Attacker not found in map data - other players still included since they're within range
       mapsService.loadMapData.mockResolvedValue({
         players: [{ name: 'OtherPlayer', gridX: 1, gridY: 1 }],
       });
       await handle(makeAction(), makePlayerStats(), campaignName, mapName);
       event = getPendingEvent();
-      expect(event.detail.creatureTargets).toEqual([]);
+      expect(event.detail.creatureTargets).toEqual([
+        { name: 'OtherPlayer', type: 'player' },
+        { name: 'TestPaladin', type: 'player' },
+      ]);
 
-      // Map data is null - no creature targets
+      // Map data is null - only self included
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [],
         lastAttack: makeDivineSmiteAttack(),
@@ -296,9 +305,11 @@ describe('inspiringSmiteHandler.handle', () => {
       mapsService.loadMapData.mockResolvedValue(null);
       await handle(makeAction(), makePlayerStats(), campaignName, mapName);
       event = getPendingEvent();
-      expect(event.detail.creatureTargets).toEqual([]);
+      expect(event.detail.creatureTargets).toEqual([
+        { name: 'TestPaladin', type: 'player' },
+      ]);
 
-      // Map data has no players - no creature targets
+      // Map data has no players - only self included
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [],
         lastAttack: makeDivineSmiteAttack(),
@@ -308,7 +319,9 @@ describe('inspiringSmiteHandler.handle', () => {
       mapsService.loadMapData.mockResolvedValue({});
       await handle(makeAction(), makePlayerStats(), campaignName, mapName);
       event = getPendingEvent();
-      expect(event.detail.creatureTargets).toEqual([]);
+      expect(event.detail.creatureTargets).toEqual([
+        { name: 'TestPaladin', type: 'player' },
+      ]);
     });
 
     it('excludes targets beyond range', async () => {
@@ -320,6 +333,7 @@ describe('inspiringSmiteHandler.handle', () => {
       automationService.resolveDiceExpression.mockReturnValue('2d8 + 8');
       rangeValidation.rangeToFeet.mockReturnValue(30);
       rangeValidation.getDistanceFeet.mockReturnValue(40);
+      rangeCheck.isWithinRange.mockResolvedValue(false);
       mapsService.loadMapData.mockResolvedValue({
         players: [
           { name: 'TestPaladin', gridX: 1, gridY: 1 },

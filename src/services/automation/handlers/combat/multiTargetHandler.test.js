@@ -25,6 +25,10 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+  isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('../../common/targetResolver.js', () => ({
   resolveMapPositions: vi.fn(),
 }));
@@ -49,6 +53,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
 import { rangeToFeet, getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
@@ -99,6 +104,7 @@ describe('multiTargetHandler.handle', () => {
     getCombatSummary.mockImplementation((_name) => {
       return { creatures: [], players: [], placedItems: [] };
     });
+    isWithinRange.mockResolvedValue(true);
   });
 
   describe('combat context validation', () => {
@@ -416,6 +422,7 @@ describe('multiTargetHandler.applyMultiTarget', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     addEntry.mockReturnValue(Promise.resolve());
+    isWithinRange.mockResolvedValue(true);
   });
 
   describe('early returns', () => {
@@ -501,6 +508,7 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       rangeToFeet.mockReturnValue(30);
       resolveMapPositions.mockResolvedValue({ attackerPos: { gridX: 1, gridY: 1 } });
       getDistanceFeet.mockReturnValue(50);
+      isWithinRange.mockResolvedValue(false);
 
       const result = await applyMultiTarget(
         action, ps, campaignName, mapName,
@@ -519,6 +527,7 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       rangeToFeet.mockReturnValue(30);
       resolveMapPositions.mockResolvedValue({ attackerPos: { gridX: 1, gridY: 1 } });
       getDistanceFeet.mockReturnValueOnce(10).mockReturnValueOnce(50);
+      isWithinRange.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
 
       const result = await applyMultiTarget(
         action, ps, campaignName, mapName,

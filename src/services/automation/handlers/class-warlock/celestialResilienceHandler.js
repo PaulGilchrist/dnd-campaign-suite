@@ -36,18 +36,14 @@ export async function grantCelestialResilience(playerStats, campaignName, source
             const rangeFt = rangeToFeet(auto.range || '60_ft');
             const targets = [];
 
-            if (mapName && rangeFt != null) {
-                const attackerPlayer = await loadMapData(campaignName, mapName).then(md => md?.players?.find(p => p.name === playerStats.name));
-                if (attackerPlayer) {
-                    const attackerPos = { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY };
-                    const mapPlayers = (await loadMapData(campaignName, mapName))?.players || [];
-                    for (const p of mapPlayers) {
-                        if (p.name === playerStats.name) continue;
-                        if (targets.length >= maxAllies) break;
-                        const pos = { gridX: p.gridX, gridY: p.gridY };
-                        if (isWithinRange(attackerPos, pos, rangeFt)) {
-                            targets.push(p.name);
-                        }
+            if (rangeFt != null) {
+                const mapPlayers = (await loadMapData(campaignName, mapName))?.players || [];
+                for (const p of mapPlayers) {
+                    if (p.name === playerStats.name) continue;
+                    if (targets.length >= maxAllies) break;
+                    const inRange = await isWithinRange(playerStats.name, p.name, rangeFt);
+                    if (inRange) {
+                        targets.push(p.name);
                     }
                 }
             }

@@ -27,6 +27,10 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
     rangeToFeet: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+    isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
 // ── Re-import mocks after mocking ──────────────────────────────
 
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -34,6 +38,7 @@ import { evaluateAutoExpression } from '../../../combat/automation/automationSer
 import { addEntry } from '../../../ui/logService.js';
 import { loadMapData } from '../../../maps/mapsService.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -80,6 +85,7 @@ function makeAction(overrides = {}) {
 describe('celestialResilienceHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        isWithinRange.mockResolvedValue(true);
     });
 
     describe('grantCelestialResilience', () => {
@@ -298,11 +304,8 @@ describe('celestialResilienceHandler', () => {
                     { name: 'FarAlly', gridX: 10, gridY: 10 },
                 ],
             });
-            getDistanceFeet.mockImplementation((a, b) => {
-                const dx = b.gridX - a.gridX;
-                const dy = b.gridY - a.gridY;
-                return Math.sqrt(dx * dx + dy * dy) * 5;
-            });
+            isWithinRange.mockResolvedValueOnce(true)
+                .mockResolvedValueOnce(false);
 
             const result = await grantCelestialResilience(
                 makeCelestialStats(),
@@ -438,7 +441,7 @@ describe('celestialResilienceHandler', () => {
                     { name: 'DistantAlly', gridX: 50, gridY: 50 },
                 ],
             });
-            getDistanceFeet.mockReturnValue(100);
+            isWithinRange.mockResolvedValue(false);
 
             const result = await grantCelestialResilience(
                 makeCelestialStats(),

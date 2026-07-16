@@ -35,6 +35,10 @@ vi.mock('../../../encounters/combatData.js', () => ({
   getCurrentCombatRound: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+  isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
 import { handle, confirmVitalityOfTheTree } from './tempHpBuffHandler.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';

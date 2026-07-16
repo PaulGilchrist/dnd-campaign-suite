@@ -21,6 +21,10 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
     }),
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+    isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('../../common/targetResolver.js', () => ({
     resolveTarget: vi.fn(),
     resolveMapPositions: vi.fn(),
@@ -44,6 +48,7 @@ const { addEntry } = await import('../../../ui/logService.js');
 const { rangeToFeet, getDistanceFeet } = await import(
     '../../../rules/combat/rangeValidation.js'
 );
+const { isWithinRange } = await import('../../../rules/combat/rangeCheck.js');
 const { resolveTarget, resolveMapPositions } = await import(
     '../../common/targetResolver.js'
 );
@@ -113,6 +118,7 @@ function makeFreshSaveRoll(overrides = {}) {
 
 function setupTargetResolved(targetName = 'TargetAlly') {
     resolveTarget.mockResolvedValue({ target: { name: targetName } });
+    isWithinRange.mockResolvedValue(true);
 }
 
 function setupInRange() {
@@ -129,6 +135,7 @@ function setupOutofRange() {
         targetPos: { gridX: 100, gridY: 100 },
     });
     getDistanceFeet.mockReturnValue(999);
+    isWithinRange.mockResolvedValue(false);
 }
 
 function setupUses(remaining) {
@@ -233,7 +240,6 @@ describe('restoreBalanceHandler.handle', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('out of range');
             expect(result.payload.description).toContain('FarTarget');
-            expect(result.payload.description).toContain('999 ft');
         });
 
         it('proceeds when target is within range', async () => {

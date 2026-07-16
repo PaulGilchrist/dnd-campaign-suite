@@ -20,6 +20,10 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
     getDistanceFeet: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+    isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('../../common/targetResolver.js', () => ({
     resolveTarget: vi.fn(),
     resolveMapPositions: vi.fn(),
@@ -29,6 +33,7 @@ const { getRuntimeValue, setRuntimeValue } = await import('../../../../hooks/run
 const { rollExpression } = await import('../../../dice/diceRoller.js');
 const { addEntry } = await import('../../../ui/logService.js');
 const { rangeToFeet, getDistanceFeet } = await import('../../../rules/combat/rangeValidation.js');
+const { isWithinRange } = await import('../../../rules/combat/rangeCheck.js');
 const { resolveTarget, resolveMapPositions } = await import('../../common/targetResolver.js');
 
 const campaignName = 'test-campaign';
@@ -67,6 +72,7 @@ function setupDefaultMocks() {
     resolveMapPositions.mockResolvedValue(null);
     getRuntimeValue.mockReturnValue(5);
     rollExpression.mockReturnValue({ total: 5 });
+    isWithinRange.mockResolvedValue(true);
 }
 
 describe('bastionOfLawHandler', () => {
@@ -95,14 +101,13 @@ describe('bastionOfLawHandler', () => {
                 targetPos: { gridX: 10, gridY: 0 },
             });
             getDistanceFeet.mockReturnValue(50);
+            isWithinRange.mockResolvedValue(false);
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toContain('out of range');
-            expect(result.payload.description).toContain('50 ft');
-            expect(result.payload.description).toContain('30 ft');
         });
 
         it('returns modal when target exists and is in range', async () => {

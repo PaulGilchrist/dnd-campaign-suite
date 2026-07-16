@@ -19,6 +19,10 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
   rangeToFeet: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+  isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn().mockResolvedValue({ round: 1, creatures: [] }),
 }));
@@ -72,6 +76,7 @@ import { handle } from './reactionDebuffHandler.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
 import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
+import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
 import * as combatData from '../../../encounters/combatData.js';
 import * as abilityLookup from '../../../shared/abilityLookup.js';
 import * as savePrompt from '../../common/savePrompt.js';
@@ -119,6 +124,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   useRuntimeState.getRuntimeValue.mockReturnValue(null);
   rangeValidation.rangeToFeet.mockReturnValue(30);
+  rangeCheck.isWithinRange.mockResolvedValue(true);
   abilityLookup.getAbilityModifier.mockReturnValue(4);
   addEventListenerSpy = vi.fn();
   removeEventListenerSpy = vi.fn();
@@ -154,6 +160,7 @@ describe('branchesOfTheTree (teleport_and_slow)', () => {
     combatData.loadCombatSummary.mockResolvedValue(mockCombatSummary);
     combatData.getCombatSummary.mockReturnValue(mockCombatSummary);
     rangeValidation.getDistanceFeet.mockReturnValue(50);
+    rangeCheck.isWithinRange.mockResolvedValue(false);
 
     const action = makeTeleportAction();
     const result = await handle(action, makeBarbarianStats(), campaignName, mapName);

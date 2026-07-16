@@ -336,7 +336,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const isHolyAuraActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Holy Aura' && b.effect === 'holy_aura');
     const isProtectionFromPoisonActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Protection from Poison' && b.effect === 'protection_from_poison');
     const combatContext = getCombatSummary(campaignName);
-    const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers, myTargetEffects, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, seeInvisibilityActive, playerStats?.name, isLivingLegendActive, isElderChampionActive, isHolyAuraActive, isProtectionFromPoisonActive);
+     const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers, myTargetEffects, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, seeInvisibilityActive, playerStats?.name, isLivingLegendActive, isElderChampionActive, false, isHolyAuraActive, isProtectionFromPoisonActive);
     if (playerStats) {
         const speedHalvedTime = getRuntimeValue(playerStats.name, 'stunned_speedHalved', campaignName);
         if (speedHalvedTime) conditionEffects.speedHalved = true;

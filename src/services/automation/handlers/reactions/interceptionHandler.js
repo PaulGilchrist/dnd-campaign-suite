@@ -1,6 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
-import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
@@ -33,18 +32,18 @@ export async function handle(action, playerStats, campaignName, mapName) {
     const shieldOrWeaponResult = checkShieldOrWeapon(playerStats, auto, featureName);
     if (shieldOrWeaponResult) return shieldOrWeaponResult;
 
-    const rangeFt = rangeToFeet(auto.range || '5_ft');
-    if (mapName && rangeFt != null) {
-        const positions = await resolveMapPositions(campaignName, mapName, playerName);
+    const rangeFt = auto.range ? parseInt(auto.range.replace(/[^0-9]/g, '')) || 5 : 5;
+    if (rangeFt != null) {
+        const positions = mapName ? await resolveMapPositions(campaignName, playerName) : null;
         if (positions?.attackerPos && positions?.targetPos) {
-            const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
-            if (!isWithinRange(positions.attackerPos, positions.targetPos, rangeFt)) {
+            const inRange = await isWithinRange(playerName, attackerName, rangeFt);
+            if (!inRange) {
                 return {
                     type: 'popup',
                     payload: {
                         type: 'automation_info',
                         name: featureName,
-                        description: `${attackerName} is out of range (${Math.round(dist)} ft > ${rangeFt} ft).`,
+                        description: `${attackerName} is out of range.`,
                         automation: auto,
                     },
                 };
@@ -52,7 +51,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
         }
     }
 
-    const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+    const storedEffects = getRuntimeValue(playerName, 'targetEffects') || [];
     const protectionEffect = {
         effect: 'protection',
         target: defenderName,
@@ -68,7 +67,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
     } else {
         storedEffects[existingIndex] = protectionEffect;
     }
-    await setRuntimeValue(campaignName, 'targetEffects', storedEffects, campaignName);
+    await setRuntimeValue(playerName, 'targetEffects', storedEffects, campaignName);
 
     const combatSummary = await getCombatContext(campaignName);
     if (!combatSummary) {

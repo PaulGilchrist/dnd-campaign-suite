@@ -116,22 +116,18 @@ async function handleMultiTargetAllyTempHp(action, playerStats, campaignName, ma
     const allies = [];
 
     if (mapName && rangeFt != null) {
-        const attackerPlayer = await loadMapData(campaignName, mapName).then(md => md?.players?.find(p => p.name === playerName));
-        if (attackerPlayer) {
-            const attackerPos = { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY };
-            const mapPlayers = (await loadMapData(campaignName, mapName))?.players || [];
-            for (const p of mapPlayers) {
+        const mapPlayers = (await loadMapData(campaignName))?.players || [];
+        for (const p of mapPlayers) {
+            if (allies.length >= maxTargets) break;
+            if (auto.includesSelf && p.name === playerName) {
+                allies.push(p.name);
+                continue;
+            }
+            if (p.name === playerName) continue;
+            const inRange = await isWithinRange(playerName, p.name, rangeFt);
+            if (inRange) {
+                allies.push(p.name);
                 if (allies.length >= maxTargets) break;
-                if (auto.includesSelf && p.name === playerName) {
-                    allies.push(p.name);
-                    continue;
-                }
-                if (p.name === playerName) continue;
-                const pos = { gridX: p.gridX, gridY: p.gridY };
-                if (isWithinRange(attackerPos, pos, rangeFt)) {
-                    allies.push(p.name);
-                    if (allies.length >= maxTargets) break;
-                }
             }
         }
     } else if (!auto.includesSelf) {
@@ -152,7 +148,7 @@ async function handleMultiTargetAllyTempHp(action, playerStats, campaignName, ma
     }
 
     for (const targetName of allies) {
-        const existingTempHp = Number(getRuntimeValue(targetName, 'tempHp', campaignName) || 0);
+        const existingTempHp = Number(getRuntimeValue(targetName, 'tempHp') || 0);
         const newTotal = Math.max(existingTempHp, amount);
         setRuntimeValue(targetName, 'tempHp', newTotal, campaignName);
     }
@@ -181,7 +177,7 @@ export async function handleMantleOfInspiration(action, playerStats, campaignNam
         || getAbilityModifier(playerStats, 'Charisma');
 
     if (usesMax > 0) {
-        const currentUses = Number(getRuntimeValue(playerName, 'bardicInspirationUses', campaignName) ?? usesMax);
+        const currentUses = Number(getRuntimeValue(playerName, 'bardicInspirationUses') ?? usesMax);
         // usesMax and currentUses available via handleMantleOfInspiration params
         if (currentUses <= 0) {
             return {
@@ -232,7 +228,7 @@ export async function confirmMantleOfInspiration(action, playerStats, campaignNa
     const finalTargets = (selectedTargets || []).slice(0, Math.max(1, getAbilityModifier(playerStats, 'Charisma')));
 
     for (const targetName of finalTargets) {
-        const existingTempHp = Number(getRuntimeValue(targetName, 'tempHp', campaignName) || 0);
+        const existingTempHp = Number(getRuntimeValue(targetName, 'tempHp') || 0);
         const newTotal = Math.max(existingTempHp, tempHp);
         setRuntimeValue(targetName, 'tempHp', newTotal, campaignName);
         setRuntimeValue(targetName, 'inspiringMovementNoOA', true, campaignName);
@@ -274,7 +270,7 @@ export function grantTempHpOnRage(action, playerStats, campaignName) {
     const amount = evaluateAutoExpression(tempHpExpression, playerStats);
     if (typeof amount !== 'number' || amount <= 0) return false;
 
-    const existing = getRuntimeValue(playerStats.name, 'tempHp', campaignName) || 0;
+    const existing = getRuntimeValue(playerStats.name, 'tempHp') || 0;
     const newTotal = Math.max(existing, amount);
     setRuntimeValue(playerStats.name, 'tempHp', newTotal, campaignName);
 
@@ -301,7 +297,7 @@ export async function handleVitalityOfTheTree(action, playerStats, campaignName,
     const playerName = playerStats.name;
 
     const currentRound = getCurrentCombatRound(campaignName);
-    const rageActivationRound = getRuntimeValue(playerName, 'vitalityOfTheTreeRageRound', campaignName);
+    const rageActivationRound = getRuntimeValue(playerName, 'vitalityOfTheTreeRageRound');
 
     const roundsElapsed = currentRound - (rageActivationRound ?? currentRound);
     const maxTargets = Math.max(1, roundsElapsed);
@@ -358,7 +354,7 @@ export async function confirmVitalityOfTheTree(action, playerStats, campaignName
     const finalTargets = (selectedTargets || []).slice(0, maxTargets || 999);
 
     for (const targetName of finalTargets) {
-        const existingTempHp = Number(getRuntimeValue(targetName, 'tempHp', campaignName) || 0);
+        const existingTempHp = Number(getRuntimeValue(targetName, 'tempHp') || 0);
         const newTotal = Math.max(existingTempHp, tempHp);
         setRuntimeValue(targetName, 'tempHp', newTotal, campaignName);
     }
@@ -412,7 +408,7 @@ async function handleBolsteringTreats(action, playerStats, campaignName, _mapNam
         };
     }
 
-    const currentTreats = Number(getRuntimeValue(playerName, treatUsesKey, campaignName) ?? craftCount);
+    const currentTreats = Number(getRuntimeValue(playerName, treatUsesKey) ?? craftCount);
     if (currentTreats <= 0) {
         return {
             type: 'popup',
@@ -428,7 +424,7 @@ async function handleBolsteringTreats(action, playerStats, campaignName, _mapNam
 
     await setRuntimeValue(playerName, treatUsesKey, currentTreats - 1, campaignName);
 
-    const existingTempHp = Number(getRuntimeValue(playerName, 'tempHp', campaignName) || 0);
+    const existingTempHp = Number(getRuntimeValue(playerName, 'tempHp') || 0);
     const newTotal = Math.max(existingTempHp, tempHpAmount);
     setRuntimeValue(playerName, 'tempHp', newTotal, campaignName);
 

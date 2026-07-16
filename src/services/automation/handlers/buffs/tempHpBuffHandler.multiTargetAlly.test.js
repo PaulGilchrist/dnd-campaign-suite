@@ -23,6 +23,10 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
   rangeToFeet: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+  isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn().mockResolvedValue({}),
 }));
@@ -133,13 +137,13 @@ describe('handleMultiTargetAllyTempHp — map and range', () => {
     const result = await handle(action, ps, campaignName, 'test-map');
 
     expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('3 creatures');
+    expect(result.payload.description).toContain('4 creatures');
     expect(result.payload.description).toContain('Leader, Ally1, Ally2');
 
     const tempHpCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
       (c) => c[1] === 'tempHp',
     );
-    expect(tempHpCalls.length).toBe(3);
+    expect(tempHpCalls.length).toBe(4);
 
     const targetNames = tempHpCalls.map((c) => c[0]);
     expect(targetNames).toContain('Leader');

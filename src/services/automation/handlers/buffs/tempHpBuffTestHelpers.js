@@ -5,6 +5,7 @@ import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { addEntry } from '../../../ui/logService.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
+import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
 
 export const campaignName = 'TestCampaign';
 
@@ -49,6 +50,7 @@ export function resetMocks() {
   getDistanceFeet.mockClear().mockReset();
   rangeToFeet.mockClear().mockReset();
   addEntry.mockClear().mockResolvedValue({});
+  rangeCheck.isWithinRange.mockClear().mockReset().mockResolvedValue(true);
   if (damageUtils.getCombatContext?.mock) {
     damageUtils.getCombatContext.mockClear().mockReset();
   }

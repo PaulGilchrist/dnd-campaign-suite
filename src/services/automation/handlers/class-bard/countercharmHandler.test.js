@@ -6,10 +6,6 @@ import { handle } from './countercharmHandler.js';
 import { addEntry } from '../../../ui/logService.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { rangeToFeet, getDistanceFeet, getNearestPlacedItem } from '../../../rules/combat/rangeValidation.js';
-import * as mapsService from '../../../maps/mapsService.js';
-
-// ── Mocks ──────────────────────────────────────────────────────
 
 vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
@@ -27,17 +23,20 @@ vi.mock('../../../combat/conditions/conditionSaveService.js', () => ({
   removeCondition: vi.fn(),
 }));
 
-vi.mock('../../../rules/combat/rangeValidation.js', () => ({
-  rangeToFeet: vi.fn(),
-  getDistanceFeet: vi.fn(),
-  getNearestPlacedItem: vi.fn(),
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+  isWithinRange: vi.fn(),
 }));
 
-vi.mock('../../../maps/mapsService.js', () => ({
-  loadMapData: vi.fn(),
+vi.mock('../../common/infoPopup.js', () => ({
+  infoPopup: vi.fn((name, desc, auto) => ({
+    type: 'popup',
+    payload: { type: 'automation_info', name, description: desc, automation: auto },
+  })),
 }));
 
 // ── Helpers ────────────────────────────────────────────────────
+
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 
 const campaignName = 'TestCampaign';
 const mapName = 'tavern-map';
@@ -111,26 +110,12 @@ function makeCheckEvent(overrides = {}) {
   };
 }
 
-function makeMapData(overrides = {}) {
-  return {
-    players: [
-      { name: 'TestHero', gridX: 1, gridY: 1 },
-      { name: 'Ally1', gridX: 4, gridY: 1 },
-    ],
-    placedItems: [
-      { name: 'Goblin', gridX: 6, gridY: 1 },
-    ],
-    ...overrides,
-  };
-}
-
 // ── Tests ──────────────────────────────────────────────────────
 
 describe('countercharmHandler.handle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     findLastAttack.mockResolvedValue(makeAttackResult());
-    rangeToFeet.mockReturnValue(30);
     getCombatContext.mockResolvedValue({
       creatures: [
         { name: 'TestHero', type: 'player' },
@@ -138,9 +123,7 @@ describe('countercharmHandler.handle', () => {
         { name: 'Goblin', type: 'npc' },
       ],
     });
-    mapsService.loadMapData.mockResolvedValue(null);
-    getDistanceFeet.mockReturnValue(0);
-    getNearestPlacedItem.mockReturnValue(null);
+    isWithinRange.mockResolvedValue(true);
   });
 
   describe('no recent roll', () => {
@@ -161,8 +144,7 @@ describe('countercharmHandler.handle', () => {
         attackEvent: makeSaveEvent(),
         targetName: 'TestHero',
       }));
-      mapsService.loadMapData.mockResolvedValue(makeMapData());
-      getDistanceFeet.mockReturnValue(50);
+      isWithinRange.mockResolvedValue(false);
 
       const result = await handle(action, ps, campaignName, mapName);
 
@@ -181,7 +163,7 @@ describe('countercharmHandler.handle', () => {
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.payload.description).toContain('Target: TestHero');
-      expect(mapsService.loadMapData).not.toHaveBeenCalled();
+      expect(isWithinRange).toHaveBeenCalledWith('TestHero', 'TestHero', 30);
     });
   });
 
@@ -208,8 +190,6 @@ describe('countercharmHandler.handle', () => {
         attackEvent: makeSaveEvent({ d20: 5, saveDc: 14, saveResult: 'failure' }),
         targetName: 'Ally1',
       }));
-      mapsService.loadMapData.mockResolvedValue(makeMapData());
-      getDistanceFeet.mockReturnValue(15);
 
       const result = await handle(action, ps, campaignName, mapName);
 
@@ -224,9 +204,6 @@ describe('countercharmHandler.handle', () => {
         attackEvent: makeSaveEvent({ d20: 5, saveDc: 14, saveResult: 'failure' }),
         targetName: 'Goblin',
       }));
-      mapsService.loadMapData.mockResolvedValue(makeMapData());
-      getNearestPlacedItem.mockReturnValue({ gridX: 6, gridY: 1 });
-      getDistanceFeet.mockReturnValue(25);
 
       const result = await handle(action, ps, campaignName, mapName);
 
@@ -356,8 +333,6 @@ describe('countercharmHandler.handle', () => {
         attackEvent: makeSaveEvent({ saveResult: 'failure' }),
         targetName: 'Ally1',
       }));
-      mapsService.loadMapData.mockResolvedValue(makeMapData());
-      getDistanceFeet.mockReturnValue(15);
 
       await handle(action, ps, campaignName, mapName);
 

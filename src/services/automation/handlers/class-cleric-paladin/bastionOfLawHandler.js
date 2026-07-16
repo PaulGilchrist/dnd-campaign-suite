@@ -1,7 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { addEntry } from '../../../ui/logService.js';
-import { rangeToFeet, getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { resolveMapPositions, resolveTarget } from '../../common/targetResolver.js';
 
@@ -14,7 +13,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
     const playerName = playerStats.name;
     const featureName = action.name || 'Bastion of Law';
 
-    const rangeFt = rangeToFeet(auto.range || '30_ft');
+    const rangeFt = auto.range ? parseInt(auto.range.replace(/[^0-9]/g, '')) || 30 : 30;
 
     const targetInfo = await resolveTarget(campaignName, playerName);
     if (!targetInfo?.target) {
@@ -31,17 +30,17 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
     const targetName = targetInfo.target.name;
 
-    if (mapName && rangeFt != null) {
-        const positions = await resolveMapPositions(campaignName, mapName, playerName);
+    if (rangeFt != null) {
+        const positions = mapName ? await resolveMapPositions(campaignName, playerName) : null;
         if (positions?.attackerPos && positions?.targetPos) {
-            const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
-            if (!isWithinRange(positions.attackerPos, positions.targetPos, rangeFt)) {
+            const inRange = await isWithinRange(playerName, targetName, rangeFt);
+            if (!inRange) {
                 return {
                     type: 'popup',
                     payload: {
                         type: 'automation_info',
                         name: featureName,
-                        description: `${targetName} is out of range (${Math.round(dist)} ft > ${rangeFt} ft).`,
+                        description: `${targetName} is out of range.`,
                         automation: auto,
                     },
                 };
@@ -73,7 +72,7 @@ export async function handleApply(action, playerStats, campaignName, spAmount, t
     const sp = Math.min(maxSP, Math.max(minSP, Number(spAmount) || 1));
 
     // Check sorcery points availability
-    const spPool = getRuntimeValue(playerName, 'sorceryPoints', campaignName);
+    const spPool = getRuntimeValue(playerName, 'sorceryPoints');
     const spMax = playerStats.resources?.sorceryPoints?.max || 0;
     const spCurrent = Number(spPool) || spMax;
 
@@ -124,8 +123,8 @@ export async function handleSpendDice(action, playerStats, campaignName, numDice
     const playerName = playerStats.name;
     const featureName = action.name || 'Bastion of Law';
 
-    const wardDice = getRuntimeValue(playerName, WARD_DICE_KEY, campaignName) || [];
-    const wardTarget = getRuntimeValue(playerName, WARD_TARGET_KEY, campaignName);
+    const wardDice = getRuntimeValue(playerName, WARD_DICE_KEY) || [];
+    const wardTarget = getRuntimeValue(playerName, WARD_TARGET_KEY);
 
     if (!wardTarget || wardDice.length === 0) {
         return {

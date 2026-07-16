@@ -23,6 +23,10 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
   rangeToFeet: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+  isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn().mockResolvedValue({}),
 }));

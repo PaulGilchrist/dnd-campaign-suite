@@ -1,8 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
-import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
-import { isDistanceInRange } from '../../../rules/combat/rangeCheck.js';
-import { loadMapData } from '../../../maps/mapsService.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { addEntry } from '../../../ui/logService.js';
 
 export async function grantDarkOnesBlessing(playerStats, campaignName, attackerName, mapName) {
@@ -31,18 +30,9 @@ export async function grantDarkOnesBlessing(playerStats, campaignName, attackerN
     if (mapName && attackerName) {
         const rangeFt = rangeToFeet(auto.range || '10_ft');
         if (rangeFt != null) {
-            const attackerPlayer = await loadMapData(campaignName, mapName).then(md => md?.players?.find(p => p.name === attackerName));
-            if (attackerPlayer) {
-                const attackerPos = { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY };
-                const mapPlayers = (await loadMapData(campaignName, mapName))?.players || [];
-                const playerPlayer = mapPlayers.find(p => p.name === playerStats.name);
-                if (playerPlayer) {
-                    const playerPos = { gridX: playerPlayer.gridX, gridY: playerPlayer.gridY };
-                    const dist = getDistanceFeet(attackerPos, playerPos);
-                    if (!isDistanceInRange(dist, rangeFt)) {
-                        result.outOfRange = true;
-                    }
-                }
+            const inRange = await isWithinRange(attackerName, playerStats.name, rangeFt);
+            if (!inRange) {
+                result.outOfRange = true;
             }
         }
     }

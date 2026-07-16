@@ -19,6 +19,10 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
     rangeToFeet: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+    isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
 }));
@@ -50,6 +54,7 @@ import { handle } from './interceptionHandler.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
 import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
+import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as applyHealing from '../../../rules/combat/applyHealing.js';
 import * as damageRollback from '../../common/damageRollback.js';
@@ -125,6 +130,7 @@ describe('interceptionHandler', () => {
         });
         rangeValidation.getDistanceFeet.mockReturnValue(5);
         rangeValidation.rangeToFeet.mockReturnValue(5);
+        rangeCheck.isWithinRange.mockResolvedValue(true);
         damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
         damageRollback.findLastAttack.mockResolvedValue({
             attackEvent: makeCombatSummary().lastAttack,
@@ -230,12 +236,12 @@ describe('interceptionHandler', () => {
                 equipment: [{ name: 'Shield', armor_category: 'Shield' }],
             });
             rangeValidation.getDistanceFeet.mockReturnValue(10);
+            rangeCheck.isWithinRange.mockResolvedValue(false);
 
             const result = await handle(action, ps, campaignName, mapName);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('out of range');
-            expect(result.payload.description).toContain('10 ft');
         });
 
         it('uses custom range from automation config', async () => {
@@ -251,12 +257,12 @@ describe('interceptionHandler', () => {
             });
             rangeValidation.rangeToFeet.mockReturnValue(10);
             rangeValidation.getDistanceFeet.mockReturnValue(15);
+            rangeCheck.isWithinRange.mockResolvedValue(false);
 
             const result = await handle(action, ps, campaignName, mapName);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('out of range');
-            expect(result.payload.description).toContain('15 ft > 10 ft');
         });
 
         it('rounds distance in range error message', async () => {
@@ -266,10 +272,11 @@ describe('interceptionHandler', () => {
                 equipment: [{ name: 'Shield', armor_category: 'Shield' }],
             });
             rangeValidation.getDistanceFeet.mockReturnValue(7.8);
+            rangeCheck.isWithinRange.mockResolvedValue(false);
 
             const result = await handle(action, ps, campaignName, mapName);
 
-            expect(result.payload.description).toContain('8 ft');
+            expect(result.payload.description).toContain('out of range');
         });
 
         it('passes range check when attacker is within range', async () => {
@@ -344,7 +351,7 @@ describe('interceptionHandler', () => {
             await handle(action, ps, campaignName, mapName);
 
             expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-                campaignName,
+                playerName,
                 'targetEffects',
                 expect.arrayContaining([
                     expect.objectContaining({

@@ -11,7 +11,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
     const playerName = playerStats.name;
 
     // Check Channel Divinity charges
-    const storedCharges = getRuntimeValue(playerName, 'channelDivinityCharges', campaignName);
+    const storedCharges = getRuntimeValue(playerName, 'channelDivinityCharges');
     const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
     const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
     const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
@@ -65,7 +65,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
     }
 
     // Get ally list from selectedAllies
-    const storedAllies = getRuntimeValue(playerName, 'selectedAllies', campaignName);
+    const storedAllies = getRuntimeValue(playerName, 'selectedAllies');
     const allyList = Array.isArray(storedAllies) && storedAllies.length > 0 ? storedAllies : null;
 
     // Build target list using allies within range
@@ -73,35 +73,29 @@ export async function handle(action, playerStats, campaignName, mapName) {
     const creatureTargets = [];
 
     if (mapName && rangeFt != null) {
-        const attackerPlayer = await loadMapData(campaignName, mapName).then(md => md?.players?.find(p => p.name === playerName));
-        if (attackerPlayer) {
-            const attackerPos = { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY };
-            const mapPlayers = (await loadMapData(campaignName, mapName))?.players || [];
+        const mapPlayers = (await loadMapData(campaignName, mapName))?.players || [];
 
-            if (allyList) {
-                for (const allyName of allyList) {
-                    if (allyName === playerName) continue;
-                    const ally = mapPlayers.find(p => p.name === allyName);
-                    if (!ally) continue;
-                    const allyPos = { gridX: ally.gridX, gridY: ally.gridY };
-                    if (isWithinRange(attackerPos, allyPos, rangeFt)) {
-                        creatureTargets.push({ name: allyName, type: 'player' });
-                    }
-                }
-            } else {
-                for (const p of mapPlayers) {
-                    if (p.name === playerName) continue;
-                    if (creatureTargets.length >= 10) break;
-                    const pos = { gridX: p.gridX, gridY: p.gridY };
-                    if (isWithinRange(attackerPos, pos, rangeFt)) {
-                        creatureTargets.push({ name: p.name, type: 'player' });
-                    }
+        if (allyList) {
+            for (const allyName of allyList) {
+                if (allyName === playerName) continue;
+                const inRange = await isWithinRange(playerName, allyName, rangeFt);
+                if (inRange) {
+                    creatureTargets.push({ name: allyName, type: 'player' });
                 }
             }
-
-            // Include self
-            creatureTargets.push({ name: playerName, type: 'player' });
+        } else {
+            for (const p of mapPlayers) {
+                if (p.name === playerName) continue;
+                if (creatureTargets.length >= 10) break;
+                const inRange = await isWithinRange(playerName, p.name, rangeFt);
+                if (inRange) {
+                    creatureTargets.push({ name: p.name, type: 'player' });
+                }
+            }
         }
+
+        // Include self
+        creatureTargets.push({ name: playerName, type: 'player' });
     } else {
         // No map: include all allies + self (assume in range)
         if (allyList) {

@@ -30,6 +30,10 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
     }),
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+    isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('../../common/targetResolver.js', () => ({
     resolveMapPositions: vi.fn(async () => ({
         attackerPos: { gridX: 1, gridY: 1 },
@@ -55,6 +59,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 
@@ -100,6 +105,7 @@ describe('autoRerollHandler', () => {
         vi.clearAllMocks();
         getRuntimeValue.mockReturnValue(null);
         getCurrentCombatRound.mockReturnValue(1);
+        isWithinRange.mockResolvedValue(true);
     });
 
     // ── No recent roll ──────────────────────────────────────────
@@ -230,6 +236,7 @@ describe('autoRerollHandler', () => {
                 lastAttack: { rollType: 'attack', attackerName: 'Ally', d20: 3, bonus: 5, targetAc: 15, hit: false }
             });
             getDistanceFeet.mockReturnValue(50);
+            isWithinRange.mockResolvedValue(false);
 
             const action = makeAction({
                 automation: { bonus: 2, range: '30_ft' },

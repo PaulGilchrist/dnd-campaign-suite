@@ -1,6 +1,4 @@
-import { loadMapData } from '../../maps/mapsService.js';
-import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
-import { isDistanceInRange } from '../../rules/combat/rangeCheck.js';
+import { isWithinRange } from '../../rules/combat/rangeCheck.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 export const CANNOT_ACT_CONDITIONS = ['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious'];
@@ -37,25 +35,7 @@ export function hasCannotActCondition(sourceName, _campaignName) {
   }
 }
 
-export async function isWithinRange(sourceName, targetName, campaignName, activeMapName, computedCharacters) {
-  if (!activeMapName) return true;
-  try {
-    const data = await loadMapData(campaignName, activeMapName);
-    if (!data?.players?.length) return true;
-    const sourcePlayer = data.players.find(p => p.name === sourceName);
-    const targetPlayer = data.players.find(p => p.name === targetName);
-    if (!sourcePlayer || !targetPlayer) return true;
-    const dist = getDistanceFeet(sourcePlayer, targetPlayer);
-    if (dist == null) return true;
-    const sourceEntry = computedCharacters?.find(c => c.name === sourceName);
-    const range = sourceEntry?.computedStats ? getAuraRangeFromStats(sourceEntry.computedStats) : DEFAULT_AURA_RANGE_FT;
-    return isDistanceInRange(dist, range);
-  } catch {
-    return true;
-  }
-}
-
-export async function computeAuraBonus({ targetName, characters, campaignName, activeMapName }) {
+export async function computeAuraBonus({ targetName, characters }) {
   let bestBonus = 0;
   let bestSource = null;
 
@@ -64,14 +44,15 @@ export async function computeAuraBonus({ targetName, characters, campaignName, a
     const stats = entry.computedStats;
     if (!name) continue;
     if (!stats || !hasAuraOfProtection(stats)) continue;
-    if (hasCannotActCondition(name, campaignName)) continue;
-    const storedAllies = getRuntimeValue(name, 'selectedAllies', campaignName);
+    if (hasCannotActCondition(name)) continue;
+    const storedAllies = getRuntimeValue(name, 'selectedAllies');
     if (Array.isArray(storedAllies) && storedAllies.length > 0) {
       if (!storedAllies.includes(targetName)) continue;
     }
     const chaMod = getChaModifier(stats);
     const bonus = Math.max(1, chaMod);
-    const inRange = await isWithinRange(name, targetName, campaignName, activeMapName, characters);
+    const range = getAuraRangeFromStats(stats);
+    const inRange = await isWithinRange(name, targetName, range);
     if (!inRange) continue;
     if (bonus > bestBonus) {
       bestBonus = bonus;

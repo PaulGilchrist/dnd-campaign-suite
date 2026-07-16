@@ -12,11 +12,16 @@ vi.mock('../../../combat/automation/automationService.js', () => ({
   evaluateAutoExpression: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+  isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle, craftBolsteringTreats } from './tempHpBuffHandler.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as automationService from '../../../combat/automation/automationService.js';
+import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -50,6 +55,7 @@ describe('handle — Bolstering Treats', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useRuntimeState.getRuntimeValue.mockReturnValue(null);
+    rangeCheck.isWithinRange.mockResolvedValue(true);
   });
 
   describe('dispatch logic', () => {

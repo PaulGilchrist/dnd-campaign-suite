@@ -1,6 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { resolveMapPositions, resolveTarget } from '../../common/targetResolver.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
@@ -15,7 +14,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
     const playerName = playerStats.name;
     const featureName = action.name || 'Restore Balance';
 
-    const rangeFt = rangeToFeet(auto.range || '60_ft');
+    const rangeFt = auto.range ? parseInt(auto.range) || 60 : 60;
 
     const targetInfo = await resolveTarget(campaignName, playerName);
     if (!targetInfo?.target) {
@@ -32,17 +31,17 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
     const targetName = targetInfo.target.name;
 
-    if (mapName && rangeFt != null) {
-        const positions = await resolveMapPositions(campaignName, mapName, playerName);
+    if (rangeFt != null) {
+        const positions = mapName ? await resolveMapPositions(campaignName, playerName) : null;
         if (positions?.attackerPos && positions?.targetPos) {
-            const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
-            if (!isWithinRange(positions.attackerPos, positions.targetPos, rangeFt)) {
+            const inRange = await isWithinRange(playerName, targetName, rangeFt);
+            if (!inRange) {
                 return {
                     type: 'popup',
                     payload: {
                         type: 'automation_info',
                         name: featureName,
-                        description: `${targetName} is out of range (${Math.round(dist)} ft > ${rangeFt} ft).`,
+                        description: `${targetName} is out of range.`,
                         automation: auto,
                     },
                 };

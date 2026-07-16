@@ -382,18 +382,18 @@ describe('saveModifierApplies — condition-based boolean checks', () => {
   });
 
   it('returns isElderChampionActive when condition is elder_champion_active', () => {
-    expect(saveModifierApplies({ target: 'saving_throw', condition: 'elder_champion_active' }, ...fnArgs, null, false, true, false, false)).toBe(true);
-    expect(saveModifierApplies({ target: 'saving_throw', condition: 'elder_champion_active' }, ...fnArgs, null, false, false, false, false)).toBe(false);
+    expect(saveModifierApplies({ target: 'saving_throw', condition: 'elder_champion_active' }, ...fnArgs, null, false, true, false, false, false)).toBe(true);
+    expect(saveModifierApplies({ target: 'saving_throw', condition: 'elder_champion_active' }, ...fnArgs, null, false, false, false, false, false)).toBe(false);
   });
 
   it('returns isHolyAuraActive when condition is holy_aura_active', () => {
-    expect(saveModifierApplies({ target: 'attack_roll', condition: 'holy_aura_active' }, ...fnArgs, null, false, false, true, false)).toBe(true);
-    expect(saveModifierApplies({ target: 'attack_roll', condition: 'holy_aura_active' }, ...fnArgs, null, false, false, false, false)).toBe(false);
+    expect(saveModifierApplies({ target: 'attack_roll', condition: 'holy_aura_active' }, ...fnArgs, null, false, false, false, true, false)).toBe(true);
+    expect(saveModifierApplies({ target: 'attack_roll', condition: 'holy_aura_active' }, ...fnArgs, null, false, false, false, false, false)).toBe(false);
   });
 
   it('returns isProtectionFromPoisonActive when condition is protection_from_poison_active', () => {
-    expect(saveModifierApplies({ target: 'saving_throw', condition: 'protection_from_poison_active' }, ...fnArgs, null, false, false, false, true)).toBe(true);
-    expect(saveModifierApplies({ target: 'saving_throw', condition: 'protection_from_poison_active' }, ...fnArgs, null, false, false, false, false)).toBe(false);
+    expect(saveModifierApplies({ target: 'saving_throw', condition: 'protection_from_poison_active' }, ...fnArgs, null, false, false, false, false, true)).toBe(true);
+    expect(saveModifierApplies({ target: 'saving_throw', condition: 'protection_from_poison_active' }, ...fnArgs, null, false, false, false, false, false)).toBe(false);
   });
 });
 

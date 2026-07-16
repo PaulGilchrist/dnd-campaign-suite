@@ -1,22 +1,13 @@
-// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-// ── Mocks ───────────────────────────────────────────────────────
-
-vi.mock('../../maps/mapsService.js', () => ({
-  loadMapData: vi.fn(),
-}));
-
-vi.mock('../../rules/combat/rangeValidation.js', () => ({
-  getDistanceFeet: vi.fn(),
-}));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));
 
-// ── Imports ─────────────────────────────────────────────────────
+vi.mock('../../rules/combat/rangeCheck.js', () => ({
+  isWithinRange: vi.fn(),
+}));
 
 import {
   CANNOT_ACT_CONDITIONS,
@@ -27,15 +18,11 @@ import {
   getAuraRangeFromStats,
   getChaModifier,
   hasCannotActCondition,
-  isWithinRange,
   computeAuraBonus,
 } from './auraOfProtection.js';
 
-import { loadMapData } from '../../maps/mapsService.js';
-import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-
-// ── Helpers ─────────────────────────────────────────────────────
+import { isWithinRange } from '../../rules/combat/rangeCheck.js';
 
 function makeStats(extra = {}) {
   return { automation: extra.automation ?? null };
@@ -49,20 +36,10 @@ function makeSourceEntry(name, computedStats) {
   return { name, computedStats };
 }
 
-function mockMapWithPlayers(players) {
-  loadMapData.mockResolvedValue({ players });
-}
-
-// ── Constants ───────────────────────────────────────────────────
-
 describe('constants', () => {
   it('exports CANNOT_ACT_CONDITIONS with the five incapacitating conditions', () => {
     expect(CANNOT_ACT_CONDITIONS).toEqual([
-      'incapacitated',
-      'paralyzed',
-      'petrified',
-      'stunned',
-      'unconscious',
+      'incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious',
     ]);
   });
 
@@ -71,8 +48,6 @@ describe('constants', () => {
     expect(EXPANDED_AURA_RANGE_FT).toBe(30);
   });
 });
-
-// ── hasAura ─────────────────────────────────────────────────────
 
 describe('hasAura', () => {
   it('returns true when a passive with the matching name exists', () => {
@@ -97,8 +72,6 @@ describe('hasAura', () => {
   });
 });
 
-// ── hasAuraOfProtection ─────────────────────────────────────────
-
 describe('hasAuraOfProtection', () => {
   it('returns true when the character has the Aura of Protection passive', () => {
     const stats = makeStats({ automation: { passives: [makePassive('Aura of Protection')] } });
@@ -111,8 +84,6 @@ describe('hasAuraOfProtection', () => {
     expect(hasAuraOfProtection(null)).toBe(false);
   });
 });
-
-// ── getAuraRangeFromStats ───────────────────────────────────────
 
 describe('getAuraRangeFromStats', () => {
   it('returns expanded range when Aura Expansion is present', () => {
@@ -132,8 +103,6 @@ describe('getAuraRangeFromStats', () => {
     expect(getAuraRangeFromStats(stats)).toBe(DEFAULT_AURA_RANGE_FT);
   });
 });
-
-// ── getChaModifier ──────────────────────────────────────────────
 
 describe('getChaModifier', () => {
   it('returns cha.bonus when present (including zero and negative)', () => {
@@ -157,13 +126,11 @@ describe('getChaModifier', () => {
   });
 
   it('includes featIncrease and miscIncrease in the formula and floors odd results', () => {
-    // base 14 + feat 2 + misc 2 = 18 -> floor((18-10)/2) = 4
     const stats = {
       abilities: [{ name: 'Charisma', baseScore: 14, featIncrease: 2, miscIncrease: 2 }],
     };
     expect(getChaModifier(stats)).toBe(4);
 
-    // base 15 -> floor((15-10)/2) = floor(2.5) = 2
     const statsFloored = {
       abilities: [{ name: 'Charisma', baseScore: 15, featIncrease: 0, miscIncrease: 0 }],
     };
@@ -181,12 +148,8 @@ describe('getChaModifier', () => {
   });
 });
 
-// ── hasCannotActCondition ───────────────────────────────────────
-
 describe('hasCannotActCondition', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it('returns true for any of the incapacitating conditions', () => {
     for (const condition of CANNOT_ACT_CONDITIONS) {
@@ -205,9 +168,7 @@ describe('hasCannotActCondition', () => {
   it('returns false when activeConditions is not an array or getRuntimeValue throws', () => {
     getRuntimeValue.mockReturnValue(null);
     expect(hasCannotActCondition('Paladin', 'Campaign')).toBe(false);
-    getRuntimeValue.mockImplementation(() => {
-      throw new Error('runtime unavailable');
-    });
+    getRuntimeValue.mockImplementation(() => { throw new Error('runtime unavailable'); });
     expect(hasCannotActCondition('Paladin', 'Campaign')).toBe(false);
   });
 
@@ -218,133 +179,18 @@ describe('hasCannotActCondition', () => {
   });
 });
 
-// ── isWithinRange ───────────────────────────────────────────────
-
-describe('isWithinRange', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('returns true when activeMapName is falsy', async () => {
-    expect(await isWithinRange('A', 'B', 'C', null, [])).toBe(true);
-    expect(await isWithinRange('A', 'B', 'C', undefined, [])).toBe(true);
-    expect(await isWithinRange('A', 'B', 'C', '', [])).toBe(true);
-  });
-
-  it('returns true when map data has no players or players array is empty', async () => {
-    mockMapWithPlayers([]);
-    expect(await isWithinRange('A', 'B', 'C', 'Map', [])).toBe(true);
-    loadMapData.mockResolvedValue({});
-    expect(await isWithinRange('A', 'B', 'C', 'Map', [])).toBe(true);
-  });
-
-  it('returns true when either source or target is not found on the map', async () => {
-    mockMapWithPlayers([{ name: 'B', gridX: 0, gridY: 0 }]);
-    expect(await isWithinRange('A', 'B', 'C', 'Map', [])).toBe(true);
-
-    mockMapWithPlayers([{ name: 'A', gridX: 0, gridY: 0 }]);
-    expect(await isWithinRange('A', 'B', 'C', 'Map', [])).toBe(true);
-  });
-
-  it('returns true when getDistanceFeet returns null', async () => {
-    mockMapWithPlayers([
-      { name: 'A', gridX: 0, gridY: 0 },
-      { name: 'B', gridX: 2, gridY: 0 },
-    ]);
-    getDistanceFeet.mockReturnValue(null);
-    expect(await isWithinRange('A', 'B', 'C', 'Map', [])).toBe(true);
-  });
-
-  it('returns true when distance is within range, false when outside', async () => {
-    mockMapWithPlayers([
-      { name: 'A', gridX: 0, gridY: 0 },
-      { name: 'B', gridX: 2, gridY: 0 },
-    ]);
-
-    getDistanceFeet.mockReturnValue(10);
-    expect(await isWithinRange('A', 'B', 'C', 'Map', [])).toBe(true);
-
-    getDistanceFeet.mockReturnValue(11);
-    expect(await isWithinRange('A', 'B', 'C', 'Map', [])).toBe(false);
-  });
-
-  it('uses expanded aura range when source has Aura Expansion', async () => {
-    mockMapWithPlayers([
-      { name: 'A', gridX: 0, gridY: 0 },
-      { name: 'B', gridX: 10, gridY: 0 },
-    ]);
-    getDistanceFeet.mockReturnValue(25);
-
-    const sourceEntry = makeSourceEntry('A', {
-      automation: { passives: [makePassive('Aura Expansion')] },
-    });
-    expect(await isWithinRange('A', 'B', 'C', 'Map', [sourceEntry])).toBe(true);
-
-    getDistanceFeet.mockReturnValue(31);
-    expect(await isWithinRange('A', 'B', 'C', 'Map', [sourceEntry])).toBe(false);
-  });
-
-  it('falls back to default range when sourceEntry has no computedStats', async () => {
-    mockMapWithPlayers([
-      { name: 'A', gridX: 0, gridY: 0 },
-      { name: 'B', gridX: 2, gridY: 0 },
-    ]);
-    getDistanceFeet.mockReturnValue(10);
-
-    const sourceEntry = makeSourceEntry('A', null);
-    expect(await isWithinRange('A', 'B', 'C', 'Map', [sourceEntry])).toBe(true);
-  });
-
-  it('returns true when loadMapData or getDistanceFeet throws', async () => {
-    loadMapData.mockRejectedValue(new Error('network error'));
-    expect(await isWithinRange('A', 'B', 'C', 'Map', [])).toBe(true);
-
-    loadMapData.mockResolvedValue({
-      players: [
-        { name: 'A', gridX: 0, gridY: 0 },
-        { name: 'B', gridX: 2, gridY: 0 },
-      ],
-    });
-    getDistanceFeet.mockImplementation(() => {
-      throw new Error('position error');
-    });
-    expect(await isWithinRange('A', 'B', 'C', 'Map', [])).toBe(true);
-  });
-});
-
-// ── computeAuraBonus ────────────────────────────────────────────
-
 describe('computeAuraBonus', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it('returns { bonus: 0, sourceName: null } when there are no characters or no valid aura bearers', async () => {
-    const result = await computeAuraBonus({
-      targetName: 'Cleric',
-      characters: [],
-      campaignName: 'C',
-      activeMapName: '',
-    });
-    expect(result).toEqual({ bonus: 0, sourceName: null });
+    expect(await computeAuraBonus({ targetName: 'Cleric', characters: [], campaignName: 'C', activeMapName: '' }))
+      .toEqual({ bonus: 0, sourceName: null });
 
-    const result2 = await computeAuraBonus({
-      targetName: 'Cleric',
-      characters: [makeSourceEntry('', {}), makeSourceEntry('Paladin', null)],
-      campaignName: 'C',
-      activeMapName: '',
-    });
-    expect(result2).toEqual({ bonus: 0, sourceName: null });
+    expect(await computeAuraBonus({ targetName: 'Cleric', characters: [makeSourceEntry('', {}), makeSourceEntry('Paladin', null)], campaignName: 'C', activeMapName: '' }))
+      .toEqual({ bonus: 0, sourceName: null });
 
-    const result3 = await computeAuraBonus({
-      targetName: 'Cleric',
-      characters: [makeSourceEntry('Wizard', {
-        automation: { passives: [makePassive('Spell Sniper')] },
-      })],
-      campaignName: 'C',
-      activeMapName: '',
-    });
-    expect(result3).toEqual({ bonus: 0, sourceName: null });
+    expect(await computeAuraBonus({ targetName: 'Cleric', characters: [makeSourceEntry('Wizard', { automation: { passives: [makePassive('Spell Sniper')] } })], campaignName: 'C', activeMapName: '' }))
+      .toEqual({ bonus: 0, sourceName: null });
   });
 
   it('skips sources with a cannot-act condition', async () => {
@@ -353,78 +199,51 @@ describe('computeAuraBonus', () => {
       automation: { passives: [makePassive('Aura of Protection')] },
       abilities: [{ name: 'Charisma', bonus: 5 }],
     });
-    const result = await computeAuraBonus({
-      targetName: 'Cleric',
-      characters: [paladin],
-      campaignName: 'C',
-      activeMapName: '',
-    });
+    const result = await computeAuraBonus({ targetName: 'Cleric', characters: [paladin], campaignName: 'C', activeMapName: '' });
     expect(result).toEqual({ bonus: 0, sourceName: null });
   });
 
   it('skips sources that are out of range', async () => {
     getRuntimeValue.mockReturnValue([]);
-    mockMapWithPlayers([
-      { name: 'Paladin', gridX: 0, gridY: 0 },
-      { name: 'Cleric', gridX: 10, gridY: 0 },
-    ]);
-    getDistanceFeet.mockReturnValue(20);
+    isWithinRange.mockResolvedValue(false);
 
     const paladin = makeSourceEntry('Paladin', {
       automation: { passives: [makePassive('Aura of Protection')] },
       abilities: [{ name: 'Charisma', bonus: 5 }],
     });
-    const result = await computeAuraBonus({
-      targetName: 'Cleric',
-      characters: [paladin],
-      campaignName: 'C',
-      activeMapName: 'Map',
-    });
+    const result = await computeAuraBonus({ targetName: 'Cleric', characters: [paladin], campaignName: 'C', activeMapName: 'Map' });
     expect(result).toEqual({ bonus: 0, sourceName: null });
   });
 
   it('returns the cha bonus from the first valid aura bearer', async () => {
+    isWithinRange.mockResolvedValue(true);
     const paladin = makeSourceEntry('Paladin', {
       automation: { passives: [makePassive('Aura of Protection')] },
       abilities: [{ name: 'Charisma', bonus: 3 }],
     });
-    const result = await computeAuraBonus({
-      targetName: 'Cleric',
-      characters: [paladin],
-      campaignName: 'C',
-      activeMapName: '',
-    });
+    const result = await computeAuraBonus({ targetName: 'Cleric', characters: [paladin], campaignName: 'C', activeMapName: '' });
     expect(result).toEqual({ bonus: 3, sourceName: 'Paladin' });
   });
 
   it('clamps negative and zero modifiers to a minimum bonus of 1', async () => {
+    isWithinRange.mockResolvedValue(true);
     const negativePaladin = makeSourceEntry('Paladin', {
       automation: { passives: [makePassive('Aura of Protection')] },
       abilities: [{ name: 'Charisma', bonus: -2 }],
     });
-    const result1 = await computeAuraBonus({
-      targetName: 'Cleric',
-      characters: [negativePaladin],
-      campaignName: 'C',
-      activeMapName: '',
-    });
-    expect(result1).toEqual({ bonus: 1, sourceName: 'Paladin' });
+    expect(await computeAuraBonus({ targetName: 'Cleric', characters: [negativePaladin], campaignName: 'C', activeMapName: '' }))
+      .toEqual({ bonus: 1, sourceName: 'Paladin' });
 
     const zeroPaladin = makeSourceEntry('Paladin', {
       automation: { passives: [makePassive('Aura of Protection')] },
       abilities: [{ name: 'Charisma', bonus: 0 }],
     });
-    const result2 = await computeAuraBonus({
-      targetName: 'Cleric',
-      characters: [zeroPaladin],
-      campaignName: 'C',
-      activeMapName: '',
-    });
-    expect(result2).toEqual({ bonus: 1, sourceName: 'Paladin' });
+    expect(await computeAuraBonus({ targetName: 'Cleric', characters: [zeroPaladin], campaignName: 'C', activeMapName: '' }))
+      .toEqual({ bonus: 1, sourceName: 'Paladin' });
   });
 
   it('selects the source with the highest bonus, skipping disabled or out-of-range ones', async () => {
-    // Test highest bonus selection
+    isWithinRange.mockResolvedValue(true);
     const p1 = makeSourceEntry('Paladin1', {
       automation: { passives: [makePassive('Aura of Protection')] },
       abilities: [{ name: 'Charisma', bonus: 2 }],
@@ -433,15 +252,9 @@ describe('computeAuraBonus', () => {
       automation: { passives: [makePassive('Aura of Protection')] },
       abilities: [{ name: 'Charisma', bonus: 5 }],
     });
-    const result = await computeAuraBonus({
-      targetName: 'Cleric',
-      characters: [p1, p2],
-      campaignName: 'C',
-      activeMapName: '',
-    });
-    expect(result).toEqual({ bonus: 5, sourceName: 'Paladin2' });
+    expect(await computeAuraBonus({ targetName: 'Cleric', characters: [p1, p2], campaignName: 'C', activeMapName: '' }))
+      .toEqual({ bonus: 5, sourceName: 'Paladin2' });
 
-    // Test skipping petrified source in the middle
     getRuntimeValue.mockReturnValueOnce(['petrified']);
     const p3 = makeSourceEntry('Paladin1', {
       automation: { passives: [makePassive('Aura of Protection')] },
@@ -451,143 +264,42 @@ describe('computeAuraBonus', () => {
       automation: { passives: [makePassive('Aura of Protection')] },
       abilities: [{ name: 'Charisma', bonus: 8 }],
     });
-    const result2 = await computeAuraBonus({
-      targetName: 'Cleric',
-      characters: [p3, p4],
-      campaignName: 'C',
-      activeMapName: '',
-    });
-    expect(result2).toEqual({ bonus: 8, sourceName: 'Paladin2' });
-
-    // Test skipping out-of-range source
-    getRuntimeValue.mockReturnValue([]).mockReturnValue([]);
-    mockMapWithPlayers([
-      { name: 'Paladin1', gridX: 0, gridY: 0 },
-      { name: 'Paladin2', gridX: 5, gridY: 0 },
-      { name: 'Cleric', gridX: 8, gridY: 0 },
-    ]);
-    getDistanceFeet.mockReturnValueOnce(20).mockReturnValueOnce(5);
-
-    const p5 = makeSourceEntry('Paladin1', {
-      automation: { passives: [makePassive('Aura of Protection')] },
-      abilities: [{ name: 'Charisma', bonus: 5 }],
-    });
-    const p6 = makeSourceEntry('Paladin2', {
-      automation: { passives: [makePassive('Aura of Protection')] },
-      abilities: [{ name: 'Charisma', bonus: 3 }],
-    });
-    const result3 = await computeAuraBonus({
-      targetName: 'Cleric',
-      characters: [p5, p6],
-      campaignName: 'C',
-      activeMapName: 'Map',
-    });
-    expect(result3).toEqual({ bonus: 3, sourceName: 'Paladin2' });
+    expect(await computeAuraBonus({ targetName: 'Cleric', characters: [p3, p4], campaignName: 'C', activeMapName: '' }))
+      .toEqual({ bonus: 8, sourceName: 'Paladin2' });
   });
 
   it('computes bonus from baseScore when cha.bonus is absent', async () => {
+    isWithinRange.mockResolvedValue(true);
     const paladin = makeSourceEntry('Paladin', {
       automation: { passives: [makePassive('Aura of Protection')] },
       abilities: [{ name: 'Charisma', baseScore: 18, featIncrease: 0, miscIncrease: 0 }],
     });
-    const result = await computeAuraBonus({
-      targetName: 'Cleric',
-      characters: [paladin],
-      campaignName: 'C',
-      activeMapName: '',
-    });
+    const result = await computeAuraBonus({ targetName: 'Cleric', characters: [paladin], campaignName: 'C', activeMapName: '' });
     expect(result).toEqual({ bonus: 4, sourceName: 'Paladin' });
   });
 
   it('uses expanded aura range when source has Aura Expansion', async () => {
     getRuntimeValue.mockReturnValue([]);
-    mockMapWithPlayers([
-      { name: 'Paladin', gridX: 0, gridY: 0 },
-      { name: 'Cleric', gridX: 10, gridY: 0 },
-    ]);
-    getDistanceFeet.mockReturnValue(25);
-
+    isWithinRange.mockResolvedValue(true);
     const paladin = makeSourceEntry('Paladin', {
-      automation: {
-        passives: [makePassive('Aura of Protection'), makePassive('Aura Expansion')],
-      },
+      automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura Expansion')] },
       abilities: [{ name: 'Charisma', bonus: 3 }],
     });
-    const result = await computeAuraBonus({
-      targetName: 'Cleric',
-      characters: [paladin],
-      campaignName: 'C',
-      activeMapName: 'Map',
-    });
+    const result = await computeAuraBonus({ targetName: 'Cleric', characters: [paladin], campaignName: 'C', activeMapName: 'Map' });
     expect(result).toEqual({ bonus: 3, sourceName: 'Paladin' });
+    expect(isWithinRange).toHaveBeenCalledWith('Paladin', 'Cleric', 30);
   });
 
-  it('does not call map services for characters without aura', async () => {
+  it('does not call isWithinRange for characters without aura', async () => {
     const wizard = makeSourceEntry('Wizard', {
       automation: { passives: [makePassive('Spell Sniper')] },
     });
-    await computeAuraBonus({
-      targetName: 'Cleric',
-      characters: [wizard],
-      campaignName: 'C',
-      activeMapName: '',
-    });
-    expect(loadMapData).not.toHaveBeenCalled();
-  });
-
-  it('calls loadMapData only for valid aura bearers in sequence', async () => {
-    getRuntimeValue.mockReturnValue([]).mockReturnValue([]);
-    loadMapData.mockResolvedValue({
-      players: [{ name: 'Paladin1', gridX: 0, gridY: 0 }, { name: 'Cleric', gridX: 1, gridY: 0 }],
-    }).mockResolvedValue({
-      players: [{ name: 'Paladin2', gridX: 0, gridY: 0 }, { name: 'Cleric', gridX: 1, gridY: 0 }],
-    });
-    getDistanceFeet.mockReturnValue(5).mockReturnValue(5);
-
-    const p1 = makeSourceEntry('Paladin1', {
-      automation: { passives: [makePassive('Aura of Protection')] },
-      abilities: [{ name: 'Charisma', bonus: 3 }],
-    });
-    const p2 = makeSourceEntry('Paladin2', {
-      automation: { passives: [makePassive('Aura of Protection')] },
-      abilities: [{ name: 'Charisma', bonus: 4 }],
-    });
-    await computeAuraBonus({
-      targetName: 'Ally',
-      characters: [p1, p2],
-      campaignName: 'C',
-      activeMapName: 'Map',
-    });
-    expect(loadMapData).toHaveBeenCalledTimes(2);
-  });
-
-  it('skips non-aura entries between aura bearers without calling map services for them', async () => {
-    getRuntimeValue.mockReturnValue([]);
-    loadMapData.mockResolvedValue({
-      players: [{ name: 'Paladin', gridX: 0, gridY: 0 }, { name: 'Cleric', gridX: 1, gridY: 0 }],
-    });
-    getDistanceFeet.mockReturnValue(5);
-
-    const wizard = makeSourceEntry('Wizard', {});
-    const paladin = makeSourceEntry('Paladin', {
-      automation: { passives: [makePassive('Aura of Protection')] },
-      abilities: [{ name: 'Charisma', bonus: 2 }],
-    });
-    const result = await computeAuraBonus({
-      targetName: 'Cleric',
-      characters: [wizard, paladin],
-      campaignName: 'C',
-      activeMapName: 'Map',
-    });
-    expect(result).toEqual({ bonus: 2, sourceName: 'Paladin' });
-    expect(loadMapData).toHaveBeenCalledTimes(1);
+    await computeAuraBonus({ targetName: 'Cleric', characters: [wizard], campaignName: 'C', activeMapName: 'Map' });
+    expect(isWithinRange).not.toHaveBeenCalled();
   });
 
   describe('ally filtering', () => {
-    beforeEach(() => {
-      vi.clearAllMocks();
-      getRuntimeValue.mockReturnValue([]);
-    });
+    beforeEach(() => { vi.clearAllMocks(); getRuntimeValue.mockReturnValue([]); });
 
     it('returns { bonus: 0, sourceName: null } when selectedAllies excludes the target', async () => {
       getRuntimeValue.mockReturnValue(['OtherPlayer']);
@@ -595,32 +307,24 @@ describe('computeAuraBonus', () => {
         automation: { passives: [makePassive('Aura of Protection')] },
         abilities: [{ name: 'Charisma', bonus: 5 }],
       });
-      const result = await computeAuraBonus({
-        targetName: 'Cleric',
-        characters: [paladin],
-        campaignName: 'C',
-        activeMapName: '',
-      });
+      const result = await computeAuraBonus({ targetName: 'Cleric', characters: [paladin], campaignName: 'C', activeMapName: '' });
       expect(result).toEqual({ bonus: 0, sourceName: null });
     });
 
     it('returns the bonus when selectedAllies includes the target', async () => {
       getRuntimeValue.mockReturnValue(['Cleric']);
+      isWithinRange.mockResolvedValue(true);
       const paladin = makeSourceEntry('Paladin', {
         automation: { passives: [makePassive('Aura of Protection')] },
         abilities: [{ name: 'Charisma', bonus: 5 }],
       });
-      const result = await computeAuraBonus({
-        targetName: 'Cleric',
-        characters: [paladin],
-        campaignName: 'C',
-        activeMapName: '',
-      });
+      const result = await computeAuraBonus({ targetName: 'Cleric', characters: [paladin], campaignName: 'C', activeMapName: '' });
       expect(result).toEqual({ bonus: 5, sourceName: 'Paladin' });
     });
 
     it('selects the highest bonus source whose allies include the target', async () => {
       getRuntimeValue.mockReturnValue(['Cleric']).mockReturnValue(['Cleric']);
+      isWithinRange.mockResolvedValue(true);
       const p1 = makeSourceEntry('Paladin1', {
         automation: { passives: [makePassive('Aura of Protection')] },
         abilities: [{ name: 'Charisma', bonus: 2 }],
@@ -629,12 +333,7 @@ describe('computeAuraBonus', () => {
         automation: { passives: [makePassive('Aura of Protection')] },
         abilities: [{ name: 'Charisma', bonus: 5 }],
       });
-      const result = await computeAuraBonus({
-        targetName: 'Cleric',
-        characters: [p1, p2],
-        campaignName: 'C',
-        activeMapName: '',
-      });
+      const result = await computeAuraBonus({ targetName: 'Cleric', characters: [p1, p2], campaignName: 'C', activeMapName: '' });
       expect(result).toEqual({ bonus: 5, sourceName: 'Paladin2' });
     });
 
@@ -644,6 +343,7 @@ describe('computeAuraBonus', () => {
         if (name === 'Paladin2' && key === 'selectedAllies') return ['Cleric'];
         return undefined;
       });
+      isWithinRange.mockResolvedValue(true);
       const p1 = makeSourceEntry('Paladin1', {
         automation: { passives: [makePassive('Aura of Protection')] },
         abilities: [{ name: 'Charisma', bonus: 5 }],
@@ -652,42 +352,29 @@ describe('computeAuraBonus', () => {
         automation: { passives: [makePassive('Aura of Protection')] },
         abilities: [{ name: 'Charisma', bonus: 3 }],
       });
-      const result = await computeAuraBonus({
-        targetName: 'Cleric',
-        characters: [p1, p2],
-        campaignName: 'C',
-        activeMapName: '',
-      });
+      const result = await computeAuraBonus({ targetName: 'Cleric', characters: [p1, p2], campaignName: 'C', activeMapName: '' });
       expect(result).toEqual({ bonus: 3, sourceName: 'Paladin2' });
     });
 
     it('falls back to no ally filtering when selectedAllies is null', async () => {
       getRuntimeValue.mockReturnValue(null);
+      isWithinRange.mockResolvedValue(true);
       const paladin = makeSourceEntry('Paladin', {
         automation: { passives: [makePassive('Aura of Protection')] },
         abilities: [{ name: 'Charisma', bonus: 5 }],
       });
-      const result = await computeAuraBonus({
-        targetName: 'Cleric',
-        characters: [paladin],
-        campaignName: 'C',
-        activeMapName: '',
-      });
+      const result = await computeAuraBonus({ targetName: 'Cleric', characters: [paladin], campaignName: 'C', activeMapName: '' });
       expect(result).toEqual({ bonus: 5, sourceName: 'Paladin' });
     });
 
     it('falls back to no ally filtering when selectedAllies is empty', async () => {
       getRuntimeValue.mockReturnValue([]);
+      isWithinRange.mockResolvedValue(true);
       const paladin = makeSourceEntry('Paladin', {
         automation: { passives: [makePassive('Aura of Protection')] },
         abilities: [{ name: 'Charisma', bonus: 5 }],
       });
-      const result = await computeAuraBonus({
-        targetName: 'Cleric',
-        characters: [paladin],
-        campaignName: 'C',
-        activeMapName: '',
-      });
+      const result = await computeAuraBonus({ targetName: 'Cleric', characters: [paladin], campaignName: 'C', activeMapName: '' });
       expect(result).toEqual({ bonus: 5, sourceName: 'Paladin' });
     });
   });

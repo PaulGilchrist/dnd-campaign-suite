@@ -5,7 +5,6 @@ import { infoPopup } from '../../common/infoPopup.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
-import { resolveMapPositions } from '../../common/targetResolver.js';
 import { getClassFeatures } from '../../../../services/character/classFeatures.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
@@ -40,7 +39,7 @@ async function handleAttackRoll(action, bonus, lastAttack, playerStats, campaign
                 const cs = await getCombatContext(campaignName);
                 const characters = [playerStats];
                 try {
-                    const appliedDmg = applyDamageToTarget(cs, targetName, damageResult.total, [damageType || 'unknown'], campaignName, characters, false, playerStats.name);
+                    const appliedDmg = applyDamageToTarget(cs, targetName, damageResult.total, [damageType || 'unknown'], characters, false, playerStats.name);
                     if (appliedDmg) {
                         addEntry(campaignName, {
                             type: 'roll',
@@ -124,7 +123,7 @@ async function consumeResourceCost(auto, playerStats, campaignName) {
     else if (auto.resourceCost === 'focus_points') {
         const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
         const maxFocus = classLevel?.focus_points || getClassFeatures(playerStats)?.maxFocusPoints || 0;
-        const currentFocus = Number(getRuntimeValue(playerStats.name, 'focusPoints', campaignName) ?? maxFocus);
+        const currentFocus = Number(getRuntimeValue(playerStats.name, 'focusPoints') ?? maxFocus);
 
         if (currentFocus <= 0) {
             return infoPopup(playerStats.name, 'No Focus Points remaining.', auto);
@@ -144,10 +143,8 @@ async function findAllyMissedAttack(playerStats, campaignName, mapName, rangeFt)
     if (lastAttack.attackerName === playerStats.name) return null;
 
     if (mapName && rangeFt != null) {
-        const positions = await resolveMapPositions(campaignName, mapName, playerStats.name);
-        if (positions?.attackerPos && positions?.targetPos) {
-            if (!isWithinRange(positions.attackerPos, positions.targetPos, rangeFt)) return null;
-        }
+        const inRange = await isWithinRange(playerStats.name, lastAttack.attackerName, rangeFt);
+        if (!inRange) return null;
     }
 
     return { name: lastAttack.attackerName, attackEvent: lastAttack };
@@ -169,7 +166,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
     if (auto.target === 'saving_throw') {
         if (auto.effect === 'override_fail_to_success' && auto.oncePer) {
             const trackingKey = `_guardedMind_usedRest`;
-            const usedRest = getRuntimeValue(playerName, trackingKey, campaignName);
+            const usedRest = getRuntimeValue(playerName, trackingKey);
             if (usedRest === 'rest') {
                 return infoPopup(action.name, `${action.name} can only be used once per Short or Long Rest.`, auto);
             }
@@ -240,7 +237,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
         let currentUses = usesMax;
         if (usesMax > 0) {
-            currentUses = Number(getRuntimeValue(playerName, 'bardicInspirationUses', campaignName) ?? usesMax);
+            currentUses = Number(getRuntimeValue(playerName, 'bardicInspirationUses') ?? usesMax);
             if (currentUses <= 0) {
                 return infoPopup(action.name, `${action.name} has no uses remaining. Recharges on a Long Rest.`, auto);
             }
@@ -302,7 +299,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
     if (auto.bonusExpression === 'psionic_energy_die') {
         const usesKey = 'psionicEnergy';
         const defaultMax = playerStats._trackedResources?.[usesKey]?.max || 6;
-        const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? defaultMax);
+        const currentUses = Number(getRuntimeValue(playerName, usesKey) ?? defaultMax);
 
         if (currentUses <= 0) {
             return infoPopup(action.name, `${action.name}: No Psionic Energy remaining. Recharges on a Short or Long Rest.`, auto);
@@ -386,7 +383,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
                 const cs = await getCombatContext(campaignName);
                 const characters = [playerStats];
                 try {
-                    const appliedDmg = applyDamageToTarget(cs, lastAttack.targetName, damageResult.total, [lastAttack.damageType || 'unknown'], campaignName, characters, false, playerName);
+                    const appliedDmg = applyDamageToTarget(cs, lastAttack.targetName, damageResult.total, [lastAttack.damageType || 'unknown'], characters, false, playerName);
                     if (appliedDmg) {
                         addEntry(campaignName, {
                             type: 'roll',
@@ -449,7 +446,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
                         const cs = await getCombatContext(campaignName);
                         const characters = [playerStats];
                         try {
-                            const appliedDmg = applyDamageToTarget(cs, lastAttack.targetName, damageResult.total, [lastAttack.damageType || 'unknown'], campaignName, characters, false, playerName);
+                            const appliedDmg = applyDamageToTarget(cs, lastAttack.targetName, damageResult.total, [lastAttack.damageType || 'unknown'], characters, false, playerName);
                             if (appliedDmg) {
                                 addEntry(campaignName, {
                                     type: 'roll',
@@ -512,7 +509,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
                             const cs = await getCombatContext(campaignName);
                             const characters = [playerStats];
                             try {
-                                const appliedDmg = applyDamageToTarget(cs, attackEvent.targetName, damageResult.total, [attackEvent.damageType || 'unknown'], campaignName, characters, false, ally.name);
+                                const appliedDmg = applyDamageToTarget(cs, attackEvent.targetName, damageResult.total, [attackEvent.damageType || 'unknown'], characters, false, ally.name);
                                 if (appliedDmg) {
                                     addEntry(campaignName, {
                                         type: 'roll',

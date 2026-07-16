@@ -15,7 +15,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
     if (maxUses > 0) {
         const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
-        const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? maxUses);
+        const currentUses = Number(getRuntimeValue(playerName, usesKey) ?? maxUses);
         if (currentUses <= 0) {
             return {
                 type: 'popup',
@@ -34,16 +34,12 @@ export async function handle(action, playerStats, campaignName, mapName) {
     const allies = [];
 
     if (mapName && rangeFt != null) {
-        const attackerPlayer = await loadMapData(campaignName, mapName).then(md => md?.players?.find(p => p.name === playerName));
-        if (attackerPlayer) {
-            const attackerPos = { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY };
-            const mapPlayers = (await loadMapData(campaignName, mapName))?.players || [];
-            for (const p of mapPlayers) {
-                if (p.name === playerName) continue;
-                const pos = { gridX: p.gridX, gridY: p.gridY };
-                if (isWithinRange(attackerPos, pos, rangeFt)) {
-                    allies.push(p.name);
-                }
+        const mapPlayers = (await loadMapData(campaignName))?.players || [];
+        for (const p of mapPlayers) {
+            if (p.name === playerName) continue;
+            const inRange = await isWithinRange(playerName, p.name, rangeFt);
+            if (inRange) {
+                allies.push(p.name);
             }
         }
     } else if (!mapName) {
@@ -60,7 +56,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
     }
 
     for (const targetName of allies) {
-        const existing = getRuntimeValue(targetName, 'hasInspiration', campaignName) || false;
+        const existing = getRuntimeValue(targetName, 'hasInspiration') || false;
         if (!existing) {
             await setRuntimeValue(targetName, 'hasInspiration', true, campaignName);
         }

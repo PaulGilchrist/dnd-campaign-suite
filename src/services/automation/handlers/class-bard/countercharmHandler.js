@@ -1,43 +1,12 @@
 import { addEntry } from '../../../ui/logService.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { rangeToFeet, getNearestPlacedItem } from '../../../rules/combat/rangeValidation.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
-import * as mapsService from '../../../maps/mapsService.js';
 import { infoPopup } from '../../common/infoPopup.js';
 import { removeCondition } from '../../../combat/conditions/conditionSaveService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
-async function checkRange(campaignName, mapName, rangeFt, sourceName, targetName) {
-    if (!mapName || !rangeFt) return true;
-
-    try {
-        const mapData = await mapsService.loadMapData(campaignName, mapName);
-        if (!mapData) return true;
-
-        // Find source position (bard)
-        const sourcePlayer = mapData?.players?.find(p => p.name === sourceName);
-        if (!sourcePlayer) return true;
-        const sourcePos = { gridX: sourcePlayer.gridX, gridY: sourcePlayer.gridY };
-
-        // Find target position — check players first, then placedItems for NPCs
-        const targetPlayer = mapData?.players?.find(p => p.name === targetName);
-        const targetNpc = mapData?.placedItems?.length
-            ? getNearestPlacedItem(mapData.placedItems, targetName, sourcePos)
-            : null;
-        const targetPos = targetPlayer
-            ? { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY }
-            : targetNpc ? { gridX: targetNpc.gridX, gridY: targetNpc.gridY } : null;
-
-        if (!targetPos) return true;
-
-        return isWithinRange(sourcePos, targetPos, rangeFt);
-    } catch {
-        return true;
-    }
-}
-
-async function findRecentRoll(playerStats, campaignName, mapName, rangeFt) {
+async function findRecentRoll(playerStats, campaignName, rangeFt) {
     const playerName = playerStats.name;
     const attackResult = await findLastAttack(campaignName);
     const attackEvent = attackResult.attackEvent;
@@ -47,14 +16,12 @@ async function findRecentRoll(playerStats, campaignName, mapName, rangeFt) {
     const rollType = attackEvent.rollType;
 
     // Determine which creature made the roll (the one Countercharm targets)
-    // For saves: the target of the spell made the save
-    // For attacks/checks: the attacker made the roll
     const rollerName = rollType === 'save' ? attackResult.targetName : attackResult.attackerName;
 
     if (!rollerName) return null;
 
-    // Range check: bard to the creature who made the roll
-    const inRange = await checkRange(campaignName, mapName, rangeFt, playerName, rollerName);
+    // Range check using universal function
+    const inRange = await isWithinRange(playerName, rollerName, rangeFt);
     if (!inRange) return null;
 
     return {
@@ -108,13 +75,13 @@ function computeOutcome(rollEvent, rerolledD20, newTotal) {
     }
 }
 
-export async function handle(action, playerStats, campaignName, mapName) {
+export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
     const featureName = action.name || 'Countercharm';
 
-    const rangeFt = rangeToFeet(auto.range || '30 ft');
-    const result = await findRecentRoll(playerStats, campaignName, mapName, rangeFt);
+    const rangeFt = auto.range ? parseInt(auto.range.replace(/[^0-9]/g, '')) || 30 : 30;
+    const result = await findRecentRoll(playerStats, campaignName, rangeFt);
 
     if (!result) {
         return infoPopup(featureName, `No recent D20 test found. ${featureName} must be used as a reaction shortly after a failed attack roll, ability check, or saving throw.`, auto);
@@ -181,8 +148,8 @@ export async function handle(action, playerStats, campaignName, mapName) {
         const oldSuccess = saveResult === 'success';
         const newSuccess = newTotal >= rollEvent.saveDc;
         if (!oldSuccess && newSuccess) {
-            await removeCondition(cs, targetName, 'charmed', getRuntimeValue, setRuntimeValue, campaignName);
-            await removeCondition(cs, targetName, 'frightened', getRuntimeValue, setRuntimeValue, campaignName);
+            await removeCondition(cs, targetName, 'charmed', getRuntimeValue, setRuntimeValue);
+            await removeCondition(cs, targetName, 'frightened', getRuntimeValue, setRuntimeValue);
         }
     }
 

@@ -22,6 +22,10 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
   rangeToFeet: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+  isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
@@ -72,6 +76,7 @@ import * as targetResolver from '../../common/targetResolver.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
 import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
+import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as damageRollback from '../../common/damageRollback.js';
 
@@ -128,6 +133,7 @@ describe('reactionDebuffHandler — disadvantage_on_attacks_vs_ally', () => {
     vi.clearAllMocks();
     rangeValidation.rangeToFeet.mockReset();
     rangeValidation.getDistanceFeet.mockReset();
+    rangeCheck.isWithinRange.mockReset().mockResolvedValue(true);
   });
 
   describe('effect: disadvantage_on_attacks_vs_ally', () => {
@@ -290,6 +296,7 @@ describe('reactionDebuffHandler — disadvantage_on_attacks_vs_ally', () => {
         targetPos: { gridX: 20, gridY: 0 },
       });
       rangeValidation.getDistanceFeet.mockReturnValue(50);
+      rangeCheck.isWithinRange.mockResolvedValue(false);
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
       damageRollback.findLastAttack.mockResolvedValue({
         attackEvent: freshAttackEvent(),
