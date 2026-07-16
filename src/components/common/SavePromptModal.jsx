@@ -9,6 +9,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntime
 import { normalizeSaveType } from '../../services/rules/combat/applyDamage.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
 import './savePromptModal.css';
+import { getPendingPopupSetter } from '../../services/combat/auras/pendingPopupRegistry.js';
 
 function SavePromptModal({ campaignName, characters, activeMapName }) {
   const [prompts, setPrompts] = useState([]);
@@ -72,6 +73,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
     const pendingSaves = getRuntimeValue(campaignName, 'pendingSavePrompts') || {};
     delete pendingSaves[event.data.promptId];
     setRuntimeValue(campaignName, 'pendingSavePrompts', pendingSaves, campaignName);
+    getPendingPopupSetter(event.data.promptId);
 
     setPrompts(prev => prev.filter(p => p.promptId !== event.data.promptId));
   }, [campaignName]);
@@ -325,7 +327,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
               )}
             </div>
             <div className="sp-body">
-              <p><strong>{current.targetName}</strong> must make a <strong>{abilityLabel}</strong> saving throw.</p>
+              <p><strong>{current.targetName}</strong> must make a <strong>{abilityLabel}</strong> saving throw.{current.disadvantage ? <span className="sp-disadvantage-badge"> (Disadvantage)</span> : ''}</p>
               <p className="sp-dc">DC {current.saveDc}</p>
               {current.dcSuccess === 'half' && (() => {
                 const normalizedSaveType = normalizeSaveType(current.saveType);

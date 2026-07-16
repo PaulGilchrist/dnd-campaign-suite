@@ -12,6 +12,7 @@ import { addEntry } from '../../services/ui/logService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import { hasSoulstitchProtection } from './loggedDiceRollUtils.js';
 import utils from '../../services/ui/utils.js';
+import { getPendingPopupSetter } from '../../services/combat/auras/pendingPopupRegistry.js';
 import storage from '../../services/ui/storage.js';
 
 export function setupEventListeners(deps) {
@@ -27,8 +28,6 @@ export function setupEventListeners(deps) {
 
             const createSaveListenerPrompts = getRuntimeValue(campaignName, 'pendingSaveListenerPrompts') || new Set();
             if (createSaveListenerPrompts.has(e.detail.promptId)) return;
-
-            const combatSummary = getCombatSummary(campaignName);
             const normalizedSaveType = normalizeSaveType(e.detail.saveType || pending.saveType);
             const targetChar = (charactersRef.current || []).find(c => c.name === e.detail.targetName);
             const targetConditions = getRuntimeValue(e.detail.targetName, 'activeConditions', pending.campaignName) || [];
@@ -62,6 +61,7 @@ export function setupEventListeners(deps) {
             }
             const pendingTargetName = pending.targetName;
             let targetMaxHp = 0;
+            const combatSummary = getCombatSummary(campaignName);
             if (combatSummary) {
                 const t = combatSummary.creatures.find(c => c.name === pendingTargetName);
                 if (t) targetMaxHp = t.type === 'player' ? (getRuntimeValue(t.name, 'hitPoints') ?? 0) : t.maxHp;
@@ -329,8 +329,11 @@ export function setupEventListeners(deps) {
                 popupData.secondaryDamageType = secondaryResult.damageType;
                 popupData.secondaryFinalDamage = secondaryResult.finalDamage;
             }
-            if (pending.setPopupHtml) {
-                pending.setPopupHtml(popupData);
+            const setPopupHtml = getPendingPopupSetter(e.detail.promptId);
+            if (setPopupHtml) {
+                setPopupHtml(popupData);
+            } else {
+                console.error('[save-result] NO setPopupHtml found! promptId=', e.detail.promptId, 'pending keys=', Object.keys(pending));
             }
         });
 

@@ -23,8 +23,10 @@ import {
     applyMinDamageAdjustment,
 } from './loggedDiceRollUtils.js';
 import { getCoronaSaveDisadvantage } from '../../services/combat/auras/coronaAuraUtils.js';
+import { getElderChampionSaveDisadvantage } from '../../services/combat/auras/elderChampionAuraUtils.js';
 import { hasBardicInspirationOffense, getBardicInspirationDieSize, getBardicInspirationDieSizeFromClass } from '../../services/combat/auras/bardicInspirationState.js';
 import { computeConditionEffects } from '../../services/combat/conditions/conditionEffects.js';
+import { registerPendingPopupSetter } from '../../services/combat/auras/pendingPopupRegistry.js';
 
 function handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters) {
     if (context?.overchannelActive) {
@@ -303,6 +305,16 @@ export function createLogDamageAndShow(deps) {
                 disadvantage = true;
             }
         }
+        if (!disadvantage) {
+            const elderChampionResult = await getElderChampionSaveDisadvantage({
+                attackerName: characterName,
+                attackerStats: context?.playerStats,
+                targetName: target.name,
+            });
+            if (elderChampionResult.disadvantage) {
+                disadvantage = true;
+            }
+        }
         const isSoulstitchProtected = hasSoulstitchProtection(target.name, characterName, campaignName);
         const targetCharacter = (characters || []).find(c => utils.getName(c.name) === target.name);
         const targetSaveModifiers = targetCharacter?.saveModifiers || targetCharacter?.computedStats?.saveModifiers || [];
@@ -401,6 +413,16 @@ export function createLogDamageAndShow(deps) {
                             skipRangeCheck: true,
                         });
                         if (coronaResult.disadvantage) {
+                            secondaryDisadvantage = true;
+                        }
+                    }
+                    if (!secondaryDisadvantage) {
+                        const elderChampionResult = await getElderChampionSaveDisadvantage({
+                            attackerName: characterName,
+                            attackerStats: context?.playerStats,
+                            targetName: target.name,
+                        });
+                        if (elderChampionResult.disadvantage) {
                             secondaryDisadvantage = true;
                         }
                     }
@@ -627,6 +649,16 @@ export function createLogDamageAndShow(deps) {
                         skipRangeCheck: true,
                     });
                     if (coronaResult.disadvantage) {
+                        twinDisadvantage = true;
+                    }
+                }
+                if (!twinDisadvantage) {
+                    const elderChampionResult = await getElderChampionSaveDisadvantage({
+                        attackerName: characterName,
+                        attackerStats: context?.playerStats,
+                        targetName: twinTarget.name,
+                    });
+                    if (elderChampionResult.disadvantage) {
                         twinDisadvantage = true;
                     }
                 }
@@ -945,7 +977,12 @@ export function createLogDamageAndShow(deps) {
             damageType,
             skipRangeCheck: true,
         }).disadvantage || false;
-        const saveDisadvantage = (context?.metamagicHeighten || false) || coronaDisadvantage;
+        const elderChampionDisadvantage = await getElderChampionSaveDisadvantage({
+            attackerName: characterName,
+            attackerStats: context?.playerStats,
+            targetName: target.name,
+        });
+        const saveDisadvantage = (context?.metamagicHeighten || false) || coronaDisadvantage || elderChampionDisadvantage.disadvantage;
 
         pendingSaves[promptId] = {
             targetName: target.name, rawDamage: adjustedTotal, saveDc, saveType, dcSuccess,
@@ -961,6 +998,7 @@ export function createLogDamageAndShow(deps) {
             autoDamageSecondaryName: context?.autoDamageSecondaryName || null,
             autoDamageSecondaryDamageType: context?.autoDamageSecondaryDamageType || null,
         };
+        registerPendingPopupSetter(promptId, setPopupHtml);
 
         sendSavePrompt(campaignName, {
             promptId,

@@ -27,6 +27,12 @@ vi.mock('../../services/ui/logService.js', () => {
     const mockAddEntry = vi.fn().mockReturnValue(Promise.resolve(undefined));
     return { addEntry: mockAddEntry };
 });
+let _registry = {};
+vi.mock('../../services/combat/auras/pendingPopupRegistry.js', () => ({
+    registerPendingPopupSetter: vi.fn((id, fn) => { _registry[id] = fn; }),
+    getPendingPopupSetter: vi.fn((id) => { const fn = _registry[id]; if (fn) { delete _registry[id]; return fn; } return null; }),
+}));
+import { registerPendingPopupSetter } from '../../services/combat/auras/pendingPopupRegistry.js';
 
 import { addExpiration } from '../../services/rules/effects/expirations.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
@@ -126,6 +132,7 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
             const setPopupHtml = vi.fn();
             const pid = 'p4';
             testPendingSaves = { [pid]: createSavePrompt(pid, { setPopupHtml }) };
+            registerPendingPopupSetter(pid, setPopupHtml);
             window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: false, roll: 8, total: 11, saveBonus: 3 } }));
             expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ type: 'save-damage', name: 'Fireball' }));
         });

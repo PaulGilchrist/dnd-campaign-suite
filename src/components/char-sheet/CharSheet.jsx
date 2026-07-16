@@ -19,7 +19,8 @@ import CharSummary from './char-summary/CharSummary.jsx'
 import { computeAuraComboEffects } from '../../services/combat/auras/auraComboEffects.js';
 import { computeConditionEffects, getNetAttackMode, CONDITIONS_THAT_CANNOT_ACT } from '../../services/combat/conditions/conditionEffects.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
-import { getDistanceFeet, isDistanceInRange } from '../../services/rules/combat/rangeValidation.js';
+import { getDistanceFeet } from '../../services/rules/combat/rangeValidation.js';
+import { isDistanceInRange } from '../../services/rules/combat/rangeCheck.js';
 import { evaluateAutoExpression } from '../../services/combat/automation/automationService.js';
 import { EXHAUSTION_LEVELS } from '../../services/combat/conditions/exhaustionRules.js';
 import { isCreatureWarded } from '../../services/automation/handlers/buffs/protectionFromEvilAndGoodHandler.js';
