@@ -230,12 +230,12 @@ describe('MetamagicPopup', () => {
       expect(screen.getByText(/Second Target/)).toBeInTheDocument();
     });
 
-    it('populates target dropdown with non-player creatures and excludes the player', () => {
+    it('populates target dropdown with all creatures in combat', () => {
       renderPopup();
       fireEvent.click(screen.getByText('Twinned Spell'));
       expect(screen.getByText('Goblin')).toBeInTheDocument();
       expect(screen.getByText('Orc')).toBeInTheDocument();
-      expect(screen.queryByText('Sorcerer')).not.toBeInTheDocument();
+      expect(screen.getByText('Sorcerer')).toBeInTheDocument();
     });
 
     it('disables Apply & Cast when Twinned selected but no target chosen', () => {
@@ -335,6 +335,24 @@ describe('MetamagicPopup', () => {
       expect(onConfirm).toHaveBeenCalledWith({
         options: ['Careful Spell', 'Quickened Spell'],
         totalCost: 1,
+        twinTarget: null,
+        psionicActive: false,
+      });
+    });
+
+    it('enables Apply & Cast when a single option is free via Arcane Apotheosis', () => {
+      hasArcaneApotheosis.mockReturnValue(true);
+      getMaxMetamagicPerSpell.mockReturnValue(3);
+      setupApotheosisCostMock();
+      const { onConfirm } = renderPopup({ playerStats: { ...basePlayerStats, _metamagicCurrentSP: 1 } });
+      fireEvent.click(screen.getByText('Quickened Spell'));
+      const btn = screen.getByText(/Apply & Cast/);
+      expect(btn.disabled).toBe(false);
+      expect(btn.textContent).toContain('0 SP');
+      fireEvent.click(btn);
+      expect(onConfirm).toHaveBeenCalledWith({
+        options: ['Quickened Spell'],
+        totalCost: 0,
         twinTarget: null,
         psionicActive: false,
       });

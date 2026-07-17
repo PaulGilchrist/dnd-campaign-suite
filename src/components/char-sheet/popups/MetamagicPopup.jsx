@@ -3,15 +3,13 @@ import { getPreCastOptions, getMaxMetamagicPerSpell, computeMetamagicCost, hasAr
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import './MetamagicPopup.css';
 
-function getCreatureTargets(excludeName, campaignName) {
+function getCreatureTargets(campaignName) {
   const cs = getCombatSummary(campaignName);
   if (!cs?.creatures) return [];
-  return cs.creatures
-    .filter(c => c.name !== excludeName)
-    .map(c => c.name);
+  return cs.creatures.map(c => c.name);
 }
 
-export default function MetamagicPopup({ spell, playerStats, _campaignName, onConfirm, onSkip }) {
+export default function MetamagicPopup({ spell, playerStats, campaignName, onConfirm, onSkip }) {
   const spellLevel = spell?.level || 0;
   const currentSP = Number(playerStats._metamagicCurrentSP) || 0;
   const options = getPreCastOptions(playerStats, currentSP, spellLevel);
@@ -22,7 +20,7 @@ export default function MetamagicPopup({ spell, playerStats, _campaignName, onCo
   const [selected, setSelected] = useState([]);
   const [twinTarget, setTwinTarget] = useState('');
   const [psionicActive, setPsionicActive] = useState(false);
-  const creatureTargets = getCreatureTargets(playerStats?.name, _campaignName);
+  const creatureTargets = getCreatureTargets(campaignName);
 
   const apotheosisActive = hasArcaneApotheosis(playerStats, playerStats?.name);
   const { totalCost, waivedName } = computeMetamagicCost(selected, options, playerStats, playerStats?.name);
@@ -34,7 +32,7 @@ export default function MetamagicPopup({ spell, playerStats, _campaignName, onCo
   const canSelectMore = selected.length < maxPerSpell;
 
   const hasTwinned = selected.includes('Twinned Spell');
-  const needsTwinTarget = hasTwinned && !twinTarget;
+  const needsTwinTarget = hasTwinned && creatureTargets.length > 0 && !twinTarget;
 
   const toggleOption = useCallback((name, affordable) => {
     if (!affordable) return;
@@ -63,10 +61,10 @@ export default function MetamagicPopup({ spell, playerStats, _campaignName, onCo
     onConfirm({
       options: selected,
       totalCost: grandTotalCost,
-      twinTarget: hasTwinned ? twinTarget : null,
+      twinTarget: hasTwinned && creatureTargets.length > 0 ? twinTarget : null,
       psionicActive,
     });
-  }, [selected, grandTotalCost, twinTarget, hasTwinned, needsTwinTarget, onConfirm, psionicActive]);
+  }, [selected, grandTotalCost, twinTarget, hasTwinned, needsTwinTarget, creatureTargets.length, onConfirm, psionicActive]);
 
   useEffect(() => {
     const handleKey = (e) => {
@@ -180,13 +178,13 @@ export default function MetamagicPopup({ spell, playerStats, _campaignName, onCo
              <button className="btn btn-secondary" onClick={onSkip}>
                Cast Without Metamagic
              </button>
-             <button
-               className="btn"
-               onClick={handleConfirm}
-               disabled={needsTwinTarget || grandTotalCost === 0}
-             >
-               Apply &amp; Cast ({grandTotalCost} SP)
-             </button>
+              <button
+                className="btn"
+                onClick={handleConfirm}
+                disabled={needsTwinTarget || (grandTotalCost === 0 && selected.length === 0)}
+              >
+                Apply &amp; Cast ({grandTotalCost} SP)
+              </button>
            </div>
         </div>
       </div>
