@@ -8,23 +8,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const playerName = playerStats.name;
 
     // Check if Vow of Enmity is active
-    const activeBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName) || [];
-    const vowOfEnmityActive = activeBuffs.some(b => b.effect === 'vow_of_enmity');
-
-    if (!vowOfEnmityActive) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                automationType: auto.type,
-                description: `${action.name} — Vow of Enmity is not active.`,
-                automation: auto,
-            },
-        };
-    }
-
-    // Get the Vow of Enmity target
     const vowTarget = getRuntimeValue(playerName, 'vowOfEnmityTarget', campaignName);
 
     if (!vowTarget) {
@@ -34,7 +17,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 type: 'automation_info',
                 name: action.name,
                 automationType: auto.type,
-                description: `${action.name} — No Vow of Enmity target selected.`,
+                description: `${action.name} — Vow of Enmity is not active.`,
                 automation: auto,
             },
         };

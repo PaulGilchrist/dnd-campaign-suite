@@ -13,6 +13,11 @@ const ADRENALINE_RUSH_USES_KEY = 'adrenalineRushUses';
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
 
+    // Vow of Enmity: delegate to dedicated handler
+    if (auto?.effect === 'vow_of_enmity') {
+        return handleVowOfEnmity(action, playerStats, campaignName, _mapName);
+    }
+
     // Handle Adrenaline Rush: bonus action dash with temp HP, uses = proficiency_bonus, short_rest recharge
     if (auto?.effect === 'bonus_action_dash') {
         return handleBonusActionDash(action, playerStats, campaignName, _mapName);

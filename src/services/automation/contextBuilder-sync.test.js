@@ -510,10 +510,9 @@ describe('contextBuilder: buildAttackContextSync', () => {
   });
 
   describe('activeBuffs — vow of enmity and clairvoyant combatant', () => {
-    it('sets advantage when vow of enmity or clairvoyant combatant active with matching target', async () => {
+    it('sets advantage when vow of enmity is on target activeBuffs', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'activeBuffs') return [{ effect: 'vow_of_enmity' }];
-        if (key === 'vowOfEnmityTarget') return 'Orc';
         return undefined;
       });
 
@@ -530,15 +529,14 @@ describe('contextBuilder: buildAttackContextSync', () => {
       expect(clairResult.forcedMode).toBe('advantage');
     });
 
-    it('does not set advantage when vow/clairvoyant target does not match or is undefined', async () => {
+    it('does not set advantage when vow_of_enmity is not on target activeBuffs', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [{ effect: 'vow_of_enmity' }];
-        if (key === 'vowOfEnmityTarget') return 'Goblin';
+        if (key === 'activeBuffs') return [{ effect: 'divine_shield' }];
         return undefined;
       });
 
-      const vowResult = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
-      expect(vowResult.forcedMode).toBeUndefined();
+      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+      expect(result.forcedMode).toBeUndefined();
 
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'activeBuffs') return [{ effect: 'clairvoyant_combatant' }];

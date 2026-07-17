@@ -308,6 +308,16 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
     }
   }
 
+  // Clear Vow of Enmity state on short rest
+  const vowTarget = getRuntimeValue(name, 'vowOfEnmityTarget', campaignName);
+  updates.vowOfEnmityTarget = null;
+  updates.vowOfEnmityCostPaid = null;
+  if (vowTarget) {
+    const targetBuffs = getRuntimeValue(vowTarget, 'activeBuffs', campaignName) || [];
+    const filteredTargetBuffs = targetBuffs.filter(b => b.effect !== 'vow_of_enmity');
+    await setRuntimeValue(vowTarget, 'activeBuffs', filteredTargetBuffs, campaignName);
+  }
+
   // Tireless: decrease exhaustion by 1 on short rest
   if (playerStats.class?.name === 'Ranger' && playerStats.level >= 10) {
     const currentExhaustion = getRuntimeValue(name, 'exhaustionLevel', campaignName)
@@ -431,10 +441,14 @@ export async function applyLongRest(playerStats, campaignName) {
     // Clear Avenging Angel active state on long rest
      charData.avengingAngelActive = null;
 
-     // Clear Peerless Athlete active state on long rest
-     charData.peerlessAthleteActive = null;
+      // Clear Peerless Athlete active state on long rest
+      charData.peerlessAthleteActive = null;
 
-     const currentExhaustion = getRuntimeValue(name, 'exhaustionLevel')
+    // Clear Vow of Enmity active state on long rest
+    charData.vowOfEnmityTarget = null;
+    charData.vowOfEnmityCostPaid = null;
+
+      const currentExhaustion = getRuntimeValue(name, 'exhaustionLevel')
    if (typeof currentExhaustion === 'number' && currentExhaustion > 0) {
      charData.exhaustionLevel = getLevelAfterLongRest(currentExhaustion)
          }

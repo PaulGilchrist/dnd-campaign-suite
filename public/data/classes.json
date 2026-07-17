@@ -8234,12 +8234,19 @@
           {
             "level": 3,
             "features": [
-              {
+{
                 "name": "Channel Divinity: Vow of Enmity",
                 "level": 3,
                 "prerequisites": [],
-                "description": "As a bonus action, you can utter a vow of enmity against a creature you can see within 10 feet of you, using your Channel Divinity. You gain advantage on attack rolls against the creature for 1 minute or until it drops to 0 hit points or falls unconscious."
-              }
+                "description": "As an action, you can utter a vow of enmity against a creature you can see within 10 feet of you, using your Channel Divinity. You gain advantage on attack rolls against the creature for 1 minute or until it drops to 0 hit points or falls unconscious.",
+                "automation": {
+                    "type": "temp_buff",
+                    "effect": "vow_of_enmity",
+                    "duration": "1_minute",
+                    "resourceCost": "channel_divinity",
+                    "casting_time": "1 action"
+                }
+            }
             ]
           },
           {

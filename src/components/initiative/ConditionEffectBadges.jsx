@@ -9,7 +9,7 @@ function getEffectDescription(label) {
     return label
 }
 
-function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, campaignName, hasTacticalShift, hasSpeedyOpportunityDisadvantage, hasSpeedyDifficultTerrainIgnore, isLocalhost, coronaDisadvantage }) {
+function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, campaignName, allCreatures, hasTacticalShift, hasSpeedyOpportunityDisadvantage, hasSpeedyDifficultTerrainIgnore, isLocalhost, coronaDisadvantage }) {
     const condKeys = (conditions || []).map(c => c.key)
     const effects = computeConditionEffects(condKeys, [], targetEffects, false, false, false, false, null, false, null, false, false, false, false, false)
     const activeBuffs = creatureName && campaignName ? (getRuntimeValue(creatureName, 'activeBuffs', campaignName) || []) : []
@@ -21,9 +21,24 @@ function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, c
                 effects.saveAdvantageCount = (effects.saveAdvantageCount || 0) + 1
                 effects.saveAdvantageReasons.push(buff.name)
             }
+            if (buff.effect === 'vow_of_enmity') {
+                effects.attackAdvantageCount = (effects.attackAdvantageCount || 0) + 1
+                effects.attackAdvantageReasons.push(buff.name)
+            }
         }
     }
     const badges = []
+    // Check if any creature has Vow of Enmity against this creature
+    if (allCreatures?.length && campaignName) {
+        const hasVow = allCreatures.some(c => {
+            const vowTarget = getRuntimeValue(c.name, 'vowOfEnmityTarget', campaignName);
+            return vowTarget === creatureName;
+        });
+        if (hasVow) {
+            effects.attackAdvantageCount = (effects.attackAdvantageCount || 0) + 1
+            effects.attackAdvantageReasons.push('Vow of Enmity')
+        }
+    }
     const stealthAttackCost = creatureName && campaignName ? (getRuntimeValue(creatureName, 'stealthAttackCost', campaignName) ?? 0) : 0
     if (stealthAttackCost > 0) {
         badges.push({ label: 'Stealth Attack', cls: 'effect-stealth-attack', icon: 'fa-eye-slash', removable: false })

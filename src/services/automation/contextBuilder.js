@@ -258,10 +258,9 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
         }
 
         // Vow of Enmity: Advantage on attack rolls against the vowed creature
-        const vowOfEnmityActive = activeBuffs.some(b => b.effect === 'vow_of_enmity');
-        if (vowOfEnmityActive && targetName) {
-            const vowTarget = getRuntimeValue(playerName, 'vowOfEnmityTarget', campaignName);
-            if (vowTarget && targetName === vowTarget && forcedMode === undefined) {
+        if (targetName && forcedMode === undefined) {
+            const targetBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
+            if (Array.isArray(targetBuffs) && targetBuffs.some(b => b.effect === 'vow_of_enmity')) {
                 forcedMode = 'advantage';
             }
         }

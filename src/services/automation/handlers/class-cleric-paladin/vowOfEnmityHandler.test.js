@@ -1,8 +1,13 @@
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, applyTargetChoice } from './vowOfEnmityHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
+
+vi.mock('../../../ui/logService.js', () => ({
+    addEntry: vi.fn().mockResolvedValue({}),
+}));
+
+import { addEntry } from '../../../ui/logService.js';
 
 const campaignName = 'TestCampaign';
 
@@ -48,20 +53,6 @@ function mockRuntimeValues(getters, state = {}) {
 describe('vowOfEnmityHandler.handle', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-    });
-
-    it('returns info popup when vow is already active against a target', async () => {
-        mockRuntimeValues({ vowOfEnmityTarget: 'Goblin' });
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.name).toBe('Vow of Enmity');
-        expect(result.payload.automationType).toBe('vow_of_enmity');
-        expect(result.payload.description).toContain('already active against Goblin');
-        expect(result.payload.automation).toEqual({ type: 'vow_of_enmity' });
-        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
     it('returns no-charges popup when channel divinity is depleted', async () => {
@@ -193,24 +184,16 @@ describe('vowOfEnmityHandler.handle', () => {
             'Goblin',
             campaignName,
         );
-        const buffsCall = vi.mocked(runtimeState.setRuntimeValue).mock.calls.find(
-            (c) => c[0] === 'Paladin1' && c[1] === 'activeBuffs' && Array.isArray(c[2]),
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+            'Paladin1',
+            'vowOfEnmityCostPaid',
+            true,
+            campaignName,
         );
-        expect(buffsCall).toBeDefined();
-        expect(buffsCall[2]).toHaveLength(1);
-        expect(buffsCall[2][0]).toEqual({
-            name: 'Vow of Enmity',
-            effect: 'vow_of_enmity',
-            duration: '1_minute',
-            target: 'Goblin',
-        });
     });
 
-    it('preserves existing buffs when adding vow_of_enmity', async () => {
-        mockRuntimeValues({
-            channelDivinityCharges: 2,
-            activeBuffs: [{ effect: 'divine_shield', target: 'Paladin1' }],
-        });
+    it('adds vow_of_enmity to target activeBuffs', async () => {
+        mockRuntimeValues({ channelDivinityCharges: 2, activeBuffs: [] });
         vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({
             creatures: [{ name: 'Goblin' }],
         });
@@ -218,27 +201,116 @@ describe('vowOfEnmityHandler.handle', () => {
 
         await handle(makeAction(), makePlayerStats(), campaignName);
 
-        const buffsCall = vi.mocked(runtimeState.setRuntimeValue).mock.calls.find(
-            (c) => c[0] === 'Paladin1' && c[1] === 'activeBuffs' && Array.isArray(c[2]),
+        const targetBuffsCall = vi.mocked(runtimeState.setRuntimeValue).mock.calls.find(
+            (c) => c[0] === 'Goblin' && c[1] === 'activeBuffs' && Array.isArray(c[2]),
         );
-        expect(buffsCall[2]).toHaveLength(2);
-        expect(buffsCall[2][0].effect).toBe('divine_shield');
-        expect(buffsCall[2][1].effect).toBe('vow_of_enmity');
+        expect(targetBuffsCall).toBeDefined();
+        expect(targetBuffsCall[2]).toHaveLength(1);
+        expect(targetBuffsCall[2][0]).toEqual({
+            name: 'Vow of Enmity',
+            effect: 'vow_of_enmity',
+            duration: '1_minute',
+            source: 'Paladin1',
+        });
     });
 
-    it('uses custom duration from automation when provided', async () => {
+    it('logs to campaign log on activation', async () => {
         mockRuntimeValues({ channelDivinityCharges: 2, activeBuffs: [] });
         vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({
             creatures: [{ name: 'Goblin' }],
         });
         vi.spyOn(damageUtils, 'getTargetFromAttacker').mockReturnValue({ name: 'Goblin' });
 
-        await handle(makeAction({ automation: { duration: '1_hour' } }), makePlayerStats(), campaignName);
+        await handle(makeAction(), makePlayerStats(), campaignName);
 
-        const buffsCall = vi.mocked(runtimeState.setRuntimeValue).mock.calls.find(
-            (c) => c[0] === 'Paladin1' && c[1] === 'activeBuffs' && Array.isArray(c[2]),
+        expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            type: 'ability_use',
+            characterName: 'Paladin1',
+            abilityName: 'Vow of Enmity',
+            description: expect.stringContaining('Paladin1 used Vow of Enmity against Goblin'),
+        }));
+    });
+
+    it('charges CD when switching to new target with old target still alive', async () => {
+        mockRuntimeValues({
+            channelDivinityCharges: 2,
+            activeBuffs: [],
+            vowOfEnmityTarget: 'Goblin',
+            vowOfEnmityCostPaid: true,
+        });
+        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({
+            creatures: [
+                { name: 'Goblin', currentHp: 5 },
+                { name: 'Orc', currentHp: 10 },
+            ],
+        });
+        vi.spyOn(damageUtils, 'getTargetFromAttacker').mockReturnValue({ name: 'Orc' });
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName);
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toContain('transferred from Goblin to Orc');
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+            'Paladin1',
+            'channelDivinityCharges',
+            1,
+            campaignName,
         );
-        expect(buffsCall[2][0].duration).toBe('1_hour');
+    });
+
+    it('free reactivation when previous target at 0 HP', async () => {
+        mockRuntimeValues({
+            channelDivinityCharges: 2,
+            activeBuffs: [],
+            vowOfEnmityTarget: 'Goblin',
+            vowOfEnmityCostPaid: true,
+        });
+        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({
+            creatures: [
+                { name: 'Goblin', currentHp: 0 },
+                { name: 'Orc', currentHp: 10 },
+            ],
+        });
+        vi.spyOn(damageUtils, 'getTargetFromAttacker').mockReturnValue({ name: 'Orc' });
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName);
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toContain('reactivated against Orc');
+        expect(result.payload.description).toContain('Previous target defeated');
+        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+            'Paladin1',
+            'channelDivinityCharges',
+            expect.any(Number),
+            campaignName,
+        );
+    });
+
+    it('free reactivation when previous target missing from combatSummary', async () => {
+        mockRuntimeValues({
+            channelDivinityCharges: 2,
+            activeBuffs: [],
+            vowOfEnmityTarget: 'Goblin',
+            vowOfEnmityCostPaid: true,
+        });
+        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({
+            creatures: [
+                { name: 'Orc', currentHp: 10 },
+            ],
+        });
+        vi.spyOn(damageUtils, 'getTargetFromAttacker').mockReturnValue({ name: 'Orc' });
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName);
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toContain('reactivated against Orc');
+        expect(result.payload.description).toContain('Previous target removed');
+        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+            'Paladin1',
+            'channelDivinityCharges',
+            expect.any(Number),
+            campaignName,
+        );
     });
 });
 
@@ -264,8 +336,11 @@ describe('vowOfEnmityHandler.applyTargetChoice', () => {
         expect(result.payload.description).toBe('No target selected.');
     });
 
-    it('activates vow with chosen target, storing target and adding buff', async () => {
-        mockRuntimeValues({ activeBuffs: [] });
+    it('activates vow with chosen target, storing target and cost flag', async () => {
+        mockRuntimeValues({ channelDivinityCharges: 2 });
+        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({
+            creatures: [{ name: 'Orc' }],
+        });
 
         const result = await applyTargetChoice(makeAction(), makePlayerStats(), campaignName, 'Orc');
 
@@ -277,12 +352,28 @@ describe('vowOfEnmityHandler.applyTargetChoice', () => {
             'Orc',
             campaignName,
         );
-        const buffsCall = vi.mocked(runtimeState.setRuntimeValue).mock.calls.find(
-            (c) => c[0] === 'Paladin1' && c[1] === 'activeBuffs' && Array.isArray(c[2]),
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+            'Paladin1',
+            'vowOfEnmityCostPaid',
+            true,
+            campaignName,
         );
-        expect(buffsCall[2][0].target).toBe('Orc');
-        expect(buffsCall[2][0].effect).toBe('vow_of_enmity');
-        expect(buffsCall[2][0].duration).toBe('1_minute');
+    });
+
+    it('adds vow_of_enmity to target activeBuffs from applyTargetChoice', async () => {
+        mockRuntimeValues({ channelDivinityCharges: 2, activeBuffs: [] });
+        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({
+            creatures: [{ name: 'Orc' }],
+        });
+
+        await applyTargetChoice(makeAction(), makePlayerStats(), campaignName, 'Orc');
+
+        const targetBuffsCall = vi.mocked(runtimeState.setRuntimeValue).mock.calls.find(
+            (c) => c[0] === 'Orc' && c[1] === 'activeBuffs' && Array.isArray(c[2]),
+        );
+        expect(targetBuffsCall).toBeDefined();
+        expect(targetBuffsCall[2][0].effect).toBe('vow_of_enmity');
+        expect(targetBuffsCall[2][0].source).toBe('Paladin1');
     });
 
     it('passes custom automation fields through to the payload', async () => {

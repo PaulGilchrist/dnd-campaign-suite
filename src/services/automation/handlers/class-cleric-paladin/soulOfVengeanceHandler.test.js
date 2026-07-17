@@ -91,7 +91,7 @@ describe('soulOfVengeanceHandler', () => {
       const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No Vow of Enmity target selected');
+      expect(result.payload.description).toContain('Vow of Enmity is not active');
     });
   });
 

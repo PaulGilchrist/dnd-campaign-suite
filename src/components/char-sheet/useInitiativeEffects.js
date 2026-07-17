@@ -49,6 +49,16 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
             // Clear Avenging Angel active state on initiative roll (new combat)
             setRuntimeValue(playerStats.name, 'avengingAngelActive', false, campaignName);
 
+            // Clear Vow of Enmity active state on initiative roll (new combat)
+            const vowTarget = getRuntimeValue(playerStats.name, 'vowOfEnmityTarget', campaignName);
+            setRuntimeValue(playerStats.name, 'vowOfEnmityTarget', null, campaignName);
+            setRuntimeValue(playerStats.name, 'vowOfEnmityCostPaid', null, campaignName);
+            if (vowTarget) {
+                const targetBuffs = getRuntimeValue(vowTarget, 'activeBuffs', campaignName) || [];
+                const filteredTargetBuffs = targetBuffs.filter(b => b.effect !== 'vow_of_enmity');
+                setRuntimeValue(vowTarget, 'activeBuffs', filteredTargetBuffs, campaignName);
+            }
+
             // Clear concentration on initiative roll (new combat round)
             const cs = getCombatSummary(campaignName);
             if (cs && cs.creatures) {

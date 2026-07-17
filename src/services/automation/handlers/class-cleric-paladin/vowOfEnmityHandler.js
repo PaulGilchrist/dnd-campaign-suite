@@ -1,27 +1,10 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
+import { addEntry } from '../../../ui/logService.js';
 
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation;
     const playerName = playerStats.name;
-
-    // Check if Vow of Enmity is already active
-    const vowKey = 'vowOfEnmityTarget';
-    const currentTarget = getRuntimeValue(playerName, vowKey, campaignName);
-
-    if (currentTarget) {
-        // Already active - show info about current target
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                automationType: auto.type,
-                description: `${action.name} is already active against ${currentTarget}. Activate again to change target.`,
-                automation: auto,
-            },
-        };
-    }
 
     // Check Channel Divinity charges
     const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
@@ -42,9 +25,6 @@ export async function handle(action, playerStats, campaignName) {
         };
     }
 
-    // Consume Channel Divinity charge
-    await setRuntimeValue(playerName, 'channelDivinityCharges', currentCharges - 1, campaignName);
-
     // Get the current combat target
     const cs = await getCombatContext(campaignName);
     const target = cs ? getTargetFromAttacker(cs, playerName) : null;
@@ -62,7 +42,7 @@ export async function handle(action, playerStats, campaignName) {
         };
     }
 
-    return activateVowOfEnmity(action, playerStats, campaignName, targetName);
+    return activateVowOfEnmity(action, playerStats, campaignName, targetName, currentCharges);
 }
 
 export async function applyTargetChoice(action, playerStats, campaignName, chosenTargetName) {
@@ -78,29 +58,86 @@ export async function applyTargetChoice(action, playerStats, campaignName, chose
             },
         };
     }
-    return activateVowOfEnmity(action, playerStats, campaignName, chosenTargetName);
+    const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
+    const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
+    const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges', campaignName);
+    const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
+    return activateVowOfEnmity(action, playerStats, campaignName, chosenTargetName, currentCharges);
 }
 
-async function activateVowOfEnmity(action, playerStats, campaignName, targetName) {
+async function activateVowOfEnmity(action, playerStats, campaignName, targetName, currentCharges) {
     const auto = action.automation;
     const playerName = playerStats.name;
+    const previousTarget = getRuntimeValue(playerName, 'vowOfEnmityTarget', campaignName);
 
-    // Store the vow target
+    // Determine if this is a free reactivation (previous target at 0 HP or missing)
+    let isFree = false;
+    let costMessage = '';
+
+    if (previousTarget) {
+        // Check if previous target is defeated or removed
+        const cs = await getCombatContext(campaignName);
+        const prevCreature = cs?.creatures?.find(c => c.name === previousTarget);
+
+        if (prevCreature) {
+            const prevHp = prevCreature.currentHp ?? prevCreature.hit_points?.current ?? 0;
+            if (prevHp <= 0) {
+                isFree = true;
+                costMessage = ' Previous target defeated — no Channel Divinity cost.';
+            }
+        } else {
+            // Previous target not in combatSummary — missing
+            isFree = true;
+            costMessage = ' Previous target removed from combat — no Channel Divinity cost.';
+        }
+    }
+
+    let description;
+
+    if (isFree) {
+        // Free reactivation
+        if (previousTarget && previousTarget !== targetName) {
+            description = `${action.name} reactivated against ${targetName}. Transferred from ${previousTarget}.${costMessage}`;
+        } else {
+            description = `${action.name} reactivated against ${targetName}.${costMessage}`;
+        }
+    } else {
+        // Costs 1 CD
+        const newCharges = currentCharges - 1;
+        await setRuntimeValue(playerName, 'channelDivinityCharges', newCharges, campaignName);
+        costMessage = newCharges > 0 ? ` (${newCharges} Channel Divinity charge${newCharges !== 1 ? 's' : ''} remaining).` : ' (Channel Divinity depleted).';
+
+        if (previousTarget && previousTarget !== targetName) {
+            description = `${action.name} transferred from ${previousTarget} to ${targetName}.${costMessage}`;
+        } else {
+            description = `${action.name} activated against ${targetName}.${costMessage}`;
+        }
+    }
+
+    // Store the vow target and cost flag
     await setRuntimeValue(playerName, 'vowOfEnmityTarget', targetName, campaignName);
+    await setRuntimeValue(playerName, 'vowOfEnmityCostPaid', true, campaignName);
 
-    // Also add to activeBuffs for contextBuilder to detect
-    const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
-    const activeBuffs = Array.isArray(stored) ? stored : [];
-    const newBuffs = [...activeBuffs, {
+    // Add vow_of_enmity to target's activeBuffs (for contextBuilder and badge)
+    const targetBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
+    const newTargetBuffs = [...targetBuffs, {
         name: action.name,
         effect: 'vow_of_enmity',
         duration: auto.duration || '1_minute',
-        target: targetName,
+        source: playerName,
     }];
-    setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
+    await setRuntimeValue(targetName, 'activeBuffs', newTargetBuffs, campaignName);
 
     // Set up listener to clear vow when target drops to 0 HP
     setupVowTransferListener(playerName, targetName, campaignName);
+
+    // Log to campaign log
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: action.name,
+        description: `${playerName} used ${action.name} against ${targetName}.${costMessage}`,
+    }).catch((e) => { console.error('[vowOfEnmity] Error logging:', e); });
 
     return {
         type: 'popup',
@@ -108,7 +145,7 @@ async function activateVowOfEnmity(action, playerStats, campaignName, targetName
             type: 'automation_info',
             name: action.name,
             automationType: auto.type,
-            description: `${action.name} activated against ${targetName}. You have advantage on attack rolls against ${targetName} for 1 minute or until used again.`,
+            description,
             automation: auto,
         },
     };
@@ -122,12 +159,18 @@ function setupVowTransferListener(playerName, targetName, campaignName) {
         if (creature) {
             const currentHp = creature.currentHp ?? creature.hit_points?.current ?? 0;
             if (currentHp <= 0) {
-                // Target is at 0 HP - clear the vow
+                // Target is at 0 HP - clear the vow from attacker and target
                 await setRuntimeValue(playerName, 'vowOfEnmityTarget', null, campaignName);
+                await setRuntimeValue(playerName, 'vowOfEnmityCostPaid', null, campaignName);
                 const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
                 const activeBuffs = Array.isArray(stored) ? stored : [];
                 const filtered = activeBuffs.filter(b => b.effect !== 'vow_of_enmity');
-                setRuntimeValue(playerName, 'activeBuffs', filtered, campaignName);
+                await setRuntimeValue(playerName, 'activeBuffs', filtered, campaignName);
+
+                // Also clear from target's activeBuffs
+                const targetBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
+                const filteredTargetBuffs = targetBuffs.filter(b => b.effect !== 'vow_of_enmity');
+                await setRuntimeValue(targetName, 'activeBuffs', filteredTargetBuffs, campaignName);
             }
         }
     };

@@ -7537,7 +7537,7 @@
                             "effect": "vow_of_enmity",
                             "duration": "1_minute",
                             "resourceCost": "channel_divinity",
-                            "casting_time": "1 bonus action"
+                            "casting_time": "1 action"
                         }
                     },
                     {
