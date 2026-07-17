@@ -447,6 +447,12 @@ export async function applyLongRest(playerStats, campaignName) {
     // Clear Vow of Enmity active state on long rest
     charData.vowOfEnmityTarget = null;
     charData.vowOfEnmityCostPaid = null;
+    const vowTarget = getRuntimeValue(name, 'vowOfEnmityTarget', campaignName);
+    if (vowTarget) {
+      const targetBuffs = getRuntimeValue(vowTarget, 'activeBuffs', campaignName) || [];
+      const filteredTargetBuffs = targetBuffs.filter(b => b.effect !== 'vow_of_enmity');
+      await setRuntimeValue(vowTarget, 'activeBuffs', filteredTargetBuffs, campaignName);
+    }
 
       const currentExhaustion = getRuntimeValue(name, 'exhaustionLevel')
    if (typeof currentExhaustion === 'number' && currentExhaustion > 0) {
