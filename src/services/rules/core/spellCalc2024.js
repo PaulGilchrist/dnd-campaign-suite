@@ -215,12 +215,16 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
                     }
                 }
                 if (feature.type === 'passive_rule' && feature.effect === 'always_prepared_spells' && feature.spells) {
-                    feature.spells.forEach(spellName => {
-                        const knownSpell = spellAbilities.spells.find(s => s.name === spellName);
-                        if (!knownSpell) {
-                            spellAbilities.spells.push({ name: spellName, prepared: 'Always' });
-                        }
-                    });
+                    const majorFeatures = playerStats.class?.major?.features || [];
+                    const majorFeatureNames = majorFeatures.map(f => f.name);
+                    if (majorFeatureNames.includes(feature.name)) {
+                        feature.spells.forEach(spellName => {
+                            const knownSpell = spellAbilities.spells.find(s => s.name === spellName);
+                            if (!knownSpell) {
+                                spellAbilities.spells.push({ name: spellName, prepared: 'Always' });
+                            }
+                        });
+                    }
                 }
                 if ((feature.type === 'free_spell' || feature.type === 'fey_reinforcements') && feature.spell) {
                     const spellNames = Array.isArray(feature.spell) ? feature.spell : [feature.spell];
@@ -242,12 +246,16 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
                         }
                     });
                 }
-                if (feature.type === 'psionic_spells_list' && feature.psionic_spells) {
-                    feature.psionic_spells.forEach(spellName => {
-                        if (!spellAbilities.spells.find(s => s.name === spellName)) {
-                            spellAbilities.spells.push({ name: spellName, prepared: 'Always' });
-                        }
-                    });
+                if (feature.type === 'psionic_spells_list' && feature.psionicSpells) {
+                    const majorFeatures = playerStats.class?.major?.features || [];
+                    const majorFeatureNames = majorFeatures.map(f => f.name);
+                    if (majorFeatureNames.includes(feature.name)) {
+                        feature.psionicSpells.forEach(spellName => {
+                            if (!spellAbilities.spells.find(s => s.name === spellName)) {
+                                spellAbilities.spells.push({ name: spellName, prepared: 'Always' });
+                            }
+                        });
+                    }
                 }
             });
 

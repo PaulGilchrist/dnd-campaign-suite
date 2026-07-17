@@ -166,18 +166,22 @@ export function getSpellAbilities(allSpells, playerStats) {
         if (playerStats.automation?.passives) {
             playerStats.automation.passives.forEach(passive => {
                 if (passive.type === 'passive_rule' && passive.effect === 'always_prepared_spells' && passive.spells) {
-                    passive.spells.forEach(spellName => {
-                        const knownSpell = spellAbilities.spells.find(s => s.name === spellName);
-                        if (knownSpell) {
-                            knownSpell.prepared = 'Always';
-                        } else {
-                            if(spellAbilities.spells_known) spellAbilities.spells_known += 1;
-                            spellAbilities.spells.push({
-                                name: spellName,
-                                prepared: 'Always'
-                            });
-                        }
-                    });
+                    const majorFeatures = playerStats.class?.major?.features || [];
+                    const majorFeatureNames = majorFeatures.map(f => f.name);
+                    if (majorFeatureNames.includes(passive.name)) {
+                        passive.spells.forEach(spellName => {
+                            const knownSpell = spellAbilities.spells.find(s => s.name === spellName);
+                            if (knownSpell) {
+                                knownSpell.prepared = 'Always';
+                            } else {
+                                if(spellAbilities.spells_known) spellAbilities.spells_known += 1;
+                                spellAbilities.spells.push({
+                                    name: spellName,
+                                    prepared: 'Always'
+                                });
+                            }
+                        });
+                    }
                 }
             });
         }

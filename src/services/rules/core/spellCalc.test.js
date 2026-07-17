@@ -508,6 +508,9 @@ describe('spellCalc', () => {
             subclass: null,
             class_levels: [],
             spell_casting_ability: 'Intelligence',
+            major: {
+              features: [{ name: 'Beguiling Magic' }],
+            },
           },
           spells: ['Fire Bolt'],
           spellsKnown: 3,
@@ -516,6 +519,7 @@ describe('spellCalc', () => {
               {
                 type: 'passive_rule',
                 effect: 'always_prepared_spells',
+                name: 'Beguiling Magic',
                 spells: ['Charm Person'],
               },
             ],
@@ -543,6 +547,9 @@ describe('spellCalc', () => {
             subclass: null,
             class_levels: [],
             spell_casting_ability: 'Intelligence',
+            major: {
+              features: [{ name: 'Magic User Spells' }],
+            },
           },
           spells: ['Fire Bolt'],
           automation: {
@@ -550,6 +557,7 @@ describe('spellCalc', () => {
               {
                 type: 'passive_rule',
                 effect: 'always_prepared_spells',
+                name: 'Magic User Spells',
                 spells: ['Magic Missile', 'Shield'],
               },
             ],
