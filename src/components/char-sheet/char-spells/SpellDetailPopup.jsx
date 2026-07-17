@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { sanitizeHtml } from '../../../services/ui/sanitize.js';
 import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js'
@@ -6,6 +6,8 @@ import { getOverchannelNecroticDamage } from '../../../services/automation/handl
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { addConcentration, breakConcentration } from '../../../services/combat/concentration/concentrationService.js';
 import * as storageService from '../../../services/ui/storage.js';
+import { isPsionicSpell, hasPsionicSorcery } from '../../../services/rules/spells/metamagicRules.js';
+import { addEntry } from '../../../services/ui/logService.js';
 
 function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, campaignName) {
   const naturalRecoveryFreeCast = getRuntimeValue(playerName, 'naturalRecoveryFreeCast');
@@ -217,7 +219,18 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
   const isUpcastable = !isCantrip && ((slotDmg && Object.keys(slotDmg).length > 1) || (healAtSlotLevel && Object.keys(healAtSlotLevel).length > 1));
 
   const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, spell.name, spell.level, playerStats, campaignName);
-  const hasAnySlots = isCantrip || freeCastAuthorized || upcastLevels.some(l => l.availableSlots > 0);
+
+  const _psionicSorceryAvailable = (() => {
+    const isSorcerer = playerStats.class?.name === 'Sorcerer';
+    if (!isSorcerer) return 0;
+    if (!isPsionicSpell(playerStats, spell.name)) return 0;
+    if (!hasPsionicSorcery(playerStats)) return 0;
+    if (isCantrip) return 0;
+    const currentSP = Number(getRuntimeValue(playerStats.name, 'sorceryPoints') ?? 0);
+    return currentSP;
+  })();
+
+  const hasAnySlots = isCantrip || freeCastAuthorized || upcastLevels.some(l => l.availableSlots > 0) || _psionicSorceryAvailable > 0;
 
   const isWarlock = playerStats.class?.name === 'Warlock';
   const hasPsychicSpells = playerStats.automation?.passives?.some(p => p.type === 'psychic_spells');
@@ -238,6 +251,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
   const [noVSComponents] = useState(isWarlock && hasPsychicSpells && isEnchantmentOrIllusion());
   const [noVComponents] = useState(hasImprovedIllusions && isIllusionSpell());
 
+  const [usePsionicPayment, setUsePsionicPayment] = useState(false);
   const [selectedUpcastLvl, setSelectedUpcastLvl] = useState(() => {
     const firstAvailable = upcastLevels.find(l => l.availableSlots > 0);
     return firstAvailable ? String(firstAvailable.level) : String(upcastLevels[0]?.level || spell.level);
@@ -308,9 +322,37 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
 
     let effectiveSpellLevel = spell.level;
 
+    // --- Psionic Sorcery: determine payment method ---
+    const isPsionic = isPsionicSpell(playerStats, spell.name);
+    const hasPsionic = hasPsionicSorcery(playerStats);
+    const isFreeCast = freeCastAuthorized;
+
+    if (isPsionic && hasPsionic && !isFreeCast) {
+      const currentSP = _psionicSorceryAvailable;
+      const upcastLevel = isUpcast ? Number(selectedUpcastLvl) : spell.level;
+
+      if (usePsionicPayment && currentSP >= upcastLevel) {
+        setRuntimeValue(playerStats.name, 'sorceryPoints', currentSP - upcastLevel, campaignName);
+        metaCtx.psionicSorcery = 'sorceryPoints';
+        metaCtx.psionicCost = upcastLevel;
+        effectiveSpellLevel = upcastLevel;
+        metaCtx._psionicUsed = true;
+        addEntry(campaignName, {
+          type: 'psionic_sorcery',
+          characterName: playerStats.name,
+          spellName: spell.name,
+          spellLevel: upcastLevel,
+          sorceryPointsSpent: upcastLevel,
+          note: 'Cast without Verbal or Somatic components. No Material components unless consumed or have cost.',
+          timestamp: Date.now(),
+        });
+      }
+    }
+    // --- End Psionic Sorcery ---
+
     if (isWgbSpell && spell.name === 'Spiritual Weapon') {
       cleanupBuffsByName(playerStats.name, 'Shield of Faith', campaignName);
-    } else if (isUpcast) {
+    } else if (isUpcast && !metaCtx._psionicUsed) {
       const upcastLevel = Number(selectedUpcastLvl);
       effectiveSpellLevel = upcastLevel;
       const slotKey = `spell_slots_level_${upcastLevel}`;
@@ -416,7 +458,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
           setRuntimeValue(playerStats.name, divUsedKey, true, campaignName);
         }
       }
-    } else {
+    } else if (!metaCtx._psionicUsed) {
       const spellSlotKey = `spell_slots_level_${spell.level}`;
       const currentSlots = getRuntimeValue(playerStats.name, spellSlotKey);
       const maxSlots = (playerStats.spellAbilities && playerStats.spellAbilities[spellSlotKey]) || 0;
@@ -486,7 +528,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
     const stored = getRuntimeValue(playerStats.name, baseKey);
     const max = (playerStats.spellAbilities && playerStats.spellAbilities[baseKey]) || 0;
     return (stored != null ? stored : max) > 0;
-  })())));
+  })())) || (_psionicSorceryAvailable >= (isUpcastable ? Number(selectedUpcastLvl) || spell.level : spell.level)));
 
   const showUpcastSelector = isUpcastable && upcastLevels.length > 1;
 
@@ -507,7 +549,14 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
               const baseKey = `spell_slots_level_${spell.level}`;
               const stored = getRuntimeValue(playerStats.name, baseKey);
               const max = (playerStats.spellAbilities && playerStats.spellAbilities[baseKey]) || 0;
-              return stored != null ? stored : max;
+              const slots = stored != null ? stored : max;
+              return slots > 0 ? `${slots} slot${slots !== 1 ? 's' : ''}` : slots;
+            })()}{!isCantrip && !showUpcastSelector && _psionicSorceryAvailable > 0 && (() => {
+              const baseKey = `spell_slots_level_${spell.level}`;
+              const stored = getRuntimeValue(playerStats.name, baseKey);
+              const max = (playerStats.spellAbilities && playerStats.spellAbilities[baseKey]) || 0;
+              const slots = stored != null ? stored : max;
+              return slots > 0 ? ` or ${_psionicSorceryAvailable} SP` : `${_psionicSorceryAvailable} SP`;
             })()}</span>
           )}
         </div>
@@ -517,6 +566,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
             {upcastLevels.map(({ level, formula, availableSlots }) => {
               const isSelected = selectedUpcastLvl === String(level);
               const resolvedFormula = formula.replace(/\bMOD\b/g, String(playerStats.spellAbilities?.modifier || 0));
+              const spCanCover = _psionicSorceryAvailable >= level;
               return (
                 <label
                   key={level}
@@ -528,16 +578,39 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
                     value={level}
                     checked={isSelected}
                     onChange={() => setSelectedUpcastLvl(String(level))}
-                    disabled={availableSlots <= 0}
+                    disabled={availableSlots <= 0 && !spCanCover}
                   />
                   <span className="spell-detail-upcast-level-number">Level {level}</span>
                   <span className="spell-detail-upcast-formula">{resolvedFormula}</span>
-                  <span className="spell-detail-upcast-slots">{availableSlots} slot{availableSlots !== 1 ? 's' : ''}</span>
+                  <span className="spell-detail-upcast-slots">{availableSlots > 0 ? `${availableSlots} slot${availableSlots !== 1 ? 's' : ''}` : ''}{availableSlots > 0 && spCanCover ? ' or ' : ''}{spCanCover ? `${_psionicSorceryAvailable} SP` : ''}</span>
                 </label>
               );
             })}
           </div>
         )}
+        {(() => {
+          const upcastLevel = isUpcastable ? (Number(selectedUpcastLvl) || spell.level) : spell.level;
+          const slotKey = `spell_slots_level_${upcastLevel}`;
+          const currentSlots = getRuntimeValue(playerStats.name, slotKey);
+          const maxSlots = (playerStats.spellAbilities && playerStats.spellAbilities[slotKey]) || 0;
+          const availableSlots = currentSlots != null ? currentSlots : maxSlots;
+          const showBoth = _psionicSorceryAvailable > 0 && availableSlots > 0;
+          const isPsionic = isPsionicSpell(playerStats, spell.name);
+          const hasPsionic = hasPsionicSorcery(playerStats);
+          if (!isPsionic || !hasPsionic || isCantrip || freeCastAuthorized || !showBoth) return null;
+          return (
+            <div className="spell-detail-upcast">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={usePsionicPayment}
+                  onChange={() => setUsePsionicPayment(!usePsionicPayment)}
+                />
+                <span>Use Sorcery Points ({upcastLevel} SP) instead of spell slot</span>
+              </label>
+            </div>
+          );
+        })()}
         {canChangeDamageType && (
           <div className="spell-detail-upcast">
             <label>

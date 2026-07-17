@@ -1,0 +1,91 @@
+.psionic-choice-popup {
+  max-width: 480px;
+  width: 90%;
+}
+
+.psionic-choice-inner {
+  padding: 20px;
+}
+
+.psionic-choice-inner h3 {
+  margin: 0 0 10px 0;
+  color: var(--color-header);
+  font-size: 1.3em;
+}
+
+.psionic-choice-inner h3 i {
+  margin-right: 8px;
+}
+
+.psionic-choice-spell {
+  margin: 0 0 6px 0;
+  font-size: 1.05em;
+  color: var(--color-text);
+}
+
+.psionic-choice-description {
+  margin: 0 0 14px 0;
+  font-size: 0.9em;
+  color: var(--color-text-secondary, var(--color-text));
+  line-height: 1.4;
+}
+
+.psionic-choice-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.psionic-choice-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color-input, #ccc);
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--background-color-surface, #fafafa);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.psionic-choice-option:hover {
+  background: var(--background-color-card-hover, #f0f0f0);
+}
+
+.psionic-choice-option-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.psionic-choice-option-icon {
+  font-size: 1.1em;
+  color: var(--color-text-muted);
+  padding-top: 1px;
+  width: 24px;
+  text-align: center;
+}
+
+.psionic-choice-option-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.psionic-choice-option-name {
+  font-weight: 600;
+  font-size: 0.95em;
+  color: var(--color-text);
+}
+
+.psionic-choice-option-cost {
+  font-size: 0.85em;
+  color: var(--color-text-secondary, #555);
+  white-space: nowrap;
+}
+
+.psionic-choice-option-desc {
+  font-size: 0.85em;
+  color: var(--color-text-secondary, #777);
+}

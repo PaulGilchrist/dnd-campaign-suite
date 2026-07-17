@@ -137,6 +137,9 @@ export function getPsionicSpellsList(playerStats) {
         if (passive.type === 'psionic_spells_list' && Array.isArray(passive.psionicSpells)) {
             return passive.psionicSpells;
         }
+        if (passive.type === 'psionic_sorcery' && Array.isArray(passive.psionicSpells)) {
+            return passive.psionicSpells;
+        }
     }
     return [];
 }
