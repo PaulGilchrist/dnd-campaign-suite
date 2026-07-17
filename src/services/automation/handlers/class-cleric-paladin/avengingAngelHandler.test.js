@@ -43,10 +43,25 @@ vi.mock('../../../ui/storage.js', () => ({
   },
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+  isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
+vi.mock('../../../../hooks/useAllySelection.js', () => ({
+  getAllyList: vi.fn().mockReturnValue([]),
+}));
+
+vi.mock('../../../automation/common/savePrompt.js', () => ({
+  createSaveListener: vi.fn().mockReturnValue({
+    promptId: 'test-prompt-id',
+    promise: Promise.resolve({ success: false, roll: 12, total: 15 }),
+  }),
+}));
+
 import {
   handle,
   isAuraTarget,
-  removeFrightenedOnDamage,
+  cleanupAuraTargetOnDamage,
 } from './avengingAngelHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
@@ -56,6 +71,9 @@ import { rollD20 } from '../../../dice/diceRoller.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 import { sendSaveResult } from '../../../combat/conditions/savePromptService.js';
 import utils from '../../../ui/utils.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
+import { getAllyList } from '../../../../hooks/useAllySelection.js';
+import { createSaveListener } from '../../../automation/common/savePrompt.js';
 
 const campaignName = 'TestCampaign';
 
@@ -277,7 +295,83 @@ describe('avengingAngelHandler.handle', () => {
     });
   });
 
+  describe('Frightful Aura - ally filtering', () => {
+    it('should skip creatures in the ally list', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'avengingAngelActive') return false;
+        if (key === 'activeBuffs') return [];
+        return null;
+      });
+      getAllyList.mockReturnValue(['FriendlyNPC']);
+      getCombatContext.mockResolvedValue({
+        creatures: [
+          { name: 'FriendlyNPC', type: 'npc', saveBonuses: { wis: 0 }, conditions: [] },
+          { name: 'EnemyNPC', type: 'npc', saveBonuses: { wis: 0 }, conditions: [] },
+        ],
+      });
+      rollD20.mockReturnValue(1);
+      getAbilityModifier.mockReturnValue(3);
+      utils.guid.mockReturnValue('test-guid');
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(sendSaveResult).not.toHaveBeenCalledWith(campaignName, 'FriendlyNPC', expect.anything());
+      expect(sendSaveResult).toHaveBeenCalledWith(campaignName, 'EnemyNPC', expect.anything());
+    });
+  });
+
+  describe('Frightful Aura - range filtering', () => {
+    it('should skip creatures beyond 30 ft aura range', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'avengingAngelActive') return false;
+        if (key === 'activeBuffs') return [];
+        return null;
+      });
+      getCombatContext.mockResolvedValue({
+        creatures: [
+          { name: 'CloseEnemy', type: 'npc', saveBonuses: { wis: 0 }, conditions: [] },
+          { name: 'FarEnemy', type: 'npc', saveBonuses: { wis: 0 }, conditions: [] },
+        ],
+      });
+      isWithinRange.mockImplementation(async (source, target) => target === 'CloseEnemy');
+      rollD20.mockReturnValue(1);
+      getAbilityModifier.mockReturnValue(3);
+      utils.guid.mockReturnValue('test-guid');
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(sendSaveResult).toHaveBeenCalledWith(campaignName, 'CloseEnemy', expect.anything());
+      expect(sendSaveResult).not.toHaveBeenCalledWith(campaignName, 'FarEnemy', expect.anything());
+    });
+
+    it('should skip creatures at the edge if out of range', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'avengingAngelActive') return false;
+        if (key === 'activeBuffs') return [];
+        return null;
+      });
+      getCombatContext.mockResolvedValue({
+        creatures: [
+          { name: 'Goblin', type: 'npc', saveBonuses: { wis: 0 }, conditions: [] },
+        ],
+      });
+      isWithinRange.mockResolvedValue(false);
+      rollD20.mockReturnValue(20);
+      getAbilityModifier.mockReturnValue(3);
+      utils.guid.mockReturnValue('test-guid');
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(sendSaveResult).not.toHaveBeenCalled();
+      expect(addExpiration).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Frightful Aura - NPC handling', () => {
+    beforeEach(() => {
+      getAllyList.mockReturnValue([]);
+      isWithinRange.mockResolvedValue(true);
+    });
     it('should apply frightened and addExpiration when NPC fails save', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'avengingAngelActive') return false;
@@ -360,7 +454,11 @@ describe('avengingAngelHandler.handle', () => {
   });
 
   describe('Frightful Aura - player creature handling', () => {
-    it('should send save prompt for player-type creatures', async () => {
+    beforeEach(() => {
+      getAllyList.mockReturnValue([]);
+      isWithinRange.mockResolvedValue(true);
+    });
+    it('should use createSaveListener for player-type creatures', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'avengingAngelActive') return false;
         if (key === 'activeBuffs') return [];
@@ -368,7 +466,7 @@ describe('avengingAngelHandler.handle', () => {
       });
       getCombatContext.mockResolvedValue({
         creatures: [
-          { name: 'Ally', type: 'player' },
+          { name: 'EnemyPlayer', type: 'player' },
         ],
       });
       rollD20.mockReturnValue(20);
@@ -377,15 +475,16 @@ describe('avengingAngelHandler.handle', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(sendSaveResult).toHaveBeenCalledWith(campaignName, 'Ally', expect.objectContaining({
-        success: false,
-        roll: 0,
+      expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        targetName: 'EnemyPlayer',
+        saveType: 'WIS',
+        saveDc: 14,
+        dcSuccess: false,
       }));
+      expect(sendSaveResult).not.toHaveBeenCalled();
     });
-  });
 
-  describe('Frightful Aura - storage', () => {
-    it('should store only failed NPCs and player creatures, not successful NPCs', async () => {
+    it('should apply condition and add to aura targets when player fails save', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'avengingAngelActive') return false;
         if (key === 'activeBuffs') return [];
@@ -393,9 +492,49 @@ describe('avengingAngelHandler.handle', () => {
       });
       getCombatContext.mockResolvedValue({
         creatures: [
+          { name: 'EnemyPlayer', type: 'player' },
+        ],
+      });
+      rollD20.mockReturnValue(20);
+      getAbilityModifier.mockReturnValue(3);
+      utils.guid.mockReturnValue('test-guid');
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      // Wait for the async save result handler
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      expect(addExpiration).toHaveBeenCalledWith(
+        'TestPaladin',
+        'EnemyPlayer',
+        expect.any(Array),
+        campaignName,
+      );
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'save_result',
+        targetName: 'EnemyPlayer',
+        success: false,
+      }));
+    });
+  });
+
+  describe('Frightful Aura - storage', () => {
+    beforeEach(() => {
+      getAllyList.mockReturnValue([]);
+      isWithinRange.mockResolvedValue(true);
+    });
+    it('should store only failed NPCs, not successful NPCs or allies', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'avengingAngelActive') return false;
+        if (key === 'activeBuffs') return [];
+        return null;
+      });
+      getAllyList.mockReturnValue(['Ally']);
+      getCombatContext.mockResolvedValue({
+        creatures: [
           { name: 'Goblin1', type: 'npc', saveBonuses: { wis: 0 }, conditions: [] },
           { name: 'Goblin2', type: 'npc', saveBonuses: { wis: 20 }, conditions: [] },
-          { name: 'Ally', type: 'player' },
+          { name: 'Ally', type: 'npc', conditions: [] },
         ],
       });
       rollD20.mockReturnValue(1);
@@ -404,8 +543,8 @@ describe('avengingAngelHandler.handle', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      // Goblin1 fails (1+0 < 14), Goblin2 succeeds (1+20 >= 14), Ally is player (always stored)
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', ['Goblin1', 'Ally'], campaignName);
+      // Goblin1 fails (1+0 < 14), Goblin2 succeeds (1+20 >= 14), Ally is in ally list (skipped)
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', ['Goblin1'], campaignName);
     });
   });
 });
@@ -421,7 +560,7 @@ describe('avengingAngelHandler.isAuraTarget', () => {
   });
 });
 
-describe('avengingAngelHandler.removeFrightenedOnDamage', () => {
+describe('avengingAngelHandler.cleanupAuraTargetOnDamage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getRuntimeValue.mockReset();
@@ -429,38 +568,44 @@ describe('avengingAngelHandler.removeFrightenedOnDamage', () => {
     setRuntimeValue.mockReset();
   });
 
-  it('should remove frightened and clear from aura targets', async () => {
+  it('should clean up aura targets list when target is present', async () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'avengingAngelAuraTargets') return ['Goblin'];
-      if (key === 'activeConditions') return ['frightened', 'blinded', 'poisoned'];
       return null;
     });
-    getCombatContext.mockResolvedValue({
-      creatures: [{
-        name: 'Goblin',
-        conditions: [{ key: 'frightened' }, { key: 'blinded' }, { key: 'poisoned' }],
-      }],
-    });
 
-    await removeFrightenedOnDamage('TestPaladin', 'Goblin', campaignName);
+    await cleanupAuraTargetOnDamage('TestPaladin', 'Goblin', campaignName);
 
-    expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', ['blinded', 'poisoned'], campaignName);
     expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
+    expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      type: 'condition',
+      action: 'removed',
+      characterName: 'Goblin',
+      condition: 'Frightened',
+      reason: 'took damage (Frightful Aura)',
+    }));
   });
 
   it('should remove target from aura targets list preserving others', async () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'avengingAngelAuraTargets') return ['Goblin1', 'Goblin2', 'Goblin3'];
-      if (key === 'activeConditions') return ['frightened'];
       return null;
     });
-    getCombatContext.mockResolvedValue({
-      creatures: [{ name: 'Goblin2', conditions: [{ key: 'frightened' }] }],
-    });
 
-    await removeFrightenedOnDamage('TestPaladin', 'Goblin2', campaignName);
+    await cleanupAuraTargetOnDamage('TestPaladin', 'Goblin2', campaignName);
 
     expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', ['Goblin1', 'Goblin3'], campaignName);
   });
-});
 
+  it('should be a no-op when target is not in aura targets', async () => {
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'avengingAngelAuraTargets') return ['Goblin1', 'Goblin3'];
+      return null;
+    });
+
+    await cleanupAuraTargetOnDamage('TestPaladin', 'Goblin2', campaignName);
+
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
+  });
+});

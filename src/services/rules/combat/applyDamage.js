@@ -17,6 +17,7 @@ import { checkUndyingSentinel } from '../../rules/features/undyingSentinelServic
 import { checkBoonOfRecoveryLastStand } from '../../rules/features/boonOfRecoveryService.js';
 import { checkRelentlessEndurance } from '../../rules/features/relentlessEnduranceService.js';
 import { checkRelentlessRage } from '../../rules/features/relentlessRageService.js';
+import { isActive as isAvengingAngelActive, cleanupAuraTargetOnDamage } from '../../automation/handlers/class-cleric-paladin/avengingAngelHandler.js';
 
 // Tracks which multi-attack sequences have already triggered Relentless Endurance.
 // Prevents follow-up hits in the same sequence from re-killing the character.
@@ -352,10 +353,21 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
         }
      }
 
-     checkHolyAuraDamage(creature, attackerName, combatSummary, campaignName, wardDamage);
-    }
+      checkHolyAuraDamage(creature, attackerName, combatSummary, campaignName, wardDamage);
+     }
 
-   const wasAlive = oldHp > 0;
+     // Clean up Avenging Angel Frightful Aura tracking list when a creature takes damage
+     if (wardDamage > 0 && characters?.length) {
+         for (const char of characters) {
+             if (isAvengingAngelActive(char.name, campaignName)) {
+                 cleanupAuraTargetOnDamage(char.name, creature.name, campaignName).catch(e => {
+                     console.error('[applyDamage] Avenging Angel aura cleanup failed:', e);
+                 });
+             }
+         }
+     }
+
+    const wasAlive = oldHp > 0;
    const isNowUnconscious = newHp <= 0;
 
    if (!options?.skipConcentration && creature.concentration && (actualDamageTaken > 0 || options?.concentrationTotalDamage > 0)) {

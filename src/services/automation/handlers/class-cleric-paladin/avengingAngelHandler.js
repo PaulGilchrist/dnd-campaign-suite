@@ -7,10 +7,14 @@ import { rollD20 } from '../../../dice/diceRoller.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 import { sendSaveResult } from '../../../combat/conditions/savePromptService.js';
 import utils from '../../../ui/utils.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
+import { getAllyList } from '../../../../hooks/useAllySelection.js';
+import { createSaveListener } from '../../../automation/common/savePrompt.js';
 
 const AVENGING_ANGEL_KEY = 'avengingAngelActive';
 const AVENGING_ANGEL_AURA_KEY = 'avengingAngelAuraTargets';
 const AVENGING_ANGEL_REST_KEY = 'avengingAngelRestUsed';
+const AURA_RANGE_FT = 30;
 
 function buildSaveDc(playerStats) {
     const chaBonus = getAbilityModifier(playerStats.abilities, 'Charisma');
@@ -145,15 +149,18 @@ async function resolveFrightfulAura(action, playerStats, campaignName) {
     const combatSummary = await getCombatContext(campaignName);
     if (!combatSummary || !combatSummary.creatures) return;
 
+    const allies = getAllyList(playerName);
     const auraTargets = [];
     const npcResults = [];
-    const playerPrompts = [];
+    const pendingPlayerSaves = [];
 
     for (const creature of combatSummary.creatures) {
         if (creature.name === playerName) continue;
+        if (allies.includes(creature.name)) continue;
 
-        // Check if creature is in aura range (no map = all in range)
-        // For now, apply to all non-self creatures (range check handled by aura context)
+        const inRange = await isWithinRange(playerName, creature.name, AURA_RANGE_FT);
+        if (!inRange) continue;
+
         const isNpc = !creature.type || creature.type === 'npc';
 
         if (isNpc) {
@@ -172,11 +179,9 @@ async function resolveFrightfulAura(action, playerStats, campaignName) {
             });
 
             if (!success) {
-                // Apply frightened condition
                 await applyFrightenedToCreature(creature.name, saveDc, campaignName);
                 auraTargets.push(creature.name);
 
-                // Add expiration - 1 minute (10 rounds) or until taking damage
                 addExpiration(playerName, creature.name, [
                     { type: 'frightened', condition: 'frightened' },
                     { type: 'avenging_angel_aura' },
@@ -185,22 +190,54 @@ async function resolveFrightfulAura(action, playerStats, campaignName) {
 
             npcResults.push({ targetName: creature.name, success, roll: roll1, total, saveBonus });
         } else {
-            // Player - send save prompt
-            const promptId = utils.guid();
-            sendSaveResult(campaignName, creature.name, {
-                promptId,
-                success: false,
-                roll: 0,
-                total: 0,
-                saveBonus: 0,
-                rawRolls: [],
+            const { promptId, promise } = createSaveListener(campaignName, {
+                targetName: creature.name,
+                saveType: 'WIS',
+                saveDc,
+                dcSuccess: false,
             });
-            playerPrompts.push({ promptId, targetName: creature.name });
-            auraTargets.push(creature.name);
+
+            promise.then((result) => {
+                if (result.success === false) {
+                    applyFrightenedToCreature(creature.name, saveDc, campaignName);
+
+                    addExpiration(playerName, creature.name, [
+                        { type: 'frightened', condition: 'frightened' },
+                        { type: 'avenging_angel_aura' },
+                    ], campaignName);
+
+                    const currentTargets = getRuntimeValue(playerName, AVENGING_ANGEL_AURA_KEY, campaignName) || [];
+                    const newTargets = currentTargets.includes(creature.name)
+                        ? currentTargets
+                        : [...currentTargets, creature.name];
+                    setRuntimeValue(playerName, AVENGING_ANGEL_AURA_KEY, newTargets, campaignName);
+
+                    addEntry(campaignName, {
+                        type: 'save_result',
+                        characterName: playerName,
+                        targetName: creature.name,
+                        saveDc,
+                        saveType: 'WIS',
+                        success: false,
+                        description: `${creature.name} failed WIS save. Frightened by Frightful Aura for 1 minute or until taking damage.`,
+                    }).catch((e) => { console.error("[avengingAngel] Error:", e); });
+                } else {
+                    addEntry(campaignName, {
+                        type: 'save_result',
+                        characterName: playerName,
+                        targetName: creature.name,
+                        saveDc,
+                        saveType: 'WIS',
+                        success: true,
+                        description: `${creature.name} succeeded on WIS save against Frightful Aura.`,
+                    }).catch((e) => { console.error("[avengingAngel] Error:", e); });
+                }
+            }).catch((e) => { console.error("[avengingAngel] Error handling player save result:", e); });
+
+            pendingPlayerSaves.push({ promptId, targetName: creature.name });
         }
     }
 
-    // Store affected targets for the aura
     await setRuntimeValue(playerName, AVENGING_ANGEL_AURA_KEY, auraTargets, campaignName);
 }
 
@@ -211,13 +248,6 @@ async function applyFrightenedToCreature(targetName, saveDc, campaignName) {
     setRuntimeValue(targetName, 'activeConditions', [...conditions, 'frightened'], campaignName);
 }
 
-export async function handleSaveResult(event) {
-    const detail = event.detail;
-    if (!detail || !detail.promptId) return;
-
-    // This is a placeholder for handling player save results
-    // The actual handling is done in SetConditionModal pattern
-}
 
 /**
  * Check if a creature is affected by the Avenging Angel Frightful Aura.
@@ -236,20 +266,22 @@ export function isActive(playerName, campaignName) {
 }
 
 /**
- * Remove Frightened condition from aura targets when they take damage.
+ * Clean up the Avenging Angel Frightful Aura tracking list when a creature takes damage.
+ * The actual Frightened condition removal is handled by the generic code in applyDamage.js.
  */
-export async function removeFrightenedOnDamage(playerName, targetName, campaignName) {
+export async function cleanupAuraTargetOnDamage(playerName, targetName, campaignName) {
     const auraTargets = getRuntimeValue(playerName, AVENGING_ANGEL_AURA_KEY, campaignName) || [];
     if (!auraTargets.includes(targetName)) return;
 
-    // Remove frightened condition from the target
-    const conditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'frightened');
-    if (filtered.length !== conditions.length) {
-        setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
-    }
-
-    // Remove from aura targets
     const newTargets = auraTargets.filter(t => t !== targetName);
     await setRuntimeValue(playerName, AVENGING_ANGEL_AURA_KEY, newTargets, campaignName);
+
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'removed',
+        characterName: targetName,
+        condition: 'Frightened',
+        reason: 'took damage (Frightful Aura)',
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[avengingAngel] Error:", e); });
 }

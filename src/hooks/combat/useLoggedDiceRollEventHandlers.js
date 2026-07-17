@@ -335,8 +335,6 @@ export function setupEventListeners(deps) {
             const setPopupHtml = getPendingPopupSetter(e.detail.promptId);
             if (setPopupHtml) {
                 setPopupHtml(popupData);
-            } else {
-                console.error('[save-result] NO setPopupHtml found! promptId=', e.detail.promptId, 'pending keys=', Object.keys(pending));
             }
         });
 
