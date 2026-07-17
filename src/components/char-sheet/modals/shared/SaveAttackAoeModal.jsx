@@ -2,10 +2,11 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { rollExpression } from '../../../../services/dice/diceRoller.js';
 import { resolveScaling } from '../../../../services/combat/automation/automationExpressions.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { sendSavePrompt, sendSaveResult } from '../../../../services/combat/conditions/savePromptService.js';
+import { sendSavePrompt } from '../../../../services/combat/conditions/savePromptService.js';
 import { applyDamageToTarget, computeDamageAfterSave, computeDamageAfterResistancesWithDetails } from '../../../../services/rules/combat/applyDamage.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
+import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { renderTargetList, persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
@@ -22,12 +23,17 @@ function SaveAttackAoeModal({
     saveDc,
     dcSuccess,
     activeOverlay,
+    metamagicCareful,
     onClose,
 }) {
     const [summary, setSummary] = useState(null);
     const [selected, setSelected] = useState(new Set());
     const [pendingPrompts, setPendingPrompts] = useState([]);
     const [results, setResults] = useState([]);
+
+    const isCarefulSpell = metamagicCareful || false;
+    const allyList = isCarefulSpell ? getAllyList(playerStats.name) : null;
+    const isCarefulAlly = useCallback((name) => allyList ? allyList.includes(name) : false, [allyList]);
 
     useEffect(() => {
         return () => {
@@ -63,6 +69,8 @@ function SaveAttackAoeModal({
             const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
 
             if (isNpc) {
+                const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
+
                 const saveRoll = Math.floor(Math.random() * 20) + 1;
                 const saveTotal = saveRoll + saveBonus;
                 const success = saveTotal >= saveDc;
@@ -74,44 +82,39 @@ function SaveAttackAoeModal({
                 const resistances = targetCreature?.resistances || [];
                 const immunities = targetCreature?.immunities || [];
                 const resResult = computeDamageAfterResistancesWithDetails(damageAfterSave, [damageType], resistances, immunities, false);
-                const finalDamage = resResult.finalDamage;
+                let finalDamage = resResult.finalDamage;
 
-                sendSaveResult(campaignName, targetName, {
-                    promptId: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-                    success,
-                    roll: saveRoll,
-                    total: saveTotal,
-                    saveBonus,
-                    rawRolls: [saveRoll, saveRoll],
-                });
-
-                addEntry(campaignName, {
-                    type: 'roll',
-                    characterName: playerStats.name,
-                    rollType: 'save-damage',
-                    name: action.name,
-                    formula: resolvedDamage,
-                    rolls: damageRoll?.rolls ?? [],
-                    total: rawDamage,
-                    modifier: damageRoll?.modifier ?? 0,
-                    damageType: damageType,
-                    targetName,
-                    saveType: saveType,
-                    saveDc: saveDc,
-                    dcSuccess: dcSuccess,
-                    saveResult: success ? 'success' : 'failure',
-                    saveRoll: saveRoll,
-                    saveBonus,
-                    saveRawRolls: [saveRoll, saveRoll],
-                    finalDamage: finalDamage,
-                    timestamp: Date.now(),
-                }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging save:', e); });
+                if (carefulSpellProtected) {
+                    finalDamage = 0;
+                }
 
                 if (finalDamage > 0) {
                     applyDamageToTarget(
                         combatSummary, targetName, finalDamage, [damageType],
                         campaignName, characters, true, playerStats.name, false
                     );
+
+                    addEntry(campaignName, {
+                        type: 'roll',
+                        characterName: playerStats.name,
+                        rollType: 'save-damage',
+                        name: action.name,
+                        formula: resolvedDamage,
+                        rolls: damageRoll?.rolls ?? [],
+                        total: rawDamage,
+                        modifier: damageRoll?.modifier ?? 0,
+                        damageType: damageType,
+                        targetName,
+                        saveType: saveType,
+                        saveDc: saveDc,
+                        dcSuccess: dcSuccess,
+                        saveResult: success ? 'success' : 'failure',
+                        saveRoll: saveRoll,
+                        saveBonus,
+                        saveRawRolls: [saveRoll, saveRoll],
+                        finalDamage: finalDamage,
+                        timestamp: Date.now(),
+                    }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging save:', e); });
                 }
 
                 results.push({
@@ -124,32 +127,51 @@ function SaveAttackAoeModal({
                     finalDamage,
                 });
             } else {
-                const promptId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-                const scalingEntry = resolveScaling(playerStats, action.automation?.scaling);
-                const resolvedDamage = scalingEntry?.damage || damage;
-                const damageRoll = rollExpression(resolvedDamage);
-                const rawDamage = damageRoll?.total ?? 0;
+                const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
 
-                sendSavePrompt(campaignName, {
-                    promptId,
-                    targetName,
-                    saveType: saveType,
-                    saveDc: saveDc,
-                    sourceName: playerStats.name,
-                    rawDamage,
-                });
+                if (carefulSpellProtected) {
+                    applyDamageToTarget(
+                        combatSummary, targetName, 0, [damageType],
+                        campaignName, characters, true, playerStats.name, false
+                    );
 
-                const existingPrompts = getRuntimeValue(campaignName, 'pendingSaveListenerPrompts') || new Set();
-                existingPrompts.add(promptId);
-                setRuntimeValue(campaignName, 'pendingSaveListenerPrompts', existingPrompts, campaignName);
+                    results.push({
+                        targetName,
+                        success: true,
+                        roll: null,
+                        total: 0,
+                        saveBonus: 0,
+                        rawDamage: 0,
+                        finalDamage: 0,
+                    });
+                } else {
+                    const promptId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+                    const scalingEntry = resolveScaling(playerStats, action.automation?.scaling);
+                    const resolvedDamage = scalingEntry?.damage || damage;
+                    const damageRoll = rollExpression(resolvedDamage);
+                    const rawDamage = damageRoll?.total ?? 0;
 
-                prompts.push({ promptId, targetName });
+                    sendSavePrompt(campaignName, {
+                        promptId,
+                        targetName,
+                        saveType: saveType,
+                        saveDc: saveDc,
+                        sourceName: playerStats.name,
+                        rawDamage,
+                    });
+
+                    const existingPrompts = getRuntimeValue(campaignName, 'pendingSaveListenerPrompts') || new Set();
+                    existingPrompts.add(promptId);
+                    setRuntimeValue(campaignName, 'pendingSaveListenerPrompts', existingPrompts, campaignName);
+
+                    prompts.push({ promptId, targetName });
+                }
             }
         }
 
         persistAndNotify(combatSummary, campaignName);
         return { results, prompts };
-    }, [campaignName, action.name, action.automation?.scaling, playerStats, damage, damageType, dcSuccess, saveDc, saveType]);
+    }, [campaignName, action.name, action.automation?.scaling, playerStats, damage, damageType, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly]);
 
     const handleSaveResult = useCallback((event, ctx) => {
         const detail = event.detail;
@@ -169,23 +191,23 @@ function SaveAttackAoeModal({
         const resolvedDamage = scalingEntry?.damage || damage;
         const damageRoll = rollExpression(resolvedDamage);
 
-        addEntry(campaignName, {
-            type: 'roll',
-            characterName: playerStats.name,
-            rollType: 'save-damage',
-            name: action.name,
-            targetName,
-            saveDc: saveDc,
-            saveType: saveType,
-            saveResult: success ? 'success' : 'failure',
-            total: detail.total ?? 0,
-            rolls: [detail.roll ?? 0],
-            bonus: saveBonus,
-            formula: `1d20${saveBonus !== 0 ? '+' + saveBonus : ''}`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging player save:', e); });
-
         if (finalDamage > 0) {
+            addEntry(campaignName, {
+                type: 'roll',
+                characterName: playerStats.name,
+                rollType: 'save-damage',
+                name: action.name,
+                targetName,
+                saveDc: saveDc,
+                saveType: saveType,
+                saveResult: success ? 'success' : 'failure',
+                total: detail.total ?? 0,
+                rolls: [detail.roll ?? 0],
+                bonus: saveBonus,
+                formula: `1d20${saveBonus !== 0 ? '+' + saveBonus : ''}`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging player save:', e); });
+
             const combatSummary = getCombatSummary(campaignName);
             const characters = combatSummary?.creatures?.filter(c => c.type === 'player') || [];
             applyDamageToTarget(
@@ -272,8 +294,13 @@ function SaveAttackAoeModal({
 
     const eligibleTargets = React.useMemo(() => {
         if (!combatSummary?.creatures) return [];
-        return combatSummary.creatures.filter(c => c.name !== playerStats.name);
-    }, [combatSummary, playerStats.name]);
+        return combatSummary.creatures
+            .filter(c => c.name !== playerStats.name)
+            .map(c => ({
+                ...c,
+                carefulSpellProtected: isCarefulSpell && isCarefulAlly(c.name),
+            }));
+    }, [combatSummary, playerStats.name, isCarefulSpell, isCarefulAlly]);
 
     const getCreatureTargets = () => {
         return eligibleTargets.map(c => ({
@@ -281,6 +308,7 @@ function SaveAttackAoeModal({
             type: c.type,
             currentHp: c.currentHp,
             maxHp: c.maxHp,
+            carefulSpellProtected: c.carefulSpellProtected,
         }));
     };
 
@@ -331,7 +359,8 @@ function SaveAttackAoeModal({
                     <p>Select creatures in the area of effect. Each must make a <strong>{saveType}</strong> saving throw (DC {saveDc}).</p>
                     <p className="sp-note">On a failed save, target takes {damage} {damageType} damage. On a successful save, target takes half damage.</p>
                     <p className="sp-note">Targets selected: {ctx.selected.size}/{ctx.eligibleTargets.length}</p>
-                    {renderTargetList({ eligibleTargets: ctx.eligibleTargets, selected: ctx.selected, toggleTarget: ctx.toggleTarget })}
+                    {metamagicCareful && renderTargetList({ eligibleTargets: ctx.eligibleTargets, selected: ctx.selected, toggleTarget: ctx.toggleTarget, isCarefulAlly: ctx.isCarefulAlly })}
+                    {!metamagicCareful && renderTargetList({ eligibleTargets: ctx.eligibleTargets, selected: ctx.selected, toggleTarget: ctx.toggleTarget })}
                 </>
             );
         }

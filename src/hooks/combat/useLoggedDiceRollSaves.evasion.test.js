@@ -130,7 +130,7 @@ describe('createSaves (useLoggedDiceRollSaves) - Evasion & Shields', () => {
                 0,
                 ['fire'],
                 'test-campaign',
-                null,
+                expect.any(Array),
                 false,
                 'TestWizard'
             );
@@ -256,7 +256,7 @@ describe('createSaves (useLoggedDiceRollSaves) - Evasion & Shields', () => {
                 7,
                 ['fire'],
                 'test-campaign',
-                null,
+                expect.any(Array),
                 false,
                 'TestWizard'
             );
@@ -294,7 +294,7 @@ describe('createSaves (useLoggedDiceRollSaves) - Evasion & Shields', () => {
                 0,
                 ['lightning'],
                 'test-campaign',
-                null,
+                expect.any(Array),
                 false,
                 'TestWizard'
             );

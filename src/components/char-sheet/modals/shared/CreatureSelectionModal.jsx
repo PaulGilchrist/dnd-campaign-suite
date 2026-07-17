@@ -73,6 +73,9 @@ export default function CreatureSelectionModal({
                                             </span>
                                         )}
                                     </span>
+                                    {target.carefulSpellProtected && (
+                                        <span className="sp-note" style={{ fontSize: '0.85em', color: '#4ade80', marginLeft: '4px' }}>✓ Careful Spell protected</span>
+                                    )}
                                 </label>
                             );
                         })}

@@ -71,6 +71,9 @@ function handleModalResult(popup, setModalState) {
         case 'massHealingWordTarget':
             setModalState({ massHealingWordModal: payload });
             break;
+        case 'saveAttackAoe':
+            setModalState({ saveAttackAoeModal: payload });
+            break;
         default:
             console.error(`[useSpellCastExecutor] Unknown modalName from spell cast: ${modalName}`);
     }

@@ -232,7 +232,8 @@ export function createSaves(deps) {
             }
         }
         const ignoreResistance = (pending.playerStats && hasIgnoreResistance(pending.playerStats, pending.damageType)) || false;
-        const applyResult = applyDamageToTarget(combatSummary, pending.targetName, finalDamage, [pending.damageType], campaignName, null, ignoreResistance, pending.attackerName || characterName);
+        const allCharacters = charactersRef.current || [];
+        const applyResult = applyDamageToTarget(combatSummary, pending.targetName, finalDamage, [pending.damageType], campaignName, allCharacters, ignoreResistance, pending.attackerName || characterName);
 
         delete pendingSaves[promptId];
 

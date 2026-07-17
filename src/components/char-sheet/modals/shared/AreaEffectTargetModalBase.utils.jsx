@@ -2,7 +2,7 @@ import { addEntry } from '../../../../services/ui/logService.js';
 import storage from '../../../../services/ui/storage.js';
 import { setCombatSummaryCache } from '../../../../services/encounters/combatData.js';
 
-export function renderTargetList({ eligibleTargets, selected, toggleTarget }) {
+export function renderTargetList({ eligibleTargets, selected, toggleTarget, _isCarefulAlly }) {
   return (
     <div className="abjure-targets-list">
       {eligibleTargets.map(c => (
@@ -14,6 +14,7 @@ export function renderTargetList({ eligibleTargets, selected, toggleTarget }) {
           />
           <span className="abjure-target-name">{c.name}</span>
           <span className="abjure-target-type">({c.type})</span>&nbsp;&nbsp;
+          {c.carefulSpellProtected && <span className="sp-note" style={{ fontSize: '0.85em', color: '#4ade80' }}>✓ Careful Spell protected</span>}
         </label>
       ))}
       {eligibleTargets.length === 0 && (

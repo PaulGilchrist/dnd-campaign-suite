@@ -689,6 +689,67 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         } catch (e) {
             console.error('[spellCast] Soulstitch Spells trigger failed:', e);
         }
+
+        // AoE spells without dedicated automation: show modal for creature selection
+        const aoe = spell.area_of_effect;
+        const aoeShape = aoe?.shape || aoe?.type;
+        const isAreaShape = aoeShape ? ['emanation','cone','line','sphere','cube','cylinder','square','circle','wall','cage','floor','area'].includes(String(aoeShape).toLowerCase()) : false;
+
+        if (isAreaShape) {
+            const cs = getCombatContext(campaignName);
+            const attackerTargetName = cs ? cs.creatures?.find(c => c.name === playerStats.name)?.targetName : null;
+            const isOverlayTargeted = attackerTargetName?.startsWith('overlay-');
+
+            let activeOverlay = null;
+            if (isOverlayTargeted) {
+                const overlayId = attackerTargetName.slice('overlay-'.length);
+                try {
+                    const response = await fetch(`/api/campaigns/${campaignName}/spell-overlays`);
+                    const overlays = await response.json();
+                    activeOverlay = overlays.find(o => o.id === overlayId) || null;
+                } catch (error) {
+                    console.error('[spellCast] Error fetching overlay:', error);
+                }
+            }
+
+            const rangeFeet = rangeToFeet(spell.range);
+            const slotLevel = metaCtx?.slotLevel || spell.level;
+            const damageAtSlotLevel = spell.damage?.damage_at_slot_level || spell.damage?.damage_at_character_level || {};
+            let damageExpression = damageAtSlotLevel[slotLevel];
+            if (!damageExpression && Object.keys(damageAtSlotLevel).length > 0) {
+                const levels = Object.keys(damageAtSlotLevel).map(Number).sort((a, b) => a - b);
+                const highestBelow = levels.filter(l => l <= slotLevel).pop();
+                if (highestBelow) {
+                    damageExpression = damageAtSlotLevel[highestBelow];
+                }
+            }
+            if (!damageExpression) {
+                const firstKey = Object.keys(damageAtSlotLevel)[0];
+                damageExpression = damageAtSlotLevel[firstKey];
+            }
+
+            return {
+                automationPopup: {
+                    type: 'modal',
+                    modalName: 'saveAttackAoe',
+                    payload: {
+                        action: { name: spell.name, automation: {}, spell },
+                        playerStats,
+                        campaignName,
+                        shape: aoeShape,
+                        range: rangeFeet,
+                        damage: damageExpression || '0',
+                        damageType: spell.damage?.damage_type || '',
+                        saveType: spell.dc.dc_type || 'DEX',
+                        saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
+                        dcSuccess: spell.dc.dc_success === 0 ? 'none' : (spell.dc.dc_success === 0.5 ? 'half' : spell.dc.dc_success),
+                        activeOverlay,
+                        metamagicCareful: metaCtx?.metamagicCareful || false,
+                    },
+                },
+            };
+        }
+
         const target = await getTargetInfo();
         const context = {
             targetName: target?.name,

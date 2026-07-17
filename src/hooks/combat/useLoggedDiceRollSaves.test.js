@@ -185,7 +185,7 @@ describe('createSaves (useLoggedDiceRollSaves) - Core', () => {
                 expect.any(Number),
                 ['fire'],
                 'test-campaign',
-                null,
+                expect.any(Array),
                 true,
                 'TestWizard'
             );
