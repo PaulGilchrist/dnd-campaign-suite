@@ -27,6 +27,8 @@ export async function resolveAttackDamageStandalone(attack, ctxOverrides, { play
             saveDc: o.saveDc || null,
             saveType: o.saveType || null,
             dcSuccess: o.dcSuccess || null,
+            metamagicTwinTarget: o.metamagicTwinTarget || null,
+            metamagicHeighten: o.metamagicHeighten || false,
         };
         rollDamage(a.name, formula, total, rolls, modifier, minimalCtx);
     };
@@ -120,6 +122,7 @@ export function normalizeAutoDamage(autoDamage, isCrit, playerStats) {
     attackerName: autoDamage.attackerName,
     isCantrip: autoDamage.isCantrip || false,
     metamagicHeighten: autoDamage.metamagicHeighten || false,
+    metamagicTwinTarget: autoDamage.metamagicTwinTarget || null,
     autoDamageSchool: autoDamage.autoDamageSchool || '',
   };
 
@@ -138,7 +141,7 @@ export default function useAttackDamageResolution({
     const proceedWithDamage = (attack, formula, total, rolls, modifier) => {
         if (buildCtxSync) {
             (mapName ? buildCtx(attack) : buildCtxSync(attack)).then(ctx => {
-                rollDamage(attack.name, formula, total, rolls, modifier, ctx);
+                rollDamage(attack.name, formula, total, rolls, modifier, { ...ctx, ...pendingCtxOverrides });
             }).catch((e) => { console.error("[useAttackDamageResolution] Error:", e); });
         } else {
             const o = pendingCtxOverrides;

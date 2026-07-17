@@ -88,10 +88,10 @@ export function getChaModifier(stats) {
 export function getMaxMetamagicPerSpell(stats, playerName) {
   if (stats?.rules === '2024' && (stats.level || 0) >= 6) {
      const buffs = getRuntimeValue(playerName, 'activeBuffs');
-      if (buffs == null) { console.error('[metamagicRules] Missing array:', buffs); throw new Error('Expected array, got ' + buffs); }
-      return Array.isArray(buffs) && buffs.some(b => b.name === 'Innate Sorcery') ? 2 : 1;
-   }
-  return 1;
+       if (!Array.isArray(buffs)) return 1;
+       return buffs.some(b => b.name === 'Innate Sorcery') ? 2 : 1;
+    }
+   return 1;
 }
 
 export function isPreCastOption(option) {
@@ -103,8 +103,8 @@ export function hasArcaneApotheosis(stats, playerName) {
     const hasFeature = passives.some(p => p.name === 'Arcane Apotheosis');
     if (!hasFeature) return false;
     const buffs = getRuntimeValue(playerName, 'activeBuffs');
-    if (buffs == null) { console.error('[metamagicRules] Missing array:', buffs); throw new Error('Expected array, got ' + buffs); }
-    return Array.isArray(buffs) && buffs.some(b => b.name === 'Innate Sorcery');
+    if (!Array.isArray(buffs)) return false;
+    return buffs.some(b => b.name === 'Innate Sorcery');
  }
 
 export function computeMetamagicCost(selectedOptionNames, optionsList, stats, playerName) {

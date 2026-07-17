@@ -701,7 +701,7 @@ export function createLogDamageAndShow(deps) {
                     gwfDisplayRolls: displayRolls,
                 });
 
-                const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, twinFinalDamage, [damageType], campaignName, null, ignoreResistance, characterName);
+                const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, twinFinalDamage, [damageType], campaignName, characters, ignoreResistance, characterName);
 
                 if (twinApplyResult && twinApplyResult.finalDamage > 0) {
                     endInvisibilityOnHostileAction(characterName, campaignName);
@@ -1406,7 +1406,7 @@ export function createLogDamageAndShow(deps) {
                     gwfDisplayRolls: gwfDisplayRolls,
                 });
 
-                const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, adjustedTotal, [damageType], campaignName, null, false, characterName);
+                const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, adjustedTotal, [damageType], campaignName, characters, false, characterName);
 
                 if (twinApplyResult && twinApplyResult.finalDamage > 0) {
                     endInvisibilityOnHostileAction(characterName, campaignName);

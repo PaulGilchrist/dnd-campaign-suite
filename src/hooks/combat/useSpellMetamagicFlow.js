@@ -322,7 +322,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
       }
     }
 
-    const spellLevel = sorcerySpell.level || 0;
+    const spellLevel = (metaCtx?.slotLevel ?? (sorcerySpell.baseLevel ?? sorcerySpell.level)) || 0;
     const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
     const isPsionic = isPsionicSpell(playerStats, spell.name);
     const hasPsionic = hasPsionicSorcery(playerStats);
@@ -330,7 +330,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
     cfSetPending('metamagic', {
       spell: sorcerySpell,
       spellName: spell.name,
-      spellLevel: sorcerySpell.level || 0,
+      spellLevel: spellLevel,
       castingTime: spell.casting_time,
       _currentSP: currentSP,
       isPsionic: isPsionic && hasPsionic,
