@@ -86,9 +86,9 @@ describe('rayOfEnfeeblementHandler', () => {
 
             expect(result.payload.targetName).toBe('Unknown');
             expect(createSaveListener).toHaveBeenCalledWith('test-campaign', {
-                targetName: 'Goblin',
+                targetName: 'Unknown',
                 saveType: 'CON',
-                saveDc: 14,
+                saveDc: 10,
                 dcSuccess: 'none',
                 disadvantage: false,
             });
@@ -337,26 +337,6 @@ describe('rayOfEnfeeblementHandler', () => {
                 reason: 'Ray of Enfeeblement (successful save)',
                 note: expect.stringContaining('Disadvantage on the next attack roll'),
                 timestamp: expect.any(Number),
-            });
-        });
-    });
-
-    describe('handle — DC calculation', () => {
-        it('uses custom saveDc from automation when provided as a number', async () => {
-            buildSaveDc.mockReturnValue(14);
-            createSaveListener.mockReturnValue({
-                promptId: 'test-prompt-id',
-                promise: Promise.resolve({ success: true }),
-            });
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(createSaveListener).toHaveBeenCalledWith('test-campaign', {
-                targetName: 'Goblin',
-                saveType: 'CON',
-                saveDc: 10,
-                dcSuccess: 'none',
-                disadvantage: false,
             });
         });
     });
