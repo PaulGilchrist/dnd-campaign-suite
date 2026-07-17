@@ -154,6 +154,7 @@ describe('createSaveListener', () => {
             saveType: 'CON',
             advantage: false,
             disadvantage: false,
+            condition: null,
         });
     });
 
@@ -177,6 +178,7 @@ describe('createSaveListener', () => {
             dcSuccess: 'The orc falls prone.',
             advantage: true,
             disadvantage: false,
+            condition: null,
         });
     });
 

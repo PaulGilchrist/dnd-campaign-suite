@@ -107,6 +107,7 @@ describe('suggestionHandler.handle', () => {
         saveDc: 15,
         dcSuccess: 'none',
         disadvantage: false,
+        condition: 'charmed',
       });
     });
   });

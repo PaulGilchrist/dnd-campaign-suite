@@ -116,6 +116,7 @@ describe('charmPersonHandler.handle', () => {
         dcSuccess: 'none',
         advantage: true,
         disadvantage: false,
+        condition: 'charmed',
       });
     });
   });

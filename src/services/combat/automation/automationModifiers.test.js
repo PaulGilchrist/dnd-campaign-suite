@@ -399,7 +399,7 @@ describe('collectSaveModifiers', () => {
         name: 'Passive Immunity',
         automation: {
           type: 'passive_immunity',
-          saveAdvantage: [
+          save_advantage: [
             { saveType: 'wis', condition: 'charmed' },
             { saveType: 'cha', condition: 'frightened' }
           ]
@@ -430,7 +430,7 @@ describe('collectSaveModifiers', () => {
         name: 'Passive Immunity',
         automation: {
           type: 'passive_immunity',
-          saveAdvantage: [{ saveType: 'con' }]
+          save_advantage: [{ saveType: 'con' }]
         }
       }]
       const result = collectSaveModifiers(features)

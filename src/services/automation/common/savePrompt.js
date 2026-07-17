@@ -33,6 +33,7 @@ export function createSaveListener(campaignName, config) {
         dcSuccess: config.dcSuccess,
         advantage: config.advantage || false,
         disadvantage: config.disadvantage || false,
+        condition: config.condition || null,
     };
     setRuntimeValue(campaignName, 'pendingSavePrompts', pendingSaves, campaignName);
 
@@ -44,6 +45,7 @@ export function createSaveListener(campaignName, config) {
         dcSuccess: config.dcSuccess,
         advantage: config.advantage || false,
         disadvantage: config.disadvantage || false,
+        condition: config.condition || null,
      });
 
     const promise = new Promise((resolve) => {

@@ -438,7 +438,21 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
         } else if (mod.condition === 'visible_effect' && [...CONDITIONS_THAT_CANNOT_ACT].some(c => conditionSet.has(c))) {
         continue; // Danger Sense disabled while incapacitated
        }
-     }
+    }
+
+  // Handle passive_immunity save advantage (e.g., Psychic Defense) — applies regardless of current conditions
+  for (const mod of saveModifiers) {
+    if (mod.saveType && mod.condition && mod.target === 'saving_throw' && mod.effect === 'advantage' && (!mod.abilities || mod.abilities.length === 0)) {
+      if (!effects.saveAdvantage.includes(mod.condition)) {
+        effects.saveAdvantage.push(mod.condition);
+      }
+    }
+    if (mod.saveType && mod.condition && mod.target === 'saving_throw' && mod.effect === 'disadvantage' && (!mod.abilities || mod.abilities.length === 0)) {
+      if (!effects.saveDisadvantage.includes(mod.condition)) {
+        effects.saveDisadvantage.push(mod.condition);
+      }
+    }
+  }
 
   const isIncapacitated = [...CONDITIONS_THAT_CANNOT_ACT].some(c => conditionSet.has(c));
   const activeSaveModifiers = isIncapacitated

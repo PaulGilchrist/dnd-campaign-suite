@@ -132,6 +132,10 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
             hasAdvantage = true;
             break;
           }
+          if (mod.saveType && current.condition && mod.condition === current.condition) {
+            hasAdvantage = true;
+            break;
+          }
         }
       }
     }

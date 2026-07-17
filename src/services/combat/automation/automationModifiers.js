@@ -155,8 +155,8 @@ export function collectSaveModifiers(features) {
                     abilities: ['INT'],
                 })
             }
-            if (auto.type === 'passive_immunity' && auto.saveAdvantage) {
-                for (const sa of auto.saveAdvantage) {
+            if (auto.type === 'passive_immunity' && auto.save_advantage) {
+                for (const sa of auto.save_advantage) {
                     modifiers.push({
                         source: feature.name,
                         target: 'saving_throw',

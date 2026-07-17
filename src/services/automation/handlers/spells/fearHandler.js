@@ -37,6 +37,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             saveDc: dc,
             dcSuccess: 'none',
             disadvantage: action.metaCtx?.heightenTarget === targetName,
+            condition: 'frightened',
         });
 
         addEntry(campaignName, {

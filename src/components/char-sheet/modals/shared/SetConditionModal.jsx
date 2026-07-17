@@ -113,6 +113,7 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
                     saveType,
                     saveDc,
                     sourceName: attackerName,
+                    condition: conditionName,
                 });
                 playerPrompts.push({ promptId, targetName });
             }
@@ -126,7 +127,7 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
 
         ctx.setResults(npcResults);
         ctx.setPendingPrompts(playerPrompts);
-    }, [campaignName, attackerName, saveDc, saveType, featureName, addConditionToCreature, logCondition, channelDivinityCharges]);
+    }, [campaignName, attackerName, saveDc, saveType, featureName, addConditionToCreature, logCondition, channelDivinityCharges, conditionName]);
 
     const handleSaveResultOverride = useCallback((event, ctx) => {
         const detail = event.detail;

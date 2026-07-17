@@ -68,6 +68,7 @@ export async function resolveMassFear(campaignName, casterName, primaryTargetNam
             saveType,
             saveDc: dc,
             dcSuccess: 'none',
+            condition: condition,
         });
 
         addEntry(campaignName, {

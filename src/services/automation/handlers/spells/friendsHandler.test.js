@@ -327,6 +327,7 @@ describe('friendsHandler.handle', () => {
                 saveDc: 10,
                 dcSuccess: 'none',
                 disadvantage: false,
+                condition: 'charmed',
             });
         });
     });
