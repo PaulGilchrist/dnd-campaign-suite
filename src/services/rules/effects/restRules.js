@@ -378,10 +378,17 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
     // Clear Avenging Angel active state on short rest
     updates.avengingAngelActive = null;
 
-   // Clear Peerless Athlete active state on short rest
-   updates.peerlessAthleteActive = null;
+    // Clear Peerless Athlete active state on short rest
+    updates.peerlessAthleteActive = null;
 
-   setRuntimeBatch(name, updates, campaignName)
+    // Clear Bastion of Law ward on short rest
+    updates.bastionOfLawActive = null;
+    updates.bastionOfLawWardDice = null;
+    updates.bastionOfLawWardSource = null;
+    updates.bastionOfLawWardUsed = null;
+    updates.bastionOfLawLastAttackDamage = null;
+
+    setRuntimeBatch(name, updates, campaignName)
 
   clearAllExpirationEffects(name, campaignName)
   clearHuntersMarkConcentration(name, campaignName)
@@ -582,10 +589,19 @@ export async function applyLongRest(playerStats, campaignName) {
        }
      }
 
-      // Reset Bastion of Law ward on long rest
-    setRuntimeValue(name, 'bastionOfLawActive', false, campaignName, true)
-    setRuntimeValue(name, 'bastionOfLawWardDice', [], campaignName, true)
-    setRuntimeValue(name, 'bastionOfLawWardTarget', null, campaignName, true)
+       // Reset Bastion of Law ward on long rest
+     const wardTarget = getRuntimeValue(name, 'bastionOfLawWardTarget', campaignName)
+     setRuntimeValue(name, 'bastionOfLawActive', false, campaignName, true)
+     setRuntimeValue(name, 'bastionOfLawWardDice', [], campaignName, true)
+     setRuntimeValue(name, 'bastionOfLawWardTarget', null, campaignName, true)
+     // Clear ward from the target character
+     if (wardTarget) {
+      setRuntimeValue(wardTarget, 'bastionOfLawActive', false, campaignName, true)
+      setRuntimeValue(wardTarget, 'bastionOfLawWardDice', [], campaignName, true)
+      setRuntimeValue(wardTarget, 'bastionOfLawWardSource', null, campaignName, true)
+      setRuntimeValue(wardTarget, 'bastionOfLawWardUsed', null, campaignName, true)
+      setRuntimeValue(wardTarget, 'bastionOfLawLastAttackDamage', null, campaignName, true)
+     }
 
     // Reset Arcane Ward on long rest
     setRuntimeValue(name, 'arcaneWardActive', false, campaignName, true)

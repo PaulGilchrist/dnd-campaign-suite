@@ -129,7 +129,7 @@ import { handle as handleUseMagicDevice } from './handlers/class-fighter-rogue/u
 import { handle as handleRevelationInFlesh } from './handlers/class-warlock/revelationInFleshHandler.js';
 import { handle as handleWarpingImplosion } from './handlers/class-sorcerer/warpingImplosionHandler.js';
 import { handle as handleRestoreBalance } from './handlers/class-sorcerer/restoreBalanceHandler.js';
-import { handle as handleBastionOfLaw } from './handlers/class-cleric-paladin/bastionOfLawHandler.js';
+import { handle as handleBastionOfLaw, handleSpendDice as handleBastionOfLawSpend } from './handlers/class-cleric-paladin/bastionOfLawHandler.js';
 import { handle as handleTranseOfOrder } from './handlers/class-cleric-paladin/transeOfOrderHandler.js';
 import { handle as handleClockworkCavalcade } from './handlers/class-sorcerer/clockworkCavalcadeHandler.js';
 import { handle as handleElementalAffinity } from './handlers/class-sorcerer/elementalAffinityHandler.js';
@@ -386,6 +386,7 @@ const HANDLER_MAP = {
         warping_implosion: handleWarpingImplosion,
          restore_balance: handleRestoreBalance,
          bastion_of_law: handleBastionOfLaw,
+         bastion_of_law_spend: handleBastionOfLawSpend,
          transe_of_order: handleTranseOfOrder,
           clockwork_cavalcade: handleClockworkCavalcade,
           elemental_affinity: handleElementalAffinity,

@@ -63,7 +63,7 @@ import MassCureWoundsModal from './modals/MassCureWoundsModal.jsx'
 import PrayerOfHealingModal from './modals/PrayerOfHealingModal.jsx'
 import PowerWordFortifyModal from './modals/PowerWordFortifyModal.jsx'
 import MassHealingWordModal from './modals/MassHealingWordModal.jsx'
-import { handleClearWard, handleSpendDice, handleApply } from '../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js'
+import { handleApply } from '../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js'
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { sanitizeHtml } from '../../services/ui/sanitize.js'
@@ -433,17 +433,13 @@ export default function CharActionModals({
                 <BastionOfLawModal
                     {...mergedModalState.bastionOfLawModal}
                     campaignName={campaignName}
-                    onConfirm={async (spAmount, targetName, diceToSpend, clearWard) => {
-                        if (clearWard) {
-                            const action = { name: mergedModalState.bastionOfLawModal.featureName, automation: mergedModalState.bastionOfLawModal.auto };
-                            return await handleClearWard(action, playerStats, campaignName);
-                        }
-                        if (diceToSpend !== undefined && diceToSpend !== null) {
-                            const action = { name: mergedModalState.bastionOfLawModal.featureName, automation: mergedModalState.bastionOfLawModal.auto };
-                            return await handleSpendDice(action, playerStats, campaignName, diceToSpend);
-                        }
+                    onConfirm={async (spAmount, selectedTargetName) => {
                         const action = { name: mergedModalState.bastionOfLawModal.featureName, automation: mergedModalState.bastionOfLawModal.auto };
-                        return await handleApply(action, playerStats, campaignName, spAmount, targetName);
+                        const result = await handleApply(action, playerStats, campaignName, spAmount, selectedTargetName);
+                        if (result?.payload) {
+                            setPopupHtml(result.payload);
+                        }
+                        setModalState({ bastionOfLawModal: null });
                     }}
                     onClose={() => setModalState({ bastionOfLawModal: null })}
                 />

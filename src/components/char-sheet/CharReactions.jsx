@@ -3,6 +3,7 @@ import Popup from '../common/popup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import MetamagicPopup from './popups/MetamagicPopup.jsx'
 import ArcaneWardRestoreModal from './modals/arcane/ArcaneWardRestoreModal.jsx'
+import BastionOfLawSpendModal from './modals/divine/BastionOfLawSpendModal.jsx'
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx'
 import { getReactionSpellNames } from '../../services/ui/spellSectionUtils.js'
 import { getCategories } from '../../services/character/featureCategories.js'
@@ -85,6 +86,19 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         reactions.push({
             name: 'Stand (Power Word Heal)',
             description: 'You can use your Reaction to stand up.',
+        });
+    }
+
+    // Add Bastion of Law ward reaction if active
+    const wardActive = useRuntimeValue(playerStats?.name, 'bastionOfLawActive', campaignName);
+    const wardDice = useRuntimeValue(playerStats?.name, 'bastionOfLawWardDice', campaignName) || [];
+    if (wardActive && wardDice.length > 0 && !reactions.find(r => r.name === 'Bastion of Law')) {
+        reactions.push({
+            name: 'Bastion of Law',
+            description: `Ward active (${wardDice.length}d8 remaining). Click when you take damage to spend dice and reduce damage.`,
+            automation: {
+                type: 'bastion_of_law_spend',
+            },
         });
     }
 
@@ -189,6 +203,8 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                 setModalState({ inspiringMovementAllyModal: result.payload });
             } else if (result.modalName === 'beguilingTwist') {
                 setModalState({ beguilingTwistModal: result.payload });
+            } else if (result.modalName === 'bastionOfLawSpend') {
+                setModalState({ bastionOfLawSpendModal: result.payload });
             } else {
                 const html = buildFeatureDetailHtml(reaction);
                 if (html) setPopupHtml(html);
@@ -430,6 +446,30 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                     featureDescription={`Target must make a WIS save (DC ${modalState.beguilingTwistModal.saveDc}) or be ${modalState.beguilingTwistModal.conditionKey} for 1 minute.`}
                     onTargetSelected={handleBeguilingTwistConfirm}
                     onSkip={() => handleBeguilingTwistConfirm(null)}
+                />
+            )}
+            {modalState.bastionOfLawSpendModal && (
+                <BastionOfLawSpendModal
+                    {...modalState.bastionOfLawSpendModal}
+                    playerName={playerStats.name}
+                    campaignName={campaignName}
+                    onClose={() => setModalState({ bastionOfLawSpendModal: null })}
+                    onConfirm={async (diceToSpend, rollResultData) => {
+                        const action = {
+                            automation: { type: 'bastion_of_law_spend' },
+                            numDice: diceToSpend,
+                            preRollResult: rollResultData,
+                        };
+                        const result = await executeHandler(action, playerStats, campaignName, mapName, playerStats.equipment);
+                        if (result) {
+                            if (result.type === 'popup') {
+                                setPopupHtml(result.payload);
+                            }
+                            if (result.type === 'modal') {
+                                setModalState({ bastionOfLawSpendModal: result.payload });
+                            }
+                        }
+                    }}
                 />
             )}
             {reactions.filter(r => !getCategories(playerStats.rules || '5e').featuresToIgnore.includes(r.name)).map((reaction) => {

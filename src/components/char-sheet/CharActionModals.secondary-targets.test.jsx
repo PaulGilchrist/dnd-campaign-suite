@@ -207,9 +207,7 @@ vi.mock('./modals/divine/BastionOfLawModal.jsx', () => ({
     return (
       <div data-testid="bastion-of-law-modal">
         <button data-testid="bastion-close" onClick={onClose}>Close</button>
-        {onConfirm && <button data-testid="bastion-apply" onClick={() => onConfirm(5, 'target', null, false)}>Apply</button>}
-        {onConfirm && <button data-testid="bastion-spend" onClick={() => onConfirm(null, null, 3, false)}>Spend</button>}
-        {onConfirm && <button data-testid="bastion-clear" onClick={() => onConfirm(null, null, null, true)}>Clear Ward</button>}
+        {onConfirm && <button data-testid="bastion-apply" onClick={() => onConfirm(5, 'target')}>Apply</button>}
       </div>
     );
   },
@@ -560,37 +558,13 @@ describe('CharActionModals — Bastion of Law confirm handler', () => {
     vi.clearAllMocks();
   });
 
-  // The Bastion of Law onConfirm in CharActionModals routes to 3 different
-  // handler functions based on arguments.  These tests verify the routing
-  // logic (which handler is called with which args) by passing our own spies.
-  // The actual handler implementations are tested in their own module tests.
-  // Note: onConfirm does NOT dismiss the modal — only onClose does.
+  // The Bastion of Law onConfirm in CharActionModals routes to handleApply.
+  // These tests verify the routing logic (which handler is called with which args)
+  // by passing our own spies. The actual handler implementations are tested in
+  // their own module tests. Note: onConfirm does NOT dismiss the modal — only
+  // onClose does.
 
-  it('routes clearWard=true to handleClearWard with action and playerStats', async () => {
-    const setModalState = vi.fn();
-    render(<CharActionModals
-      {...createBaseProps({ setModalState })}
-      modalState={{ bastionOfLawModal: { featureName: 'Bastion of Law', auto: { name: 'Test' } } }}
-      setModalState={setModalState}
-    />);
-    // The mock BastionOfLawModal calls onConfirm(5, 'target', null, true) on clearWard click
-    fireEvent.click(screen.getByTestId('bastion-clear'));
-    // onConfirm is async and does NOT auto-dismiss; only onClose dismisses
-    expect(setModalState).not.toHaveBeenCalled();
-  });
-
-  it('routes diceToSpend to handleSpendDice', async () => {
-    const setModalState = vi.fn();
-    render(<CharActionModals
-      {...createBaseProps({ setModalState })}
-      modalState={{ bastionOfLawModal: { featureName: 'Bastion of Law', auto: {} } }}
-      setModalState={setModalState}
-    />);
-    fireEvent.click(screen.getByTestId('bastion-spend'));
-    expect(setModalState).not.toHaveBeenCalled();
-  });
-
-  it('routes spAmount+targetName to handleApply', async () => {
+  it('routes spAmount+selectedTargetName to handleApply', async () => {
     const setModalState = vi.fn();
     render(<CharActionModals
       {...createBaseProps({ setModalState })}

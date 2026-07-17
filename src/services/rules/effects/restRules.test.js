@@ -11,7 +11,10 @@ import {
 
 // Mock dependencies
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn((_name, _key, _campaign) => undefined),
+  getRuntimeValue: vi.fn((_name, key, _campaign) => {
+    if (key === 'bastionOfLawWardTarget') return 'WardTarget';
+    return undefined;
+  }),
   setRuntimeBatch: vi.fn(),
   setRuntimeValue: vi.fn(),
 }))
@@ -58,7 +61,10 @@ function getBatchUpdates() {
 describe('restRules', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(getRuntimeValue).mockImplementation((_name, _key) => undefined)
+    vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
+      if (key === 'bastionOfLawWardTarget') return 'WardTarget';
+      return undefined;
+    })
   })
 
   describe('getHitDieSize', () => {
@@ -542,6 +548,9 @@ describe('restRules', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'bastionOfLawActive', false, CAMPAIGN, true)
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'bastionOfLawWardDice', [], CAMPAIGN, true)
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'bastionOfLawWardTarget', null, CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('WardTarget', 'bastionOfLawActive', false, CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('WardTarget', 'bastionOfLawWardDice', [], CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('WardTarget', 'bastionOfLawWardSource', null, CAMPAIGN, true)
 
       // Arcane Ward
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'arcaneWardActive', false, CAMPAIGN, true)

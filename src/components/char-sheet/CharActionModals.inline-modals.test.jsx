@@ -191,7 +191,7 @@ vi.mock('./modals/divine/BastionOfLawModal.jsx', () => ({
     return (
       <div data-testid="bastion-of-law-modal">
         <button data-testid="bastion-close" onClick={onClose}>Close</button>
-        {onConfirm && <button data-testid="bastion-confirm" onClick={() => onConfirm(5, 'target', null, false)}>Confirm</button>}
+        {onConfirm && <button data-testid="bastion-confirm" onClick={() => onConfirm(5, 'target')}>Confirm</button>}
       </div>
     );
   },
@@ -201,8 +201,8 @@ vi.mock('./modals/MoonlightStepResourceModal.jsx', () => ({
 }));
 vi.mock('../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js', () => ({
   handle: vi.fn().mockResolvedValue(undefined),
-  handleClearWard: vi.fn().mockResolvedValue(undefined),
   handleSpendDice: vi.fn().mockResolvedValue(undefined),
+  handleClearWard: vi.fn().mockResolvedValue(undefined),
   handleApply: vi.fn().mockResolvedValue(undefined),
 }));
 

@@ -191,7 +191,7 @@ vi.mock('./modals/divine/BastionOfLawModal.jsx', () => ({
     return (
       <div data-testid="bastion-of-law-modal">
         <button data-testid="bastion-close" onClick={onClose}>Close</button>
-        {onConfirm && <button data-testid="bastion-confirm" onClick={() => onConfirm(5, 'target', null, false)}>Confirm</button>}
+        {onConfirm && <button data-testid="bastion-confirm" onClick={() => onConfirm(5, 'target')}>Confirm</button>}
       </div>
     );
   },

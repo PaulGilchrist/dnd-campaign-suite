@@ -76,6 +76,13 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
                 }
             }
 
+            // Clear Bastion of Law ward on initiative roll (new combat)
+            setRuntimeValue(playerStats.name, 'bastionOfLawActive', null, campaignName);
+            setRuntimeValue(playerStats.name, 'bastionOfLawWardDice', null, campaignName);
+            setRuntimeValue(playerStats.name, 'bastionOfLawWardSource', null, campaignName);
+            setRuntimeValue(playerStats.name, 'bastionOfLawWardUsed', null, campaignName);
+            setRuntimeValue(playerStats.name, 'bastionOfLawLastAttackDamage', null, campaignName);
+
             const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
 
             // Check for Perfect Focus (Monk level 15)
