@@ -1,7 +1,6 @@
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
-import { getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
-import { isDistanceInRange } from '../../../rules/combat/rangeCheck.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
@@ -14,7 +13,7 @@ export async function handle(action, playerStats, campaignName, mapName, _charac
     return resolveMassFear(campaignName, playerStats.name, targetName, auto, playerStats, mapName);
 }
 
-export async function resolveMassFear(campaignName, casterName, primaryTargetName, option, playerStats, mapName) {
+export async function resolveMassFear(campaignName, casterName, primaryTargetName, option, playerStats, _mapName) {
     const auto = { ...option, saveDc: option.saveDc || 'ability', saveAbility: option.saveAbility || 'WIS' };
     const saveType = option.saveType || 'WIS';
     const dc = buildSaveDc(auto, playerStats);
@@ -37,14 +36,14 @@ export async function resolveMassFear(campaignName, casterName, primaryTargetNam
 
     const primaryTarget = cs.creatures.find(c => c.name === primaryTargetName);
 
-    const hasMap = mapName && cs.creatures.some(c => c.position);
-    const targets = cs.creatures.filter(c => {
-        if (c.name === casterName) return false;
-        if (c.name === primaryTargetName) return true;
-        if (!hasMap) return true;
-        if (!primaryTarget?.position || !c.position) return true;
-        return isDistanceInRange(getDistanceFeet(primaryTarget.position, c.position), range);
-    });
+    const targets = [];
+    for (const c of cs.creatures) {
+        if (c.name === casterName) continue;
+        if (c.name === primaryTargetName) { targets.push(c); continue; }
+        if (!primaryTarget) { targets.push(c); continue; }
+        const inRange = await isWithinRange(primaryTargetName, c.name, range);
+        if (inRange) targets.push(c);
+    }
 
     if (targets.length === 0) {
         return {

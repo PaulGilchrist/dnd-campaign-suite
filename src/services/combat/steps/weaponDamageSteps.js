@@ -13,8 +13,7 @@ import { getActiveBuffs } from '../../automation/common/buffToggle.js';
 import utils from '../../ui/utils.js';
 import { featureModules } from './features/index.js';
 import { applyMasteryEffect } from '../../automation/handlers/combat/weaponMasteryHandler.js';
-import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
-import { isDistanceInRange } from '../../rules/combat/rangeCheck.js';
+import { isWithinRange } from '../../rules/combat/rangeCheck.js';
 import { createSaveListener } from '../../automation/common/savePrompt.js';
 import { resolveDiceExpression } from '../automation/automationExpressions.js';
 
@@ -900,18 +899,16 @@ export function buildDamageSteps() {
 
         let secondTargets;
         if (hasMapPositions) {
-          const attackerPos = cs?.creatures?.find(c => c.name === ctx.playerStats.name)?.position;
+          const attackerName = ctx.playerStats.name;
           const reach = 8;
-          if (attackerPos) {
-            secondTargets = cs.creatures
-              .filter(c => c.name !== lastAttack.targetName && c.position)
-              .map(c => ({
-                ...c,
-                ...resolveHp(c, ctx.playerStats),
-                distanceFromFirst: getDistanceFeet(firstTarget.position, c.position),
-                distanceFromAttacker: getDistanceFeet(attackerPos, c.position),
-              }))
-               .filter(t => t.distanceFromFirst !== null && isDistanceInRange(t.distanceFromFirst, 5) && t.distanceFromAttacker !== null && isDistanceInRange(t.distanceFromAttacker, reach));
+          secondTargets = [];
+          for (const c of cs.creatures) {
+            if (c.name === lastAttack.targetName) continue;
+            const nearFirst = await isWithinRange(firstTarget.name, c.name, 5);
+            const nearAttacker = await isWithinRange(attackerName, c.name, reach);
+            if (nearFirst && nearAttacker) {
+              secondTargets.push({ ...c, ...resolveHp(c, ctx.playerStats) });
+            }
           }
         }
 

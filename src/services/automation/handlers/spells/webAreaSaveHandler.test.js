@@ -29,6 +29,10 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+  isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('../../../combat/automation/automationImmunities.js', () => ({
   playerIsImmuneToCondition: vi.fn(),
 }));
@@ -42,6 +46,7 @@ import * as logService from '../../../ui/logService.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as mapsService from '../../../maps/mapsService.js';
 import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
+import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
 import * as automationImmunities from '../../../combat/automation/automationImmunities.js';
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -425,7 +430,7 @@ describe('webAreaSaveHandler.processWebAreaSave', () => {
       const result = await processWebAreaSave('TestCaster', 'Goblin', campaignName, mapName);
 
       expect(result.type).toBe('popup');
-      expect(rangeValidation.getDistanceFeet).toHaveBeenCalled();
+      expect(rangeCheck.isWithinRange).toHaveBeenCalled();
     });
 
     it('proceeds with save when map load fails', async () => {

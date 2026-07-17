@@ -31,6 +31,7 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
 
 vi.mock('../../../rules/combat/rangeCheck.js', () => ({
   isDistanceInRange: vi.fn((dist, rangeFt) => rangeFt == null || dist == null || dist <= rangeFt),
+  isWithinRange: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('../../../maps/mapsService.js', () => ({
@@ -49,7 +50,7 @@ import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
 import * as expirations from '../../../rules/effects/expirations.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
-import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
+import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
 import * as mapsService from '../../../maps/mapsService.js';
 import * as automationImmunities from '../../../combat/automation/automationImmunities.js';
 
@@ -452,7 +453,7 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
           players: [{ name: casterName, gridX: 5, gridY: 10 }],
           placedItems: [{ name: 'Goblin', gridX: 6, gridY: 10 }],
         });
-        rangeValidation.getDistanceFeet.mockReturnValue(5);
+        rangeCheck.isWithinRange.mockResolvedValue(true);
       };
 
       setupTracking();
@@ -504,7 +505,7 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
         creatures: [{ name: 'Goblin', type: 'player' }],
       });
       automationImmunities.playerIsImmuneToCondition.mockReturnValue(true);
-      rangeValidation.getDistanceFeet.mockReturnValue(5);
+      rangeCheck.isWithinRange.mockResolvedValue(true);
 
       const result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
       expect(result).toBeNull();
@@ -534,7 +535,7 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
         creatures: [{ name: 'Goblin', type: 'monster' }],
       });
       automationImmunities.playerIsImmuneToCondition.mockClear();
-      rangeValidation.getDistanceFeet.mockReturnValue(5);
+      rangeCheck.isWithinRange.mockResolvedValue(true);
       vi.mocked(savePrompt.createSaveListener).mockReturnValue({
         promptId: 'grease-monster',
         promise: Promise.resolve({ success: true }),
@@ -566,7 +567,7 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
         players: [{ name: casterName, gridX: 5, gridY: 10 }],
         placedItems: [{ name: 'Goblin', gridX: 6, gridY: 10 }],
       });
-      rangeValidation.getDistanceFeet.mockReturnValue(5);
+      rangeCheck.isWithinRange.mockResolvedValue(true);
     }
 
     it('triggers save listener with correct parameters', async () => {
@@ -689,7 +690,7 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [{ name: 'Goblin', type: 'monster' }],
       });
-      rangeValidation.getDistanceFeet.mockReturnValue(5);
+      rangeCheck.isWithinRange.mockResolvedValue(true);
       vi.mocked(savePrompt.createSaveListener).mockReturnValue({
         promptId: 'grease-dedup',
         promise: Promise.resolve({ success: false }),
@@ -726,7 +727,7 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
         players: [{ name: casterName, gridX: 5, gridY: 10 }],
         placedItems: [{ name: 'Goblin', gridX: 6, gridY: 10 }],
       });
-      rangeValidation.getDistanceFeet.mockReturnValue(5);
+      rangeCheck.isWithinRange.mockResolvedValue(true);
     }
 
     it('calls addEntry with ability_use when triggering save', async () => {
@@ -853,7 +854,7 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [{ name: 'Goblin', type: 'monster' }],
       });
-      rangeValidation.getDistanceFeet.mockReturnValue(5);
+      rangeCheck.isWithinRange.mockResolvedValue(true);
       vi.mocked(savePrompt.createSaveListener).mockReturnValue({
         promptId: 'grease-placed-items',
         promise: Promise.resolve({ success: true }),
@@ -886,7 +887,7 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [{ name: 'Goblin', type: 'player' }],
       });
-      rangeValidation.getDistanceFeet.mockReturnValue(4);
+      rangeCheck.isWithinRange.mockResolvedValue(true);
       automationImmunities.playerIsImmuneToCondition.mockReturnValue(false);
       vi.mocked(savePrompt.createSaveListener).mockReturnValue({
         promptId: 'grease-prefer-players',
@@ -896,10 +897,7 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
       const result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
 
       expect(result.type).toBe('popup');
-      expect(rangeValidation.getDistanceFeet).toHaveBeenCalledWith(
-        expect.objectContaining({ gridX: 5, gridY: 10 }),
-        expect.objectContaining({ gridX: 3, gridY: 3 }),
-      );
+      expect(rangeCheck.isWithinRange).toHaveBeenCalledWith(casterName, 'Goblin', expect.any(Number));
     });
   });
 });

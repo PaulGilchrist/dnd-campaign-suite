@@ -1,8 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
-import { isDistanceInRange } from '../../../rules/combat/rangeCheck.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
 
 
@@ -11,10 +10,9 @@ export async function handle(action, playerStats, campaignName, mapName) {
     const playerName = playerStats.name;
     const featureName = action.name || 'Shake Out Stupor';
 
-    const rangeFt = rangeToFeet(auto.range || '5 ft');
+    const rangeFt = auto.range ? parseInt(auto.range.match(/(\d+)/)?.[1] || '5', 10) : 5;
 
     const positions = mapName ? await resolveMapPositions(campaignName, mapName, playerName) : null;
-    const attackerPos = positions?.attackerPos || null;
 
     const combatSummary = await getCombatContext(campaignName);
     if (!combatSummary?.creatures) {
@@ -29,23 +27,15 @@ export async function handle(action, playerStats, campaignName, mapName) {
         };
     }
 
-    const eligibleTargets = combatSummary.creatures.filter(c => {
-        if (c.name === playerName) return false;
-        if (rangeFt && attackerPos) {
-            const targetPosData = (() => {
-                const mp = positions?.mapData?.players?.find(p => p.name === c.name);
-                if (mp) return { gridX: mp.gridX, gridY: mp.gridY };
-                const mi = positions?.mapData?.placedItems?.find(i => i.name === c.name);
-                if (mi) return { gridX: mi.gridX, gridY: mi.gridY };
-                return null;
-            })();
-            if (targetPosData) {
-                const dist = getDistanceFeet(attackerPos, targetPosData);
-                if (!isDistanceInRange(dist, rangeFt)) return false;
-            }
+    const eligibleTargets = [];
+    for (const c of combatSummary.creatures) {
+        if (c.name === playerName) continue;
+        if (rangeFt > 0 && positions) {
+            const inRange = await isWithinRange(playerName, c.name, rangeFt);
+            if (!inRange) continue;
         }
-        return true;
-    });
+        eligibleTargets.push(c);
+    }
 
     const hypnoTargets = combatSummary.creatures.filter(c => {
         if (c.name === playerName) return false;

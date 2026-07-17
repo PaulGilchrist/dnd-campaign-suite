@@ -118,6 +118,7 @@ vi.mock('../../rules/combat/rangeValidation.js', () => ({
 
 vi.mock('../../rules/combat/rangeCheck.js', () => ({
   isDistanceInRange: vi.fn((dist, rangeFt) => rangeFt == null || dist == null || dist <= rangeFt),
+  isWithinRange: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('../../automation/common/savePrompt.js', () => ({
@@ -132,7 +133,7 @@ const { loadCombatSummary } = await import('../../encounters/combatData.js');
 const { addEntry } = await import('../../ui/logService.js');
 const { collectWeaponMastery } = await import('../../combat/automation/automationService.js');
 const { applyMasteryEffect } = await import('../../automation/handlers/combat/weaponMasteryHandler.js');
-const { getDistanceFeet } = await import('../../rules/combat/rangeValidation.js');
+const { isWithinRange } = await import('../../rules/combat/rangeCheck.js');
 const { createSaveListener } = await import('../../automation/common/savePrompt.js');
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -357,7 +358,7 @@ describe('buildDamageSteps - cleaveMastery, tacticalMaster, toppleMastery, maste
         });
         await steps[cleaveIdx].handler(ctx);
 
-        expect(getDistanceFeet).toHaveBeenCalled();
+        expect(isWithinRange).toHaveBeenCalled();
       });
 
       it('resolves HP for player creatures using runtime values', async () => {

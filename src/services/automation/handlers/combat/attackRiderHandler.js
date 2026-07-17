@@ -2,8 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 
-import { getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
-import { isDistanceInRange } from '../../../rules/combat/rangeCheck.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { buildSaveDc, createSaveListener } from '../../../automation/common/savePrompt.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
@@ -135,18 +134,14 @@ export async function applyRiderOption(action, playerStats, campaignName, target
             hasVersatileTrickster = true;
             const cs = await getCombatContext(campaignName);
             if (cs?.creatures) {
-                const primaryTarget = cs.creatures.find(c => c.name === targetName);
-                if (primaryTarget?.position) {
-                    const secondaryTargets = cs.creatures
-                        .filter(c => c.name !== targetName && c.position)
-                        .map(c => ({
-                            creature: c,
-                            distance: getDistanceFeet(primaryTarget.position, c.position),
-                        }))
-                        .filter(t => isDistanceInRange(t.distance, 5));
-                    if (secondaryTargets.length > 0) {
-                        versatileTricksterSecondaryTarget = secondaryTargets.map(t => t.creature);
-                    }
+                const secondaryTargets = [];
+                for (const c of cs.creatures) {
+                    if (c.name === targetName) continue;
+                    const inRange = await isWithinRange(targetName, c.name, 5);
+                    if (inRange) secondaryTargets.push(c);
+                }
+                if (secondaryTargets.length > 0) {
+                    versatileTricksterSecondaryTarget = secondaryTargets;
                 }
             }
         }
@@ -165,19 +160,11 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     if (hasStalkersFlurry && targetName) {
         const cs = await getCombatContext(campaignName);
         if (cs?.creatures) {
-            const primaryTarget = cs.creatures.find(c => c.name === targetName);
-            if (primaryTarget?.position) {
-                stalkersFlurrySecondaryTarget = cs.creatures
-                    .filter(c => c.name !== targetName && c.position)
-                    .map(c => ({
-                        creature: c,
-                        distance: getDistanceFeet(primaryTarget.position, c.position),
-                    }))
-                    .filter(t => isDistanceInRange(t.distance, 5));
-            } else {
-                stalkersFlurrySecondaryTarget = cs.creatures
-                    .filter(c => c.name !== targetName)
-                    .map(c => ({ creature: c, distance: 0 }));
+            stalkersFlurrySecondaryTarget = [];
+            for (const c of cs.creatures) {
+                if (c.name === targetName) continue;
+                const inRange = await isWithinRange(targetName, c.name, 5);
+                if (inRange) stalkersFlurrySecondaryTarget.push(c);
             }
         }
     }

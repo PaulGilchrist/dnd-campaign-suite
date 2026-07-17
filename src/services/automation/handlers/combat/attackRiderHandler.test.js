@@ -33,6 +33,10 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
     getDistanceFeet: vi.fn(() => 5),
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+    isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('../../common/damageUtils.js', () => ({
     getCombatContext: vi.fn(async () => ({
         creatures: [{ name: 'Goblin', size: 'Medium', position: { x: 1, y: 1 } }],

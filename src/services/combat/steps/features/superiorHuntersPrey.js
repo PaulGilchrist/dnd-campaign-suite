@@ -1,8 +1,7 @@
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
-import { isDistanceInRange } from '../../../rules/combat/rangeCheck.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { getCurrentCombatRound, loadCombatSummary } from '../../../encounters/combatData.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { addEntry } from '../../../ui/logService.js';
@@ -43,15 +42,17 @@ export const superiorHuntersPrey = {
     const die = isFoeSlayer ? '1d10' : '1d6';
 
     const mapName = ctx.playerStats?.mapName;
-    const hasMapPositions = mapName && markedTarget?.position;
+    const hasMapPositions = mapName;
 
     let targets = cs.creatures?.filter(c => c.name !== ctx.playerStats.name && c.name !== markedTarget.name) || [];
 
     if (hasMapPositions) {
-      targets = targets
-        .filter(c => c.position)
-        .map(c => ({ ...c, distance: getDistanceFeet(markedTarget.position, c.position) }))
-        .filter(c => c.distance !== null && isDistanceInRange(c.distance, MAX_RANGE_FEET));
+      targets = [];
+      for (const c of cs.creatures) {
+        if (c.name === ctx.playerStats.name || c.name === markedTarget.name) continue;
+        const inRange = await isWithinRange(markedTarget.name, c.name, MAX_RANGE_FEET);
+        if (inRange) targets.push(c);
+      }
     }
 
     targets = targets.map(c => ({ ...c, ...resolveHp(c) }));

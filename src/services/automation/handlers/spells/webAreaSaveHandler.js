@@ -4,8 +4,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { playerIsImmuneToCondition } from '../../../combat/automation/automationImmunities.js';
 import * as mapsService from '../../../maps/mapsService.js';
-import { getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
-import { isDistanceInRange } from '../../../rules/combat/rangeCheck.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 
 /**
  * Web spell area save handler for 2024 ruleset.
@@ -29,22 +28,10 @@ export async function processWebAreaSave(casterName, targetName, campaignName, m
         return null;
     }
 
-    // If there's a map and a center position, check if target is still in the area
-    if (mapName && tracking.center) {
+    // If there's a map, check if target is still in the area
+    if (mapName) {
         try {
-            const mapData = await mapsService.loadMapData(campaignName, mapName);
-            const targetPos = mapData?.players?.find(p => p.name === targetName) ||
-                              mapData?.placedItems?.find(i => i.name === targetName);
-
-            if (!targetPos) return null;
-
-            const dist = getDistanceFeet(tracking.center, {
-                gridX: targetPos.gridX,
-                gridY: targetPos.gridY,
-            });
-
-            // Allow some tolerance for cube area
-            const inArea = isDistanceInRange(dist, tracking.radius);
+            const inArea = await isWithinRange(casterName, targetName, tracking.radius);
 
             if (!inArea) return null;
         } catch {

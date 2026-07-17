@@ -93,6 +93,10 @@ vi.mock('../../../../services/rules/combat/rangeValidation.js', () => ({
     }),
 }));
 
+vi.mock('../../../../services/rules/combat/rangeCheck.js', () => ({
+    isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('../../../../services/ui/logService.js', () => ({
     addEntry: vi.fn(async () => {}),
 }));

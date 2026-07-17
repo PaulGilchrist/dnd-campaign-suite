@@ -34,6 +34,10 @@ vi.mock('../../rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
 }));
 
+vi.mock('../../rules/combat/rangeCheck.js', () => ({
+  isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('../../automation/handlers/spells/slowHandler.js', () => ({
   processSlowRepeatSave: vi.fn().mockResolvedValue(undefined),
   handle: vi.fn(),
@@ -55,7 +59,7 @@ vi.mock('../../rules/combat/applyDamage.js', () => ({
 import { applyAuraDamage } from './expirations.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getCombatSummary, loadCombatSummary } from '../../encounters/combatData.js';
-import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
+import { isWithinRange } from '../../rules/combat/rangeCheck.js';
 import utils from '../../ui/utils.js';
 import { applyDamageToTarget } from '../../rules/combat/applyDamage.js';
 
@@ -87,7 +91,7 @@ describe('applyAuraDamage — damage application', () => {
         { name: 'Goblin', hit_points: { current: 7 } },
       ],
     });
-    getDistanceFeet.mockReturnValue(5);
+    isWithinRange.mockResolvedValue(true);
 
     await applyAuraDamage('Test', {}, 'Campaign', [], {
       activeKey: 'innerRadianceActive',
@@ -119,7 +123,7 @@ describe('applyAuraDamage — damage application', () => {
         { name: 'Orc' },
       ],
     });
-    getDistanceFeet.mockReturnValue(5);
+    isWithinRange.mockResolvedValue(true);
 
     await applyAuraDamage('Test', {}, 'Campaign', [], {
       activeKey: 'innerRadianceActive',
@@ -145,12 +149,7 @@ describe('applyAuraDamage — damage application', () => {
         { name: 'Goblin', gridX: 10, gridY: 10 },
       ],
     });
-    getDistanceFeet.mockImplementation((a, b) => {
-      const dx = Math.abs(a.gridX - b.gridX);
-      const dy = Math.abs(a.gridY - b.gridY);
-      const dist = Math.sqrt(dx * dx + dy * dy) * 5;
-      return dist > 10 ? null : dist;
-    });
+    isWithinRange.mockResolvedValue(true);
 
     await applyAuraDamage('Test', {}, 'Campaign', [], {
       activeKey: 'innerRadianceActive',
@@ -176,7 +175,7 @@ describe('applyAuraDamage — damage application', () => {
         { name: 'Slime', type: 'ooze', hit_points: { current: 5 } },
       ],
     });
-    getDistanceFeet.mockReturnValue(5);
+    isWithinRange.mockResolvedValue(true);
 
     await applyAuraDamage('Test', {}, 'Campaign', [], {
       activeKey: 'holyNimbusActive',
@@ -221,7 +220,7 @@ describe('applyAuraDamage — damage application', () => {
     getCombatSummary.mockReturnValue(null);
     const loadedSummary = { creatures: [{ name: 'Orc', hit_points: { current: 15 } }] };
     loadCombatSummary.mockResolvedValue(loadedSummary);
-    getDistanceFeet.mockReturnValue(5);
+    isWithinRange.mockResolvedValue(true);
 
     await applyAuraDamage('Test', {}, 'Campaign', [], {
       activeKey: 'innerRadianceActive',
@@ -241,7 +240,7 @@ describe('applyAuraDamage — damage application', () => {
     getCombatSummary.mockReturnValue({
       creatures: [{ name: 'Orc', hit_points: { current: 15 } }],
     });
-    getDistanceFeet.mockReturnValue(5);
+    isWithinRange.mockResolvedValue(true);
 
     await applyAuraDamage('Test', {}, 'Campaign', [], {
       activeKey: 'innerRadianceActive',

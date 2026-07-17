@@ -5,8 +5,7 @@ import utils from '../../ui/utils.js';
 import storage from '../../ui/storage.js';
 import { getCurrentCombatRound, getActiveCreatureName, getCombatSummary, loadCombatSummary } from '../../encounters/combatData.js';
 import { addEntry } from '../../ui/logService.js';
-import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
-import { isDistanceInRange } from '../../rules/combat/rangeCheck.js';
+import { isWithinRange } from '../combat/rangeCheck.js';
 import { applyDamageToTarget } from '../../rules/combat/applyDamage.js';
 import { processSlowRepeatSave } from '../../automation/handlers/spells/slowHandler.js';
 import { processTashasLaughterRepeatSave } from '../../automation/handlers/spells/tashasLaughterHandler.js';
@@ -779,9 +778,6 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
     const storedAllies = allyFilter ? getAllyList(activeName) : null;
     const allyList = Array.isArray(storedAllies) && storedAllies.length > 0 ? storedAllies : null;
 
-    const activeMapName = getRuntimeValue('__map__', 'activeMapName');
-    const playerCreature = combatSummary.players?.find(p => p.name === activeName);
-
     for (const creature of creatures) {
         const creatureName = utils.getName(creature.name);
         if (creatureName === utils.getName(activeName)) continue;
@@ -790,17 +786,8 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
 
         if (allyList && allyList.includes(creatureName)) continue;
 
-        const hasMap = !!activeMapName;
-        const hasPlayerPos = playerCreature?.gridX != null && playerCreature?.gridY != null;
-        const hasCreaturePos = creature.gridX != null && creature.gridY != null;
-
-        if (hasMap && hasPlayerPos && hasCreaturePos) {
-            const dist = getDistanceFeet(
-                { gridX: playerCreature.gridX, gridY: playerCreature.gridY },
-                { gridX: creature.gridX, gridY: creature.gridY }
-            );
-            if (!isDistanceInRange(dist, range)) continue;
-        }
+        const inRange = await isWithinRange(activeName, creatureName, range);
+        if (!inRange) continue;
 
         try {
             applyDamageToTarget(combatSummary, creatureName, damageValue, [damageType], campaignName, characters, false, activeName);
@@ -820,10 +807,6 @@ async function applyHolyNimbusDamage(activeName, characters, campaignName) {
     const summary = getCombatSummary(campaignName) || await loadCombatSummary(campaignName);
     if (!summary) return;
 
-    const activeMapName = getRuntimeValue('__map__', 'activeMapName');
-    const activeCreature = summary.creatures?.find(c => utils.getName(c.name) === utils.getName(activeName));
-    if (!activeCreature) return;
-
     for (const character of characters) {
         const charName = utils.getName(character.name);
         const holyNimbusActive = getRuntimeValue(charName, 'holyNimbusActive', campaignName);
@@ -839,18 +822,8 @@ async function applyHolyNimbusDamage(activeName, characters, campaignName) {
         if (damageValue <= 0) continue;
 
         const range = 10;
-        if (activeMapName) {
-            const playerCreature = summary.players?.find(p => utils.getName(p.name) === utils.getName(charName));
-            const hasPlayerPos = playerCreature?.gridX != null && playerCreature?.gridY != null;
-            const hasCreaturePos = activeCreature.gridX != null && activeCreature.gridY != null;
-            if (hasPlayerPos && hasCreaturePos) {
-                const dist = getDistanceFeet(
-                    { gridX: playerCreature.gridX, gridY: playerCreature.gridY },
-                    { gridX: activeCreature.gridX, gridY: activeCreature.gridY }
-                );
-            if (!isDistanceInRange(dist, range)) continue;
-            }
-        }
+        const inRange = await isWithinRange(charName, activeName, range);
+        if (!inRange) continue;
 
         try {
             applyDamageToTarget(summary, activeName, damageValue, ['Radiant'], campaignName, characters, false, charName);

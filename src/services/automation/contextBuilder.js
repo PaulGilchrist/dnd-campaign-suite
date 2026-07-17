@@ -3,7 +3,7 @@ import { getCombatContext, getTargetFromAttacker } from '../rules/combat/damageU
 import { getCurrentCombatRound } from '../encounters/combatData.js';
 import * as mapsService from '../maps/mapsService.js';
 import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHostileNPC, getNearestPlacedItem, rangeToFeet } from '../rules/combat/rangeValidation.js';
-import { isDistanceInRange } from '../rules/combat/rangeCheck.js';
+import { isWithinRange } from '../rules/combat/rangeCheck.js';
 import { computeCover } from '../rules/combat/coverService.js';
 import { loadNPCs } from '../npcs/npcsService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -484,20 +484,16 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
                     if (combatSummary) {
                         const targetCreature = combatSummary.creatures?.find(c => c.name === targetName);
                         if (targetCreature) {
-                            const hasAllyInRange = combatSummary.creatures.some(c => {
-                                if (c.name === playerName || c.name === targetName) return false;
+                        const hasAllyInRange = await (async () => {
+                            for (const c of combatSummary.creatures) {
+                                if (c.name === playerName || c.name === targetName) continue;
                                 if (c.type === 'player' || (c.type === 'npc' && c.attitude !== 'hostile')) {
-                                    const targetPos = targetCreature.position;
-                                    const allyPos = c.position;
-                                    if (targetPos && allyPos) {
-                                        const distance = getDistanceFeet(targetPos, allyPos);
-                                        return isDistanceInRange(distance, 5);
-                                    } else {
-                                        return true;
-                                    }
+                                    const inRange = await isWithinRange(targetName, c.name, 5);
+                                    if (inRange) return true;
                                 }
-                                return false;
-                            });
+                            }
+                            return false;
+                        })();
                             if (hasAllyInRange) {
                                 sneakAttackDice = sneakAttackNumD6;
                             }
@@ -559,7 +555,7 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
         if (!attackerPlayer) return base;
 
         let targetPos = null;
-        return getCombatContext(campaignName).then(cs => {
+        return getCombatContext(campaignName).then(async cs => {
             if (cs) {
                 const target = getTargetFromAttacker(cs, playerStats.name);
                 if (target) {
@@ -751,7 +747,7 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                 if (smiteCoverActive && coverResult.acBonus < 2) {
                     const auraSource = getAuraSourceForSmiteCover(playerStats, mapData);
                     if (auraSource) {
-                        const inAura = checkInAuraOfProtectionSync(auraSource, base.targetName, mapData, playerStats);
+                        const inAura = await checkInAuraOfProtection(auraSource, base.targetName, playerStats);
                         if (inAura) {
                             coverResult = { level: 'half', acBonus: 2 };
                             base.coverReason = 'Smite of Protection';
@@ -825,16 +821,7 @@ function getAuraSourceForSmiteCover(playerStats, mapData) {
     return mapData.players.find(p => hasAuraOfProtection(playerStats) && p.name === playerStats.name) || null;
 }
 
-function checkInAuraOfProtectionSync(auraSource, targetName, mapData, playerStats) {
-    if (!mapData?.players?.length) return true;
-
-    const sourcePlayer = auraSource;
-    if (!sourcePlayer) return true;
-
-    const targetPlayer = mapData.players.find(p => p.name === targetName);
-    if (!targetPlayer) return true;
-
-    const dist = getDistanceFeet(sourcePlayer, targetPlayer);
+async function checkInAuraOfProtection(auraSource, targetName, playerStats) {
     const auraRange = hasAuraOfProtection(playerStats) ? 30 : 10;
-    return isDistanceInRange(dist, auraRange);
+    return await isWithinRange(auraSource.name, targetName, auraRange);
 }

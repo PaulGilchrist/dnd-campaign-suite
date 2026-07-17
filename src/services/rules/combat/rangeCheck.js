@@ -40,3 +40,16 @@ export function isDistanceInRange(dist, rangeFt) {
   if (rangeFt == null) return true;
   return dist == null || dist <= rangeFt;
 }
+
+/**
+ * Check if targetName is within range of referenceName's position.
+ * Useful for effects that radiate from a target (not the caster).
+ *
+ * @param {string} referenceName - The creature/item whose position is the center
+ * @param {string} targetName - The creature to check
+ * @param {number|null} rangeFt - Range in feet, null means always in range
+ * @returns {Promise<boolean>}
+ */
+export async function isWithinRangeOf(referenceName, targetName, rangeFt) {
+  return isWithinRange(referenceName, targetName, rangeFt);
+}

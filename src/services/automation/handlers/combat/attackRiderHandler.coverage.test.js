@@ -27,8 +27,8 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
     getDistanceFeet: vi.fn(() => 5),
 }));
 
-vi.mock('../../../rules/combat/rangeValidation.js', () => ({
-    getDistanceFeet: vi.fn(() => 5),
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+    isWithinRange: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('../../../../../services/encounters/combatData.js', () => ({
@@ -47,7 +47,7 @@ vi.mock('../../../automation/common/savePrompt.js', () => ({
 
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -397,7 +397,7 @@ describe('attackRiderHandler - Versatile Trickster edge cases', () => {
                 { name: 'Skeleton', size: 'Medium', position: { x: 10, y: 10 } },
             ],
         });
-        vi.mocked(getDistanceFeet).mockReturnValue(50);
+        isWithinRange.mockResolvedValue(false);
         const stats = makePlayerStats({
             automation: {
                 passives: [{ type: 'passive_rule', effect: 'versatile_trickster' }],

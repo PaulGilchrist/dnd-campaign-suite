@@ -18,6 +18,10 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+  isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('../../common/targetResolver.js', () => ({
   resolveMapPositions: vi.fn(),
 }));
@@ -26,7 +30,7 @@ import { handle, handleConfirm } from './sleepShakeHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { rangeToFeet, getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
 
 const campaignName = 'TestCampaign';
@@ -99,7 +103,6 @@ describe('sleepShakeHandler', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -110,7 +113,6 @@ describe('sleepShakeHandler', () => {
 
       it('falls back to eligible targets when no sleep targets exist', async () => {
         getCombatContext.mockResolvedValue(baseCombatContext);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -136,7 +138,6 @@ describe('sleepShakeHandler', () => {
 
       it('skips caster from eligible targets', async () => {
         getCombatContext.mockResolvedValue(baseCombatContext);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -157,7 +158,11 @@ describe('sleepShakeHandler', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(10);
+        isWithinRange.mockImplementation(async (src, tgt, _range) => {
+          if (tgt === 'Goblin') return true;
+          if (tgt === 'Orc') return false;
+          return true;
+        });
         resolveMapPositions.mockResolvedValue({
           attackerPos: { gridX: 5, gridY: 10 },
           mapData: {
@@ -167,12 +172,6 @@ describe('sleepShakeHandler', () => {
               { name: 'Orc', gridX: 8, gridY: 10 },
             ],
           },
-        });
-
-        getDistanceFeet.mockImplementation((p1, p2) => {
-          const dx = p2.gridX - p1.gridX;
-          const dy = p2.gridY - p1.gridY;
-          return Math.sqrt(dx * dx + dy * dy) * 5;
         });
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
@@ -192,7 +191,7 @@ describe('sleepShakeHandler', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(Infinity);
+        isWithinRange.mockResolvedValue(true);
         resolveMapPositions.mockResolvedValue({
           attackerPos: { gridX: 5, gridY: 10 },
           mapData: {
@@ -218,7 +217,7 @@ describe('sleepShakeHandler', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(Infinity);
+        isWithinRange.mockResolvedValue(true);
         resolveMapPositions.mockResolvedValue({
           attackerPos: { gridX: 5, gridY: 10 },
           mapData: {
@@ -244,7 +243,7 @@ describe('sleepShakeHandler', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(10);
+        isWithinRange.mockResolvedValue(true);
         resolveMapPositions.mockResolvedValue({
           attackerPos: { gridX: 5, gridY: 10 },
           mapData: {
@@ -257,33 +256,6 @@ describe('sleepShakeHandler', () => {
 
         expect(result.type).toBe('modal');
         expect(result.payload.targets).toEqual(['Goblin', 'Orc']);
-      });
-
-      it('includes target when distance is null (assumes in range)', async () => {
-        const ctx = {
-          creatures: [
-            { name: 'Goblin', type: 'monster' },
-            { name: 'TestCaster', gridX: 5, gridY: 10 },
-          ],
-          players: [{ name: 'TestCaster', gridX: 5, gridY: 10 }],
-          placedItems: [],
-        };
-        getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(10);
-        resolveMapPositions.mockResolvedValue({
-          attackerPos: { gridX: 5, gridY: 10 },
-          mapData: {
-            players: [{ name: 'TestCaster', gridX: 5, gridY: 10 }],
-            placedItems: [{ name: 'Goblin', gridX: 6, gridY: 10 }],
-          },
-        });
-        getDistanceFeet.mockReturnValue(null);
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-        // Code returns true when dist == null, so Goblin is included
-        expect(result.type).toBe('modal');
-        expect(result.payload.targets).toEqual(['Goblin']);
       });
     });
 
@@ -299,7 +271,6 @@ describe('sleepShakeHandler', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
         getRuntimeValue.mockReturnValue(['incapacitated', 'poisoned']);
 
@@ -319,7 +290,6 @@ describe('sleepShakeHandler', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
         getRuntimeValue.mockReturnValue(['unconscious', 'frightened']);
 
@@ -339,7 +309,6 @@ describe('sleepShakeHandler', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
         getRuntimeValue.mockReturnValue(['frightened', 'poisoned']);
 
@@ -358,7 +327,6 @@ describe('sleepShakeHandler', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
         getRuntimeValue.mockReturnValue(null);
 
@@ -380,7 +348,6 @@ describe('sleepShakeHandler', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -399,7 +366,6 @@ describe('sleepShakeHandler', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -418,7 +384,6 @@ describe('sleepShakeHandler', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -437,7 +402,6 @@ describe('sleepShakeHandler', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -450,7 +414,6 @@ describe('sleepShakeHandler', () => {
     describe('modal payload', () => {
       it('returns correct modal payload structure', async () => {
         getCombatContext.mockResolvedValue(baseCombatContext);
-        rangeToFeet.mockReturnValue(5);
         resolveMapPositions.mockResolvedValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -466,7 +429,6 @@ describe('sleepShakeHandler', () => {
 
       it('uses action name when provided', async () => {
         getCombatContext.mockResolvedValue(baseCombatContext);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
 
         const action = makeAction();
@@ -476,19 +438,17 @@ describe('sleepShakeHandler', () => {
         expect(result.payload.featureName).toBe('Custom Shake');
       });
 
-      it('handles default range string conversion', async () => {
+      it('parses range from automation string', async () => {
         getCombatContext.mockResolvedValue(baseCombatContext);
-        rangeToFeet.mockReturnValue(5);
         resolveMapPositions.mockResolvedValue(null);
 
-        await handle(makeAction(), makePlayerStats(), campaignName, null);
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-        expect(rangeToFeet).toHaveBeenCalledWith('5 ft');
+        expect(result.payload.rangeFeet).toBe(5);
       });
 
       it('passes automation through payload', async () => {
         getCombatContext.mockResolvedValue(baseCombatContext);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
 
         const action = makeAction({ range: '10 ft' });

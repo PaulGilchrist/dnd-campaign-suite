@@ -18,6 +18,10 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+  isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('../../common/targetResolver.js', () => ({
   resolveMapPositions: vi.fn(),
 }));
@@ -26,7 +30,7 @@ import { handle, handleConfirm } from './hypnoticPatternShake.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { rangeToFeet, getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
 
 const campaignName = 'TestCampaign';
@@ -90,7 +94,6 @@ describe('hypnoticPatternShake', () => {
     describe('target selection — no map', () => {
       it('skips caster, returns all other creatures as eligible', async () => {
         getCombatContext.mockResolvedValue(baseCombatContext);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -126,7 +129,6 @@ describe('hypnoticPatternShake', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -146,7 +148,6 @@ describe('hypnoticPatternShake', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -168,7 +169,11 @@ describe('hypnoticPatternShake', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(10);
+        isWithinRange.mockImplementation(async (src, tgt, _range) => {
+          if (tgt === 'Goblin') return true;
+          if (tgt === 'Orc') return false;
+          return true;
+        });
         resolveMapPositions.mockResolvedValue({
           attackerPos: { gridX: 5, gridY: 10 },
           mapData: {
@@ -182,12 +187,6 @@ describe('hypnoticPatternShake', () => {
 
         // Goblin at (6, 10) = 5 ft, within range
         // Orc at (8, 10) = 15 ft, out of range
-        getDistanceFeet.mockImplementation((p1, p2) => {
-          const dx = p2.gridX - p1.gridX;
-          const dy = p2.gridY - p1.gridY;
-          return Math.sqrt(dx * dx + dy * dy) * 5;
-        });
-
         const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
         expect(result.type).toBe('modal');
@@ -205,7 +204,7 @@ describe('hypnoticPatternShake', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(Infinity);
+        isWithinRange.mockResolvedValue(true);
         resolveMapPositions.mockResolvedValue({
           attackerPos: { gridX: 5, gridY: 10 },
           mapData: {
@@ -231,7 +230,7 @@ describe('hypnoticPatternShake', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(10);
+        isWithinRange.mockResolvedValue(true);
         // Only attacker has position, Goblin has none
         resolveMapPositions.mockResolvedValue({
           attackerPos: { gridX: 5, gridY: 10 },
@@ -251,7 +250,6 @@ describe('hypnoticPatternShake', () => {
     describe('modal payload', () => {
       it('returns correct modal payload structure', async () => {
         getCombatContext.mockResolvedValue(baseCombatContext);
-        rangeToFeet.mockReturnValue(5);
         resolveMapPositions.mockResolvedValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -267,7 +265,6 @@ describe('hypnoticPatternShake', () => {
 
       it('uses action name when provided', async () => {
         getCombatContext.mockResolvedValue(baseCombatContext);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
 
         const action = makeAction();
@@ -277,14 +274,12 @@ describe('hypnoticPatternShake', () => {
         expect(result.payload.featureName).toBe('Custom Shake');
       });
 
-      it('handles default range string conversion', async () => {
+      it('parses range from automation string', async () => {
         getCombatContext.mockResolvedValue(baseCombatContext);
-        rangeToFeet.mockReturnValue(5);
         resolveMapPositions.mockResolvedValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-        expect(rangeToFeet).toHaveBeenCalledWith('5 ft');
         expect(result.payload.rangeFeet).toBe(5);
       });
     });
@@ -301,7 +296,6 @@ describe('hypnoticPatternShake', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
         getRuntimeValue.mockReturnValue(['charmed', 'frightened']);
 
@@ -322,7 +316,6 @@ describe('hypnoticPatternShake', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
         getRuntimeValue.mockReturnValue(['incapacitated', 'poisoned']);
 
@@ -342,7 +335,6 @@ describe('hypnoticPatternShake', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
         getRuntimeValue.mockReturnValue(['frightened', 'poisoned']);
 
@@ -364,7 +356,6 @@ describe('hypnoticPatternShake', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -383,7 +374,6 @@ describe('hypnoticPatternShake', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -402,7 +392,6 @@ describe('hypnoticPatternShake', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -421,7 +410,6 @@ describe('hypnoticPatternShake', () => {
           placedItems: [],
         };
         getCombatContext.mockResolvedValue(ctx);
-        rangeToFeet.mockReturnValue(null);
         resolveMapPositions.mockResolvedValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);

@@ -8,8 +8,8 @@ import { loadManeuvers } from '../../../ui/dataLoader.js';
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
-import { isDistanceInRange } from '../../../rules/combat/rangeCheck.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 
 function applyConditionToTarget(targetName, conditionKey, campaignName, combatSummary) {
@@ -705,14 +705,13 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
 
             if (targetIndex >= 0 && cs.creatures[targetIndex]?.position) {
                 const rangeFt = rangeToFeet(maneuver.range || '8_ft') || 8;
-                secondaryTargets = cs.creatures
-                    .filter((c, i) => i !== targetIndex && c.position)
-                    .map(c => ({
-                        creature: c,
-                        distance: getDistanceFeet(cs.creatures[targetIndex].position, c.position),
-                    }))
-                    .filter(t => isDistanceInRange(t.distance, rangeFt))
-                    .map(t => t.creature);
+                secondaryTargets = [];
+                for (let i = 0; i < cs.creatures.length; i++) {
+                    if (i === targetIndex) continue;
+                    const c = cs.creatures[i];
+                    const inRange = await isWithinRange(cs.creatures[targetIndex].name, c.name, rangeFt);
+                    if (inRange) secondaryTargets.push(c);
+                }
 
                 if (secondaryTargets.length === 0) {
                     description += ` No valid secondary targets within 5 feet of ${targetName}.`;
