@@ -876,3 +876,57 @@
     background: var(--background-color-input);
     border-radius: 3px;
 }
+
+/* Summons entries */
+.log-summons {
+    border-left: 3px solid #06b6d4;
+}
+
+.log-summons-details {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-left: 28px;
+    margin-top: 2px;
+}
+
+.log-summons-description {
+    font-size: 0.85rem;
+    color: var(--color-text);
+}
+
+.log-summons-description b,
+.log-summons-description strong {
+    font-weight: 700;
+    color: var(--color-header);
+}
+
+.log-summons-description i {
+    font-style: italic;
+    color: var(--color-text-muted);
+}
+
+.log-summons-creatures {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.log-summons-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+}
+
+.log-summons-creature {
+    font-size: 0.82rem;
+    color: var(--color-text);
+}
+
+.log-summons-duration {
+    font-size: 0.78rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+}

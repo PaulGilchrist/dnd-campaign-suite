@@ -50,17 +50,22 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     await setRuntimeValue(playerName, usesKey, usesRemaining - 1, campaignName);
 
-    const description = `<b>${featureName}</b><br/>Action — 30-foot Cube<br/>`
+    const description = `Action — 30-foot Cube<br/>`
         + `• Heal: Up to 100 HP divided among creatures in range<br/>`
         + `• Repair: Damaged objects repaired instantly<br/>`
         + `• Dispel: Every spell of level 6 and lower ends<br/>`
         + `${usesRemaining > 1 ? (usesRemaining - 1) + ' use' + (usesRemaining - 1 > 1 ? 's' : '') + ' remaining' : 'No uses remaining'}.`;
 
     addEntry(campaignName, {
-        type: 'ability_use',
+        type: 'summons',
         characterName: playerName,
-        abilityName: featureName,
-        description: `${playerName} used ${featureName}.`,
+        summonName: featureName,
+        description: `<b>${featureName}</b><br/>Action — 30-foot Cube<br/>`
+            + `• Heal: Up to 100 HP divided among creatures in range<br/>`
+            + `• Repair: Damaged objects repaired instantly<br/>`
+            + `• Dispel: Every spell of level 6 and lower ends<br/>`
+            + `${usesRemaining > 1 ? (usesRemaining - 1) + ' use' + (usesRemaining - 1 > 1 ? 's' : '') + ' remaining' : 'No uses remaining'}.`,
+        summonedCreatures: ['spirits of order'],
     }).catch((e) => { console.error("[clockworkCavalcade] Error:", e); });
 
     return {

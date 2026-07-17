@@ -203,6 +203,7 @@ const categories2024 = {
         "Animal Speaker",
         "Avatar of Battle",
         "Bonus Proficiencies",
+        "Clockwork Spells",
         "Deft Explorer",
         "Divine Order",
         "Draconic Ancestry",

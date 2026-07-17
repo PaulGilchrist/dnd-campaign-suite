@@ -115,15 +115,16 @@ describe('clockworkCavalcadeHandler', () => {
             expect(calls[0][2]).toBe(0);
         });
 
-        it('should log the ability use', async () => {
+        it('should log the summons', async () => {
             useRuntimeState.getRuntimeValue.mockReturnValue(null);
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
             expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                type: 'ability_use',
+                type: 'summons',
                 characterName: 'TestSorcerer',
-                abilityName: 'Clockwork Cavalcade',
+                summonName: 'Clockwork Cavalcade',
+                summonedCreatures: ['spirits of order'],
             }));
         });
 
@@ -198,6 +199,23 @@ describe('clockworkCavalcadeHandler', () => {
                 type: 'ability_use',
                 characterName: 'TestSorcerer',
                 abilityName: 'Clockwork Cavalcade',
+            }));
+        });
+
+        it('should log a summons entry when restoring via SP and using the feature', async () => {
+            useRuntimeState.getRuntimeValue.mockReturnValue('0');
+
+            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+
+            const calls = logService.addEntry.mock.calls.filter(
+                (c) => c[1] && c[1].type === 'summons'
+            );
+            expect(calls.length).toBe(1);
+            expect(calls[0][1]).toEqual(expect.objectContaining({
+                type: 'summons',
+                characterName: 'TestSorcerer',
+                summonName: 'Clockwork Cavalcade',
+                summonedCreatures: ['spirits of order'],
             }));
         });
     });
