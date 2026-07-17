@@ -421,7 +421,7 @@ describe('psionicStrikeHandler', () => {
             }));
         });
 
-        it('calls addEntry with damage_roll log entry', async () => {
+        it('calls addEntry with roll log entry', async () => {
             getRuntimeValue.mockImplementation((player, key, _campaign) => {
                 if (player === 'characters' && key === 'characters') return [];
                 if (key === 'psionicEnergy') return 5;
@@ -435,7 +435,8 @@ describe('psionicStrikeHandler', () => {
             await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                type: 'damage_roll',
+                type: 'roll',
+                rollType: 'damage',
                 characterName: 'Test Fighter',
                 targetName: 'Target Goblin',
                 damageType: 'Force',

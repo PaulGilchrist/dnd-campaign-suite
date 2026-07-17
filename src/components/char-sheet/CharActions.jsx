@@ -317,19 +317,19 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             const abilityMod = ability?.bonus || 0;
             const prof = playerStats.proficiency || 0;
             const saveDc = 8 + abilityMod + prof;
-            const { promptId, promise } = createSaveListener(campaignName, {
+            const { promise } = createSaveListener(campaignName, {
                 targetName: actualTargetName,
                 saveType: 'CON',
                 saveDc,
             });
             await addEntry(campaignName, {
-                type: 'save_triggered',
+                type: 'save_result',
                 characterName: playerStats.name,
                 targetName: actualTargetName,
                 saveType: 'CON',
                 saveDc,
                 description: `Topple: ${actualTargetName} must make a DC ${saveDc} CON save (weapon ${abilityName}) or fall Prone.`,
-                promptId,
+                success: null,
             }).catch(() => {});
             const result = await promise;
             if (result && !result.success) {

@@ -169,11 +169,15 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 }).catch((e) => { console.error("[hurlThroughHell] Error:", e); });
 
                 addEntry(campaignName, {
-                    type: 'damage_roll',
+                    type: 'roll',
                     characterName: playerName,
+                    rollType: 'damage',
+                    name: 'Hurl Through Hell Damage',
                     targetName,
                     damageType: damageType,
                     formula: damageExpression,
+                    rolls: dieRoll?.rolls,
+                    total: damageTotal,
                     description: `${targetName} takes ${damageTotal} ${damageType} damage from Hurl Through Hell.`,
                     timestamp: Date.now(),
                 }).catch((e) => { console.error("[hurlThroughHell] Error:", e); });

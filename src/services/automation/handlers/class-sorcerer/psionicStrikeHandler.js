@@ -140,13 +140,15 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }).catch(() => {});
 
     await addEntry(campaignName, {
-        type: 'damage_roll',
+        type: 'roll',
         characterName: playerName,
+        rollType: 'damage',
+        name: 'Psionic Strike Damage',
         targetName,
         damageType: 'Force',
         total: totalDamage,
         formula: `${psionicDieSize} + ${intMod}`,
-        description: `${action.name} dealt ${totalDamage} Force damage to ${targetName}.`,
+        rolls: [dieValue, intMod],
     }).catch(() => {});
 
     let description = `${action.name}: Dealt <strong>${totalDamage}</strong> Force damage to ${targetName}. (Rolled ${psionicDieSize} for ${dieValue} + INT ${intMod}). Psionic Energy: ${currentUses - 1}/${defaultMax}.`;

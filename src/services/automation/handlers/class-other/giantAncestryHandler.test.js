@@ -221,7 +221,8 @@ describe('giantAncestryHandler', () => {
             expect(result.payload.description).toContain('Fire');
             expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', "fire'sburnUses", 2, 'campaign');
             expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
-                type: 'damage_roll',
+                type: 'roll',
+                rollType: 'damage',
                 characterName: 'TestHero',
                 targetName: 'Goblin',
                 damageType: 'Fire',
@@ -264,7 +265,8 @@ describe('giantAncestryHandler', () => {
             expect(result.payload.description).toContain('Cold');
             expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', expect.any(Array), 'campaign');
             expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
-                type: 'damage_roll',
+                type: 'roll',
+                rollType: 'damage',
                 targetName: 'Goblin',
                 damageType: 'Cold',
             }));
@@ -369,7 +371,8 @@ describe('giantAncestryHandler', () => {
             expect(result.payload.description).toContain('Thunder');
             expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', "storm'sthunderUses", 2, 'campaign');
             expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
-                type: 'damage_roll',
+                type: 'roll',
+                rollType: 'damage',
                 targetName: 'Goblin',
                 damageType: 'Thunder',
             }));

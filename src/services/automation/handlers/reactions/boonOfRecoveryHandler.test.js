@@ -87,14 +87,13 @@ describe('boonOfRecoveryHandler', () => {
                     playerName, 'activeConditions', ['poisoned'], campaignName
                 );
                 expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
-                    type: 'heal',
+                    type: 'hp_change',
                     targetName: playerName,
                     delta: 20,
                     currentHp: 20,
                     maxHp: 40,
                     isHealing: true,
                     isUnconscious: false,
-                    abilityName: 'Boon Of Recovery',
                 });
                 expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
                     type: 'ability_use',

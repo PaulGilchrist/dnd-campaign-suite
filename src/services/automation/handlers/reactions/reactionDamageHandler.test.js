@@ -387,7 +387,10 @@ describe('reactionDamageHandler', () => {
             await new Promise(r => setTimeout(r, 10));
 
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                type: 'damage_roll', targetName: 'Enemy', damageType: 'Necrotic',
+                type: 'roll',
+                rollType: 'damage',
+                targetName: 'Enemy',
+                damageType: 'Necrotic',
             }));
         });
 
@@ -404,7 +407,8 @@ describe('reactionDamageHandler', () => {
             await new Promise(r => setTimeout(r, 10));
 
             expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                type: 'damage_roll',
+                type: 'roll',
+                rollType: 'damage',
             }));
 
             vi.clearAllMocks();
@@ -420,7 +424,8 @@ describe('reactionDamageHandler', () => {
             await new Promise(r => setTimeout(r, 10));
 
             expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                type: 'damage_roll',
+                type: 'roll',
+                rollType: 'damage',
             }));
         });
 

@@ -1078,20 +1078,20 @@ export function buildDamageSteps() {
         const prof = ctx.playerStats.proficiency || 0;
         const saveDc = 8 + abilityMod + prof;
 
-        const { promptId, promise } = createSaveListener(ctx.campaignName, {
+        const { promise } = createSaveListener(ctx.campaignName, {
           targetName: toppleTargetName,
           saveType: 'CON',
           saveDc,
         });
 
         addEntry(ctx.campaignName, {
-          type: 'save_triggered',
+          type: 'save_result',
           characterName: ctx.playerStats.name,
           targetName: toppleTargetName,
           saveType: 'CON',
           saveDc,
           description: `Topple: ${toppleTargetName} must make a DC ${saveDc} CON save (weapon ${abilityName}) or fall Prone.`,
-          promptId,
+          success: null,
         }).catch(() => {});
 
         const result = await promise;

@@ -554,11 +554,9 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
             }
 
             await addEntry(campaignName, {
-                type: 'damage',
+                type: 'ability_use',
                 characterName: activeName,
-                targetName: creatureName,
-                damageType: damageType.toLowerCase(),
-                damageAmount: damage,
+                abilityName: 'Unarmed Fighting',
                 description: `Unarmed Fighting grapple damage: ${damage} ${damageType.toLowerCase()} to ${creatureName}`,
                 timestamp: Date.now(),
             }).catch((e) => { console.error("[expirations] Error:", e); });

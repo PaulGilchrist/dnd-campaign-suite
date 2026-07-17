@@ -868,7 +868,7 @@ describe('buildDamageSteps - cleaveMastery, tacticalMaster, toppleMastery, maste
         }));
       });
 
-      it('logs a save_triggered entry', async () => {
+      it('logs a save_result entry', async () => {
         loadCombatSummary.mockResolvedValue({
           lastAttack: { hit: true, targetName: 'Orc', attackName: 'Greataxe' },
         });
@@ -889,7 +889,7 @@ describe('buildDamageSteps - cleaveMastery, tacticalMaster, toppleMastery, maste
         expect(addEntry).toHaveBeenCalledWith(
           'test-campaign',
           expect.objectContaining({
-            type: 'save_triggered',
+            type: 'save_result',
             targetName: 'Orc',
             saveType: 'CON',
             saveDc: 14,

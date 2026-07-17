@@ -119,8 +119,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             // The Psychic damage is equal to the damage the player takes (after halving)
             // Since we can't know the exact damage at this point, describe it as a prompt
             addEntry(campaignName, {
-                type: 'damage_roll',
+                type: 'roll',
                 characterName: playerName,
+                rollType: 'damage',
+                name: featureName + ' Damage',
                 targetName,
                 damageType: 'Psychic',
                 formula: 'equal to damage taken (after halving)',

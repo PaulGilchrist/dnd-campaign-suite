@@ -506,7 +506,7 @@ describe('Initiative - Callback Integration', () => {
             });
 
             expect(breakConcentration).toHaveBeenCalled();
-            expect(logConditionEvent).toHaveBeenCalledWith('test-campaign', 'concentration-broken', 'Alice', 'Concentration: Shield');
+            expect(logConditionEvent).toHaveBeenCalledWith('test-campaign', 'removed', 'Alice', 'Concentration: Shield');
         });
     });
 

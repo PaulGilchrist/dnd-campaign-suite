@@ -108,23 +108,27 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     // Log the healing
     await addEntry(campaignName, {
-        type: 'heal',
+        type: 'hp_change',
         characterName: playerName,
         targetName: targetName || 'target',
-        amount: healAmount,
-        abilityName: action.name,
-        timestamp: Date.now(),
+        delta: healAmount,
+        currentHp: (targetName ? (getRuntimeValue(targetName, 'currentHitPoints') ?? 0) : 0),
+        maxHp: (targetName ? (getRuntimeValue(targetName, 'currentHitPoints') ?? 40) : 40),
+        isHealing: true,
     }).catch((e) => { console.error("[searingVengeance] Error:", e); });
 
     // Log the damage
     if (damageAmount > 0) {
         await addEntry(campaignName, {
-            type: 'damage_roll',
+            type: 'roll',
             characterName: playerName,
+            rollType: 'damage',
+            name: action.name + ' Damage',
             targetName: targetName || 'target',
             damageType: auto.damageType || 'Radiant',
             total: damageAmount,
             formula: damageExpr,
+            rolls: damageResult?.rolls,
             description: `${action.name} dealt ${damageAmount} radiant damage to creatures within 30 feet.`,
         }).catch((e) => { console.error("[searingVengeance] Error:", e); });
     }

@@ -270,12 +270,15 @@ export async function handleFiresBurn(action, playerStats, campaignName, option)
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
     await addEntry(campaignName, {
-        type: 'damage_roll',
+        type: 'roll',
         characterName: playerStats.name,
+        rollType: 'damage',
+        name: option.name + ' Damage',
         targetName,
         damageType: option.damageType,
         total: damageResult?.total ?? 0,
         formula: option.damage,
+        rolls: damageResult?.rolls,
         description: `${playerStats.name} used ${option.name} to deal ${damageDisplay} ${option.damageType} damage to ${targetName}.`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
@@ -340,12 +343,15 @@ export async function handleFrostsChill(action, playerStats, campaignName, optio
     await setRuntimeValue(campaignName, 'targetEffects', [...storedEffects, speedEffect], campaignName);
 
     await addEntry(campaignName, {
-        type: 'damage_roll',
+        type: 'roll',
         characterName: playerStats.name,
+        rollType: 'damage',
+        name: option.name + ' Damage',
         targetName,
         damageType: option.damageType,
         total: damageResult?.total ?? 0,
         formula: option.damage,
+        rolls: damageResult?.rolls,
         description: `${playerStats.name} used ${option.name} to deal ${damageDisplay} ${option.damageType} damage and reduce ${targetName}'s speed by 10 feet.`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
@@ -502,12 +508,15 @@ export async function handleStormsThunder(action, playerStats, campaignName, _ma
     const damageDisplay = damageResult ? damageResult.total : option.damage;
 
     await addEntry(campaignName, {
-        type: 'damage_roll',
+        type: 'roll',
         characterName: playerStats.name,
+        rollType: 'damage',
+        name: option.name + ' Damage',
         targetName,
         damageType: option.damageType,
         total: damageResult?.total ?? 0,
         formula: option.damage,
+        rolls: damageResult?.rolls,
         description: `${playerStats.name} used ${option.name} to deal ${damageDisplay} ${option.damageType} damage to ${targetName} as a reaction.`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 

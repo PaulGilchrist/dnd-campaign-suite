@@ -694,7 +694,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         if (!spell) return
         storage.set('combatSummary', combatSummary, campaignName)
         setCombatSummary(cloneDeep(combatSummary))
-        logConditionEvent(campaignName, 'concentration-broken', creatureName, `Concentration: ${spell}`)
+        logConditionEvent(campaignName, 'removed', creatureName, `Concentration: ${spell}`)
         if (spell === "Hunter's Mark") {
             const existingBuffs = getRuntimeValue(creatureName, 'activeBuffs', campaignName) || []
             const newBuffs = Array.isArray(existingBuffs) ? existingBuffs.filter(b => b.name !== "Hunter's Mark") : []

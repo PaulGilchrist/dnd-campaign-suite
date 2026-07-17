@@ -475,26 +475,28 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
         const { success, roll, total } = rollConcentrationSave(saveBonus, creature.concentration.dc, dragonConstellationActive);
         if (!success) {
           const spellName = creature.concentration.spell;
-          const dc = creature.concentration.dc;
           creature.concentration = null;
           npcConcentrationBroken = true;
           addEntry(campaignName, {
-            type: 'concentration-broken',
+            type: 'condition',
+            action: 'removed',
             characterName: creature.name,
-            spellName,
-            roll,
-            total,
-            dc,
+            condition: 'Concentrating on ' + spellName,
+            sourceName: 'Concentration broken by damage',
           }).catch((e) => { console.error("[applyDamage] Error:", e); });
         } else {
           addEntry(campaignName, {
-            type: 'concentration-save',
+            type: 'roll',
             characterName: creature.name,
-            spellName: creature.concentration.spell,
-            roll,
-            total,
-            dc: creature.concentration.dc,
-            success: true,
+            rollType: 'save',
+            name: 'Concentration Save',
+            targetName: creature.concentration.spell,
+            rolls: [roll],
+            total: total,
+            bonus: total - roll,
+            saveType: 'CON',
+            saveDc: creature.concentration.dc,
+            saveResult: 'success',
           }).catch((e) => { console.error("[applyDamage] Error:", e); });
         }
       }

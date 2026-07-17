@@ -37,14 +37,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     await setRuntimeValue(playerName, 'deathFailures', [false, false, false], campaignName);
 
     addEntry(campaignName, {
-        type: 'heal',
+        type: 'hp_change',
         targetName: playerName,
         delta: newHp,
         currentHp: newHp,
         maxHp,
         isHealing: true,
         isUnconscious: false,
-        abilityName: action.name,
     }).catch((e) => { console.error("[boonOfRecovery] Error:", e); });
 
     addEntry(campaignName, {

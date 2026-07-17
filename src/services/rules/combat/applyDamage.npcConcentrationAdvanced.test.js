@@ -286,7 +286,7 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
 
 
   describe('concentration save logging', () => {
-    it('logs concentration-broken when NPC fails save (no special features)', () => {
+    it('logs a condition entry when NPC fails save (no special features)', () => {
       const orcCreature = createNpcCreature('Orc', 30, 30, {
         concentration: { spell: 'Haste', dc: 15 },
         saveBonuses: { con: -1 },
@@ -301,17 +301,15 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
       ]);
 
       expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
-        type: 'concentration-broken',
+        type: 'condition',
+        action: 'removed',
         characterName: 'Orc',
-        spellName: 'Haste',
-        roll: 5,
-        total: 4,
-        dc: 10,
+        condition: 'Concentrating on Haste',
       }));
       expect(orcCreature.concentration).toBeNull();
     });
 
-    it('logs concentration-save when NPC passes save (no special features)', () => {
+    it('logs a roll entry when NPC passes save (no special features)', () => {
       const orcCreature = createNpcCreature('Orc', 30, 30, {
         concentration: { spell: 'Haste', dc: 10 },
         saveBonuses: { con: 5 },
@@ -326,13 +324,13 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
       ]);
 
       expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
-        type: 'concentration-save',
+        type: 'roll',
+        rollType: 'save',
         characterName: 'Orc',
-        spellName: 'Haste',
-        roll: 12,
-        total: 17,
-        dc: 10,
-        success: true,
+        name: 'Concentration Save',
+        saveType: 'CON',
+        saveDc: 10,
+        saveResult: 'success',
       }));
       expect(orcCreature.concentration).not.toBeNull();
     });

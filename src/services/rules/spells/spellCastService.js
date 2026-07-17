@@ -590,7 +590,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
 
     // Hunter's Mark: does not deal damage on cast — adds 1d6 Force damage to weapon attacks via concentration
     if (spell.name === "Hunter's Mark") {
-        addEntry(campaignName, { type: 'cast', characterName: playerStats.name, spellName: "Hunter's Mark" }).catch(() => {});
+        addEntry(campaignName, { type: 'spell', characterName: playerStats.name, spellName: "Hunter's Mark", spellLevel: 1, castingTime: '1 bonus action' }).catch(() => {});
         return;
     }
 
@@ -1038,11 +1038,15 @@ async function applyPowerWordKillToTarget(targetName, playerStats, campaignName)
 
     if (currentHp <= 100) {
         addEntry(campaignName, {
-            type: 'creature_death',
-            characterName: targetName,
-            cause: 'Power Word Kill',
-            casterName: playerStats.name,
-            timestamp: Date.now(),
+            type: 'hp_change',
+            targetName: targetName,
+            delta: -(currentHp || creature.maxHp),
+            currentHp: 0,
+            maxHp: creature.maxHp,
+            isHealing: false,
+            isUnconscious: false,
+            threshold: 'dead',
+            note: 'Power Word Kill',
         }).catch((e) => { console.error("[spellCast] Error:", e); });
 
         applyDamageToTarget(combatSummary, targetName, currentHp, ['Psychic'], campaignName, [], false, playerStats.name);

@@ -549,7 +549,8 @@ describe('hurlThroughHellHandler', () => {
                 dispatchSaveResult('test-prompt-id', false);
 
                 expect(addEntry).not.toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
-                    type: 'damage_roll',
+                    type: 'roll',
+                    rollType: 'damage',
                 }));
             });
 
@@ -568,7 +569,8 @@ describe('hurlThroughHellHandler', () => {
                 await Promise.resolve();
 
                 expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
-                    type: 'damage_roll',
+                    type: 'roll',
+                    rollType: 'damage',
                     targetName: 'Goblin',
                     damageType: 'Psychic',
                     formula: '8d10',

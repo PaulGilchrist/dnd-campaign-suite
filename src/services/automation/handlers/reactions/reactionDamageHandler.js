@@ -181,12 +181,15 @@ export async function handle(action, playerStats, campaignName, mapName, allEqui
             const damageResult = rollExpression(auto.damageExpression);
             if (damageResult) {
                 addEntry(campaignName, {
-                    type: 'damage_roll',
+                    type: 'roll',
                     characterName: playerStats.name,
+                    rollType: 'damage',
+                    name: action.name + ' Damage',
                     targetName,
                     damageType: auto.damageType || 'Necrotic',
                     total: damageResult.total,
                     formula: auto.damageExpression,
+                    rolls: damageResult.rolls,
                     description: `${action.name} dealt ${damageResult.total} ${auto.damageType || 'Necrotic'} damage to ${targetName}.`,
                 }).catch((e) => { console.error("[reactionDamage] Error:", e); });
             }

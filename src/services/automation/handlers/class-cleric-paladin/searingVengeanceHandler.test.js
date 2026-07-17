@@ -302,14 +302,13 @@ describe('searingVengeanceHandler.handle', () => {
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'heal',
+        type: 'hp_change',
         targetName: 'Ally',
-        amount: 20,
-        abilityName: 'Searing Vengeance',
+        isHealing: true,
       }));
     });
 
-    it('logs a damage_roll entry when damage is greater than zero', async () => {
+    it('logs a roll entry with damage details when damage is greater than zero', async () => {
       mockRuntimeValues({ searingvengeanceUses: 1 });
       damageUtils.getCombatContext.mockResolvedValue({});
       damageUtils.getTargetFromAttacker.mockReturnValue({
@@ -321,7 +320,8 @@ describe('searingVengeanceHandler.handle', () => {
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'damage_roll',
+        type: 'roll',
+        rollType: 'damage',
         damageType: 'Radiant',
         total: 14,
       }));
@@ -340,7 +340,7 @@ describe('searingVengeanceHandler.handle', () => {
       await handle(action, makePlayerStats(), campaignName, null);
 
       const damageEntries = addEntry.mock.calls.filter(
-        call => call[1] && call[1].type === 'damage_roll'
+        call => call[1] && call[1].type === 'roll' && call[1].rollType === 'damage'
       );
       expect(damageEntries[0][1].damageType).toBe('Radiant');
     });
