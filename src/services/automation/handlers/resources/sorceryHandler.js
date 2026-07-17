@@ -1,10 +1,23 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getClassFeatures } from '../../../character/classFeatures.js';
 import { getCurrentSorceryPoints, spendSorceryPoints } from '../../../../hooks/combat/useMetamagic.js';
-import { setInnateSorceryActive } from '../../../combat/buffs/buffService.js';
+import { setInnateSorceryActive, isInnateSorceryActive } from '../../../combat/buffs/buffService.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
+
+    if (isInnateSorceryActive(playerStats.name, campaignName)) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description: `${action.name} is already active.`,
+                automation: auto,
+            },
+        };
+    }
 
     if (auto.type === 'sorcery_aura') {
         const currentUses = getRuntimeValue(playerStats.name, 'innateSorceryUses', campaignName);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useSyncedState } from '../../hooks/runtime/useSyncedState.js'
+import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { getCategories } from '../../services/character/featureCategories.js'
 import { getActionSpellNames } from '../../services/ui/spellSectionUtils.js'
 import { formatRange, signFormatter, getAttackSpellLevel } from '../../services/ui/formatUtils.js'
@@ -71,6 +72,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [featRangeEffects, setFeatRangeEffects] = useState(null);
     const [autoDamageRollContext] = useSyncedState(campaignName, 'autoDamageContext', null, campaignName);
     const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
+    const _activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName); (void _activeBuffs);
     const { popupHtml, setPopupHtml } = useDiceRollPopup();
 
     const getSpellDamageDisplay = React.useCallback((spell) => {

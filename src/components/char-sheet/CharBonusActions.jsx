@@ -9,7 +9,7 @@ import { getBonusActionSpellNames } from '../../services/ui/spellSectionUtils.js
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
 import { hasAutomation } from '../../services/combat/automation/automationService.js'
 
-import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
+import { getRuntimeValue, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js'
 import { useSpellUpcastFlow } from '../../hooks/combat/useSpellUpcastFlow.js'
 import { getCurrentCombatRound } from '../../services/encounters/combatData.js'
@@ -27,6 +27,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
     const [selectedBonusSpell, setSelectedBonusSpell] = useState(null);
 
     const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
+    const _activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName); (void _activeBuffs);
 
     const is2024Rules = playerStats.rules === '2024';
 

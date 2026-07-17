@@ -66,6 +66,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   listeners: new Map(),
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
+  useRuntimeValue: vi.fn(() => null),
 }));
 
 vi.mock('../../services/maps/mapsService.js', () => ({

@@ -19,6 +19,7 @@ vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
 
 vi.mock('../../../combat/buffs/buffService.js', () => ({
   setInnateSorceryActive: vi.fn(),
+  isInnateSorceryActive: vi.fn(() => false),
 }));
 
 // ── Imports ─────────────────────────────────────────────────────────
@@ -59,9 +60,22 @@ function makeAction(overrides = {}) {
 describe('sorceryHandler.handle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    buffService.isInnateSorceryActive.mockReturnValue(false);
   });
 
   describe('sorcery_aura automation type', () => {
+    it('returns already active when Innate Sorcery buff is already present', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction({ type: 'sorcery_aura' });
+      buffService.isInnateSorceryActive.mockReturnValue(true);
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.payload.description).toContain('already active');
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(buffService.setInnateSorceryActive).not.toHaveBeenCalled();
+    });
+
     it('returns failure popup when innateSorceryUses is zero', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ type: 'sorcery_aura' });
@@ -162,6 +176,19 @@ describe('sorceryHandler.handle', () => {
   });
 
   describe('metamagic_sorcery automation type', () => {
+    it('returns already active when Innate Sorcery buff is already present', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction({ type: 'metamagic_sorcery' });
+      buffService.isInnateSorceryActive.mockReturnValue(true);
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.payload.description).toContain('already active');
+      expect(useMetamagic.spendSorceryPoints).not.toHaveBeenCalled();
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(buffService.setInnateSorceryActive).not.toHaveBeenCalled();
+    });
+
     it('blocks activation when innateSorcery still has uses remaining', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ type: 'metamagic_sorcery' });

@@ -8,6 +8,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   useSyncedState: vi.fn(() => [null, vi.fn()]),
   listeners: new Map(),
   getRuntimeValue: vi.fn(),
+  useRuntimeValue: vi.fn(() => null),
 }));
 
 const basePlayerStats = {

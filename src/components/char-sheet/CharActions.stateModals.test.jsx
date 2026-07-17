@@ -60,6 +60,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(() => Promise.resolve()),
   getStore: vi.fn(() => new Map()),
   useSyncedState: vi.fn(() => [null, vi.fn()]),
+  useRuntimeValue: vi.fn(() => null),
   listeners: new Map(),
 }));
 

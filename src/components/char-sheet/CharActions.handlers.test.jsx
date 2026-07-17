@@ -24,6 +24,10 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     });
     return [value, setter];
   }),
+  useRuntimeValue: vi.fn((_, key, _campaignName) => {
+    const hasValue = _syncedStore.has(key);
+    return hasValue ? _syncedStore.get(key) : null;
+  }),
   listeners: new Map(),
 }));
 

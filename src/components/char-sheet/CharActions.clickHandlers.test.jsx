@@ -68,6 +68,10 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
   setRuntimeBatch: vi.fn(),
+  useRuntimeValue: vi.fn((_, key, _campaignName) => {
+    const hasValue = _syncedStore.has(key);
+    return hasValue ? _syncedStore.get(key) : null;
+  }),
 }));
 
 vi.mock('../../services/maps/mapsService.js', () => ({
