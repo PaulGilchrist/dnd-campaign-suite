@@ -1,5 +1,5 @@
 import React from 'react'
-import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from './useMetamagic.js'
+import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints, logMetamagicUse } from './useMetamagic.js'
 import { addEntry } from '../../services/ui/logService.js'
 import { getMultiTargetSpreadForSpell } from '../../services/rules/spells/postCastRiderService.js'
 import { getCombatSummary } from '../../services/encounters/combatData.js'
@@ -360,6 +360,10 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
     const metamagicOptions = result?.options || [];
     if (psionicCost > 0 && !metamagicOptions.includes('Psionic Sorcery')) {
       metamagicOptions.push('Psionic Sorcery');
+    }
+
+    if (totalCost > 0) {
+      logMetamagicUse(campaignName, playerStats.name, pending.spellName, metamagicOptions, totalCost);
     }
 
     addEntry(campaignName, {

@@ -15,6 +15,7 @@ vi.mock('./useMetamagic.js', () => ({
   getCurrentSorceryPoints: vi.fn(() => 5),
   getMaxSorceryPoints: vi.fn(() => 10),
   spendSorceryPoints: vi.fn(),
+  logMetamagicUse: vi.fn(),
 }));
 
 vi.mock('../../services/ui/logService.js', () => ({

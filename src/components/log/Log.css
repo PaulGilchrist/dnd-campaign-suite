@@ -698,6 +698,26 @@
     font-style: italic;
 }
 
+.log-metamagic-details {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-left: 28px;
+    flex-wrap: wrap;
+}
+
+.log-metamagic-spell {
+    font-size: 0.82rem;
+    color: var(--color-text);
+    font-weight: 600;
+}
+
+.log-remaining-sp {
+    font-size: 0.72rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
 /* Resistance/Immunity details per damage type */
 .log-resistance-details {
     display: inline-flex;

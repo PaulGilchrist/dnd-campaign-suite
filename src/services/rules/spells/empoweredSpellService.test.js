@@ -7,6 +7,7 @@ vi.mock('../../../hooks/combat/useMetamagic.js', () => ({
   getMaxSorceryPoints: vi.fn(),
   getCurrentSorceryPoints: vi.fn(),
   spendSorceryPoints: vi.fn(),
+  logMetamagicUse: vi.fn(),
 }));
 
 vi.mock('../../automation/common/damageRollback.js', () => ({

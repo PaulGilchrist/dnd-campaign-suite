@@ -1,4 +1,4 @@
-import { getMaxSorceryPoints, getCurrentSorceryPoints, spendSorceryPoints } from '../../../hooks/combat/useMetamagic.js';
+import { getMaxSorceryPoints, getCurrentSorceryPoints, spendSorceryPoints, logMetamagicUse } from '../../../hooks/combat/useMetamagic.js';
 import { getChaModifier } from './metamagicRules.js';
 import { parseExpression } from '../../dice/diceRoller.js';
 import { getCombatContext } from '../combat/damageUtils.js';
@@ -101,6 +101,7 @@ export async function executeEmpoweredReroll({ campaignName, playerStats, lastEv
     }
 
     spendSorceryPoints(name, 1, campaignName, maxSP);
+    logMetamagicUse(campaignName, name, lastEvent.spellName, ['Empowered Spell'], 1);
 
     const logEntry = {
         type: 'metamagic',

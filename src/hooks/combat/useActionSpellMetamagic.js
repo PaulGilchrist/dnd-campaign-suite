@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from './useMetamagic.js'
+import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints, logMetamagicUse } from './useMetamagic.js'
 import { addEntry } from '../../services/ui/logService.js'
 import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js'
 import { isPsionicSpell, hasPsionicSorcery } from '../../services/rules/spells/metamagicRules.js'
@@ -104,6 +104,10 @@ export function useActionSpellMetamagic({
         const metamagicOptions = result?.options || [];
         if (psionicCost > 0 && !metamagicOptions.includes('Psionic Sorcery')) {
             metamagicOptions.push('Psionic Sorcery');
+        }
+
+        if (totalCost > 0) {
+            logMetamagicUse(campaignName, playerStats.name, pending.spellName, metamagicOptions, totalCost);
         }
 
         addEntry(campaignName, {

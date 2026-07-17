@@ -71,7 +71,7 @@ const spell = (o = {}) => ({
 const meta = (o = {}) => ({
   id: 'm', type: 'metamagic', characterName: 'Gandalf', spellName: 'Fireball',
   targetName: 'Orc', originalDamage: 30, newTotal: 38, damageDifference: 8,
-  rerolledDiceCount: 2, timestamp: Date.now(), ...o,
+  rerolledDiceCount: 2, rollType: 'empowered-spell', timestamp: Date.now(), ...o,
 });
 
 // ── Q helpers so we don't repeat code ───────────────────────

@@ -479,27 +479,56 @@ function SpellEntry({ entry }) {
 }
 
 function MetamagicEntry({ entry }) {
+  const isEmpowered = entry.rollType === 'empowered-spell';
   const isPositive = entry.damageDifference > 0;
   const isNegative = entry.damageDifference < 0;
+
+  if (isEmpowered) {
+    return (
+      <div className="log-entry log-metamagic">
+        <div className="log-entry-header">
+          <span className="log-icon"><i className="fas fa-dice"></i></span>
+          <span className="log-character">{entry.characterName}</span>
+          <span className="log-name">Empowered Spell — {entry.spellName}</span>
+          <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
+        </div>
+        <div className="log-empowered-details">
+          <span className="log-target">→ {entry.targetName}</span>
+          <span className="log-empowered-damage">
+            {entry.originalDamage} → {entry.newTotal}
+          </span>
+          <span className={`log-empowered-difference${isPositive ? ' log-empowered-positive' : ''}${isNegative ? ' log-empowered-negative' : ''}${!isPositive && !isNegative ? ' log-empowered-neutral' : ''}`}>
+            {isPositive ? '+' : ''}{entry.damageDifference}
+          </span>
+          <span className="log-empowered-dice-info">
+            Rerolled {entry.rerolledDiceCount} die{entry.rerolledDiceCount !== 1 ? 's' : ''}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="log-entry log-metamagic">
       <div className="log-entry-header">
         <span className="log-icon"><i className="fas fa-dice"></i></span>
         <span className="log-character">{entry.characterName}</span>
-        <span className="log-name">Empowered Spell — {entry.spellName}</span>
+        <span className="log-name">Metamagic Applied</span>
         <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
       </div>
-      <div className="log-empowered-details">
-        <span className="log-target">→ {entry.targetName}</span>
-        <span className="log-empowered-damage">
-          {entry.originalDamage} → {entry.newTotal}
+      <div className="log-metamagic-details">
+        <span className="log-metamagic-spell">Spell: {entry.spellName}</span>
+        <span className="log-metamagic-list">
+          {entry.options?.map((opt, i) => (
+            <span key={i} className="log-metamagic-option">{opt}</span>
+          ))}
         </span>
-        <span className={`log-empowered-difference${isPositive ? ' log-empowered-positive' : ''}${isNegative ? ' log-empowered-negative' : ''}${!isPositive && !isNegative ? ' log-empowered-neutral' : ''}`}>
-          {isPositive ? '+' : ''}{entry.damageDifference}
-        </span>
-        <span className="log-empowered-dice-info">
-          Rerolled {entry.rerolledDiceCount} die{entry.rerolledDiceCount !== 1 ? 's' : ''}
-        </span>
+        {entry.sorceryPointsSpent > 0 && (
+          <span className="log-metamagic-cost">{entry.sorceryPointsSpent} SP</span>
+        )}
+        {entry.remainingSorceryPoints != null && (
+          <span className="log-remaining-sp">Remaining: {entry.remainingSorceryPoints} SP</span>
+        )}
       </div>
     </div>
   );
@@ -693,6 +722,7 @@ export default function Log({ campaignName, characters }) {
             {entry.type === 'death_save' && <DeathSaveEntry entry={entry}/>}
             {entry.type === 'spell' && <SpellEntry entry={entry}/>}
             {entry.type === 'metamagic' && <MetamagicEntry entry={entry}/>}
+            {entry.type === 'metamagic_use' && <MetamagicEntry entry={entry}/>}
             {entry.type === 'healing_pool' && <HealingPoolEntry entry={entry}/>}
             {entry.type === 'ability_use' && <AbilityUseEntry entry={entry}/>}
             {entry.type === 'short_rest' && <RestEntry entry={entry}/>}

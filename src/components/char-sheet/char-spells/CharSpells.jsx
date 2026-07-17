@@ -18,7 +18,8 @@ import { getExcludedSpellNames } from '../../../services/ui/spellSectionUtils.js
 import MagicMissileTargetPopup from '../popups/MagicMissileTargetPopup.jsx'
 import { getCombatContext, getTargetFromAttacker, getAttackerTargetName } from '../../../services/rules/combat/damageUtils.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
-import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from '../../../hooks/combat/useMetamagic.js'
+import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints, logMetamagicUse } from '../../../hooks/combat/useMetamagic.js'
+import { addEntry } from '../../../services/ui/logService.js'
 import { isPsionicSpell, hasPsionicSorcery } from '../../../services/rules/spells/metamagicRules.js';
 import { useSpellMetamagicFlow } from '../../../hooks/combat/useSpellMetamagicFlow.js'
 import { useSpellUpcastFlow } from '../../../hooks/combat/useSpellUpcastFlow.js'
@@ -67,6 +68,10 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         metamagicOptions.push('Psionic Sorcery');
       }
 
+      if (totalCost > 0) {
+        logMetamagicUse(campaignName, playerStats.name, pending.spellName, metamagicOptions, totalCost);
+      }
+
       const metaCtx = {};
       if (result?.options) {
         if (result.options.includes('Heightened Spell')) metaCtx.metamagicHeighten = true;
@@ -85,8 +90,20 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
       const pending = pendingSimpleMetamagic;
       setPendingSimpleMetamagic(null);
       if (!pending) return;
+
+      addEntry(campaignName, {
+        type: 'spell',
+        characterName: playerStats.name,
+        spellName: pending.spellName,
+        spellLevel: pending.spellLevel || 0,
+        castingTime: pending.castingTime,
+        metamagic: [],
+        spCost: 0,
+        timestamp: Date.now(),
+      });
+
       pending.action({});
-    }, [pendingSimpleMetamagic]);
+    }, [pendingSimpleMetamagic, playerStats, campaignName]);
 
     const getTargetInfo = React.useCallback(async () => {
         const cs = await getCombatContext(campaignName);
