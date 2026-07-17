@@ -5,6 +5,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { resolveHealingBonusesWithDetails } from '../../../combat/automation/automationService.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 
 const MASS_HEAL_NAME = 'Mass Heal';
 const CONDITIONS_TO_REMOVE = ['blinded', 'deafened', 'poisoned'];
@@ -40,7 +41,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
     const maxTargets = auto?.maxTargets || 10;
-    const rangeFt = auto?.range ? await import('../../../rules/combat/rangeValidation.js').then(m => m.rangeToFeet(auto.range)) : 60;
+    const rangeFt = auto?.range ? rangeToFeet(auto.range) : 60;
 
     const combatSummary = await getCombatContext(campaignName);
     if (!combatSummary) return null;

@@ -6,6 +6,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { resolveHealingBonusesWithDetails, hasHealingMaximization } from '../../../combat/automation/automationService.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 
 const MASS_HEALING_WORD_NAME = 'Mass Healing Word';
 
@@ -48,7 +49,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const playerName = playerStats.name;
     const slotLevel = auto?.slotLevel || playerStats.level || 3;
     const maxTargets = auto?.maxTargets || 6;
-    const rangeFt = auto?.range ? await import('../../../rules/combat/rangeValidation.js').then(m => m.rangeToFeet(auto.range)) : 60;
+    const rangeFt = auto?.range ? rangeToFeet(auto.range) : 60;
 
     const spellCastingMod = getSpellCastingMod(playerStats, action.spell);
     const healExpression = resolveHealExpression(action.spell, slotLevel, spellCastingMod);

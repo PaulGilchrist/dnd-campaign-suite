@@ -6,6 +6,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { resolveHealingBonusesWithDetails, hasHealingMaximization } from '../../../combat/automation/automationService.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 
 const PRAYER_OF_HEALING_NAME = 'Prayer of Healing';
 
@@ -46,7 +47,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
     const maxTargets = auto?.maxTargets || 5;
-    const rangeFt = auto?.range ? await import('../../../rules/combat/rangeValidation.js').then(m => m.rangeToFeet(auto.range)) : 30;
+    const rangeFt = auto?.range ? rangeToFeet(auto.range) : 30;
 
     const combatSummary = await getCombatContext(campaignName);
     if (!combatSummary) return null;

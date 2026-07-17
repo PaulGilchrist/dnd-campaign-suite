@@ -3,6 +3,8 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { rollExpression } from '../../../dice/diceRoller.js';
 
 const POWER_WORD_FORTIFY_NAME = 'Power Word Fortify';
 
@@ -10,10 +12,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
     const maxTargets = auto?.maxTargets || 6;
-    const rangeFt = auto?.range ? await import('../../../rules/combat/rangeValidation.js').then(m => m.rangeToFeet(auto.range)) : 60;
+    const rangeFt = auto?.range ? rangeToFeet(auto.range) : 60;
     const tempHpExpression = resolveTempHpExpression(auto, playerStats);
 
-    const result = await import('../../../dice/diceRoller.js').then(m => m.rollExpression(tempHpExpression));
+    const result = rollExpression(tempHpExpression);
     if (!result) {
         return {
             type: 'popup',
