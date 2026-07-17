@@ -261,13 +261,13 @@ describe('restore_balance feature', () => {
       expect(hasSaveAdvantage(effects3, 'con', true)).toBe(true);
     });
 
-    it('returns true for condition-specific and ability-specific advantage despite restoreBalance', () => {
+    it('cancels condition-specific advantage when restoreBalance is true', () => {
       const condEffects = { saveAdvantageCount: 0, saveDisadvantageCount: 0, saveAdvantage: ['charmed'] };
-      expect(hasSaveAdvantage(condEffects, 'charmed', true)).toBe(true);
+      expect(hasSaveAdvantage(condEffects, 'charmed', true)).toBe(false);
       expect(hasSaveAdvantage(condEffects, 'con', true)).toBe(false);
 
       const abEffects = { saveAdvantageCount: 0, saveDisadvantageCount: 0, saveAdvantageAbilities: ['CON'] };
-      expect(hasSaveAdvantage(abEffects, 'con', true)).toBe(true);
+      expect(hasSaveAdvantage(abEffects, 'con', true)).toBe(false);
       expect(hasSaveAdvantage({ ...abEffects, saveAdvantageAbilities: ['STR'] }, 'con', true)).toBe(false);
     });
 
@@ -276,9 +276,9 @@ describe('restore_balance feature', () => {
       expect(hasSaveAdvantage(effects, 'con', true)).toBe(false);
     });
 
-    it('returns true for against_spell advantage with restoreBalance (no-op, always true)', () => {
+    it('cancels against_spell advantage when restoreBalance is true', () => {
       const effects = { saveAdvantageCount: 0, saveAdvantage: ['against_spell'] };
-      expect(hasSaveAdvantage(effects, 'con', true)).toBe(true);
+      expect(hasSaveAdvantage(effects, 'con', true)).toBe(false);
     });
 
     it('returns false when effects is null', () => {

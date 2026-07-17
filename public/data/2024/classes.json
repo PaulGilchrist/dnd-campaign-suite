@@ -10719,7 +10719,8 @@
                         "automation": {
                             "type": "restore_balance",
                             "target": "d20",
-                            "range": "60_ft"
+                            "range": "60_ft",
+                            "casting_time": "1 reaction"
                         }
                     },
                     {

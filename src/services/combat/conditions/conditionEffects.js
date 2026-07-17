@@ -833,17 +833,12 @@ function combineAttackModes(attackerEffects, targetEffects, attackRange, targetN
 function hasSaveAdvantage(effects, saveType, restoreBalance) {
   if (!effects) return false;
   if (effects.saveAdvantage?.includes('against_spell')) {
-    if (restoreBalance) return true;
+    if (restoreBalance) return false;
     return true;
   }
   if (restoreBalance) {
     const effectiveAdvCount = Math.max(0, (effects.saveAdvantageCount || 0) - 1);
     if (effectiveAdvCount > 0) return true;
-    if (saveType && effects.saveAdvantage?.includes(saveType)) return true;
-    if (saveType && effects.saveAdvantageAbilities?.length) {
-      const abbr = saveType.substring(0, 3).toUpperCase();
-      if (effects.saveAdvantageAbilities.includes(abbr)) return true;
-    }
     return false;
   }
   if ((effects.saveAdvantageCount || 0) > 0) return true;

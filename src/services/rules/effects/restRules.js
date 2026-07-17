@@ -149,7 +149,8 @@ export const LONG_REST_RESOURCES = [
        'aspectOfTheWildsOption',
     'elderChampionRestUsed',
     'avengingAngelRestUsed',
-  'warpingimplosionUses'
+  'warpingimplosionUses',
+  'restorebalanceUses'
 ]
 
 export function getLongRestResources() {

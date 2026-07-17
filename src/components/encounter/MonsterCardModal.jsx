@@ -221,12 +221,13 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const attackerConditions = (attacker?.conditions || []).map(c => c.key)
     const targetConditions = (target?.conditions || []).map(c => c.key)
 
-    const attackerEffects = computeConditionEffects(attackerConditions, [], monsterTargetEffects, false, false, false, false, null, false, null, false, false, false, false, false)
+    const targetSaveModifiers = target?.type === 'player' ? targetComputed?.saveModifiers : (target?.saveModifiers || []);
+    const attackerEffects = computeConditionEffects(attackerConditions, targetSaveModifiers, monsterTargetEffects, false, false, false, false, null, false, null, false, false, false, false, false)
     const attackerCannotAct = attackerConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c))
     if (attackerCannotAct) return
 
     const targetRiderForTarget = allTargetEffects.filter(te => te.target === target?.name)
-    const targetEffectData = computeConditionEffects(targetConditions, [], targetRiderForTarget, false, false, false, false, null, false, null, false, false, false, false, false)
+    const targetEffectData = computeConditionEffects(targetConditions, targetSaveModifiers, targetRiderForTarget, false, false, false, false, null, false, null, false, false, false, false, false)
 
     const riderAttackBonus = targetEffectData.riderAttackBonus || 0;
     const effectiveBonus = bonus + riderAttackBonus;

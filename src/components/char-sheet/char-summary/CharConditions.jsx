@@ -7,6 +7,7 @@ import { CONDITION_DESCRIPTIONS } from '../../../services/combat/conditions/effe
 import { addEntry } from '../../../services/ui/logService.js'
 import { EXHAUSTION_LEVELS, isDeadFromExhaustion, getExhaustionSaveDC } from '../../../services/combat/conditions/exhaustionRules.js'
 import { logConditionSave } from '../../../services/encounters/combatLoggingService.js'
+import { hasSaveAdvantage } from '../../../services/combat/conditions/conditionEffects.js'
 import usePopup from '../../../hooks/combat/usePopup.js'
 import Popup from '../../common/popup.jsx'
 import DiceRollResult from '../DiceRollResult.jsx'
@@ -85,7 +86,7 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
     const saveLabel = getAbilityLabel(saveAbility)
     const conditionLabel = conditionKey.charAt(0).toUpperCase() + conditionKey.slice(1)
     const saveBonus = getAbilitySaveBonus(playerStats, saveAbility)
-    const hasAdvantage = (conditionEffects?.saveAdvantageCount || 0) > 0 || conditionEffects?.saveAdvantage?.includes(conditionKey) || conditionEffects?.saveAdvantageAbilities?.includes(saveAbility);
+    const hasAdvantage = hasSaveAdvantage(conditionEffects, conditionKey, conditionEffects?.restoreBalance);
 
     let roll1, roll2, finalRoll, mode
     if (hasAdvantage) {

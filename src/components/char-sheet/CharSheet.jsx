@@ -482,7 +482,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     }
 
     const cannotAct = activeConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c))
-    const conditionAttackMode = getNetAttackMode(conditionEffects.attackAdvantageCount, conditionEffects.attackDisadvantageCount)
+    const conditionAttackMode = getNetAttackMode(conditionEffects.attackAdvantageCount, conditionEffects.attackDisadvantageCount, conditionEffects.restoreBalance)
 
     const handleReroll = React.useCallback(() => {
         if (playerStats) {

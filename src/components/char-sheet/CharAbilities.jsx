@@ -4,6 +4,7 @@ import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js'
 import { buildAbilityDetailHtml } from '../../hooks/combat/useActionPopup.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { hasSaveAdvantage } from '../../services/combat/conditions/conditionEffects.js';
 import './CharAbilities.css'
 
 const INTERNAL_SKILL_CHECK_EVENT = 'internal-skill-check';
@@ -176,19 +177,22 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                 return Object.keys(ctx).length > 0 ? ctx : undefined
           }, [conditionEffects, playerStats]);
 
-       const makeSaveContext = (abilityName) => {
-          const abbr = abilityName.substring(0, 3).toLowerCase()
-          const autoFail = conditionEffects?.autoFailSaves?.includes(abbr)
-          let forcedMode = undefined
-          if (!autoFail && conditionEffects?.saveDisadvantage?.includes(abbr)) {
-            forcedMode = 'disadvantage'
-          }
-           if (!autoFail && !forcedMode && (conditionEffects?.saveAdvantageCount || 0) > 0) {
-            forcedMode = 'advantage'
+        const makeSaveContext = (abilityName) => {
+           const abbr = abilityName.substring(0, 3).toLowerCase()
+           const autoFail = conditionEffects?.autoFailSaves?.includes(abbr)
+           let forcedMode = undefined
+            const restoreBalance = conditionEffects?.restoreBalance
+            if (restoreBalance) {
+              forcedMode = 'normal'
+            } else if (!autoFail && conditionEffects?.saveDisadvantage?.includes(abbr)) {
+              forcedMode = 'disadvantage'
+            }
+             if (!autoFail && !restoreBalance && !forcedMode && (conditionEffects?.saveAdvantageCount || 0) > 0) {
+              forcedMode = 'advantage'
+               }
+             if (!autoFail && !restoreBalance && !forcedMode && conditionEffects?.saveAdvantageAbilities?.includes(abilityName.substring(0, 3).toUpperCase())) {
+              forcedMode = 'advantage'
              }
-           if (!autoFail && !forcedMode && conditionEffects?.saveAdvantageAbilities?.includes(abilityName.substring(0, 3).toUpperCase())) {
-            forcedMode = 'advantage'
-           }
             if (conditionEffects?.autoRerollForSaves) {
               return { forcedMode, autoFail: autoFail || undefined, autoReroll: true, autoRerollCondition: conditionEffects.autoRerollCondition, autoRerollBonus: conditionEffects.autoRerollBonus || null }
             }
@@ -211,9 +215,7 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
           return { forcedMode, autoFail: autoFail || undefined }
       }
 
-        const hasSaveAdvantage = (abilityName) => {
-           return (conditionEffects?.saveAdvantageCount || 0) > 0 || conditionEffects?.saveAdvantageAbilities?.includes(abilityName.substring(0, 3).toUpperCase());
-          }
+
 
         const getSaveAdvantageSource = () => {
           if (conditionEffects?.saveAdvantage?.includes('against_spell')) {
@@ -276,7 +278,7 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                           const checkBonus = getAbilityCheckBonus(ability, conditionEffects);
                           rollAbilityCheck(ability.name, checkBonus - exhaustionPenalty, checkCtx);
                         }}>{signFormatter.format(getAbilityCheckBonus(ability, conditionEffects) - exhaustionPenalty)}</div>
-                       <div className={'clickable' + (exhaustionPenalty > 0 || autoFailSave || conditionEffects?.saveDisadvantage?.length > 0 ? ' stat--penalized' : '') + (hasSaveAdvantage(ability.name) ? ' stat--buffed' : '')} onClick={() => {
+                       <div className={'clickable' + (exhaustionPenalty > 0 || autoFailSave || conditionEffects?.saveDisadvantage?.length > 0 ? ' stat--penalized' : '') + (hasSaveAdvantage(conditionEffects, ability.name, conditionEffects?.restoreBalance) ? ' stat--buffed' : '')} onClick={() => {
                            if (!autoFailSave) {
                              const saveCtx = { ...saveContext };
                              const biDie = getRuntimeValue(playerStats.name, 'bardicInspirationDie', campaignName);
@@ -287,7 +289,7 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                              const saveBonus = getSaveBonus(ability.name);
                               rollSavingThrow(ability.name, ability.save + saveBonus - exhaustionPenalty, saveCtx);
                             }
-                          }} title={getSaveAdvantageSource()}>{autoFailSave ? 'AUTO FAIL' : signFormatter.format(ability.save + getSaveBonus(ability.name) - exhaustionPenalty)}{hasSaveAdvantage(ability.name) ? ' (Adv)' : ''}</div>
+                          }} title={getSaveAdvantageSource()}>{autoFailSave ? 'AUTO FAIL' : signFormatter.format(ability.save + getSaveBonus(ability.name) - exhaustionPenalty)}{hasSaveAdvantage(conditionEffects, ability.name, conditionEffects?.restoreBalance) ? ' (Adv)' : ''}</div>
                       <div className='left'>{ability.skills.map((skill) => {
                            const skillBonus = getSkillBonus(skill);
                            const isExpert = playerStats.expertise?.includes(skill.name);

@@ -892,6 +892,7 @@ export function createLogDamageAndShow(deps) {
         const isProtectionFromPoisonActive = Array.isArray(targetBuffs) && targetBuffs.some(b => b.name === 'Protection from Poison' && b.effect === 'protection_from_poison');
         const combatContext = getCombatSummary(campaignName);
         const targetConditionEffects = computeConditionEffects(targetConditions, targetSaveModifiers, targetEffects, isRaging, shapeShiftActive, false, false, combatContext, seeInvisibilityActive, target.name, isLivingLegendActive, isElderChampionActive, isElderChampionAttackerActive, isHolyAuraActive, isProtectionFromPoisonActive);
+        const restoreBalance = targetConditionEffects.restoreBalance;
         const fanaticalFocusUsed = getRuntimeValue(target.name, 'fanaticalFocusUsed', campaignName);
         const indomitableUses = Number(getRuntimeValue(target.name, 'indomitableUses', campaignName) ?? 0);
         const indomitableMax = (targetChar?.computedStats?.level || 0) >= 17 ? 3 : (targetChar?.computedStats?.level || 0) >= 13 ? 2 : 1;
@@ -1046,7 +1047,11 @@ export function createLogDamageAndShow(deps) {
             attackerStats: context?.playerStats,
             targetName: target.name,
         });
-        const saveDisadvantage = (context?.metamagicHeighten || false) || coronaDisadvantage || elderChampionDisadvantage.disadvantage;
+        let saveDisadvantage = (context?.metamagicHeighten || false) || coronaDisadvantage || elderChampionDisadvantage.disadvantage;
+        if (restoreBalance && saveDisadvantage) {
+            const disadvantageSources = [context?.metamagicHeighten, coronaDisadvantage, elderChampionDisadvantage.disadvantage].filter(Boolean).length;
+            saveDisadvantage = disadvantageSources > 1;
+        }
 
         pendingSaves[promptId] = {
             targetName: target.name, rawDamage: adjustedTotal, saveDc, saveType, dcSuccess,
