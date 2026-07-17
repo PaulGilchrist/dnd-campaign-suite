@@ -173,43 +173,196 @@ This is a thin wrapper for clarity but signals intent. It also centralizes the "
 - `superiorHuntersPrey.js` — "is creature within range of marked target?"
 - `combatSuperiorityHandler.js` — "is creature within range of primary target?" (Category not yet migrated)
 
-## Phase 3: Refactor Sorting Files (Category 2 — 4 files)
+## Phase 3: Integrate Spell Casting into Automation Handler System — Modal-Based Target Selection
 
-### Current Pattern
+### Background
 
-```js
-.map(c => ({
-  creature: c,
-  dist: getDistanceFeet(casterPos, targetPos),
-}))
-.filter(item => isDistanceInRange(item.dist, rangeFt))
-.sort((a, b) => a.dist - b.dist)
-.slice(0, maxTargets);
+The automation handler system (`src/services/automation/`) already has a proven modal pattern:
+
+```
+handler.handle() → { type: 'modal', modalName: '...', payload: {...} }
+→ CharActions.jsx switch → setModalState({ xxxModal: payload })
+→ CharActionModals.jsx renders modal component
+→ CreatureSelectionModal → user selects → onConfirm(selectedNames)
+→ handler.confirm(action, playerStats, campaignName, selectedNames)
+→ applies effect → returns { type: 'popup', payload: {...} }
 ```
 
-### Proposed Pattern
+But spell casting **bypasses** this system entirely. `spellCastService.js` has dedicated handlers for multi-target spells that run to completion server-side — no modals, no player input. The four Phase 3 files (`massHealService.js`, `massCureWoundsService.js`, `prayerOfHealingService.js`, `powerWordFortifyService.js`) plus `massHealingWordService.js` all silently select targets by sorting creatures by distance and slicing to the max count.
 
-Replace the `isDistanceInRange` filter with `isWithinRange()`:
+Additionally, **~87% of spells are not automated** (285/328 5e spells, 345/393 2024 spells lack `automation.type`). Many will need modals and special handling. Integrating spell casting into the automation handler system now avoids creating a second parallel modal flow.
 
-```js
-const eligible = [];
-for (const c of combatSummary.creatures) {
-  if (c.name === casterName) continue;
-  if (!await isWithinRange(casterName, c.name, rangeFt)) continue;
-  eligible.push(c);
-}
-// Then sort by distance if needed
-eligible.sort((a, b) => {
-  const distA = computeDistance(a);
-  const distB = computeDistance(b);
-  return distA - distB;
-});
-return eligible.slice(0, maxTargets);
+### Architecture Change
+
+**Current flow (broken for modals):**
+```
+spellCastService.js → triggerMassHeal() → applies to sorted targets → returns result
+→ useSpellCastExecutor → setPopupHtml(result.automationPopup.payload)
+→ popup rendered (modal result is LOST — no modal handling in executor)
 ```
 
-### Key Question
+**Proposed flow (unified with automation handlers):**
+```
+spellCastService.js → spell.automation?.type check FIRST
+→ executeHandler(action, ...) → handler returns { type: 'modal', modalName, payload }
+→ return { automationPopup: handlerResult }
+→ useSpellCastExecutor → detects automationPopup.type === 'modal'
+→ setModalState({ xxxModal: automationPopup.payload })
+→ CharActionModals.jsx renders modal
+→ CreatureSelectionModal → onConfirm(selectedNames)
+→ handler.confirm(action, playerStats, campaignName, selectedNames)
+→ applies effect → returns { type: 'popup', payload: {...} }
+→ setPopupHtml(result.payload)
+→ modal dismissed
+```
 
-Before implementing, we need to understand WHY sorting by distance matters. Does the game rule require closest targets first? Or is it arbitrary? This affects whether the sort can be replaced with a simpler selection strategy.
+### Key Design Decisions
+
+1. **Add ally list filtering** — Use `getAllyList(casterName)` from `useAllySelection.js` to filter `combatSummary.creatures` down to allies before checking range/count limits. If allies ≤ maxTargets, no modal needed — apply to all. If allies > maxTargets, show modal for selection.
+
+2. **Add `setModalState` to `useSpellCastExecutor`** — Accept an optional `setModalState` parameter. When `automationPopup.type === 'modal'`, route through the same switch-case pattern that `CharActions.jsx` uses.
+
+3. **Move dedicated handlers INTO the automation handler system** — The four Phase 3 services (plus Mass Healing Word) become proper automation handlers with `handle()` and `confirm()` exports, registered in `HANDLER_MAP`.
+
+4. **Remove `spellCastService.js` dedicated cases** — Once handlers are in the automation system, the dedicated `if (spell.name === 'Mass Heal')` cases become unnecessary — the `spell.automation?.type` routing handles them.
+
+5. **Use `isWithinRange()` for eligibility** — Replace `getDistanceFeet` + `isDistanceInRange` + `.sort()` with `isWithinRange()` for boolean range checks. No distance computation or sorting needed.
+
+6. **Modal only when needed** — If ally count ≤ maxTargets, skip the modal and apply directly. Modal only shows when there are more allies than the spell allows.
+
+### Implementation Steps
+
+#### Step 1: Wire `setModalState` through `useSpellCastExecutor`
+
+**File:** `src/hooks/combat/useSpellCastExecutor.js`
+
+- Accept `setModalState` as optional parameter (after `setPopupHtml`)
+- When `result?.automationPopup` and `result.automationPopup.type === 'modal'`:
+  - Switch on `result.automationPopup.modalName`
+  - Set the appropriate `modalState` key
+- Pass `setModalState` from all callers: `CharActions.jsx`, `CharBonusActions.jsx`, `CharReactions.jsx`, `CharSpells.jsx`
+
+#### Step 2: Create automation handlers for the four Phase 3 spells
+
+Each handler follows the `zealousPresenceHandler.js` pattern:
+
+**`src/services/automation/handlers/healing/massHealHandler.js`**
+- `handle(action, playerStats, campaignName, mapName, characters)`
+  - Get combat context, filter to allies via `getAllyList(casterName)`
+  - Use `isWithinRange(casterName, allyName, 60)` to check range eligibility
+  - If eligible ≤ 10 (maxTargets): apply directly, return popup
+  - If eligible > 10: return `{ type: 'modal', modalName: 'massHealTarget', payload: { creatureTargets, spell, metaCtx, playerStats, campaignName, mapName } }`
+- `confirmMassHeal(action, playerStats, campaignName, mapName, selectedTargetNames)`
+  - Apply healing to selected targets (700 HP pool + condition removal)
+  - Return popup with results
+
+**`src/services/automation/handlers/healing/massCureWoundsHandler.js`**
+- Same pattern, 30-ft radius, max 6 targets
+
+**`src/services/automation/handlers/healing/prayerOfHealingHandler.js`**
+- Same pattern, 30-ft range, max 5 targets, tracks `prayerOfHealing_lastUsedRound` per creature
+
+**`src/services/automation/handlers/buffs/powerWordFortifyHandler.js`**
+- Same pattern, 60-ft range, max 6 targets, grants temp HP
+- Note: Power Word Fortify already has `automation.type: "power_word_fortify"` in 2024 spells.json — the handler just needs to be created and registered
+
+**`src/services/automation/handlers/healing/massHealingWordHandler.js`**
+- Same pattern, 60-ft range, max 6 targets
+- Note: Mass Healing Word has `automation.type: "healing"` but goes through a dedicated handler — this new handler replaces it
+
+#### Step 3: Register handlers in `HANDLER_MAP`
+
+**File:** `src/services/automation/index.js`
+
+- Import new handlers
+- Register in `HANDLER_MAP`:
+  - `mass_heal: handleMassHeal`
+  - `mass_cure_wounds: handleMassCureWounds`
+  - `prayer_of_healing: handlePrayerOfHealing`
+  - `power_word_fortify: handlePowerWordFortify`
+  - `mass_healing_word: handleMassHealingWord`
+- Export confirm functions
+
+#### Step 4: Add automation entries to spell data
+
+**Files:** `public/data/spells.json`, `public/data/2024/spells.json`
+
+Add `"automation": { "type": "mass_heal" }` etc. to spells that currently lack automation entries. This enables the `spell.automation?.type` routing to catch them.
+
+#### Step 5: Create modal wrapper components
+
+**Files:**
+- `src/components/char-sheet/modals/MassHealModal.jsx`
+- `src/components/char-sheet/modals/MassCureWoundsModal.jsx`
+- `src/components/char-sheet/modals/PrayerOfHealingModal.jsx`
+- `src/components/char-sheet/modals/PowerWordFortifyModal.jsx`
+- `src/components/char-sheet/modals/MassHealingWordModal.jsx`
+
+Each is a thin wrapper around `CreatureSelectionModal` with appropriate title, icon, description, and confirm label.
+
+#### Step 6: Wire modals in `CharActionModals.jsx`
+
+Add modal render blocks for each new modal, wired to `modalState.{name}Modal`.
+
+#### Step 7: Add confirm handlers in component files
+
+**Files:** `CharActions.jsx`, `CharBonusActions.jsx`, `CharReactions.jsx`, `CharSpells.jsx`
+
+Add `handle{Spell}Confirm` callbacks that call the handler's `confirm` function and clear modal state.
+
+#### Step 8: Add modal name cases in `useSpellCastExecutor.js`
+
+Add switch cases for each `modalName` to route to the correct `modalState` setter.
+
+#### Step 9: Remove dedicated handlers from `spellCastService.js`
+
+Remove the `if (spell.name === 'Mass Heal')` etc. cases. The `spell.automation?.type` routing (line 591) will catch them via the new automation handlers.
+
+#### Step 10: Update tests
+
+- Update `massHealService.test.js`, `massCureWoundsService.test.js`, `prayerOfHealingService.test.js`, `powerWordFortifyService.test.js` — either update to test the new handler files or remove if the service files are deprecated
+- Add tests for each new handler: `handle()` returns modal when > maxTargets, applies directly when ≤ maxTargets
+- Test `confirm()` applies effect to selected targets
+- Mock `isWithinRange` and `getAllyList`
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `useSpellCastExecutor.js` | Accept `setModalState`, handle modal results |
+| `massHealHandler.js` | **New** — handle + confirm for Mass Heal |
+| `massCureWoundsHandler.js` | **New** — handle + confirm |
+| `prayerOfHealingHandler.js` | **New** — handle + confirm |
+| `powerWordFortifyHandler.js` | **New** — handle + confirm |
+| `massHealingWordHandler.js` | **New** — handle + confirm |
+| `automation/index.js` | Import + register new handlers in HANDLER_MAP |
+| `spells.json` (5e) | Add automation.type to Mass Heal, Mass Cure Wounds, Prayer of Healing, Mass Healing Word |
+| `spells.json` (2024) | Add automation.type to same spells + Power Word Fortify |
+| `MassHealModal.jsx` | **New** — CreatureSelectionModal wrapper |
+| `MassCureWoundsModal.jsx` | **New** |
+| `PrayerOfHealingModal.jsx` | **New** |
+| `PowerWordFortifyModal.jsx` | **New** |
+| `MassHealingWordModal.jsx` | **New** |
+| `CharActionModals.jsx` | Add 5 modal render blocks |
+| `CharActions.jsx` | Add 5 confirm handlers + modal cleanup |
+| `CharBonusActions.jsx` | Same (bonus action spells) |
+| `CharReactions.jsx` | Same (reaction spells) |
+| `CharSpells.jsx` | Same (spell slot casts) |
+| `spellCastService.js` | Remove dedicated handler cases (mass heal, mass cure, prayer, mass healing word, power word fortify) |
+| `massHealService.test.js` | Update or remove |
+| `massCureWoundsService.test.js` | Update or remove |
+| `prayerOfHealingService.test.js` | Update or remove |
+| `powerWordFortifyService.test.js` | Update or remove |
+
+### Refactored Spell Services (Phase 3b)
+
+After the automation handler integration is complete, the original four service files can be **deprecated** (removed) since their logic moves into the handler files. Alternatively, they can be kept as utility functions called by the confirm handlers if the logic is complex enough to warrant separation.
+
+The key change: **no more distance computation or sorting**. The handlers use:
+1. `getAllyList(casterName)` → get allies
+2. `isWithinRange(casterName, allyName, range)` → filter by range
+3. Compare count to maxTargets → modal or direct apply
+4. `confirm(selectedNames)` → apply effect to exactly what the player chose
 
 ## Phase 4: Partial Replacements (Category 3 — 2 files)
 

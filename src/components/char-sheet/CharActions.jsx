@@ -23,6 +23,11 @@ import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
 import { onSpellSelected as onDivineInterventionSpellSelected } from '../../services/automation/handlers/class-cleric-paladin/divineInterventionHandler.js';
 import { confirmZealousPresence } from '../../services/automation/handlers/class-barbarian/zealousPresenceHandler.js';
+import { confirmMassHeal } from '../../services/automation/handlers/healing/massHealHandler.js';
+import { confirmMassCureWounds } from '../../services/automation/handlers/healing/massCureWoundsHandler.js';
+import { confirmPrayerOfHealing } from '../../services/automation/handlers/healing/prayerOfHealingHandler.js';
+import { confirmPowerWordFortify } from '../../services/automation/handlers/buffs/powerWordFortifyHandler.js';
+import { confirmMassHealingWord } from '../../services/automation/handlers/healing/massHealingWordHandler.js';
 import { getClassFeatures } from '../../services/character/classFeatures.js';
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js'
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
@@ -60,7 +65,7 @@ import { isEqual } from 'lodash';
 
 const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextProps.playerStats) && prevProps.conditionAttackMode === nextProps.conditionAttackMode && prevProps.exhaustionPenalty === nextProps.exhaustionPenalty && prevProps.cannotAct === nextProps.cannotAct;
 
-const CharActions = React.memo(function CharActions({ playerStats, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName, onBuffsChange, characters }) {
+const CharActions = React.memo(function CharActions({ playerStats, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName, onBuffsChange, characters, onSpellModalStateChange, spellModalState }) {
     const [actions, setActions] = useState([]);
     const [selectedActionSpell, setSelectedActionSpell] = useState(null);
     const [featRangeEffects, setFeatRangeEffects] = useState(null);
@@ -117,7 +122,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const {
         pendingDamage,
         modalState,
-        setModalState,
+        setModalState: setModalStateInternal,
         resolveAttackDamage,
         handleMasteryClose,
         handleWeaponMasteryChoice,
@@ -142,6 +147,13 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects,
         popupHtml, setPopupHtml, rollDamage, rollAttack, buildCtx, buildCtxSync,
     });
+
+    const setModalState = React.useCallback((state) => {
+        setModalStateInternal(state);
+        if (onSpellModalStateChange) {
+            onSpellModalStateChange(state);
+        }
+    }, [setModalStateInternal, onSpellModalStateChange]);
 
     // Handle damage type choice popup (e.g. Blessed Strikes: Necrotic or Radiant)
     useEffect(() => {
@@ -750,6 +762,56 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         setModalState({ zealousPresenceModal: null });
     }, [setPopupHtml, modalState.zealousPresenceModal, setModalState]);
 
+    const handleMassHealConfirm = React.useCallback(async (targetNames) => {
+        if (!targetNames || !modalState.massHealModal) return;
+        const { action, playerStats, campaignName } = modalState.massHealModal;
+        const result = await confirmMassHeal(action, playerStats, campaignName, targetNames, modalState.massHealModal.totalPool, modalState.massHealModal.bonusHeal);
+        if (result?.payload) {
+            setPopupHtml(result.payload);
+        }
+        setModalState({ massHealModal: null });
+    }, [setPopupHtml, modalState.massHealModal, setModalState]);
+
+    const handleMassCureWoundsConfirm = React.useCallback(async (targetNames) => {
+        if (!targetNames || !modalState.massCureWoundsModal) return;
+        const { action, playerStats, campaignName } = modalState.massCureWoundsModal;
+        const result = await confirmMassCureWounds(action, playerStats, campaignName, targetNames, modalState.massCureWoundsModal.healAmount, modalState.massCureWoundsModal.healExpression, modalState.massCureWoundsModal.rolls, modalState.massCureWoundsModal.bonusHeal);
+        if (result?.payload) {
+            setPopupHtml(result.payload);
+        }
+        setModalState({ massCureWoundsModal: null });
+    }, [setPopupHtml, modalState.massCureWoundsModal, setModalState]);
+
+    const handlePrayerOfHealingConfirm = React.useCallback(async (targetNames) => {
+        if (!targetNames || !modalState.prayerOfHealingModal) return;
+        const { action, playerStats, campaignName } = modalState.prayerOfHealingModal;
+        const result = await confirmPrayerOfHealing(action, playerStats, campaignName, targetNames, modalState.prayerOfHealingModal.healAmount, modalState.prayerOfHealingModal.healExpression, modalState.prayerOfHealingModal.rolls, modalState.prayerOfHealingModal.bonusHeal, modalState.prayerOfHealingModal.currentRound);
+        if (result?.payload) {
+            setPopupHtml(result.payload);
+        }
+        setModalState({ prayerOfHealingModal: null });
+    }, [setPopupHtml, modalState.prayerOfHealingModal, setModalState]);
+
+    const handlePowerWordFortifyConfirm = React.useCallback(async (targetNames) => {
+        if (!targetNames || !modalState.powerWordFortifyModal) return;
+        const { action, playerStats, campaignName } = modalState.powerWordFortifyModal;
+        const result = await confirmPowerWordFortify(action, playerStats, campaignName, targetNames, modalState.powerWordFortifyModal.totalTempHp, modalState.powerWordFortifyModal.tempHpExpression);
+        if (result?.payload) {
+            setPopupHtml(result.payload);
+        }
+        setModalState({ powerWordFortifyModal: null });
+    }, [setPopupHtml, modalState.powerWordFortifyModal, setModalState]);
+
+    const handleMassHealingWordConfirm = React.useCallback(async (targetNames) => {
+        if (!targetNames || !modalState.massHealingWordModal) return;
+        const { action, playerStats, campaignName } = modalState.massHealingWordModal;
+        const result = await confirmMassHealingWord(action, playerStats, campaignName, targetNames, modalState.massHealingWordModal.healAmount, modalState.massHealingWordModal.healExpression, modalState.massHealingWordModal.rolls, modalState.massHealingWordModal.bonusHeal);
+        if (result?.payload) {
+            setPopupHtml(result.payload);
+        }
+        setModalState({ massHealingWordModal: null });
+    }, [setPopupHtml, modalState.massHealingWordModal, setModalState]);
+
     const handleNaturesSanctuaryConfirm = React.useCallback(async (targetNames) => {
         if (!targetNames || !modalState.naturesSanctuaryCreaturesModal) return;
         const { action, isMove } = modalState.naturesSanctuaryCreaturesModal;
@@ -1275,7 +1337,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const { resolvePositions: resolveActionSpellPositions, cachedPosRef: cachedActionCastPosRef } = useSpellPositionResolver(campaignName, mapName, playerStats.name);
 
-    const { castAction: actionCastAction } = useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, { featEffects: featRangeEffects }, cachedActionCastPosRef);
+    const { castAction: actionCastAction } = useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, { featEffects: featRangeEffects }, cachedActionCastPosRef, setModalState);
 
     const { pendingMetamagic: actionPendingMetamagic, gateMetamagic: actionGateMetamagic, handleConfirm: actionHandleConfirm, handleSkip: actionHandleSkip, pendingAid: actionPendingAid, handleAidConfirm: actionHandleAidConfirm, handleAidSkip: actionHandleAidSkip, pendingGreaterRestoration: actionPendingGreaterRestoration, handleGreaterRestorationConfirm: actionHandleGreaterRestorationConfirm, handleGreaterRestorationSkip: actionHandleGreaterRestorationSkip, pendingRemoveCurse: actionPendingRemoveCurse, handleRemoveCurseConfirm: actionHandleRemoveCurseConfirm, handleRemoveCurseSkip: actionHandleRemoveCurseSkip, pendingMagicMissile: actionPendingMagicMissile, handleMagicMissileConfirm: actionHandleMagicMissileConfirm, handleMagicMissileSkip: actionHandleMagicMissileSkip } = useSpellMetamagicFlow(playerStats, campaignName, actionCastAction, setModalState, characters);
 
@@ -1409,6 +1471,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     mapName={mapName}
                     characters={characters}
                     modalState={modalState}
+                    spellModalState={spellModalState}
                     setModalState={setModalState}
                     combatSuperiorityModal={combatSuperiorityModal}
                     setCombatSuperiorityModal={setCombatSuperiorityModal}
@@ -1457,6 +1520,11 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleRecklessAttackCancel={handleRecklessAttackCancel}
                     handleBrutalStrikeConfirm={handleBrutalStrikeConfirm}
                     handleBrutalStrikeCancel={handleBrutalStrikeCancel}
+                    handleMassHealConfirm={handleMassHealConfirm}
+                    handleMassCureWoundsConfirm={handleMassCureWoundsConfirm}
+                    handlePrayerOfHealingConfirm={handlePrayerOfHealingConfirm}
+                    handlePowerWordFortifyConfirm={handlePowerWordFortifyConfirm}
+                    handleMassHealingWordConfirm={handleMassHealingWordConfirm}
                 />
                 <CharActionSpellPopups
                     playerStats={playerStats}
@@ -1553,6 +1621,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 rollDamage={rollDamage}
                 getTargetInfo={getTargetInfo}
                 characters={characters}
+                setModalState={setModalState}
             />
             {showCleaveTargetSelection && (
                 <SecondaryTargetModal

@@ -22,7 +22,7 @@ import { useSpellPositionResolver } from '../../hooks/combat/useSpellPositionRes
 import { useSpellCastExecutor } from '../../hooks/combat/useSpellCastExecutor.js';
 import './CharActions.css'
 
-function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, characters, onAttackClick, onResolveSpellDamage, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo }) {
+function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, characters, onAttackClick, onResolveSpellDamage, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo, setModalState }) {
     const { popupHtml, setPopupHtml } = useDiceRollPopup();
     const [selectedBonusSpell, setSelectedBonusSpell] = useState(null);
 
@@ -58,7 +58,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
 
     const { resolvePositions: resolveBonusSpellPositions, cachedPosRef: cachedBonusCastPosRef } = useSpellPositionResolver(campaignName, mapName, playerStats.name);
 
-    const { castAction: bonusCastAction } = useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, { innateSorceryActive: !!displaySaveDcBonus }, cachedBonusCastPosRef);
+    const { castAction: bonusCastAction } = useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, { innateSorceryActive: !!displaySaveDcBonus }, cachedBonusCastPosRef, setModalState);
 
     const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, bonusCastAction, null, characters);
     const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);

@@ -16,11 +16,7 @@ import { rollExpressionMaximized } from '../../dice/diceRoller.js';
 import { addExpiration } from '../effects/expirations.js';
 import { triggerFalseLife } from '../features/falseLifeService.js';
 import { triggerHealingWord } from '../features/healingWordService.js';
-import { triggerMassCureWounds } from '../features/massCureWoundsService.js';
-import { triggerMassHeal } from '../features/massHealService.js';
 import { usesSpellSlot } from '../features/spellUtils.js';
-import { triggerMassHealingWord } from '../features/massHealingWordService.js';
-import { triggerPrayerOfHealing } from '../features/prayerOfHealingService.js';
 import { triggerFear } from '../features/fearService.js';
 import { triggerFeignDeath } from '../features/feignDeathService.js';
 import { triggerFleshToStone } from '../features/fleshToStoneService.js';
@@ -42,7 +38,6 @@ import { triggerHeroism } from '../features/heroismService.js';
 import { triggerHolyAura } from '../features/holyAuraService.js';
 import { triggerSilence, getSilenceSource, isCreatureInSilenceZone } from '../features/silenceService.js';
 import { triggerSlow } from '../features/slowService.js';
-import { triggerPowerWordFortify } from '../features/powerWordFortifyService.js';
 import { triggerPowerWordStun } from '../features/powerWordStunService.js';
 import { triggerSeeInvisibility } from '../features/seeInvisibilityService.js';
 import { triggerSleep } from '../features/sleepService.js';
@@ -190,12 +185,6 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
 
     if (!formula) {
 
-        // Power Word Fortify — multi-target temp HP (up to 6 creatures within range)
-        if (spell.name && spell.name.toLowerCase() === 'power word fortify') {
-            await triggerPowerWordFortify(spell, metaCtx, playerStats, campaignName, mapName);
-            return;
-        }
-
         // Fear — multi-target WIS save for all creatures (30-ft cone)
         if (spell.name && spell.name.toLowerCase() === 'fear' && spell.dc) {
             const fearInnateBonus = innateSorceryActive ? 1 : 0;
@@ -214,26 +203,6 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                 return await applyRegenerateSpell(spell, target, playerStats, campaignName);
             }
             return null;
-        }
-
-        // Mass Cure Wounds — multi-target healing in 30-ft radius sphere
-        if (spell.name && spell.name.toLowerCase() === 'mass cure wounds') {
-            return await triggerMassCureWounds(spell, metaCtx, playerStats, campaignName, mapName);
-        }
-
-        // Mass Healing Word — up to 6 creatures regain 2d4+MOD HP (bonus action)
-        if (spell.name && spell.name.toLowerCase() === 'mass healing word') {
-            return await triggerMassHealingWord(spell, metaCtx, playerStats, campaignName, mapName);
-        }
-
-        // Mass Heal — 9th level multi-target healing (up to 700 HP) + condition removal
-        if (spell.name && spell.name.toLowerCase() === 'mass heal') {
-            return await triggerMassHeal(spell, metaCtx, playerStats, campaignName, mapName);
-        }
-
-        // Prayer of Healing — up to 5 creatures gain Short Rest benefits + 2d8 HP (10 min casting, Long Rest cooldown per creature)
-        if (spell.name && spell.name.toLowerCase() === 'prayer of healing') {
-            return await triggerPrayerOfHealing(spell, metaCtx, playerStats, campaignName, mapName);
         }
 
         // Feign Death — buff/condition spell with no damage or save

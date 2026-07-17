@@ -68,17 +68,12 @@ vi.mock('../features/rayOfEnfeeblementService.js', () => ({ triggerRayOfEnfeeble
 vi.mock('../features/globeOfInvulnerabilityService.js', () => ({ triggerGlobeOfInvulnerability: vi.fn(async () => {}) }))
 vi.mock('../features/heroismService.js', () => ({ triggerHeroism: vi.fn(async () => {}) }))
 vi.mock('../features/holyAuraService.js', () => ({ triggerHolyAura: vi.fn(async () => {}) }))
-vi.mock('../features/powerWordFortifyService.js', () => ({ triggerPowerWordFortify: vi.fn(async () => {}) }))
 vi.mock('../features/powerWordStunService.js', () => ({ triggerPowerWordStun: vi.fn(async () => {}) }))
 vi.mock('../features/seeInvisibilityService.js', () => ({ triggerSeeInvisibility: vi.fn(async () => {}) }))
 vi.mock('../features/sleepService.js', () => ({ triggerSleep: vi.fn(async () => {}) }))
 vi.mock('../features/stinkingCloudService.js', () => ({ triggerStinkingCloud: vi.fn(async () => {}) }))
 vi.mock('../features/tashasHideousLaughterService.js', () => ({ triggerTashasHideousLaughter: vi.fn(async () => {}) }))
 vi.mock('../features/removeCurseService.js', () => ({ triggerRemoveCurse: vi.fn(async () => {}) }))
-vi.mock('../features/massCureWoundsService.js', () => ({ triggerMassCureWounds: vi.fn(async () => {}) }))
-vi.mock('../features/massHealService.js', () => ({ triggerMassHeal: vi.fn(async () => {}) }))
-vi.mock('../features/massHealingWordService.js', () => ({ triggerMassHealingWord: vi.fn(async () => {}) }))
-vi.mock('../features/prayerOfHealingService.js', () => ({ triggerPrayerOfHealing: vi.fn(async () => {}) }))
 vi.mock('../features/slowService.js', () => ({ triggerSlow: vi.fn(async () => {}) }))
 
 vi.mock('./postCastRiderService.js', () => ({

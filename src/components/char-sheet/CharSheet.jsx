@@ -64,6 +64,7 @@ function ShieldOfFaithTargetSelectionModal({ popupHtml, setPopupHtml, playerStat
 
 function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters }) {
     const [playerStats, setPlayerStats] = React.useState(null);
+    const [charActionsModalState, setCharActionsModalState] = React.useState({});
 
     const { popupHtml, setPopupHtml, value, Provider } = useSharedPopup();
 
@@ -752,6 +753,8 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                     mapName={activeMapName}
                     onBuffsChange={handleBuffsChange}
                     characters={characters}
+                    onSpellModalStateChange={(state) => setCharActionsModalState(state)}
+                    spellModalState={charActionsModalState}
                 ></CharActions>
                 <CharReactions
                     playerStats={playerStats}
@@ -761,8 +764,8 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                     characters={characters}
                 ></CharReactions>
                 {playerSummary.rules === '2024'
-                    ? <CharSpells playerStats={playerStats} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} cannotAct={cannotAct} mapName={activeMapName} characters={characters}></CharSpells>
-                    : <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} cannotAct={cannotAct} mapName={activeMapName} characters={characters}></CharSpells>
+                    ? <CharSpells playerStats={playerStats} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} cannotAct={cannotAct} mapName={activeMapName} characters={characters} setModalState={setCharActionsModalState}></CharSpells>
+                    : <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} cannotAct={cannotAct} mapName={activeMapName} characters={characters} setModalState={setCharActionsModalState}></CharSpells>
 
                 }
                 <CharInventory playerStats={playerStats}></CharInventory>

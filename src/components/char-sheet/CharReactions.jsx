@@ -208,7 +208,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
 
     const { resolvePositions: resolveReactionSpellPositions, cachedPosRef: cachedReactionCastPosRef } = useSpellPositionResolver(campaignName, mapName, playerStats.name);
 
-    const { castAction: reactionCastAction } = useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, {}, cachedReactionCastPosRef);
+    const { castAction: reactionCastAction } = useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, {}, cachedReactionCastPosRef, setModalState);
 
     const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, reactionCastAction, null, characters);
     const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);

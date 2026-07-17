@@ -1,7 +1,7 @@
 import { useRef, useCallback } from 'react'
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
 
-export function useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, extraMeta = {}, cachedPosRef) {
+export function useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, extraMeta = {}, cachedPosRef, setModalState) {
     const internalPosRef = useRef(null);
     const ref = cachedPosRef || internalPosRef;
 
@@ -22,7 +22,12 @@ export function useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTar
         if (!promise) return;
         promise.then((result) => {
             if (result?.automationPopup) {
-                setPopupHtml(result.automationPopup.payload);
+                const popup = result.automationPopup;
+                if (popup.type === 'modal' && setModalState) {
+                    handleModalResult(popup, setModalState);
+                } else {
+                    setPopupHtml(popup.payload);
+                }
             } else if (result && result.healAmount > 0) {
                 const bonusHealDetail = result.bonusDetails?.length > 0
                     ? result.bonusDetails.map(d => `${d.amount} ${d.name}`).join(', ')
@@ -42,7 +47,31 @@ export function useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTar
             }
         }).catch((e) => { console.error(`[useSpellCastExecutor] executeSpellCast error for ${spell.name}:`, e); });
         ref.current = null;
-    }, [rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, extraMeta, ref]);
+    }, [rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, extraMeta, ref, setModalState]);
 
     return { castAction, cachedPosRef: ref };
+}
+
+function handleModalResult(popup, setModalState) {
+    const modalName = popup.modalName;
+    const payload = popup.payload;
+    switch (modalName) {
+        case 'massHealTarget':
+            setModalState({ massHealModal: payload });
+            break;
+        case 'massCureWoundsTarget':
+            setModalState({ massCureWoundsModal: payload });
+            break;
+        case 'prayerOfHealingTarget':
+            setModalState({ prayerOfHealingModal: payload });
+            break;
+        case 'powerWordFortifyTarget':
+            setModalState({ powerWordFortifyModal: payload });
+            break;
+        case 'massHealingWordTarget':
+            setModalState({ massHealingWordModal: payload });
+            break;
+        default:
+            console.error(`[useSpellCastExecutor] Unknown modalName from spell cast: ${modalName}`);
+    }
 }

@@ -1,7 +1,12 @@
 import { handle as handleSaveOnly } from './handlers/combat/saveOnlyHandler.js';
 import { handle as handleSaveAttack } from './handlers/combat/saveAttackHandler.js';
 import { handle as handleHealing } from './handlers/healing/healingHandler.js';
+import { handle as handleMassHeal } from './handlers/healing/massHealHandler.js';
+import { handle as handleMassCureWounds } from './handlers/healing/massCureWoundsHandler.js';
+import { handle as handlePrayerOfHealing } from './handlers/healing/prayerOfHealingHandler.js';
+import { handle as handleMassHealingWord } from './handlers/healing/massHealingWordHandler.js';
 import { handle as handleBuff } from './handlers/buffs/buffHandler.js';
+import { handle as handlePowerWordFortify } from './handlers/buffs/powerWordFortifyHandler.js';
 import { handle as handleCondition } from './handlers/buffs/conditionHandler.js';
 import { handle as handleMagicInitiate } from './handlers/feats/magicInitiateHandler.js';
 import { handle as handleTelekineticShove } from './handlers/feats/telekineticShoveHandler.js';
@@ -236,6 +241,11 @@ const HANDLER_MAP = {
     save_attack: handleSaveAttack,
     healing: handleHealing,
     self_healing: handleHealing,
+    mass_heal: handleMassHeal,
+    mass_cure_wounds: handleMassCureWounds,
+    prayer_of_healing: handlePrayerOfHealing,
+    mass_healing_word: handleMassHealingWord,
+    power_word_fortify: handlePowerWordFortify,
     temp_buff: handleBuff,
     set_condition: handleCondition,
     sorcery_aura: handleSorcery,
@@ -493,6 +503,11 @@ export {
     isResistanceUsedThisTurn, applyShieldOfFaithEffect, isShieldOfFaithActive, getShieldOfFaithBonus,
     getWardingBondTarget, getWardingBondSource, isWardingBondActive,
 };
+export { confirmMassHeal } from './handlers/healing/massHealHandler.js';
+export { confirmMassCureWounds } from './handlers/healing/massCureWoundsHandler.js';
+export { confirmPrayerOfHealing } from './handlers/healing/prayerOfHealingHandler.js';
+export { confirmMassHealingWord } from './handlers/healing/massHealingWordHandler.js';
+export { confirmPowerWordFortify } from './handlers/buffs/powerWordFortifyHandler.js';
 export async function executeHandler(action, playerStats, campaignName, mapName, characters) {
     if (!action?.automation) {
         return null;

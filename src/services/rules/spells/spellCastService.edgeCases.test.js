@@ -145,10 +145,6 @@ vi.mock('../features/holyAuraService.js', () => ({
   triggerHolyAura: vi.fn(async () => {}),
 }))
 
-vi.mock('../features/powerWordFortifyService.js', () => ({
-  triggerPowerWordFortify: vi.fn(async () => {}),
-}))
-
 vi.mock('../features/powerWordStunService.js', () => ({
   triggerPowerWordStun: vi.fn(async () => {}),
 }))
@@ -171,22 +167,6 @@ vi.mock('../features/tashasHideousLaughterService.js', () => ({
 
 vi.mock('../features/removeCurseService.js', () => ({
   triggerRemoveCurse: vi.fn(async () => {}),
-}))
-
-vi.mock('../features/massCureWoundsService.js', () => ({
-  triggerMassCureWounds: vi.fn(async () => {}),
-}))
-
-vi.mock('../features/massHealService.js', () => ({
-  triggerMassHeal: vi.fn(async () => {}),
-}))
-
-vi.mock('../features/massHealingWordService.js', () => ({
-  triggerMassHealingWord: vi.fn(async () => {}),
-}))
-
-vi.mock('../features/prayerOfHealingService.js', () => ({
-  triggerPrayerOfHealing: vi.fn(async () => {}),
 }))
 
 vi.mock('../features/slowService.js', () => ({
@@ -360,9 +340,6 @@ async function resetMockImplementations() {
   await m('../features/holyAuraService.js', {
     triggerHolyAura: async () => {},
   })
-  await m('../features/powerWordFortifyService.js', {
-    triggerPowerWordFortify: async () => {},
-  })
   await m('../features/powerWordStunService.js', {
     triggerPowerWordStun: async () => {},
   })
@@ -380,18 +357,6 @@ async function resetMockImplementations() {
   })
   await m('../features/removeCurseService.js', {
     triggerRemoveCurse: async () => {},
-  })
-  await m('../features/massCureWoundsService.js', {
-    triggerMassCureWounds: async () => {},
-  })
-  await m('../features/massHealService.js', {
-    triggerMassHeal: async () => {},
-  })
-  await m('../features/massHealingWordService.js', {
-    triggerMassHealingWord: async () => {},
-  })
-  await m('../features/prayerOfHealingService.js', {
-    triggerPrayerOfHealing: async () => {},
   })
   await m('../features/slowService.js', {
     triggerSlow: async () => {},
