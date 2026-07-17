@@ -10579,7 +10579,7 @@
                     },
                     {
                         "name": "Revelation in Flesh",
-                        "description": "Bonus Action, spend 1+ Sorcery Points to magically alter body for 10 minutes. For each SP spent, gain one benefit: Aquatic Adaptation (Swim Speed = 2x Speed, breathe underwater), Glistening Flight (Fly Speed = Speed, hover), See the Invisible (see Invisible creatures within 60 feet), Wormhole Movement (move through spaces as narrow as 1 inch, escape nonmagical restraints).",
+                        "description": "Bonus Action, spend 1+ Sorcery Points to magically alter body for 10 minutes. For each SP spent, gain one benefit:<ul><li>Aquatic Adaptation (Swim Speed = 2x Speed, breathe underwater)</li><li>Glistening Flight (Fly Speed = Speed, hover)</li><li>See the Invisible (see Invisible creatures within 60 feet)</li><li>Wormhole Movement (move through spaces as narrow as 1 inch, escape nonmagical restraints).</li></ul>",
                         "level": 14,
                         "automation": {
                             "type": "revelation_in_flesh",

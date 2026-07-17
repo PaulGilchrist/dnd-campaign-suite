@@ -375,7 +375,7 @@
 }
 
 .ally-badge {
-    display: inline-flex;
+    display: inline-block;
     align-items: center;
     gap: 4px;
     padding: 1px 8px;
@@ -387,6 +387,7 @@
     cursor: pointer;
     transition: background-color 0.15s ease;
     white-space: nowrap;
+    margin-top: 6px;
 }
 
 .ally-badge:hover {

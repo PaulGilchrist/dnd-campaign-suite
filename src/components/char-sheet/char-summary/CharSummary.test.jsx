@@ -106,11 +106,6 @@ describe('CharSummary - Buff Effects', () => {
         [{ effect: 'mage_armor' }, /\+3 from Mage Armor/],
         [{ effect: 'shield' }, /\+5 from Shield/],
         [{ effect: 'ice_walk' }, /ice walk/],
-        [{ effect: 'see_the_invisible' }, /See Invisible 60 ft/],
-        [{ effect: 'see_invisibility' }, /See Invisible 120 ft/],
-        [{ effect: 'wormhole_movement' }, /Narrow Space/],
-        [{ name: 'The Third Eye', effect: 'darkvision_120' }, /Darkvision 120 ft/],
-        [{ name: 'The Third Eye', effect: 'greater_comprehension' }, /Greater Comprehension/],
     ])('shows indicator for %j buff effect', (buff, expectedText) => {
         getActiveBuffs.mockReturnValue([buff]);
         render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);

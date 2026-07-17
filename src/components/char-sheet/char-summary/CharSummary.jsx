@@ -247,13 +247,9 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     let mageArmorActive = false;
     let iceWalkActive = false;
     let acrobaticMovementActive = false;
-    let seeInvisibleRange = null;
-    let narrowSpaceActive = false;
     let glisteningFlightHover = false;
     let dragonWingsHover = false;
     let tremorsenseActive = false;
-    const thirdEyeBuff = Array.isArray(activeBuffs) ? (activeBuffs.find(b => b.name === 'The Third Eye') || null) : null;
-    const thirdEyeEffect = thirdEyeBuff?.effect || null;
     const huntersMarkActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === "Hunter's Mark");
     const aspectBuff = Array.isArray(activeBuffs) ? (activeBuffs.find(b => b.name === 'Aspect of the Wilds') || null) : null;
     const aspectOption = aspectBuff?.optionName || null;
@@ -271,9 +267,6 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         if (buff.effect === 'dragon_wings') { flySpeed = buff.flySpeed || 60; dragonWingsHover = true; }
         if (buff.flySpeed && !['fly_speed_20_hover', 'telekinetic_leap', 'avenging_angel_flight', 'dragon_wings'].includes(buff.effect)) hasFlySpeedBuff = true;
         if (buff.effect === 'aquatic_adaptation') swimSpeed = speed * 2;
-        if (buff.effect === 'see_the_invisible') seeInvisibleRange = 60;
-        if (buff.effect === 'see_invisibility') seeInvisibleRange = 120;
-        if (buff.effect === 'wormhole_movement') narrowSpaceActive = true;
         if (buff.effect === 'tremorsense_60ft') tremorsenseActive = true;
     });
     if (aspectOption === 'Panther') {
@@ -482,16 +475,12 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                             setPopupHtml(html);
                         }
                     }} />
-                    {flyBuffActive && <span className="automation-badge">{flyBuffName} Active</span>}
-                    {huntersMarkActive && <span className="automation-badge">Hunter's Mark Active</span>}
-                    {seeInvisibleRange && <span className="automation-badge">See Invisible {seeInvisibleRange} ft</span>}
-                    {thirdEyeEffect === 'darkvision_120' && <span className="automation-badge">Darkvision 120 ft</span>}
-                    {thirdEyeEffect === 'greater_comprehension' && <span className="automation-badge">Greater Comprehension (read any language)</span>}
-                    {narrowSpaceActive && <span className="automation-badge">Narrow Space</span>}
-                    {tremorsenseActive && <span className="automation-badge">Tremorsense 60 ft.</span>}
                     <span className="ally-badge clickable no-print" onClick={handleAllyModalOpen} title="Manage allies">
                         <i className="fa-solid fa-users"></i> Allies ({currentAllies.length})
                     </span>
+                    {flyBuffActive && <span className="automation-badge">{flyBuffName} Active</span>}
+                    {huntersMarkActive && <span className="automation-badge">Hunter's Mark Active</span>}
+                    {tremorsenseActive && <span className="automation-badge">Tremorsense 60 ft.</span>}
                 </div>
                 <div>
                       <CharClassFeatures playerStats={playerStats} campaignName={campaignName} />

@@ -59,6 +59,13 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
                 setRuntimeValue(vowTarget, 'activeBuffs', filteredTargetBuffs, campaignName);
             }
 
+            // Clear Revelation in Flesh active state on initiative roll (new combat)
+            const revelationBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || [];
+            const filteredRevelationBuffs = revelationBuffs.filter(b => b.name !== 'Revelation in Flesh');
+            if (filteredRevelationBuffs.length !== revelationBuffs.length) {
+                setRuntimeValue(playerStats.name, 'activeBuffs', filteredRevelationBuffs, campaignName);
+            }
+
             // Clear concentration on initiative roll (new combat round)
             const cs = getCombatSummary(campaignName);
             if (cs && cs.creatures) {
