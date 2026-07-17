@@ -1,6 +1,6 @@
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { handle, isActive, deactivate } from './transeOfOrderHandler.js';
+import { handle, isActive, deactivate } from './tranceOfOrderHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as metamagic from '../../../../hooks/combat/useMetamagic.js';
 import * as classFeatures from '../../../character/classFeatures.js';
@@ -13,6 +13,7 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
     spendSorceryPoints: vi.fn(),
+    getCurrentSorceryPoints: vi.fn(() => 10),
 }));
 
 vi.mock('../../../character/classFeatures.js', () => ({
@@ -25,9 +26,9 @@ vi.mock('../../../ui/logService.js', () => ({
 
 function makeAction(name) {
     return {
-        name: name || 'Transe of Order',
+        name: name || 'Trance of Order',
         automation: {
-            type: 'transe_of_order',
+            type: 'trance_of_order',
             action: 'bonus_action',
             duration: '1_minute',
             restoreCost: 5,
@@ -50,22 +51,18 @@ function makePlayerStats(overrides) {
     };
 }
 
-function getRuntimeKey(playerName, key) {
-    return playerName.toLowerCase().replace(/\s+/g, '') + '_' + key;
-}
-
-describe('Transe of Order Handler', () => {
+describe('Trance of Order Handler', () => {
     const campaignName = 'test-campaign';
     const playerName = 'Test Character';
-    const activeKey = getRuntimeKey(playerName, 'transeOfOrderActive');
-    const usesKey = getRuntimeKey(playerName, 'transeOfOrderUses');
+    const activeKey = 'tranceOfOrderActive';
+    const usesKey = 'tranceOfOrderUses';
 
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
     describe('handle()', () => {
-        it('should activate Transe of Order when uses are available', async () => {
+        it('should activate Trance of Order when uses are available', async () => {
             runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === activeKey) return false;
                 if (key === usesKey) return 1;
@@ -85,18 +82,24 @@ describe('Transe of Order Handler', () => {
                 true,
                 campaignName,
             );
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+                playerName,
+                usesKey,
+                0,
+                campaignName,
+            );
             expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
             expect(logService.addEntry).toHaveBeenCalledWith(
                 campaignName,
                 expect.objectContaining({
                     type: 'ability_use',
                     characterName: playerName,
-                    abilityName: 'Transe of Order',
+                    abilityName: 'Trance of Order',
                 }),
             );
         });
 
-        it('should restore uses by spending 5 SP when no uses remain and player has enough SP', async () => {
+        it('should restore and activate by spending 5 SP when no uses remain and player has enough SP', async () => {
             runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === activeKey) return false;
                 if (key === usesKey) return 0;
@@ -107,12 +110,19 @@ describe('Transe of Order Handler', () => {
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('restored');
+            expect(result.payload.description).toContain('activated');
+            expect(result.payload.description).toContain('5 SP');
             expect(metamagic.spendSorceryPoints).toHaveBeenCalledWith(playerName, 5, campaignName);
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 playerName,
+                activeKey,
+                true,
+                campaignName,
+            );
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+                playerName,
                 usesKey,
-                1,
+                0,
                 campaignName,
             );
             expect(logService.addEntry).toHaveBeenCalledWith(
@@ -130,6 +140,7 @@ describe('Transe of Order Handler', () => {
                 if (key === usesKey) return 0;
                 return null;
             });
+            metamagic.getCurrentSorceryPoints.mockReturnValue(2);
             classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 10 });
 
             const result = await handle(makeAction(), makePlayerStats({
@@ -155,7 +166,7 @@ describe('Transe of Order Handler', () => {
             expect(result.payload.name).toBe('Custom Feature');
             expect(result.payload.description).toContain('Custom Feature');
             expect(result.payload.automation).toEqual({
-                type: 'transe_of_order',
+                type: 'trance_of_order',
                 action: 'bonus_action',
                 duration: '1_minute',
                 restoreCost: 5,

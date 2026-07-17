@@ -42,6 +42,7 @@ export const ALL_TRACKED_RESOURCES = [
   'moonlightStepUses',
   'dreadambushUses',
   'cosmicomenUses',
+  'tranceOfOrderUses',
   'shortRestHitDice',
   'spell_slots_level_1',
   'spell_slots_level_2',
@@ -174,6 +175,10 @@ export function computeTrackedResources(playerStats) {
   const hasRestoration = (playerStats.automation?.passives ?? [])
     .some(a => a.type === 'resource_restoration')
   resources.sorcerousRestorationUses = { current: hasRestoration ? 1 : 0, max: hasRestoration ? 1 : 0 }
+
+  const hasTrance = (playerStats.automation?.bonusActions ?? [])
+    .some(a => a.type === 'trance_of_order')
+  resources.tranceOfOrderUses = { current: hasTrance ? 1 : 0, max: hasTrance ? 1 : 0 }
 
   const maxUM = (features?.uncannymetabolismUses || 0)
   resources.uncannymetabolismUses = { current: maxUM, max: maxUM }

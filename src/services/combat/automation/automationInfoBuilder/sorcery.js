@@ -39,13 +39,14 @@ export const sorceryHandlers = {
         }
     },
 
-    'transe_of_order': (feature, _playerStats) => {
+    'trance_of_order': (feature, _playerStats) => {
         const auto = feature.automation
         return {
-            type: 'transe_of_order',
+            type: 'trance_of_order',
             name: feature.name,
             duration: auto.duration || '1_minute',
             action: auto.action || 'bonus_action',
+            casting_time: auto.casting_time || '1 bonus action',
             restoreCost: auto.restoreCost || 5,
             hasAutomation: true
         }

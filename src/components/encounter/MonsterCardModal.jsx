@@ -222,12 +222,12 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const targetConditions = (target?.conditions || []).map(c => c.key)
 
     const targetSaveModifiers = target?.type === 'player' ? targetComputed?.saveModifiers : (target?.saveModifiers || []);
-    const attackerEffects = computeConditionEffects(attackerConditions, targetSaveModifiers, monsterTargetEffects, false, false, false, false, null, false, null, false, false, false, false, false)
+    const attackerEffects = computeConditionEffects(attackerConditions, targetSaveModifiers, monsterTargetEffects, false, false, false, false, null, false, null, false, false, false, false, false, false, false)
     const attackerCannotAct = attackerConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c))
     if (attackerCannotAct) return
 
     const targetRiderForTarget = allTargetEffects.filter(te => te.target === target?.name)
-    const targetEffectData = computeConditionEffects(targetConditions, targetSaveModifiers, targetRiderForTarget, false, false, false, false, null, false, null, false, false, false, false, false)
+    const targetEffectData = computeConditionEffects(targetConditions, targetSaveModifiers, targetRiderForTarget, false, false, false, false, null, false, null, false, false, false, false, false, false, false)
 
     const riderAttackBonus = targetEffectData.riderAttackBonus || 0;
     const effectiveBonus = bonus + riderAttackBonus;
@@ -527,7 +527,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const creature = getAttackerCreature();
     const monsterConditions = creature?.conditions || [];
     const condKeys = monsterConditions.map(c => c.key);
-    const condEffects = computeConditionEffects(condKeys, [], monsterTargetEffects, false, false, false, false, null, false, null, false, false, false, false, false);
+    const condEffects = computeConditionEffects(condKeys, [], monsterTargetEffects, false, false, false, false, null, false, null, false, false, false, false, false, false, false);
     const condEffectBadges = [];
     if (condEffects) {
       if (condEffects.noAdvantageAgainst) condEffectBadges.push({ label: 'No Adv vs', cls: 'effect-target-disadv', icon: 'fa-arrow-down' });

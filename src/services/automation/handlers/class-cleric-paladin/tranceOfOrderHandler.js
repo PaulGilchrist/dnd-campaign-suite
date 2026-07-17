@@ -1,21 +1,18 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { spendSorceryPoints } from '../../../../hooks/combat/useMetamagic.js';
+import { spendSorceryPoints, getCurrentSorceryPoints } from '../../../../hooks/combat/useMetamagic.js';
 import { getClassFeatures } from '../../../character/classFeatures.js';
 import { addEntry } from '../../../ui/logService.js';
-
-function getRuntimeKey(playerName, key) {
-    return playerName.toLowerCase().replace(/\s+/g, '') + '_' + key;
-}
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
-    const featureName = action.name || 'Transe of Order';
+    const featureName = action.name || 'Trance of Order';
 
     const maxSP = getClassFeatures(playerStats)?.maxSorceryPoints || 0;
-    const currentSP = playerStats.resources?.sorcery_points?.current ?? maxSP;
+    const currentSP = getCurrentSorceryPoints(playerName, maxSP);
 
-    const usesKey = getRuntimeKey(playerName, 'transeOfOrderUses');
+    const usesKey = 'tranceOfOrderUses';
+    const activeKey = 'tranceOfOrderActive';
     const usesMax = 1;
 
     const stored = getRuntimeValue(playerName, usesKey, campaignName);
@@ -24,21 +21,24 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     if (!active) {
         if (currentSP >= 5) {
             spendSorceryPoints(playerName, 5, campaignName);
-            await setRuntimeValue(playerName, usesKey, usesMax, campaignName);
 
             addEntry(campaignName, {
                 type: 'ability_use',
                 characterName: playerName,
                 abilityName: featureName,
-                description: `${playerName} restored Transe of Order by spending 5 Sorcery Points.`,
-            }).catch((e) => { console.error("[transeOfOrder] Error:", e); });
+                description: `${playerName} restored and activated Trance of Order by spending 5 Sorcery Points.`,
+            }).catch((e) => { console.error("[tranceOfOrder] Error:", e); });
+
+            setRuntimeValue(playerName, usesKey, 0, campaignName);
+            setRuntimeValue(playerName, activeKey, true, campaignName);
+            window.dispatchEvent(new CustomEvent('trance-of-order-updated'));
 
             return {
                 type: 'popup',
                 payload: {
                     type: 'automation_info',
                     name: featureName,
-                    description: `${featureName} restored (5 SP spent). Active until Long Rest.`,
+                    description: `${featureName} activated (5 SP spent). Attack rolls against you can't benefit from Advantage. D20 tests treat 9 or lower as 10.`,
                     automation: auto,
                 },
             };
@@ -55,15 +55,16 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    setRuntimeValue(playerName, getRuntimeKey(playerName, 'transeOfOrderActive'), true, campaignName);
-    window.dispatchEvent(new CustomEvent('transe-of-order-updated'));
+    setRuntimeValue(playerName, usesKey, 0, campaignName);
+    setRuntimeValue(playerName, activeKey, true, campaignName);
+    window.dispatchEvent(new CustomEvent('trance-of-order-updated'));
 
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
         abilityName: featureName,
         description: `${playerName} activated ${featureName} (Bonus Action, 1 minute). Attack rolls against you can't benefit from Advantage. D20 tests treat 9 or lower as 10.`,
-    }).catch((e) => { console.error("[transeOfOrder] Error:", e); });
+    }).catch((e) => { console.error("[tranceOfOrder] Error:", e); });
 
     return {
         type: 'popup',
@@ -77,11 +78,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 }
 
 export function isActive(playerName) {
-    const key = getRuntimeKey(playerName, 'transeOfOrderActive');
-    return getRuntimeValue(playerName, key, null) === true;
+    return getRuntimeValue(playerName, 'tranceOfOrderActive', null) === true;
 }
 
 export function deactivate(playerName, campaignName) {
-    const key = getRuntimeKey(playerName, 'transeOfOrderActive');
-    setRuntimeValue(playerName, key, false, campaignName);
+    setRuntimeValue(playerName, 'tranceOfOrderActive', false, campaignName);
 }

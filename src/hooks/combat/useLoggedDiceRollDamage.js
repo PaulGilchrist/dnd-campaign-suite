@@ -891,7 +891,7 @@ export function createLogDamageAndShow(deps) {
         const isHolyAuraActive = Array.isArray(targetBuffs) && targetBuffs.some(b => b.name === 'Holy Aura' && b.effect === 'holy_aura');
         const isProtectionFromPoisonActive = Array.isArray(targetBuffs) && targetBuffs.some(b => b.name === 'Protection from Poison' && b.effect === 'protection_from_poison');
         const combatContext = getCombatSummary(campaignName);
-        const targetConditionEffects = computeConditionEffects(targetConditions, targetSaveModifiers, targetEffects, isRaging, shapeShiftActive, false, false, combatContext, seeInvisibilityActive, target.name, isLivingLegendActive, isElderChampionActive, isElderChampionAttackerActive, isHolyAuraActive, isProtectionFromPoisonActive);
+        const targetConditionEffects = computeConditionEffects(targetConditions, targetSaveModifiers, targetEffects, isRaging, shapeShiftActive, false, false, combatContext, seeInvisibilityActive, target.name, isLivingLegendActive, isElderChampionActive, isElderChampionAttackerActive, isHolyAuraActive, isProtectionFromPoisonActive, false);
         const restoreBalance = targetConditionEffects.restoreBalance;
         const fanaticalFocusUsed = getRuntimeValue(target.name, 'fanaticalFocusUsed', campaignName);
         const indomitableUses = Number(getRuntimeValue(target.name, 'indomitableUses', campaignName) ?? 0);

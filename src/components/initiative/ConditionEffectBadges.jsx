@@ -11,7 +11,7 @@ function getEffectDescription(label) {
 
 function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, campaignName, allCreatures, hasTacticalShift, hasSpeedyOpportunityDisadvantage, hasSpeedyDifficultTerrainIgnore, isLocalhost, coronaDisadvantage }) {
     const condKeys = (conditions || []).map(c => c.key)
-    const effects = computeConditionEffects(condKeys, [], targetEffects, false, false, false, false, null, false, null, false, false, false, false, false)
+    const effects = computeConditionEffects(condKeys, [], targetEffects, false, false, false, false, null, false, null, false, false, false, false, false, false, false)
     const activeBuffs = creatureName && campaignName ? (getRuntimeValue(creatureName, 'activeBuffs', campaignName) || []) : []
     if (Array.isArray(activeBuffs)) {
         for (const buff of activeBuffs) {

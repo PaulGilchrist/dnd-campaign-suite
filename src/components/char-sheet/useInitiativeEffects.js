@@ -83,6 +83,9 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
             setRuntimeValue(playerStats.name, 'bastionOfLawWardUsed', null, campaignName);
             setRuntimeValue(playerStats.name, 'bastionOfLawLastAttackDamage', null, campaignName);
 
+            // Clear Trance of Order on initiative roll (new combat)
+            setRuntimeValue(playerStats.name, 'tranceOfOrderActive', null, campaignName);
+
             const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
 
             // Check for Perfect Focus (Monk level 15)

@@ -8,18 +8,17 @@ const CONDITIONS_THAT_SPEED_ZERO = new Set([
 
 const CONDITION_KEYWORDS = new Set(['charmed', 'frightened', 'poison', 'magic'])
 
-function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, conditions = [], attackerName = null, isLivingLegendActive = false, isElderChampionActive = false, isElderChampionAttackerActive = false, isHolyAuraActive = false, isProtectionFromPoisonActive = false) {
+function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, conditions = [], attackerName = null, isLivingLegendActive = false, isElderChampionActive = false, isElderChampionAttackerActive = false, isHolyAuraActive = false, isProtectionFromPoisonActive = false, isTranceOfOrderActive = false) {
   const conditionSet = new Set(conditions);
   if (modifier.effect === 'replacement') return true;
   if (modifier.effect === 'reliable_talent') return true;
   if (modifier.effect === 'dex_jump') return true;
   if (modifier.effect === 'restore_balance') return true;
-  if (modifier.effect === 'd20_floor_10') return true;
-  if (modifier.effect === 'no_advantage_against') return true;
   if (modifier.effect === 'dark_ones_look') return true;
   if (modifier.effect === 'portent') return true;
   if (modifier.effect === 'potent_cantrip') return true;
   if (modifier.effect === 'soulstitch_spells') return true;
+  if (modifier.condition === 'trance_of_order_active') return isTranceOfOrderActive;
   if (modifier.condition === 'creature_grappled_by_you') {
     if (!combatContext || !combatContext.creatures) return false;
     const attackerName = combatContext.activeCreatureName || combatContext.attackerName;
@@ -128,10 +127,10 @@ function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, 
   return true;
 }
 
-function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, conditions = [], attackerName = null, isLivingLegendActive = false, isElderChampionActive = false, isElderChampionAttackerActive = false, isHolyAuraActive = false, isProtectionFromPoisonActive = false) {
+function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, conditions = [], attackerName = null, isLivingLegendActive = false, isElderChampionActive = false, isElderChampionAttackerActive = false, isHolyAuraActive = false, isProtectionFromPoisonActive = false, isTranceOfOrderActive = false) {
   if (!modifiers || modifiers.length === 0) return;
   for (const mod of modifiers) {
-    if (!saveModifierApplies(mod, saveType, abilityName, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, conditions, attackerName, isLivingLegendActive, isElderChampionActive, isElderChampionAttackerActive, isHolyAuraActive, isProtectionFromPoisonActive)) continue;
+    if (!saveModifierApplies(mod, saveType, abilityName, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, conditions, attackerName, isLivingLegendActive, isElderChampionActive, isElderChampionAttackerActive, isHolyAuraActive, isProtectionFromPoisonActive, isTranceOfOrderActive)) continue;
     if (mod.target === 'ability_check' || mod.target === 'check' || mod.target === 'performance_checks' || mod.target === 'deception_performance_checks') {
       if (mod.effect === 'advantage') {
         // Skill-specific advantage (e.g., Peerless Athlete) — check before abilities
@@ -318,7 +317,7 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
   }
 }
 
-function computeConditionEffects(conditions = [], saveModifiers = [], targetEffects = [], isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, seeInvisibilityActive = false, attackerName = null, isLivingLegendActive = false, isElderChampionActive = false, isElderChampionAttackerActive = false, isHolyAuraActive = false, isProtectionFromPoisonActive = false) {
+function computeConditionEffects(conditions = [], saveModifiers = [], targetEffects = [], isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, seeInvisibilityActive = false, attackerName = null, isLivingLegendActive = false, isElderChampionActive = false, isElderChampionAttackerActive = false, isHolyAuraActive = false, isProtectionFromPoisonActive = false, isTranceOfOrderActive = false) {
   const effects = {
     attackAdvantageCount: 0,
     attackAdvantageReasons: [],
@@ -458,7 +457,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
   const activeSaveModifiers = isIncapacitated
     ? saveModifiers.filter(mod => mod.condition !== 'visible_effect')
     : saveModifiers;
-  applySaveModifiers(effects, activeSaveModifiers, null, null, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, conditions, attackerName, isLivingLegendActive, isElderChampionActive, isElderChampionAttackerActive, isHolyAuraActive, isProtectionFromPoisonActive);
+  applySaveModifiers(effects, activeSaveModifiers, null, null, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, conditions, attackerName, isLivingLegendActive, isElderChampionActive, isElderChampionAttackerActive, isHolyAuraActive, isProtectionFromPoisonActive, isTranceOfOrderActive);
 
   for (const key of conditionSet) {
     switch (key) {

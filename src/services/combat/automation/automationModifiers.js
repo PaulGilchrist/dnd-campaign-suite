@@ -174,17 +174,17 @@ export function collectSaveModifiers(features) {
                     effect: 'restore_balance',
                 })
             }
-            if (auto.type === 'transe_of_order') {
+            if (auto.type === 'trance_of_order') {
                 modifiers.push({
                     source: feature.name,
                     target: 'attack_roll',
-                    condition: 'transe_of_order_active',
+                    condition: 'trance_of_order_active',
                     effect: 'no_advantage_against',
                 })
                 modifiers.push({
                     source: feature.name,
                     target: 'd20',
-                    condition: '',
+                    condition: 'trance_of_order_active',
                     effect: 'd20_floor_10',
                 })
             }

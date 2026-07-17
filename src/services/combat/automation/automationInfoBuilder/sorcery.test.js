@@ -106,34 +106,37 @@ describe('sorceryHandlers – bastion_of_law', () => {
     })
 })
 
-describe('sorceryHandlers – transe_of_order', () => {
+describe('sorceryHandlers – trance_of_order', () => {
     it('returns correct defaults', () => {
-        const feature = makeFeature({ type: 'transe_of_order' })
-        const result = sorceryHandlers.transe_of_order(feature, BASE_STATS)
+        const feature = makeFeature({ type: 'trance_of_order' })
+        const result = sorceryHandlers.trance_of_order(feature, BASE_STATS)
 
         expect(result).toMatchObject({
-            type: 'transe_of_order',
+            type: 'trance_of_order',
             name: 'Test Feature',
             duration: '1_minute',
             action: 'bonus_action',
+            casting_time: '1 bonus action',
             restoreCost: 5,
             hasAutomation: true,
         })
     })
 
     it('passes through custom fields', () => {
-        const feature = makeFeature({ type: 'transe_of_order', duration: '10_minutes', action: 'action', restoreCost: 10 })
-        const result = sorceryHandlers.transe_of_order(feature, BASE_STATS)
+        const feature = makeFeature({ type: 'trance_of_order', duration: '10_minutes', action: 'action', restoreCost: 10, casting_time: '1 action' })
+        const result = sorceryHandlers.trance_of_order(feature, BASE_STATS)
         expect(result.duration).toBe('10_minutes')
         expect(result.action).toBe('action')
+        expect(result.casting_time).toBe('1 action')
         expect(result.restoreCost).toBe(10)
     })
 
     it('falls back to defaults when automation fields are empty strings or zero', () => {
-        const feature = makeFeature({ type: 'transe_of_order', duration: '', action: '', restoreCost: 0 })
-        const result = sorceryHandlers.transe_of_order(feature, BASE_STATS)
+        const feature = makeFeature({ type: 'trance_of_order', duration: '', action: '', restoreCost: 0 })
+        const result = sorceryHandlers.trance_of_order(feature, BASE_STATS)
         expect(result.duration).toBe('1_minute')
         expect(result.action).toBe('bonus_action')
+        expect(result.casting_time).toBe('1 bonus action')
         expect(result.restoreCost).toBe(5)
     })
 })

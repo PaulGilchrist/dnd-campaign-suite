@@ -472,6 +472,7 @@ const SorcererFeatures = function SorcererFeatures({ playerStats, campaignName }
     const innateSorceryActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Innate Sorcery');
     const telepathicSpeechActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Telepathic Speech');
     const hasRestoration = (playerStats.automation?.passives ?? []).some(a => a.type === 'resource_restoration');
+    const tranceActive = useRuntimeValue(playerStats.name, 'tranceOfOrderActive', campaignName) === true;
     const REVELATION_EFFECTS = {
         'aquatic_adaptation': 'Aquatic Adaptation',
         'glistening_flight': 'Glistening Flight',
@@ -487,9 +488,10 @@ const SorcererFeatures = function SorcererFeatures({ playerStats, campaignName }
                    {telepathicSpeechActive && <span className="automation-badge"><i className="fa-solid fa-brain"></i> Telepathic Speech</span>}
                     <TrackedResourceInput label="Metamagic Known" resourceKey="metamagicKnown" playerName={playerStats.name} getMax={() => sorcererFeatures?.metamagicKnown || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
                   {revelationBuffs.length > 0 && <span className="automation-badge">{revelationBuffs.map(b => REVELATION_EFFECTS[b.effect] || 'Revelation in Flesh').join(', ')}</span>}
-                  {hasRestoration && <TrackedResourceInput label="Sorcerous Restoration" resourceKey="sorcerousRestorationUses" playerName={playerStats.name} getMax={() => 1} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />}
-                  <TrackedResourceInput label="Sorcery Points" resourceKey="sorceryPoints" playerName={playerStats.name} getMax={() => sorcererFeatures?.maxSorceryPoints || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-            </div>
+                   {hasRestoration && <TrackedResourceInput label="Sorcerous Restoration" resourceKey="sorcerousRestorationUses" playerName={playerStats.name} getMax={() => 1} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />}
+                   <TrackedResourceInput label="Sorcery Points" resourceKey="sorceryPoints" playerName={playerStats.name} getMax={() => sorcererFeatures?.maxSorceryPoints || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+                   {tranceActive && <span className="automation-badge">Trance of Order</span>}
+             </div>
         );
 };
 

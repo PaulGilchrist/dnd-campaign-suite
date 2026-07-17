@@ -791,8 +791,12 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'bastion_of_law':
                 result.actions.push(info)
                 break
-            case 'transe_of_order':
-                result.specialActions.push(info)
+            case 'trance_of_order':
+                if (info.action === 'bonus_action') {
+                    result.bonusActions.push(info)
+                } else {
+                    result.actions.push(info)
+                }
                 break
             case 'clockwork_cavalcade':
                 if (info.action === 'bonus_action') {

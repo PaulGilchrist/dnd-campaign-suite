@@ -933,9 +933,10 @@ export function createLogAndShow(deps) {
         }
 
         if (rollType === 'check' || rollType === 'skill') {
-            const effectiveD20 = context?.reliableTalent && r1 <= 9 ? 10 : r1;
+            const effectiveD20 = (context?.d20Floor10 && r1 <= 9) ? 10 : r1;
+            const reliableD20 = context?.reliableTalent && effectiveD20 <= 9 ? 10 : effectiveD20;
             setRuntimeValue(characterName, 'lastAbilityCheck', {
-                d20: effectiveD20,
+                d20: reliableD20,
                 bonus,
                 checkName: name,
                 targetName,
@@ -947,10 +948,10 @@ export function createLogAndShow(deps) {
                 combatSummary.lastAttack = {
                     attackerName: characterName,
                     targetName,
-                    d20: effectiveD20,
+                    d20: reliableD20,
                     d20Rolls: [r1, r2],
                     bonus,
-                    total: effectiveD20 + bonus,
+                    total: reliableD20 + bonus,
                     checkName: name,
                     rollType,
                     timestamp: Date.now(),
@@ -961,7 +962,7 @@ export function createLogAndShow(deps) {
             setRuntimeValue(characterName, '_lastRollContext', {
                 type: 'check',
                 checkName: name,
-                oldTotal: effectiveD20 + bonus,
+                oldTotal: reliableD20 + bonus,
                 timestamp: Date.now(),
             }, campaignName);
         }

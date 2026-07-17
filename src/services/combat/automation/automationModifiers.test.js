@@ -463,24 +463,24 @@ describe('collectSaveModifiers', () => {
     })
   })
 
-  describe('transe_of_order type', () => {
+  describe('trance_of_order type', () => {
     it('produces two modifiers: attack_roll and d20', () => {
       const features = [{
-        name: 'Transe of Order',
-        automation: { type: 'transe_of_order' }
+        name: 'Trance of Order',
+        automation: { type: 'trance_of_order' }
       }]
       const result = collectSaveModifiers(features)
       expect(result).toHaveLength(2)
       expect(result[0]).toEqual({
-        source: 'Transe of Order',
+        source: 'Trance of Order',
         target: 'attack_roll',
-        condition: 'transe_of_order_active',
+        condition: 'trance_of_order_active',
         effect: 'no_advantage_against'
       })
       expect(result[1]).toEqual({
-        source: 'Transe of Order',
+        source: 'Trance of Order',
         target: 'd20',
-        condition: '',
+        condition: 'trance_of_order_active',
         effect: 'd20_floor_10'
       })
     })

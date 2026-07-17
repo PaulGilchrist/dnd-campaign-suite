@@ -150,7 +150,8 @@ export const LONG_REST_RESOURCES = [
     'elderChampionRestUsed',
     'avengingAngelRestUsed',
   'warpingimplosionUses',
-  'restorebalanceUses'
+  'restorebalanceUses',
+  'tranceOfOrderUses'
 ]
 
 export function getLongRestResources() {
@@ -389,6 +390,9 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
     updates.bastionOfLawWardUsed = null;
     updates.bastionOfLawLastAttackDamage = null;
 
+    // Clear Trance of Order active state on short rest
+    updates.tranceOfOrderActive = null;
+
     setRuntimeBatch(name, updates, campaignName)
 
   clearAllExpirationEffects(name, campaignName)
@@ -450,10 +454,13 @@ export async function applyLongRest(playerStats, campaignName) {
     // Clear Avenging Angel active state on long rest
      charData.avengingAngelActive = null;
 
-      // Clear Peerless Athlete active state on long rest
-      charData.peerlessAthleteActive = null;
+       // Clear Peerless Athlete active state on long rest
+       charData.peerlessAthleteActive = null;
 
-    // Clear Vow of Enmity active state on long rest
+     // Clear Trance of Order active state on long rest
+     charData.tranceOfOrderActive = null;
+
+     // Clear Vow of Enmity active state on long rest
     charData.vowOfEnmityTarget = null;
     charData.vowOfEnmityCostPaid = null;
     const vowTarget = getRuntimeValue(name, 'vowOfEnmityTarget', campaignName);

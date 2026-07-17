@@ -211,7 +211,7 @@ describe('collectAutomationFromFeatures – special action types', () => {
         'living_legend', 'cloak_of_shadows', 'holy_nimbus', 'holy_aura',
         'avenging_angel', 'elder_champion', 'large_form',
         'celestial_resilience', 'revelation_in_flesh', 'peerless_athlete',
-        'transe_of_order', 'dragon_wings', 'clairvoyant_combatant',
+        'dragon_wings', 'clairvoyant_combatant',
         'celestial_revelation', 'elfish_lineage', 'gnomish_lineage',
         'fiendish_legacy', 'portent',
     ]
@@ -324,6 +324,12 @@ describe('collectAutomationFromFeatures – casting_time conditional types', () 
         const actionResult = collectAutomationFromFeatures([makeFeature({ type: 'misty_wanderer', casting_time: '1 action' })], ps)
         expect(actionResult.actions).toHaveLength(1)
         expect(actionResult.bonusActions).toHaveLength(0)
+    })
+
+    it('categorizes trance_of_order as a bonus action', () => {
+        const bonusResult = collectAutomationFromFeatures([makeFeature({ type: 'trance_of_order', action: 'bonus_action' })], ps)
+        expect(bonusResult.bonusActions).toHaveLength(1)
+        expect(bonusResult.actions).toHaveLength(0)
     })
 
     it('categorizes cosmic_omen by casting_time', () => {

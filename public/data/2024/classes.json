@@ -10738,14 +10738,14 @@
                         }
                     },
                     {
-                        "name": "Transe of Order",
-                        "description": "Bonus Action for 1 minute. Attack rolls against you can't benefit from Advantage. Whenever you make a D20 Test, treat roll of 9 or lower as 10. Once per Long Rest (or spend 5 SP to restore).",
+                        "name": "Trance of Order",
+                        "description": "You gain the ability to align your consciousness with the endless calculations of Mechanus. As a Bonus Action, you can enter this state for 1 minute. For the duration, attack rolls against you can't benefit from Advantage, and whenever you make a D20 Test, you can treat a roll of 9 or lower on the d20 as a 10. Once you use this feature, you can't use it again until you finish a Long Rest unless you spend 5 Sorcery Points (no action required) to restore your use of it.",
                         "level": 14,
                         "automation": {
-                            "type": "transe_of_order",
+                            "type": "trance_of_order",
                             "action": "bonus_action",
                             "duration": "1_minute",
-                            "restoreCost": 5
+                            "casting_time": "bonus action"
                         }
                     },
                     {
