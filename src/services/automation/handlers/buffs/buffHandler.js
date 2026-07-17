@@ -7,6 +7,7 @@ import { getCombatSummary, loadCombatSummary } from '../../../encounters/combatD
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
+import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 
 const ADRENALINE_RUSH_USES_KEY = 'adrenalineRushUses';
 
@@ -97,6 +98,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // Corona of Light: defer to modal for enemy selection
     if (auto?.effect === 'sunlight_aura') {
         return handleCoronaOfLight(action, playerStats, campaignName, _mapName);
+    }
+
+    // Telepathic Speech: defer to modal for target selection
+    if (auto?.effect === 'telepathic_speech') {
+        return handleTelepathicSpeech(action, playerStats, campaignName, _mapName);
     }
 
     // Wild Shape: check uses before toggling
@@ -397,6 +403,96 @@ async function handleTricksterBlessing(action, playerStats, campaignName, _mapNa
             playerStats,
             campaignName,
             creatureTargets: allyTargets,
+        },
+    };
+}
+
+async function handleTelepathicSpeech(action, playerStats, campaignName, _mapName) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+    const featureName = action.name || 'Telepathic Speech';
+
+    const storedBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName);
+    const activeBuffs = Array.isArray(storedBuffs) ? storedBuffs : [];
+    const wasActive = activeBuffs.some(b => b.name === featureName);
+
+    if (wasActive) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: `${featureName} is already active.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const combatSummary = await loadCombatSummary(campaignName);
+    const allCreatures = combatSummary?.creatures || [];
+    const creatureTargets = allCreatures
+        .filter(c => c.name !== playerName)
+        .map(c => ({
+            name: c.name,
+            currentHp: c.currentHp,
+            maxHp: c.maxHp,
+            size: c.size,
+            type: c.type,
+        }));
+
+    return {
+        type: 'modal',
+        modalName: 'telepathicSpeech',
+        payload: {
+            action,
+            playerStats,
+            campaignName,
+            creatureTargets,
+        },
+    };
+}
+
+export async function confirmTelepathicSpeech(action, playerStats, campaignName, targetName) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+    const featureName = action.name || 'Telepathic Speech';
+
+    const chaMod = getAbilityModifier(playerStats.abilities, 'CHA');
+    const miles = Math.max(1, chaMod);
+    const durationMinutes = playerStats.level;
+
+    const { wasActive } = toggleBuff(
+        playerName,
+        featureName,
+        auto,
+        campaignName,
+        playerName
+    );
+
+    if (!wasActive) {
+        addExpiration(playerName, playerName, [
+            { type: 'remove_active_buff', buffName: featureName }
+        ], campaignName);
+    }
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: featureName,
+        description: `${playerName} activated Telepathic Speech with ${targetName} for ${miles} mile${miles !== 1 ? 's' : ''} (duration: ${durationMinutes} minute${durationMinutes !== 1 ? 's' : ''}).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[buffHandler] Telepathic Speech log error:', e); });
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: featureName,
+            automationType: auto.type,
+            description: wasActive
+                ? `${featureName} deactivated.`
+                : `${featureName} activated with ${targetName} (${miles} mile${miles !== 1 ? 's' : ''}, ${durationMinutes} minute${durationMinutes !== 1 ? 's' : ''} duration).`,
+            automation: auto,
         },
     };
 }

@@ -36,6 +36,7 @@ import { getTargetFromAttacker, getCombatContext, getAttackerTargetName } from '
 import { getActiveCreatureName } from '../../services/encounters/combatData.js';
 import { executeSweepingAttack, executeBaitAndSwitchChoice, executeCommanderStrikeChoice, executeRallyChoice } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { activateBulwarkOfForce } from '../../services/automation/handlers/class-sorcerer/bulwarkOfForceHandler.js';
+import { confirmTelepathicSpeech } from '../../services/automation/handlers/buffs/buffHandler.js';
 import { activateNaturesSanctuary, moveNaturesSanctuary } from '../../services/automation/handlers/class-ranger/naturesSanctuaryHandler.js';
 import { activateCoronaOfLight } from '../../services/automation/handlers/class-cleric-paladin/coronaOfLightHandler.js';
 import { confirmRadianceOfDawn } from '../../services/automation/handlers/class-cleric-paladin/radianceOfDawnHandler.js';
@@ -1237,6 +1238,29 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'oceanicGiftTarget':
                         setModalState({ oceanicGiftTargetModal: result.payload });
                         break;
+                    case 'telepathicSpeech': {
+                        const { action, playerStats, campaignName, creatureTargets } = result.payload;
+                        setModalState({ secondaryTargetModal: {
+                            title: 'Telepathic Speech',
+                            icon: 'fa-brain',
+                            targets: creatureTargets,
+                            confirmLabel: 'Establish Link',
+                            confirmIcon: 'fa-brain',
+                            description: 'Choose one creature within 30 feet to communicate with telepathically.',
+                            featureDescription: `Range: ${Math.max(1, playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 1)} mile(s) | Duration: ${playerStats.level} minute(s)`,
+                            onTargetSelected: async (targetName) => {
+                                const confirmResult = await confirmTelepathicSpeech(action, playerStats, campaignName, targetName);
+                                if (confirmResult?.payload) {
+                                    setPopupHtml(confirmResult.payload);
+                                }
+                                setModalState({ secondaryTargetModal: null });
+                            },
+                            onSkip: () => {
+                                setModalState({ secondaryTargetModal: null });
+                            },
+                        }});
+                        break;
+                    }
                 }
                 break;
             case 'roll':

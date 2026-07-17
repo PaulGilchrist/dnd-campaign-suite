@@ -470,6 +470,7 @@ const SorcererFeatures = function SorcererFeatures({ playerStats, campaignName }
     const sorcererFeatures = getClassFeatures(playerStats);
     const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
     const innateSorceryActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Innate Sorcery');
+    const telepathicSpeechActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Telepathic Speech');
     const hasRestoration = (playerStats.automation?.passives ?? []).some(a => a.type === 'resource_restoration');
     const REVELATION_EFFECTS = {
         'aquatic_adaptation': 'Aquatic Adaptation',
@@ -482,8 +483,9 @@ const SorcererFeatures = function SorcererFeatures({ playerStats, campaignName }
             <div data-testid="char-class-sorcerer">
                   {sorcererFeatures?.creatingSpellSlotCosts?.length > 0 && <div><b>Spell Slot (level 1-5) Costs: </b>{sorcererFeatures.creatingSpellSlotCosts.join(', ')}</div>}
                    <TrackedResourceInput label="Innate Sorcery" resourceKey="innateSorceryUses" playerName={playerStats.name} getMax={() => sorcererFeatures?.maxInnateSorcery || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-                  {innateSorceryActive && <span className="automation-badge">+1 Save DC, Spell Adv</span>}
-                   <TrackedResourceInput label="Metamagic Known" resourceKey="metamagicKnown" playerName={playerStats.name} getMax={() => sorcererFeatures?.metamagicKnown || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+                   {innateSorceryActive && <span className="automation-badge">+1 Save DC, Spell Adv</span>}
+                   {telepathicSpeechActive && <span className="automation-badge"><i className="fa-solid fa-brain"></i> Telepathic Speech</span>}
+                    <TrackedResourceInput label="Metamagic Known" resourceKey="metamagicKnown" playerName={playerStats.name} getMax={() => sorcererFeatures?.metamagicKnown || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
                   {revelationBuffs.length > 0 && <span className="automation-badge">{revelationBuffs.map(b => REVELATION_EFFECTS[b.effect] || 'Revelation in Flesh').join(', ')}</span>}
                   {hasRestoration && <TrackedResourceInput label="Sorcerous Restoration" resourceKey="sorcerousRestorationUses" playerName={playerStats.name} getMax={() => 1} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />}
                   <TrackedResourceInput label="Sorcery Points" resourceKey="sorceryPoints" playerName={playerStats.name} getMax={() => sorcererFeatures?.maxSorceryPoints || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
