@@ -18,6 +18,8 @@ import {
     markAttackerTriggeredMajesty,
 } from '../../services/combat/auras/unbreakableMajesty.js';
 import { hasBardicInspirationDefense, hasBardicInspirationOffense, getBardicInspirationDieSize, getBardicInspirationDieSizeFromClass } from '../../services/combat/auras/bardicInspirationState.js';
+import { hasEmpoweredSpell } from '../../services/rules/spells/empoweredSpellService.js';
+import { getChaModifier } from '../../services/rules/spells/metamagicRules.js';
 import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
 import { addEntry } from '../../services/ui/logService.js';
@@ -558,6 +560,8 @@ export function createLogAndShow(deps) {
                 bardicInspirationDefenseTargetName: context?.bardicInspirationDefenseTargetName,
                 bardicInspirationOffense: context?.bardicInspirationOffense || (context?.playerStats ? hasBardicInspirationOffense(context.playerStats, campaignName) : false),
                 bardicInspirationOffenseDieSize: context?.bardicInspirationOffenseDieSize || getBardicInspirationDieSize(characterName, campaignName) || (context?.playerStats ? getBardicInspirationDieSizeFromClass(context.playerStats) : null),
+                empoweredSpell: context?.empoweredSpell || (context?.playerStats ? hasEmpoweredSpell(context.playerStats) : false),
+                empoweredSpellChaMod: context?.empoweredSpellChaMod || getChaModifier(context?.playerStats),
                 cosmicOmenAppliedBonus,
                 luckyRerolled,
                 luckyRerollValue,

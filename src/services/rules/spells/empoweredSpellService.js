@@ -184,6 +184,14 @@ export async function executeEmpoweredReroll({ campaignName, playerStats, lastEv
     };
 }
 
+export function hasEmpoweredSpell(playerStats) {
+    if (!playerStats) return false;
+    const metamagicAction = playerStats.actions?.find(a => a.name === 'Metamagic' && a.automation?.type === 'spell_modifier');
+    if (!metamagicAction) return false;
+    const options = metamagicAction.automation.options || [];
+    return options.some(o => o.effect === 'reroll_damage_dice');
+}
+
 export function getEmpoweredSpellDescription(action) {
     if (action.details) {
         const match = action.details.match(

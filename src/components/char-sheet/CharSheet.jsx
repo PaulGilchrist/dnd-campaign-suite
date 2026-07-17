@@ -26,6 +26,7 @@ import { EXHAUSTION_LEVELS } from '../../services/combat/conditions/exhaustionRu
 import { isCreatureWarded } from '../../services/automation/handlers/buffs/protectionFromEvilAndGoodHandler.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
+import { executeEmpoweredReroll } from '../../services/rules/spells/empoweredSpellService.js';
 import { getManeuversForRules, getSuperiorityDice } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import * as storageService from '../../services/ui/storage.js';
@@ -579,6 +580,21 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         });
     }, [playerStats, campaignName, characters]);
 
+    const handleEmpoweredSpell = React.useCallback(async (lastEventData) => {
+        if (!playerStats || !campaignName) return null;
+        const result = await executeEmpoweredReroll({
+            campaignName,
+            playerStats,
+            lastEvent: lastEventData,
+            chaMod: popupHtml?.empoweredSpellChaMod || 0,
+            characters,
+        });
+        if (result?.popupState?.result) {
+            return result.popupState.result;
+        }
+        return null;
+    }, [playerStats, campaignName, characters, popupHtml]);
+
     const handleTacticalMind = React.useCallback(async (dieResult) => {
         if (!playerStats) return;
         const playerName = playerStats.name;
@@ -784,40 +800,6 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                     if (popupHtml.type === 'automation_info') {
                         return <Popup onClickOrKeyDown={() => setPopupHtml(null)}><div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div><div className="dice-roll-hint">click to dismiss</div></div></Popup>;
                     }
-                    if (popupHtml.type === 'empowered_spell') {
-                        return <Popup onClickOrKeyDown={() => setPopupHtml(null)}>
-                            <div className="dice-roll-result">
-                                <div className="dice-roll-header">
-                                    <i className="fa-solid fa-wand-magic-sparkles"></i>{popupHtml.name}
-                                </div>
-                                <div className="dice-roll-breakdown">
-                                    SP: {popupHtml.currentSP}/{popupHtml.maxSP} | Cha Mod: +{popupHtml.chaMod}
-                                </div>
-                                {popupHtml.lastEvent && (
-                                    <div className="dice-roll-breakdown">
-                                        {popupHtml.lastEvent.damageInfo?.map((d, i) => (
-                                            <div key={i}>{d.formula}: {d.rolls.join(', ')} = {d.total} {d.type}</div>
-                                        ))}
-                                    </div>
-                                )}
-                                {popupHtml.error ? (
-                                    <div className="dice-roll-crit dice-roll-crit-miss">{popupHtml.error}</div>
-                                ) : popupHtml.lastEvent && !popupHtml.error ? (
-                                    <div className="dice-roll-reroll">
-                                        <button className="dice-roll-reroll-btn" onClick={() => {
-                                            setPopupHtml({
-                                                ...popupHtml,
-                                                lastEvent: { ...popupHtml.lastEvent, completed: true }
-                                            });
-                                        }}>
-                                            <i className="fa-solid fa-check"></i> Apply Reroll
-                                        </button>
-                                    </div>
-                                ) : null}
-                                <div className="dice-roll-hint">click to dismiss</div>
-                            </div>
-                        </Popup>;
-                    }
                     return <AttackResultPopup
                         popupHtml={popupHtml}
                         onClose={() => setPopupHtml(null)}
@@ -829,6 +811,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                         onPsiBolsteredKnack={popupHtml?.psiBolsteredKnack ? handlePsiBolsteredKnack : undefined}
                         onBardicInspiration={popupHtml?.bardicInspiration ? handleBardicInspiration : undefined}
                         onBardicInspirationOffense={popupHtml?.bardicInspirationOffense ? handleBardicInspirationOffense : undefined}
+                        onEmpoweredSpell={popupHtml?.empoweredSpell ? handleEmpoweredSpell : undefined}
                         onAfterBiDefense={handleBiDefenseCombatSummary}
                     />;
                 })()}

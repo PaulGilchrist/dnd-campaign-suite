@@ -25,6 +25,8 @@ import {
 import { getCoronaSaveDisadvantage } from '../../services/combat/auras/coronaAuraUtils.js';
 import { getElderChampionSaveDisadvantage } from '../../services/combat/auras/elderChampionAuraUtils.js';
 import { hasBardicInspirationOffense, getBardicInspirationDieSize, getBardicInspirationDieSizeFromClass } from '../../services/combat/auras/bardicInspirationState.js';
+import { hasEmpoweredSpell } from '../../services/rules/spells/empoweredSpellService.js';
+import { getChaModifier } from '../../services/rules/spells/metamagicRules.js';
 import { computeConditionEffects } from '../../services/combat/conditions/conditionEffects.js';
 import { registerPendingPopupSetter } from '../../services/combat/auras/pendingPopupRegistry.js';
 
@@ -1377,6 +1379,9 @@ export function createLogDamageAndShow(deps) {
 
         popupData.bardicInspirationOffense = context?.bardicInspirationOffense || (context?.playerStats ? hasBardicInspirationOffense(context.playerStats, campaignName) : false);
         popupData.bardicInspirationOffenseDieSize = context?.bardicInspirationOffenseDieSize || getBardicInspirationDieSize(characterName, campaignName) || (context?.playerStats ? getBardicInspirationDieSizeFromClass(context.playerStats) : null);
+        popupData.empoweredSpell = context?.empoweredSpell || (context?.playerStats ? hasEmpoweredSpell(context.playerStats) : false);
+        popupData.empoweredSpellChaMod = context?.empoweredSpellChaMod || getChaModifier(context?.playerStats);
+        popupData.spellName = context?.spellName || '';
 
         setPopupHtml(popupData);
 

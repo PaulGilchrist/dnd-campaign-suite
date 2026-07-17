@@ -46,7 +46,7 @@ import { endFriendsOnHostileAction } from '../../services/rules/features/friends
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
 import { buildAttackContext, buildAttackContextSync } from '../../services/automation/contextBuilder.js';
-import { buildEmpoweredSpellState, getEmpoweredSpellDescription } from '../../services/rules/spells/empoweredSpellService.js';
+import { getEmpoweredSpellDescription } from '../../services/rules/spells/empoweredSpellService.js';
 import { useActionSpellMetamagic } from '../../hooks/combat/useActionSpellMetamagic.js';
 import { useSimpleDamageRoll } from '../../hooks/combat/useSimpleDamageRoll.js';
 import { useSpellPositionResolver } from '../../hooks/combat/useSpellPositionResolver.js';
@@ -1010,10 +1010,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         const cloakActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'cloak_of_shadows');
 
         const auto = action.automation;
-        if (auto?.type === 'spell_modifier' && action.name === 'Metamagic') {
-            setPopupHtml(buildEmpoweredSpellState(playerStats));
-            return;
-        }
 
         // If feature has options that need choosing (e.g. Blessed Strikes), present choice
         if (auto?.type === 'damage_bonus' && auto?.options?.length > 0) {
