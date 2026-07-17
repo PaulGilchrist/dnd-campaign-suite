@@ -129,6 +129,7 @@ describe('stinkingCloudHandler', () => {
           saveType: 'CON',
           saveDc: 13,
           dcSuccess: 'none',
+          disadvantage: false,
         });
       });
     });
@@ -148,6 +149,7 @@ describe('stinkingCloudHandler', () => {
           saveType: 'CON',
           saveDc: 13,
           dcSuccess: 'none',
+          disadvantage: false,
         });
       });
 
@@ -487,12 +489,13 @@ describe('stinkingCloudHandler', () => {
         campaignName,
       );
 
-      expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
-        targetName: 'EnemyGoblin',
-        saveType: 'CON',
-        saveDc: 13,
-        dcSuccess: 'none',
-      });
+        expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
+          targetName: 'EnemyGoblin',
+          saveType: 'CON',
+          saveDc: 13,
+          dcSuccess: 'none',
+          disadvantage: false,
+        });
     });
 
     it('should log ability_use for repeat save', async () => {

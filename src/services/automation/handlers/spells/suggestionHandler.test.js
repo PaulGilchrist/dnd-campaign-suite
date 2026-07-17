@@ -106,6 +106,7 @@ describe('suggestionHandler.handle', () => {
         saveType: 'WIS',
         saveDc: 15,
         dcSuccess: 'none',
+        disadvantage: false,
       });
     });
   });

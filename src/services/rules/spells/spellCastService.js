@@ -97,6 +97,23 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         return;
     }
 
+    // Compute hasInvisible early so it's available for all spell paths
+    const magicalAmbush = (function () {
+        const passives = playerStats.automation?.passives;
+        if (passives == null) {
+            console.error('[spellCast] magicalAmbush check: playerStats.automation.passives is missing');
+            throw new Error('playerStats.automation.passives is required for magical ambush check');
+        }
+        return passives.some(p => p.type === 'passive_rule' && p.effect === 'magical_ambush');
+    })();
+    const rawConditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName);
+    if (rawConditions == null || !Array.isArray(rawConditions)) {
+        console.error('[spellCast] casterConditions: activeConditions is not an array');
+        throw new Error('activeConditions must be an array for caster');
+    }
+    const casterConditions = rawConditions;
+    const hasInvisible = magicalAmbush && casterConditions.some(c => String(c).toLowerCase() === 'invisible');
+
     // Silence — block Verbal components if caster is in a silence zone
     if (spell.components && spell.components.includes('V')) {
         const silenceCaster = getSilenceSource(playerStats.name, campaignName);
@@ -373,13 +390,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                 saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
                 saveType: spell.dc.dc_type,
                 dcSuccess: spell.dc.dc_success,
-                metamagicHeighten: (() => {
-                    const passives = playerStats.automation?.passives;
-                    const magicalAmbush = passives?.some(p => p.type === 'passive_rule' && p.effect === 'magical_ambush');
-                    const rawConditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName);
-                    const casterConditions = Array.isArray(rawConditions) ? rawConditions : [];
-                    return magicalAmbush && casterConditions.some(c => String(c).toLowerCase() === 'invisible');
-                })(),
+                metamagicHeighten: hasInvisible || metaCtx?.metamagicHeighten,
                 isCantrip: spell.baseLevel === 0 || spell.level === 0,
             };
             if (spell.status_effects && spell.status_effects.length > 0) {
@@ -550,6 +561,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                     name: 'Resistance',
                     spell: spell,
                     automation: spell.automation ?? {},
+                    metaCtx,
                 };
                 await executeHandler(action, playerStats, campaignName, mapName, characters);
             }
@@ -562,6 +574,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                 name: spell.name,
                 spell: spell,
                 automation: spell.automation,
+                metaCtx,
             };
             const handlerResult = await executeHandler(action, playerStats, campaignName, mapName, characters);
             if (handlerResult) {
@@ -601,22 +614,6 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
             }
         }
     }
-
-    const magicalAmbush = (function () {
-        const passives = playerStats.automation?.passives;
-        if (passives == null) {
-            console.error('[spellCast] magicalAmbush check: playerStats.automation.passives is missing');
-            throw new Error('playerStats.automation.passives is required for magical ambush check');
-        }
-        return passives.some(p => p.type === 'passive_rule' && p.effect === 'magical_ambush');
-    })();
-    const rawConditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName);
-    if (rawConditions == null || !Array.isArray(rawConditions)) {
-        console.error('[spellCast] casterConditions: activeConditions is not an array');
-        throw new Error('activeConditions must be an array for caster');
-    }
-    const casterConditions = rawConditions;
-    const hasInvisible = magicalAmbush && casterConditions.some(c => String(c).toLowerCase() === 'invisible');
 
     const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(playerStats).length > 0;
     const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
@@ -743,8 +740,9 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                         saveType: spell.dc.dc_type || 'DEX',
                         saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
                         dcSuccess: spell.dc.dc_success === 0 ? 'none' : (spell.dc.dc_success === 0.5 ? 'half' : spell.dc.dc_success),
-                        activeOverlay,
-                        metamagicCareful: metaCtx?.metamagicCareful || false,
+                         activeOverlay,
+                         metamagicCareful: metaCtx?.metamagicCareful || false,
+                         metamagicHeighten: hasInvisible || metaCtx?.metamagicHeighten,
                     },
                 },
             };
@@ -758,7 +756,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
             saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
             saveType: spell.dc.dc_type,
             dcSuccess: spell.dc.dc_success,
-            metamagicHeighten: hasInvisible,
+            metamagicHeighten: hasInvisible || metaCtx?.metamagicHeighten,
             isCantrip: spell.baseLevel === 0 || spell.level === 0,
             overchannelActive,
             overchannelUseCount,

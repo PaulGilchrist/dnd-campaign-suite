@@ -2,7 +2,13 @@ import { addEntry } from '../../../../services/ui/logService.js';
 import storage from '../../../../services/ui/storage.js';
 import { setCombatSummaryCache } from '../../../../services/encounters/combatData.js';
 
-export function renderTargetList({ eligibleTargets, selected, toggleTarget, _isCarefulAlly }) {
+export function renderTargetList({ eligibleTargets, selected, toggleTarget, _isCarefulAlly, heightenTarget, setHeightenTarget, metamagicHeighten }) {
+  const handleHeightenSelect = (name) => {
+    if (setHeightenTarget) {
+      setHeightenTarget(heightenTarget === name ? null : name);
+    }
+  };
+
   return (
     <div className="abjure-targets-list">
       {eligibleTargets.map(c => (
@@ -15,6 +21,18 @@ export function renderTargetList({ eligibleTargets, selected, toggleTarget, _isC
           <span className="abjure-target-name">{c.name}</span>
           <span className="abjure-target-type">({c.type})</span>&nbsp;&nbsp;
           {c.carefulSpellProtected && <span className="sp-note" style={{ fontSize: '0.85em', color: '#4ade80' }}>✓ Careful Spell protected</span>}
+          {metamagicHeighten && (
+            <span style={{ fontSize: '0.85em', color: '#60a5fa', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <input
+                type="radio"
+                name="heightenTarget"
+                checked={heightenTarget === c.name}
+                onChange={() => handleHeightenSelect(c.name)}
+                title="Select this target for Heightened Spell disadvantage"
+              />
+              Heighten
+            </span>
+          )}
         </label>
       ))}
       {eligibleTargets.length === 0 && (

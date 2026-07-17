@@ -24,12 +24,14 @@ function SaveAttackAoeModal({
     dcSuccess,
     activeOverlay,
     metamagicCareful,
+    metamagicHeighten,
     onClose,
 }) {
     const [summary, setSummary] = useState(null);
     const [selected, setSelected] = useState(new Set());
     const [pendingPrompts, setPendingPrompts] = useState([]);
     const [results, setResults] = useState([]);
+    const [heightenTarget, setHeightenTarget] = useState(null);
 
     const isCarefulSpell = metamagicCareful || false;
     const allyList = isCarefulSpell ? getAllyList(playerStats.name) : null;
@@ -70,8 +72,9 @@ function SaveAttackAoeModal({
 
             if (isNpc) {
                 const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
+                const isHeightenTarget = heightenTarget === targetName;
 
-                const saveRoll = Math.floor(Math.random() * 20) + 1;
+                const saveRoll = isHeightenTarget ? Math.min(Math.floor(Math.random() * 20) + 1, Math.floor(Math.random() * 20) + 1) : Math.floor(Math.random() * 20) + 1;
                 const saveTotal = saveRoll + saveBonus;
                 const success = saveTotal >= saveDc;
                 const damageRoll = rollExpression(resolvedDamage);
@@ -158,6 +161,7 @@ function SaveAttackAoeModal({
                         saveDc: saveDc,
                         sourceName: playerStats.name,
                         rawDamage,
+                        disadvantage: heightenTarget === targetName,
                     });
 
                     const existingPrompts = getRuntimeValue(campaignName, 'pendingSaveListenerPrompts') || new Set();
@@ -171,7 +175,7 @@ function SaveAttackAoeModal({
 
         persistAndNotify(combatSummary, campaignName);
         return { results, prompts };
-    }, [campaignName, action.name, action.automation?.scaling, playerStats, damage, damageType, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly]);
+    }, [campaignName, action.name, action.automation?.scaling, playerStats, damage, damageType, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget]);
 
     const handleSaveResult = useCallback((event, ctx) => {
         const detail = event.detail;
@@ -358,9 +362,10 @@ function SaveAttackAoeModal({
                 <>
                     <p>Select creatures in the area of effect. Each must make a <strong>{saveType}</strong> saving throw (DC {saveDc}).</p>
                     <p className="sp-note">On a failed save, target takes {damage} {damageType} damage. On a successful save, target takes half damage.</p>
+                    {metamagicHeighten && <p className="sp-note">Heightened Spell: select one target for disadvantage on its first save.</p>}
                     <p className="sp-note">Targets selected: {ctx.selected.size}/{ctx.eligibleTargets.length}</p>
-                    {metamagicCareful && renderTargetList({ eligibleTargets: ctx.eligibleTargets, selected: ctx.selected, toggleTarget: ctx.toggleTarget, isCarefulAlly: ctx.isCarefulAlly })}
-                    {!metamagicCareful && renderTargetList({ eligibleTargets: ctx.eligibleTargets, selected: ctx.selected, toggleTarget: ctx.toggleTarget })}
+                    {metamagicCareful && renderTargetList({ eligibleTargets: ctx.eligibleTargets, selected: ctx.selected, toggleTarget: ctx.toggleTarget, isCarefulAlly: ctx.isCarefulAlly, heightenTarget: ctx.heightenTarget, setHeightenTarget: ctx.setHeightenTarget, metamagicHeighten: metamagicHeighten })}
+                    {!metamagicCareful && renderTargetList({ eligibleTargets: ctx.eligibleTargets, selected: ctx.selected, toggleTarget: ctx.toggleTarget, heightenTarget: ctx.heightenTarget, setHeightenTarget: ctx.setHeightenTarget, metamagicHeighten: metamagicHeighten })}
                 </>
             );
         }
@@ -415,7 +420,7 @@ function SaveAttackAoeModal({
         return null;
     };
 
-    const extraState = { selected, setSelected, toggleTarget };
+    const extraState = { selected, setSelected, toggleTarget, heightenTarget, setHeightenTarget };
 
     if (summary) {
         return (
@@ -474,11 +479,14 @@ function SaveAttackAoeModal({
             icon="fa-bomb"
             targets={getCreatureTargets()}
             description={`Select creatures in the area of effect. Each must make a <strong>${saveType}</strong> saving throw (DC ${saveDc}).`}
-            note={`On a failed save, target takes ${damage} ${damageType} damage. On a successful save, target takes half damage.`}
+            note={`On a failed save, target takes ${damage} ${damageType} damage. On a successful save, target takes half damage.${metamagicHeighten ? ' Heightened Spell: one target will have disadvantage.' : ''}`}
             confirmLabel={action.name}
             confirmIcon="fa-bomb"
             onConfirm={handleCreatureSelectionConfirm}
             onSkip={handleCreatureSelectionSkip}
+            metamagicHeighten={metamagicHeighten}
+            heightenTarget={heightenTarget}
+            setHeightenTarget={setHeightenTarget}
         />
     );
 }

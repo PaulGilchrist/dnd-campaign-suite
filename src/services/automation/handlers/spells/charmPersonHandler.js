@@ -60,6 +60,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         saveDc: dc,
         dcSuccess: 'none',
         advantage: saveAdvantage,
+        disadvantage: !!action.metaCtx?.metamagicHeighten,
     });
 
     addEntry(campaignName, {

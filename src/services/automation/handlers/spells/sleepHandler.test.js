@@ -124,12 +124,14 @@ describe('sleepHandler.handle', () => {
         saveType: 'WIS',
         saveDc: 14,
         dcSuccess: 'none',
+        disadvantage: false,
       });
       expect(createSaveListener).toHaveBeenNthCalledWith(2, campaignName, {
         targetName: 'Orc',
         saveType: 'WIS',
         saveDc: 14,
         dcSuccess: 'none',
+        disadvantage: false,
       });
     });
 
@@ -623,6 +625,7 @@ describe('sleepHandler.processSleepRepeatSave', () => {
       saveType: 'WIS',
       saveDc: 15,
       dcSuccess: 'none',
+      disadvantage: false,
     });
   });
 

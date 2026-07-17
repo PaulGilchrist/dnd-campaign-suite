@@ -40,6 +40,7 @@ export async function processStinkingCloudRepeatSave(casterName, targetName, sav
         saveType: 'CON',
         saveDc,
         dcSuccess: 'none',
+        disadvantage: false,
     });
 
     addEntry(campaignName, {
@@ -160,6 +161,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             saveType: 'CON',
             saveDc: dc,
             dcSuccess: 'none',
+            disadvantage: action.metaCtx?.heightenTarget === targetName,
         });
 
         addEntry(campaignName, {

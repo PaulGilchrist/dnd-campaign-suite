@@ -96,6 +96,7 @@ describe('processSlowRepeatSave', () => {
       saveType: 'WIS',
       saveDc,
       dcSuccess: 'none',
+      disadvantage: false,
     });
   });
 
@@ -360,6 +361,7 @@ describe('slowHandler.handle', () => {
         saveType: 'WIS',
         saveDc: 17,
         dcSuccess: 'none',
+        disadvantage: false,
       });
     });
 

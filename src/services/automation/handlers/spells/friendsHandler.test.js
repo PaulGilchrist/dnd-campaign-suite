@@ -326,6 +326,7 @@ describe('friendsHandler.handle', () => {
                 saveType: 'WIS',
                 saveDc: 10,
                 dcSuccess: 'none',
+                disadvantage: false,
             });
         });
     });

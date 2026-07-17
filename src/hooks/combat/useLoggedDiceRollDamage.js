@@ -205,6 +205,7 @@ export function createLogDamageAndShow(deps) {
         const casterName = attackerName || characterName;
         const isCarefulSpell = context?.metamagicCareful || false;
         const allyList = isCarefulSpell ? getAllyList(casterName) : null;
+        const heightenTarget = context?.heightenTarget || null;
 
         const isCarefulAlly = (creatureName) => {
             if (!allyList) return false;
@@ -218,7 +219,7 @@ export function createLogDamageAndShow(deps) {
             const nonCarefulAffected = affected.filter(a => !isCarefulAlly(a.creature.name));
             const carefulAffected = affected.filter(a => isCarefulAlly(a.creature.name));
 
-            const npcResultsFromProcess = processAoeNpcs(combatSummary, nonCarefulAffected, adjustedTotal, damageType, saveDc, saveType, dcSuccess, campaignName, casterName, characters);
+            const npcResultsFromProcess = processAoeNpcs(combatSummary, nonCarefulAffected, adjustedTotal, damageType, saveDc, saveType, dcSuccess, campaignName, casterName, characters, heightenTarget);
             npcResults.push(...npcResultsFromProcess);
 
             for (const { creature } of carefulAffected) {
@@ -299,7 +300,7 @@ export function createLogDamageAndShow(deps) {
         }
 
         if (playersNeedingSave.length && saveDc && saveType) {
-            const playerPrompts = sendAoePlayerSaves(playersNeedingSave, adjustedTotal, damageType, saveDc, saveType, dcSuccess, campaignName, name, casterName, rolls, formula);
+            const playerPrompts = sendAoePlayerSaves(playersNeedingSave, adjustedTotal, damageType, saveDc, saveType, dcSuccess, campaignName, name, casterName, rolls, formula, heightenTarget);
             for (const pp of playerPrompts) {
                 pendingSaves[pp.promptId] = {
                     targetName: pp.targetName, rawDamage: adjustedTotal, saveDc, saveType, dcSuccess,

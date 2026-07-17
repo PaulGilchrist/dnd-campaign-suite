@@ -40,6 +40,7 @@ export async function processSleepRepeatSave(casterName, targetName, saveDc, cam
         saveType: 'WIS',
         saveDc,
         dcSuccess: 'none',
+        disadvantage: false,
     });
 
     addEntry(campaignName, {
@@ -181,6 +182,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             saveType: 'WIS',
             saveDc: dc,
             dcSuccess: 'none',
+            disadvantage: action.metaCtx?.heightenTarget === targetName,
         });
 
         addEntry(campaignName, {

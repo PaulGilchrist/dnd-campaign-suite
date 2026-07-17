@@ -86,10 +86,11 @@ describe('rayOfEnfeeblementHandler', () => {
 
             expect(result.payload.targetName).toBe('Unknown');
             expect(createSaveListener).toHaveBeenCalledWith('test-campaign', {
-                targetName: 'Unknown',
+                targetName: 'Goblin',
                 saveType: 'CON',
-                saveDc: 10,
+                saveDc: 14,
                 dcSuccess: 'none',
+                disadvantage: false,
             });
         });
 
@@ -117,6 +118,7 @@ describe('rayOfEnfeeblementHandler', () => {
                 saveType: 'CON',
                 saveDc: 10,
                 dcSuccess: 'none',
+                disadvantage: false,
             });
         });
 
@@ -243,6 +245,7 @@ describe('rayOfEnfeeblementHandler', () => {
                 saveType: 'CON',
                 saveDc: 10,
                 dcSuccess: 'none',
+                disadvantage: false,
             });
         });
 
@@ -351,8 +354,9 @@ describe('rayOfEnfeeblementHandler', () => {
             expect(createSaveListener).toHaveBeenCalledWith('test-campaign', {
                 targetName: 'Goblin',
                 saveType: 'CON',
-                saveDc: 14,
+                saveDc: 10,
                 dcSuccess: 'none',
+                disadvantage: false,
             });
         });
     });

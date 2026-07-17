@@ -36,7 +36,7 @@ export function getAffectedCreatures(overlay, players, placedItems, combatSummar
   return affected;
 }
 
-export function processAoeNpcs(combatSummary, affected, rawDamage, damageType, saveDc, saveType, dcSuccess, campaignName, attackerName, characters) {
+export function processAoeNpcs(combatSummary, affected, rawDamage, damageType, saveDc, saveType, dcSuccess, campaignName, attackerName, characters, heightenTarget) {
   const results = [];
   for (const { creature } of affected) {
     if (creature.type !== 'npc') continue;
@@ -48,6 +48,9 @@ export function processAoeNpcs(combatSummary, affected, rawDamage, damageType, s
       skipRangeCheck: true,
     });
     if (coronaResult.disadvantage) {
+      disadvantage = true;
+    }
+    if (!disadvantage && heightenTarget && creature.name === heightenTarget) {
       disadvantage = true;
     }
     const saveResult = rollSaveForCreature(creature, saveType, saveDc, disadvantage);
@@ -68,7 +71,7 @@ export function processAoeNpcs(combatSummary, affected, rawDamage, damageType, s
   return results;
 }
 
-export function sendAoePlayerSaves(affected, rawDamage, damageType, saveDc, saveType, dcSuccess, campaignName, spellName, attackerName, rolls, formula) {
+export function sendAoePlayerSaves(affected, rawDamage, damageType, saveDc, saveType, dcSuccess, campaignName, spellName, attackerName, rolls, formula, heightenTarget) {
   const pendingList = [];
   for (const { creature } of affected) {
     if (creature.type !== 'player') continue;
@@ -85,7 +88,8 @@ export function sendAoePlayerSaves(affected, rawDamage, damageType, saveDc, save
       damageType,
       skipRangeCheck: true,
     });
-    const disadvantage = coronaResult.disadvantage || false;
+    const heightenDisadvantage = !!(heightenTarget && creature.name === heightenTarget);
+    const disadvantage = coronaResult.disadvantage || heightenDisadvantage;
 
     sendSavePrompt(campaignName, {
       promptId,

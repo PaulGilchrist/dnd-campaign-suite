@@ -13,6 +13,9 @@ export default function CreatureSelectionModal({
     onConfirm,
     onSkip,
     defaultSelected,
+    metamagicHeighten,
+    heightenTarget,
+    setHeightenTarget,
 }) {
     const [selected, setSelected] = useState(defaultSelected || []);
 
@@ -24,6 +27,12 @@ export default function CreatureSelectionModal({
                     ? [...prev, name]
                     : prev
         );
+    };
+
+    const handleHeightenSelect = (name) => {
+        if (setHeightenTarget) {
+            setHeightenTarget(heightenTarget === name ? null : name);
+        }
     };
 
     const handleConfirm = () => {
@@ -75,6 +84,18 @@ export default function CreatureSelectionModal({
                                     </span>
                                     {target.carefulSpellProtected && (
                                         <span className="sp-note" style={{ fontSize: '0.85em', color: '#4ade80', marginLeft: '4px' }}>✓ Careful Spell protected</span>
+                                    )}
+                                    {metamagicHeighten && (
+                                        <span style={{ fontSize: '0.85em', color: '#60a5fa', display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '8px' }}>
+                                            <input
+                                                type="radio"
+                                                name="heightenTarget"
+                                                checked={heightenTarget === name}
+                                                onChange={(e) => { e.stopPropagation(); handleHeightenSelect(name); }}
+                                                title="Select this target for Heightened Spell disadvantage"
+                                            />
+                                            Heighten
+                                        </span>
                                     )}
                                 </label>
                             );
