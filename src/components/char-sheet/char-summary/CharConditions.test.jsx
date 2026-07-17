@@ -3,14 +3,20 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharConditions, { loadActiveConditions } from './CharConditions.jsx';
 
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(() => null),
-  setRuntimeValue: vi.fn(),
-  addStorageChangeListener: vi.fn(),
-}));
+let runtimeValues = {};
 
-vi.mock('../../../services/automation/common/conditionEventStore.js', () => ({
-  storeConditionEvent: vi.fn(),
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn((name, key, _campaignName) => {
+    const storageKey = `${name}::${key}`;
+    if (key === 'activeConditionMeta') {
+      return runtimeValues[storageKey] ?? runtimeValues[key] ?? null;
+    }
+    return runtimeValues[storageKey] ?? runtimeValues[key] ?? null;
+  }),
+  setRuntimeValue: vi.fn((name, key, value, _campaignName) => {
+    runtimeValues[`${name}::${key}`] = value;
+  }),
+  addStorageChangeListener: vi.fn(() => () => {}),
 }));
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -18,19 +24,6 @@ vi.mock('../../../services/dice/diceRoller.js', () => ({
 }));
 
 vi.mock('../../../services/combat/conditions/conditionUtils.js', () => ({
-  CONDITIONS: [
-    { key: 'blinded', label: 'Blinded' },
-    { key: 'charmed', label: 'Charmed' },
-    { key: 'incapacitated', label: 'Incapacitated' },
-    { key: 'stunned', label: 'Stunned' },
-  ],
-  CONDITION_SAVE_DC: 10,
-  CONDITION_SAVE_MAP: {
-    blinded: null,
-    charmed: 'wis',
-    incapacitated: null,
-    stunned: 'con',
-  },
   getAbilityLabel: vi.fn((abbr) => abbr || 'None'),
   getAbilitySaveBonus: vi.fn(() => 2),
 }));
@@ -42,13 +35,11 @@ vi.mock('../../../services/combat/conditions/exhaustionRules.js', () => ({
 }));
 
 const mockSetPopupHtml = vi.fn();
-const mockShowPopup = vi.fn();
 
 vi.mock('../../../hooks/combat/usePopup.js', () => ({
   default: vi.fn(() => ({
     popupHtml: null,
     setPopupHtml: mockSetPopupHtml,
-    showPopup: mockShowPopup,
   })),
 }));
 
@@ -66,21 +57,30 @@ vi.mock('../../../services/combat/auras/auraOfProtection.js', () => ({
   computeAuraBonus: vi.fn(async () => ({ bonus: 0, sourceName: null })),
 }));
 
-vi.mock('../../../services/combat/auras/unbreakableMajesty.js', () => ({
-  clearUnbreakableMajesty: vi.fn(),
-  isUnbreakableMajestyActive: vi.fn(() => false),
-  getUnbreakableMajestySaveDc: vi.fn(() => 0),
+vi.mock('../../../services/ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+vi.mock('../../../services/encounters/combatLoggingService.js', () => ({
+  logConditionSave: vi.fn(() => Promise.resolve()),
+  logConcentrationSave: vi.fn(() => Promise.resolve()),
+}));
+
+let mockCombatSummary = null;
+
+vi.mock('../../../services/encounters/combatData.js', () => ({
+  getCombatSummary: vi.fn(() => mockCombatSummary),
+}));
+
+import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { rollD20 } from '../../../services/dice/diceRoller.js';
-import { clearUnbreakableMajesty } from '../../../services/combat/auras/unbreakableMajesty.js';
 import { computeAuraBonus } from '../../../services/combat/auras/auraOfProtection.js';
 
 describe('CharConditions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getRuntimeValue.mockReturnValue(null);
+    runtimeValues = {};
+    mockCombatSummary = null;
     rollD20.mockReturnValue(15);
     global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: vi.fn() }));
   });
@@ -103,16 +103,22 @@ describe('CharConditions', () => {
     conditionEffects: {},
   };
 
+  describe('empty state', () => {
+    it('returns null when nothing is active', () => {
+      const { container } = render(<CharConditions {...defaultProps} />);
+      expect(container.firstChild).toBeNull();
+    });
+  });
+
   describe('exhaustion badge', () => {
-    it('renders exhaustion label with current level', () => {
-      render(<CharConditions {...defaultProps} />);
-      expect(screen.getByText('Exhaustion (0)')).toBeInTheDocument();
+    it('renders nothing when exhaustion level is 0', () => {
+      const { container } = render(<CharConditions {...defaultProps} />);
+      expect(container.firstChild).toBeNull();
     });
 
-    it('disables the minus button when exhaustion is at 0', () => {
-      render(<CharConditions {...defaultProps} />);
-      const minusBtn = screen.getByRole('button', { name: '−' });
-      expect(minusBtn).toBeDisabled();
+    it('renders exhaustion badge when level > 0', () => {
+      render(<CharConditions {...defaultProps} exhaustionLevel={2} />);
+      expect(screen.getByText('Exhaustion (2)')).toBeInTheDocument();
     });
 
     it('disables the plus button when exhaustion is at maximum (dead)', () => {
@@ -149,7 +155,7 @@ describe('CharConditions', () => {
       fireEvent.click(minusBtn);
       expect(setRuntimeValue).not.toHaveBeenCalledWith(
         'Test Character',
-        'exhaustionLevel',
+        expect.any(String),
         expect.any(Number),
         'test-campaign'
       );
@@ -157,26 +163,38 @@ describe('CharConditions', () => {
   });
 
   describe('condition badges', () => {
-    it('renders all condition badges from CONDITIONS list', () => {
+    it('renders nothing when no conditions are active', () => {
+      runtimeValues['Test Character::activeConditions'] = [];
+      runtimeValues['Test Character::activeConditionMeta'] = {};
+      const { container } = render(<CharConditions {...defaultProps} />);
+      expect(container.firstChild).toBeNull();
+    });
+
+    it('renders only active conditions', () => {
+      runtimeValues['Test Character::activeConditions'] = ['charmed', 'blinded'];
+      runtimeValues['Test Character::activeConditionMeta'] = {
+        charmed: { dc: 12, ability: 'wis' },
+        blinded: { dc: 10, ability: 'con' },
+      };
+      render(<CharConditions {...defaultProps} />);
+      expect(screen.getByText('Charmed DC 12')).toBeInTheDocument();
+      expect(screen.getByText('Blinded DC 10')).toBeInTheDocument();
+      expect(screen.queryByText('Stunned')).not.toBeInTheDocument();
+      expect(screen.queryByText('Incapacitated')).not.toBeInTheDocument();
+    });
+
+    it('shows condition without DC when no meta available', () => {
+      runtimeValues['Test Character::activeConditions'] = ['blinded'];
+      runtimeValues['Test Character::activeConditionMeta'] = {};
       render(<CharConditions {...defaultProps} />);
       expect(screen.getByText('Blinded')).toBeInTheDocument();
-      expect(screen.getByText('Charmed')).toBeInTheDocument();
-      expect(screen.getByText('Incapacitated')).toBeInTheDocument();
-      expect(screen.getByText('Stunned')).toBeInTheDocument();
     });
 
-    it('toggles a condition badge on click and calls onConditionsChange', () => {
-      getRuntimeValue.mockReturnValue([]);
+    it('condition with save ability rolls save on click', async () => {
+      runtimeValues['Test Character::activeConditions'] = ['charmed'];
+      runtimeValues['Test Character::activeConditionMeta'] = { charmed: { dc: 14, ability: 'wis' } };
       render(<CharConditions {...defaultProps} />);
-      const charmedBtn = screen.getByText('Charmed');
-      fireEvent.click(charmedBtn);
-      expect(defaultProps.onConditionsChange).toHaveBeenCalled();
-    });
-
-    it('removes condition from active list on successful save and calls onConditionsChange', async () => {
-      getRuntimeValue.mockReturnValue(['charmed']);
-      render(<CharConditions {...defaultProps} />);
-      const charmedBtn = screen.getByText('Charmed');
+      const charmedBtn = screen.getByText('Charmed DC 14');
       fireEvent.click(charmedBtn);
       await waitFor(() => {
         expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'activeConditions', [], 'test-campaign');
@@ -184,11 +202,54 @@ describe('CharConditions', () => {
       expect(defaultProps.onConditionsChange).toHaveBeenCalled();
     });
 
+    it('condition without save ability does nothing on click', () => {
+      runtimeValues['Test Character::activeConditions'] = ['blinded'];
+      runtimeValues['Test Character::activeConditionMeta'] = { blinded: { dc: 10, ability: null } };
+      render(<CharConditions {...defaultProps} />);
+      const callCountBefore = setRuntimeValue.mock.calls.filter(
+        c => c[1] === 'activeConditions'
+      ).length;
+      const blindedBtn = screen.getByText('Blinded DC 10');
+      fireEvent.click(blindedBtn);
+      const callCountAfter = setRuntimeValue.mock.calls.filter(
+        c => c[1] === 'activeConditions'
+      ).length;
+      expect(callCountAfter).toBe(callCountBefore);
+    });
+
+    it('condition without ability is not savable', () => {
+      runtimeValues['Test Character::activeConditions'] = ['blinded'];
+      runtimeValues['Test Character::activeConditionMeta'] = { blinded: { dc: 10, ability: null } };
+      render(<CharConditions {...defaultProps} />);
+      const blindedBtn = screen.getByText('Blinded DC 10');
+      expect(blindedBtn).toHaveClass('condition-badge--display-only');
+    });
+
+    it('condition with ability is savable', () => {
+      runtimeValues['Test Character::activeConditions'] = ['charmed'];
+      runtimeValues['Test Character::activeConditionMeta'] = { charmed: { dc: 12, ability: 'wis' } };
+      render(<CharConditions {...defaultProps} />);
+      const charmedBtn = screen.getByText('Charmed DC 12');
+      expect(charmedBtn).toHaveClass('condition-badge--savable');
+    });
+
+    it('removes condition from active list on successful save', async () => {
+      runtimeValues['Test Character::activeConditions'] = ['charmed'];
+      runtimeValues['Test Character::activeConditionMeta'] = { charmed: { dc: 14, ability: 'wis' } };
+      render(<CharConditions {...defaultProps} />);
+      const charmedBtn = screen.getByText('Charmed DC 14');
+      fireEvent.click(charmedBtn);
+      await waitFor(() => {
+        expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'activeConditions', [], 'test-campaign');
+      });
+    });
+
     it('keeps condition in active list on failed save', async () => {
       rollD20.mockReturnValueOnce(1);
-      getRuntimeValue.mockReturnValue(['charmed']);
+      runtimeValues['Test Character::activeConditions'] = ['charmed'];
+      runtimeValues['Test Character::activeConditionMeta'] = { charmed: { dc: 14, ability: 'wis' } };
       render(<CharConditions {...defaultProps} />);
-      const charmedBtn = screen.getByText('Charmed');
+      const charmedBtn = screen.getByText('Charmed DC 14');
       fireEvent.click(charmedBtn);
       await waitFor(() => {
         expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -206,9 +267,10 @@ describe('CharConditions', () => {
         bonus: 3,
         sourceName: 'Paladin',
       });
-      getRuntimeValue.mockReturnValue(['charmed']);
+      runtimeValues['Test Character::activeConditions'] = ['charmed'];
+      runtimeValues['Test Character::activeConditionMeta'] = { charmed: { dc: 14, ability: 'wis' } };
       render(<CharConditions {...defaultProps} />);
-      const charmedBtn = screen.getByText('Charmed');
+      const charmedBtn = screen.getByText('Charmed DC 14');
       fireEvent.click(charmedBtn);
       await waitFor(() => {
         expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'activeConditions', [], 'test-campaign');
@@ -216,9 +278,10 @@ describe('CharConditions', () => {
     });
 
     it('applies save advantage and rolls two d20s', async () => {
-      getRuntimeValue.mockReturnValue(['charmed']);
+      runtimeValues['Test Character::activeConditions'] = ['charmed'];
+      runtimeValues['Test Character::activeConditionMeta'] = { charmed: { dc: 12, ability: 'wis' } };
       render(<CharConditions {...defaultProps} conditionEffects={{ saveAdvantage: ['charmed'] }} />);
-      const charmedBtn = screen.getByText('Charmed');
+      const charmedBtn = screen.getByText('Charmed DC 12');
       fireEvent.click(charmedBtn);
       await waitFor(() => {
         expect(rollD20).toHaveBeenCalledTimes(2);
@@ -226,45 +289,125 @@ describe('CharConditions', () => {
       });
     });
 
-    it('calls clearUnbreakableMajesty when incapacitated is toggled', () => {
-      getRuntimeValue.mockReturnValue(['incapacitated']);
+    it('uses tracked DC from meta instead of hardcoded value', async () => {
+      runtimeValues['Test Character::activeConditions'] = ['charmed'];
+      runtimeValues['Test Character::activeConditionMeta'] = { charmed: { dc: 18, ability: 'wis' } };
       render(<CharConditions {...defaultProps} />);
-      const incapacitatedBtn = screen.getByText('Incapacitated');
-      fireEvent.click(incapacitatedBtn);
-      expect(clearUnbreakableMajesty).toHaveBeenCalledWith(
-        'Test Character',
-        'test-campaign'
-      );
+      const charmedBtn = screen.getByText('Charmed DC 18');
+      fireEvent.click(charmedBtn);
+      await waitFor(() => {
+        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+          dc: 18,
+        }));
+      });
+    });
+
+    it('does not remove condition on failed save', async () => {
+      rollD20.mockReturnValueOnce(1);
+      runtimeValues['Test Character::activeConditions'] = ['charmed'];
+      runtimeValues['Test Character::activeConditionMeta'] = { charmed: { dc: 14, ability: 'wis' } };
+      render(<CharConditions {...defaultProps} />);
+      const charmedBtn = screen.getByText('Charmed DC 14');
+      fireEvent.click(charmedBtn);
+      await waitFor(() => {
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+          'Test Character',
+          'activeConditions',
+          ['charmed'],
+          'test-campaign'
+        );
+      });
+    });
+  });
+
+  describe('concentration badge', () => {
+    it('renders concentration badge when active', () => {
+      runtimeValues['Test Character::activeConditions'] = [];
+      runtimeValues['Test Character::activeConditionMeta'] = {};
+      mockCombatSummary = {
+        creatures: [
+          { name: 'Test Character', concentration: { spell: 'Bless', dc: 10 } },
+        ],
+      };
+
+      render(<CharConditions {...defaultProps} />);
+      expect(screen.getByText('Bless DC 10')).toBeInTheDocument();
+    });
+
+    it('does not render concentration badge when no concentration', () => {
+      runtimeValues['Test Character::activeConditions'] = [];
+      runtimeValues['Test Character::activeConditionMeta'] = {};
+      mockCombatSummary = {
+        creatures: [
+          { name: 'Test Character', concentration: null },
+        ],
+      };
+
+      const { container } = render(<CharConditions {...defaultProps} />);
+      expect(container.firstChild).toBeNull();
+    });
+
+    it('concentration badge is displayed with spinner icon', () => {
+      runtimeValues['Test Character::activeConditions'] = [];
+      runtimeValues['Test Character::activeConditionMeta'] = {};
+      mockCombatSummary = {
+        creatures: [
+          { name: 'Test Character', concentration: { spell: 'Haste', dc: 13 } },
+        ],
+      };
+
+      render(<CharConditions {...defaultProps} />);
+      const badge = screen.getByText('Haste DC 13');
+      expect(badge.closest('.concentration-badge')).toBeInTheDocument();
+    });
+  });
+
+  describe('combined display', () => {
+    it('renders conditions, exhaustion, and concentration together', () => {
+      runtimeValues['Test Character::activeConditions'] = ['charmed'];
+      runtimeValues['Test Character::activeConditionMeta'] = { charmed: { dc: 12, ability: 'wis' } };
+      mockCombatSummary = {
+        creatures: [
+          { name: 'Test Character', concentration: { spell: 'Bless', dc: 10 } },
+        ],
+      };
+
+      render(<CharConditions {...defaultProps} exhaustionLevel={2} />);
+      expect(screen.getByText('Charmed DC 12')).toBeInTheDocument();
+      expect(screen.getByText('Exhaustion (2)')).toBeInTheDocument();
+      expect(screen.getByText('Bless DC 10')).toBeInTheDocument();
     });
   });
 
   describe('state persistence', () => {
     it('loads conditions from runtime storage on mount', () => {
-      getRuntimeValue.mockReturnValue(['blinded', 'stunned']);
+      runtimeValues['Test Character::activeConditions'] = ['blinded', 'stunned'];
+      runtimeValues['Test Character::activeConditionMeta'] = {
+        blinded: { dc: 10, ability: null },
+        stunned: { dc: 10, ability: 'con' },
+      };
       render(<CharConditions {...defaultProps} />);
-      expect(screen.getByText('Blinded')).toHaveClass('condition-badge--active');
-      expect(screen.getByText('Stunned')).toHaveClass('condition-badge--active');
+      expect(screen.getByText('Blinded DC 10')).toBeInTheDocument();
+      expect(screen.getByText('Stunned DC 10')).toBeInTheDocument();
     });
 
     it('saves conditions to runtime storage on change', () => {
-      getRuntimeValue.mockReturnValue([]);
+      runtimeValues['Test Character::activeConditions'] = [];
+      runtimeValues['Test Character::activeConditionMeta'] = {};
       render(<CharConditions {...defaultProps} />);
-      const charmedBtn = screen.getByText('Charmed');
-      fireEvent.click(charmedBtn);
-      expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'activeConditions', ['charmed'], 'test-campaign');
     });
   });
 
   describe('loadActiveConditions', () => {
     it('returns stored conditions array', () => {
-      getRuntimeValue.mockReturnValue(['blinded', 'grappled']);
+      runtimeValues['Test Character::activeConditions'] = ['blinded', 'grappled'];
       const result = loadActiveConditions('Test Character', 'test-campaign');
       expect(result).toEqual(['blinded', 'grappled']);
     });
 
     it('returns empty array when stored value is not an array', () => {
       for (const badValue of [null, undefined, 'not-an-array', { key: 'blinded' }, 42]) {
-        getRuntimeValue.mockReturnValue(badValue);
+        runtimeValues['Test Character::activeConditions'] = badValue;
         const result = loadActiveConditions('Test Character', 'test-campaign');
         expect(result).toEqual([]);
       }

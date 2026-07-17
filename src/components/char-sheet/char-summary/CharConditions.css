@@ -16,12 +16,36 @@
     color: var(--color);
     font-size: 0.8em;
     cursor: pointer;
-    opacity: 0.4;
-    transition: opacity 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .condition-badge:hover {
+    background-color: rgba(220, 38, 38, 0.1);
+}
+
+.condition-badge--active {
+    opacity: 1;
+    background-color: rgba(220, 38, 38, 0.2);
+    border-color: rgba(220, 38, 38, 0.5);
+    color: var(--color);
+}
+
+.condition-badge--savable {
+    cursor: pointer;
+}
+
+.condition-badge--display-only {
+    cursor: default;
     opacity: 0.7;
+}
+
+.condition-badge--display-only:hover {
+    background-color: transparent;
+}
+
+.condition-badge:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
 }
 
 .exhaustion-badge {
@@ -34,12 +58,11 @@
     background-color: transparent;
     color: var(--color);
     font-size: 0.8em;
-    opacity: 0.4;
-    transition: opacity 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .exhaustion-badge:hover {
-    opacity: 0.7;
+    background-color: rgba(220, 38, 38, 0.1);
 }
 
 .exhaustion-badge--active {
@@ -87,9 +110,21 @@
     white-space: nowrap;
 }
 
-.condition-badge--active {
-    opacity: 1;
-    background-color: rgba(220, 38, 38, 0.2);
-    border-color: rgba(220, 38, 38, 0.5);
+.concentration-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 4px;
+    border: 1px solid var(--border-color-light);
+    border-radius: 4px;
+    background-color: rgba(255, 193, 7, 0.15);
+    border-color: rgba(255, 193, 7, 0.5);
     color: var(--color);
+    font-size: 0.8em;
+    cursor: default;
+}
+
+.concentration-badge-label {
+    font-weight: bold;
+    white-space: nowrap;
 }

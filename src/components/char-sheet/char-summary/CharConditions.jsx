@@ -2,25 +2,30 @@
 import React from 'react'
 import { getRuntimeValue, setRuntimeValue, addStorageChangeListener } from '../../../hooks/runtime/useRuntimeState.js'
 import { rollD20 } from '../../../services/dice/diceRoller.js'
-import { storeConditionEvent } from '../../../services/automation/common/conditionEventStore.js'
-import { CONDITIONS, CONDITION_SAVE_DC, CONDITION_SAVE_MAP, getAbilityLabel, getAbilitySaveBonus } from '../../../services/combat/conditions/conditionUtils.js'
+import { getAbilityLabel, getAbilitySaveBonus } from '../../../services/combat/conditions/conditionUtils.js'
 import { CONDITION_DESCRIPTIONS } from '../../../services/combat/conditions/effectDescriptions.js'
 import { addEntry } from '../../../services/ui/logService.js'
 import { EXHAUSTION_LEVELS, isDeadFromExhaustion, getExhaustionSaveDC } from '../../../services/combat/conditions/exhaustionRules.js'
+import { logConditionSave } from '../../../services/encounters/combatLoggingService.js'
 import usePopup from '../../../hooks/combat/usePopup.js'
 import Popup from '../../common/popup.jsx'
 import DiceRollResult from '../DiceRollResult.jsx'
 import { computeAuraBonus } from '../../../services/combat/auras/auraOfProtection.js'
-import { clearUnbreakableMajesty } from '../../../services/combat/auras/unbreakableMajesty.js'
 import { getCombatSummary } from '../../../services/encounters/combatData.js'
 import './CharConditions.css'
 
 const STORAGE_KEY = 'activeConditions'
+const META_KEY = 'activeConditionMeta'
 
 function loadConditions(name, campaignName) {
   void campaignName;
   const stored = getRuntimeValue(name, STORAGE_KEY)
   return Array.isArray(stored) ? stored : []
+}
+
+function loadConditionMeta(name, campaignName) {
+  const stored = getRuntimeValue(name, META_KEY, campaignName)
+  return typeof stored === 'object' && stored !== null ? stored : {}
 }
 
 function saveConditions(name, campaignName, conditions) {
@@ -37,31 +42,48 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
   const [activeConditions, setActiveConditions] = React.useState(() =>
     loadConditions(playerStats.name, campaignName)
   )
+  const [conditionMeta, setConditionMeta] = React.useState(() =>
+    loadConditionMeta(playerStats.name, campaignName)
+  )
 
   const { popupHtml, setPopupHtml } = usePopup(() => null)
 
   React.useEffect(() => {
-    setActiveConditions(loadConditions(playerStats.name, campaignName))
-   }, [playerStats.name, campaignName])
+    const conditions = loadConditions(playerStats.name, campaignName)
+    const meta = loadConditionMeta(playerStats.name, campaignName)
+    setActiveConditions(conditions)
+    setConditionMeta(meta)
+  }, [playerStats.name, campaignName])
 
-   React.useEffect(() => {
+  React.useEffect(() => {
     saveConditions(playerStats.name, campaignName, activeConditions)
-   }, [activeConditions, playerStats.name, campaignName])
+  }, [activeConditions, playerStats.name, campaignName])
 
-   React.useEffect(() => {
-     const unsubscribe = addStorageChangeListener(playerStats.name, () => {
-       setActiveConditions(loadConditions(playerStats.name, campaignName))
-     })
-     return unsubscribe
-   }, [playerStats.name, campaignName])
+  React.useEffect(() => {
+    const unsubscribe = addStorageChangeListener(playerStats.name, () => {
+      const conditions = loadConditions(playerStats.name, campaignName)
+      const meta = loadConditionMeta(playerStats.name, campaignName)
+      setActiveConditions(conditions)
+      setConditionMeta(meta)
+    })
+    return unsubscribe
+  }, [playerStats.name, campaignName])
+
+  const combatSummary = getCombatSummary(campaignName)
+  const playerCreature = combatSummary?.creatures?.find(c => c.name === playerStats.name)
+  const concentration = playerCreature?.concentration ?? null
 
   function logEntry(entry) {
     addEntry(campaignName, entry).catch((e) => { console.error("[CharConditions] Error:", e); })
   }
 
-  async function handleConditionSave(conditionKey, saveAbility, saveLabel) {
-    const condition = CONDITIONS.find(c => c.key === conditionKey)
-    const conditionName = condition?.label || conditionKey
+  async function handleConditionSave(conditionKey) {
+    const meta = conditionMeta[conditionKey]
+    if (!meta || !meta.dc) return
+
+    const saveAbility = meta.ability || 'con'
+    const saveLabel = getAbilityLabel(saveAbility)
+    const conditionLabel = conditionKey.charAt(0).toUpperCase() + conditionKey.slice(1)
     const saveBonus = getAbilitySaveBonus(playerStats, saveAbility)
     const hasAdvantage = (conditionEffects?.saveAdvantageCount || 0) > 0 || conditionEffects?.saveAdvantage?.includes(conditionKey) || conditionEffects?.saveAdvantageAbilities?.includes(saveAbility);
 
@@ -78,10 +100,10 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
       mode = 'normal'
     }
 
-    const aura = await computeAuraBonus({ targetName: playerStats.name, characters, campaignName, activeMapName, allCreatures: getCombatSummary(campaignName)?.creatures })
+    const aura = await computeAuraBonus({ targetName: playerStats.name, characters, campaignName, activeMapName, allCreatures: combatSummary?.creatures })
     const auraBonus = aura.bonus
     const total = finalRoll + saveBonus + auraBonus
-    const success = total >= CONDITION_SAVE_DC
+    const success = total >= meta.dc
 
     const bonusDetail = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined
 
@@ -89,67 +111,42 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
       type: 'roll',
       characterName: playerStats.name,
       rollType: 'save',
-      name: `${saveLabel} (${conditionName})`,
+      name: `${saveLabel} (${conditionLabel})`,
       rolls: hasAdvantage ? [roll1, roll2] : [roll1],
       mode,
       total,
       bonus: saveBonus + auraBonus,
       bonusDetail,
-      dc: CONDITION_SAVE_DC,
+      dc: meta.dc,
       success,
-      condition: conditionName,
+      condition: conditionLabel,
     })
+
+    logConditionSave(campaignName, playerStats.name, finalRoll, saveBonus + auraBonus, bonusDetail, conditionLabel, saveLabel, meta.dc, success)
 
     setPopupHtml({
       type: 'd20',
-      rollType: 'save',
-      name: `${saveLabel} (DC ${CONDITION_SAVE_DC})`,
+      rollType: 'condition-save',
+      name: `${saveLabel} (DC ${meta.dc})`,
       rolls: hasAdvantage ? [roll1, roll2] : [roll1],
       bonus: saveBonus + auraBonus,
       bonusDetail,
       total,
-      dc: CONDITION_SAVE_DC,
-      success,
-      forcedMode: hasAdvantage ? 'advantage' : undefined,
-    })
-
-    setPopupHtml({
-      type: 'd20',
-      rollType: 'save',
-      name: `${saveLabel} (DC ${CONDITION_SAVE_DC})`,
-      rolls: hasAdvantage ? [roll1, roll2] : [roll1],
-      bonus: saveBonus,
-      dc: CONDITION_SAVE_DC,
+      dc: meta.dc,
       success,
       forcedMode: hasAdvantage ? 'advantage' : undefined,
     })
 
     if (success) {
-    setActiveConditions(prev => prev.filter(c => c !== conditionKey))
-    onConditionsChange?.()
-   }
+      setActiveConditions(prev => prev.filter(c => c !== conditionKey))
+      const existingMeta = { ...conditionMeta }
+      delete existingMeta[conditionKey]
+      setConditionMeta(existingMeta)
+      onConditionsChange?.()
+    }
   }
 
-    const toggle = (key) => {
-    const saveAbility = CONDITION_SAVE_MAP[key]
-
-    if (activeConditions.includes(key) && saveAbility) {
-      handleConditionSave(key, saveAbility, getAbilityLabel(saveAbility))
-      return
-     }
-
-    const isAdding = !activeConditions.includes(key)
-    setActiveConditions(prev => prev.includes(key) ? prev.filter(c => c !== key) : [...prev, key])
-     onConditionsChange?.()
-     if (key === 'incapacitated') {
-          clearUnbreakableMajesty(playerStats.name, campaignName)
-      }
-     if (isAdding && campaignName && key === 'charmed' || isAdding && campaignName && key === 'frightened') {
-         storeConditionEvent(campaignName, playerStats.name, key)
-     }
-     }
-
-   const adjustExhaustion = (delta) => {
+  const adjustExhaustion = (delta) => {
     if (delta < 0 && exhaustionLevel > 0) {
       const conSaveBonus = getAbilitySaveBonus(playerStats, 'con')
       const dc = getExhaustionSaveDC(exhaustionLevel)
@@ -193,6 +190,13 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
 
   const dead = isDeadFromExhaustion(exhaustionLevel)
   const active = exhaustionLevel > 0
+  const hasConditions = activeConditions.length > 0
+  const hasExhaustion = active
+  const hasConcentration = !!concentration
+
+  if (!hasConditions && !hasExhaustion && !hasConcentration) {
+    return null
+  }
 
   return (
     <div className="char-conditions">
@@ -202,22 +206,41 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
         </Popup>
       )}
       <div className="char-conditions-grid">
-        <span className={`exhaustion-badge ${dead ? 'exhaustion-badge--dead' : active ? 'exhaustion-badge--active' : ''}`}>
-          <button className="exhaustion-badge-btn" onClick={() => adjustExhaustion(-1)} type="button" disabled={exhaustionLevel <= 0}>−</button>
-          <span className="exhaustion-badge-label" title={`Exhaustion level ${exhaustionLevel}${dead ? ' - DEAD' : ''}\n\n${CONDITION_DESCRIPTIONS['Exhausted'] || ''}`}>Exhaustion ({exhaustionLevel})</span>
-          <button className="exhaustion-badge-btn" onClick={() => adjustExhaustion(1)} type="button" disabled={dead}>+</button>
-        </span>
-        {CONDITIONS.map(({ key, label }) => (
-          <button
-            key={key}
-            className={`condition-badge ${activeConditions.includes(key) ? 'condition-badge--active' : ''}`}
-            onClick={() => toggle(key)}
-            type="button"
-            title={CONDITION_DESCRIPTIONS[label] || label}
-          >
-            {label}
-          </button>
-        ))}
+        {hasConditions && activeConditions.map(key => {
+          const meta = conditionMeta[key] || {}
+          const label = key.charAt(0).toUpperCase() + key.slice(1)
+          const hasSave = !!(meta.dc && meta.ability)
+          const displayText = meta.dc ? `${label} DC ${meta.dc}` : label
+          const title = meta.dc ? CONDITION_DESCRIPTIONS[label] || label : (CONDITION_DESCRIPTIONS[label] || label)
+          const onClick = hasSave ? () => handleConditionSave(key) : null
+
+          return (
+            <button
+              key={key}
+              className={`condition-badge condition-badge--active ${hasSave ? 'condition-badge--savable' : 'condition-badge--display-only'}`}
+              onClick={onClick}
+              type="button"
+              title={title}
+              disabled={!hasSave}
+            >
+              {displayText}
+            </button>
+          )
+        })}
+        {hasExhaustion && (
+          <span className={`exhaustion-badge ${dead ? 'exhaustion-badge--dead' : 'exhaustion-badge--active'}`}>
+            <button className="exhaustion-badge-btn" onClick={() => adjustExhaustion(-1)} type="button" disabled={exhaustionLevel <= 0}>−</button>
+            <span className="exhaustion-badge-label" title={`Exhaustion level ${exhaustionLevel}${dead ? ' - DEAD' : ''}\n\n${CONDITION_DESCRIPTIONS['Exhausted'] || ''}`}>Exhaustion ({exhaustionLevel})</span>
+            <button className="exhaustion-badge-btn" onClick={() => adjustExhaustion(1)} type="button" disabled={dead}>+</button>
+          </span>
+        )}
+        {hasConcentration && (
+          <span className="concentration-badge">
+            <span className="concentration-badge-label" title={`Concentration: ${concentration.spell} (DC ${concentration.dc} Constitution)`}>
+              <i className="fa-solid fa-spinner"></i> {concentration.spell} DC {concentration.dc}
+            </span>
+          </span>
+        )}
       </div>
     </div>
   )
