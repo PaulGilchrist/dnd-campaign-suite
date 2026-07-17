@@ -98,6 +98,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     const [overlays, setOverlays] = React.useState([])
 
     const [turnStartTick, setTurnStartTick] = React.useState(0)
+    const [runtimeStateTick, setRuntimeStateTick] = React.useState(0)
 
     const displayCreatures = React.useMemo(() => {
         if (!combatSummary || !combatSummary.creatures) return []
@@ -234,9 +235,13 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                   }
                   const newActiveChar = characters.find(ch => utils.getName(ch.name) === utils.getName(event.data))
                   applyTurnStartEffects(event.data, newActiveChar?.computedStats || newActiveChar, campaignName, characters)
-                  setTurnStartTick(t => t + 1)
-              }
-          }
+                   setTurnStartTick(t => t + 1)
+               }
+           } else if (!['log', 'spell-overlay'].includes(dataKey)) {
+               // Any character-level change (vowOfEnmityTarget, activeBuffs, etc.) triggers a re-render
+               // so ConditionEffectBadges picks up the updated runtime state
+               setRuntimeStateTick(t => t + 1)
+           }
         }, [campaignName, characters, activeCreatureName, handleOverlayEvent, setCombatSummaryG, setActiveCreatureNameG])
 
     React.useEffect(() => {
@@ -744,7 +749,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                     })()
                     return (
                         <CreatureCard
-                            key={creature.name}
+                            key={`${creature.name}-${runtimeStateTick}`}
                             creature={creature}
                             isActive={isActive}
                             isLocalhost={isLocalhost}

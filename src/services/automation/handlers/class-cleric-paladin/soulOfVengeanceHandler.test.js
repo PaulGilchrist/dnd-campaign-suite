@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './soulOfVengeanceHandler.js';
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
+import { findLastAttack } from '../../common/damageRollback.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
@@ -15,9 +15,8 @@ vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../rules/combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(),
-  getTargetFromAttacker: vi.fn(),
+vi.mock('../../common/damageRollback.js', () => ({
+  findLastAttack: vi.fn(),
 }));
 
 const campaignName = 'test-campaign';
@@ -49,12 +48,28 @@ function setupVowOfEnmityActive(vowTarget = 'Orc') {
   });
 }
 
-function setupDefaultCombatContext(targetName = 'Orc') {
-  getCombatContext.mockResolvedValue({
-    targets: [{ attackerName: 'TestHero', targetName }],
-    creatures: [{ name: targetName }],
+function setupLastAttack(attackerName = 'Orc') {
+  findLastAttack.mockResolvedValue({
+    attackEvent: {
+      attackerName,
+      targetName: 'Ally',
+      d20: 15,
+      bonus: 6,
+      total: 21,
+      targetAc: 14,
+      hit: true,
+      isCrit: false,
+      damageType: 'Slashing',
+      damageFormula: '1d8+3',
+      attackName: 'Longsword',
+    },
+    attackerName,
+    targetName: 'Ally',
+    primaryDamage: 7,
+    secondaryDamage: 0,
+    totalDamage: 7,
+    damageTypes: ['Slashing'],
   });
-  getTargetFromAttacker.mockReturnValue({ name: targetName });
 }
 
 describe('soulOfVengeanceHandler', () => {
@@ -65,8 +80,15 @@ describe('soulOfVengeanceHandler', () => {
       if (key === 'vowOfEnmityTarget') return null;
       return null;
     });
-    getCombatContext.mockResolvedValue(null);
-    getTargetFromAttacker.mockReturnValue(null);
+    findLastAttack.mockResolvedValue({
+      attackEvent: null,
+      attackerName: null,
+      targetName: null,
+      primaryDamage: 0,
+      secondaryDamage: 0,
+      totalDamage: 0,
+      damageTypes: [],
+    });
   });
 
   describe('vow of enmity checks', () => {
@@ -95,23 +117,53 @@ describe('soulOfVengeanceHandler', () => {
     });
   });
 
-  describe('combat context checks', () => {
-    it('should return popup when combat context or target is missing', async () => {
+  describe('lastAttack checks', () => {
+    it('should return popup when no lastAttack found', async () => {
       setupVowOfEnmityActive('Orc');
-      getCombatContext.mockResolvedValue({});
-      getTargetFromAttacker.mockReturnValue(null);
+      findLastAttack.mockResolvedValue({
+        attackEvent: null,
+        attackerName: null,
+        targetName: null,
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No target selected in combat');
+      expect(result.payload.description).toContain('No recent attack found');
+    });
+
+    it('should return popup when last attacker is not the Vow target', async () => {
+      setupVowOfEnmityActive('Orc');
+      setupLastAttack('Goblin');
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('Goblin');
+      expect(result.payload.description).toContain('Orc');
+      expect(result.payload.description).toContain('last attacker');
+    });
+
+    it('should return popup when last attacker is not the Vow target (different names)', async () => {
+      setupVowOfEnmityActive('Dragon');
+      setupLastAttack('Bandit');
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('Bandit');
+      expect(result.payload.description).toContain('Dragon');
     });
   });
 
   describe('attack selection', () => {
     it('should return popup when no attacks are available', async () => {
       setupVowOfEnmityActive('Orc');
-      setupDefaultCombatContext('Orc');
+      setupLastAttack('Orc');
       const stats = makePlayerStats({ attacks: [] });
 
       const result = await handle(makeAction(), stats, campaignName);
@@ -138,7 +190,7 @@ describe('soulOfVengeanceHandler', () => {
       },
     ])('should $name', async ({ attacks, expectedAttack }) => {
       setupVowOfEnmityActive('Orc');
-      setupDefaultCombatContext('Orc');
+      setupLastAttack('Orc');
       const stats = makePlayerStats({ attacks });
 
       const result = await handle(makeAction(), stats, campaignName);
@@ -149,9 +201,9 @@ describe('soulOfVengeanceHandler', () => {
   });
 
   describe('successful attack_roll path', () => {
-    it('should return attack_roll with correct payload and log ability_use', async () => {
+    it('should return attack_roll targeting the Vow target and log ability_use', async () => {
       setupVowOfEnmityActive('Orc');
-      setupDefaultCombatContext('Orc');
+      setupLastAttack('Orc');
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
@@ -172,8 +224,19 @@ describe('soulOfVengeanceHandler', () => {
         type: 'ability_use',
         characterName: 'TestHero',
         abilityName: 'Soul of Vengeance',
-        description: 'Soul of Vengeance used against Orc',
+        description: expect.stringContaining('Soul of Vengeance'),
+        targetName: 'Orc',
       }));
+    });
+
+    it('should use the custom action name from the automation', async () => {
+      setupVowOfEnmityActive('Goblin');
+      setupLastAttack('Goblin');
+
+      const result = await handle(makeAction({ name: 'My Soul of Vengeance' }), makePlayerStats(), campaignName);
+
+      expect(result.type).toBe('attack_roll');
+      expect(result.payload.sourceName).toBe('My Soul of Vengeance');
     });
   });
 });
