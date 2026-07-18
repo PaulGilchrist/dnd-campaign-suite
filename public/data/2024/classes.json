@@ -6529,7 +6529,7 @@
                 "features": [
                     {
                         "name": "Open Hand Technique",
-                        "description": "Whenever you hit a creature with an Unarmed Strike as part of your Flurry of Blows, you can impose one of the following effects on the target. It must succeed on a Strength saving throw (DC 8 + your Wisdom modifier + Proficiency Bonus) or: Push it up to 15 feet away. It has Disadvantage on its next attack roll. It can't take Reactions until the start of your next turn.",
+                        "description": "Whenever you hit a Creature with a11 attack granted by your Flurry of Blows, you can impose one of the following effects on that target. <ul><li><b>Addle:</b> The target can't make Opportunity Attacks until the start of its next turn.</li><li><b>Push:</b> The target must succeed on a Strength saving throw or be pushed up to 15 feet away from you.</li><li><b>Topple:</b> The target must succeed on a Dexterity saving throw or have the Prone condition.</li></ul>",
                         "level": 3,
                         "automation": {
                             "type": "open_hand_technique",
@@ -6565,6 +6565,16 @@
                             "recharge": "long_rest",
                             "casting_time": "1 bonus action"
                         }
+                    },
+                    {
+                        "name": "Fleet Step",
+                        "description": "When you take a Bonus Action other than Step of the Wind, you can also use Step of the Wind immediately after that Bonus Action.",
+                        "level": 11
+                    },
+                    {
+                        "name": "Quivering Palm",
+                        "description": "You gain the ability to set up lethal vibrations in someone's body. When you hit a creature with an Unarmed Strike, you can expend 4 Focus Points to start these imperceptible vibrations, which last for a number of days equal to your Monk level. The vibrations are harmless unless you take an action to end them. Alternatively, when you take the Attack action on your turn, you can forgo one of the attacks to end the vibrations. To end them, you and the target must be on the same plane of existence.",
+                        "level": 17
                     }
                 ],
                 "spells": []
