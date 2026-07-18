@@ -115,7 +115,7 @@ function CreatureCard({
                     min="0"
                     onChange={(event) => onInitiativeChange(creature.name, event.target.value)}
                     type="number"
-                    value={creature.initiative}
+                    value={creature.initiative ?? ''}
                     placeholder="Init"
                 />
             </div>
