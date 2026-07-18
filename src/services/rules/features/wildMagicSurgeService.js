@@ -47,47 +47,25 @@ export function getFeatsOfChaosFeature(playerStats) {
 }
 
 export async function triggerWildMagicSurge(spell, metaCtx, playerStats, campaignName, mapName) {
-    if (!playerStats) {
-        console.log('[wildMagicSurge] No playerStats, returning null');
-        return null;
-    }
-    console.log('[wildMagicSurge] triggerWildMagicSurge called for', playerStats.name, 'spell:', spell.name);
-    if (!isSorcererSpell(spell, playerStats)) {
-        console.log('[wildMagicSurge] NOT a sorcerer spell, returning null');
-        return null;
-    }
-    console.log('[wildMagicSurge] Is sorcerer spell');
-
-    if (!usesSpellSlot(spell, metaCtx)) {
-        console.log('[wildMagicSurge] Does not use spell slot, returning null. metaCtx:', JSON.stringify(metaCtx));
-        return null;
-    }
-    console.log('[wildMagicSurge] Uses spell slot');
+    if (!playerStats) return null;
+    if (!isSorcererSpell(spell, playerStats)) return null;
+    if (!usesSpellSlot(spell, metaCtx)) return null;
 
     const surgeFeatures = getWildMagicSurgeFeatures(playerStats);
-    console.log('[wildMagicSurge] surgeFeatures.length:', surgeFeatures.length, 'passives count:', playerStats?.automation?.passives?.length);
-    if (surgeFeatures.length === 0) {
-        console.log('[wildMagicSurge] No surge features, returning null');
-        return null;
-    }
-    console.log('[wildMagicSurge] Found surge features:', surgeFeatures.map(f => f.name));
+    if (surgeFeatures.length === 0) return null;
 
     const controlledChaos = getControlledChaosFeature(playerStats);
-    console.log('[wildMagicSurge] controlledChaos:', !!controlledChaos);
     if (controlledChaos) {
         await setRuntimeValue(playerStats.name, 'wildMagicDoubleRoll', true, campaignName, true);
     }
 
     const featsOfChaos = getFeatsOfChaosFeature(playerStats);
     const featsOfChaosActive = getRuntimeValue(playerStats.name, 'featsOfChaosActive', campaignName) === true;
-    console.log('[wildMagicSurge] featsOfChaos:', !!featsOfChaos, 'featsOfChaosActive:', featsOfChaosActive);
 
     if (featsOfChaos && featsOfChaosActive) {
-        console.log('[wildMagicSurge] FoC active — recharging and auto-triggering surge');
         const usesKey = 'featsOfChaosUses';
         await setRuntimeValue(playerStats.name, 'featsOfChaosActive', false, campaignName, true);
         await setRuntimeValue(playerStats.name, usesKey, 1, campaignName, true);
-        console.log('[wildMagicSurge] Set featsOfChaosActive=false, featsOfChaosUses=1');
 
         const surgeFeature = surgeFeatures[0];
         const surgeTable = playerStats.wildMagicSurgeTable;
