@@ -56,15 +56,15 @@ describe('CreatureHp', () => {
         `('should call onChange with $expectedCall when current HP input is "$inputValue"', ({ inputValue, expectedCall }) => {
             render(<CreatureHp {...props} creature={defaultNpcCreature} isLocalhost={true} />);
             const currentInput = document.querySelectorAll('.hp-inline-input')[0];
-            fireEvent.change(currentInput, { target: { value: inputValue } });
+            fireEvent.blur(currentInput, { target: { value: inputValue } });
             expect(props.onChange).toHaveBeenCalledWith(...expectedCall);
         });
 
-        it('should update creature.maxHp and cap currentHp when max HP input decreases below current', () => {
+        it('should update creature.maxHp and cap currentHp when max HP input blurs below current', () => {
             const creature = { ...defaultNpcCreature, currentHp: 10, maxHp: 10 };
             render(<CreatureHp {...props} creature={creature} isLocalhost={true} />);
             const maxInput = document.querySelectorAll('.hp-inline-input')[1];
-            fireEvent.change(maxInput, { target: { value: '5' } });
+            fireEvent.blur(maxInput, { target: { value: '5' } });
             expect(props.onChange).toHaveBeenCalledWith('Goblin', 5);
         });
     });
@@ -77,7 +77,7 @@ describe('CreatureHp', () => {
         `('should call onChange with $expectedCall when current HP input is "$inputValue"', ({ inputValue, expectedCall }) => {
             render(<CreatureHp {...props} isLocalhost={true} />);
             const currentInput = document.querySelector('.hp-inline-input');
-            fireEvent.change(currentInput, { target: { value: inputValue } });
+            fireEvent.blur(currentInput, { target: { value: inputValue } });
             expect(props.onChange).toHaveBeenCalledWith(...expectedCall);
         });
     });

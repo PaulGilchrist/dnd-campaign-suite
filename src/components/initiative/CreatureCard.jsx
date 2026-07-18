@@ -113,9 +113,14 @@ function CreatureCard({
             <div className='creature-initiative'>Initiative&nbsp;
                 <input
                     min="0"
-                    onChange={(event) => onInitiativeChange(creature.name, event.target.value)}
+                    onBlur={(event) => onInitiativeChange(creature.name, event.target.value)}
+                    onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                            event.target.blur()
+                        }
+                    }}
                     type="number"
-                    value={creature.initiative ?? ''}
+                    defaultValue={creature.initiative ?? ''}
                     placeholder="Init"
                 />
             </div>

@@ -23,7 +23,7 @@ vi.mock('./NpcAvatar.jsx', () => ({
 
 vi.mock('./CreatureHp.jsx', () => ({
     default: vi.fn(({ creature, isLocalhost, onChange }) => {
-        return <div data-testid={`creature-hp-${creature.name}`} className="creature-hp"><input data-testid={`hp-input-${creature.name}`} type="number" value={creature.currentHp ?? 0} onChange={(e) => onChange(creature.name, parseInt(e.target.value) || 0)} disabled={!isLocalhost && creature.type === 'player'} /><span>{creature.currentHp ?? 0}/{creature.maxHp ?? 1}</span></div>;
+        return <div data-testid={`creature-hp-${creature.name}`} className="creature-hp"><input data-testid={`hp-input-${creature.name}`} type="number" defaultValue={creature.currentHp ?? 0} onBlur={(e) => onChange(creature.name, parseInt(e.target.value) || 0)} disabled={!isLocalhost && creature.type === 'player'} /><span>{creature.currentHp ?? 0}/{creature.maxHp ?? 1}</span></div>;
     }),
 }));
 
@@ -205,10 +205,10 @@ describe('CreatureCard', () => {
             expect(initiativeInput).toHaveValue(18);
         });
 
-        it('should call onInitiativeChange when initiative input changes for player', () => {
+        it('should call onInitiativeChange when initiative input blurs for player', () => {
             render(<CreatureCard {...props} creature={defaultPlayerCreature} />);
             const initiativeInput = document.querySelector('.creature-initiative input[type="number"]');
-            fireEvent.change(initiativeInput, { target: { value: '20' } });
+            fireEvent.blur(initiativeInput, { target: { value: '20' } });
             expect(props.onInitiativeChange).toHaveBeenCalledWith('Alice', '20');
         });
     });
@@ -341,10 +341,10 @@ describe('CreatureCard', () => {
     });
 
     describe('HP change', () => {
-        it('should call onHpChange when HP input changes for player', () => {
+        it('should call onHpChange when HP input blurs for player', () => {
             render(<CreatureCard {...props} creature={defaultPlayerCreature} />);
             const hpInput = screen.getByTestId('hp-input-Alice');
-            fireEvent.change(hpInput, { target: { value: '15' } });
+            fireEvent.blur(hpInput, { target: { value: '15' } });
             expect(props.onHpChange).toHaveBeenCalledWith('Alice', 15);
         });
 

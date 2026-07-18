@@ -38,8 +38,11 @@ function CreatureHp({ creature, isLocalhost, onChange }) {
                         className="hp-inline-input"
                         type="number"
                         min="0"
-                        value={currentHp}
-                        onChange={(e) => onChange(creature.name, parseInt(e.target.value) || 0)}
+                        defaultValue={currentHp}
+                        onBlur={(e) => onChange(creature.name, parseInt(e.target.value) || 0)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') e.target.blur()
+                        }}
                         aria-label={`${creature.name} current HP`}
                     />
                     <span className="hp-sep">/</span>
@@ -47,14 +50,17 @@ function CreatureHp({ creature, isLocalhost, onChange }) {
                         className="hp-inline-input hp-max-input"
                         type="number"
                         min="1"
-                        value={maxHp}
-                        onChange={(e) => {
+                        defaultValue={maxHp}
+                        onBlur={(e) => {
                             const newMax = parseInt(e.target.value) || 1
                             creature.maxHp = newMax
                             if (creature.currentHp > newMax) {
                                 creature.currentHp = newMax
                             }
                             onChange(creature.name, creature.currentHp)
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') e.target.blur()
                         }}
                         aria-label={`${creature.name} max HP`}
                     />
@@ -76,8 +82,11 @@ function CreatureHp({ creature, isLocalhost, onChange }) {
                             className="hp-inline-input"
                             type="number"
                             min={0}
-                            value={currentHp}
-                            onChange={(e) => onChange(creature.name, parseInt(e.target.value) || 0)}
+                            defaultValue={currentHp}
+                            onBlur={(e) => onChange(creature.name, parseInt(e.target.value) || 0)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') e.target.blur()
+                            }}
                             aria-label={`${creature.name} current HP`}
                         />
                         <span className="hp-sep">/</span>
