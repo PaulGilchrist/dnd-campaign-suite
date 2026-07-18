@@ -10838,7 +10838,7 @@
                     },
                     {
                         "name": "Elemental Affinity",
-                        "description": "Choose one damage type (Acid, Cold, Fire, Lightning, or Poison). Resistance to that type. When you cast a spell that deals damage of that type, add Charisma modifier to one damage roll.",
+                        "description": "Choose one damage type (Acid, Cold, Fire, Lightning, or Poison). Resistance to that type. When you cast a spell that deals damage of that type, add Charisma modifier.",
                         "level": 6,
                         "automation": {
                             "type": "damage_type_choice",
@@ -10859,7 +10859,7 @@
                         "level": 14,
                         "automation": {
                             "type": "dragon_wings",
-                            "action": "bonus_action",
+                            "casting_time": "bonus action",
                             "duration": "1_hour",
                             "flySpeed": 60,
                             "hover": true,

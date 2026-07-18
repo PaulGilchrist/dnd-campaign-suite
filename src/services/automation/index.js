@@ -368,6 +368,7 @@ const HANDLER_MAP = {
         bewitching_magic: handleBewitchingMagic,
         hunter_prey: handleHunterPrey,
         defensive_tactics: handleDefensiveTactics,
+        damage_type_choice: handleElementalAffinity,
         superior_hunter_prey: handleSuperiorHunterPrey,
         superior_hunter_defense: handleSuperiorHunterDefense,
         dread_ambush_damage: handleDreadAmbushDamage,

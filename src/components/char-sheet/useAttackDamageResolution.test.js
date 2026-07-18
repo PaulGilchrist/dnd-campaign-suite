@@ -22,6 +22,10 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
+vi.mock('../../services/automation/common/choiceStorage.js', () => ({
+    getChosenRuntimeValue: vi.fn(() => undefined),
+}));
+
 vi.mock('../../services/automation/common/buffToggle.js', () => ({
     getActiveBuffs: vi.fn(),
 }));

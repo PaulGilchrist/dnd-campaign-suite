@@ -809,7 +809,11 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 result.actions.push(info)
                 break
             case 'damage_type_choice':
-                result.passives.push(info)
+                if (info.effect === 'elemental_affinity') {
+                    result.specialActions.push(info)
+                } else {
+                    result.passives.push(info)
+                }
                 break
             case 'radiant_soul':
                 result.passives.push(info)

@@ -3,6 +3,7 @@ import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from 
 import { addEntry } from '../../ui/logService.js';
 import { featureModules } from './features/index.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getChosenRuntimeValue } from '../../../services/automation/common/choiceStorage.js';
 
 /**
  * Build the damage pipeline steps for a spell-type action.
@@ -71,6 +72,20 @@ export function buildSpellDamageSteps() {
               if (spellcastingMod > 0) {
                 formula = `${formula} + ${spellcastingMod} [Blessed Strikes]`;
               }
+            }
+          }
+        }
+
+        // Elemental Affinity: add CHA mod to one spell damage roll of chosen type
+        const elementalAffinityType = getChosenRuntimeValue(ps, 'Elemental Affinity', 'chosenType', ctx.campaignName);
+        if (elementalAffinityType && typeof elementalAffinityType === 'string') {
+          const spellDamageType = (ctx.attack?.damageType || '').toLowerCase();
+          const chosenTypeLower = elementalAffinityType.toLowerCase();
+          if (spellDamageType === chosenTypeLower) {
+            const charismaAbility = ps.abilities?.find(a => a.name === 'Charisma');
+            const chaMod = Math.max(0, charismaAbility?.bonus || 0);
+            if (chaMod > 0) {
+              formula = `${formula} + ${chaMod} [Elemental Affinity]`;
             }
           }
         }

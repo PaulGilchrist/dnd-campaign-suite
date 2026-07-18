@@ -22,6 +22,7 @@ import WeaponMasteryChoiceModal from './modals/WeaponMasteryChoiceModal.jsx';
 import ResourcePoolModal from './modals/ResourcePoolModal.jsx';
 import NaturalRecoveryModal from './modals/NaturalRecoveryModal.jsx';
 import CircleOfTheLandSpellsModal from './modals/CircleOfTheLandSpellsModal.jsx';
+import ElementalAffinityModal from './modals/ElementalAffinityModal.jsx';
 import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
 import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
 import { onSavantSelected } from '../../services/automation/handlers/class-wizard/SavantHandler.js';
@@ -42,6 +43,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
     const [circleOfTheLandSpellsModal, setCircleOfTheLandSpellsModal] = useState(null);
     const [featureChoiceModal, setFeatureChoiceModal] = useState(null);
     const [aspectOfTheWildsModal, setAspectOfTheWildsModal] = useState(null);
+    const [elementalAffinityModal, setElementalAffinityModal] = useState(null);
     const [fightingStylesMap, setFightingStylesMap] = useState(null);
     const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats?.name, campaignName, {
@@ -223,6 +225,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                 setCircleOfTheLandSpellsModal(result.payload);
             } else if (result.modalName === 'moonlightStepFallback') {
                 setMoonlightStepFallback(result.payload);
+            } else if (result.modalName === 'elementalAffinity') {
+                setElementalAffinityModal(result.payload);
             }
         } else if (result.type === 'popup') {
             const payload = result.payload;
@@ -423,6 +427,14 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                     playerStats={playerStats}
                     campaignName={campaignName}
                     onClose={() => setCircleOfTheLandSpellsModal(null)}
+                />
+            )}
+            {elementalAffinityModal && (
+                <ElementalAffinityModal
+                    action={elementalAffinityModal.action}
+                    playerStats={elementalAffinityModal.playerStats}
+                    campaignName={elementalAffinityModal.campaignName}
+                    onClose={() => setElementalAffinityModal(null)}
                 />
             )}
             {featureChoiceModal && (

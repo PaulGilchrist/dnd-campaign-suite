@@ -28,6 +28,7 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     'circle_of_the_land_spells',
     'animal_aspect',
     'combat_stance',
+    'damage_type_choice',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([

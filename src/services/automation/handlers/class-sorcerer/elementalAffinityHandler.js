@@ -4,8 +4,8 @@ import { addEntry } from '../../../ui/logService.js';
 const DAMAGE_TYPES = ['Acid', 'Cold', 'Fire', 'Lightning', 'Poison'];
 
 export async function handle(action, playerStats, campaignName, _mapName) {
-    const auto = action.automation;
     const name = action.name;
+    const damageTypes = action.damageTypes || action.automation?.damageTypes || DAMAGE_TYPES;
 
     // Check if a damage type has already been chosen
     const chosenType = getChosenRuntimeValue(playerStats, name, 'chosenType', campaignName);
@@ -25,7 +25,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 action,
                 playerStats,
                 campaignName,
-                damageTypes: auto.damageTypes || DAMAGE_TYPES,
+                damageTypes,
                 existingType: chosenType,
             },
         };
@@ -38,15 +38,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             action,
             playerStats,
             campaignName,
-            damageTypes: auto.damageTypes || DAMAGE_TYPES,
+            damageTypes,
         },
     };
 }
 
 export async function applyTypeChoice(action, playerStats, campaignName, chosenType) {
-    const auto = action.automation;
     const name = action.name;
-    const validTypes = auto.damageTypes || DAMAGE_TYPES;
+    const validTypes = action.damageTypes || action.automation?.damageTypes || DAMAGE_TYPES;
 
     if (!validTypes.includes(chosenType)) {
         return null;
@@ -69,9 +68,9 @@ export async function applyTypeChoice(action, playerStats, campaignName, chosenT
         payload: {
             type: 'automation_info',
             name,
-            automationType: auto.type,
-            description: `${name}: ${chosenType} selected. You gain resistance to ${chosenType} damage. When you cast a spell that deals ${chosenType} damage, add your Charisma modifier to one damage roll.`,
-            automation: auto,
+            automationType: action.type,
+            description: `${name}: ${chosenType} selected. You gain resistance to ${chosenType} damage. When you cast a spell that deals ${chosenType} damage, add your Charisma modifier.`,
+            automation: action,
         },
     };
 }

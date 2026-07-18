@@ -2,6 +2,7 @@ import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '
 import { getCombatContext, getTargetFromAttacker } from '../../rules/combat/damageUtils.js';
 import { getCurrentCombatRound, loadCombatSummary } from '../../encounters/combatData.js';
 import { getRuntimeValue, setRuntimeObject, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getChosenRuntimeValue } from '../../automation/common/choiceStorage.js';
 import { hasTwoWeaponFighting, collectWeaponMastery } from '../../combat/automation/automationService.js';
 import { applyDamageToTarget } from '../../rules/combat/applyDamage.js';
 import { addEntry } from '../../ui/logService.js';
@@ -229,6 +230,21 @@ export function buildDamageSteps() {
         const empEvocMod = ctx.empoweredEvocationModifier || 0;
         if (empEvocMod > 0) {
           formula = `${formula} + ${empEvocMod} [Empowered Evocation]`;
+        }
+
+        // Elemental Affinity: add CHA mod to one spell damage roll of chosen type
+        const ps = ctx.playerStats;
+        const elementalAffinityType = getChosenRuntimeValue(ps, 'Elemental Affinity', 'chosenType', ctx.campaignName);
+        if (elementalAffinityType && typeof elementalAffinityType === 'string') {
+          const spellDamageType = (ctx.attack?.damageType || '').toLowerCase();
+          const chosenTypeLower = elementalAffinityType.toLowerCase();
+          if (spellDamageType === chosenTypeLower) {
+            const charismaAbility = ps.abilities?.find(a => a.name === 'Charisma');
+            const chaMod = Math.max(0, charismaAbility?.bonus || 0);
+            if (chaMod > 0) {
+              formula = `${formula} + ${chaMod} [Elemental Affinity]`;
+            }
+          }
         }
 
         const isOverchannel = ctx.overchannelActive;
