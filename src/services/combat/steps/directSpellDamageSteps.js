@@ -9,7 +9,7 @@ import { getChosenRuntimeValue } from '../../../services/automation/common/choic
  * Build the damage pipeline steps for a spell-type action.
  * Each step: { name, subscribe, emit, condition(ctx), handler(ctx) → result|null }
  */
-export function buildSpellDamageSteps() {
+export function buildDirectSpellDamageSteps() {
   return [
 
     // =========================================================

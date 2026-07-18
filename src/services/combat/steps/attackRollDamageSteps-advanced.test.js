@@ -122,7 +122,7 @@ vi.mock('../../automation/common/savePrompt.js', () => ({
 
 // ── Imports ──────────────────────────────────────────────────────
 
-const { buildDamageSteps } = await import('./weaponDamageSteps.js');
+const { buildAttackRollDamageSteps } = await import('./attackRollDamageSteps.js');
 const { rollExpression } = await import('../../dice/diceRoller.js');
 const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
 const { loadCombatSummary, getCurrentCombatRound } = await import('../../encounters/combatData.js');
@@ -151,13 +151,13 @@ function makeCtx(overrides = {}) {
 
 // ── Tests ────────────────────────────────────────────────────────
 
-describe('buildDamageSteps - natural20Bonuses, celestialRevelation, featureRiders, damageTypeModifiers, overchannel, proceedToDamage', () => {
+describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation, featureRiders, damageTypeModifiers, overchannel, proceedToDamage', () => {
   let steps;
 
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(loadCombatSummary).mockImplementation(() => Promise.resolve({ lastAttack: { hit: true } }));
-    steps = buildDamageSteps();
+    steps = buildAttackRollDamageSteps();
     featureModules.length = 0;
   });
 

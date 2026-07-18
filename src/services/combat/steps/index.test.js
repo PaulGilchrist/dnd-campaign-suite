@@ -36,8 +36,8 @@ describe('buildPipelineForAction', () => {
   });
 
   it('spell pipeline includes featureRiders step', async () => {
-    const { buildSpellDamageSteps } = await import('./spellDamageSteps.js');
-    const steps = buildSpellDamageSteps();
+    const { buildDirectSpellDamageSteps } = await import('./directSpellDamageSteps.js');
+    const steps = buildDirectSpellDamageSteps();
     const stepNames = steps.map(s => s.name);
     expect(stepNames).toContain('spellFeatureRiders');
     expect(stepNames).toContain('spellRollDamage');

@@ -122,7 +122,7 @@ vi.mock('../../automation/common/savePrompt.js', () => ({
 
 // ── Imports ──────────────────────────────────────────────────────
 
-const { buildDamageSteps } = await import('./weaponDamageSteps.js');
+const { buildAttackRollDamageSteps } = await import('./attackRollDamageSteps.js');
 const { rollExpression, rollExpressionDoubled, rollExpressionMaximized } = await import('../../dice/diceRoller.js');
 const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
 const { loadCombatSummary } = await import('../../encounters/combatData.js');
@@ -147,13 +147,13 @@ function makeCtx(overrides = {}) {
 
 // ── Tests ────────────────────────────────────────────────────────
 
-describe('buildDamageSteps - rollBaseDamage, buildContext, sneakAttack', () => {
+describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack', () => {
   let steps;
 
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(loadCombatSummary).mockImplementation(() => Promise.resolve({ lastAttack: { hit: true } }));
-    steps = buildDamageSteps();
+    steps = buildAttackRollDamageSteps();
   });
 
   // ──────────────────────────────────────────────────────────────

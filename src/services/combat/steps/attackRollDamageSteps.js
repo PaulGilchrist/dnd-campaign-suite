@@ -22,7 +22,7 @@ import { resolveDiceExpression } from '../automation/automationExpressions.js';
  * Build the damage pipeline steps for a weapon-type action.
  * Each step: { name, subscribe, emit, condition(ctx), handler(ctx) → result|null }
  */
-export function buildDamageSteps() {
+export function buildAttackRollDamageSteps() {
 
   // Shared helpers used by multiple steps - these receive ctx at call time
 

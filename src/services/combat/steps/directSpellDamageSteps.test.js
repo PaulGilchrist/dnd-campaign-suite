@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { buildSpellDamageSteps } from './spellDamageSteps.js';
+import { buildDirectSpellDamageSteps } from './directSpellDamageSteps.js';
 
 vi.mock('../../dice/diceRoller.js', () => ({
   rollExpression: vi.fn((formula) => {
@@ -89,7 +89,7 @@ function makeCtx(overrides = {}) {
   };
 }
 
-describe('buildSpellDamageSteps', () => {
+describe('buildDirectSpellDamageSteps', () => {
   let steps;
 
   beforeEach(() => {
@@ -97,7 +97,7 @@ describe('buildSpellDamageSteps', () => {
     vi.mocked(getEmpoweredEvocationFeatures).mockReturnValue([]);
     vi.mocked(getEmpoweredEvocationIntModifier).mockReturnValue(0);
     _featureModulesRef.value = [];
-    steps = buildSpellDamageSteps();
+    steps = buildDirectSpellDamageSteps();
   });
 
   describe('structure', () => {

@@ -1,6 +1,6 @@
 import { createPipeline } from '../actionPipeline.js';
-import { buildDamageSteps } from './weaponDamageSteps.js';
-import { buildSpellDamageSteps } from './spellDamageSteps.js';
+import { buildAttackRollDamageSteps } from './attackRollDamageSteps.js';
+import { buildDirectSpellDamageSteps } from './directSpellDamageSteps.js';
 import { buildGenericSteps } from './genericSteps.js';
 import { createObservers } from './observers.js';
 import { createSseObservers } from './sseObservers.js';
@@ -32,16 +32,16 @@ export function buildPipelineForAction(action, playerStats) {
 
   // Register steps based on action type
   const hasDamage = action?.damage || action?.hasDamage || action?.damageExpression;
-  const isWeaponAttack = action?.type === 'weapon_attack' || action?.weaponType || (hasDamage && !action?.autoDamageSchool && !action?.spellType);
-  const isSpell = action?.type === 'spell' || action?.spellType || action?.autoDamageSchool;
+  const isAttackRoll = action?.type === 'weapon_attack' || action?.weaponType || (hasDamage && !action?.autoDamageSchool && !action?.spellType);
+  const isDirectSpell = action?.type === 'spell' || action?.spellType || action?.autoDamageSchool;
 
-  if (isWeaponAttack) {
-    const steps = buildDamageSteps();
+  if (isAttackRoll) {
+    const steps = buildAttackRollDamageSteps();
     for (const step of steps) {
       pipeline.step(step);
     }
-  } else if (isSpell) {
-    const steps = buildSpellDamageSteps();
+  } else if (isDirectSpell) {
+    const steps = buildDirectSpellDamageSteps();
     for (const step of steps) {
       pipeline.step(step);
     }
