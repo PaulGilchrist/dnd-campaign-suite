@@ -28,6 +28,12 @@ export function useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTar
                 } else {
                     setPopupHtml(popup.payload);
                 }
+            } else if (result && result.modalName) {
+                if (setModalState) {
+                    handleModalResult(result, setModalState);
+                } else {
+                    setPopupHtml(result.payload);
+                }
             } else if (result && result.healAmount > 0) {
                 const bonusHealDetail = result.bonusDetails?.length > 0
                     ? result.bonusDetails.map(d => `${d.amount} ${d.name}`).join(', ')
@@ -73,6 +79,9 @@ function handleModalResult(popup, setModalState) {
             break;
         case 'saveAttackAoe':
             setModalState({ saveAttackAoeModal: payload });
+            break;
+        case 'wildMagicSurge':
+            setModalState({ wildMagicSurgeModal: payload });
             break;
         default:
             console.error(`[useSpellCastExecutor] Unknown modalName from spell cast: ${modalName}`);
