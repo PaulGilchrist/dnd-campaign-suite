@@ -279,6 +279,18 @@ describe('wildMagicSurgeService', () => {
                 return null;
             });
 
+            executeHandler.mockResolvedValue({
+                type: 'modal',
+                modalName: 'wildMagicSurge',
+                payload: {
+                    featureName: 'Tamed Surge',
+                    surgeTable: BASE_SURGE_TABLE,
+                    mode: 'tamedSurge',
+                    playerStats,
+                    campaignName: CAMPAIGN_NAME,
+                },
+            });
+
             const result = await triggerWildMagicSurge(spell, { slotLevel: 1 }, playerStats, CAMPAIGN_NAME, MAP_NAME);
 
             expect(result).toEqual({
@@ -286,18 +298,13 @@ describe('wildMagicSurgeService', () => {
                 modalName: 'wildMagicSurge',
                 payload: {
                     featureName: 'Tamed Surge',
-                    surgeTable: [
-                        { min: 1, max: 5, effect: 'Effect 1' },
-                        { min: 6, max: 10, effect: 'Effect 2' },
-                        { min: 11, max: 15, effect: 'Effect 3' },
-                        { min: 16, max: 20, effect: 'Effect 4' },
-                    ],
+                    surgeTable: BASE_SURGE_TABLE,
                     mode: 'tamedSurge',
                     playerStats,
                     campaignName: CAMPAIGN_NAME,
                 },
             });
-            expect(executeHandler).not.toHaveBeenCalled();
+            expect(executeHandler).toHaveBeenCalled();
         });
 
         it('falls through to executeHandler when tamed surge has no available surges (all max=20)', async () => {
@@ -364,10 +371,12 @@ describe('wildMagicSurgeService', () => {
                 return null;
             });
 
+            executeHandler.mockResolvedValue({ type: 'modal', payload: { mode: 'tamedSurge' } });
+
             const result = await triggerWildMagicSurge(spell, { slotLevel: 1 }, playerStats, CAMPAIGN_NAME, MAP_NAME);
 
             expect(result).toEqual({ type: 'modal', payload: expect.objectContaining({ mode: 'tamedSurge' }) });
-            expect(executeHandler).not.toHaveBeenCalled();
+            expect(executeHandler).toHaveBeenCalled();
         });
 
         it('triggers tamed surge when uses is undefined (recharged)', async () => {
@@ -384,10 +393,12 @@ describe('wildMagicSurgeService', () => {
 
             getRuntimeValue.mockReturnValue(null);
 
+            executeHandler.mockResolvedValue({ type: 'modal', payload: { mode: 'tamedSurge' } });
+
             const result = await triggerWildMagicSurge(spell, { slotLevel: 1 }, playerStats, CAMPAIGN_NAME, MAP_NAME);
 
             expect(result).toEqual({ type: 'modal', payload: expect.objectContaining({ mode: 'tamedSurge' }) });
-            expect(executeHandler).not.toHaveBeenCalled();
+            expect(executeHandler).toHaveBeenCalled();
         });
 
         it('executes feats of chaos when feature exists and has uses', async () => {

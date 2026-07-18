@@ -2,6 +2,23 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { checkOncePerTurn, markOncePerTurn } from '../../common/oncePerTurn.js';
 
+const SURGE_EFFECTS_KEY = 'wildMagicSurgeEffects';
+
+async function getSurgeEffects(playerName, campaignName) {
+    const effects = getRuntimeValue(playerName, SURGE_EFFECTS_KEY, campaignName);
+    return Array.isArray(effects) ? effects : [];
+}
+
+async function setSurgeEffects(playerName, campaignName, effects) {
+    await setRuntimeValue(playerName, SURGE_EFFECTS_KEY, effects, campaignName, true);
+}
+
+async function addSurgeEffect(playerName, campaignName, surgeEntry) {
+    const effects = await getSurgeEffects(playerName, campaignName);
+    const newEffects = [...effects, surgeEntry];
+    await setSurgeEffects(playerName, campaignName, newEffects);
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -9,8 +26,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const skip = await checkOncePerTurn(action.name, 'surgeUsedRound', campaignName);
     if (skip) return skip;
 
-    const roll1 = Math.floor(Math.random() * 20) + 1;
-    const doubleRoll = getRuntimeValue(playerName, 'wildMagicDoubleRoll', campaignName) === true;
+    const activeEffects = await getSurgeEffects(playerName, campaignName);
+    const hasRollOnTableEffect = activeEffects.some(e => e && e.effect && e.effect.includes('Roll on the surge table at the start of each turn'));
+
+    const d20Roll = Math.floor(Math.random() * 20) + 1;
+    const doubleRoll = getRuntimeValue(playerName, 'wildMagicDoubleRoll', campaignName) === true ||
+        (playerStats.automation?.passives ?? []).some(p => p.type === 'auto_effect' && p.effect === 'wild_magic_double_roll');
 
     if (doubleRoll) {
         await setRuntimeValue(playerName, 'wildMagicDoubleRoll', false, campaignName, true);
@@ -24,19 +45,19 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 campaignName,
                 playerStats,
                 mode: 'controlledChaos',
-                roll1,
+                roll1: Math.floor(Math.random() * 100) + 1,
                 roll2: Math.floor(Math.random() * 100) + 1,
             },
         };
     }
 
-    if (roll1 !== 20) {
+    if (!hasRollOnTableEffect && d20Roll !== 20) {
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: `${action.name}: Rolled ${roll1} (not a 20). No surge occurs.`,
+                description: `${action.name}: Rolled ${d20Roll} (not a 20). No surge occurs.`,
                 automation: auto,
             },
         };
@@ -95,8 +116,13 @@ export async function onSurgeSelected(featureName, playerStats, campaignName, se
     const playerName = playerStats.name;
     const auto = featureName ? { type: 'wild_magic_surge' } : { type: 'wild_magic_surge' };
 
-    const lastSurge = { roll: selectedRoll, effect: surgeEntry.effect, timestamp: Date.now() };
-    await setRuntimeValue(playerName, 'lastWildMagicSurge', lastSurge, campaignName, true);
+    const surgeEffect = {
+        roll: selectedRoll,
+        effect: surgeEntry.effect,
+        duration: surgeEntry.duration || null,
+        timestamp: Date.now(),
+    };
+    await addSurgeEffect(playerName, campaignName, surgeEffect);
 
     await addEntry(campaignName, {
         type: 'ability_use',
@@ -153,6 +179,14 @@ export async function onDoubleRollSelected(action, playerStats, campaignName, se
 
     await markOncePerTurn(action.name, 'surgeUsedRound', playerStats, campaignName);
 
+    const surgeEffect = {
+        roll: selectedRoll,
+        effect: effectText,
+        duration: surgeEntry.duration || null,
+        timestamp: Date.now(),
+    };
+    await addSurgeEffect(playerName, campaignName, surgeEffect);
+
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
@@ -183,8 +217,14 @@ export async function onTamedSurgeSelected(action, playerStats, campaignName, se
     if (normalizedUses <= 0) return null;
 
     const newUses = normalizedUses - 1;
-    const lastSurge = { roll: 'tamed', effect: selectedSurge.effect, timestamp: Date.now() };
-    await setRuntimeValue(playerName, 'lastWildMagicSurge', lastSurge, campaignName, true);
+
+    const surgeEffect = {
+        roll: 'tamed',
+        effect: selectedSurge.effect,
+        duration: selectedSurge.duration || null,
+        timestamp: Date.now(),
+    };
+    await addSurgeEffect(playerName, campaignName, surgeEffect);
 
     await setRuntimeValue(playerName, usesKey, newUses, campaignName, true);
 

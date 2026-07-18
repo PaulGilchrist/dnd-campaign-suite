@@ -47,6 +47,21 @@ export async function applyTurnStartEffects(activeName, playerStats, campaignNam
         }
     }
 
+    // Wild Magic Surge: expire effects with "start of your next turn" duration
+    if (activeName) {
+        const surgeEffects = getRuntimeValue(activeName, 'wildMagicSurgeEffects', campaignName);
+        if (Array.isArray(surgeEffects) && surgeEffects.length > 0) {
+            const filtered = surgeEffects.filter(e => {
+                if (!e || !e.duration) return true;
+                return e.duration.trim().toLowerCase() !== 'start of your next turn';
+            });
+            if (filtered.length !== surgeEffects.length) {
+                await setRuntimeValue(activeName, 'wildMagicSurgeEffects', filtered, campaignName, true);
+                console.error(`[expirations] Removed ${surgeEffects.length - filtered.length} "start of next turn" surge effects for ${activeName}`);
+            }
+        }
+    }
+
     for (const effect of turnStartEffects) {
         if (effect.type === 'heroic_inspiration') {
             const currentInspiration = getRuntimeValue(activeName, 'hasInspiration') || false;
@@ -234,6 +249,21 @@ export async function applyTurnStartEffects(activeName, playerStats, campaignNam
                 processTashasLaughterRepeatSave(tashasEffect.source, activeName, tashasEffect.dc, campaignName).catch(e => {
                     console.error('[expirations] Tasha\'s Hideous Laughter repeat save failed:', e);
                 });
+            }
+        }
+    }
+
+    // Wild Magic Surge: expire effects with "end of next turn" duration at the START of the next turn
+    if (activeName) {
+        const surgeEffects = getRuntimeValue(activeName, 'wildMagicSurgeEffects', campaignName);
+        if (Array.isArray(surgeEffects) && surgeEffects.length > 0) {
+            const filtered = surgeEffects.filter(e => {
+                if (!e || !e.duration) return true;
+                return e.duration.trim().toLowerCase() !== 'end of your next turn';
+            });
+            if (filtered.length !== surgeEffects.length) {
+                await setRuntimeValue(activeName, 'wildMagicSurgeEffects', filtered, campaignName, true);
+                console.error(`[expirations] Removed ${surgeEffects.length - filtered.length} "end of next turn" surge effects for ${activeName}`);
             }
         }
     }
@@ -739,18 +769,31 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
            const creatures = combatData.creatures;
            if (!Array.isArray(creatures)) return;
 
-           // Phase 1: Process entries owned by the active creature
-           for (const attacker of creatures) {
-               if (utils.getName(attacker.name) !== utils.getName(activeName)) continue;
-               expireForCreature(attacker.name, currentRound, campaignName);
-           }
+            // Phase 1: Process entries owned by the active creature
+            for (const attacker of creatures) {
+                if (utils.getName(attacker.name) !== utils.getName(activeName)) continue;
+                expireForCreature(attacker.name, currentRound, campaignName);
 
-           // Phase 2: Scan all stores for entries targeting the active creature
+                // Wild Magic Surge: expire effects with "end of your current turn" duration
+                const surgeEffects = getRuntimeValue(attacker.name, 'wildMagicSurgeEffects', campaignName);
+                if (Array.isArray(surgeEffects) && surgeEffects.length > 0) {
+                    const filtered = surgeEffects.filter(e => {
+                        if (!e || !e.duration) return true;
+                        return e.duration.trim().toLowerCase() !== 'end of your current turn';
+                    });
+                    if (filtered.length !== surgeEffects.length) {
+                        setRuntimeValue(attacker.name, 'wildMagicSurgeEffects', filtered, campaignName, true);
+                        console.error(`[expirations] Removed ${surgeEffects.length - filtered.length} "end of current turn" surge effects for ${attacker.name}`);
+                    }
+                }
+            }
+
+            // Phase 2: Scan all stores for entries targeting the active creature
            // This handles self-targeted effects (e.g. Nature's Veil, Misty Escape)
            // stored on the character's own pendingExpirations — they fire whenever
            // the target becomes active, regardless of who owns the entry.
-           expireForTarget(activeName, currentRound, campaignName);
-           } catch (_e) { /* ignore */ }
+            expireForTarget(activeName, currentRound, campaignName);
+            } catch (_e) { /* ignore */ }
    }
 
  export async function applyAuraDamage(activeName, playerStats, campaignName, characters = [], options = {}) {

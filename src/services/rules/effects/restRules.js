@@ -395,7 +395,7 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
     updates.tranceOfOrderActive = null;
 
     // Clear Wild Magic Surge badge on short rest
-    updates.lastWildMagicSurge = null;
+    updates.wildMagicSurgeEffects = null;
 
     setRuntimeBatch(name, updates, campaignName)
 
@@ -465,7 +465,7 @@ export async function applyLongRest(playerStats, campaignName) {
       charData.tranceOfOrderActive = null;
 
       // Clear Wild Magic Surge badge on long rest
-      charData.lastWildMagicSurge = null;
+      charData.wildMagicSurgeEffects = null;
 
       // Clear Vow of Enmity active state on long rest
     charData.vowOfEnmityTarget = null;

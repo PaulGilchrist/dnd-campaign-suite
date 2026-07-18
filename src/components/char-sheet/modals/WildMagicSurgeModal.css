@@ -5,13 +5,35 @@
     flex-wrap: wrap;
 }
 
+.wms-rolls-display--centered {
+    justify-content: center;
+}
+
+.wms-overlay--no-dismiss {
+    cursor: default;
+}
+
+.wms-overlay--no-dismiss * {
+    cursor: default;
+}
+
+.wms-overlay--no-dismiss .wms-roll-badge {
+    cursor: pointer !important;
+}
+
+.wms-modal--centered {
+    max-width: 800px;
+    margin: 2rem auto;
+}
+
 .wms-roll-badge {
     padding: 12px;
     border: 2px solid var(--color-link);
     border-radius: 8px;
     background-color: var(--background-color);
-    min-width: 200px;
-    max-width: 400px;
+    min-width: 250px;
+    max-width: none;
+    flex: 1;
 }
 
 .wms-roll-badge--result {

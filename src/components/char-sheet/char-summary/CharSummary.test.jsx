@@ -30,7 +30,7 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 vi.mock('../../../hooks/runtime/useSyncedState.js', () => ({
-    useSyncedState: vi.fn((_name, _key, defaultValue) => defaultValue),
+    useSyncedState: vi.fn((_name, _key, defaultValue) => [defaultValue, vi.fn()]),
 }));
 
 vi.mock('../../../hooks/combat/useActionPopup.js', () => ({

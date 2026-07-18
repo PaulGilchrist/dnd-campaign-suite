@@ -244,11 +244,13 @@ describe('wildMagicSurgeHandler', () => {
             expect(result.payload.description).toContain('Test surge effect');
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestSorcerer',
-                'lastWildMagicSurge',
-                expect.objectContaining({
-                    roll: 42,
-                    effect: 'Test surge effect',
-                }),
+                'wildMagicSurgeEffects',
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        roll: 42,
+                        effect: 'Test surge effect',
+                    }),
+                ]),
                 'campaign',
                 true,
             );

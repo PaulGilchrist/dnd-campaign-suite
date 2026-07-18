@@ -41,15 +41,15 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const [showAllyModal, setShowAllyModal] = React.useState(false);
     const [allyModalCreatures, setAllyModalCreatures] = React.useState([]);
     const storedAllies = useRuntimeValue(playerStats.name, 'selectedAllies', campaignName);
-    const lastSurge = useRuntimeValue(playerStats.name, 'lastWildMagicSurge', campaignName);
+    const [surgeEffects, setSurgeEffects] = useSyncedState(playerStats.name, 'wildMagicSurgeEffects', null, campaignName);
     const currentAllies = Array.isArray(storedAllies) && storedAllies.length > 0 ? storedAllies : [playerStats.name];
     React.useEffect(() => {
         const handleInitiative = () => {
-            setRuntimeValue(playerStats.name, 'lastWildMagicSurge', null, campaignName, true);
+            setSurgeEffects(null);
         };
         window.addEventListener('initiative-rolled', handleInitiative);
         return () => window.removeEventListener('initiative-rolled', handleInitiative);
-    }, [playerStats.name, campaignName]);
+    }, [playerStats.name, campaignName, setSurgeEffects]);
 
     React.useEffect(() => {
         setDisplayXp(playerStats?.xp ?? 0);
@@ -583,14 +583,19 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
             )}
                 <CharConditions playerStats={playerStats} campaignName={campaignName} activeMapName={activeMapName} characters={characters} exhaustionLevel={exhaustionLevel} onConditionsChange={onConditionsChange} conditionEffects={conditionEffects} />
               </div>
-              {lastSurge && (
-                  <div className="wild-surge-badge">
-                      <b>Last Surge: </b>
-                      <span className="wild-surge-badge-name" title={lastSurge.effect}>
-                          {lastSurge.roll === 'tamed' ? 'Tamed' : `#${lastSurge.roll}`} — {lastSurge.effect}
-                      </span>
-                  </div>
-              )}
+               {surgeEffects && Array.isArray(surgeEffects) && surgeEffects.length > 0 && (
+                   <div className="wild-surge-badge">
+                       <b>Surge Effects: </b>
+                       <ul className="wild-surge-effects-list">
+                           {surgeEffects.map((surge, index) => (
+                               <li key={surge.timestamp || index} className="wild-surge-badge-name" title={surge.effect}>
+                                   {surge.roll === 'tamed' ? 'Tamed' : `#${surge.roll}`} — {surge.effect}
+                                   {surge.duration && <i className="fa-solid fa-hourglass-end" title={surge.duration}></i>}
+                               </li>
+                           ))}
+                       </ul>
+                   </div>
+               )}
               {showAllyModal && (
                   <AllySelectionModal
                       creatures={allyModalCreatures}

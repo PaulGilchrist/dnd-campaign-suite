@@ -407,7 +407,13 @@ function App() {
     } else if (storeKey === 'targetEffects' && actualData && typeof actualData === 'object' && !Array.isArray(actualData)) {
         actualData = actualData[storeKey];
     }
-    setRuntimeObject(campaignName, { [effectiveStoreKey]: actualData }, campaignName, true);
+    // When the store key is a character name, event.data is the full character store object.
+    // Apply each property directly to the character store instead of wrapping it.
+    if (effectiveStoreKey !== 'targetEffects' && actualData && typeof actualData === 'object' && !Array.isArray(actualData)) {
+        setRuntimeObject(storeKey, actualData, campaignName, true);
+    } else {
+        setRuntimeObject(campaignName, { [effectiveStoreKey]: actualData }, campaignName, true);
+    }
   }, [campaignName, setCharacters]);
 
   const handleDeleteCharacter = async (characterName) => {

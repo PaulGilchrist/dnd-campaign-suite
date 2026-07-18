@@ -4,9 +4,9 @@ import WildMagicSurgeModal from './WildMagicSurgeModal.jsx';
 import * as handler from '../../../services/automation/handlers/class-sorcerer/wildMagicSurgeHandler.js';
 
 vi.mock('../../../services/automation/handlers/class-sorcerer/wildMagicSurgeHandler.js', () => ({
-    onSurgeSelected: vi.fn(),
-    onDoubleRollSelected: vi.fn(),
-    onTamedSurgeSelected: vi.fn(),
+    onSurgeSelected: vi.fn(async () => null),
+    onDoubleRollSelected: vi.fn(async () => null),
+    onTamedSurgeSelected: vi.fn(async () => null),
 }));
 
 const surgeTable = [
@@ -53,22 +53,11 @@ describe('WildMagicSurgeModal', () => {
     });
 
     describe('roll mode', () => {
-        it('displays all surge table entries', () => {
+        it('shows the rolled number and effect', () => {
             render(<WildMagicSurgeModal {...defaultProps} />);
-            expect(screen.getByText(/Effect 25/)).toBeInTheDocument();
-            const entries = document.querySelectorAll('.wms-entry-effect');
-            expect(entries.length).toBe(25);
-        });
-
-        it('highlights the rolled entry', () => {
-            render(<WildMagicSurgeModal {...defaultProps} />);
-            const highlightedEntries = document.querySelectorAll('.wms-entry--highlighted');
-            expect(highlightedEntries.length).toBe(1);
-        });
-
-        it('shows the rolled number', () => {
-            render(<WildMagicSurgeModal {...defaultProps} />);
-            expect(screen.getByText(/Rolled: 42/)).toBeInTheDocument();
+            expect(screen.getByText(/Effect 11/)).toBeInTheDocument();
+            const badges = document.querySelectorAll('.wms-roll-badge');
+            expect(badges.length).toBe(1);
         });
 
         it('shows Done button', () => {
@@ -77,6 +66,15 @@ describe('WildMagicSurgeModal', () => {
             expect(doneBtn).toBeInTheDocument();
             fireEvent.click(doneBtn);
             expect(defaultProps.onClose).toHaveBeenCalled();
+        });
+
+        it('Done button does not call onSurgeSelected', async () => {
+            render(<WildMagicSurgeModal {...defaultProps} />);
+            const doneBtn = screen.getByRole('button', { name: 'Done' });
+            fireEvent.click(doneBtn);
+            await waitFor(() => {
+                expect(handler.onSurgeSelected).not.toHaveBeenCalled();
+            });
         });
     });
 
@@ -87,20 +85,36 @@ describe('WildMagicSurgeModal', () => {
             expect(screen.getByText(/Roll 2: 87/)).toBeInTheDocument();
         });
 
-        it('highlights both rolled entries', () => {
+        it('does not show the full table', () => {
             render(<WildMagicSurgeModal {...defaultProps} mode="controlledChaos" roll1={15} roll2={87} />);
-            const highlightedEntries = document.querySelectorAll('.wms-entry--highlighted');
-            expect(highlightedEntries.length).toBe(2);
+            const badges = document.querySelectorAll('.wms-roll-badge');
+            expect(badges.length).toBe(2);
         });
 
-        it('allows selecting a roll', async () => {
-            handler.onDoubleRollSelected.mockResolvedValue({ type: 'popup', payload: {} });
+        it('allows selecting a roll', () => {
             render(<WildMagicSurgeModal {...defaultProps} mode="controlledChaos" roll1={15} roll2={87} />);
-            const allEntries = document.querySelectorAll('.wms-entry');
-            const entry15 = allEntries[3]; // index 3 = min 13, max 16
-            fireEvent.click(entry15);
+            const badges = document.querySelectorAll('.wms-roll-badge');
+            expect(badges.length).toBe(2);
+            fireEvent.click(badges[0]);
+            const doneBtn = screen.getByRole('button', { name: 'Done' });
+            expect(doneBtn).not.toBeDisabled();
+        });
+
+        it('Done button is disabled when no roll selected', () => {
+            render(<WildMagicSurgeModal {...defaultProps} mode="controlledChaos" roll1={15} roll2={87} />);
+            const doneBtn = screen.getByRole('button', { name: 'Done' });
+            expect(doneBtn).toBeDisabled();
+        });
+
+        it('calls onSurgeSelected when Done is clicked after selection', async () => {
+            handler.onSurgeSelected.mockResolvedValue({ type: 'popup', payload: {} });
+            render(<WildMagicSurgeModal {...defaultProps} mode="controlledChaos" roll1={15} roll2={87} />);
+            const badges = document.querySelectorAll('.wms-roll-badge');
+            fireEvent.click(badges[0]);
+            const doneBtn = screen.getByRole('button', { name: 'Done' });
+            fireEvent.click(doneBtn);
             await waitFor(() => {
-                expect(handler.onDoubleRollSelected).toHaveBeenCalled();
+                expect(handler.onSurgeSelected).toHaveBeenCalled();
             });
         });
     });
@@ -116,7 +130,7 @@ describe('WildMagicSurgeModal', () => {
             handler.onTamedSurgeSelected.mockResolvedValue({ type: 'popup', payload: {} });
             render(<WildMagicSurgeModal {...defaultProps} mode="tamedSurge" />);
             const entries = document.querySelectorAll('.wms-entry');
-            expect(entries.length).toBe(24); // All except last
+            expect(entries.length).toBe(24);
             const firstEntry = entries[0];
             fireEvent.click(firstEntry);
             const confirmBtn = screen.getByRole('button', { name: 'Confirm' });
