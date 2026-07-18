@@ -6,6 +6,7 @@ import { useEquipmentSearch } from './useEquipmentSearch.js';
 
 vi.mock('../../services/ui/dataLoader.js', () => ({
   loadEquipment: vi.fn(),
+  loadWildMagicSurgeTable: vi.fn(async () => []),
 }));
 
 const { loadEquipment } = await import('../../services/ui/dataLoader.js');

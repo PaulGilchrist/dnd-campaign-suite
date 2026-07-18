@@ -4,6 +4,7 @@ import { computeFeatRangeEffects } from './featRangeService.js'
 import * as dataLoader from '../ui/dataLoader.js'
 
 vi.mock('../ui/dataLoader.js', () => ({
+  loadWildMagicSurgeTable: vi.fn(async () => []),
   loadFeatData: vi.fn(),
 }))
 

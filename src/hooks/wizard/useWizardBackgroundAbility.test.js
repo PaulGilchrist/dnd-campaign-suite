@@ -3,6 +3,7 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 
 vi.mock('../../services/ui/dataLoader.js', () => ({
   fetchBackgroundData: vi.fn(),
+  loadWildMagicSurgeTable: vi.fn(async () => []),
 }));
 
 import useWizardBackgroundAbility from './useWizardBackgroundAbility.js';

@@ -74,6 +74,7 @@ vi.mock('./loggedDiceRollUtils.js', () => ({
 
 vi.mock('../../services/ui/dataLoader.js', () => ({
     loadManeuvers: vi.fn(),
+    loadWildMagicSurgeTable: vi.fn(async () => []),
 }));
 
 import { rollD20, rollExpression } from '../../services/dice/diceRoller.js';

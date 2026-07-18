@@ -65,33 +65,6 @@ export async function triggerWildMagicSurge(spell, metaCtx, playerStats, campaig
         await setRuntimeValue(playerStats.name, 'wildMagicDoubleRoll', true, campaignName, true);
     }
 
-    const tamedSurge = getTamedSurgeFeature(playerStats);
-    if (tamedSurge) {
-        const usesKey = 'tamedSurgeUses';
-        const currentUses = Number(getRuntimeValue(playerStats.name, usesKey) ?? 0);
-
-        if (currentUses > 0) {
-            const surgeTable = playerStats.wildMagicSurgeTable;
-            if (surgeTable == null) {
-                console.error('[wildMagicSurgeService] Missing array:', surgeTable);
-                throw new Error('Expected array, got ' + surgeTable);
-            }
-            const availableSurges = surgeTable.filter(e => e.max < 20);
-            if (availableSurges.length > 0) {
-                return {
-                    type: 'modal',
-                    modalName: 'wildMagicTamed',
-                    payload: {
-                        featureName: tamedSurge.name,
-                        availableSurges,
-                        playerStats,
-                        campaignName,
-                    },
-                };
-            }
-        }
-    }
-
     const featsOfChaos = getFeatsOfChaosFeature(playerStats);
     const featsOfChaosActive = getRuntimeValue(playerStats.name, 'featsOfChaosActive', campaignName) === true;
 
@@ -114,15 +87,15 @@ export async function triggerWildMagicSurge(spell, metaCtx, playerStats, campaig
                 console.error('[wildMagicSurgeService] Missing array:', surgeTable);
                 throw new Error('Expected array, got ' + surgeTable);
             }
-            const d20Roll = Math.floor(Math.random() * 20) + 1;
-            const surgeEntry = surgeTable.find(e => d20Roll >= e.min && d20Roll <= e.max);
+            const d100Roll = Math.floor(Math.random() * 100) + 1;
+            const surgeEntry = surgeTable.find(e => d100Roll >= e.min && d100Roll <= e.max);
             const effectText = surgeEntry ? surgeEntry.effect : 'Unknown Wild Magic effect.';
             return {
                 type: 'popup',
                 payload: {
                     type: 'automation_info',
                     name: featsOfChaos.name,
-                    description: `<b>${featsOfChaos.name}: Advantage granted, Wild Magic Surge triggered!</b><br/>Rolled ${d20Roll}: ${effectText}`,
+                    description: `<b>${featsOfChaos.name}: Advantage granted, Wild Magic Surge triggered!</b><br/>Rolled ${d100Roll}: ${effectText}`,
                     automation: featsOfChaos,
                 },
             };

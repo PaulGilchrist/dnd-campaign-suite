@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../ui/dataLoader.js', () => ({
   loadEquipment: vi.fn(),
   clearDataCache: vi.fn(),
+  loadWildMagicSurgeTable: vi.fn(async () => []),
 }));
 
 vi.mock('../core/attackCalc.js', () => ({

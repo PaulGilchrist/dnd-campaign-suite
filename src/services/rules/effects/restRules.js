@@ -151,7 +151,8 @@ export const LONG_REST_RESOURCES = [
     'avengingAngelRestUsed',
   'warpingimplosionUses',
   'restorebalanceUses',
-  'tranceOfOrderUses'
+  'tranceOfOrderUses',
+  'tamedSurgeUses'
 ]
 
 export function getLongRestResources() {
@@ -393,6 +394,9 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
     // Clear Trance of Order active state on short rest
     updates.tranceOfOrderActive = null;
 
+    // Clear Wild Magic Surge badge on short rest
+    updates.lastWildMagicSurge = null;
+
     setRuntimeBatch(name, updates, campaignName)
 
   clearAllExpirationEffects(name, campaignName)
@@ -457,10 +461,13 @@ export async function applyLongRest(playerStats, campaignName) {
        // Clear Peerless Athlete active state on long rest
        charData.peerlessAthleteActive = null;
 
-     // Clear Trance of Order active state on long rest
-     charData.tranceOfOrderActive = null;
+      // Clear Trance of Order active state on long rest
+      charData.tranceOfOrderActive = null;
 
-     // Clear Vow of Enmity active state on long rest
+      // Clear Wild Magic Surge badge on long rest
+      charData.lastWildMagicSurge = null;
+
+      // Clear Vow of Enmity active state on long rest
     charData.vowOfEnmityTarget = null;
     charData.vowOfEnmityCostPaid = null;
     const vowTarget = getRuntimeValue(name, 'vowOfEnmityTarget', campaignName);

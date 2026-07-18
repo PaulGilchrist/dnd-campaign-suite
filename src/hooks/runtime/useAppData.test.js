@@ -8,6 +8,7 @@ vi.mock('../../services/ui/dataLoader.js', () => ({
   loadClassData: vi.fn(),
   loadEquipment: vi.fn(),
   loadMagicItems: vi.fn(),
+  loadWildMagicSurgeTable: vi.fn(async () => []),
   loadRaceData: vi.fn(),
   loadSpells: vi.fn(),
 }));

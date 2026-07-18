@@ -29,6 +29,8 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     'animal_aspect',
     'combat_stance',
     'damage_type_choice',
+    'wild_magic_surge',
+    'wild_magic_tamed',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([

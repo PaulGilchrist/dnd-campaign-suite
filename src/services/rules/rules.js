@@ -17,7 +17,7 @@ import { getSpellAbilities as getSpellAbilities2024 } from './core/spellCalc2024
 import { getAttacks as getAttacks5e } from './core/attackCalc.js';
 import { getAttacks as getAttacks2024 } from './core/attackCalc2024.js';
 import { getSpellMaxLevel } from '../shared/spell-utils.js';
-import { loadFeatData, loadSkills, loadBackgroundData } from '../ui/dataLoader.js';
+import { loadFeatData, loadSkills, loadBackgroundData, loadWildMagicSurgeTable } from '../ui/dataLoader.js';
 import { computeAllFeatBuffs } from '../character/featBuffService.js';
 import { getCategories } from '../character/featureCategories.js';
 import {
@@ -846,9 +846,9 @@ const rules = {
 
         const { classRules: cr, raceRules: rr } = rules.getSubModules(playerStats, playerSummary);
 
-         playerStats.class = cr.getClass(allClasses, playerSummary);
-         playerStats.wildMagicSurgeTable = playerStats.class?.wild_magic_surge_table || null;
-         playerStats.race = rr.getRace(allRaces, playerSummary);
+          playerStats.class = cr.getClass(allClasses, playerSummary);
+          playerStats.wildMagicSurgeTable = await loadWildMagicSurgeTable();
+          playerStats.race = rr.getRace(allRaces, playerSummary);
           applyPowerfulBuild(playerStats);
           applyHalflingNimbleness(playerStats);
           playerStats.inventory.magicItems = rules.getMagicItems(allMagicItems, playerSummary, playerStats);

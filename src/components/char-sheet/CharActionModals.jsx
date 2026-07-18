@@ -34,8 +34,7 @@ import RevelationInFleshModal from './modals/RevelationInFleshModal.jsx'
 import ElementalAffinityModal from './modals/ElementalAffinityModal.jsx'
 import FiendishResilienceModal from './modals/FiendishResilienceModal.jsx'
 import DragonCompanionModal from './modals/DragonCompanionModal.jsx'
-import WildMagicDoubleRollModal from './modals/WildMagicDoubleRollModal.jsx'
-import WildMagicTamedModal from './modals/WildMagicTamedModal.jsx'
+import WildMagicSurgeModal from './modals/WildMagicSurgeModal.jsx'
 import BendFateModal from './modals/BendFateModal.jsx'
 import ThirdEyeModal from './modals/arcane/ThirdEyeModal.jsx'
 import SoulstitchSpellsModal from './modals/arcane/SoulstitchSpellsModal.jsx'
@@ -610,16 +609,10 @@ export default function CharActionModals({
                     onClose={() => setModalState({ dragonCompanionModal: null })}
                 />
             )}
-            {mergedModalState.wildMagicDoubleRollModal && (
-                <WildMagicDoubleRollModal
-                    {...mergedModalState.wildMagicDoubleRollModal}
-                    onClose={() => setModalState({ wildMagicDoubleRollModal: null })}
-                />
-            )}
-            {mergedModalState.wildMagicTamedModal && (
-                <WildMagicTamedModal
-                    {...mergedModalState.wildMagicTamedModal}
-                    onClose={() => setModalState({ wildMagicTamedModal: null })}
+            {mergedModalState.wildMagicSurgeModal && (
+                <WildMagicSurgeModal
+                    {...mergedModalState.wildMagicSurgeModal}
+                    onClose={() => setModalState({ wildMagicSurgeModal: null })}
                 />
             )}
             {mergedModalState.bendFateModal && (

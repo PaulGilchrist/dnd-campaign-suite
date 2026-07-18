@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../ui/dataLoader.js', () => ({
   loadSkills: vi.fn(),
   loadPassiveSkills: vi.fn(),
+  loadWildMagicSurgeTable: vi.fn(async () => []),
   loadFeatData: vi.fn().mockResolvedValue([]),
 }));
 

@@ -34,7 +34,8 @@
        equipment: null,
       monsters: null,
       magicItems: null,
-      fightingStyles: null
+      fightingStyles: null,
+      wildMagicSurgeTable: null
       };
 
 /**
@@ -472,8 +473,33 @@ export async function loadPassiveSkills() {
  }
 
 /**
-  * Clears the data cache (useful for testing or data refresh)
-  */
+   * Fetches wild magic surge table data (with caching) - version agnostic
+   * @returns {Promise<object[]>} - Array of surge entries with min/max/effect
+   */
+export async function loadWildMagicSurgeTable() {
+    if (sharedDataCache.wildMagicSurgeTable) {
+        return sharedDataCache.wildMagicSurgeTable;
+    }
+    try {
+        const response = await fetch('/data/wild-magic-surge.json');
+        if (response.ok) {
+            const data = await response.json();
+            const parsed = data.map(entry => {
+                const [min, max] = entry.range.split('-').map(Number);
+                return { min, max, effect: entry.effect };
+            });
+            sharedDataCache.wildMagicSurgeTable = parsed;
+            return parsed;
+        }
+    } catch (error) {
+        console.error('Error loading wild magic surge table:', error);
+    }
+    return [];
+}
+
+/**
+   * Clears the data cache (useful for testing or data refresh)
+   */
 export function clearDataCache() {
     dataCache['5e'] = {
       classes: null,
@@ -500,6 +526,7 @@ export function clearDataCache() {
    sharedDataCache.monsters = null;
  sharedDataCache.magicItems = null;
 sharedDataCache.fightingStyles = null;
+    sharedDataCache.wildMagicSurgeTable = null;
   }
 
 

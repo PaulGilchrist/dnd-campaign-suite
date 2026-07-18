@@ -7,6 +7,7 @@ vi.mock('../../ui/dataLoader.js', () => ({
   loadRaceData: vi.fn(),
   loadBackgroundData: vi.fn(),
   loadFeatData: vi.fn(),
+  loadWildMagicSurgeTable: vi.fn(async () => []),
   fetchClassData: vi.fn(),
   fetchRaceData: vi.fn(),
   fetchBackgroundData: vi.fn(),

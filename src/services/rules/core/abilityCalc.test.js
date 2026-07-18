@@ -28,6 +28,7 @@ const mockSkills = [
 
 vi.mock('../../ui/dataLoader.js', () => ({
   loadSkills: vi.fn(() => Promise.resolve(mockSkills)),
+  loadWildMagicSurgeTable: vi.fn(async () => []),
 }));
 
 // Mock race rules — getRacialBonus returns 0 by default (Human baseline)

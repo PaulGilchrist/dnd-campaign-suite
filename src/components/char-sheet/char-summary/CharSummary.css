@@ -397,3 +397,12 @@
 .ally-badge .fa-users {
     font-size: 0.85em;
 }
+
+.wild-surge-badge {
+    margin-top: 6px;
+    padding: 4px 8px;
+    border: 1px solid var(--border-color-light);
+    border-radius: 4px;
+    font-size: 0.85em;
+    background-color: rgba(168, 85, 247, 0.1);
+}

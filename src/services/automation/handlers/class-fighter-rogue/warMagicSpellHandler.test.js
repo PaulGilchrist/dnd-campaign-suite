@@ -4,6 +4,7 @@ import { handle, confirmWarMagicSpell } from './warMagicSpellHandler.js'
 
 vi.mock('../../../ui/dataLoader.js', () => ({
     loadSpellData: vi.fn(),
+    loadWildMagicSurgeTable: vi.fn(async () => []),
 }))
 
 vi.mock('../../../ui/logService.js', () => ({

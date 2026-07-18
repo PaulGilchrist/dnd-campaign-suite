@@ -41,7 +41,16 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const [showAllyModal, setShowAllyModal] = React.useState(false);
     const [allyModalCreatures, setAllyModalCreatures] = React.useState([]);
     const storedAllies = useRuntimeValue(playerStats.name, 'selectedAllies', campaignName);
+    const lastSurge = useRuntimeValue(playerStats.name, 'lastWildMagicSurge', campaignName);
     const currentAllies = Array.isArray(storedAllies) && storedAllies.length > 0 ? storedAllies : [playerStats.name];
+    React.useEffect(() => {
+        const handleInitiative = () => {
+            setRuntimeValue(playerStats.name, 'lastWildMagicSurge', null, campaignName, true);
+        };
+        window.addEventListener('initiative-rolled', handleInitiative);
+        return () => window.removeEventListener('initiative-rolled', handleInitiative);
+    }, [playerStats.name, campaignName]);
+
     React.useEffect(() => {
         setDisplayXp(playerStats?.xp ?? 0);
     }, [playerStats?.xp]);
@@ -572,8 +581,16 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                     onClose={() => setShowAvatarModal(false)}
                 />
             )}
-               <CharConditions playerStats={playerStats} campaignName={campaignName} activeMapName={activeMapName} characters={characters} exhaustionLevel={exhaustionLevel} onConditionsChange={onConditionsChange} conditionEffects={conditionEffects} />
-             </div>
+                <CharConditions playerStats={playerStats} campaignName={campaignName} activeMapName={activeMapName} characters={characters} exhaustionLevel={exhaustionLevel} onConditionsChange={onConditionsChange} conditionEffects={conditionEffects} />
+              </div>
+              {lastSurge && (
+                  <div className="wild-surge-badge">
+                      <b>Last Surge: </b>
+                      <span className="wild-surge-badge-name" title={lastSurge.effect}>
+                          {lastSurge.roll === 'tamed' ? 'Tamed' : `#${lastSurge.roll}`} — {lastSurge.effect}
+                      </span>
+                  </div>
+              )}
               {showAllyModal && (
                   <AllySelectionModal
                       creatures={allyModalCreatures}

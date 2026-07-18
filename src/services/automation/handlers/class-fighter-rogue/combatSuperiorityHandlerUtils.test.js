@@ -16,6 +16,7 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../../../services/ui/dataLoader.js', () => ({
     loadManeuvers: vi.fn(),
+    loadWildMagicSurgeTable: vi.fn(async () => []),
 }));
 
 const SELECTION_KEY = 'BattleMasterManeuvers_selection';

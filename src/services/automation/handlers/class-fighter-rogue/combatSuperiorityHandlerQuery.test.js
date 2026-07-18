@@ -20,6 +20,7 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../../../services/ui/dataLoader.js', () => ({
     loadManeuvers: vi.fn(),
+    loadWildMagicSurgeTable: vi.fn(async () => []),
 }));
 
 vi.mock('../../../../services/encounters/combatData.js', () => ({

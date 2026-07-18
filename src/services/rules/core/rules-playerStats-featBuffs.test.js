@@ -6,6 +6,7 @@ vi.mock('../../ui/dataLoader.js', () => ({
   loadPassiveSkills: vi.fn(),
   loadFeatData: vi.fn().mockResolvedValue([]),
   loadBackgroundData: vi.fn(() => null),
+  loadWildMagicSurgeTable: vi.fn(async () => []),
   loadManeuvers: vi.fn(() => []),
 }));
 

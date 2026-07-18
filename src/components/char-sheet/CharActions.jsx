@@ -1147,17 +1147,14 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'dragonCompanion':
                         setModalState({ dragonCompanionModal: result.payload });
                         break;
-                    case 'wildMagicDoubleRoll':
-                        setModalState({ wildMagicDoubleRollModal: result.payload });
+                    case 'wildMagicSurge':
+                        setModalState({ wildMagicSurgeModal: result.payload });
                         break;
                     case 'weaponMasteryChoice':
                         setModalState({ weaponMasteryChoiceModal: result.payload });
                         break;
                     case 'weaponKindMastery':
                         setModalState({ weaponKindMasteryModal: result.payload });
-                        break;
-                    case 'wildMagicTamed':
-                        setModalState({ wildMagicTamedModal: result.payload });
                         break;
                     case 'bendFateChoice':
                         setModalState({ bendFateModal: result.payload });
@@ -1315,6 +1312,23 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 mapName,
                 characters,
             }).then((healResult) => {
+                if (healResult?.triggerResult) {
+                    const tr = healResult.triggerResult;
+                    if (tr.type === 'modal') {
+                        if (tr.modalName === 'wildMagicSurge') {
+                            setModalState({ wildMagicSurgeModal: tr.payload });
+                        }
+                    } else if (tr.type === 'popup') {
+                        const payload = tr.payload;
+                        const name = payload?.name || spell.name || 'Automation';
+                        const description = payload?.description || '';
+                        setPopupHtml({
+                            type: 'automation_info',
+                            name,
+                            description,
+                        });
+                    }
+                }
                 if (healResult && healResult.healAmount > 0) {
                     const bonusHealDetail = healResult.bonusDetails?.length > 0
                         ? healResult.bonusDetails.map(d => `${d.amount} ${d.name}`).join(', ')

@@ -5,6 +5,7 @@ import { loadMonsters } from '../ui/dataLoader.js';
 import { npcToMonsterFormat } from '../encounters/npcStatBlockUtils.js';
 
 vi.mock('../ui/dataLoader.js', () => ({
+  loadWildMagicSurgeTable: vi.fn(async () => []),
   loadMonsters: vi.fn(() => Promise.resolve([
     { index: 'goblin', name: 'Goblin' },
     { index: 'orc', name: 'Orc' },

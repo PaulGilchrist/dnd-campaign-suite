@@ -42,6 +42,7 @@ vi.mock('../../../../services/ui/dataLoader.js', () => ({
         { name: 'Parry', effect: 'damage_reduction', actionType: 'reaction' },
         { name: 'Riposte', effect: 'melee_attack_reaction', actionType: 'reaction' },
     ]),
+    loadWildMagicSurgeTable: vi.fn(async () => []),
 }));
 
 vi.mock('../../../../services/encounters/combatData.js', () => ({

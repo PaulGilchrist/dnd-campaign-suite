@@ -1,0 +1,90 @@
+.wms-rolls-display {
+    display: flex;
+    gap: 12px;
+    margin: 12px 0;
+    flex-wrap: wrap;
+}
+
+.wms-roll-badge {
+    padding: 12px;
+    border: 2px solid var(--color-link);
+    border-radius: 8px;
+    background-color: var(--background-color);
+    min-width: 200px;
+    max-width: 400px;
+}
+
+.wms-roll-badge--result {
+    border-color: var(--color-header);
+    background-color: rgba(168, 85, 247, 0.15);
+}
+
+.wms-roll-badge--selected {
+    border-color: #4CAF50;
+    background-color: rgba(76, 175, 80, 0.15);
+}
+
+.wms-roll-number {
+    display: block;
+    font-weight: bold;
+    font-size: 1.1em;
+    color: var(--color-header);
+    margin-bottom: 4px;
+}
+
+.wms-roll-effect {
+    display: block;
+    font-size: 0.9em;
+    color: var(--color);
+    opacity: 0.9;
+}
+
+.wms-table {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-top: 12px;
+}
+
+.wms-entry {
+    display: flex;
+    gap: 12px;
+    padding: 8px 12px;
+    margin: 2px 0;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--color);
+    font-size: 0.9em;
+    text-align: left;
+    cursor: default;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.wms-entry--highlighted {
+    background-color: rgba(168, 85, 247, 0.2);
+    border-color: rgba(168, 85, 247, 0.5);
+    font-weight: bold;
+}
+
+.wms-entry--selected {
+    background-color: rgba(76, 175, 80, 0.2);
+    border-color: #4CAF50;
+    cursor: pointer;
+}
+
+.wms-entry--selected:hover {
+    background-color: rgba(76, 175, 80, 0.3);
+}
+
+.wms-entry-range {
+    flex-shrink: 0;
+    min-width: 50px;
+    font-weight: bold;
+    color: var(--color-header);
+    text-align: right;
+}
+
+.wms-entry-effect {
+    flex: 1;
+    line-height: 1.4;
+}

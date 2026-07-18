@@ -1,102 +1,127 @@
 [
     {
         "range": "01-04",
+        "duration": "1 minute",
         "effect": "Roll on the surge table at the start of each turn for 1 minute, ignoring this result."
     },
     {
         "range": "05-08",
+        "duration": "1 minute",
         "effect": "Friendly creature appears for 1 minute; roll 1d4 for type."
     },
     {
         "range": "09-12",
+        "duration": "1 minute",
         "effect": "Regain 5 HP at the start of each turn for 1 minute."
     },
     {
         "range": "13-16",
+        "duration": "1 minute",
         "effect": "Creatures have disadvantage on saves vs your next spell within 1 minute."
     },
     {
         "range": "17-20",
+        "duration": "1 minute",
         "effect": "Roll 1d8 for a random cosmetic or sensory effect lasting 1 minute (one lasts 24 hours)."
     },
     {
         "range": "21-24",
+        "duration": "1 minute",
         "effect": "Your action-time spells become bonus actions for 1 minute."
     },
     {
         "range": "25-28",
+        "duration": "end of your next turn",
         "effect": "You shift to the Astral Plane until end of next turn, then return."
     },
     {
         "range": "29-32",
+        "duration": "1 minute",
         "effect": "Next damaging spell within 1 minute deals maximum damage dice."
     },
     {
         "range": "33-36",
+        "duration": "1 minute",
         "effect": "You gain resistance to all damage for 1 minute."
     },
     {
         "range": "37-40",
+        "duration": "start of your next turn",
         "effect": "You become a potted plant until next turn; incapacitated and vulnerable."
     },
     {
         "range": "41-44",
+        "duration": "1 minute",
         "effect": "Teleport 20 ft as a bonus action each turn for 1 minute."
     },
     {
         "range": "45-48",
+        "duration": "1 minute",
         "effect": "You and up to 3 creatures become invisible for 1 minute until attacking, damaging, or casting."
     },
     {
         "range": "49-52",
+        "duration": "1 minute",
         "effect": "Spectral shield grants +2 AC and Magic Missile immunity for 1 minute."
     },
     {
         "range": "53-56",
+        "duration": "end of your current turn",
         "effect": "You can take one extra action this turn."
     },
     {
         "range": "57-60",
+        "duration": "1 hour",
         "effect": "Cast a random spell (1d10); concentration not required; lasts full duration."
     },
     {
         "range": "61-64",
+        "duration": "1 minute",
         "effect": "Flammable nonmagical objects you touch ignite and take minor fire damage."
     },
     {
         "range": "65-68",
+        "duration": "1 hour",
         "effect": "If you die within the next hour, you revive as if via the Reincarnate spell."
     },
     {
         "range": "69-72",
+        "duration": "end of your next turn",
         "effect": "You are frightened until the end of your next turn; DM chooses the source."
     },
     {
         "range": "73-76",
+        "duration": "end of your current turn",
         "effect": "Teleport up to 60 ft to a visible unoccupied space."
     },
     {
         "range": "77-80",
+        "duration": "1 hours",
         "effect": "Random creature within 60 ft is poisoned for 1d4 hours."
     },
     {
         "range": "81-84",
+        "duration": "1 minute",
         "effect": "You emit bright light for 1 minute; creatures ending turns within 5 ft are blinded until next turn."
     },
     {
         "range": "85-88",
+        "duration": "end of your current turn",
         "effect": "Up to 3 creatures within 30 ft take 1d10 necrotic; you heal equal to total damage dealt."
     },
     {
         "range": "89-92",
+        "duration": "end of your current turn",
         "effect": "Up to 3 creatures within 30 ft take 4d10 lightning damage."
     },
     {
         "range": "93-96",
+        "duration": "1 minute",
         "effect": "You and all creatures within 30 ft have vulnerability to piercing damage for 1 minute."
     },
     {
         "range": "97-100",
+        "duration": "end of your current turn",
         "effect": "Roll 1d6: 1) You regain 2d10 HP; 2) An ally within 300 ft regains 2d10 HP; 3) You regain your lowest-level expended spell slot; 4) An ally regains their lowest-level expended spell slot; 5) You regain all sorcery points; 6) All effects from row 17-20 affect you simultaneously."
     }
 ]

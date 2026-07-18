@@ -538,6 +538,11 @@ export async function executeHandler(action, playerStats, campaignName, mapName,
 
     if (auto.type === 'passive_rule' && PASSIVE_RULE_EFFECTS[auto.effect]) {
         handler = PASSIVE_RULE_EFFECTS[auto.effect];
+    } else if (auto.type === 'auto_effect' && auto.effect === 'wild_magic_surge_table') {
+        handler = handleWildMagicSurge;
+    } else if (auto.type === 'auto_effect' && auto.effect === 'wild_magic_double_roll') {
+        // Controlled Chaos — just set the flag, no handler needed
+        return null;
     } else {
         handler = HANDLER_MAP[auto.type];
     }

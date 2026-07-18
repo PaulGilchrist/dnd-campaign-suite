@@ -5,6 +5,7 @@ import {
     onTamedSurgeSelected,
     handleFeatsOfChaos,
     onDoubleRollSelected,
+    onSurgeSelected,
     onFeatsOfChaosActivate,
     onFeatsOfChaosConsume,
 } from './wildMagicSurgeHandler.js';
@@ -26,10 +27,31 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
 }));
 
 const surgeTable = [
-    { min: 1, max: 5, effect: 'Surge effect 1' },
-    { min: 6, max: 10, effect: 'Surge effect 2' },
-    { min: 11, max: 15, effect: 'Surge effect 3' },
-    { min: 16, max: 20, effect: 'Surge effect 4' },
+    { min: 1, max: 4, effect: 'Surge effect 1' },
+    { min: 5, max: 8, effect: 'Surge effect 2' },
+    { min: 9, max: 12, effect: 'Surge effect 3' },
+    { min: 13, max: 16, effect: 'Surge effect 4' },
+    { min: 17, max: 20, effect: 'Surge effect 5' },
+    { min: 21, max: 24, effect: 'Surge effect 6' },
+    { min: 25, max: 28, effect: 'Surge effect 7' },
+    { min: 29, max: 32, effect: 'Surge effect 8' },
+    { min: 33, max: 36, effect: 'Surge effect 9' },
+    { min: 37, max: 40, effect: 'Surge effect 10' },
+    { min: 41, max: 44, effect: 'Surge effect 11' },
+    { min: 45, max: 48, effect: 'Surge effect 12' },
+    { min: 49, max: 52, effect: 'Surge effect 13' },
+    { min: 53, max: 56, effect: 'Surge effect 14' },
+    { min: 57, max: 60, effect: 'Surge effect 15' },
+    { min: 61, max: 64, effect: 'Surge effect 16' },
+    { min: 65, max: 68, effect: 'Surge effect 17' },
+    { min: 69, max: 72, effect: 'Surge effect 18' },
+    { min: 73, max: 76, effect: 'Surge effect 19' },
+    { min: 77, max: 80, effect: 'Surge effect 20' },
+    { min: 81, max: 84, effect: 'Surge effect 21' },
+    { min: 85, max: 88, effect: 'Surge effect 22' },
+    { min: 89, max: 92, effect: 'Surge effect 23' },
+    { min: 93, max: 96, effect: 'Surge effect 24' },
+    { min: 97, max: 100, effect: 'Surge effect 25' },
 ];
 
 const makeAction = (auto = {}) => ({
@@ -69,7 +91,7 @@ describe('wildMagicSurgeHandler', () => {
             expect(result.payload.description).toContain('once per turn');
         });
 
-        it('should return modal with double roll when doubleRoll flag is true', async () => {
+        it('should return modal with controlled chaos when doubleRoll flag is true', async () => {
             runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === 'wildMagicDoubleRoll') return true;
                 return null;
@@ -79,11 +101,12 @@ describe('wildMagicSurgeHandler', () => {
             const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
 
             expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('wildMagicDoubleRoll');
+            expect(result.modalName).toBe('wildMagicSurge');
+            expect(result.payload.mode).toBe('controlledChaos');
             expect(result.payload.roll1).toBeGreaterThan(0);
-            expect(result.payload.roll1).toBeLessThanOrEqual(20);
+            expect(result.payload.roll1).toBeLessThanOrEqual(100);
             expect(result.payload.roll2).toBeGreaterThan(0);
-            expect(result.payload.roll2).toBeLessThanOrEqual(20);
+            expect(result.payload.roll2).toBeLessThanOrEqual(100);
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestSorcerer',
                 'wildMagicDoubleRoll',
@@ -109,51 +132,34 @@ describe('wildMagicSurgeHandler', () => {
             expect(result.payload.description).toContain('not a 20');
         });
 
-        it('should return surge popup when roll is 20 and table has matching entry', async () => {
+        it('should return modal with roll mode when roll is 20 and table has matching entry', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(null);
-            vi.spyOn(global.Math, 'random').mockReturnValue(19 / 20);
+            vi.spyOn(global.Math, 'random').mockReturnValue(0.99);
 
             const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('SURGE');
-            expect(result.payload.description).toContain('Surge effect');
+            expect(result.type).toBe('modal');
+            expect(result.modalName).toBe('wildMagicSurge');
+            expect(result.payload.mode).toBe('roll');
+            expect(result.payload.roll).toBeGreaterThan(0);
+            expect(result.payload.roll).toBeLessThanOrEqual(100);
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestSorcerer',
                 'surgeUsedRound',
                 { round: 1, activeCreature: 'TestSorcerer' },
                 'campaign',
             );
-            expect(logService.addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
-                type: 'ability_use',
-                characterName: 'TestSorcerer',
-                abilityName: 'Wild Magic Surge',
-            }));
         });
 
         it('should return info popup when roll is 20 but no surge table', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(null);
-            vi.spyOn(global.Math, 'random').mockReturnValue(19 / 20);
+            vi.spyOn(global.Math, 'random').mockReturnValue(0.99);
 
             const result = await handle(makeActionNoTable(), makePlayerStats(), 'campaign', 'map');
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No Wild Magic Surge table');
-        });
-
-        it('should return info popup when roll is 20 but no matching surge entry', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(null);
-            vi.spyOn(global.Math, 'random').mockReturnValue(19 / 20);
-            const action = {
-                name: 'Wild Magic Surge',
-                automation: { type: 'wild_magic_surge' },
-                wildMagicSurgeTable: [{ min: 1, max: 5, effect: 'Surge 1' }],
-            };
-
-            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No matching surge effect');
+            expect(result.type).toBe('modal');
+            expect(result.modalName).toBe('wildMagicSurge');
+            expect(result.payload.surgeTable).toEqual([]);
         });
     });
 
@@ -170,19 +176,7 @@ describe('wildMagicSurgeHandler', () => {
             expect(result.payload.description).toContain('no uses remaining');
         });
 
-        it('should return info popup when no surge table', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'tamedSurgeUses') return 1;
-                return null;
-            });
-
-            const result = await handleTamedSurge(makeActionNoTable(), makePlayerStats(), 'campaign', 'map');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No Wild Magic Surge table');
-        });
-
-        it('should return modal with available surges excluding roll 20 entries', async () => {
+        it('should return modal with tamedSurge mode', async () => {
             runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === 'tamedSurgeUses') return 1;
                 return null;
@@ -191,9 +185,8 @@ describe('wildMagicSurgeHandler', () => {
             const result = await handleTamedSurge(makeAction(), makePlayerStats(), 'campaign', 'map');
 
             expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('wildMagicTamed');
-            expect(result.payload.availableSurges.length).toBe(3);
-            expect(result.payload.availableSurges.every(s => s.max < 20)).toBe(true);
+            expect(result.modalName).toBe('wildMagicSurge');
+            expect(result.payload.mode).toBe('tamedSurge');
         });
     });
 
@@ -231,6 +224,39 @@ describe('wildMagicSurgeHandler', () => {
                 type: 'ability_use',
                 characterName: 'TestSorcerer',
                 abilityName: 'Wild Magic Surge',
+            }));
+        });
+    });
+
+    describe('onSurgeSelected', () => {
+        it('should store last surge and log to campaign log', async () => {
+            const result = await onSurgeSelected(
+                'Wild Magic Surge',
+                makePlayerStats(),
+                'campaign',
+                42,
+                { min: 41, max: 44, effect: 'Test surge effect' }
+            );
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('SURGE');
+            expect(result.payload.description).toContain('42');
+            expect(result.payload.description).toContain('Test surge effect');
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+                'TestSorcerer',
+                'lastWildMagicSurge',
+                expect.objectContaining({
+                    roll: 42,
+                    effect: 'Test surge effect',
+                }),
+                'campaign',
+                true,
+            );
+            expect(logService.addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestSorcerer',
+                abilityName: 'Wild Magic Surge',
+                description: expect.stringContaining('42'),
             }));
         });
     });

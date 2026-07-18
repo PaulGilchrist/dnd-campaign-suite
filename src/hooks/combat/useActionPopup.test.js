@@ -22,6 +22,7 @@ vi.mock('./usePopup.js', () => ({
 
 vi.mock('../../services/ui/dataLoader.js', () => ({
   loadBackgroundData: vi.fn(),
+  loadWildMagicSurgeTable: vi.fn(async () => []),
 }));
 
 import { loadBackgroundData } from '../../services/ui/dataLoader.js';

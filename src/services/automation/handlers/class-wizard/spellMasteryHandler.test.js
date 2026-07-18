@@ -8,6 +8,7 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../../ui/dataLoader.js', () => ({
   loadSpells: vi.fn(),
+  loadWildMagicSurgeTable: vi.fn(async () => []),
 }));
 
 import { handle, onSpellMasterySelected } from './spellMasteryHandler.js';

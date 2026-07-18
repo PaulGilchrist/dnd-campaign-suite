@@ -834,9 +834,11 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     triggerSpellThief(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Spell Thief failed:', e);
     });
-    triggerWildMagicSurge(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+    let triggerResult = null;
+    const wmsResult = await triggerWildMagicSurge(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Wild Magic Surge trigger failed:', e);
     });
+    if (wmsResult) triggerResult = wmsResult;
     triggerBewitchingMagic(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Bewitching Magic trigger failed:', e);
     });
@@ -853,6 +855,8 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     if (spell.name === 'Dispel Magic' && metaCtx?.slotLevel > 0) {
         setupSpellBreakerDispelRetention(playerStats.name, metaCtx.slotLevel, campaignName, playerStats);
     }
+
+    return triggerResult;
 }
 
 // Spell Breaker slot retention for Dispel Magic: listens for spell-result events

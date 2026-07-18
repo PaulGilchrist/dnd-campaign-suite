@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { getPreSelectedSpells } from './getPreSelectedSpells.js';
 
 vi.mock('../ui/dataLoader.js', () => ({
+  loadWildMagicSurgeTable: vi.fn(async () => []),
   loadClassData: vi.fn(),
   loadRaceData: vi.fn(),
   loadFeatData: vi.fn(),

@@ -101,6 +101,7 @@ vi.mock('../ui/dataLoader.js', () => ({
   loadFeatData: vi.fn(async () => ({ abilityScoreIncreases: [], proficiencies: [], features: [] })),
   loadSkills: vi.fn(async () => []),
   loadBackgroundData: vi.fn(() => null),
+  loadWildMagicSurgeTable: vi.fn(async () => []),
 }))
 
 vi.mock('../character/featBuffService.js', () => ({

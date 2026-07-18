@@ -73,6 +73,7 @@ vi.mock('./loggedDiceRollUtils.js', () => ({
 
 vi.mock('../../services/ui/dataLoader.js', () => ({
     loadManeuvers: vi.fn(),
+    loadWildMagicSurgeTable: vi.fn(async () => []),
 }));
 
 vi.mock('../../services/ui/logService.js', () => ({

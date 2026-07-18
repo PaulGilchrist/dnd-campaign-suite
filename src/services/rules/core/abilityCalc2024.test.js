@@ -27,6 +27,7 @@ const mockSkills = [
 
 vi.mock('../../ui/dataLoader.js', () => ({
   loadSkills: vi.fn(() => Promise.resolve(mockSkills)),
+  loadWildMagicSurgeTable: vi.fn(async () => []),
 }));
 
 // Mock evaluateAutoExpression for automation.passives tests

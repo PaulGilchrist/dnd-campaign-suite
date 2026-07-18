@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as dataLoader from '../ui/dataLoader.js';
 
 vi.mock('../ui/dataLoader.js', () => ({
+  loadWildMagicSurgeTable: vi.fn(async () => []),
   fetchClassData: vi.fn(),
   fetchRaceData: vi.fn(),
   fetchBackgroundData: vi.fn(),

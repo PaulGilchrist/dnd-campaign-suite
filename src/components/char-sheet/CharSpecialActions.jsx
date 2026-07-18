@@ -23,6 +23,7 @@ import ResourcePoolModal from './modals/ResourcePoolModal.jsx';
 import NaturalRecoveryModal from './modals/NaturalRecoveryModal.jsx';
 import CircleOfTheLandSpellsModal from './modals/CircleOfTheLandSpellsModal.jsx';
 import ElementalAffinityModal from './modals/ElementalAffinityModal.jsx';
+import WildMagicSurgeModal from './modals/WildMagicSurgeModal.jsx';
 import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
 import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
 import { onSavantSelected } from '../../services/automation/handlers/class-wizard/SavantHandler.js';
@@ -44,6 +45,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
     const [featureChoiceModal, setFeatureChoiceModal] = useState(null);
     const [aspectOfTheWildsModal, setAspectOfTheWildsModal] = useState(null);
     const [elementalAffinityModal, setElementalAffinityModal] = useState(null);
+    const [wildMagicSurgeModal, setWildMagicSurgeModal] = useState(null);
     const [fightingStylesMap, setFightingStylesMap] = useState(null);
     const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats?.name, campaignName, {
@@ -227,6 +229,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                 setMoonlightStepFallback(result.payload);
             } else if (result.modalName === 'elementalAffinity') {
                 setElementalAffinityModal(result.payload);
+            } else if (result.modalName === 'wildMagicSurge') {
+                setWildMagicSurgeModal(result.payload);
             }
         } else if (result.type === 'popup') {
             const payload = result.payload;
@@ -435,6 +439,12 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                     playerStats={elementalAffinityModal.playerStats}
                     campaignName={elementalAffinityModal.campaignName}
                     onClose={() => setElementalAffinityModal(null)}
+                />
+            )}
+            {wildMagicSurgeModal && (
+                <WildMagicSurgeModal
+                    {...wildMagicSurgeModal}
+                    onClose={() => setWildMagicSurgeModal(null)}
                 />
             )}
             {featureChoiceModal && (
