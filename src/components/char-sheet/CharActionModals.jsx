@@ -216,7 +216,6 @@ export default function CharActionModals({
     const [combatSummary, setCombatSummary] = React.useState(null);
     const mergedModalState = React.useMemo(() => {
         const result = { ...modalState, ...spellModalState };
-        console.log('[CharActionModals] mergedModalState wildMagicSurgeModal:', result.wildMagicSurgeModal ? 'OBJECT' : 'null/undefined', 'modalState.wildMagicSurgeModal:', modalState.wildMagicSurgeModal ? 'OBJECT' : 'null', 'spellModalState.wildMagicSurgeModal:', spellModalState.wildMagicSurgeModal ? 'OBJECT' : 'null');
         return result;
     }, [modalState, spellModalState]);
 

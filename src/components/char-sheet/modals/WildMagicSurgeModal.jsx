@@ -25,12 +25,10 @@ function WildMagicSurgeModal({ featureName, surgeTable, campaignName, playerStat
     };
 
     const handleConfirmRoll = async () => {
-        console.log('[WildMagicSurgeModal] handleConfirmRoll called, selectedRoll:', selectedRoll);
         if (!selectedRoll) return;
         const surge = getSurgeForRoll(selectedRoll);
         if (!surge) return;
 
-        console.log('[WildMagicSurgeModal] Applying surge:', surge.effect);
         await onSurgeSelected(
             featureName,
             playerStats || { name: 'Player' },
@@ -38,9 +36,7 @@ function WildMagicSurgeModal({ featureName, surgeTable, campaignName, playerStat
             selectedRoll,
             surge
         );
-        console.log('[WildMagicSurgeModal] Surge applied, calling onClose');
         onClose();
-        console.log('[WildMagicSurgeModal] onClose returned');
     };
 
     const handleSelectSurge = async (surge) => {

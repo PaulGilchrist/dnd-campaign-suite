@@ -266,8 +266,6 @@ export async function handleFeatsOfChaos(action, playerStats, campaignName, _map
     const usesKey = 'featsOfChaosUses';
     const currentUses = getRuntimeValue(playerName, usesKey);
     const normalizedUses = currentUses === null || currentUses === undefined ? 1 : Number(currentUses);
-    console.log('[handleFeatsOfChaos] playerName:', playerName, 'usesKey:', usesKey, 'currentUses:', currentUses, 'normalizedUses:', normalizedUses);
-
     if (normalizedUses <= 0) {
         return {
             type: 'popup',

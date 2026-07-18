@@ -7,52 +7,54 @@
       "name": "Strength",
       "baseScore": 12,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     },
     {
       "name": "Dexterity",
       "baseScore": 15,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     },
     {
       "name": "Constitution",
       "baseScore": 13,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     },
     {
       "name": "Intelligence",
       "baseScore": 10,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     },
     {
       "name": "Wisdom",
       "baseScore": 14,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     },
     {
       "name": "Charisma",
       "baseScore": 8,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     }
   ],
   "background": "Farmer",
   "class": {
     "name": "Monk",
     "subclass": {
-      "name": "Warrior of Mercy",
+      "name": "Warrior of Shadow",
       "type": ""
-    }
+    },
+    "divineOrder": "",
+    "primalOrder": ""
   },
   "expertSkills": [],
   "feats": [],
@@ -101,6 +103,5 @@
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
-  "imagePath": "images/Seris.png",
-  "originalFileName": "Seris.json"
+  "imagePath": "images/Seris.png"
 }

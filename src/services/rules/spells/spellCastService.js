@@ -838,7 +838,6 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     const wmsResult = await triggerWildMagicSurge(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Wild Magic Surge trigger failed:', e);
     });
-    console.log('[spellCast] triggerWildMagicSurge returned:', JSON.stringify({ type: wmsResult?.type, modalName: wmsResult?.modalName, hasPayload: !!wmsResult?.payload }));
     if (wmsResult) triggerResult = wmsResult;
     triggerBewitchingMagic(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Bewitching Magic trigger failed:', e);

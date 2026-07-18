@@ -770,10 +770,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                     mapName={activeMapName}
                     onBuffsChange={handleBuffsChange}
                     characters={characters}
-                    onSpellModalStateChange={(state) => {
-                        console.log('[CharSheet] onSpellModalStateChange called:', state.wildMagicSurgeModal ? 'OBJECT' : 'null');
-                        setCharActionsModalState(state);
-                    }}
+                    onSpellModalStateChange={(state) => setCharActionsModalState(state)}
                     spellModalState={charActionsModalState}
                 ></CharActions>
                 <CharReactions
