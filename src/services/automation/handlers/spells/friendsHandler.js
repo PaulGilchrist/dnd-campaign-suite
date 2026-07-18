@@ -3,6 +3,8 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import storage from '../../../ui/storage.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+
 
 
 export async function handle(action, playerStats, campaignName, _mapName) {
@@ -52,7 +54,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             saveConditions: ['charmed'],
             timestamp: Date.now(),
         };
-        await storage.setProperty('combatSummary', 'lastAttack', lastAttackData, campaignName);
+        try {
+            const cs = await getCombatContext(campaignName);
+            const merged = { ...(cs || {}), lastAttack: lastAttackData };
+            await storage.set('combatSummary', merged, campaignName);
+        } catch (err) {
+            console.error('[friends] Failed to set lastAttack:', err);
+        }
     }
 
     if (saveResult.success) {

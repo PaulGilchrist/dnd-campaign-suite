@@ -159,6 +159,29 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             }
         }
 
+        // Target conditions that grant advantage (blinded, charmed, paralyzed, petrified, restrained, stunned, unconscious, dazed, slow)
+        if (targetName && forcedMode === undefined) {
+            const targetConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+            if (Array.isArray(targetConditions)) {
+                const condSet = new Set(targetConditions.map(c => String(c).toLowerCase()));
+                if (condSet.has('blinded')) {
+                    adv++;
+                }
+                if (condSet.has('charmed')) {
+                    adv++;
+                }
+                if (condSet.has('paralyzed') || condSet.has('petrified') || condSet.has('stunned') || condSet.has('unconscious')) {
+                    adv++;
+                }
+                if (condSet.has('restrained')) {
+                    adv++;
+                }
+                if (condSet.has('dazed') || condSet.has('slow')) {
+                    adv++;
+                }
+            }
+        }
+
         // Resolve accumulated adv/dis to forcedMode (they cancel per rules)
         if (forcedMode === undefined) {
             if (adv > dis) {

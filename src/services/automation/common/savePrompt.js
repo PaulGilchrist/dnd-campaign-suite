@@ -3,6 +3,7 @@ import utils from '../../ui/utils.js';
 import { getAbilityModifier } from '../../shared/abilityLookup.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import storage from '../../ui/storage.js';
+import { getCombatContext } from '../../rules/combat/damageUtils.js';
 
 export function buildSaveDc(auto, playerStats) {
     if (auto.saveDc === 'ability') {
@@ -61,7 +62,7 @@ export function createSaveListener(campaignName, config) {
         window.addEventListener('save-result', handler);
      });
 
-    const saveResultPromise = promise.then((detail) => {
+    const saveResultPromise = promise.then(async (detail) => {
         const attackerName = config.attackerName || config.targetName;
         const lastAttackData = {
             attackerName,
@@ -78,7 +79,14 @@ export function createSaveListener(campaignName, config) {
             actionName: config.actionName || null,
             timestamp: Date.now(),
         };
-        return storage.setProperty('combatSummary', 'lastAttack', lastAttackData, campaignName).then(() => detail).catch(() => detail);
+        try {
+            const cs = await getCombatContext(campaignName);
+            const merged = { ...(cs || {}), lastAttack: lastAttackData };
+            await storage.set('combatSummary', merged, campaignName);
+        } catch (err) {
+            console.error('[savePrompt] Failed to set lastAttack:', err);
+        }
+        return detail;
     });
 
     saveResultPromise.finally(() => {

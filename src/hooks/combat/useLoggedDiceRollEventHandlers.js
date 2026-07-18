@@ -26,6 +26,11 @@ export function setupEventListeners(deps) {
             const pending = pendingSaves[e.detail.promptId];
             if (!pending) return;
 
+            const isStunningStrike = (pending.name || '').includes('Stunning');
+            if (isStunningStrike) {
+                console.log(`[useLoggedDiceRollEventHandlers] ★ save-result for "${pending.name}" - rawDamage: ${pending.rawDamage}, damageType: ${pending.damageType}, name: ${pending.name}`);
+            }
+
             const createSaveListenerPrompts = getRuntimeValue(campaignName, 'pendingSaveListenerPrompts') || new Set();
             if (createSaveListenerPrompts.has(e.detail.promptId)) return;
             const normalizedSaveType = normalizeSaveType(e.detail.saveType || pending.saveType);

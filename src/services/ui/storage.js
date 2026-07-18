@@ -51,6 +51,9 @@ const storage = {
             });
             return queue.pending;
         }
+        if (key === 'combatsumm' && value && value.lastAttack) {
+            console.log(`[storage] ★ storage.set combatsumm - value keys:`, Object.keys(value).join(', '));
+        }
         const fullUrl = `/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(key)}`;
         return fetch(fullUrl, {
             method: 'POST',
@@ -74,7 +77,13 @@ const storage = {
             obj = {};
           }
         obj[propertyName] = value;
+        if (name === 'combatSummary' && propertyName === 'lastAttack') {
+            console.log(`[storage] ★ setProperty combatSummary.lastAttack - obj keys before write:`, Object.keys(obj).join(', '));
+        }
         await storage.set(firstName, obj, campaignName);
+        if (name === 'combatSummary' && propertyName === 'lastAttack') {
+            console.log(`[storage] ★ setProperty combatSummary.lastAttack - write complete for key: ${firstName}`);
+        }
       }
 }
 

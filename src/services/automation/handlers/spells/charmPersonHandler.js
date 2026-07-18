@@ -8,6 +8,7 @@ import { rollSaveForCreature } from '../../../rules/combat/applyDamage.js';
 import { rollD20 } from '../../../dice/diceRoller.js';
 import { sendSaveResult } from '../../../combat/conditions/savePromptService.js';
 import storage from '../../../ui/storage.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 
 function dispatchSaveResult(campaignName, promptId, targetName, saveType, saveDc, saveResult) {
     sendSaveResult(campaignName, targetName, {
@@ -110,7 +111,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             saveConditions: ['charmed'],
             timestamp: Date.now(),
         };
-        await storage.setProperty('combatSummary', 'lastAttack', lastAttackData, campaignName);
+        try {
+            const cs = await getCombatContext(campaignName);
+            const merged = { ...(cs || {}), lastAttack: lastAttackData };
+            await storage.set('combatSummary', merged, campaignName);
+        } catch (err) {
+            console.error('[charmPerson] Failed to set lastAttack:', err);
+        }
     }
 
     if (saveResult.success) {

@@ -198,13 +198,13 @@ describe('friendsHandler.handle', () => {
             expect(result.payload.targetName).toBe('Goblin');
         });
 
-        it('does not call storage.set', async () => {
+        it('sets lastAttack on combatSummary even when save fails', async () => {
             defaultSaveListener(false);
             getRuntimeValue.mockReturnValue([]);
 
             await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
 
-            expect(storage.set).not.toHaveBeenCalled();
+            expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.objectContaining({ lastAttack: expect.any(Object) }), campaignName);
         });
     });
 
