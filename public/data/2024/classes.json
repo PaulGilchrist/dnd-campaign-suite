@@ -10952,7 +10952,8 @@
                                 "condition": "feats_of_chaos_active",
                                 "effect": "advantage",
                                 "uses": 1,
-                                "recharge": "long_rest"
+                                "recharge": "long_rest",
+                                "casting_time": "passive"
                             },
                             {
                                 "type": "auto_effect",
