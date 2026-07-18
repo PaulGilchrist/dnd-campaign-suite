@@ -21,7 +21,7 @@
     },
     {
         "range": "21-24",
-        "effect": "Your action‑time spells become bonus actions for 1 minute."
+        "effect": "Your action-time spells become bonus actions for 1 minute."
     },
     {
         "range": "25-28",
@@ -63,7 +63,6 @@
         "range": "61-64",
         "effect": "Flammable nonmagical objects you touch ignite and take minor fire damage."
     },
-    /* NEW ROWS FROM YOUR SECOND DOCUMENT */
     {
         "range": "65-68",
         "effect": "If you die within the next hour, you revive as if via the Reincarnate spell."
@@ -98,6 +97,6 @@
     },
     {
         "range": "97-100",
-        "effect": "Roll 1d6: 1) You regain 2d10 HP; 2) An ally within 300 ft regains 2d10 HP; 3) You regain your lowest‑level expended spell slot; 4) An ally regains their lowest‑level expended spell slot; 5) You regain all sorcery points; 6) All effects from row 17–20 affect you simultaneously."
+        "effect": "Roll 1d6: 1) You regain 2d10 HP; 2) An ally within 300 ft regains 2d10 HP; 3) You regain your lowest-level expended spell slot; 4) An ally regains their lowest-level expended spell slot; 5) You regain all sorcery points; 6) All effects from row 17-20 affect you simultaneously."
     }
 ]

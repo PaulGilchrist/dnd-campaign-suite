@@ -62,6 +62,7 @@ function SaveAttackAoeModal({
         const characters = combatSummary?.creatures?.filter(c => c.type === 'player') || [];
         const scalingEntry = resolveScaling(playerStats, action.automation?.scaling);
         const resolvedDamage = scalingEntry?.damage || damage;
+        let lastNpcResult = null;
 
         for (const targetName of selectedNames) {
             const target = combatSummary.creatures.find(c => c.name === targetName);
@@ -120,6 +121,7 @@ function SaveAttackAoeModal({
                     }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging save:', e); });
                 }
 
+                lastNpcResult = { targetName, success, roll: saveRoll, total: saveTotal, saveBonus, rawDamage, finalDamage };
                 results.push({
                     targetName,
                     success,
@@ -171,6 +173,30 @@ function SaveAttackAoeModal({
                     prompts.push({ promptId, targetName });
                 }
             }
+        }
+
+        if (lastNpcResult) {
+            combatSummary.lastAttack = {
+                attackerName: playerStats.name,
+                targetName: lastNpcResult.targetName,
+                d20: lastNpcResult.roll,
+                d20Rolls: [lastNpcResult.roll],
+                bonus: lastNpcResult.saveBonus,
+                total: lastNpcResult.total,
+                rollType: 'attack',
+                saveType: saveType || null,
+                saveDc: saveDc,
+                saveResult: lastNpcResult.success ? 'success' : 'failure',
+                damageFormula: resolvedDamage || null,
+                damageName: action.name || null,
+                damageType: damageType || null,
+                rawDamage: lastNpcResult.rawDamage || 0,
+                primaryDamage: lastNpcResult.rawDamage || 0,
+                primaryDamageType: damageType || null,
+                actualDamage: lastNpcResult.finalDamage || 0,
+                damageApplied: lastNpcResult.finalDamage > 0,
+                timestamp: Date.now(),
+            };
         }
 
         persistAndNotify(combatSummary, campaignName);
@@ -242,7 +268,32 @@ function SaveAttackAoeModal({
             }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging player damage:', e); });
         }
 
-        persistAndNotify(getCombatSummary(campaignName), campaignName);
+        const cs = getCombatSummary(campaignName);
+        if (cs) {
+            cs.lastAttack = {
+                attackerName: playerStats.name,
+                targetName,
+                d20: detail.roll ?? 0,
+                d20Rolls: [detail.roll ?? 0],
+                bonus: saveBonus,
+                total: detail.total ?? 0,
+                rollType: 'attack',
+                saveType: saveType || null,
+                saveDc: saveDc,
+                saveResult: success ? 'success' : 'failure',
+                damageFormula: resolvedDamage || null,
+                damageName: action.name || null,
+                damageType: damageType || null,
+                rawDamage: rawDamage || 0,
+                primaryDamage: rawDamage || 0,
+                primaryDamageType: damageType || null,
+                actualDamage: finalDamage || 0,
+                damageApplied: finalDamage > 0,
+                timestamp: Date.now(),
+            };
+        }
+
+        persistAndNotify(cs, campaignName);
         const targetResult = {
             targetName,
             success,

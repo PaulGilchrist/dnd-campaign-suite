@@ -5,6 +5,7 @@ import MetamagicPopup from './popups/MetamagicPopup.jsx'
 import ArcaneWardRestoreModal from './modals/arcane/ArcaneWardRestoreModal.jsx'
 import BastionOfLawSpendModal from './modals/divine/BastionOfLawSpendModal.jsx'
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx'
+import BendFateModal from './modals/BendFateModal.jsx'
 import { getReactionSpellNames } from '../../services/ui/spellSectionUtils.js'
 import { getCategories } from '../../services/character/featureCategories.js'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
@@ -41,6 +42,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
     const [reactiveSpellWarnings, setReactiveSpellWarnings] = React.useState(false);
     const [isReactiveSpellFlow, setIsReactiveSpellFlow] = React.useState(false);
     const [modalState, setModalState] = React.useState({});
+    // modalState and setModalState are now passed as props from CharSheet
 
     const activeBuffs = useRuntimeValue(playerStats?.name, 'activeBuffs', campaignName) ?? [];
 
@@ -205,6 +207,8 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                 setModalState({ beguilingTwistModal: result.payload });
             } else if (result.modalName === 'bastionOfLawSpend') {
                 setModalState({ bastionOfLawSpendModal: result.payload });
+            } else if (result.modalName === 'bendFateChoice') {
+                setModalState({ bendFateModal: result.payload });
             } else {
                 const html = buildFeatureDetailHtml(reaction);
                 if (html) setPopupHtml(html);
@@ -470,6 +474,12 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                             }
                         }
                     }}
+                />
+            )}
+            {modalState.bendFateModal && (
+                <BendFateModal
+                    {...modalState.bendFateModal}
+                    onClose={() => setModalState({ bendFateModal: null })}
                 />
             )}
             {reactions.filter(r => !getCategories(playerStats.rules || '5e').featuresToIgnore.includes(r.name)).map((reaction) => {

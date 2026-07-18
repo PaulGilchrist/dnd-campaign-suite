@@ -8,6 +8,7 @@ import {
 import { sendSaveResult } from '../../services/combat/conditions/savePromptService.js';
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
+import storage from '../../services/ui/storage.js';
 import { MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js';
 import { hasIgnoreResistance, evaluateAutoExpression } from '../../services/combat/automation/automationService.js';
 
@@ -234,6 +235,8 @@ export function createSaves(deps) {
         const ignoreResistance = (pending.playerStats && hasIgnoreResistance(pending.playerStats, pending.damageType)) || false;
         const allCharacters = charactersRef.current || [];
         const applyResult = applyDamageToTarget(combatSummary, pending.targetName, finalDamage, [pending.damageType], campaignName, allCharacters, ignoreResistance, pending.attackerName || characterName);
+
+        storage.set('combatSummary', combatSummary, campaignName);
 
         delete pendingSaves[promptId];
 

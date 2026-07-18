@@ -77,7 +77,7 @@ const categories5e = {
 
     reactions: [
         // "Beguiling Defenses",
-        // "Bend Fate",
+        "Bend Fate",
         // "Channel Divinity: War God's Blessing",
         // "Entropic Ward",
         // "Instinctive Charm",

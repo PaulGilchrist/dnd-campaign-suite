@@ -2,6 +2,7 @@ import { sendSavePrompt } from '../../combat/conditions/savePromptService.js';
 import utils from '../../ui/utils.js';
 import { getAbilityModifier } from '../../shared/abilityLookup.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import storage from '../../ui/storage.js';
 
 export function buildSaveDc(auto, playerStats) {
     if (auto.saveDc === 'ability') {
@@ -60,11 +61,31 @@ export function createSaveListener(campaignName, config) {
         window.addEventListener('save-result', handler);
      });
 
-    promise.finally(() => {
+    const saveResultPromise = promise.then((detail) => {
+        const attackerName = config.attackerName || config.targetName;
+        const lastAttackData = {
+            attackerName,
+            targetName: config.targetName,
+            d20: detail.roll ?? 0,
+            d20Rolls: [detail.roll ?? 0, ...(detail.rawRolls || [])],
+            bonus: detail.saveBonus ?? 0,
+            total: detail.total ?? 0,
+            rollType: 'attack',
+            saveType: config.saveType || null,
+            saveDc: config.saveDc,
+            saveResult: detail.success ? 'success' : 'failure',
+            saveConditions: config.condition ? [config.condition] : [],
+            actionName: config.actionName || null,
+            timestamp: Date.now(),
+        };
+        return storage.setProperty('combatSummary', 'lastAttack', lastAttackData, campaignName).then(() => detail).catch(() => detail);
+    });
+
+    saveResultPromise.finally(() => {
         const saves = getRuntimeValue(campaignName, 'pendingSavePrompts') || {};
         delete saves[promptId];
         setRuntimeValue(campaignName, 'pendingSavePrompts', saves, campaignName);
     });
 
-    return { promptId, promise };
+    return { promptId, promise: saveResultPromise };
 }

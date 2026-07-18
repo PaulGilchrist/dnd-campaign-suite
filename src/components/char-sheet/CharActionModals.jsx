@@ -36,6 +36,7 @@ import FiendishResilienceModal from './modals/FiendishResilienceModal.jsx'
 import DragonCompanionModal from './modals/DragonCompanionModal.jsx'
 import WildMagicDoubleRollModal from './modals/WildMagicDoubleRollModal.jsx'
 import WildMagicTamedModal from './modals/WildMagicTamedModal.jsx'
+import BendFateModal from './modals/BendFateModal.jsx'
 import ThirdEyeModal from './modals/arcane/ThirdEyeModal.jsx'
 import SoulstitchSpellsModal from './modals/arcane/SoulstitchSpellsModal.jsx'
 import IllusoryRealityModal from './modals/arcane/IllusoryRealityModal.jsx'
@@ -619,6 +620,12 @@ export default function CharActionModals({
                 <WildMagicTamedModal
                     {...mergedModalState.wildMagicTamedModal}
                     onClose={() => setModalState({ wildMagicTamedModal: null })}
+                />
+            )}
+            {mergedModalState.bendFateModal && (
+                <BendFateModal
+                    {...mergedModalState.bendFateModal}
+                    onClose={() => setModalState({ bendFateModal: null })}
                 />
             )}
             {mergedModalState.thirdEyeModal && (

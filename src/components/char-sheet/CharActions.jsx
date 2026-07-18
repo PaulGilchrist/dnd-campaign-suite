@@ -1159,6 +1159,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'wildMagicTamed':
                         setModalState({ wildMagicTamedModal: result.payload });
                         break;
+                    case 'bendFateChoice':
+                        setModalState({ bendFateModal: result.payload });
+                        break;
                     case 'thirdEye':
                         setModalState({ thirdEyeModal: result.payload });
                         break;

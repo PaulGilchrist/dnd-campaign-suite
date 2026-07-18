@@ -5,7 +5,6 @@ import { addEntry } from '../../../../services/ui/logService.js';
 import utils from '../../../../services/ui/utils.js';
 import { applyHealingDirectly, logHealingToSSE } from '../../../../services/automation/common/healingRoll.js';
 import { applyDamageToTarget, computeDamageAfterSave } from '../../../../services/rules/combat/applyDamage.js';
-import storage from '../../../../services/ui/storage.js';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { renderTargetList, logSaveEntry, persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 
@@ -17,6 +16,7 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
         const results = [];
         const prompts = [];
         const characters = combatSummary?.creatures?.filter(c => c.type === 'player') || [];
+        let lastNpcResult = null;
 
         for (const targetName of targets) {
             const target = combatSummary.creatures.find(c => c.name === targetName);
@@ -62,12 +62,37 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
                     }).catch((e) => { console.error('[SaveAttackHealModal] Error logging damage:', e); });
                 }
 
+                lastNpcResult = { targetName, success, roll: saveRoll?.total ?? 0, total: saveTotal, saveBonus, rawDamage, finalDamage };
                 results.push({ targetName, success, roll: saveRoll?.total ?? 0, total: saveTotal, saveBonus, rawDamage, finalDamage });
             } else {
                 const promptId = utils.guid();
                 sendSavePrompt(campaignName, { promptId, targetName, saveType, saveDc, sourceName: attackerName });
                 prompts.push({ promptId, targetName });
             }
+        }
+
+        if (lastNpcResult) {
+            combatSummary.lastAttack = {
+                attackerName,
+                targetName: lastNpcResult.targetName,
+                d20: lastNpcResult.roll,
+                d20Rolls: [lastNpcResult.roll],
+                bonus: 0,
+                total: lastNpcResult.total,
+                rollType: 'attack',
+                saveType: saveType || null,
+                saveDc: saveDc,
+                saveResult: lastNpcResult.success ? 'success' : 'failure',
+                damageFormula: damageExpression || null,
+                damageName: featureName || null,
+                damageType: damageType || null,
+                rawDamage: lastNpcResult.rawDamage || 0,
+                primaryDamage: lastNpcResult.rawDamage || 0,
+                primaryDamageType: damageType || null,
+                actualDamage: lastNpcResult.finalDamage || 0,
+                damageApplied: lastNpcResult.finalDamage > 0,
+                timestamp: Date.now(),
+            };
         }
 
         return { results, prompts };
@@ -126,15 +151,34 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
                     finalDamage: applyResult?.finalDamage ?? finalDamage,
                     timestamp: Date.now(),
                 }).catch((e) => { console.error('[SaveAttackHealModal] Error logging player damage:', e); });
-
-                storage.set('combatSummary', combatSummary, campaignName);
-                window.dispatchEvent(new CustomEvent('combat-summary-updated'));
             }
         } else {
             const damageRoll = rollExpression(damageExpression);
             rawDamage = damageRoll?.total ?? 0;
             finalDamage = computeDamageAfterSave(rawDamage, success, 'half');
         }
+
+        combatSummary.lastAttack = {
+            attackerName,
+            targetName,
+            d20: detail.roll ?? 0,
+            d20Rolls: [detail.roll ?? 0],
+            bonus: detail.saveBonus ?? 0,
+            total: detail.total ?? 0,
+            rollType: 'attack',
+            saveType: saveType || null,
+            saveDc: saveDc,
+            saveResult: success ? 'success' : 'failure',
+            damageFormula: damageExpression || null,
+            damageName: featureName || null,
+            damageType: damageType || null,
+            rawDamage: rawDamage || 0,
+            primaryDamage: rawDamage || 0,
+            primaryDamageType: damageType || null,
+            actualDamage: finalDamage || 0,
+            damageApplied: finalDamage > 0,
+            timestamp: Date.now(),
+        };
 
         persistAndNotify(ctx.combatSummary, campaignName);
         ctx.setResults(prev => [...prev, {

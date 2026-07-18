@@ -9,6 +9,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntime
 import { getAllyList } from '../../hooks/useAllySelection.js';
 import { normalizeSaveType } from '../../services/rules/combat/applyDamage.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
+import storage from '../../services/ui/storage.js';
 import './savePromptModal.css';
 import { getPendingPopupSetter } from '../../services/combat/auras/pendingPopupRegistry.js';
 
@@ -238,6 +239,33 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
         evasionActive: hasEvasion,
       },
     }));
+
+    const cs = getCombatSummary(campaignName);
+    if (cs) {
+      cs.lastAttack = {
+        attackerName: current.attackerName || current.targetName,
+        targetName: current.targetName,
+        d20: finalRoll,
+        d20Rolls: [roll1, roll2],
+        bonus: saveBonus + auraBonus + cosmicOmenAppliedBonus,
+        total,
+        rollType: 'attack',
+        saveType: current.saveType || null,
+        saveDc: current.saveDc,
+        saveResult: success ? 'success' : 'failure',
+        saveConditions: current.condition ? [current.condition] : [],
+        damageFormula: current.damageFormula || null,
+        damageName: current.sourceName || null,
+        damageType: current.damageType || null,
+        rawDamage: current.rawDamage || 0,
+        primaryDamage: current.rawDamage || 0,
+        primaryDamageType: current.damageType || null,
+        actualDamage: current.rawDamage || 0,
+        damageApplied: (current.rawDamage || 0) > 0,
+        timestamp: Date.now(),
+      };
+      storage.set('combatSummary', cs, campaignName);
+    }
 
     setPrompts(prev => prev.map((p, i) =>
       i === 0

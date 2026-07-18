@@ -1,14 +1,16 @@
-import { resolveTarget, resolveMapPositions } from '../../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { spendSorceryPoints, getCurrentSorceryPoints } from '../../../../hooks/combat/useMetamagic.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getClassFeatures } from '../../../../services/character/classFeatures.js';
 import { executeHandler } from '../../index.js';
 import { parseDurationRounds } from '../../../rules/effects/durationParser.js';
+import { infoPopup } from '../../common/infoPopup.js';
+import storage from '../../../ui/storage.js';
+import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
+import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 
 export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
@@ -36,7 +38,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
     return handleInspiringMovement(action, playerStats, campaignName, mapName);
 }
 
-async function handleBendFate(action, playerStats, campaignName, mapName) {
+async function handleBendFate(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
     const featureName = action.name || 'Bend Fate';
@@ -46,130 +48,233 @@ async function handleBendFate(action, playerStats, campaignName, mapName) {
     const currentSP = getCurrentSorceryPoints(playerName, maxSP);
 
     if (currentSP < 1) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `No Sorcery Points available. ${featureName} requires 1 Sorcery Point.`,
-                automation: auto,
-            },
-        };
-    }
-
-    const targetInfo = await resolveTarget(campaignName, playerName);
-    if (!targetInfo?.target) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName} requires selecting a creature in combat.`,
-                automation: auto,
-            },
-        };
-    }
-
-    const targetName = targetInfo.target.name;
-
-    if (targetName === playerName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName} can only be used on another creature, not yourself.`,
-                automation: auto,
-            },
-        };
-    }
-
-    if (mapName) {
-        const positions = await resolveMapPositions(campaignName, mapName, playerName);
-        if (positions?.attackerPos && positions?.targetPos) {
-            const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
-            if (dist == null) {
-                return {
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: featureName,
-                        description: `Could not determine distance to ${targetName}. Ensure both creatures are placed on the map.`,
-                        automation: auto,
-                    },
-                };
-            }
-        }
+        return infoPopup(featureName, `${featureName}: No Sorcery Points available. Requires 1 Sorcery Point.`, auto);
     }
 
     const cs = await getCombatContext(campaignName);
     const lastAttack = cs?.lastAttack || null;
 
-    const isTargetRoll = lastAttack?.attackerName === targetName;
-    const attackFresh = lastAttack?.rollType === 'attack' && isTargetRoll;
-    const abilityFresh = (lastAttack?.rollType === 'check' || lastAttack?.rollType === 'skill') && isTargetRoll;
-    const saveFresh = lastAttack?.rollType === 'save' && isTargetRoll;
 
-    if (!attackFresh && !abilityFresh && !saveFresh) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `No recent D20 test found for ${targetName}. ${featureName} can only be used shortly after another creature rolls a d20.`,
-                automation: auto,
-            },
-        };
+    if (!lastAttack) {
+        return infoPopup(featureName, `${featureName}: No recent D20 test found. Bend Fate can only be used shortly after a creature rolls a d20.`, auto);
+    }
+
+    if (lastAttack.targetName === playerName) {
+        return infoPopup(featureName, `${featureName} can only be used on another creature, not yourself.`, auto);
     }
 
     const d4Roll = rollExpression('1d4');
     if (!d4Roll) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `Roll failed.`,
-                automation: auto,
-            },
+        return infoPopup(featureName, `${featureName}: Roll failed.`, auto);
+    }
+
+    const attackerName = lastAttack.attackerName;
+    const rollType = lastAttack.rollType || 'attack';
+    const isAttack = rollType === 'attack';
+    const isSave = rollType === 'save' || (rollType === 'attack' && lastAttack.saveDc != null && lastAttack.saveResult != null);
+    const isCheck = rollType === 'check' || rollType === 'skill';
+
+    let eventLabel;
+    if (isAttack) {
+        eventLabel = `Attack by ${attackerName}`;
+    } else if (isCheck) {
+        eventLabel = `${lastAttack.checkName || 'Ability check'} by ${attackerName}`;
+    } else {
+        const saveLabel = lastAttack.saveType ? lastAttack.saveType.toUpperCase() : 'Save';
+        eventLabel = `${saveLabel} by ${attackerName}`;
+    }
+
+    const originalTotal = (lastAttack.d20 || 0) + (lastAttack.bonus || 0);
+    const hitStatus = isAttack && lastAttack.targetAc != null
+        ? (originalTotal >= lastAttack.targetAc ? 'Hit' : 'Miss')
+        : null;
+    const saveStatus = isSave && lastAttack.saveDc != null
+        ? (originalTotal >= lastAttack.saveDc ? 'Success' : 'Failure')
+        : null;
+
+    return {
+        type: 'modal',
+        modalName: 'bendFateChoice',
+        payload: {
+            action,
+            playerStats,
+            campaignName,
+            d4Roll,
+            lastAttack,
+            attackerName,
+            eventLabel,
+            hitStatus,
+            saveStatus,
+            isAttack,
+            isSave,
+            isCheck,
+        },
+    };
+}
+
+export async function applyBendFateChoice(action, playerStats, campaignName, d4Roll, lastAttack, mode) {
+    const playerName = playerStats.name;
+    const featureName = action.name || 'Bend Fate';
+    const auto = action.automation;
+
+    const d20 = lastAttack.d20 || 0;
+    const bonus = lastAttack.bonus || 0;
+    const originalTotal = d20 + bonus;
+    const d4Value = typeof d4Roll === 'object' ? d4Roll.total : d4Roll;
+    const modifier = mode === 'bonus' ? d4Value : -d4Value;
+    const newTotal = originalTotal + modifier;
+
+    const cs = await getCombatContext(campaignName);
+    const attackerName = lastAttack.attackerName;
+    const targetName = lastAttack.targetName;
+    const rollType = lastAttack.rollType || 'attack';
+    const isAttack = rollType === 'attack';
+    const isSave = rollType === 'save' || (rollType === 'attack' && lastAttack.saveDc != null && lastAttack.saveResult != null);
+    const isCheck = rollType === 'check' || rollType === 'skill';
+
+    const modifierLabel = modifier >= 0 ? `+${modifier}` : `${modifier}`;
+    let outcomeNote = '';
+    let conditionsAdded = [];
+    let conditionsRemoved = [];
+
+    if (isAttack && cs) {
+        const targetAc = lastAttack.targetAc || lastAttack.effectiveAc;
+        const oldHit = (originalTotal >= targetAc);
+        const newHit = (newTotal >= targetAc);
+
+        cs.lastAttack = {
+            ...cs.lastAttack,
+            d20: newTotal - bonus,
+            total: newTotal,
+            hit: newHit,
+            bendFateApplied: true,
+            bendFateModifier: modifier,
+            bendFateD4: d4Value,
+            bendFateMode: mode,
+            timestamp: Date.now(),
         };
+        storage.set('combatSummary', cs, campaignName);
+
+        if (oldHit && !newHit) {
+            outcomeNote = ' → The attack now misses!';
+            const rawDamage = lastAttack.primaryDamage || lastAttack.rawDamage || 0;
+            if (rawDamage > 0) {
+                const healResult = applyHealingToTarget(cs, targetName, rawDamage, campaignName);
+                if (healResult) {
+                    outcomeNote += ` Undid ${healResult.actualHeal} damage.`;
+                }
+            }
+        } else if (!oldHit && newHit) {
+            outcomeNote = ' → The attack now hits!';
+            const damageFormula = lastAttack.damageFormula;
+            if (damageFormula) {
+                const dmgResult = rollExpression(damageFormula);
+                if (dmgResult && dmgResult.total > 0) {
+                    const characters = [playerStats];
+                    const appliedDmg = applyDamageToTarget(cs, targetName, dmgResult.total, [lastAttack.damageType || 'unknown'], campaignName, characters, false, attackerName);
+                    if (appliedDmg) {
+                        outcomeNote += ` Rolled ${appliedDmg.finalDamage} damage.`;
+                    }
+                }
+            }
+        } else if (oldHit && newHit) {
+            outcomeNote = ' → The attack still hits.';
+        } else {
+            outcomeNote = ' → The attack still misses.';
+        }
+    } else if (isSave && cs) {
+        const saveDc = lastAttack.saveDc;
+        const oldSuccess = (originalTotal >= saveDc);
+        const newSuccess = (newTotal >= saveDc);
+
+        cs.lastAttack = {
+            ...cs.lastAttack,
+            total: newTotal,
+            saveResult: newSuccess ? 'success' : 'failure',
+            bendFateApplied: true,
+            bendFateModifier: modifier,
+            bendFateD4: d4Value,
+            bendFateMode: mode,
+            timestamp: Date.now(),
+        };
+        storage.set('combatSummary', cs, campaignName);
+
+        if (oldSuccess && !newSuccess) {
+            outcomeNote = ' → The save now fails!';
+            const saveConditions = lastAttack.saveConditions || [];
+            for (const condKey of saveConditions) {
+                const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+                const filtered = conditions.filter(c => String(c).toLowerCase() !== String(condKey).toLowerCase());
+                setRuntimeValue(targetName, 'activeConditions', [...filtered, condKey], campaignName);
+                conditionsAdded.push(condKey);
+            }
+        } else if (!oldSuccess && newSuccess) {
+            outcomeNote = ' → The save now succeeds!';
+            const saveConditions = lastAttack.saveConditions || [];
+            for (const condKey of saveConditions) {
+                const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+                const filtered = conditions.filter(c => String(c).toLowerCase() !== String(condKey).toLowerCase());
+                setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
+                conditionsRemoved.push(condKey);
+            }
+        } else if (oldSuccess && newSuccess) {
+            outcomeNote = ' → The save still succeeds.';
+        } else {
+            outcomeNote = ' → The save still fails.';
+        }
+    } else if (isCheck) {
+        cs.lastAttack = {
+            ...cs.lastAttack,
+            total: newTotal,
+            bendFateApplied: true,
+            bendFateModifier: modifier,
+            bendFateD4: d4Value,
+            bendFateMode: mode,
+            timestamp: Date.now(),
+        };
+        storage.set('combatSummary', cs, campaignName);
+        outcomeNote = ` New total: ${newTotal}.`;
     }
 
     spendSorceryPoints(playerName, 1, campaignName);
 
-    let rollDescription;
-    if (attackFresh) {
-        const { d20, bonus, targetName: atkTarget, hit } = lastAttack;
-        const ac = atkTarget;
-        rollDescription = `Attack roll on ${targetName}: d20(${d20}) + ${bonus} = ${d20 + bonus} vs AC ${ac != null ? ac : '—'} → ${hit ? 'HIT' : 'MISS'}`;
-    } else if (abilityFresh) {
-        const { d20, bonus, checkName } = lastAttack;
-        rollDescription = `${checkName} by ${targetName}: d20(${d20}) + ${bonus} = ${d20 + bonus}`;
-    } else {
-        const { d20, bonus, saveType } = lastAttack;
-        const saveLabel = saveType ? saveType.toUpperCase() : 'Save';
-        rollDescription = `${saveLabel} by ${targetName}: d20(${d20}) + ${bonus} = ${d20 + bonus}`;
-    }
-
-    const description = `<b>${featureName}</b><br/>Target: ${targetName}<br/>Rolled 1d4: <b>${d4Roll.total}</b><br/>Choose to apply <b>+${d4Roll.total}</b> (bonus) or <b>-${d4Roll.total}</b> (penalty) to the d20 roll.<br/><br/>${rollDescription}`;
+    const logConditions = (arr, verb) => {
+        if (arr.length === 0) return '';
+        return ` ${verb}: ${arr.join(', ')}.`;
+    };
 
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
         abilityName: featureName,
-        description: `${playerName} used ${featureName} on ${targetName}. Rolled 1d4: ${d4Roll.total}. Applied as bonus/penalty.`,
+        description: `${playerName} used ${featureName} on ${attackerName}. Rolled 1d4: ${d4Value}. Applied as ${mode}. ${attackerName}'s roll: d20(${d20}) + ${bonus} = ${originalTotal} → ${newTotal}. Outcome changed: ${outcomeNote.replace(' → ', '')}.${logConditions(conditionsAdded, 'Added')}${logConditions(conditionsRemoved, 'Removed')}`,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[reactionBonus] Error:", e); });
+    }).catch((e) => { console.error(`[${featureName}] Error:`, e); });
 
-    return {
-        type: 'popup',
-        payload: {
-            type: 'automation_info',
-            name: featureName,
-            description,
-            automation: auto,
-        },
-    };
+    let description = `Target: ${attackerName}<br/>`;
+    description += `Rolled 1d4: <b>${d4Value}</b><br/>`;
+    description += `Applied as <b>${mode}</b>: <b>${modifierLabel}</b><br/><br/>`;
+
+    if (isAttack) {
+        const ac = lastAttack.targetAc || lastAttack.effectiveAc || '—';
+        const hitStatus = (newTotal >= (lastAttack.targetAc || lastAttack.effectiveAc)) ? 'HIT' : 'MISS';
+        description += `Attack: d20(${d20}) + ${bonus}${modifierLabel} = <strong>${newTotal}</strong> vs AC ${ac} → ${hitStatus}${outcomeNote}`;
+    } else if (isSave) {
+        const saveLabel = lastAttack.saveType ? lastAttack.saveType.toUpperCase() : 'Save';
+        const dc = lastAttack.saveDc || '—';
+        const saveStatus = (newTotal >= (lastAttack.saveDc || 0)) ? 'Success' : 'Failure';
+        description += `${saveLabel}: d20(${d20}) + ${bonus}${modifierLabel} = <strong>${newTotal}</strong> vs DC ${dc} → ${saveStatus}${outcomeNote}`;
+        if (conditionsAdded.length > 0) {
+            description += `<br/><i>Conditions applied: ${conditionsAdded.join(', ')}</i>`;
+        }
+        if (conditionsRemoved.length > 0) {
+            description += `<br/><i>Conditions removed: ${conditionsRemoved.join(', ')}</i>`;
+        }
+    } else {
+        description += `${lastAttack.checkName || 'Check'}: d20(${d20}) + ${bonus}${modifierLabel} = <strong>${newTotal}</strong>${outcomeNote}`;
+    }
+
+    return infoPopup(featureName, description, auto);
 }
 
 async function handleAcBonus(action, playerStats, campaignName) {

@@ -1,6 +1,7 @@
 import { rollExpression, rollExpressionDoubled, formatDamageFormula } from '../../services/dice/diceRoller.js';
 import { addEntry } from '../../services/ui/logService.js';
 import utils from '../../services/ui/utils.js';
+import storage from '../../services/ui/storage.js';
 import {
     computeDamageAfterSave,
     computeDamageAfterEvasion,
@@ -693,6 +694,29 @@ export function createLogDamageAndShow(deps) {
             popupData.secondaryDamageType = secondaryResult.damageType;
             popupData.secondaryFinalDamage = secondaryResult.finalDamage;
         }
+
+        combatSummary.lastAttack = {
+            attackerName: characterName,
+            targetName: target.name,
+            d20: saveResult.roll,
+            d20Rolls: saveResult.rawRolls || [saveResult.roll],
+            bonus: saveResult.bonus,
+            total: saveResult.total,
+            rollType: 'attack',
+            saveType: saveType || null,
+            saveDc: saveDc,
+            saveResult: isSoulstitchProtected ? 'success' : (saveResult.success ? 'success' : 'failure'),
+            damageFormula: formula || null,
+            damageName: name || null,
+            damageType: damageType || null,
+            rawDamage: adjustedTotal || 0,
+            primaryDamage: adjustedTotal || 0,
+            primaryDamageType: damageType || null,
+            actualDamage: primaryApplyResult?.finalDamage ?? finalDamage,
+            damageApplied: (primaryApplyResult?.finalDamage ?? finalDamage) > 0,
+            timestamp: Date.now(),
+        };
+        storage.set('combatSummary', combatSummary, campaignName);
 
         setPopupHtml(popupData);
 
