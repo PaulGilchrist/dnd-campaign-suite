@@ -144,12 +144,12 @@ describe('wildMagicSurgeService', () => {
             const playerStats = {
                 automation: {
                     passives: [
-                        { type: 'conditional_advantage', condition: 'feats_of_chaos_active', name: 'Feats of Chaos' },
+                        { type: 'feats_of_chaos', condition: 'feats_of_chaos_active', name: 'Feats of Chaos' },
                     ],
                 },
             };
             const result = getFeatsOfChaosFeature(playerStats);
-            expect(result).toEqual({ type: 'conditional_advantage', condition: 'feats_of_chaos_active', name: 'Feats of Chaos' });
+            expect(result).toEqual({ type: 'feats_of_chaos', condition: 'feats_of_chaos_active', name: 'Feats of Chaos' });
         });
 
         it('returns undefined when condition does not match', () => {
@@ -401,72 +401,28 @@ describe('wildMagicSurgeService', () => {
             expect(executeHandler).toHaveBeenCalled();
         });
 
-        it('executes feats of chaos when feature exists and has uses', async () => {
+        it('triggers surge and recharges when feats of chaos is active', async () => {
             const playerStats = {
                 ...BASE_PLAYER_STATS,
                 automation: {
                     passives: [
                         { type: 'wild_magic_surge', name: 'Wild Surge' },
-                        { type: 'conditional_advantage', condition: 'feats_of_chaos_active', name: 'Feats of Chaos' },
+                        { type: 'feats_of_chaos', condition: 'feats_of_chaos_active', name: 'Feats of Chaos' },
                     ],
                 },
             };
             const spell = { ...SPELL };
 
             getRuntimeValue.mockImplementation((_charKey, prop) => {
-                if (prop === 'featsOfChaosUses') return 1;
-                if (prop === 'featsOfChaosLastRest') return null;
-                if (prop === 'featsOfChaosActive') return false;
-                return null;
-            });
-
-            executeHandler.mockResolvedValue({ type: 'popup', payload: {} });
-
-            const result = await triggerWildMagicSurge(spell, { slotLevel: 1 }, playerStats, CAMPAIGN_NAME, MAP_NAME);
-
-            expect(result).toEqual({
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: 'Feats of Chaos',
-                    description: expect.stringContaining('Advantage granted, Wild Magic Surge triggered!'),
-                    automation: expect.objectContaining({
-                        type: 'conditional_advantage',
-                        condition: 'feats_of_chaos_active',
-                    }),
-                },
-            });
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                playerStats.name,
-                'featsOfChaosUses',
-                0,
-                CAMPAIGN_NAME,
-                true,
-            );
-        });
-
-        it('toggles featsOfChaosActive from true to false when already active', async () => {
-            const playerStats = {
-                ...BASE_PLAYER_STATS,
-                automation: {
-                    passives: [
-                        { type: 'wild_magic_surge', name: 'Wild Surge' },
-                        { type: 'conditional_advantage', condition: 'feats_of_chaos_active', name: 'Feats of Chaos' },
-                    ],
-                },
-            };
-            const spell = { ...SPELL };
-
-            getRuntimeValue.mockImplementation((_charKey, prop) => {
-                if (prop === 'featsOfChaosUses') return 1;
                 if (prop === 'featsOfChaosActive') return true;
                 return null;
             });
 
-            executeHandler.mockResolvedValue({ type: 'popup', payload: {} });
+            executeHandler.mockResolvedValue({ type: 'modal', payload: { mode: 'roll', roll: 42 } });
 
-            await triggerWildMagicSurge(spell, { slotLevel: 1 }, playerStats, CAMPAIGN_NAME, MAP_NAME);
+            const result = await triggerWildMagicSurge(spell, { slotLevel: 1 }, playerStats, CAMPAIGN_NAME, MAP_NAME);
+
+            expect(result).toEqual({ type: 'modal', payload: { mode: 'roll', roll: 42 } });
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 playerStats.name,
@@ -475,58 +431,88 @@ describe('wildMagicSurgeService', () => {
                 CAMPAIGN_NAME,
                 true,
             );
-        });
-
-        it('toggles featsOfChaosActive from false to true when not yet active', async () => {
-            const playerStats = {
-                ...BASE_PLAYER_STATS,
-                automation: {
-                    passives: [
-                        { type: 'wild_magic_surge', name: 'Wild Surge' },
-                        { type: 'conditional_advantage', condition: 'feats_of_chaos_active', name: 'Feats of Chaos' },
-                    ],
-                },
-            };
-            const spell = { ...SPELL };
-
-            getRuntimeValue.mockImplementation((_charKey, prop) => {
-                if (prop === 'featsOfChaosUses') return 1;
-                if (prop === 'featsOfChaosActive') return false;
-                return null;
-            });
-
-            executeHandler.mockResolvedValue({ type: 'popup', payload: {} });
-
-            await triggerWildMagicSurge(spell, { slotLevel: 1 }, playerStats, CAMPAIGN_NAME, MAP_NAME);
-
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 playerStats.name,
-                'featsOfChaosActive',
-                true,
+                'featsOfChaosUses',
+                1,
                 CAMPAIGN_NAME,
                 true,
             );
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    automation: expect.objectContaining({ autoSurge: true }),
+                }),
+                playerStats,
+                CAMPAIGN_NAME,
+                MAP_NAME,
+            );
         });
 
-        it('does not set last rest timestamp when feats of chaos uses reach 0', async () => {
+        it('skips feats of chaos block when not active', async () => {
             const playerStats = {
                 ...BASE_PLAYER_STATS,
                 automation: {
                     passives: [
                         { type: 'wild_magic_surge', name: 'Wild Surge' },
-                        { type: 'conditional_advantage', condition: 'feats_of_chaos_active', name: 'Feats of Chaos' },
+                        { type: 'feats_of_chaos', condition: 'feats_of_chaos_active', name: 'Feats of Chaos' },
                     ],
                 },
             };
             const spell = { ...SPELL };
 
             getRuntimeValue.mockImplementation((_charKey, prop) => {
-                if (prop === 'featsOfChaosUses') return 1;
                 if (prop === 'featsOfChaosActive') return false;
                 return null;
             });
 
-            executeHandler.mockResolvedValue({ type: 'popup', payload: {} });
+            executeHandler.mockResolvedValue({ type: 'modal', payload: { mode: 'roll', roll: 73 } });
+
+            await triggerWildMagicSurge(spell, { slotLevel: 1 }, playerStats, CAMPAIGN_NAME, MAP_NAME);
+
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                playerStats.name,
+                'featsOfChaosActive',
+                false,
+                CAMPAIGN_NAME,
+                true,
+            );
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                playerStats.name,
+                'featsOfChaosUses',
+                1,
+                CAMPAIGN_NAME,
+                true,
+            );
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    automation: expect.objectContaining({}),
+                }),
+                playerStats,
+                CAMPAIGN_NAME,
+                MAP_NAME,
+            );
+            const handlerCall = executeHandler.mock.calls[0][0];
+            expect(handlerCall.automation.autoSurge).toBeUndefined();
+        });
+
+        it('does not set last rest timestamp when feats of chaos is recharged', async () => {
+            const playerStats = {
+                ...BASE_PLAYER_STATS,
+                automation: {
+                    passives: [
+                        { type: 'wild_magic_surge', name: 'Wild Surge' },
+                        { type: 'feats_of_chaos', condition: 'feats_of_chaos_active', name: 'Feats of Chaos' },
+                    ],
+                },
+            };
+            const spell = { ...SPELL };
+
+            getRuntimeValue.mockImplementation((_charKey, prop) => {
+                if (prop === 'featsOfChaosActive') return true;
+                return null;
+            });
+
+            executeHandler.mockResolvedValue({ type: 'modal', payload: { mode: 'roll', roll: 42 } });
 
             await triggerWildMagicSurge(spell, { slotLevel: 1 }, playerStats, CAMPAIGN_NAME, MAP_NAME);
 
@@ -543,7 +529,7 @@ describe('wildMagicSurgeService', () => {
                 automation: {
                     passives: [
                         { type: 'wild_magic_surge', name: 'Wild Surge' },
-                        { type: 'conditional_advantage', condition: 'feats_of_chaos_active', name: 'Feats of Chaos' },
+                        { type: 'feats_of_chaos', condition: 'feats_of_chaos_active', name: 'Feats of Chaos' },
                     ],
                 },
             };
@@ -569,7 +555,7 @@ describe('wildMagicSurgeService', () => {
                 automation: {
                     passives: [
                         { type: 'wild_magic_surge', name: 'Wild Surge' },
-                        { type: 'conditional_advantage', condition: 'feats_of_chaos_active', name: 'Feats of Chaos' },
+                        { type: 'feats_of_chaos', condition: 'feats_of_chaos_active', name: 'Feats of Chaos' },
                     ],
                 },
             };
@@ -706,7 +692,7 @@ describe('wildMagicSurgeService', () => {
                 automation: {
                     passives: [
                         { type: 'wild_magic_surge', name: 'Wild Surge' },
-                        { type: 'conditional_advantage', condition: 'feats_of_chaos_active', name: 'Feats of Chaos' },
+                        { type: 'feats_of_chaos', condition: 'feats_of_chaos_active', name: 'Feats of Chaos' },
                     ],
                 },
                 wildMagicSurgeTable: [],
@@ -714,7 +700,6 @@ describe('wildMagicSurgeService', () => {
             const spell = { ...SPELL };
 
             getRuntimeValue.mockImplementation((_charKey, prop) => {
-                if (prop === 'featsOfChaosUses') return 1;
                 if (prop === 'featsOfChaosActive') return false;
                 return null;
             });
@@ -723,18 +708,7 @@ describe('wildMagicSurgeService', () => {
 
             const result = await triggerWildMagicSurge(spell, { slotLevel: 1 }, playerStats, CAMPAIGN_NAME, MAP_NAME);
 
-            expect(result).toEqual({
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: 'Feats of Chaos',
-                    description: expect.stringContaining('Unknown Wild Magic effect.'),
-                    automation: expect.objectContaining({
-                        type: 'conditional_advantage',
-                        condition: 'feats_of_chaos_active',
-                    }),
-                },
-            });
+            expect(result).toEqual({ type: 'popup', payload: {} });
         });
     });
 });

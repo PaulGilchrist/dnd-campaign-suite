@@ -43,63 +43,81 @@ export function getFeatsOfChaosFeature(playerStats) {
         console.error('[wildMagicSurgeService] Missing array:', passives);
         throw new Error('Expected array, got ' + passives);
     }
-    return passives.find(p => p.type === 'conditional_advantage' && p.condition === 'feats_of_chaos_active');
+    return passives.find(p => p.type === 'feats_of_chaos' && p.condition === 'feats_of_chaos_active');
 }
 
 export async function triggerWildMagicSurge(spell, metaCtx, playerStats, campaignName, mapName) {
-    if (!isSorcererSpell(spell, playerStats)) {
+    if (!playerStats) {
+        console.log('[wildMagicSurge] No playerStats, returning null');
         return null;
     }
+    console.log('[wildMagicSurge] triggerWildMagicSurge called for', playerStats.name, 'spell:', spell.name);
+    if (!isSorcererSpell(spell, playerStats)) {
+        console.log('[wildMagicSurge] NOT a sorcerer spell, returning null');
+        return null;
+    }
+    console.log('[wildMagicSurge] Is sorcerer spell');
 
     if (!usesSpellSlot(spell, metaCtx)) {
+        console.log('[wildMagicSurge] Does not use spell slot, returning null. metaCtx:', JSON.stringify(metaCtx));
         return null;
     }
+    console.log('[wildMagicSurge] Uses spell slot');
 
     const surgeFeatures = getWildMagicSurgeFeatures(playerStats);
+    console.log('[wildMagicSurge] surgeFeatures.length:', surgeFeatures.length, 'passives count:', playerStats?.automation?.passives?.length);
     if (surgeFeatures.length === 0) {
+        console.log('[wildMagicSurge] No surge features, returning null');
         return null;
     }
+    console.log('[wildMagicSurge] Found surge features:', surgeFeatures.map(f => f.name));
 
     const controlledChaos = getControlledChaosFeature(playerStats);
+    console.log('[wildMagicSurge] controlledChaos:', !!controlledChaos);
     if (controlledChaos) {
         await setRuntimeValue(playerStats.name, 'wildMagicDoubleRoll', true, campaignName, true);
     }
 
     const featsOfChaos = getFeatsOfChaosFeature(playerStats);
     const featsOfChaosActive = getRuntimeValue(playerStats.name, 'featsOfChaosActive', campaignName) === true;
+    console.log('[wildMagicSurge] featsOfChaos:', !!featsOfChaos, 'featsOfChaosActive:', featsOfChaosActive);
 
-    if (featsOfChaos) {
+    if (featsOfChaos && featsOfChaosActive) {
+        console.log('[wildMagicSurge] FoC active — recharging and auto-triggering surge');
         const usesKey = 'featsOfChaosUses';
-        const currentUses = Number(getRuntimeValue(playerStats.name, usesKey) ?? 0);
+        await setRuntimeValue(playerStats.name, 'featsOfChaosActive', false, campaignName, true);
+        await setRuntimeValue(playerStats.name, usesKey, 1, campaignName, true);
+        console.log('[wildMagicSurge] Set featsOfChaosActive=false, featsOfChaosUses=1');
 
-        if (currentUses > 0) {
-            const newUses = currentUses - 1;
-            await setRuntimeValue(playerStats.name, usesKey, newUses, campaignName, true);
-
-            if (featsOfChaosActive) {
-                await setRuntimeValue(playerStats.name, 'featsOfChaosActive', false, campaignName, true);
-            } else {
-                await setRuntimeValue(playerStats.name, 'featsOfChaosActive', true, campaignName, true);
-            }
-
-            const surgeTable = playerStats.wildMagicSurgeTable;
-            if (surgeTable == null) {
-                console.error('[wildMagicSurgeService] Missing array:', surgeTable);
-                throw new Error('Expected array, got ' + surgeTable);
-            }
-            const d100Roll = Math.floor(Math.random() * 100) + 1;
-            const surgeEntry = surgeTable.find(e => d100Roll >= e.min && d100Roll <= e.max);
-            const effectText = surgeEntry ? surgeEntry.effect : 'Unknown Wild Magic effect.';
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: featsOfChaos.name,
-                    description: `<b>${featsOfChaos.name}: Advantage granted, Wild Magic Surge triggered!</b><br/>Rolled ${d100Roll}: ${effectText}`,
-                    automation: featsOfChaos,
-                },
-            };
+        const surgeFeature = surgeFeatures[0];
+        const surgeTable = playerStats.wildMagicSurgeTable;
+        if (surgeTable == null) {
+            console.error('[wildMagicSurgeService] Missing array:', surgeTable);
+            throw new Error('Expected array, got ' + surgeTable);
         }
+
+        const action = {
+            name: surgeFeature.name,
+            automation: {
+                type: 'wild_magic_surge',
+                trigger: 'after_sorcerer_spell_slot',
+                oncePerTurn: surgeFeature.oncePerTurn || false,
+                autoSurge: true,
+            },
+            wildMagicSurgeTable: surgeTable,
+        };
+
+        try {
+            const result = await executeHandler(action, playerStats, campaignName, mapName);
+            if (result) {
+                return result;
+            }
+        } catch (e) {
+            console.error(`[wildMagicSurge] Failed to execute surge for ${surgeFeature.name}:`, e);
+            throw e;
+        }
+
+        return null;
     }
 
     const surgeFeature = surgeFeatures[0];

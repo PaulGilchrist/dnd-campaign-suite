@@ -339,8 +339,12 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const isHolyAuraActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Holy Aura' && b.effect === 'holy_aura');
     const isProtectionFromPoisonActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Protection from Poison' && b.effect === 'protection_from_poison');
     const isTranceOfOrderActive = getRuntimeValue(playerStats?.name, 'tranceOfOrderActive', campaignName) === true;
+    const featsOfChaosActive = getRuntimeValue(playerStats?.name, 'featsOfChaosActive', campaignName) === true;
     const combatContext = getCombatSummary(campaignName);
      const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers, myTargetEffects, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, seeInvisibilityActive, playerStats?.name, isLivingLegendActive, isElderChampionActive, false, isHolyAuraActive, isProtectionFromPoisonActive, isTranceOfOrderActive);
+    if (featsOfChaosActive) {
+        conditionEffects.attackAdvantageCount = (conditionEffects.attackAdvantageCount || 0) + 1;
+    }
     if (playerStats) {
         const speedHalvedTime = getRuntimeValue(playerStats.name, 'stunned_speedHalved', campaignName);
         if (speedHalvedTime) conditionEffects.speedHalved = true;
@@ -770,7 +774,10 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                     mapName={activeMapName}
                     onBuffsChange={handleBuffsChange}
                     characters={characters}
-                    onSpellModalStateChange={(state) => setCharActionsModalState(state)}
+                    onSpellModalStateChange={(state) => {
+                        console.log('[CharSheet] onSpellModalStateChange called:', state.wildMagicSurgeModal ? 'OBJECT' : 'null');
+                        setCharActionsModalState(state);
+                    }}
                     spellModalState={charActionsModalState}
                 ></CharActions>
                 <CharReactions

@@ -135,7 +135,7 @@ import { handle as handleClockworkCavalcade } from './handlers/class-sorcerer/cl
 import { handle as handleElementalAffinity } from './handlers/class-sorcerer/elementalAffinityHandler.js';
 import { handle as handleDragonWings } from './handlers/class-sorcerer/dragonWingsHandler.js';
 import { handle as handleDragonCompanion, confirmDragonCompanion as handleDragonCompanionConfirm } from './handlers/class-sorcerer/dragonCompanionHandler.js';
-import { handle as handleWildMagicSurge, handleTamedSurge as handleWildMagicTamed, handleFeatsOfChaos as handleFeatsOfChaosAdvantage, onFeatsOfChaosActivate as onFeatsOfChaosActivate, onFeatsOfChaosConsume as onFeatsOfChaosConsume, onTamedSurgeSelected as onWildMagicTamedSelected, onDoubleRollSelected } from './handlers/class-sorcerer/wildMagicSurgeHandler.js';
+import { handle as handleWildMagicSurge, handleTamedSurge as handleWildMagicTamed, handleFeatsOfChaos as handleFeatsOfChaosAdvantage, onTamedSurgeSelected as onWildMagicTamedSelected, onDoubleRollSelected } from './handlers/class-sorcerer/wildMagicSurgeHandler.js';
 import { handle as handleMagicalCunning } from './handlers/class-wizard/magicalCunningHandler.js';
 import { handle as handleContactPatron } from './handlers/class-warlock/contactPatronHandler.js';
 import { handle as handleBeguilingDefenses } from './handlers/class-warlock/beguilingDefensesHandler.js';
@@ -397,8 +397,6 @@ const HANDLER_MAP = {
             wild_magic_surge: handleWildMagicSurge,
             wild_magic_tamed: handleWildMagicTamed,
             feats_of_chaos: handleFeatsOfChaosAdvantage,
-            feats_of_chaos_activate: onFeatsOfChaosActivate,
-            feats_of_chaos_consume: onFeatsOfChaosConsume,
             wild_magic_tamed_selected: onWildMagicTamedSelected,
             wild_magic_double_roll_selected: onDoubleRollSelected,
             magical_cunning: handleMagicalCunning,

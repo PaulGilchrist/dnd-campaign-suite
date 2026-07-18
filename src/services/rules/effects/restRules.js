@@ -152,7 +152,9 @@ export const LONG_REST_RESOURCES = [
   'warpingimplosionUses',
   'restorebalanceUses',
   'tranceOfOrderUses',
-  'tamedSurgeUses'
+  'tamedSurgeUses',
+  'featsOfChaosUses',
+  'featsOfChaosActive'
 ]
 
 export function getLongRestResources() {

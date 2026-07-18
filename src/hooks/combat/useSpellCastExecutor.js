@@ -21,12 +21,21 @@ export function useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTar
         });
         if (!promise) return;
         promise.then((result) => {
+            console.log('[useSpellCastExecutor] Result for', spell.name, JSON.stringify({ type: result?.type, modalName: result?.modalName, hasAutomationPopup: !!result?.automationPopup, hasHealAmount: !!result?.healAmount, hasPayload: !!result?.payload }));
             if (result?.automationPopup) {
+                console.log('[useSpellCastExecutor] Handling automationPopup:', JSON.stringify({ type: result.automationPopup.type, modalName: result.automationPopup.modalName }));
                 const popup = result.automationPopup;
                 if (popup.type === 'modal' && setModalState) {
                     handleModalResult(popup, setModalState);
                 } else {
                     setPopupHtml(popup.payload);
+                }
+            } else if (result && result.modalName) {
+                console.log('[useSpellCastExecutor] Handling direct modal:', result.modalName);
+                if (setModalState) {
+                    handleModalResult(result, setModalState);
+                } else {
+                    setPopupHtml(result.payload);
                 }
             } else if (result && result.healAmount > 0) {
                 const bonusHealDetail = result.bonusDetails?.length > 0
@@ -53,6 +62,7 @@ export function useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTar
 }
 
 function handleModalResult(popup, setModalState) {
+    console.log('[useSpellCastExecutor] handleModalResult called with:', popup.modalName, popup.type);
     const modalName = popup.modalName;
     const payload = popup.payload;
     switch (modalName) {
@@ -73,6 +83,9 @@ function handleModalResult(popup, setModalState) {
             break;
         case 'saveAttackAoe':
             setModalState({ saveAttackAoeModal: payload });
+            break;
+        case 'wildMagicSurge':
+            setModalState({ wildMagicSurgeModal: payload });
             break;
         default:
             console.error(`[useSpellCastExecutor] Unknown modalName from spell cast: ${modalName}`);

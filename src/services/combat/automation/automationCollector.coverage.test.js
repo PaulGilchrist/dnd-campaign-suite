@@ -39,11 +39,9 @@ describe('collectAutomationFromFeatures – handler dispatch', () => {
     it('routes dispatch-only types to specialActions', () => {
         const result = collectAutomationFromFeatures([
             makeFeature({ type: 'damage_modifier' }),
-            makeFeature({ type: 'wild_magic_surge' }),
-            makeFeature({ type: 'wild_magic_tamed' }),
             makeFeature({ type: 'reaction_counterspell' }),
         ], ps)
-        expect(result.specialActions).toHaveLength(4)
+        expect(result.specialActions).toHaveLength(2)
     })
 
     it('routes handler-transformed types to their correct buckets', () => {
@@ -52,7 +50,7 @@ describe('collectAutomationFromFeatures – handler dispatch', () => {
             { type: 'two_weapon_fighting', bucket: 'passives', check: (item) => expect(item.effect).toBe('two_weapon_fighting') },
             { type: 'reroll_damage_once_per_turn', bucket: 'passives', check: (item) => expect(item.effect).toBe('reroll_damage_once_per_turn') },
             { type: 'ignore_resistance', bucket: 'passives', check: (item) => expect(item.effect).toBe('ignore_resistance') },
-            { type: 'feats_of_chaos', bucket: 'passives', check: (item) => expect(item.type).toBe('conditional_advantage') },
+            { type: 'feats_of_chaos', bucket: 'passives', check: (item) => expect(item.type).toBe('feats_of_chaos') },
             { type: 'heroic_inspiration_buff', bucket: 'actions', check: (item) => expect(item.type).toBe('buff_ally') },
             { type: 'warping_implosion', bucket: 'actions', check: (item) => expect(item.type).toBe('save_attack') },
             { type: 'sacred_weapon', bucket: 'specialActions', check: (item) => { expect(item.type).toBe('temp_buff'); expect(item.effect).toBe('sacred_weapon') } },

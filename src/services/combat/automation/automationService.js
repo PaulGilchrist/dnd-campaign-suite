@@ -31,6 +31,7 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     'damage_type_choice',
     'wild_magic_surge',
     'wild_magic_tamed',
+    'feats_of_chaos',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([

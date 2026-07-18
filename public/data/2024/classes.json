@@ -10945,24 +10945,12 @@
                         "name": "Feats of Chaos",
                         "description": "Manipulate chaos to give yourself Advantage on one D20 Test before rolling. Must cast Sorcerer spell with spell slot or finish Long Rest before using again. If you cast Sorcerer spell with spell slot before Long Rest, automatically roll on Wild Magic Surge table.",
                         "level": 3,
-                        "automation": [
-                            {
-                                "type": "conditional_advantage",
-                                "target": "d20",
-                                "condition": "feats_of_chaos_active",
-                                "effect": "advantage",
-                                "uses": 1,
-                                "recharge": "long_rest",
-                                "casting_time": "passive"
-                            },
-                            {
-                                "type": "auto_effect",
-                                "trigger": "after_sorcerer_spell_slot",
-                                "effect": "wild_magic_surge_auto",
-                                "uses": 1,
-                                "recharge": "long_rest"
-                            }
-                        ]
+                        "automation": {
+                            "type": "feats_of_chaos",
+                            "casting_time": "passive",
+                            "uses": 1,
+                            "recharge": "long_rest"
+                        }
                     },
                     {
                         "name": "Bend Fate",

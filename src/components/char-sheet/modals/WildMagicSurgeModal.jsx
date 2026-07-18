@@ -4,7 +4,6 @@ import '../CharSheet.css';
 import './WildMagicSurgeModal.css';
 
 function WildMagicSurgeModal({ featureName, surgeTable, campaignName, playerStats, mode, onClose, roll, roll1, roll2 }) {
-    const [result, setResult] = useState(null);
     const [selectedRoll, setSelectedRoll] = useState(null);
     const [selectedSurge, setSelectedSurge] = useState(null);
 
@@ -26,47 +25,27 @@ function WildMagicSurgeModal({ featureName, surgeTable, campaignName, playerStat
     };
 
     const handleConfirmRoll = async () => {
+        console.log('[WildMagicSurgeModal] handleConfirmRoll called, selectedRoll:', selectedRoll);
         if (!selectedRoll) return;
         const surge = getSurgeForRoll(selectedRoll);
         if (!surge) return;
 
-        const res = await onSurgeSelected(
+        console.log('[WildMagicSurgeModal] Applying surge:', surge.effect);
+        await onSurgeSelected(
             featureName,
             playerStats || { name: 'Player' },
             campaignName,
             selectedRoll,
             surge
         );
-        setResult(res);
+        console.log('[WildMagicSurgeModal] Surge applied, calling onClose');
+        onClose();
+        console.log('[WildMagicSurgeModal] onClose returned');
     };
 
     const handleSelectSurge = async (surge) => {
         setSelectedSurge(surge);
-        const res = await onTamedSurgeSelected(
-            { name: featureName, automation: { type: 'wild_magic_tamed' } },
-            playerStats || { name: 'Player' },
-            campaignName,
-            surge
-        );
-        setResult(res);
     };
-
-    if (result) {
-        return (
-            <div className="sp-overlay" onClick={onClose}>
-                <div className="sp-modal" onClick={e => e.stopPropagation()}>
-                    <div className="sp-header">
-                        <i className="fa-solid fa-bolt"></i> {featureName}
-                    </div>
-                    <div className="sp-body" dangerouslySetInnerHTML={{ __html: result.payload.description }}>
-                    </div>
-                    <div className="sp-actions">
-                        <button className="sp-roll-btn" onClick={onClose}>Done</button>
-                    </div>
-                </div>
-            </div>
-        );
-    }
 
     const roll1Surge = roll1 ? getSurgeForRoll(roll1) : null;
     const roll2Surge = roll2 ? getSurgeForRoll(roll2) : null;
@@ -97,7 +76,7 @@ function WildMagicSurgeModal({ featureName, surgeTable, campaignName, playerStat
                         </div>
                     </div>
                     <div className="sp-actions">
-                        <button className="sp-roll-btn" onClick={handleConfirmRoll} disabled={!selectedRoll}>Done</button>
+                        <button className="sp-roll-btn" type="button" onClick={handleConfirmRoll} disabled={!selectedRoll}>Done</button>
                     </div>
                 </div>
             </div>
@@ -130,7 +109,16 @@ function WildMagicSurgeModal({ featureName, surgeTable, campaignName, playerStat
                         </div>
                     </div>
                     <div className="sp-actions">
-                        <button className="sp-roll-btn" onClick={() => { if (selectedSurge) handleSelectSurge(selectedSurge); }} disabled={!selectedSurge}>Confirm</button>
+                        <button className="sp-roll-btn" onClick={async () => {
+                            if (!selectedSurge) return;
+                            await onTamedSurgeSelected(
+                                { name: featureName, automation: { type: 'wild_magic_tamed' } },
+                                playerStats || { name: 'Player' },
+                                campaignName,
+                                selectedSurge
+                            );
+                            onClose();
+                        }} disabled={!selectedSurge}>Confirm</button>
                         <button className="sp-dismiss-btn" onClick={onClose}>Cancel</button>
                     </div>
                 </div>

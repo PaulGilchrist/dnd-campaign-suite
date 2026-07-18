@@ -535,11 +535,11 @@ describe('miscHandlers – wild_magic_tamed', () => {
 // ── feats_of_chaos ───────────────────────────────────────────────────
 
 describe('miscHandlers – feats_of_chaos', () => {
-    it('returns conditional_advantage type with defaults', () => {
+    it('returns feats_of_chaos type with defaults', () => {
         const feature = makeFeature({ type: 'feats_of_chaos' })
         const result = miscHandlers.feats_of_chaos(feature, BASE_STATS)
         expect(result).toMatchObject({
-            type: 'conditional_advantage',
+            type: 'feats_of_chaos',
             target: 'd20',
             condition: 'feats_of_chaos_active',
             effect: 'advantage',

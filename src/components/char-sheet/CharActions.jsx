@@ -1512,6 +1512,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     modalState={modalState}
                     spellModalState={spellModalState}
                     setModalState={setModalState}
+                    setSpellModalState={onSpellModalStateChange}
                     combatSuperiorityModal={combatSuperiorityModal}
                     setCombatSuperiorityModal={setCombatSuperiorityModal}
                     handleCombatSuperiorityConfirm={handleCombatSuperiorityConfirm}

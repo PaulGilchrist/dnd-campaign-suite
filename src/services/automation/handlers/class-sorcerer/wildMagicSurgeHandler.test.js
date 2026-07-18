@@ -6,8 +6,6 @@ import {
     handleFeatsOfChaos,
     onDoubleRollSelected,
     onSurgeSelected,
-    onFeatsOfChaosActivate,
-    onFeatsOfChaosConsume,
 } from './wildMagicSurgeHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
@@ -63,6 +61,11 @@ const makeAction = (auto = {}) => ({
 const makeActionNoTable = (auto = {}) => ({
     name: 'Wild Magic Surge',
     automation: { type: 'wild_magic_surge', ...auto },
+});
+
+const makeFoCAction = (auto = {}) => ({
+    name: 'Feats of Chaos',
+    automation: { type: 'feats_of_chaos', ...auto },
 });
 
 const makePlayerStats = (overrides = {}) => ({
@@ -341,31 +344,18 @@ describe('wildMagicSurgeHandler', () => {
         });
     });
 
-    describe('onFeatsOfChaosActivate', () => {
-        it('should set featsOfChaosActive to true', async () => {
-            const result = await onFeatsOfChaosActivate(makeAction(), makePlayerStats(), 'campaign');
-
-            expect(result).toEqual({ featsOfChaosActive: true });
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'TestSorcerer',
-                'featsOfChaosActive',
-                true,
-                'campaign',
-                true,
-            );
-        });
-    });
-
-    describe('onFeatsOfChaosConsume', () => {
-        it('should consume a use and deactivate when uses available', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
+    describe('handleFeatsOfChaos', () => {
+        it('should activate FoC when uses available', async () => {
+            runtimeState.getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'featsOfChaosUses') return 1;
                 return null;
             });
 
-            const result = await onFeatsOfChaosConsume(makeAction(), makePlayerStats(), 'campaign');
+            const result = await handleFeatsOfChaos(makeFoCAction(), makePlayerStats(), 'campaign');
 
-            expect(result).toEqual({ featsOfChaosConsumed: true });
+            expect(result.type).toBe('popup');
+            expect(result.payload.name).toBe('Feats of Chaos');
+            expect(result.payload.description).toContain('Advantage on next D20 test');
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestSorcerer',
                 'featsOfChaosUses',
@@ -376,35 +366,23 @@ describe('wildMagicSurgeHandler', () => {
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestSorcerer',
                 'featsOfChaosActive',
-                false,
+                true,
                 'campaign',
                 true,
             );
         });
 
-        it('should still deactivate when no uses remaining', async () => {
+        it('should show no uses when already exhausted', async () => {
             runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === 'featsOfChaosUses') return 0;
                 return null;
             });
 
-            const result = await onFeatsOfChaosConsume(makeAction(), makePlayerStats(), 'campaign');
+            const result = await handleFeatsOfChaos(makeFoCAction(), makePlayerStats(), 'campaign');
 
-            expect(result).toEqual({ featsOfChaosConsumed: true });
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'TestSorcerer',
-                'featsOfChaosActive',
-                false,
-                'campaign',
-                true,
-            );
-            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-                'TestSorcerer',
-                'featsOfChaosUses',
-                expect.any(Number),
-                'campaign',
-                true,
-            );
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('no uses remaining');
+            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
         });
     });
 });

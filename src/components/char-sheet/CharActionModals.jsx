@@ -159,6 +159,7 @@ export default function CharActionModals({
     modalState,
     spellModalState,
     setModalState,
+    setSpellModalState,
     combatSuperiorityModal, setCombatSuperiorityModal,
     handleCombatSuperiorityConfirm,
     handleAttackRiderManeuverUse,
@@ -213,7 +214,11 @@ export default function CharActionModals({
     handleMassHealingWordConfirm,
 }) {
     const [combatSummary, setCombatSummary] = React.useState(null);
-    const mergedModalState = React.useMemo(() => ({ ...modalState, ...spellModalState }), [modalState, spellModalState]);
+    const mergedModalState = React.useMemo(() => {
+        const result = { ...modalState, ...spellModalState };
+        console.log('[CharActionModals] mergedModalState wildMagicSurgeModal:', result.wildMagicSurgeModal ? 'OBJECT' : 'null/undefined', 'modalState.wildMagicSurgeModal:', modalState.wildMagicSurgeModal ? 'OBJECT' : 'null', 'spellModalState.wildMagicSurgeModal:', spellModalState.wildMagicSurgeModal ? 'OBJECT' : 'null');
+        return result;
+    }, [modalState, spellModalState]);
 
     useEffect(() => {
         getCombatContext(campaignName).then(cs => {
@@ -612,7 +617,12 @@ export default function CharActionModals({
             {mergedModalState.wildMagicSurgeModal && (
                 <WildMagicSurgeModal
                     {...mergedModalState.wildMagicSurgeModal}
-                    onClose={() => setModalState({ wildMagicSurgeModal: null })}
+                    onClose={() => {
+                        setModalState({ wildMagicSurgeModal: null });
+                        if (setSpellModalState) {
+                            setSpellModalState({ wildMagicSurgeModal: null });
+                        }
+                    }}
                 />
             )}
             {mergedModalState.bendFateModal && (
