@@ -31,6 +31,10 @@ vi.mock('../../services/automation/handlers/class-sorcerer/twinklingConstellatio
     applyConstellationOption: vi.fn(),
 }));
 
+vi.mock('../../services/automation/handlers/combat/bonusAttacksHandler.js', () => ({
+    applyFlurryOfBlows: vi.fn(),
+}));
+
 import { rollExpression } from '../../services/dice/diceRoller.js';
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import { getDistanceFeet } from '../../services/rules/combat/rangeValidation.js';

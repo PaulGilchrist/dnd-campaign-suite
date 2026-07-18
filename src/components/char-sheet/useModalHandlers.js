@@ -3,6 +3,7 @@ import { getCurrentCombatRound } from '../../services/encounters/combatData.js';
 import { setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { applyConstellationOption } from '../../services/automation/handlers/class-sorcerer/starryFormHandler.js';
 import { applyConstellationOption as twinklingApply } from '../../services/automation/handlers/class-sorcerer/twinklingConstellationHandler.js';
+import { applyFlurryOfBlows } from '../../services/automation/handlers/combat/bonusAttacksHandler.js';
 
 export default function useModalHandlers({
     playerStats, campaignName,
@@ -197,6 +198,23 @@ export default function useModalHandlers({
         setModalState({ weaponKindMasteryModal: null });
     };
 
+    const handleFlurryOfBlowsConfirm = async (result) => {
+        const flurryPayload = modalState.flurryOfBlowsModal;
+        if (!flurryPayload) return;
+
+        const { action, playerStats, campaignName, mapName, numAttacks } = flurryPayload;
+        setModalState({ flurryOfBlowsModal: null });
+
+        const applyResult = await applyFlurryOfBlows(action, playerStats, campaignName, mapName, result.distribution, numAttacks);
+        if (applyResult?.type === 'popup') {
+            setPopupHtml(applyResult.payload);
+        }
+    };
+
+    const handleFlurryOfBlowsSkip = () => {
+        setModalState({ flurryOfBlowsModal: null });
+    };
+
     return {
         handleMasteryClose,
         handleWeaponMasteryChoice,
@@ -212,5 +230,7 @@ export default function useModalHandlers({
         handleFeatureChoiceSkip,
         handleConstellationSelect,
         handleWeaponKindMasteryClose,
+        handleFlurryOfBlowsConfirm,
+        handleFlurryOfBlowsSkip,
     };
 }

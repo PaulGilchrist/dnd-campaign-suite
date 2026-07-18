@@ -57,6 +57,8 @@ const mockModalHandlersResult = {
   handleFeatureChoiceConfirm: vi.fn(),
   handleFeatureChoiceSkip: vi.fn(),
   handleConstellationSelect: vi.fn(),
+  handleFlurryOfBlowsConfirm: vi.fn(),
+  handleFlurryOfBlowsSkip: vi.fn(),
 };
 
 const baseArgs = {
@@ -102,6 +104,8 @@ describe('useCharActionModals', () => {
     expect(result.current.handleFeatureChoiceConfirm).toBe(mockModalHandlersResult.handleFeatureChoiceConfirm);
     expect(result.current.handleFeatureChoiceSkip).toBe(mockModalHandlersResult.handleFeatureChoiceSkip);
     expect(result.current.handleConstellationSelect).toBe(mockModalHandlersResult.handleConstellationSelect);
+    expect(result.current.handleFlurryOfBlowsConfirm).toBe(mockModalHandlersResult.handleFlurryOfBlowsConfirm);
+    expect(result.current.handleFlurryOfBlowsSkip).toBe(mockModalHandlersResult.handleFlurryOfBlowsSkip);
 
     // Delegated handlers from useCombatSuperiorityModal
     expect(typeof result.current.handleCombatSuperiorityConfirm).toBe('function');

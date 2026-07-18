@@ -1,0 +1,75 @@
+.flurry-of-blows-popup {
+  max-width: 520px;
+  width: 90%;
+}
+
+.flurry-popup-inner {
+  padding: 20px;
+}
+
+.flurry-popup-inner h3 {
+  margin: 0 0 10px 0;
+  color: var(--color-header);
+  font-size: 1.3em;
+}
+
+.flurry-popup-inner h3 i {
+  margin-right: 8px;
+}
+
+.flurry-distribution {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.flurry-target-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color-input, #ccc);
+  border-radius: 4px;
+  background: var(--background-color-surface, #fafafa);
+}
+
+.flurry-current-target {
+  border-color: var(--color-primary, #1976d2);
+  background: var(--background-color-surface, #e3f2fd);
+}
+
+.flurry-target-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 12px;
+}
+
+.flurry-target-name {
+  font-weight: 600;
+  font-size: 0.95em;
+  color: var(--color-text);
+}
+
+.flurry-target-input {
+  width: 60px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-color-input, #ccc);
+  border-radius: 4px;
+  text-align: center;
+  font-size: 1em;
+}
+
+.flurry-summary {
+  text-align: right;
+  font-size: 0.95em;
+  color: var(--color-text);
+  margin-bottom: 12px;
+}
+
+.flurry-summary strong {
+  color: var(--color-primary, #1976d2);
+}

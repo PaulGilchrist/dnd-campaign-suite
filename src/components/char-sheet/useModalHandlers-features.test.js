@@ -32,6 +32,10 @@ vi.mock('../../services/automation/handlers/class-sorcerer/twinklingConstellatio
     applyConstellationOption: vi.fn(),
 }));
 
+vi.mock('../../services/automation/handlers/combat/bonusAttacksHandler.js', () => ({
+    applyFlurryOfBlows: vi.fn(),
+}));
+
 import { rollExpression } from '../../services/dice/diceRoller.js';
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import { getDistanceFeet } from '../../services/rules/combat/rangeValidation.js';
@@ -355,7 +359,7 @@ describe('useModalHandlers - features & constellation', () => {
         it('returns all expected handler functions', () => {
             const deps = createDeps();
             const handlers = useModalHandlers(deps);
-            expect(Object.keys(handlers)).toHaveLength(14);
+            expect(Object.keys(handlers)).toHaveLength(16);
             expect(Object.keys(handlers)).toEqual([
                 'handleMasteryClose',
                 'handleWeaponMasteryChoice',
@@ -371,6 +375,8 @@ describe('useModalHandlers - features & constellation', () => {
                 'handleFeatureChoiceSkip',
                 'handleConstellationSelect',
                 'handleWeaponKindMasteryClose',
+                'handleFlurryOfBlowsConfirm',
+                'handleFlurryOfBlowsSkip',
             ]);
             for (const handler of Object.values(handlers)) {
                 expect(typeof handler).toBe('function');

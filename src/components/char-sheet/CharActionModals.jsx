@@ -63,6 +63,7 @@ import MassCureWoundsModal from './modals/MassCureWoundsModal.jsx'
 import PrayerOfHealingModal from './modals/PrayerOfHealingModal.jsx'
 import PowerWordFortifyModal from './modals/PowerWordFortifyModal.jsx'
 import MassHealingWordModal from './modals/MassHealingWordModal.jsx'
+import FlurryOfBlowsTargetPopup from './popups/FlurryOfBlowsTargetPopup.jsx'
 import { handleApply } from '../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js'
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
@@ -212,6 +213,7 @@ export default function CharActionModals({
     handlePrayerOfHealingConfirm,
     handlePowerWordFortifyConfirm,
     handleMassHealingWordConfirm,
+    handleFlurryOfBlowsConfirm,
 }) {
     const [combatSummary, setCombatSummary] = React.useState(null);
     const mergedModalState = React.useMemo(() => {
@@ -874,6 +876,15 @@ export default function CharActionModals({
                         </div>
                     </div>
                 </div>
+            )}
+            {mergedModalState.flurryOfBlowsModal && (
+                <FlurryOfBlowsTargetPopup
+                    totalAttacks={mergedModalState.flurryOfBlowsModal.numAttacks || 3}
+                    creatureTargets={mergedModalState.flurryOfBlowsModal.creatureTargets}
+                    currentTargetName={mergedModalState.flurryOfBlowsModal.currentTargetName}
+                    onConfirm={handleFlurryOfBlowsConfirm}
+                    onSkip={() => setModalState({ flurryOfBlowsModal: null })}
+                />
             )}
             {mergedModalState.starryFormConstellationModal && (
                 <ConstellationSelectionModal

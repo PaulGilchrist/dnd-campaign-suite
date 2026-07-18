@@ -146,6 +146,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         handleAttackRiderManeuverUse,
         handleAttackRiderManeuverSkip,
         handleCombatSuperiorityConfirm,
+        handleFlurryOfBlowsConfirm,
+        handleFlurryOfBlowsSkip,
     } = useCharActionModals({
         playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects,
         popupHtml, setPopupHtml, rollDamage, rollAttack, buildCtx, buildCtxSync,
@@ -1048,8 +1050,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         // Skip FP cost for Hand of Healing and Flurry of Blows when Flurry of Healing and Harm is active
         // Skip FP cost for Flurry of Blows when Cloak of Shadows (Shadow Flurry) is active
         if (MONK_KI_FEATURES.includes(action.name)) {
-            const skipFP = (HAS_FLURRY_HEALING_HARM && (action.name === 'Hand of Healing' || action.name === 'Flurry of Blows'))
-                || (cloakActive && action.name === 'Flurry of Blows');
+            const skipFP = (HAS_FLURRY_HEALING_HARM && (action.name === 'Hand of Healing' || action.name === 'Flurry of Blows' || action.name === 'Heightened Flurry of Blows'))
+                || (cloakActive && (action.name === 'Flurry of Blows' || action.name === 'Heightened Flurry of Blows'));
             if (!skipFP) {
                 const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
                 const maxFP = classLevel?.focus_points || getClassFeatures(playerStats)?.maxFocusPoints || 0;
@@ -1261,6 +1263,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         }});
                         break;
                     }
+                    case 'flurryOfBlows':
+                        setModalState({ flurryOfBlowsModal: result.payload });
+                        break;
                 }
                 break;
             case 'roll':
@@ -1565,6 +1570,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handlePrayerOfHealingConfirm={handlePrayerOfHealingConfirm}
                     handlePowerWordFortifyConfirm={handlePowerWordFortifyConfirm}
                     handleMassHealingWordConfirm={handleMassHealingWordConfirm}
+                    handleFlurryOfBlowsConfirm={handleFlurryOfBlowsConfirm}
+                    handleFlurryOfBlowsSkip={handleFlurryOfBlowsSkip}
                 />
                 <CharActionSpellPopups
                     playerStats={playerStats}
