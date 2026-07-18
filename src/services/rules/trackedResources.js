@@ -54,6 +54,7 @@ export const ALL_TRACKED_RESOURCES = [
   'spell_slots_level_8',
   'spell_slots_level_9',
   'tamedSurgeUses',
+  'featsOfChaosUses',
 ]
 
 const SPELL_SLOT_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -233,6 +234,13 @@ export function computeTrackedResources(playerStats) {
   const isCircleOfTheStars = playerStats.class?.major?.name === 'Circle of the Stars' || playerStats.class?.subclass?.name === 'Circle of the Stars'
   const maxCosmicOmen = isDruid && isCircleOfTheStars && playerStats.level >= 6 ? Math.max(wis?.bonus || 0, 1) : 0
   resources.cosmicomenUses = { current: maxCosmicOmen, max: maxCosmicOmen }
+
+  const isWildMagic = playerStats.class?.subclass?.name === 'Wild Magic Sorcery'
+  const isWildMagic2024 = playerStats.rules === '2024' && isWildMagic
+  const hasFeatsOfChaos = (playerStats.automation?.specialActions ?? []).some(a => a.type === 'feats_of_chaos') ||
+    (playerStats.automation?.passives ?? []).some(a => a.type === 'feats_of_chaos')
+  const maxFoC = (isWildMagic2024 || hasFeatsOfChaos) ? 1 : 0
+  resources.featsOfChaosUses = { current: maxFoC, max: maxFoC }
 
   const isDruidStars = playerStats.class?.name === 'Druid' && isCircleOfTheStars
   const maxStarMap = isDruidStars && playerStats.level >= 3 ? Math.max(wis?.bonus || 0, 1) : 0

@@ -915,6 +915,15 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'third_eye':
                 result.bonusActions.push(info);
                 break;
+            case 'wild_magic_surge':
+                result.passives.push(info);
+                break;
+            case 'wild_magic_tamed':
+                result.passives.push(info);
+                break;
+            case 'feats_of_chaos':
+                result.passives.push(info);
+                break;
             case 'phantasmal_creatures':
                 result.passives.push(info);
                 break;

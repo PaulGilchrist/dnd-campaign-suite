@@ -838,6 +838,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     const wmsResult = await triggerWildMagicSurge(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Wild Magic Surge trigger failed:', e);
     });
+    console.log('[spellCast] triggerWildMagicSurge returned:', JSON.stringify({ type: wmsResult?.type, modalName: wmsResult?.modalName, hasPayload: !!wmsResult?.payload }));
     if (wmsResult) triggerResult = wmsResult;
     triggerBewitchingMagic(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Bewitching Magic trigger failed:', e);
@@ -1317,7 +1318,7 @@ function getMagicMissileCount(slotLevel) {
     return 3 + (slotLevel - 1);
 }
 
-async function executeMagicMissile(spell, metaCtx, { rollDamage: _rollDamage, playerStats, getTargetInfo: _getTargetInfo, campaignName, mapName: _mapName, characters }) {
+async function executeMagicMissile(spell, metaCtx, { rollDamage, playerStats, getTargetInfo: _getTargetInfo, campaignName, mapName: _mapName, characters }) {
     const slotLevel = metaCtx?.slotLevel || spell.level;
     const numMissiles = getMagicMissileCount(slotLevel);
     const missileDamage = '1d4 + 1';
@@ -1375,6 +1376,13 @@ async function executeMagicMissile(spell, metaCtx, { rollDamage: _rollDamage, pl
         }
 
         const missileFormula = missileCount === 1 ? missileDamage : `${missileCount}× ${missileDamage}`;
+
+        rollDamage(`Magic Missile (${targetName})`, missileFormula, totalTargetDamage, missileRolls, 0, {
+            targetName,
+            isAutoDamage: true,
+            damageType,
+            isAutoHit: true,
+        });
 
         logEntries.push({
             type: 'roll',

@@ -1287,5 +1287,11 @@ export function createLogAndShow(deps) {
             window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: firstName, roll: effectiveD20Roll + totalBonus } }));
             clearHuntersMarkConcentration(firstName, campaignName);
         }
+
+        // Consume Feats of Chaos after one d20 roll
+        const focActive = getRuntimeValue(characterName, 'featsOfChaosActive', campaignName);
+        if (focActive === true) {
+            setRuntimeValue(characterName, 'featsOfChaosActive', false, campaignName, true);
+        }
     };
 }

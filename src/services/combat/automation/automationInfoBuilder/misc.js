@@ -410,7 +410,7 @@ export const miscHandlers = {
     'feats_of_chaos': (feature, _playerStats) => {
         const auto = feature.automation
         return {
-            type: 'conditional_advantage',
+            type: 'feats_of_chaos',
             name: feature.name,
             target: auto.target || 'd20',
             condition: auto.condition || 'feats_of_chaos_active',

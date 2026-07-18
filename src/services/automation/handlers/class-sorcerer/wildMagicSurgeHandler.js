@@ -23,8 +23,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
 
-    const skip = await checkOncePerTurn(action.name, 'surgeUsedRound', campaignName);
-    if (skip) return skip;
+    if (!auto?.autoSurge) {
+        const skip = await checkOncePerTurn(action.name, 'surgeUsedRound', campaignName);
+        if (skip) return skip;
+    }
 
     const activeEffects = await getSurgeEffects(playerName, campaignName);
     const hasRollOnTableEffect = activeEffects.some(e => e && e.effect && e.effect.includes('Roll on the surge table at the start of each turn'));
@@ -35,7 +37,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     if (doubleRoll) {
         await setRuntimeValue(playerName, 'wildMagicDoubleRoll', false, campaignName, true);
-        await markOncePerTurn(action.name, 'surgeUsedRound', playerStats, campaignName);
+        if (!auto?.autoSurge) {
+            await markOncePerTurn(action.name, 'surgeUsedRound', playerStats, campaignName);
+        }
         return {
             type: 'modal',
             modalName: 'wildMagicSurge',
@@ -51,7 +55,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    if (!hasRollOnTableEffect && d20Roll !== 20) {
+    if (!auto?.autoSurge && !hasRollOnTableEffect && d20Roll !== 20) {
         return {
             type: 'popup',
             payload: {
@@ -63,7 +67,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    await markOncePerTurn(action.name, 'surgeUsedRound', playerStats, campaignName);
+    if (!auto?.autoSurge) {
+        await markOncePerTurn(action.name, 'surgeUsedRound', playerStats, campaignName);
+    }
 
     return {
         type: 'modal',
@@ -115,6 +121,12 @@ export async function handleTamedSurge(action, playerStats, campaignName, _mapNa
 export async function onSurgeSelected(featureName, playerStats, campaignName, selectedRoll, surgeEntry) {
     const playerName = playerStats.name;
     const auto = featureName ? { type: 'wild_magic_surge' } : { type: 'wild_magic_surge' };
+
+    const existingEffects = await getSurgeEffects(playerName, campaignName);
+    const alreadyApplied = existingEffects.some(e => e.roll === selectedRoll && e.effect === surgeEntry.effect);
+    if (alreadyApplied) {
+        return null;
+    }
 
     const surgeEffect = {
         roll: selectedRoll,
@@ -247,13 +259,14 @@ export async function onTamedSurgeSelected(action, playerStats, campaignName, se
     };
 }
 
-export async function handleFeatsOfChaos(action, playerStats, _campaignName, _mapName) {
+export async function handleFeatsOfChaos(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
 
     const usesKey = 'featsOfChaosUses';
     const currentUses = getRuntimeValue(playerName, usesKey);
     const normalizedUses = currentUses === null || currentUses === undefined ? 1 : Number(currentUses);
+    console.log('[handleFeatsOfChaos] playerName:', playerName, 'usesKey:', usesKey, 'currentUses:', currentUses, 'normalizedUses:', normalizedUses);
 
     if (normalizedUses <= 0) {
         return {
@@ -261,27 +274,33 @@ export async function handleFeatsOfChaos(action, playerStats, _campaignName, _ma
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: `${action.name} has no uses remaining. Recharges after a Long Rest.`,
+                description: `${action.name} has no uses remaining. Must cast Sorcerer spell with spell slot or finish Long Rest to recharge.`,
                 automation: auto,
             },
         };
     }
+
+    const newUses = normalizedUses - 1;
+    await setRuntimeValue(playerName, usesKey, newUses, campaignName, true);
+    await setRuntimeValue(playerName, 'featsOfChaosActive', true, campaignName, true);
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: action.name,
+        description: `${playerName} activated Feats of Chaos: Advantage on next D20 test.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[FeatsOfChaos] Error logging:", e); });
 
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
             name: action.name,
-            description: `<b>${action.name}: Advantage on next D20 test.</b><br/>Next Sorcerer spell cast will trigger a Wild Magic Surge.`,
+            description: `<b>Advantage on next D20 test.</b><br/>Next Sorcerer spell cast with spell slot will trigger a Wild Magic Surge and recharge this feature.`,
             automation: auto,
         },
     };
-}
-
-export async function onFeatsOfChaosActivate(action, playerStats, campaignName) {
-    const playerName = playerStats.name;
-    await setRuntimeValue(playerName, 'featsOfChaosActive', true, campaignName, true);
-    return { featsOfChaosActive: true };
 }
 
 export async function onFeatsOfChaosConsume(action, playerStats, campaignName) {
