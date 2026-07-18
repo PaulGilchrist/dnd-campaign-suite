@@ -365,7 +365,6 @@ export function collectAutomationFromFeatures(features, playerStats) {
 
             case 'resource_pool':
             case 'open_hand_technique':
-            case 'initiative_action':
             case 'spell_modifier':
             case 'font_of_magic':
             case 'divine_spark':
@@ -413,6 +412,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'temp_hp_buff':
             case 'damage_aura':
             case 'combat_stance':
+            case 'initiative_action':
                 result.specialActions.push(info)
                 break
             case 'attack_rider':

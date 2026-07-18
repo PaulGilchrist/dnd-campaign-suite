@@ -94,19 +94,6 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
             // Check if Uncanny Metabolism was used this initiative
             const uncannyMetabolismUsed = getRuntimeValue(playerStats.name, 'uncannyMetabolismUsed', campaignName) === true;
 
-            // Recover Focus Points (Monk Uncanny Metabolism passive)
-            const automationActions = playerStats.automation?.actions || [];
-            const hasFocusPointsAction = automationActions.some(a => a.type === 'initiative_action' && a.effect !== 'wild_shape_regen_on_initiative');
-            if (hasFocusPointsAction && !hasPerfectFocus) {
-                const maxFP = classLevel?.focus_points || getRuntimeValue(playerStats.name, 'focusPoints', campaignName) || 0;
-                if (maxFP > 0) {
-                    const currentFP = Number(getRuntimeValue(playerStats.name, 'focusPoints', campaignName) ?? 0);
-                    if (currentFP < maxFP) {
-                        setRuntimeValue(playerStats.name, 'focusPoints', maxFP, campaignName);
-                    }
-                }
-            }
-
             // Perfect Focus: recover to 4 if ≤ 3 and Uncanny Metabolism not used
             if (hasPerfectFocus && !uncannyMetabolismUsed) {
                 const focusPointsTarget = 4;
@@ -122,7 +109,7 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
             }
 
             // Recover Wild Shape use on initiative (Archdruid Evergreen Wild Shape)
-            const hasEvergreen = automationActions.some(a => a.type === 'initiative_action' && a.effect === 'wild_shape_regen_on_initiative');
+            const hasEvergreen = (playerStats.automation?.actions ?? []).some(a => a.type === 'initiative_action' && a.effect === 'wild_shape_regen_on_initiative');
             if (hasEvergreen) {
                 const druidLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
                 const maxWS = druidLevel?.wild_shape || 0;

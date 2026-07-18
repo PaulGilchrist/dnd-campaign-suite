@@ -3,6 +3,7 @@ import { rollExpression } from '../../../dice/diceRoller.js';
 import { logHealingToSSE } from '../../common/healingRoll.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import storage from '../../../ui/storage.js';
+import { addEntry } from '../../../ui/logService.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -112,7 +113,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 description: `${action.name}: You regained 1 use of Wild Shape.`,
                },
           };
-     }
+      }
 
     if (auto.effect === 'regain_bardic_inspiration_on_initiative') {
         const minTarget = auto.minTarget || 2;
@@ -158,18 +159,15 @@ export async function handle(action, playerStats, campaignName, _mapName) {
           };
         }
 
-    const resourceKey = auto.resourceKey || action.name.toLowerCase().replace(/\s+/g, '') + 'Uses';
-    const maxUses = auto.usesMax || auto.uses || 1;
-    const currentUses = Number(getRuntimeValue(playerStats.name, resourceKey, campaignName) ?? maxUses);
-    if (currentUses <= 0) {
+    const uncannyMetabolismUsed = getRuntimeValue(playerStats.name, 'uncannyMetabolismUsed', campaignName) === true;
+    if (uncannyMetabolismUsed) {
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: action.name,
                 automationType: auto.type,
-                description: `${action.name} has been used and cannot be used again until a long rest.` +
-                        (auto.recharge === 'long_rest' ? '' : ` Recharges on ${auto.recharge || 'short rest'}.`),
+                description: `${action.name} has been used and cannot be used again until a long rest.`,
                 },
               };
             }
@@ -197,8 +195,19 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         });
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 
-    setRuntimeValue(playerStats.name, resourceKey, currentUses - 1, campaignName);
+    const maxFP = classLevel?.focus_points || 0;
+    if (maxFP > 0) {
+        setRuntimeValue(playerStats.name, 'focusPoints', maxFP, campaignName);
+    }
+
     setRuntimeValue(playerStats.name, 'uncannyMetabolismUsed', true, campaignName);
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: action.name,
+        description: `Rolled ${rollResult.total} (1d${martialArtsDie}) + ${monkLevel} (Monk level) = <strong>${healAmount}</strong> HP. Regained all Focus Points.`,
+    }).catch(() => {});
 
     return {
         type: 'popup',
@@ -210,11 +219,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             bonus: monkLevel,
             modifier: 0,
             healAmount,
-            description: `${action.name}: Rolled ${rollResult.total} (1d${martialArtsDie}) + ${monkLevel} (Monk level) = <strong>${healAmount}</strong> HP`,
+            description: `${action.name}: Rolled ${rollResult.total} (1d${martialArtsDie}) + ${monkLevel} (Monk level) = <strong>${healAmount}</strong> HP. Regained all Focus Points.`,
             targetName: playerStats.name,
             targetCurrentHp: newHp,
             targetMaxHp: maxHp,
             damageApplied: true,
              },
-            };
+             };
 }

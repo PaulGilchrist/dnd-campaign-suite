@@ -28,6 +28,10 @@ vi.mock('../../../ui/storage.js', () => {
   return { default: storage };
 });
 
+vi.mock('../../../../services/ui/logService.js', () => ({
+  addEntry: vi.fn(),
+}));
+
 // ── Imports ─────────────────────────────────────────────────────
 
 import { handle } from './initiativeHandler.js';
@@ -36,6 +40,7 @@ import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as diceRoller from '../../../dice/diceRoller.js';
 import * as healingRoll from '../../common/healingRoll.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
+import * as logService from '../../../../services/ui/logService.js';
 import storage from '../../../ui/storage.js';
 
 // ── Helpers ─────────────────────────────────────────────────────
@@ -85,6 +90,7 @@ describe('initiativeHandler.handle', () => {
     useRuntimeState.setRuntimeValue.mockReset().mockResolvedValue(undefined);
     diceRoller.rollExpression.mockReset().mockReturnValue(null);
     healingRoll.logHealingToSSE.mockReset().mockReturnValue(undefined);
+    logService.addEntry.mockReset().mockResolvedValue(undefined);
     damageUtils.getCombatContext.mockReset().mockResolvedValue(null);
     storage.set.mockReset().mockResolvedValue(undefined);
     vi.stubGlobal('window', { dispatchEvent: vi.fn() });
@@ -509,13 +515,12 @@ describe('initiativeHandler.handle', () => {
       });
     }
 
-    it('returns popup when uses exhausted (usesMax)', async () => {
+    it('returns popup when Uncanny Metabolism already used this combat', async () => {
       const ps = makeMonkStats();
       const action = makeAction({
         effect: 'regain_focus_points_and_heal',
-        usesMax: 1,
       });
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
+      useRuntimeState.getRuntimeValue.mockReturnValueOnce(true);
 
       const result = await handle(action, ps, campaignName, null);
 
@@ -529,10 +534,9 @@ describe('initiativeHandler.handle', () => {
       const ps = makeMonkStats();
       const action = makeAction({
         effect: 'regain_focus_points_and_heal',
-        usesMax: 2,
       });
       useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
+        .mockReturnValueOnce(false)
         .mockReturnValueOnce(15);
       diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6] });
 
@@ -551,10 +555,9 @@ describe('initiativeHandler.handle', () => {
       const ps = makeMonkStats({ hitPoints: 20 });
       const action = makeAction({
         effect: 'regain_focus_points_and_heal',
-        usesMax: 2,
       });
       useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
+        .mockReturnValueOnce(false)
         .mockReturnValueOnce(18);
       diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6] });
 
@@ -564,36 +567,13 @@ describe('initiativeHandler.handle', () => {
       expect(result.payload.healAmount).toBe(9);
     });
 
-    it('increments uses count after healing', async () => {
-      const ps = makeMonkStats();
-      const action = makeAction({
-        effect: 'regain_focus_points_and_heal',
-        usesMax: 2,
-        resourceKey: 'focusUses',
-      });
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
-        .mockReturnValueOnce(15);
-      diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4] });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Bard',
-        'focusUses',
-        1,
-        campaignName
-      );
-    });
-
     it('logs healing to SSE', async () => {
       const ps = makeMonkStats();
       const action = makeAction({
         effect: 'regain_focus_points_and_heal',
-        usesMax: 2,
       });
       useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
+        .mockReturnValueOnce(false)
         .mockReturnValueOnce(15);
       diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4] });
 
@@ -615,10 +595,9 @@ describe('initiativeHandler.handle', () => {
       const ps = makeMonkStats();
       const action = makeAction({
         effect: 'regain_focus_points_and_heal',
-        usesMax: 2,
       });
       useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
+        .mockReturnValueOnce(false)
         .mockReturnValueOnce(15);
       diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4] });
 
@@ -636,10 +615,9 @@ describe('initiativeHandler.handle', () => {
       const ps = makeMonkStats();
       const action = makeAction({
         effect: 'regain_focus_points_and_heal',
-        usesMax: 2,
       });
       useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
+        .mockReturnValueOnce(false)
         .mockReturnValueOnce(15);
       diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4] });
 
@@ -653,14 +631,59 @@ describe('initiativeHandler.handle', () => {
       );
     });
 
+    it('restores focus points to max after healing', async () => {
+      const ps = makeMonkStats({
+        class: { name: 'Monk', class_levels: [
+          { level: 1, martial_arts_die: 4 },
+          { level: 2, martial_arts_die: 4, focus_points: 2 },
+          { level: 3, martial_arts_die: 6, focus_points: 2 },
+        ]},
+      });
+      const action = makeAction({
+        effect: 'regain_focus_points_and_heal',
+      });
+      useRuntimeState.getRuntimeValue
+        .mockReturnValueOnce(false)
+        .mockReturnValueOnce(15);
+      diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4] });
+
+      await handle(action, ps, campaignName, null);
+
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Bard',
+        'focusPoints',
+        2,
+        campaignName
+      );
+    });
+
+    it('logs ability_use to campaign log', async () => {
+      const ps = makeMonkStats();
+      const action = makeAction({
+        effect: 'regain_focus_points_and_heal',
+      });
+      useRuntimeState.getRuntimeValue
+        .mockReturnValueOnce(false)
+        .mockReturnValueOnce(15);
+      diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5] });
+
+      await handle(action, ps, campaignName, null);
+
+      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'ability_use',
+        characterName: 'Bard',
+        abilityName: 'Tandem Footwork',
+        description: expect.stringContaining('Rolled 5'),
+      });
+    });
+
     it('returns correct description with roll details', async () => {
       const ps = makeMonkStats();
       const action = makeAction({
         effect: 'regain_focus_points_and_heal',
-        usesMax: 2,
       });
       useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
+        .mockReturnValueOnce(false)
         .mockReturnValueOnce(15);
       diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6] });
 
@@ -669,47 +692,23 @@ describe('initiativeHandler.handle', () => {
       expect(result.payload.description).toContain('Rolled 6');
       expect(result.payload.description).toContain('+ 3');
       expect(result.payload.description).toContain('<strong>9</strong>');
+      expect(result.payload.description).toContain('Regained all Focus Points');
     });
 
     it('returns null when rollExpression returns null', async () => {
       const ps = makeMonkStats();
       const action = makeAction({
         effect: 'regain_focus_points_and_heal',
-        usesMax: 2,
       });
       useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2);
+        .mockReturnValueOnce(false);
       diceRoller.rollExpression.mockReturnValue(null);
 
       const result = await handle(action, ps, campaignName, null);
 
       expect(result).toBeNull();
       expect(healingRoll.logHealingToSSE).not.toHaveBeenCalled();
-    });
-
-    it('defaults resourceKey from action.name when not provided', async () => {
-      const ps = makeMonkStats();
-      const action = {
-        name: 'Diamond Soul',
-        automation: {
-          type: 'initiative',
-          effect: 'regain_focus_points_and_heal',
-          usesMax: 2,
-        },
-      };
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
-        .mockReturnValueOnce(15);
-      diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4] });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Bard',
-        'diamondsoulUses',
-        1,
-        campaignName
-      );
+      expect(logService.addEntry).not.toHaveBeenCalled();
     });
 
     it('uses martial_arts_die fallback of 4 when class_level missing', async () => {
@@ -717,45 +716,15 @@ describe('initiativeHandler.handle', () => {
       ps.class.class_levels = [];
       const action = makeAction({
         effect: 'regain_focus_points_and_heal',
-        usesMax: 2,
       });
       useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
+        .mockReturnValueOnce(false)
         .mockReturnValueOnce(10);
       diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4] });
 
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.payload.formula).toBe('1d4 + 99');
-    });
-
-    it('includes recharge message when recharge is short_rest', async () => {
-      const ps = makeMonkStats();
-      const action = makeAction({
-        effect: 'regain_focus_points_and_heal',
-        usesMax: 1,
-        recharge: 'short_rest',
-      });
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('Recharges on short_rest');
-    });
-
-    it('omits recharge message when recharge is long_rest', async () => {
-      const ps = makeMonkStats();
-      const action = makeAction({
-        effect: 'regain_focus_points_and_heal',
-        usesMax: 1,
-        recharge: 'long_rest',
-      });
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('cannot be used again until a long rest');
-      expect(result.payload.description).not.toContain('Recharges on');
     });
   });
 
