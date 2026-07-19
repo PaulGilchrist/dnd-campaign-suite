@@ -24,13 +24,6 @@ export function collectTurnStartEffects(features) {
                     })
                 }
             }
-            if (auto?.type === 'passive_rule' && auto?.effect === 'superior_defense') {
-                effects.push({
-                    type: 'superior_defense',
-                    name: feature.name,
-                    cost: auto.cost || 3,
-                })
-            }
             if (auto?.type === 'passive_rule' && auto?.effect === 'flurry_healing_harm') {
                 effects.push({
                     type: 'flurry_healing_harm',

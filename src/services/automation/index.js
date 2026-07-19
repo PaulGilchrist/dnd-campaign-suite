@@ -237,6 +237,7 @@ const PASSIVE_RULE_EFFECTS = {
     evocation_savant: makeSavantHandler('evocation_savant'),
     illusion_savant: makeSavantHandler('illusion_savant'),
     persistent_rage: handlePersistentRage,
+    superior_defense: handleSuperiorDefense,
 };
 
 const HANDLER_MAP = {

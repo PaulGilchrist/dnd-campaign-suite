@@ -212,7 +212,6 @@ describe('collectTurnStartEffects – behavioral routing', () => {
 
     it('routes passive_rule effects with custom overrides', () => {
         const overrides = [
-            { effect: 'superior_defense', field: 'cost', value: 5, default: 3 },
             { effect: 'flurry_healing_harm', field: 'usesExpression', value: 'CHA modifier', default: 'WIS modifier minimum 1' },
             { effect: 'dread_ambush_speed', field: 'bonusExpression', value: '15', default: '10' },
             { effect: 'create_thrall_temp_hp', field: 'tempHpExpression', value: 'warlock level', default: 'warlock level + CHA modifier' },
@@ -334,13 +333,12 @@ describe('collectTurnStartEffects – behavioral routing', () => {
         const result = collectTurnStartEffects([{
             name: 'Multi',
             automation: [
-                { type: 'passive_rule', effect: 'superior_defense' },
                 { type: 'passive_rule', effect: 'naturally_stealthy' },
                 { type: 'passive_rule', effect: 'umbral_sight' },
             ]
         }])
-        expect(result).toHaveLength(3)
-        expect(result.map(r => r.type)).toEqual(['superior_defense', 'naturally_stealthy', 'umbral_sight'])
+        expect(result).toHaveLength(2)
+        expect(result.map(r => r.type)).toEqual(['naturally_stealthy', 'umbral_sight'])
     })
 })
 

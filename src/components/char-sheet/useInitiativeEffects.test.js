@@ -538,6 +538,69 @@ describe('useInitiativeEffects', () => {
                 );
             });
         });
+
+        describe('superior defense buff clearing', () => {
+            it('removes Superior Defense buff from activeBuffs on initiative roll', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'activeBuffs') return [
+                        { name: 'Superior Defense', effect: 'damage_resistance' },
+                        { name: 'Mage Armor', effect: 'mage_armor' },
+                    ];
+                    return null;
+                });
+                renderHookWithStats();
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).toHaveBeenCalledWith(
+                    'TestMonk',
+                    'activeBuffs',
+                    [
+                        { name: 'Mage Armor', effect: 'mage_armor' },
+                    ],
+                    campaignName
+                );
+            });
+
+            it('does nothing when no Superior Defense buff is present', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'activeBuffs') return [
+                        { name: 'Mage Armor', effect: 'mage_armor' },
+                    ];
+                    return null;
+                });
+                renderHookWithStats();
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                    'TestMonk',
+                    'activeBuffs',
+                    expect.any(Array),
+                    campaignName
+                );
+            });
+
+            it('does nothing when no activeBuffs exist', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'activeBuffs') return null;
+                    return null;
+                });
+                renderHookWithStats();
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                    'TestMonk',
+                    'activeBuffs',
+                    expect.any(Array),
+                    campaignName
+                );
+            });
+        });
     });
 
     describe('turn-undead-result event', () => {

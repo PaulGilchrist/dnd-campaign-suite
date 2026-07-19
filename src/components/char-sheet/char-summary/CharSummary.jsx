@@ -234,6 +234,11 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
             .flatMap(b => b.resistanceTypes || [])
         : [];
 
+    const superiorDefenseResistances = Array.isArray(activeBuffs)
+        ? activeBuffs.filter(b => b.name === 'Superior Defense' && b.resistanceTypes?.length)
+            .flatMap(b => b.resistanceTypes || [])
+        : [];
+
     const rageActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Rage');
     const rageConditionalImmunities = rageActive
         ? (playerStats.automationConditionalImmunities || [])
@@ -243,7 +248,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
 
     const allImmunities = [...new Set([...baseImmunities, ...auraImmunities, ...rageConditionalImmunities])];
 
-    const allResistances = [...new Set([...baseResistances, ...auraResistances, ...stormbornResistancesActive, ...rageResistances, ...wildHeartResistances, ...rageOfTheGodsResistances])];
+    const allResistances = [...new Set([...baseResistances, ...auraResistances, ...stormbornResistancesActive, ...rageResistances, ...wildHeartResistances, ...rageOfTheGodsResistances, ...superiorDefenseResistances])];
 
     let flySpeed = null;
     let hasFlySpeedBuff = false;
@@ -500,7 +505,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
               <b>Resistances: </b>
               {allResistances.map((r, i) => (
                 <span key={r}>
-                  {i > 0 ? ', ' : ''}{r}
+                  {i > 0 ? ', ' : ''}{r.charAt(0).toUpperCase() + r.slice(1)}
                   {auraResistances.includes(r) && auraResistanceSource && <span className="aura-source" title={`From ${auraResistanceSource}'s Aura of Warding`}>*</span>}
                 </span>
               ))}

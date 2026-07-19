@@ -35,7 +35,6 @@ describe('collectTurnStartEffects', () => {
 
     describe('passive_rule effects with custom overrides', () => {
         const overridableEffects = [
-            { effect: 'superior_defense', field: 'cost', value: 5, default: 3 },
             { effect: 'flurry_healing_harm', field: 'usesExpression', value: 'CHA modifier', default: 'WIS modifier minimum 1' },
             { effect: 'dread_ambush_speed', field: 'bonusExpression', value: '15', default: '10' },
             { effect: 'create_thrall_temp_hp', field: 'tempHpExpression', value: 'warlock level', default: 'warlock level + CHA modifier' },
@@ -485,14 +484,12 @@ describe('collectTurnStartEffects', () => {
             const result = collectTurnStartEffects([{
                 name: 'Multi Feature',
                 automation: [
-                    { type: 'passive_rule', effect: 'superior_defense' },
                     { type: 'passive_rule', effect: 'naturally_stealthy' },
                     { type: 'naturally_stealthy' },
                 ]
             }])
-            expect(result).toHaveLength(2)
-            expect(result[0].type).toBe('superior_defense')
-            expect(result[1].type).toBe('naturally_stealthy')
+            expect(result).toHaveLength(1)
+            expect(result[0].type).toBe('naturally_stealthy')
         })
 
         it('merges effects from multiple features', () => {

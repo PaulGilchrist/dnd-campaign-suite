@@ -10,12 +10,6 @@ import { applyDamageToTarget } from '../../rules/combat/applyDamage.js';
 import { processSlowRepeatSave } from '../../automation/handlers/spells/slowHandler.js';
 import { processTashasLaughterRepeatSave } from '../../automation/handlers/spells/tashasLaughterHandler.js';
 
-const ALL_DAMAGES_EXCEPT_FORCE = [
-    'acid', 'bludgeoning', 'cold', 'fire', 'lightning',
-    'piercing', 'poison', 'slashing', 'thunder',
-    'necrotic', 'psychic', 'radiant'
-];
-
  const KEY = 'pendingExpirations';
 
 
@@ -79,9 +73,6 @@ export async function applyTurnStartEffects(activeName, playerStats, campaignNam
             if (filtered.length !== conditions.length) {
                 setRuntimeValue(activeName, 'activeConditions', filtered, campaignName);
             }
-        }
-        if (effect.type === 'superior_defense') {
-            applySuperiorDefenseTurnStart(activeName, playerStats, effect, campaignName);
         }
         if (effect.type === 'flurry_healing_harm') {
             applyFlurryHealingHarmTurnStart(activeName, playerStats, effect, campaignName);
@@ -267,51 +258,6 @@ export async function applyTurnStartEffects(activeName, playerStats, campaignNam
             }
         }
     }
-}
-
-async function applySuperiorDefenseTurnStart(activeName, playerStats, effect, campaignName) {
-    const conditions = Array.isArray(getRuntimeValue(activeName, 'activeConditions')) ? getRuntimeValue(activeName, 'activeConditions') : [];
-    const isIncapacitated = conditions.some(c => String(c).toLowerCase() === 'incapacitated');
-    if (isIncapacitated) {
-        return;
-    }
-
-    const stored = getRuntimeValue(activeName, 'activeBuffs', campaignName);
-    const activeBuffs = Array.isArray(stored) ? stored : [];
-    if (activeBuffs.some(b => b.name === 'Superior Defense')) {
-        return;
-    }
-
-    if (effect.cost == null) {
-        console.error('[expirations] applySuperiorDefenseTurnStart: effect.cost is missing')
-        throw new Error('effect.cost is required for Superior Defense')
-      }
-      const cost = effect.cost
-    const maxFocus = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.focus_points || 0;
-    const currentFocus = Number(getRuntimeValue(activeName, 'focusPoints', campaignName) ?? maxFocus);
-
-    if (currentFocus < cost) {
-        return;
-    }
-
-    await setRuntimeValue(activeName, 'focusPoints', currentFocus - cost, campaignName);
-
-    const buff = {
-        name: 'Superior Defense',
-        effect: 'damage_resistance',
-        duration: '1_minute',
-        resistanceTypes: ALL_DAMAGES_EXCEPT_FORCE,
-    };
-
-    const newBuffs = [...activeBuffs, buff];
-    setRuntimeValue(activeName, 'activeBuffs', newBuffs, campaignName);
-
-    await addEntry(campaignName, {
-        type: 'ability_use',
-        characterName: activeName,
-        abilityName: 'Superior Defense',
-        description: `${activeName} activated Superior Defense at start of turn. Resistance to all damage except Force.`,
-    }).catch(() => {});
 }
 
 async function applyFlurryHealingHarmTurnStart(activeName, playerStats, effect, campaignName) {
