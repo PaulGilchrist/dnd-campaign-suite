@@ -12,6 +12,7 @@ export function applyHealingToTarget(combatSummary, targetName, healAmount, camp
     if (isPlayer && oldHp <= 0 && newHp > 0) {
         setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName);
         setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);
+        setRuntimeValue(creature.name, 'isDead', 0, campaignName);
     }
 
     if (!isPlayer && delta !== 0) {

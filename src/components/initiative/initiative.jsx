@@ -535,11 +535,12 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
           if (isPlayer) {
              setRuntimeValue(creature.name, 'currentHitPoints', newValue, campaignName)
-             if (oldHp <= 0 && newValue > 0) {
-                 setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName)
-                 setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName)
-                 clearDeathSavePrompt(campaignName, creature.name)
-             }
+              if (oldHp <= 0 && newValue > 0) {
+                  setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName)
+                  setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName)
+                  setRuntimeValue(creature.name, 'isDead', 0, campaignName)
+                  clearDeathSavePrompt(campaignName, creature.name)
+              }
           }
           else {
               creature.currentHp = newValue

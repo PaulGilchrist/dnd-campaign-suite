@@ -36,9 +36,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     await setRuntimeValue(playerName, RELENTLESS_ENDURANCE_KEY, true, campaignName);
     await setRuntimeValue(playerName, 'currentHitPoints', 1, campaignName);
 
-    // Reset death saves
+    // Reset death saves and clear dead flag
     await setRuntimeValue(playerName, 'deathSaves', [false, false, false], campaignName);
     await setRuntimeValue(playerName, 'deathFailures', [false, false, false], campaignName);
+    await setRuntimeValue(playerName, 'isDead', 0, campaignName);
 
     // Remove unconscious condition
     const conditions = getRuntimeValue(playerName, 'activeConditions', campaignName) || [];

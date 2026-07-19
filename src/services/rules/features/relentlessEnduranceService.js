@@ -39,6 +39,7 @@ export function checkRelentlessEndurance(creature, playerComputed, campaignName)
 
     setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName);
     setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);
+    setRuntimeValue(creature.name, 'isDead', 0, campaignName);
 
     const rawConditions = getRuntimeValue(creature.name, 'activeConditions', campaignName);
     const conditions = rawConditions || [];

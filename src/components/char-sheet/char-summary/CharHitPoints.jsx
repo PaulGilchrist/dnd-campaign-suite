@@ -45,6 +45,7 @@ function CharHitPoints({ playerStats, campaignName, isLocalhost }) {
           if (value > 0) {
               setRuntimeValue(playerStats.name, 'deathSaves', [false, false, false], campaignName);
               setRuntimeValue(playerStats.name, 'deathFailures', [false, false, false], campaignName);
+              setRuntimeValue(playerStats.name, 'isDead', 0, campaignName);
               clearDeathSavePrompt(campaignName, playerStats.name);
           }
       };

@@ -100,6 +100,7 @@ export function checkRelentlessRage(creature, playerComputed, campaignName) {
 
             await setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName);
             await setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);
+            await setRuntimeValue(creature.name, 'isDead', 0, campaignName);
 
             const rawConditions = getRuntimeValue(creature.name, 'activeConditions', campaignName);
             const conditions = rawConditions || [];

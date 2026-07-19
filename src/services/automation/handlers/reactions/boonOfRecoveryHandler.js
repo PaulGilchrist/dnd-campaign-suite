@@ -35,6 +35,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     await setRuntimeValue(playerName, 'deathSaves', [false, false, false], campaignName);
     await setRuntimeValue(playerName, 'deathFailures', [false, false, false], campaignName);
+    await setRuntimeValue(playerName, 'isDead', 0, campaignName);
 
     addEntry(campaignName, {
         type: 'hp_change',
