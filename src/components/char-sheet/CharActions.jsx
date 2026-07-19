@@ -1754,24 +1754,29 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                         setPopupHtml({ type: 'automation_info', name: 'Grapple', description: 'Target is already grappled.' });
                                         return;
                                     }
+                                    const isMonk = playerStats.class?.name === 'Monk';
                                     const strAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
                                     const strMod = strAbility?.bonus || 0;
-                                    let strCheckBonus = strMod - exhaustionPenalty;
+                                    const dexAbility = playerStats?.abilities?.find(a => a.name === 'Dexterity');
+                                    const dexMod = dexAbility?.bonus || 0;
+                                    const useAbility = isMonk ? 'Dexterity' : 'Strength';
+                                    const abilityMod = isMonk ? dexMod : strMod;
+                                    let checkBonus = abilityMod - exhaustionPenalty;
                                     const isJackOfAllTrades = playerStats?.automation?.passives?.some(p => p.type === 'jack_of_all_trades');
                                     if (isJackOfAllTrades) {
                                         const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
-                                        strCheckBonus += Math.floor(proficiency / 2);
+                                        checkBonus += Math.floor(proficiency / 2);
                                     }
                                     let checkContext = {};
-                                    if (conditionEffects?.strCheckDisadvantage) checkContext.forcedMode = 'disadvantage';
+                                    if (isMonk && conditionEffects?.peerlessAthleteAdvantageSkills && conditionEffects.peerlessAthleteAdvantageSkills.includes(useAbility)) {
+                                        checkContext.forcedMode = checkContext.forcedMode === 'disadvantage' ? undefined : 'advantage';
+                                    }
+                                    else if (conditionEffects?.strCheckDisadvantage) checkContext.forcedMode = 'disadvantage';
                                     if (conditionEffects?.abilityCheckDisadvantage) checkContext.forcedMode = 'disadvantage';
-                                    if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === 'Strength')) {
+                                    if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === useAbility)) {
                                         checkContext.forcedMode = checkContext.forcedMode === 'disadvantage' ? undefined : 'advantage';
                                     }
-                                    if (conditionEffects?.peerlessAthleteAdvantageSkills && conditionEffects.peerlessAthleteAdvantageSkills.includes('Strength')) {
-                                        checkContext.forcedMode = checkContext.forcedMode === 'disadvantage' ? undefined : 'advantage';
-                                    }
-                                    await rollAbilityCheck('Strength', strCheckBonus, checkContext);
+                                    await rollAbilityCheck(useAbility, checkBonus, checkContext);
                                     await new Promise(resolve => setTimeout(resolve, 50));
                                     const updatedCs = await loadCombatSummary(campaignName);
                                     const lastAttack = updatedCs?.lastAttack;
@@ -1807,20 +1812,20 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                                 await setRuntimeValue(targetCreature.name, 'activeConditions', [...filtered, 'grappled'], campaignName);
                                             }
                                         }
-                                        setPopupHtml({ type: 'automation_info', name: 'Grapple', description: `Grapple successful! (d20: ${d20Val} + ${strCheckBonus} = ${rollTotal}) vs target STR (${targetStrBonus >= 0 ? '+' : ''}${targetStrBonus}). Target is now grappled.` });
+                                        setPopupHtml({ type: 'automation_info', name: 'Grapple', description: `Grapple successful! (d20: ${d20Val} + ${checkBonus} = ${rollTotal}) vs target STR (${targetStrBonus >= 0 ? '+' : ''}${targetStrBonus}). Target is now grappled.` });
                                         await addEntry(campaignName, {
                                             type: 'ability_use',
                                             characterName: playerStats.name,
                                             abilityName: 'Grapple',
-                                            description: `Strength check: ${rollTotal} (d20: ${d20Val} + ${strCheckBonus}) vs target STR (${targetStrBonus >= 0 ? '+' : ''}${targetStrBonus}) — Success. Target is now grappled.`,
+                                            description: `${useAbility} check: ${rollTotal} (d20: ${d20Val} + ${checkBonus}) vs target STR (${targetStrBonus >= 0 ? '+' : ''}${targetStrBonus}) — Success. Target is now grappled.`,
                                         }).catch(() => { });
                                     } else {
-                                        setPopupHtml({ type: 'automation_info', name: 'Grapple', description: `Grapple failed! (d20: ${d20Val} + ${strCheckBonus} = ${rollTotal}) vs target STR (${targetStrBonus >= 0 ? '+' : ''}${targetStrBonus}). Target is not grappled.` });
+                                        setPopupHtml({ type: 'automation_info', name: 'Grapple', description: `Grapple failed! (d20: ${d20Val} + ${checkBonus} = ${rollTotal}) vs target STR (${targetStrBonus >= 0 ? '+' : ''}${targetStrBonus}). Target is not grappled.` });
                                         await addEntry(campaignName, {
                                             type: 'ability_use',
                                             characterName: playerStats.name,
                                             abilityName: 'Grapple',
-                                            description: `Strength check: ${rollTotal} (d20: ${d20Val} + ${strCheckBonus}) vs target STR (${targetStrBonus >= 0 ? '+' : ''}${targetStrBonus}) — Failure. Target is not grappled.`,
+                                            description: `${useAbility} check: ${rollTotal} (d20: ${d20Val} + ${checkBonus}) vs target STR (${targetStrBonus >= 0 ? '+' : ''}${targetStrBonus}) — Failure. Target is not grappled.`,
                                         }).catch(() => { });
                                     }
                                 }}>{actionName}</span>
