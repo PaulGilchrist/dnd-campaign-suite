@@ -29,8 +29,13 @@ vi.mock('../../../services/dice/diceRoller.js', () => ({
   rollD20: vi.fn(() => 15),
 }));
 
-import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+vi.mock('../../../services/ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
+}));
+
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import * as deathSaveRules from '../../../services/combat/conditions/deathSaveRules.js';
+import { addEntry } from '../../../services/ui/logService.js';
 
 describe('DeathSavingThrows', () => {
   const mockPlayerStats = {
@@ -65,7 +70,7 @@ describe('DeathSavingThrows', () => {
       expect(screen.getByText('Death Saves')).toBeInTheDocument();
     });
 
-    it('renders filled circles for recorded successes and failures', () => {
+    it('renders empty circles on mount (fresh death saves)', () => {
       getRuntimeValue.mockImplementation((name, prop) => {
         if (prop === 'deathSaves') return [true, true, false];
         if (prop === 'deathFailures') return [true, true, true];
@@ -74,8 +79,8 @@ describe('DeathSavingThrows', () => {
       render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
       const successTrack = screen.getByText(/Successes:/).parentElement;
       const failureTrack = screen.getByText(/Failures:/).parentElement;
-      expect(successTrack.textContent).toContain('⬤⬤◯');
-      expect(failureTrack.textContent).toContain('⬤⬤⬤');
+      expect(successTrack.textContent).toContain('◯◯◯');
+      expect(failureTrack.textContent).toContain('◯◯◯');
     });
 
     it('renders Stable or Dead indicator and hides roll button when stable or dead', () => {
@@ -94,6 +99,37 @@ describe('DeathSavingThrows', () => {
       deathSaveRules.isDead.mockReturnValue(false);
       render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
       expect(screen.queryByRole('button', { name: /roll/i })).toBeInTheDocument();
+    });
+
+    it('renders DEAD badge when isDead tracked resource is set', () => {
+      getRuntimeValue.mockImplementation((name, prop) => {
+        if (prop === 'isDead') return 1;
+        return null;
+      });
+      render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
+      expect(screen.getByText('DEAD')).toBeInTheDocument();
+      expect(screen.queryByText('Death Saves')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /roll/i })).not.toBeInTheDocument();
+    });
+
+    it('does not show DEAD remove button when not localhost', () => {
+      getRuntimeValue.mockImplementation((name, prop) => {
+        if (prop === 'isDead') return 1;
+        return null;
+      });
+      render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} isLocalhost={false} />);
+      expect(screen.getByText('DEAD')).toBeInTheDocument();
+      expect(screen.queryByTitle('Resurrect character')).not.toBeInTheDocument();
+    });
+
+    it('shows DEAD remove button when localhost', () => {
+      getRuntimeValue.mockImplementation((name, prop) => {
+        if (prop === 'isDead') return 1;
+        return null;
+      });
+      render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} isLocalhost={true} />);
+      expect(screen.getByText('DEAD')).toBeInTheDocument();
+      expect(screen.getByTitle('Resurrect character')).toBeInTheDocument();
     });
   });
 
@@ -125,6 +161,101 @@ describe('DeathSavingThrows', () => {
       await waitFor(() => {
         expect(screen.getByText(_label)).toBeInTheDocument();
       });
+    });
+
+    it('logs totalSuccesses and totalFailures with each roll', async () => {
+      deathSaveRules.rollDeathSave.mockReturnValue({
+        ...defaultRollResult,
+        result: 'success',
+        newSaves: [true, true, false],
+        newFailures: [true, false, false],
+      });
+      render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
+      fireEvent.click(screen.getByRole('button', { name: /roll/i }));
+
+      await waitFor(() => {
+        expect(addEntry).toHaveBeenCalledWith(mockCampaignName, expect.objectContaining({
+          type: 'death_save',
+          totalSuccesses: 2,
+          totalFailures: 1,
+        }));
+      });
+    });
+
+    it('logs stable result and heals to 1 HP after delay when 3 successes reached', async () => {
+      deathSaveRules.rollDeathSave.mockReturnValue({
+        roll: 12,
+        result: 'stable',
+        isNat20: false,
+        isNat1: false,
+        newSaves: [true, true, true],
+        newFailures: [true, false, false],
+        restoredToHp: null,
+      });
+      render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
+      fireEvent.click(screen.getByRole('button', { name: /roll/i }));
+
+      await waitFor(() => {
+        expect(addEntry).toHaveBeenCalledWith(mockCampaignName, expect.objectContaining({
+          type: 'death_save',
+          result: 'stable',
+          totalSuccesses: 3,
+        }));
+      });
+
+      await act(async () => {
+        await new Promise(resolve => setTimeout(resolve, 1600));
+      });
+
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'currentHitPoints', 1, mockCampaignName);
+    });
+
+    it('logs dead result and sets isDead tracked resource when 3 failures reached', async () => {
+      deathSaveRules.isDead.mockReturnValue(false);
+      deathSaveRules.rollDeathSave.mockReturnValue({
+        roll: 5,
+        result: 'dead',
+        isNat20: false,
+        isNat1: false,
+        newSaves: [false, false, false],
+        newFailures: [true, true, true],
+        restoredToHp: null,
+      });
+      render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
+      fireEvent.click(screen.getByRole('button', { name: /roll/i }));
+
+      await waitFor(() => {
+        deathSaveRules.isDead.mockReturnValue(true);
+      });
+
+      expect(addEntry).toHaveBeenCalledWith(mockCampaignName, expect.objectContaining({
+        type: 'death_save',
+        result: 'dead',
+        totalFailures: 3,
+      }));
+
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'isDead', 1, mockCampaignName);
+    });
+  });
+
+  describe('DEAD badge removal', () => {
+    it('removes isDead and resets death saves when GM clicks remove button', async () => {
+      getRuntimeValue.mockImplementation((name, prop) => {
+        if (prop === 'isDead') return 1;
+        return null;
+      });
+      render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} isLocalhost={true} />);
+
+      await act(async () => {
+        fireEvent.click(screen.getByTitle('Resurrect character'));
+      });
+
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'isDead', 0, mockCampaignName);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'deathSaves', [false, false, false], mockCampaignName);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'deathFailures', [false, false, false], mockCampaignName);
+
+      expect(screen.queryByText('DEAD')).not.toBeInTheDocument();
+      expect(screen.getByText('Death Saves')).toBeInTheDocument();
     });
   });
 
@@ -180,7 +311,35 @@ describe('DeathSavingThrows', () => {
       );
 
       const successTrack = screen.getByText(/Successes:/).parentElement;
-      expect(successTrack.textContent).toContain('⬤◯◯');
+      expect(successTrack.textContent).toContain('◯◯◯');
+    });
+
+    it('sets isDead state when receiving a dead result via SSE event', async () => {
+      getRuntimeValue.mockImplementation((name, prop) => {
+        if (prop === 'deathSaves') return [false, false, false];
+        if (prop === 'deathFailures') return [false, false, false];
+        return null;
+      });
+      render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
+
+      await act(async () => {
+        window.dispatchEvent(
+          new CustomEvent('death-save-result', {
+            detail: {
+              targetName: 'Test Character',
+              roll: 3,
+              success: false,
+              isNat20: false,
+              isNat1: false,
+              newSaves: [false, false, false],
+              newFailures: [true, true, true],
+              result: 'dead',
+            },
+          })
+        );
+      });
+
+      expect(screen.getByText('DEAD')).toBeInTheDocument();
     });
   });
 });

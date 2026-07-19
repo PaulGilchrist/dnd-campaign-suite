@@ -6,7 +6,7 @@ import { addEntry } from '../../../services/ui/logService.js'
 import HiddenInput from '../../common/HiddenInput.jsx'
 import DeathSavingThrows from './DeathSavingThrows.jsx'
 
-function CharHitPoints({ playerStats, campaignName }) {
+function CharHitPoints({ playerStats, campaignName, isLocalhost }) {
       const storedHp = useRuntimeValue(playerStats.name, 'currentHitPoints', campaignName);
       const aidHpMaxIncrease = useRuntimeValue(playerStats.name, 'aidHpMaxIncrease', campaignName) || 0;
       const tempHp = useRuntimeValue(playerStats.name, 'tempHp', campaignName);
@@ -70,7 +70,7 @@ function CharHitPoints({ playerStats, campaignName }) {
                 </div>
             )}
             {currentHitPoints <= 0 && (
-                <DeathSavingThrows playerStats={playerStats} campaignName={campaignName} />
+                <DeathSavingThrows playerStats={playerStats} campaignName={campaignName} isLocalhost={isLocalhost} />
             )}
         </div>
     )

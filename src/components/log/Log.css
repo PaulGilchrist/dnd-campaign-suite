@@ -930,3 +930,20 @@
     color: var(--color-text-muted);
     font-style: italic;
 }
+
+.log-death-save-totals {
+    display: inline-flex;
+    gap: 8px;
+    margin-left: 6px;
+    font-size: 0.85em;
+}
+
+.log-death-save-total-successes {
+    color: #4CAF50;
+    font-weight: bold;
+}
+
+.log-death-save-total-failures {
+    color: #e74c3c;
+    font-weight: bold;
+}

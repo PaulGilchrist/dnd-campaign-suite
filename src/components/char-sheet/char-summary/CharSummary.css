@@ -233,6 +233,56 @@
     color: #e74c3c;
     font-weight: bold;
 }
+.death-saves-container:has(> .death-saves-dead-badge) {
+    border: none;
+    background-color: transparent;
+    padding: 0;
+}
+.death-saves-dead-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 0;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #1a0000, #330000);
+    border: 2px solid #e74c3c;
+    border-radius: 6px;
+    color: #ff4444;
+    font-size: 1.2em;
+    font-weight: bold;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    box-shadow: 0 0 12px rgba(231, 76, 60, 0.5);
+    animation: dead-pulse 2s ease-in-out infinite;
+    position: relative;
+}
+.death-saves-dead-badge i {
+    font-size: 1.3em;
+}
+.death-saves-dead-remove {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 1px solid rgba(231, 76, 60, 0.7);
+    border-radius: 50%;
+    background-color: var(--background-color, #1a1a2e);
+    color: #e74c3c;
+    font-size: 0.65em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.death-saves-dead-remove:hover {
+    background-color: rgba(231, 76, 60, 0.3);
+}
+@keyframes dead-pulse {
+    0%, 100% { box-shadow: 0 0 12px rgba(231, 76, 60, 0.5); }
+    50% { box-shadow: 0 0 20px rgba(231, 76, 60, 0.8); }
+}
 .death-saves-track {
     margin-top: 2px;
 }

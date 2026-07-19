@@ -89,7 +89,7 @@ describe('deathSaveRules', () => {
       mockD20(10);
       result = rollDeathSave([true, true, false], [false, false, false]);
       expect(result.result).toBe('stable');
-      expect(result.newSaves).toEqual([false, false, false]);
+      expect(result.newSaves).toEqual([true, true, true]);
     });
 
     it('marks failures in empty slots on roll < 10', () => {
@@ -101,7 +101,7 @@ describe('deathSaveRules', () => {
       mockD20(3);
       result = rollDeathSave([false, false, false], [true, true, false]);
       expect(result.result).toBe('dead');
-      expect(result.newFailures).toEqual([false, false, false]);
+      expect(result.newFailures).toEqual([true, true, true]);
     });
 
     it('marks 2 failures on natural 1', () => {
@@ -114,7 +114,7 @@ describe('deathSaveRules', () => {
       mockD20(1);
       result = rollDeathSave([false, false, false], [true, true, true]);
       expect(result.result).toBe('dead');
-      expect(result.newFailures).toEqual([false, false, false]);
+      expect(result.newFailures).toEqual([true, true, true]);
     });
 
     it('does not modify saves when failing and does not modify failures when succeeding', () => {
@@ -127,18 +127,18 @@ describe('deathSaveRules', () => {
       expect(result2.newFailures).toEqual([true, false, false]);
     });
 
-    it('resets saves and failures when reaching stable or dead', () => {
+    it('preserves saves and failures when reaching stable or dead', () => {
       mockD20(10);
       let result = rollDeathSave([true, true, false], [true, false, false]);
       expect(result.result).toBe('stable');
-      expect(result.newSaves).toEqual([false, false, false]);
-      expect(result.newFailures).toEqual([false, false, false]);
+      expect(result.newSaves).toEqual([true, true, true]);
+      expect(result.newFailures).toEqual([true, false, false]);
 
       mockD20(2);
       result = rollDeathSave([true, false, false], [true, true, false]);
       expect(result.result).toBe('dead');
-      expect(result.newSaves).toEqual([false, false, false]);
-      expect(result.newFailures).toEqual([false, false, false]);
+      expect(result.newSaves).toEqual([true, false, false]);
+      expect(result.newFailures).toEqual([true, true, true]);
     });
   });
 
@@ -215,7 +215,7 @@ describe('deathSaveRules', () => {
       mockD20Sequence(2, 5);
       result = rollDeathSaveWithAdvantage([false, false, false], [true, true, false]);
       expect(result.result).toBe('dead');
-      expect(result.newFailures).toEqual([false, false, false]);
+      expect(result.newFailures).toEqual([true, true, true]);
     });
 
     it('returns null restoredToHp on non-nat20', () => {

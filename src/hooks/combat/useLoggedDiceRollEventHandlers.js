@@ -370,6 +370,8 @@ export function setupEventListeners(deps) {
                 isNatural20: e.detail.isNat20,
                 isNatural1: e.detail.isNat1,
                 success: e.detail.success,
+                totalSuccesses: e.detail.newSaves?.filter(Boolean).length ?? 0,
+                totalFailures: e.detail.newFailures?.filter(Boolean).length ?? 0,
             });
         });
 

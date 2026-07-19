@@ -36,8 +36,8 @@ function rollDeathSave(currentSaves, currentFailures, treat18AsNat20 = false) {
     const stable = isStable(newSaves)
 
     return {
-      newSaves: stable ? [false, false, false] : newSaves,
-      newFailures: stable ? [false, false, false] : [...currentFailures],
+      newSaves,
+      newFailures: [...currentFailures],
       result: stable ? 'stable' : 'success',
       roll,
       isNat20,
@@ -57,8 +57,8 @@ function rollDeathSave(currentSaves, currentFailures, treat18AsNat20 = false) {
     const dead = isDead(newFailures)
 
     return {
-      newSaves: dead ? [false, false, false] : [...currentSaves],
-      newFailures: dead ? [false, false, false] : newFailures,
+      newSaves: [...currentSaves],
+      newFailures,
       result: dead ? 'dead' : 'failure',
       roll,
       isNat20,
@@ -99,8 +99,8 @@ function rollDeathSaveWithAdvantage(currentSaves, currentFailures, treat18AsNat2
     const stable = isStable(newSaves)
 
     return {
-      newSaves: stable ? [false, false, false] : newSaves,
-      newFailures: stable ? [false, false, false] : [...currentFailures],
+      newSaves,
+      newFailures: [...currentFailures],
       result: stable ? 'stable' : 'success',
       roll: bestRoll,
       rolls: [roll1, roll2],
@@ -121,8 +121,8 @@ function rollDeathSaveWithAdvantage(currentSaves, currentFailures, treat18AsNat2
     const dead = isDead(newFailures)
 
     return {
-      newSaves: dead ? [false, false, false] : [...currentSaves],
-      newFailures: dead ? [false, false, false] : newFailures,
+      newSaves: [...currentSaves],
+      newFailures,
       result: dead ? 'dead' : 'failure',
       roll: bestRoll,
       rolls: [roll1, roll2],

@@ -467,7 +467,7 @@ describe('CharSummary - Aura Sources', () => {
             exhaustionLevel={0}
             auraComboEffects={{ resistances: ['radiant'], resistanceSource: 'Aura of Protection' }}
         />);
-        expect(screen.getByText('radiant')).toBeInTheDocument();
+        expect(screen.getByText('Radiant')).toBeInTheDocument();
     });
 
     it('shows aura immunity source marker', () => {
@@ -501,8 +501,8 @@ describe('CharSummary - Aura Sources', () => {
             exhaustionLevel={0}
             auraComboEffects={{ resistances: ['fire', 'cold'], resistanceSource: 'Aura of Protection' }}
         />);
-        expect(screen.getByText('fire')).toBeInTheDocument();
-        expect(screen.getByText(/cold/)).toBeInTheDocument();
+        expect(screen.getByText('Fire')).toBeInTheDocument();
+        expect(screen.getByText(/Cold/)).toBeInTheDocument();
     });
 
     it('shows Rage of the Wilds Bear resistances', () => {
@@ -510,9 +510,9 @@ describe('CharSummary - Aura Sources', () => {
             { name: 'Rage of the Wilds', optionName: 'Bear', resistanceTypes: ['acid', 'bludgeoning', 'cold', 'fire', 'lightning', 'piercing', 'poison', 'slashing', 'thunder'] }
         ]);
         render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/acid/)).toBeInTheDocument();
-        expect(screen.getByText(/bludgeoning/)).toBeInTheDocument();
-        expect(screen.getByText(/lightning/)).toBeInTheDocument();
+        expect(screen.getByText(/Acid/)).toBeInTheDocument();
+        expect(screen.getByText(/Bludgeoning/)).toBeInTheDocument();
+        expect(screen.getByText(/Lightning/)).toBeInTheDocument();
     });
 
     it('merges Rage of the Wilds resistances with base resistances', () => {
@@ -521,8 +521,8 @@ describe('CharSummary - Aura Sources', () => {
             { name: 'Rage of the Wilds', optionName: 'Bear', resistanceTypes: ['cold', 'poison'] }
         ]);
         render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/cold/)).toBeInTheDocument();
-        expect(screen.getByText(/poison/)).toBeInTheDocument();
+        expect(screen.getByText(/Cold/)).toBeInTheDocument();
+        expect(screen.getByText(/Poison/)).toBeInTheDocument();
     });
 });
 
