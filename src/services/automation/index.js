@@ -120,6 +120,7 @@ import { handle as handleTireless } from './handlers/class-ranger/tirelessHandle
 import { handle as handleBonusActionChoice } from './handlers/combat/bonusActionChoiceHandler.js';
 import { handle as handleBonusAttacks } from './handlers/combat/bonusAttacksHandler.js';
 import { handle as handlePatientDefense } from './handlers/combat/patientDefenseHandler.js';
+import { handle as handleStepOfTheWind } from './handlers/combat/stepOfTheWindHandler.js';
 import { handle as handleSteadyAim } from './handlers/class-fighter-rogue/steadyAimHandler.js';
 import { handle as handleStrokeOfLuck } from './handlers/class-fighter-rogue/strokeOfLuckHandler.js';
 import { handle as handleMageHandControl } from './handlers/class-fighter-rogue/mageHandControlHandler.js';
@@ -379,6 +380,7 @@ const HANDLER_MAP = {
         bonus_action_choice: handleBonusActionChoice,
         bonus_attacks: handleBonusAttacks,
         patient_defense: handlePatientDefense,
+        step_of_the_wind: handleStepOfTheWind,
         steady_aim: handleSteadyAim,
         stroke_of_luck: handleStrokeOfLuck,
         mage_hand_control: handleMageHandControl,

@@ -5695,9 +5695,7 @@
                         "level": 2,
                         "type": "class_feature",
                         "automation": {
-                            "type": "bonus_attacks",
-                            "attacks": 2,
-                            "attackType": "disengage_dash",
+                            "type": "step_of_the_wind",
                             "cost": {
                                 "resource": "focus_points",
                                 "amount": 1
@@ -5960,9 +5958,7 @@
                         "level": 2,
                         "type": "class_feature",
                         "automation": {
-                            "type": "bonus_attacks",
-                            "attacks": 2,
-                            "attackType": "disengage_dash",
+                            "type": "step_of_the_wind",
                             "cost": {
                                 "resource": "focus_points",
                                 "amount": 1
