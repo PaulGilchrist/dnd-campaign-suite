@@ -1625,7 +1625,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         return (
                             <React.Fragment key={idx}>
                                 {idx > 0 && ', '}
-                                <span className="clickable" onClick={async () => {
+                                <span className="base-action-clickable" onClick={async () => {
                                     if (cannotAct) return;
                                     const currentConditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName) || [];
                                     const isAlreadyInvisible = currentConditions.some(c => String(c).toLowerCase() === 'invisible');
@@ -1705,7 +1705,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         return (
                             <React.Fragment key={idx}>
                                 {idx > 0 && ', '}
-                                <span className="clickable" onClick={async () => {
+                                <span className="base-action-clickable" onClick={async () => {
                                     if (cannotAct) return;
                                     const result = toggleBuff(
                                         playerStats.name,
@@ -1740,7 +1740,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         return (
                             <React.Fragment key={idx}>
                                 {idx > 0 && ', '}
-                                <span className="clickable" onClick={async () => {
+                                <span className="base-action-clickable" onClick={async () => {
                                     if (cannotAct) return;
                                     const cs = await loadCombatSummary(campaignName);
                                     const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;

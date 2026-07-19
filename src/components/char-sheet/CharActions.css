@@ -82,6 +82,19 @@
     gap: 4px;
 }
 
+.base-action-clickable {
+    color: var(--color-hover);
+    font-weight: 500;
+    padding: 0 1px;
+    border-radius: 2px;
+    transition: background-color 0.15s;
+    cursor: pointer;
+}
+
+.base-action-clickable:hover {
+    background: rgba(139, 92, 246, 0.12);
+}
+
 .stat--buffed {
     color: #16a34a;
     font-weight: 700;
