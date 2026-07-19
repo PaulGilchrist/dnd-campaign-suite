@@ -55,6 +55,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             rollInfo,
             maximize,
             healingName: action.name,
+            skipPopup: true,
           });
 
         const hasPhysiciansTouch = playerStats.specialActions?.some(f => f.name === "Physician's Touch");

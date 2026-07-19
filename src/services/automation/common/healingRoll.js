@@ -59,7 +59,7 @@ export function applyHealingDirectly(playerStats, targetName, amount, campaignNa
 }
 
 export function logHealingToSSE(campaignName, info) {
-    const { targetName, sourceName, actualHeal, newHp, maxHp, rollInfo, maximize, healingName, remainingUses } = info;
+    const { targetName, sourceName, actualHeal, newHp, maxHp, rollInfo, maximize, healingName, remainingUses, skipPopup } = info;
     addEntry(campaignName, {
         type: 'hp_change',
         targetName,
@@ -73,7 +73,7 @@ export function logHealingToSSE(campaignName, info) {
         maximizeHealingDice: maximize || false,
       }).catch((e) => { console.error("[healingRoll] Error:", e); });
 
-    if (healingName) {
+    if (healingName && !skipPopup) {
         const healDesc = actualHeal > 0
             ? `Regained ${actualHeal} HP`
             : 'Already at full HP';
