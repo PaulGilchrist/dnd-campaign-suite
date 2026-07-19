@@ -6346,7 +6346,7 @@
                     },
                     {
                         "name": "Cloak of Shadows",
-                        "description": "Action in Dim Light or Darkness, expend 3 Focus Points for 1 minute. Invisibility. Partially Incorporeal - move through occupied spaces. Shadow Flurry - use Flurry of Blows without expending Focus Points.",
+                        "description": "As a Magic action while entirely within Dim Light or Darkness, you can expend 3 Focus Points to shroud yourself with shadows for 1 minute, until you have the Incapacitated condition, or until you end your turn Bright Light. While shrouded by these shadows, you gain the following benefits.<ul><li><b>Invisibility:</b> You have the Invisible condition.</li><li><b>Partially Incorporeal:</b> You can move through occupied spaces as if they were Difficult Terrain. If you end your turn in such a space, you are shunted to the last unoccupied space you were in.</li><li><b>Shadow Flurry:</b> You can use your Flurry of Blows without expending any Focus Points.</li></ul>",
                         "level": 17,
                         "automation": {
                             "type": "cloak_of_shadows",

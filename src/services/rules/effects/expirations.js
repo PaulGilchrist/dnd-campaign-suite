@@ -165,6 +165,29 @@ export async function applyTurnStartEffects(activeName, playerStats, campaignNam
         }
     }
 
+    // Cloak of Shadows: end when incapacitated
+    if (activeName) {
+        const cloakBuffs = getRuntimeValue(activeName, 'activeBuffs', campaignName);
+        if (Array.isArray(cloakBuffs) && cloakBuffs.some(b => b.effect === 'cloak_of_shadows')) {
+            const conds = getRuntimeValue(activeName, 'activeConditions', campaignName);
+            if (Array.isArray(conds) && conds.some(c => String(c).toLowerCase() === 'incapacitated')) {
+                const filteredBuffs = cloakBuffs.filter(b => b.effect !== 'cloak_of_shadows');
+                setRuntimeValue(activeName, 'activeBuffs', filteredBuffs, campaignName);
+                const filteredConds = conds.filter(c => String(c).toLowerCase() !== 'invisible');
+                if (filteredConds.length !== conds.length) {
+                    setRuntimeValue(activeName, 'activeConditions', filteredConds, campaignName);
+                }
+                setRuntimeValue(campaignName, `_activeInvisibility_${activeName}`, null, campaignName);
+                addEntry(campaignName, {
+                    type: 'ability_use',
+                    characterName: activeName,
+                    abilityName: 'Cloak of Shadows',
+                    description: `${activeName}'s Cloak of Shadows ended due to the Incapacitated condition.`,
+                }).catch(() => {});
+            }
+        }
+    }
+
     // Clean up Topple weapon mastery Prone condition at start of target's next turn
     const allTargetEffectsTopple = getRuntimeValue(campaignName, 'targetEffects') || [];
     if (allTargetEffectsTopple.length > 0) {

@@ -308,6 +308,8 @@ const FighterFeatures = function FighterFeatures({ playerStats, campaignName, on
 const MonkFeatures = function MonkFeatures({ playerStats, campaignName }) {
     const wisdom = playerStats.abilities?.find((a) => a.name === 'Wisdom');
     const monkFeatures = getClassFeatures(playerStats);
+    const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+    const cloakOfShadowsActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'cloak_of_shadows');
     if (playerStats.level < 2) return null;
     const focusSaveDc = 8 + (wisdom?.bonus || 0) + playerStats.proficiency;
     return (
@@ -317,6 +319,7 @@ const MonkFeatures = function MonkFeatures({ playerStats, campaignName }) {
                <div><b>Focus Save DC: </b>{focusSaveDc}</div>
                <div><b>Martial Arts Die:</b> d{monkFeatures?.martialArtsDie || 0}</div>
                <div><b>Unarmored Movement:</b> +{monkFeatures?.unarmoredMovementIncrease || 0} ft.</div>
+               {cloakOfShadowsActive && <span className="automation-badge">Cloak of Shadows</span>}
            </div>
       );
 };
