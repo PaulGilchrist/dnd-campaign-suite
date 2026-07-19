@@ -21,6 +21,7 @@ import TeleportModal from './modals/TeleportModal.jsx'
 import SaveAttackHealModal from './modals/shared/SaveAttackHealModal.jsx'
 import SaveAttackAoeModal from './modals/shared/SaveAttackAoeModal.jsx'
 import ElementalAttunementModal from './modals/ElementalAttunementModal.jsx'
+import ElementalBurstModal from './modals/ElementalBurstModal.jsx'
 import DivineSparkModal from './modals/divine/DivineSparkModal.jsx'
 import DivineInterventionModal from './modals/divine/DivineInterventionModal.jsx'
 import ArcaneChargeModal from './modals/arcane/ArcaneChargeModal.jsx'
@@ -529,6 +530,14 @@ export default function CharActionModals({
                 <ElementalAttunementModal
                     {...mergedModalState.elementalAttunementModal}
                     onClose={() => setModalState({ elementalAttunementModal: null })}
+                />
+            )}
+            {mergedModalState.elementalBurstModal && (
+                <ElementalBurstModal
+                    {...mergedModalState.elementalBurstModal}
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    onClose={() => setModalState({ elementalBurstModal: null })}
                 />
             )}
             {mergedModalState.divineSparkModal && (

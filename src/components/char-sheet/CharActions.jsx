@@ -1098,6 +1098,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         setModalState({ saveAttackAoeModal: result.payload });
                         break;
                     case 'elementalAttunement': setModalState({ elementalAttunementModal: result.payload }); break;
+                    case 'elementalBurst': setModalState({ elementalBurstModal: result.payload }); break;
                     case 'divineSpark': setModalState({ divineSparkModal: result.payload }); break;
                     case 'divineIntervention':
                         setModalState({ divineInterventionAction: action, divineInterventionModal: result.payload });

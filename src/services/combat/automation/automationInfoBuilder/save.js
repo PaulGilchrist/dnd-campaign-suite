@@ -62,6 +62,53 @@ export const saveHandlers = {
         }
     },
 
+    'elemental_burst': (feature, playerStats) => {
+        const auto = feature.automation
+        const prof = playerStats.proficiency || 0
+        const scaling = resolveScaling(playerStats, auto.scaling)
+        const rawDamage = scaling?.damage || auto.damage || ''
+        const damage = resolveDiceExpression(rawDamage, playerStats)
+        const saveDc = auto.saveDc === 'ability'
+            ? getSaveDc(playerStats, auto.saveAbility || 'CON', prof)
+            : auto.saveDc || 10
+        const castingTime = auto.casting_time || ''
+        let action = auto.action
+        if (!action && castingTime) {
+            if (castingTime === '1 bonus action' || castingTime === 'bonus_action') {
+                action = 'bonus_action'
+            } else if (castingTime === '1 action' || castingTime === 'action') {
+                action = 'action'
+            } else if (castingTime === '1 reaction' || castingTime === 'reaction') {
+                action = 'reaction'
+            }
+        }
+        return {
+            type: 'elemental_burst',
+            name: feature.name,
+            action: action || 'action',
+            damage,
+            damageType: auto.damageType || '',
+            saveType: auto.saveType || 'DEX',
+            saveDc,
+            saveAbility: auto.saveAbility || 'CON',
+            shape: auto.shape || '',
+            range: auto.range || '',
+            conditionInflicted: auto.conditionInflicted || null,
+            duration: auto.duration || '',
+            uses: playerStats.level,
+            usesMax: playerStats.level,
+            recharge: 'long_rest',
+            resourceCost: 'focus_points',
+            hasOptions: false,
+            options: [],
+            optionDetails: {},
+            healExpression: '',
+            dcSuccess: auto.dcSuccess || null,
+            casting_time: castingTime,
+            hasAutomation: true
+        }
+    },
+
     'save_only': (feature, playerStats) => {
         const auto = feature.automation
         return {

@@ -312,6 +312,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             switch (info.type) {
             case 'save_attack':
             case 'save_only':
+            case 'elemental_burst':
             case 'wrath_of_the_sea':
             case 'oceanic_gift':
             case 'flesh_to_stone':
