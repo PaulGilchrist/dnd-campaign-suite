@@ -462,7 +462,7 @@ describe('CharActions handlers', () => {
 
       await act(async () => { render(<CharActions playerStats={stats} />); });
 
-      expect(screen.getByText('Hide')).toHaveClass('clickable');
+      expect(screen.getByText('Hide')).toHaveClass('base-action-clickable');
       expect(screen.getByText(/Dash/)).toBeInTheDocument();
     });
 
@@ -685,7 +685,7 @@ describe('CharActions handlers', () => {
 
       await act(async () => { render(<CharActions playerStats={stats} />); });
 
-      expect(screen.getByText('Grapple')).toHaveClass('clickable');
+      expect(screen.getByText('Grapple')).toHaveClass('base-action-clickable');
     });
 
     it('Grapple shows error popup when no target selected', async () => {
