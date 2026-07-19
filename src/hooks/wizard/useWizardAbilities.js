@@ -5,7 +5,25 @@ import { loadValidationRules } from '../../services/ui/dataLoader.js';
 
 function useWizardAbilities(formData, currentStep, setErrors, updateAbility) {
   const { rules: ruleset, race, abilities } = formData;
-  
+
+  useEffect(() => {
+    if (ruleset !== '5e' || !race?.name) {
+      return;
+    }
+    const raceBuffs = computeRaceBuffs(race, { race: { subrace: race.subrace }, rules: ruleset }, '5e');
+    const subraceBuffs = race.subrace?.name
+      ? computeRaceBuffs(race, { race: { subrace: { name: race.subrace.name } } }, '5e')
+      : { abilityScoreIncreases: [] };
+    abilities.forEach((ability, index) => {
+      const abilityBuffs = raceBuffs.abilityScoreIncreases.filter(b => b.name === ability.name);
+      const subraceAbilityBuffs = subraceBuffs.abilityScoreIncreases.filter(b => b.name === ability.name);
+      const racialIncrease = abilityBuffs.reduce((sum, b) => sum + b.amount, 0) + subraceAbilityBuffs.reduce((sum, b) => sum + b.amount, 0);
+      if (racialIncrease !== (ability.racialIncrease || 0)) {
+        updateAbility(index, 'racialIncrease', racialIncrease);
+      }
+    });
+  }, [race, ruleset, abilities, updateAbility]);
+
   useEffect(() => {
     const validateAbilities = async () => {
       if (currentStep === 5) {

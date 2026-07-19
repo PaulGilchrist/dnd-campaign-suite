@@ -6550,7 +6550,7 @@
                 "features": [
                     {
                         "name": "Elemental Attunement",
-                        "description": "As a Bonus Action, you can create a elemental manifestation at a point you can see within 60 feet. Choose Cold, Fire, Lightning, or Thunder. The effects last for 1 minute. Cold: 5-ft radius area of extreme cold, Dexterity save or speed reduced 15 ft. Fire: 5-ft radius flames, Dexterity save or 1d10 Fire damage. Lightning: line of lightning, Dexterity save or 1d8 Lightning damage. Thunder: burst of sonic energy, Constitution save or 1d6 Thunder damage and pushed 10 ft.",
+                        "description": "As a Bonus Action, you can create a elemental manifestation at a point you can see within 60 feet. Choose Cold, Fire, Lightning, or Thunder. The effects last for 1 minute.<ul><li><b>Cold:</b> 5-ft radius area of extreme cold, Dexterity save or speed reduced 15 ft.</li><li><b>Fire:</b> 5-ft radius flames, Dexterity save or 1d10 Fire damage.</li><li><b>Lightning:</b> line of lightning, Dexterity save or 1d8 Lightning damage.</li><li><b>Thunder:</b> burst of sonic energy, Constitution save or 1d6 Thunder damage and pushed 10 ft.</li></ul>",
                         "level": 3,
                         "automation": {
                             "type": "save_attack",
