@@ -135,3 +135,10 @@
   color: var(--color-primary);
   font-weight: 600;
 }
+
+/* Sidebar footer area — separates admin from dice tray */
+.sidebar-footer {
+  margin-top: auto;
+  border-top: 1px solid var(--border-color);
+  padding-top: 4px;
+}

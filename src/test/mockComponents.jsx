@@ -56,7 +56,7 @@ const MOCK_VIEW_LABELS = {
 export const MockSidebar = vi.fn(({
   campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick,
   onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onNotesClick, onQuestsClick,
-  onNPCsClick, onSettlementsClick, onLogClick, onRenameCampaign, onDeleteCampaign, theme, toggleTheme, isLocalhost, activeView,
+  onNPCsClick, onSettlementsClick, onLogClick, onRepairClick, isLocalhost, activeView,
 }) => {
   const activeLabel = activeView === 'charSheet' && activeCharacter
     ? activeCharacter.name
@@ -110,16 +110,11 @@ export const MockSidebar = vi.fn(({
       <button data-testid="log-btn" onClick={onLogClick}>
         Log
       </button>
-      <button data-testid="rename-campaign-btn" onClick={onRenameCampaign} disabled={!isLocalhost}>
-        Rename
-      </button>
-      <button data-testid="delete-campaign-btn" onClick={onDeleteCampaign} disabled={characters?.length > 0}>
-        Delete Campaign
-      </button>
-      <button data-testid="theme-toggle-btn" onClick={toggleTheme}>
-        {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-      </button>
-      <span data-testid="sidebar-theme">{theme}</span>
+      {isLocalhost && (
+        <button data-testid="admin-btn" onClick={onRepairClick}>
+          Admin
+        </button>
+      )}
       <span data-testid="sidebar-localhost">{String(isLocalhost)}</span>
     </div>
   );

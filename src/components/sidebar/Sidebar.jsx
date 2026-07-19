@@ -13,9 +13,10 @@ const VIEW_LABELS = {
     npcs: { label: 'NPCs', icon: 'fa-users' },
     settlements: { label: 'Settlements', icon: 'fa-city' },
     campaignLog: { label: 'Log', icon: 'fa-book-journal-whills' },
+    campaignRepair: { label: 'Admin', icon: 'fa-gears' },
 };
 
-function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onNotesClick, onQuestsClick, onNPCsClick, onSettlementsClick, onLogClick, onRenameCampaign, onDeleteCampaign, theme, toggleTheme, isLocalhost, activeView }) {
+function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onNotesClick, onQuestsClick, onNPCsClick, onSettlementsClick, onLogClick, onRepairClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView }) {
     const [isExpanded, setIsExpanded] = useState(() => {
         try {
             const stored = localStorage.getItem('sidebar-characters-expanded');
@@ -48,13 +49,6 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
             <nav className="sidebar no-print">
                 <div className="sidebar-header">
                     <div className="campaign-name">{campaignName}</div>
-                    <div className="sidebar-header-buttons">
-                        <button className="icon-button rename-campaign-btn" onClick={onRenameCampaign} disabled={!isLocalhost} title="Rename Campaign"><i className="fas fa-pen"></i></button>
-                        <button className="icon-button delete-campaign-btn" onClick={onDeleteCampaign} disabled={characters.length > 0} title="Delete Campaign"><i className="fas fa-trash"></i></button>
-                        <button className="icon-button theme-toggle-btn" onClick={toggleTheme} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
-                            <i className={`fas ${theme === 'dark' ? 'fa-sun' : 'fa-moon'}`}></i>
-                        </button>
-                    </div>
                 </div>
                 {activeView && (
                     <div className="sidebar-active-indicator">
@@ -168,6 +162,16 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
                     >
                         <i className="fa-solid fa-city"></i> Settlements
                     </button>
+                )}
+                {isLocalhost && (
+                    <div className="sidebar-footer">
+                        <button
+                            className={`sidebar-section-header${activeView === 'campaignRepair' ? ' active' : ''}`}
+                            onClick={onRepairClick}
+                        >
+                            <i className="fa-solid fa-gears"></i> Admin
+                        </button>
+                    </div>
                 )}
                 <DiceTray onRoll={setDiceResult} />
             </nav>

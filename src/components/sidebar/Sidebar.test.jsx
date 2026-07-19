@@ -1,5 +1,5 @@
 // @cleaned-by-ai
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import Sidebar from './Sidebar.jsx';
 
@@ -17,10 +17,7 @@ const defaultProps = {
   onNotesClick: vi.fn(),
   onQuestsClick: vi.fn(),
   onNPCsClick: vi.fn(),
-  onRenameCampaign: vi.fn(),
-  onDeleteCampaign: vi.fn(),
-  theme: 'dark',
-  toggleTheme: vi.fn(),
+  onRepairClick: vi.fn(),
   isLocalhost: true,
 };
 
@@ -104,22 +101,22 @@ describe('Sidebar', () => {
       expect(defaultProps.onMapsClick).toHaveBeenCalledTimes(1);
     });
 
-    it('should call toggleTheme when theme toggle is clicked', () => {
+    it('should call onRepairClick when Admin button is clicked', () => {
       render(<Sidebar {...defaultProps} />);
-      fireEvent.click(screen.getByTitle(/Switch to/));
-      expect(defaultProps.toggleTheme).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByText(/Admin/));
+      expect(defaultProps.onRepairClick).toHaveBeenCalledTimes(1);
     });
 
-    it('should call onRenameCampaign when rename button is clicked', () => {
-      render(<Sidebar {...defaultProps} />);
-      fireEvent.click(screen.getByTitle('Rename Campaign'));
-      expect(defaultProps.onRenameCampaign).toHaveBeenCalledTimes(1);
+    it('should call onRepairClick when Admin button is clicked', () => {
+      defaultProps.onRepairClick.mockClear();
+      render(<Sidebar {...defaultProps} isLocalhost={true} />);
+      fireEvent.click(screen.getByText(/Admin/));
+      expect(defaultProps.onRepairClick).toHaveBeenCalled();
     });
 
-    it('should call onDeleteCampaign when delete button is clicked', () => {
-      render(<Sidebar {...defaultProps} />);
-      fireEvent.click(screen.getByTitle('Delete Campaign'));
-      expect(defaultProps.onDeleteCampaign).toHaveBeenCalledTimes(1);
+    it('should not render Admin button on non-localhost', () => {
+      render(<Sidebar {...defaultProps} isLocalhost={false} />);
+      expect(screen.queryByTestId('admin-btn')).not.toBeInTheDocument();
     });
 
     it('should call localhost-only handlers when those buttons are clicked', () => {
@@ -147,18 +144,14 @@ describe('Sidebar', () => {
   });
 
   describe('button states', () => {
-    it('should disable rename button on non-localhost', () => {
-      render(<Sidebar {...defaultProps} isLocalhost={false} />);
-      expect(screen.getByTitle('Rename Campaign')).toHaveAttribute('disabled');
+    it('should not render rename button in header', () => {
+      render(<Sidebar {...defaultProps} isLocalhost={true} />);
+      expect(screen.queryByTitle('Rename Campaign')).not.toBeInTheDocument();
     });
 
-    it('should disable delete campaign button when characters exist, enable when empty', () => {
-      render(<Sidebar {...defaultProps} characters={[{ name: 'Aragorn' }]} />);
-      expect(screen.getByTitle('Delete Campaign')).toHaveAttribute('disabled');
-      cleanup();
-
-      render(<Sidebar {...defaultProps} characters={[]} />);
-      expect(screen.getByTitle('Delete Campaign')).not.toHaveAttribute('disabled');
+    it('should not render delete button in header', () => {
+      render(<Sidebar {...defaultProps} isLocalhost={true} />);
+      expect(screen.queryByTitle('Delete Campaign')).not.toBeInTheDocument();
     });
   });
 

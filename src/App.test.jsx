@@ -185,19 +185,16 @@ describe('App', () => {
       render(<App />);
       await selectCampaign();
       await waitFor(() => {
-        expect(screen.getByTestId('sidebar-theme').textContent).toBe(initialTheme);
+        expect(screen.getByTestId('sidebar-localhost').textContent).toBe('true');
       });
 
-      return { toggleBtn: screen.getByTestId('theme-toggle-btn'), localStorageMock };
+      return { localStorageMock };
     };
 
-    it('toggles theme and persists to localStorage', async () => {
-      const { toggleBtn, localStorageMock } = await renderWithTheme('dark');
-      fireEvent.click(toggleBtn);
-      await waitFor(() => {
-        expect(screen.getByTestId('sidebar-theme').textContent).toBe('light');
-      });
-      expect(localStorageMock.setItem).toHaveBeenCalledWith('theme', 'light');
+    it('renders the admin button on localhost', async () => {
+      const { localStorageMock } = await renderWithTheme('dark');
+      expect(screen.getByTestId('admin-btn')).toBeInTheDocument();
+      expect(localStorageMock.setItem).not.toHaveBeenCalled();
     });
   });
 

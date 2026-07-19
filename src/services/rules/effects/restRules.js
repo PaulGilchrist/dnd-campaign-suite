@@ -354,6 +354,7 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
   // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
   updates.activeBuffs = [];
   updates.activeConditions = [];
+  updates.activeConditionMeta = {};
 
   // Reset Psionic Strike once-per-turn flag on short rest
   updates.psionicStrikeUsedThisTurn = null;
@@ -447,6 +448,12 @@ export async function applyLongRest(playerStats, campaignName) {
     // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
     charData.activeBuffs = [];
     charData.activeConditions = [];
+    charData.activeConditionMeta = {};
+
+    // Clear death save state on long rest
+    charData.deathSaves = [false, false, false];
+    charData.deathFailures = [false, false, false];
+    charData.isDead = 0;
 
     // Clear Zealous Presence buff marker on long rest (recharges on long rest or rage expenditure)
     charData.zealousPresenceActive = null;

@@ -89,6 +89,13 @@ export const VIEWS = {
     component: 'Log',
     description: 'Campaign dice roll and activity log'
    },
+  CAMPAIGN_REPAIR: {
+    name: 'campaignRepair',
+    stateVar: 'activeView',
+    type: 'string',
+    component: 'CampaignAdmin',
+    description: 'GM-only admin tools'
+  },
   CAMPAIGN_SELECTION: {
     name: 'campaignSelection',
     stateVar: 'showCampaignSelection',
@@ -130,10 +137,11 @@ export const SIDEBAR_BUTTONS = [
 { label: 'Quests', icon: 'fa-scroll', view: 'quests' },
   { label: 'NPCs', icon: 'fa-users', view: 'npcs' },
   { label: 'Settlements', icon: 'fa-city', view: 'settlements' },
-  { label: 'Log', icon: 'fa-book-journal-whills', view: 'campaignLog' }
+  { label: 'Log', icon: 'fa-book-journal-whills', view: 'campaignLog' },
+  { label: 'Admin', icon: 'fa-gears', view: 'campaignRepair' }
 ];
 
 /**
  * All sidebar views — mutually exclusive via single activeView variable.
  */
-export const SIDEBAR_VIEWS = ['charSheet', 'initiative', 'mapsManager', 'encounter', 'factions', 'notes', 'quests', 'npcs', 'settlements', 'campaignLog'];
+export const SIDEBAR_VIEWS = ['charSheet', 'initiative', 'mapsManager', 'encounter', 'factions', 'notes', 'quests', 'npcs', 'settlements', 'campaignLog', 'campaignRepair'];

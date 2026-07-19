@@ -25,6 +25,7 @@ import NPCs from './components/npcs/NPCs.jsx';
 import Settlements from './components/settlements/Settlements.jsx';
 import Factions from './components/factions/Factions.jsx';
 import Log from './components/log/Log.jsx';
+import CampaignAdmin from './components/campaign-admin/CampaignAdmin.jsx';
 import SavePromptModal from './components/common/SavePromptModal.jsx';
 import DeathSavePromptModal from './components/common/DeathSavePromptModal.jsx';
 import ConcentrationPromptModal from './components/common/ConcentrationPromptModal.jsx';
@@ -446,13 +447,12 @@ function App() {
           onEncounterClick={handleEncounterClick}
           onRenameCampaign={handleRenameCampaign}
           onDeleteCampaign={handleDeleteCampaign}
-          theme={theme}
-          toggleTheme={toggleTheme}
           isLocalhost={isLocalhost}
            onNPCsClick={handleNPCsClick}
            onSettlementsClick={handleSettlementsClick}
            onFactionsClick={handleFactionsClick}
           onLogClick={handleLogClick}
+          onRepairClick={() => setActiveView('campaignRepair')}
           activeView={activeView}
            />
         {activeView === 'charSheet' && activeCharacter && (
@@ -543,7 +543,18 @@ function App() {
                          campaignName={campaignName}
                           characters={characters}
                            />
-                            ) }
+                           ) }
+
+                  { activeView === 'campaignRepair' && (
+                        <CampaignAdmin
+                         campaignName={campaignName}
+                         onBack={() => setActiveView(null)}
+                         theme={theme}
+                         toggleTheme={toggleTheme}
+                         onRenameCampaign={handleRenameCampaign}
+                         onDeleteCampaign={handleDeleteCampaign}
+                          />
+                         ) }
 
                               <br />
         {showCharacterWizard && <CharacterCreationWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} allRaces={races} allRaces2024={races2024} allClasses={classes} allSpells={spells} allSpells2024={spells2024} campaignName={campaignName} />}

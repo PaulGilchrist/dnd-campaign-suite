@@ -3,9 +3,13 @@ import fs from 'fs';
 import path from 'path';
 import asyncHandler from '../utils/asyncHandler.js';
 import { campaignDir, campaignMapsDir, campaignImagesDir, campaignDataDir, campaignDataFile } from '../utils/campaignPaths.js';
-import { characterChangeData, spellOverlayData, activeMaps, saveFile, markDirty } from '../utils/changeData.js';
+import { characterChangeData, spellOverlayData, activeMaps, saveFile, markDirty, publish } from '../utils/changeData.js';
 
 const router = express.Router();
+
+function isLocalhost(req) {
+    return req.hostname === 'localhost' || req.hostname === '127.0.0.1';
+}
 
 // API endpoint to migrate all existing campaign imagePath fields to relative format
 router.post('/api/campaigns/migrate-image-paths', asyncHandler((req, res) => {
@@ -182,6 +186,87 @@ router.delete('/api/campaigns/:campaign', asyncHandler((req, res) => {
     fs.rmSync(dir, { recursive: true, force: true });
 
     res.json({ message: 'Campaign deleted successfully' });
+}));
+
+// POST /api/campaigns/:campaign/admin/clear-change-data
+router.post('/api/campaigns/:campaign/admin/clear-change-data', asyncHandler((req, res) => {
+    if (!isLocalhost(req)) {
+        return res.status(403).json({ error: 'Only available on localhost' });
+    }
+
+    const { campaign } = req.params;
+    const filePath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'character-change-data.json');
+
+    try {
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
+    } catch (err) {
+        console.error(`Failed to delete change data file for ${campaign}:`, err.message);
+        return res.status(500).json({ error: 'Failed to delete change data file' });
+    }
+
+    characterChangeData.delete(campaign);
+    activeMaps.delete(campaign);
+    spellOverlayData.delete(campaign);
+    publish(`change-${campaign}-combatSummary`, null);
+
+    res.json({ message: 'Change data cleared' });
+}));
+
+// POST /api/campaigns/:campaign/admin/clear-log
+router.post('/api/campaigns/:campaign/admin/clear-log', asyncHandler((req, res) => {
+    if (!isLocalhost(req)) {
+        return res.status(403).json({ error: 'Only available on localhost' });
+    }
+
+    const { campaign } = req.params;
+    const filePath = campaignDataFile(campaign, 'campaign-log.json');
+
+    try {
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
+    } catch (err) {
+        console.error(`Failed to delete log file for ${campaign}:`, err.message);
+        return res.status(500).json({ error: 'Failed to delete log file' });
+    }
+
+    res.json({ message: 'Campaign log cleared' });
+}));
+
+// POST /api/campaigns/:campaign/admin/full-reset
+router.post('/api/campaigns/:campaign/admin/full-reset', asyncHandler((req, res) => {
+    if (!isLocalhost(req)) {
+        return res.status(403).json({ error: 'Only available on localhost' });
+    }
+
+    const { campaign } = req.params;
+
+    const changeDataPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'character-change-data.json');
+    try {
+        if (fs.existsSync(changeDataPath)) {
+            fs.unlinkSync(changeDataPath);
+        }
+    } catch (err) {
+        console.error(`Failed to delete change data file for ${campaign}:`, err.message);
+        return res.status(500).json({ error: 'Failed to clear change data' });
+    }
+    characterChangeData.delete(campaign);
+    activeMaps.delete(campaign);
+    spellOverlayData.delete(campaign);
+    publish(`change-${campaign}-combatSummary`, null);
+
+    try {
+        if (fs.existsSync(campaignDataFile(campaign, 'campaign-log.json'))) {
+            fs.unlinkSync(campaignDataFile(campaign, 'campaign-log.json'));
+        }
+    } catch (err) {
+        console.error(`Failed to delete log file for ${campaign}:`, err.message);
+        return res.status(500).json({ error: 'Failed to clear log' });
+    }
+
+    res.json({ message: 'Full reset complete' });
 }));
 
 export default router;
