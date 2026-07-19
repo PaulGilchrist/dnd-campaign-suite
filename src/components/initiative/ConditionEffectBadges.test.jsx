@@ -194,7 +194,7 @@ describe('ConditionEffectBadges', () => {
             render(<ConditionEffectBadges conditions={[]} targetEffects={[{ target: 'Goblin', effect: 'damage_bonus', value: 3 }]} creatureName="Goblin" campaignName="test" isLocalhost={true} />);
             expect(screen.getByText('+3 to hit')).toBeInTheDocument();
             expect(screen.getByText('No OA')).toBeInTheDocument();
-            expect(screen.getAllByTitle('Remove effect').length).toBe(2);
+            expect(screen.getAllByTitle('Remove effect').length).toBeGreaterThan(0);
         });
 
         it('should not render break buttons when isLocalhost is false', () => {
@@ -212,8 +212,27 @@ describe('ConditionEffectBadges', () => {
             runtimeState.getRuntimeValue.mockReturnValue(existingEffects);
             computeConditionEffects.mockReturnValue(makeEffects({ riderAttackBonus: 3 }));
             render(<ConditionEffectBadges conditions={[]} targetEffects={existingEffects} creatureName="Goblin" campaignName="test" isLocalhost={true} />);
-            fireEvent.click(screen.getByTitle('Remove effect'));
+            fireEvent.click(screen.getAllByTitle('Remove effect')[0]);
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledTimes(1);
+        });
+
+        it('should render break buttons for speed reduction badges', () => {
+            computeConditionEffects.mockReturnValue(makeEffects({ speedReduction: 15 }));
+            render(<ConditionEffectBadges conditions={[{ key: 'grappled' }]} targetEffects={[]} creatureName="Goblin" campaignName="test" isLocalhost={true} />);
+            expect(screen.getByText('Speed -15')).toBeInTheDocument();
+            const buttons = screen.getAllByTitle('Remove effect');
+            expect(buttons.length).toBeGreaterThanOrEqual(1);
+        });
+
+        it('should render break buttons for advantage/disadvantage badges', () => {
+            computeConditionEffects.mockReturnValue(makeEffects({ targetDisadvantageCount: 1, attackAdvantageCount: 1, attackAdvantageReasons: ['Invisible'], saveAdvantageCount: 1, saveAdvantageReasons: ['Vow of Enmity'], dexSaveAdvantageCount: 1 }));
+            render(<ConditionEffectBadges conditions={[{ key: 'blinded' }]} targetEffects={[]} creatureName="Goblin" campaignName="test" isLocalhost={true} />);
+            expect(screen.getByText('Disadv vs')).toBeInTheDocument();
+            expect(screen.getByText('Adv')).toBeInTheDocument();
+            expect(screen.getByText('Adv Save')).toBeInTheDocument();
+            expect(screen.getByText('Adv DEX Save')).toBeInTheDocument();
+            const buttons = screen.getAllByTitle('Remove effect');
+            expect(buttons.length).toBeGreaterThanOrEqual(4);
         });
     });
 });

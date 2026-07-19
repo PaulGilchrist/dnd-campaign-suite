@@ -321,6 +321,29 @@
     background-color: rgba(220, 38, 38, 0.3);
 }
 
+.initiative .badge-break-btn {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    border: 1px solid rgba(220, 38, 38, 0.7);
+    border-radius: 50%;
+    background-color: var(--background-color, #1a1a2e);
+    color: #e74c3c;
+    font-size: 0.55em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.initiative .badge-break-btn:hover {
+    background-color: rgba(220, 38, 38, 0.3);
+}
+
 .initiative .condition-add-btn {
     padding: 2px 8px;
     border: 1px dashed rgba(255, 255, 255, 0.3);

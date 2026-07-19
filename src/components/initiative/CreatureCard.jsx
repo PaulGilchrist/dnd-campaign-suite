@@ -5,7 +5,7 @@ import MonsterNameAutocomplete from '../common/MonsterNameAutocomplete.jsx'
 import NpcAvatar from './NpcAvatar.jsx'
 import CreatureHp from './CreatureHp.jsx'
 import { getAbilityLabel } from '../../services/combat/conditions/conditionUtils.js'
-import { useRuntimeValue, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import ConditionEffectBadges from './ConditionEffectBadges.jsx'
 import { isBuffActive } from '../../services/automation/common/buffToggle.js';
 import { CONDITION_DESCRIPTIONS } from '../../services/combat/conditions/effectDescriptions.js'
@@ -219,13 +219,33 @@ function CreatureCard({
                         <i className='fa-solid fa-spinner'></i>
                     </button>
                 ) : null}
-                {allCreatures?.some(c => c.concentration?.spell === "Hunter's Mark" && c.concentration?.target === creature.name) && (
-                    <div className='hunters-mark-badge-wrapper'>
-                        <span className='initiative-hunters-mark-badge' title={`Marked by ${allCreatures.find(c => c.concentration?.spell === "Hunter's Mark" && c.concentration?.target === creature.name)?.name}`}>
-                            <i className='fa-solid fa-crosshairs'></i> Hunter's Mark
-                        </span>
-                    </div>
-                )}
+                {allCreatures?.some(c => c.concentration?.spell === "Hunter's Mark" && c.concentration?.target === creature.name) && (() => {
+                    const markCreature = allCreatures.find(c => c.concentration?.spell === "Hunter's Mark" && c.concentration?.target === creature.name);
+                    return (
+                        <div className='hunters-mark-badge-wrapper'>
+                            <span className='initiative-hunters-mark-badge' title={`Marked by ${markCreature?.name}`}>
+                                <i className='fa-solid fa-crosshairs'></i> Hunter's Mark
+                            </span>
+                            {isLocalhost && (
+                                <button
+                                    className='badge-break-btn'
+                                    onClick={() => {
+                                        if (markCreature) {
+                                            const concentration = getRuntimeValue(markCreature.name, 'concentration');
+                                            if (concentration?.spell === "Hunter's Mark") {
+                                                setRuntimeValue(markCreature.name, 'concentration', null, campaignName);
+                                            }
+                                        }
+                                    }}
+                                    type='button'
+                                    title="Remove Hunter's Mark"
+                                >
+                                    <i className='fa-solid fa-xmark'></i>
+                                </button>
+                            )}
+                        </div>
+                    );
+                })()}
                 {isMajestyActive && (
                     <div className='majesty-badge-wrapper'>
                         <button
@@ -254,6 +274,20 @@ function CreatureCard({
                         <span className='initiative-wild-shape-badge' title='Wild Shape: Animal form active — spellcasting blocked, resistance types apply'>
                             <i className='fa-solid fa-paw'></i> Wild Shape
                         </span>
+                        {isLocalhost && (
+                            <button
+                                className='badge-break-btn'
+                                onClick={() => {
+                                    const buffs = getRuntimeValue(creature.name, 'activeBuffs') || [];
+                                    const filtered = buffs.filter(b => b.effect !== 'Wild Shape');
+                                    setRuntimeValue(creature.name, 'activeBuffs', filtered, campaignName);
+                                }}
+                                type='button'
+                                title='Deactivate Wild Shape'
+                            >
+                                <i className='fa-solid fa-xmark'></i>
+                            </button>
+                        )}
                     </div>
                 )}
                 {wrathOfTheSeaActive && (
@@ -261,6 +295,18 @@ function CreatureCard({
                         <span className='initiative-wrath-of-the-sea-badge' title='Wrath of the Sea: Ocean spray emanation active — Bonus Action to force CON save or take WIS modifier d6 Cold damage'>
                             <i className='fa-solid fa-water'></i> Wrath of the Sea
                         </span>
+                        {isLocalhost && (
+                            <button
+                                className='badge-break-btn'
+                                onClick={() => {
+                                    setRuntimeValue(creature.name, 'wrathOfTheSeaActive', false, campaignName);
+                                }}
+                                type='button'
+                                title='Deactivate Wrath of the Sea'
+                            >
+                                <i className='fa-solid fa-xmark'></i>
+                            </button>
+                        )}
                     </div>
                 )}
                 {sanctuaryInfo && (
@@ -268,6 +314,20 @@ function CreatureCard({
                         <span className='initiative-sanctuary-badge' title={`Nature's Sanctuary: Half Cover (AC +2), ${sanctuaryInfo.resistance} resistance. Protected by ${sanctuaryInfo.druid}'s Nature's Sanctuary`}>
                             <i className='fa-solid fa-leaf'></i> Sanctuary
                         </span>
+                        {isLocalhost && (
+                            <button
+                                className='badge-break-btn'
+                                onClick={() => {
+                                    const creatures = getRuntimeValue(sanctuaryInfo.druid, 'naturesSanctuaryCreatures', campaignName) || [];
+                                    const filtered = creatures.filter(c => c !== creature.name);
+                                    setRuntimeValue(sanctuaryInfo.druid, 'naturesSanctuaryCreatures', filtered, campaignName);
+                                }}
+                                type='button'
+                                title={'Remove from Nature\'s Sanctuary'}
+                            >
+                                <i className='fa-solid fa-xmark'></i>
+                            </button>
+                        )}
                     </div>
                 )}
                 {recklessAttackActive && (
@@ -275,6 +335,20 @@ function CreatureCard({
                         <span className='initiative-reckless-attack-badge' title='Reckless Attack: Advantage on Strength attack rolls, attack rolls against you have Advantage'>
                             <i className='fa-solid fa-shield-halved'></i> Reckless Attack
                         </span>
+                        {isLocalhost && (
+                            <button
+                                className='badge-break-btn'
+                                onClick={() => {
+                                    const existingEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                                    const filtered = existingEffects.filter(te => !(te.target === creature.name && te.effect === 'reckless_attack'));
+                                    setRuntimeValue(campaignName, 'targetEffects', filtered, campaignName);
+                                }}
+                                type='button'
+                                title='Deactivate Reckless Attack'
+                            >
+                                <i className='fa-solid fa-xmark'></i>
+                            </button>
+                        )}
                     </div>
                 )}
             </div>

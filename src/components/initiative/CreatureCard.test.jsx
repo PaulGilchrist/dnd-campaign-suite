@@ -2,6 +2,8 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CreatureCard from './CreatureCard.jsx';
+import * as runtimeState from '../../hooks/runtime/useRuntimeState.js';
+import * as buffToggle from '../../services/automation/common/buffToggle.js';
 vi.mock('../common/AvatarImage.jsx', () => ({
     default: vi.fn(({ name, imagePath }) => {
         return <div data-testid={`avatar-${name}`} className="avatar-wrapper">{imagePath ? <img src={imagePath} alt={name} /> : <span>{name?.charAt(0).toUpperCase() || '?'}</span>}</div>;
@@ -55,6 +57,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
       if (key === 'naturesSanctuaryActive') return sanctuaryMocks.naturesSanctuaryActive?.[target];
       if (key === 'naturesSanctuaryCreatures') return sanctuaryMocks.naturesSanctuaryCreatures?.[target];
       if (key === 'naturesSanctuaryResistance') return sanctuaryMocks.naturesSanctuaryResistance?.[target];
+      if (key === 'wrathOfTheSeaActive') return wrathOfTheSeaMocks[target];
       return undefined;
   }),
   setRuntimeValue: vi.fn(),
@@ -62,6 +65,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 let sanctuaryMocks = {};
+let wrathOfTheSeaMocks = {};
 
 vi.mock('../../services/combat/auras/unbreakableMajesty.js', () => ({
     isUnbreakableMajestyActive: vi.fn(() => false),
@@ -412,6 +416,115 @@ describe('CreatureCard', () => {
 
             render(<CreatureCard {...props} creature={allCreatures[1]} allCreatures={allCreatures} campaignName="test-campaign" />);
             expect(screen.queryByText('Sanctuary')).not.toBeInTheDocument();
+        });
+    });
+
+    describe('inline badge X buttons', () => {
+        beforeEach(() => {
+            sanctuaryMocks = {};
+            vi.clearAllMocks();
+        });
+
+        it('should render Hunter\'s Mark badge with X button when creature is marked', () => {
+            const allCreatures = [
+                { name: 'Ranger', type: 'player', concentration: { spell: "Hunter's Mark", target: 'Alice' } },
+                { ...defaultPlayerCreature },
+            ];
+            render(<CreatureCard {...props} creature={allCreatures[1]} allCreatures={allCreatures} campaignName="test-campaign" />);
+            expect(screen.getByText("Hunter's Mark")).toBeInTheDocument();
+            expect(screen.getByTitle("Remove Hunter's Mark")).toBeInTheDocument();
+        });
+
+        it('should not render Hunter\'s Mark X button for non-localhost', () => {
+            const allCreatures = [
+                { name: 'Ranger', type: 'player', concentration: { spell: "Hunter's Mark", target: 'Alice' } },
+                { ...defaultPlayerCreature },
+            ];
+            render(<CreatureCard {...props} creature={allCreatures[1]} allCreatures={allCreatures} campaignName="test-campaign" isLocalhost={false} />);
+            expect(screen.getByText("Hunter's Mark")).toBeInTheDocument();
+            expect(screen.queryByTitle("Remove Hunter's Mark")).not.toBeInTheDocument();
+        });
+
+        it('should render Wild Shape badge with X button when active', () => {
+            buffToggle.isBuffActive.mockReturnValue(true);
+            render(<CreatureCard {...props} creature={defaultPlayerCreature} campaignName="test-campaign" />);
+            expect(screen.getByText('Wild Shape')).toBeInTheDocument();
+            expect(screen.getByTitle('Deactivate Wild Shape')).toBeInTheDocument();
+        });
+
+        it('should not render Wild Shape X button for non-localhost', () => {
+            buffToggle.isBuffActive.mockReturnValue(true);
+            render(<CreatureCard {...props} creature={defaultPlayerCreature} campaignName="test-campaign" isLocalhost={false} />);
+            expect(screen.getByText('Wild Shape')).toBeInTheDocument();
+            expect(screen.queryByTitle('Deactivate Wild Shape')).not.toBeInTheDocument();
+        });
+
+        it('should render Wrath of the Sea badge with X button when active', () => {
+            wrathOfTheSeaMocks = { Alice: true };
+            render(<CreatureCard {...props} creature={defaultPlayerCreature} campaignName="test-campaign" />);
+            expect(screen.getByText('Wrath of the Sea')).toBeInTheDocument();
+            expect(screen.getByTitle('Deactivate Wrath of the Sea')).toBeInTheDocument();
+        });
+
+        it('should not render Wrath of the Sea X button for non-localhost', () => {
+            wrathOfTheSeaMocks = { Alice: true };
+            render(<CreatureCard {...props} creature={defaultPlayerCreature} campaignName="test-campaign" isLocalhost={false} />);
+            expect(screen.getByText('Wrath of the Sea')).toBeInTheDocument();
+            expect(screen.queryByTitle('Deactivate Wrath of the Sea')).not.toBeInTheDocument();
+        });
+
+        it('should render Nature\'s Sanctuary badge with X button when creature is in sanctuary', () => {
+            sanctuaryMocks.naturesSanctuaryActive = { Druid: true };
+            sanctuaryMocks.naturesSanctuaryCreatures = { Druid: ['Alice'] };
+            sanctuaryMocks.naturesSanctuaryResistance = { Druid: 'Fire' };
+
+            const allCreatures = [
+                { name: 'Druid', type: 'player' },
+                { ...defaultPlayerCreature },
+            ];
+
+            render(<CreatureCard {...props} creature={allCreatures[1]} allCreatures={allCreatures} campaignName="test-campaign" />);
+            expect(screen.getByText('Sanctuary')).toBeInTheDocument();
+            expect(screen.getByTitle('Remove from Nature\'s Sanctuary')).toBeInTheDocument();
+        });
+
+        it('should not render Sanctuary X button for non-localhost', () => {
+            sanctuaryMocks.naturesSanctuaryActive = { Druid: true };
+            sanctuaryMocks.naturesSanctuaryCreatures = { Druid: ['Alice'] };
+            sanctuaryMocks.naturesSanctuaryResistance = { Druid: 'Fire' };
+
+            const allCreatures = [
+                { name: 'Druid', type: 'player' },
+                { ...defaultPlayerCreature },
+            ];
+
+            render(<CreatureCard {...props} creature={allCreatures[1]} allCreatures={allCreatures} campaignName="test-campaign" isLocalhost={false} />);
+            expect(screen.getByText('Sanctuary')).toBeInTheDocument();
+            expect(screen.queryByTitle('Remove from Nature\'s Sanctuary')).not.toBeInTheDocument();
+        });
+
+        it('should render Reckless Attack badge with X button when active', () => {
+            const targetEffects = [{ target: 'Alice', effect: 'reckless_attack' }];
+            runtimeState.useRuntimeValue.mockImplementation((campaignName, key) => {
+                if (key === 'targetEffects') return targetEffects;
+                return null;
+            });
+            const allCreatures = [defaultPlayerCreature];
+            render(<CreatureCard {...props} creature={defaultPlayerCreature} allCreatures={allCreatures} campaignName="test-campaign" />);
+            expect(screen.getByText('Reckless Attack')).toBeInTheDocument();
+            expect(screen.getByTitle('Deactivate Reckless Attack')).toBeInTheDocument();
+        });
+
+        it('should not render Reckless Attack X button for non-localhost', () => {
+            const targetEffects = [{ target: 'Alice', effect: 'reckless_attack' }];
+            runtimeState.useRuntimeValue.mockImplementation((campaignName, key) => {
+                if (key === 'targetEffects') return targetEffects;
+                return null;
+            });
+            const allCreatures = [defaultPlayerCreature];
+            render(<CreatureCard {...props} creature={defaultPlayerCreature} allCreatures={allCreatures} campaignName="test-campaign" isLocalhost={false} />);
+            expect(screen.getByText('Reckless Attack')).toBeInTheDocument();
+            expect(screen.queryByTitle('Deactivate Reckless Attack')).not.toBeInTheDocument();
         });
     });
 });
