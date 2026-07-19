@@ -31,7 +31,7 @@ export function setupEventListeners(deps) {
                 console.log(`[useLoggedDiceRollEventHandlers] ★ save-result for "${pending.name}" - rawDamage: ${pending.rawDamage}, damageType: ${pending.damageType}, name: ${pending.name}`);
             }
 
-            const createSaveListenerPrompts = getRuntimeValue(campaignName, 'pendingSaveListenerPrompts') || new Set();
+            const createSaveListenerPrompts = new Set(getRuntimeValue(campaignName, 'pendingSaveListenerPrompts') || []);
             if (createSaveListenerPrompts.has(e.detail.promptId)) return;
             const normalizedSaveType = normalizeSaveType(e.detail.saveType || pending.saveType);
             const targetChar = (charactersRef.current || []).find(c => c.name === e.detail.targetName);
