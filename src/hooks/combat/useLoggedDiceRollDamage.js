@@ -407,6 +407,23 @@ export function createLogDamageAndShow(deps) {
             });
         const hasEvasion = hasOwnEvasion || hasSharedEvasion;
         let finalDamage = isSoulstitchProtected ? 0 : computeDamageAfterEvasion(adjustedTotal, saveResult.success, dcSuccess, hasEvasion);
+
+        if (hasEvasion) {
+            logEntry({
+                type: 'roll',
+                characterName: target.name,
+                rollType: 'evasion',
+                name: hasOwnEvasion ? 'Evasion' : 'Leading Evasion',
+                targetName: target.name,
+                saveType,
+                saveDc,
+                saveResult: saveResult.success ? 'success' : 'failure',
+                dcSuccess,
+                timestamp: Date.now(),
+                id: utils.guid(),
+            });
+        }
+
         const isCantripFlag = context?.isCantrip || false;
         const hasPotentFlag = hasPotentCantrip(context?.playerStats);
         const hasBlessedStrikesOptions = context?.playerStats?.automation?.actions?.some(

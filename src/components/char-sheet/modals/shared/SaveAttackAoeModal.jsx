@@ -3,7 +3,7 @@ import { rollExpression } from '../../../../services/dice/diceRoller.js';
 import { resolveScaling } from '../../../../services/combat/automation/automationExpressions.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { sendSavePrompt } from '../../../../services/combat/conditions/savePromptService.js';
-import { applyDamageToTarget, computeDamageAfterSave, computeDamageAfterResistancesWithDetails } from '../../../../services/rules/combat/applyDamage.js';
+import { applyDamageToTarget, computeDamageAfterSave, computeDamageAfterEvasion, computeDamageAfterResistancesWithDetails, hasEvasionForSave, normalizeSaveType } from '../../../../services/rules/combat/applyDamage.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
@@ -80,11 +80,15 @@ function SaveAttackAoeModal({
                 const success = saveTotal >= saveDc;
                 const damageRoll = rollExpression(resolvedDamage);
                 const rawDamage = damageRoll?.total ?? 0;
-                const damageAfterSave = computeDamageAfterSave(rawDamage, success, dcSuccess);
-
                 const targetCreature = combatSummary.creatures.find(c => c.name === targetName);
                 const resistances = targetCreature?.resistances || [];
                 const immunities = targetCreature?.immunities || [];
+
+                const targetChar = (combatSummary.creatures?.filter(c => c.type === 'player') || []).find(c => c.name === targetName);
+                const normalizedSaveType = normalizeSaveType(saveType);
+                const evasionEffects = targetChar?.computedStats?.evasionEffects;
+                const evasionActive = hasEvasionForSave(evasionEffects, normalizedSaveType);
+                const damageAfterSave = computeDamageAfterEvasion(rawDamage, success, dcSuccess, evasionActive);
                 const resResult = computeDamageAfterResistancesWithDetails(damageAfterSave, [damageType], resistances, immunities, false);
                 let finalDamage = resResult.finalDamage;
 
@@ -429,7 +433,9 @@ function SaveAttackAoeModal({
                         {ctx.results.map(r => (
                             <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
                                 <strong>{r.targetName}</strong>: {r.success
-                                    ? `Saved — takes ${r.finalDamage ?? 0} ${damageType} damage (rolled ${r.roll ?? 0}, halved)`
+                                    ? (r.finalDamage ?? 0) > 0
+                                        ? `Saved — takes ${r.finalDamage} ${damageType} damage (rolled ${r.roll ?? 0}, halved)`
+                                        : `Saved — takes no damage (rolled ${r.roll ?? 0})`
                                     : `Failed — takes ${r.finalDamage ?? 0} ${damageType} damage (rolled ${r.roll ?? 0})`}
                             </div>
                         ))}
@@ -485,7 +491,9 @@ function SaveAttackAoeModal({
                             {summary.results.map(r => (
                                 <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
                                     <strong>{r.targetName}</strong>: {r.success
-                                        ? `Saved — takes ${r.finalDamage ?? 0} ${damageType} damage (rolled ${r.roll ?? 0}, halved)`
+                                        ? (r.finalDamage ?? 0) > 0
+                                            ? `Saved — takes ${r.finalDamage} ${damageType} damage (rolled ${r.roll ?? 0}, halved)`
+                                            : `Saved — takes no damage (rolled ${r.roll ?? 0})`
                                         : `Failed — takes ${r.finalDamage ?? 0} ${damageType} damage (rolled ${r.roll ?? 0})`}
                                 </div>
                             ))}

@@ -57,6 +57,23 @@ export function setupEventListeners(deps) {
                 e.detail.rawDamage ?? pending.rawDamage, e.detail.success, e.detail.dcSuccess, hasEvasion
             );
 
+            if (hasEvasion) {
+                const evasionName = hasOwnEvasion ? 'Evasion' : 'Leading Evasion';
+                logEntry({
+                    type: 'roll',
+                    characterName: e.detail.targetName,
+                    rollType: 'evasion',
+                    name: evasionName,
+                    targetName: e.detail.targetName,
+                    saveType: normalizedSaveType,
+                    saveDc: e.detail.saveDc,
+                    saveResult: e.detail.success ? 'success' : 'failure',
+                    dcSuccess: e.detail.dcSuccess,
+                    timestamp: Date.now(),
+                    id: utils.guid(),
+                });
+            }
+
             const interveneShieldActive = getRuntimeValue(e.detail.targetName, 'interveneShieldActive', pending.campaignName);
             if (interveneShieldActive && e.detail.saveType === 'DEX' && e.detail.dcSuccess === 'half') {
                 if (e.detail.success) {

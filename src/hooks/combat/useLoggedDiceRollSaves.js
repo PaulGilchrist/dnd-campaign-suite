@@ -11,6 +11,7 @@ import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js'
 import storage from '../../services/ui/storage.js';
 import { MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js';
 import { hasIgnoreResistance, evaluateAutoExpression } from '../../services/combat/automation/automationService.js';
+import utils from '../../services/ui/utils.js';
 
 export function createSaves(deps) {
     const { characterName, campaignName, setPopupHtml, logEntry, logAndShow, pendingSaves, charactersRef } = deps;
@@ -170,6 +171,22 @@ export function createSaves(deps) {
             });
         const hasEvasion = hasOwnEvasion || hasSelectedEvasion || hasSharedEvasion;
         let finalDamage = computeDamageAfterEvasion(pending.rawDamage, saveResult.success, pending.dcSuccess, hasEvasion);
+
+        if (hasEvasion) {
+            logEntry({
+                type: 'roll',
+                characterName: pending.targetName,
+                rollType: 'evasion',
+                name: hasOwnEvasion ? 'Evasion' : hasSelectedEvasion ? 'Evasion' : 'Leading Evasion',
+                targetName: pending.targetName,
+                saveType,
+                saveDc: pending.saveDc,
+                saveResult: saveResult.success ? 'success' : 'failure',
+                dcSuccess: pending.dcSuccess,
+                timestamp: Date.now(),
+                id: utils.guid(),
+            });
+        }
 
         const isShieldActive = Array.isArray(targetActiveBuffs) && targetActiveBuffs.some(b => b.effect === 'shield');
         const isMagicMissile = pending.name && pending.name.toLowerCase() === 'magic missile';

@@ -4,7 +4,7 @@ import { rollExpression } from '../../../../services/dice/diceRoller.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 import utils from '../../../../services/ui/utils.js';
 import { applyHealingDirectly, logHealingToSSE } from '../../../../services/automation/common/healingRoll.js';
-import { applyDamageToTarget, computeDamageAfterSave } from '../../../../services/rules/combat/applyDamage.js';
+import { applyDamageToTarget, computeDamageAfterEvasion, computeDamageAfterSave, hasEvasionForSave, normalizeSaveType } from '../../../../services/rules/combat/applyDamage.js';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { renderTargetList, logSaveEntry, persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 
@@ -30,7 +30,12 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
 
                 const damageRoll = rollExpression(damageExpression);
                 const rawDamage = damageRoll?.total ?? 0;
-                const finalDamage = computeDamageAfterSave(rawDamage, success, 'half');
+
+                const targetChar = (combatSummary.creatures?.filter(c => c.type === 'player') || []).find(c => c.name === targetName);
+                const normalizedSaveType = normalizeSaveType(saveType);
+                const evasionEffects = targetChar?.computedStats?.evasionEffects;
+                const evasionActive = hasEvasionForSave(evasionEffects, normalizedSaveType);
+                const finalDamage = computeDamageAfterEvasion(rawDamage, success, 'half', evasionActive);
 
                 sendSaveResult(campaignName, targetName, {
                     promptId: utils.guid(),
@@ -234,7 +239,9 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
                     {ctx.results.map(r => (
                         <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
                             <strong>{r.targetName}</strong>: {r.success
-                                ? `Saved — takes ${r.finalDamage} ${damageType} damage (rolled ${r.rawDamage}, halved)`
+                                ? r.finalDamage > 0
+                                    ? `Saved — takes ${r.finalDamage} ${damageType} damage (rolled ${r.rawDamage}, halved)`
+                                    : `Saved — takes no damage (rolled ${r.rawDamage})`
                                 : `Failed — takes ${r.finalDamage} ${damageType} damage (rolled ${r.rawDamage})`}
                         </div>
                     ))}

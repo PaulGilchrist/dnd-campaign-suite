@@ -5628,7 +5628,7 @@
                 "features": [
                     {
                         "name": "Martial Arts",
-                        "description": "Your practice of martial arts gives you mastery of combat styles that use your Unarmed Strike and Monk weapons (Simple Melee weapons, Martial Melee weapons with Light property). Benefits while unarmed or wielding only Monk weapons and not wearing armor or wielding a Shield: Bonus Unarmed Strike. You can make an Unarmed Strike as a Bonus Action. Martial Arts Die. You can roll 1d6 in place of the normal damage of your Unarmed Strike or Monk weapons. This die changes as you gain Monk levels. Dexterous Attacks. You can use your Dexterity modifier instead of your Strength modifier for attack and damage rolls of Unarmed Strikes and Monk weapons. For Grapple or Shove, use Dexterity modifier for save DC.",
+                        "description": "Your practice of martial arts gives you mastery of combat styles that use your Unarmed Strike and Monk weapons (Simple Melee weapons, Martial Melee weapons with Light property). Benefits while unarmed or wielding only Monk weapons and not wearing armor or wielding a Shield:<ul><li><b>Bonus Unarmed Strike:</b> You can make an Unarmed Strike as a Bonus Action.</li><li><b>Martial Arts Die:</b> You can roll 1d6 in place of the normal damage of your Unarmed Strike or Monk weapons. This die changes as you gain Monk levels.</li><li><b>Dexterous Attacks:</b> You can use your Dexterity modifier instead of your Strength modifier for attack and damage rolls of Unarmed Strikes and Monk weapons. For Grapple or Shove, use Dexterity modifier for save DC.</li></ul>",
                         "level": 1,
                         "type": "class_feature"
                     },
