@@ -27,6 +27,7 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     'natural_recovery',
     'circle_of_the_land_spells',
     'animal_aspect',
+    'stride_of_the_elements',
     'combat_stance',
     'damage_type_choice',
     'wild_magic_surge',

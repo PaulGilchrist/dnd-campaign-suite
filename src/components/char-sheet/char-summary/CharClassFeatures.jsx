@@ -312,6 +312,13 @@ const MonkFeatures = function MonkFeatures({ playerStats, campaignName }) {
     const cloakOfShadowsActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'cloak_of_shadows');
     const elementalAttunementActive = useRuntimeValue(playerStats.name, 'elementalAttunementActive', campaignName);
     const elementalAttunementElement = useRuntimeValue(playerStats.name, 'elementalAttunementElement', campaignName);
+    const strideBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.name === 'Stride of the Elements') : null;
+    const STRIDE_LABELS = {
+        'ice_walk': 'Ice Walk',
+        'speed_boost': '+10 Speed',
+        'fly_speed_equals_walk_speed': 'Fly Speed',
+        'teleport_ready': 'Teleport 30 ft',
+    };
     if (playerStats.level < 2) return null;
     const focusSaveDc = 8 + (wisdom?.bonus || 0) + playerStats.proficiency;
     return (
@@ -321,8 +328,9 @@ const MonkFeatures = function MonkFeatures({ playerStats, campaignName }) {
                <div><b>Focus Save DC: </b>{focusSaveDc}</div>
                <div><b>Martial Arts Die:</b> d{monkFeatures?.martialArtsDie || 0}</div>
                <div><b>Unarmored Movement:</b> +{monkFeatures?.unarmoredMovementIncrease || 0} ft.</div>
-               {cloakOfShadowsActive && <span className="automation-badge">Cloak of Shadows</span>}
-               {elementalAttunementActive && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-wand-magic-sparkles"></i> Elemental Attunement: {elementalAttunementElement}</span>}
+                {cloakOfShadowsActive && <span className="automation-badge">Cloak of Shadows</span>}
+                {elementalAttunementActive && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-wand-magic-sparkles"></i> Elemental Attunement: {elementalAttunementElement}</span>}
+                {strideBuff && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-person-walking"></i> Stride: {STRIDE_LABELS[strideBuff.effect] || 'Stride'}</span>}
            </div>
       );
 };

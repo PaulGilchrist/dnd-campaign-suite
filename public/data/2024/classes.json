@@ -6558,7 +6558,7 @@
                             "saveDc": "ability",
                             "saveAbility": "WIS",
                             "range": "60 ft",
-                            "duration": "1_minute",
+                            "duration": "10_minutes",
                             "hasOptions": true,
                             "options": [
                                 "Cold",
@@ -6603,13 +6603,12 @@
                     },
                     {
                         "name": "Stride of the Elements",
-                        "description": "When you use your Elemental Attunement, you can gain a special movement type: Cold = Ice Walk (walk on water/ice), Fire = +10ft Speed, Lightning = Fly Speed equal to your Speed for 1 round, Thunder = teleport 30 ft.",
+                        "description": "When you use your Elemental Attunement, you can gain a special movement type: Cold = Ice Walk (walk on water/ice), Fire = +10ft Speed, Lightning = Fly Speed equal to your Speed, Thunder = teleport 30 ft.",
                         "level": 6,
                         "automation": {
-                            "type": "combat_stance",
+                            "type": "stride_of_the_elements",
                             "effect": "elemental_movement",
-                            "duration": "1_round",
-                            "casting_time": "1 bonus action",
+                            "casting_time": "passive",
                             "options": [
                                 {
                                     "name": "Cold",
@@ -6673,7 +6672,7 @@
                     },
                     {
                         "name": "Elemental Epitome",
-                        "description": "While Elemental Attunement active: Damage Resistance to one elemental type (change each turn). Destructive Stride - Step of the Wind Speed +20, creatures take Martial Arts die damage when you enter 5 feet. Empowered Strikes - once per turn, extra Martial Arts die damage on Unarmed Strike.",
+                        "description": "While your Elemental Attunement is active, you also gain the following benefits. <ul><li><b>Damage Resistance:</b> You gain Resistance to one of the following damage types of your choice: Acid, Cold, Fire, Lightning, or Thunder. At the start of each of your turns, you can change this choice.</li><li><b>Destructive Stride:</b> When you use your Step of the Wind, your Speed increases by 20 feet until the end of the turn. For that duration, any creature of your choice takes damage equal to one roll of your Martial Arts die when you enter a space within 5 feet of it. The damage type is your choice of Acid, Cold, Fire, Lightning, or Thunder. A creature can take this damage only once per turn.</li><li><b>Empowered Strikes:</b> Once on each of your turns, you ca11 deal extra damage to a target equal to one roll of your Martial Arts die when you hit it with an Unarmed Strike. The extra damage is the same type dealt by that strike.</li></ul>",
                         "level": 17
                     }
                 ],

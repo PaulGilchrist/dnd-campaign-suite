@@ -23,6 +23,7 @@ import { handle as handleFontOfMagic } from './handlers/resources/fontOfMagicHan
 import { handle as handleHealingPool } from './handlers/healing/healingPoolHandler.js';
 import { automationInfoPopup } from '../shared/popupResponse.js';
 import { handle as handleCombatStance } from './handlers/combat/combatStanceHandler.js';
+import { handle as handleStrideOfTheElements } from './handlers/combat/strideOfTheElementsHandler.js';
 import { handle as handleReactionDamage } from './handlers/reactions/reactionDamageHandler.js';
 import { handle as handlePersistentRage } from './handlers/class-barbarian/persistentRageHandler.js';
 import { handle as handleZealousPresence } from './handlers/class-barbarian/zealousPresenceHandler.js';
@@ -271,6 +272,7 @@ const HANDLER_MAP = {
     healing_pool: handleHealingPool,
     extra_action: handleExtraAction,
         combat_stance: handleCombatStance,
+    stride_of_the_elements: handleStrideOfTheElements,
     attack_rider: handleAttackRider,
     spell_modifier: (action) => (action.name === 'Metamagic' ? null : automationInfoPopup(action)),
     temp_hp_buff: handleTempHpBuff,

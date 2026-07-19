@@ -24,6 +24,7 @@ import NaturalRecoveryModal from './modals/NaturalRecoveryModal.jsx';
 import CircleOfTheLandSpellsModal from './modals/CircleOfTheLandSpellsModal.jsx';
 import ElementalAffinityModal from './modals/ElementalAffinityModal.jsx';
 import WildMagicSurgeModal from './modals/WildMagicSurgeModal.jsx';
+import StrideOfTheElementsModal from './modals/StrideOfTheElementsModal.jsx';
 import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
 import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
 import { onSavantSelected } from '../../services/automation/handlers/class-wizard/SavantHandler.js';
@@ -46,6 +47,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
     const [aspectOfTheWildsModal, setAspectOfTheWildsModal] = useState(null);
     const [elementalAffinityModal, setElementalAffinityModal] = useState(null);
     const [wildMagicSurgeModal, setWildMagicSurgeModal] = useState(null);
+    const [strideModal, setStrideModal] = useState(null);
     const [fightingStylesMap, setFightingStylesMap] = useState(null);
     const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats?.name, campaignName, {
@@ -231,6 +233,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                 setElementalAffinityModal(result.payload);
             } else if (result.modalName === 'wildMagicSurge') {
                 setWildMagicSurgeModal(result.payload);
+            } else if (result.modalName === 'strideOfTheElements') {
+                setStrideModal(result.payload);
             }
         } else if (result.type === 'popup') {
             const payload = result.payload;
@@ -240,6 +244,38 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
             setPopupHtml(html);
         }
     }, [playerStats, campaignName, cannotAct, setCombatSuperiorityModal, setPopupHtml]);
+
+    const handleStrideConfirm = useCallback(async (optionName, buffEntry) => {
+        if (!strideModal) return;
+        const { action, playerStats: modalPlayerStats, campaignName: modalCampaign } = strideModal;
+        setStrideModal(null);
+
+        const stored = getRuntimeValue(modalPlayerStats.name, 'activeBuffs', modalCampaign);
+        const activeBuffs = Array.isArray(stored) ? stored : [];
+        const existingStride = activeBuffs.find(b => b.name === 'Stride of the Elements');
+        const newBuffs = existingStride
+            ? activeBuffs.map(b => b.name === 'Stride of the Elements' ? { ...b, ...buffEntry } : b)
+            : [...activeBuffs, { name: 'Stride of the Elements', ...buffEntry }];
+        await setRuntimeValue(modalPlayerStats.name, 'activeBuffs', newBuffs, modalCampaign);
+
+        const descriptions = {
+            'Ice Walk': 'You can walk across and climb icy or wet surfaces without needing to make an Ability Check. You ignore difficult terrain that is composed of ice or snow.',
+            '+10 Speed': 'Your Speed increases by 10 feet.',
+            'Fly Speed': 'You gain a Fly Speed equal to your Speed.',
+            'Teleport 30 ft': 'You can teleport up to 30 ft to an unoccupied space you can see.',
+        };
+        const description = `Chose ${optionName}: ${descriptions[optionName] || optionName}`;
+        await addEntry(modalCampaign, {
+            type: 'ability_use',
+            characterName: modalPlayerStats.name,
+            abilityName: action.name,
+            description,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[StrideOfTheElements] Error logging:', e); });
+
+        const html = `<b>${action.name}</b><br/>Chose <strong>${optionName}</strong>. ${descriptions[optionName] || optionName}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+        setPopupHtml(html);
+    }, [strideModal, setPopupHtml]);
 
     const handleMoonlightStepFallbackConfirm = useCallback(async () => {
         if (!moonlightStepFallback) return;
@@ -445,6 +481,15 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                 <WildMagicSurgeModal
                     {...wildMagicSurgeModal}
                     onClose={() => setWildMagicSurgeModal(null)}
+                />
+            )}
+            {strideModal && (
+                <StrideOfTheElementsModal
+                    action={strideModal.action}
+                    playerStats={strideModal.playerStats}
+                    campaignName={strideModal.campaignName}
+                    onConfirm={handleStrideConfirm}
+                    onClose={() => setStrideModal(null)}
                 />
             )}
             {featureChoiceModal && (

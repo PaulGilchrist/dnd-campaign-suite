@@ -489,6 +489,7 @@ function ElementalAttunementModal({ action, playerStats, campaignName, mapName, 
             [
                 { type: 'clear_runtime_value', creatureName: playerStats.name, key: 'elementalAttunementActive' },
                 { type: 'clear_runtime_value', creatureName: playerStats.name, key: 'elementalAttunementElement' },
+                { type: 'remove_active_buff', buffName: 'Stride of the Elements' },
             ],
             campaignName,
             Infinity,
