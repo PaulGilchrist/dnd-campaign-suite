@@ -71,6 +71,7 @@ describe('abilityCalc', () => {
         },
         skillProficiencies: overrides.skillProficiencies || [],
         expertise: overrides.expertise || null,
+        saveProficiencies: overrides.saveProficiencies || [],
       };
     }
 
@@ -106,6 +107,30 @@ describe('abilityCalc', () => {
       const dex = result.find(a => a.name === 'Dexterity');
       expect(dex.proficient).toBe(false);
       expect(dex.save).toBe(2); // just bonus
+    });
+
+    it('should merge class save proficiencies with feature save proficiencies', async () => {
+      const result = await getAbilities(makeStats({
+        level: 7,
+        class: { saving_throws: ['Strength', 'Constitution'] },
+        saveProficiencies: ['Dexterity', 'Wisdom'],
+      }));
+
+      const str = result.find(a => a.name === 'Strength');
+      expect(str.proficient).toBe(true);
+      expect(str.save).toBe(6); // 3 (bonus) + 3 (proficiency)
+
+      const dex = result.find(a => a.name === 'Dexterity');
+      expect(dex.proficient).toBe(true);
+      expect(dex.save).toBe(5); // 2 (bonus) + 3 (proficiency)
+
+      const wis = result.find(a => a.name === 'Wisdom');
+      expect(wis.proficient).toBe(true);
+      expect(wis.save).toBe(4); // 1 (bonus) + 3 (proficiency)
+
+      const cha = result.find(a => a.name === 'Charisma');
+      expect(cha.proficient).toBe(false);
+      expect(cha.save).toBe(-1); // just bonus
     });
 
     it('should mark skill proficiencies and apply expertise as double proficiency', async () => {
@@ -253,15 +278,18 @@ describe('abilityCalc', () => {
       });
     });
 
-    it('should throw when class.saving_throws is undefined', async () => {
-      await expect(
-        getAbilities(makeStats({
-          class: {
-            name: 'Fighter',
-            saving_throws: undefined,
-          },
-        }))
-      ).rejects.toThrow();
+    it('should handle missing class.saving_throws gracefully', async () => {
+      const result = await getAbilities(makeStats({
+        class: {
+          name: 'Fighter',
+          saving_throws: undefined,
+        },
+      }));
+
+      result.forEach(ability => {
+        expect(ability.proficient).toBe(false);
+        expect(ability.save).toBe(ability.bonus);
+      });
     });
   });
 

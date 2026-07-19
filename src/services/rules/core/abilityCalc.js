@@ -16,7 +16,10 @@ export async function getAbilities(playerStats) {
             newAbility.totalScore += 4; // Primal Champion
          }
         newAbility.bonus = Math.floor((newAbility.totalScore - 10) / 2);
-        newAbility.proficient = playerStats.class.saving_throws.includes(newAbility.name);
+        const classSaves = playerStats.class.saving_throws || [];
+        const featureSaves = playerStats.saveProficiencies || [];
+        const allSaveProfs = [...new Set([...classSaves, ...featureSaves])];
+        newAbility.proficient = allSaveProfs.includes(newAbility.name);
         newAbility.save = newAbility.proficient ? newAbility.bonus + proficiency : newAbility.bonus;
         newAbility.skills = skills.filter(skill => skill.ability === newAbility.name);
         newAbility.skills = newAbility.skills.map((skill) => {

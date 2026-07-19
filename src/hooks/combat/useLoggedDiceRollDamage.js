@@ -922,15 +922,11 @@ export function createLogDamageAndShow(deps) {
         const fanaticalFocusUsed = getRuntimeValue(target.name, 'fanaticalFocusUsed', campaignName);
         const indomitableUses = Number(getRuntimeValue(target.name, 'indomitableUses', campaignName) ?? 0);
         const indomitableMax = (targetChar?.computedStats?.level || 0) >= 17 ? 3 : (targetChar?.computedStats?.level || 0) >= 13 ? 2 : 1;
-        const disciplinedSurvivorUsed = getRuntimeValue(target.name, 'disciplinedSurvivorUsed', campaignName);
         let autoRerollForSaves = targetConditionEffects.autoRerollForSaves;
         if (fanaticalFocusUsed && autoRerollForSaves) {
             autoRerollForSaves = false;
         }
         if (indomitableUses >= indomitableMax && autoRerollForSaves) {
-            autoRerollForSaves = false;
-        }
-        if (disciplinedSurvivorUsed && autoRerollForSaves) {
             autoRerollForSaves = false;
         }
         let autoRerollBonus = targetConditionEffects.autoRerollBonus;

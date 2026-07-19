@@ -6,6 +6,7 @@ import Subscriber from './Subscriber.jsx';
 import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.js';
 import { getAbilitySaveBonus } from '../../services/combat/conditions/conditionUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../services/ui/logService.js';
 import { getAllyList } from '../../hooks/useAllySelection.js';
 import { normalizeSaveType } from '../../services/rules/combat/applyDamage.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
@@ -323,8 +324,11 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
   const livingLegendActive = current ? getRuntimeValue(current.targetName, 'livingLegendActive', campaignName) === true : false;
   const indomitableUses = current ? Number(getRuntimeValue(current?.targetName, 'indomitableUses', campaignName) ?? 0) : 0;
   const indomitableMax = 1;
-  const disciplinedSurvivorUsed = current ? getRuntimeValue(current?.targetName, 'disciplinedSurvivorUsed', campaignName) : false;
-  const livingLegendAvailable = livingLegendActive && !fanaticalFocusUsed && indomitableUses < indomitableMax && !disciplinedSurvivorUsed;
+  const targetClassLevel = targetCharacter?.class?.class_levels?.[(targetCharacter.level || 1) - 1] || {};
+  const maxFocusPoints = targetClassLevel.focus_points || 0;
+  const currentFocusPoints = current ? Number(getRuntimeValue(current.targetName, 'focusPoints', campaignName) ?? maxFocusPoints) : 0;
+  const disciplinedSurvivorAvailable = !fanaticalFocusUsed && currentFocusPoints > 0;
+  const livingLegendAvailable = livingLegendActive && !fanaticalFocusUsed && indomitableUses < indomitableMax;
 
   const handleFanaticalFocus = useCallback(async () => {
     if (!fanaticalFocusAvailable || !current) return;
@@ -363,8 +367,109 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
         ? { ...p, result: { success, roll: finalRoll, total, saveBonus: saveBonus + aura.bonus + rerollBonus, bonusDetail: `(+${rerollBonus} Fanatical Focus)`, rawRolls: [roll1, roll2], mode: current.disadvantage ? 'disadvantage' : 'normal' } }
         : p
     ));
+
+    addEntry(campaignName, {
+      type: 'roll',
+      rollType: 'save-damage',
+      name: current.sourceName || 'Unknown',
+      formula: current.damageFormula || '',
+      rolls: [finalRoll],
+      total,
+      modifier: saveBonus + aura.bonus + rerollBonus,
+      damageType: current.damageType || null,
+      targetName: current.targetName,
+      saveType: current.saveType || null,
+      saveDc: current.saveDc,
+      saveResult: success ? 'success' : 'failure',
+      saveRoll: finalRoll,
+      saveBonus: saveBonus + aura.bonus + rerollBonus,
+      saveRawRolls: [roll1, roll2],
+      finalDamage: null,
+      note: 'fanatical_focus_reroll',
+      timestamp: Date.now(),
+    }).catch((e) => { console.error('[SavePromptModal] Error logging reroll:', e); });
+
     clearSavePrompt(campaignName, current.targetName);
   }, [fanaticalFocusAvailable, rageDamageBonus, current, campaignName, characters, activeMapName]);
+
+  const handleDisciplinedSurvivor = useCallback(async () => {
+    if (!disciplinedSurvivorAvailable || !current) return;
+    setRerollUsedForSave(true);
+    const newFocus = currentFocusPoints - 1;
+    setRuntimeValue(current.targetName, 'focusPoints', newFocus, campaignName);
+    let saveBonus = 0;
+    let character = null;
+    try {
+      character = (characters || []).find(c => {
+        const name = typeof c === 'string' ? c : c.name;
+        return name && utils.getName(name) === utils.getName(current.targetName);
+      });
+      if (character && typeof character !== 'string') {
+        saveBonus = getAbilitySaveBonus(character.computedStats || character, current.saveType);
+      }
+    } catch { /* ignore */ }
+    const aura = await computeAuraBonus({ targetName: current.targetName, characters, campaignName, activeMapName, allCreatures: getCombatSummary(campaignName)?.creatures });
+    const roll1 = rollD20();
+    const roll2 = current.disadvantage ? rollD20() : roll1;
+    const finalRoll = current.disadvantage ? Math.min(roll1, roll2) : roll1;
+    const total = finalRoll + saveBonus + aura.bonus;
+    const success = total >= current.saveDc;
+    sendSaveResult(campaignName, current.targetName, {
+      promptId: current.promptId,
+      success,
+      roll: finalRoll,
+      total,
+      saveBonus: saveBonus + aura.bonus,
+      rawRolls: [roll1, roll2],
+      mode: current.disadvantage ? 'disadvantage' : 'normal',
+      bonusDetail: '(-1 Focus Point)',
+    });
+    setPrompts(prev => prev.map((p, i) =>
+      i === 0
+        ? { ...p, result: { success, roll: finalRoll, total, saveBonus: saveBonus + aura.bonus, bonusDetail: '(-1 Focus Point)', rawRolls: [roll1, roll2], mode: current.disadvantage ? 'disadvantage' : 'normal' } }
+        : p
+    ));
+
+    addEntry(campaignName, {
+      type: 'roll',
+      rollType: 'save-damage',
+      name: current.sourceName || 'Unknown',
+      formula: current.damageFormula || '',
+      rolls: [finalRoll],
+      total,
+      modifier: saveBonus + aura.bonus,
+      damageType: current.damageType || null,
+      targetName: current.targetName,
+      saveType: current.saveType || null,
+      saveDc: current.saveDc,
+      saveResult: success ? 'success' : 'failure',
+      saveRoll: finalRoll,
+      saveBonus: saveBonus + aura.bonus,
+      saveRawRolls: [roll1, roll2],
+      finalDamage: null,
+      note: 'disciplined_survivor_reroll',
+      timestamp: Date.now(),
+    }).catch((e) => { console.error('[SavePromptModal] Error logging reroll:', e); });
+
+    const cs = getCombatSummary(campaignName);
+    if (cs) {
+      cs.lastAttack = {
+        ...cs.lastAttack,
+        d20: finalRoll,
+        d20Rolls: [roll1, roll2],
+        bonus: saveBonus + aura.bonus,
+        total,
+        saveType: current.saveType || null,
+        saveDc: current.saveDc,
+        saveResult: success ? 'success' : 'failure',
+        saveConditions: current.condition ? [current.condition] : [],
+        timestamp: Date.now(),
+      };
+      storage.set('combatSummary', cs, campaignName);
+    }
+
+    clearSavePrompt(campaignName, current.targetName);
+  }, [disciplinedSurvivorAvailable, currentFocusPoints, current, campaignName, characters, activeMapName]);
 
   return (
     <>
@@ -419,6 +524,11 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
                       <i className="fa-solid fa-rotate"></i> Reroll Save (+{rageDamageBonus})
                     </button>
                   )}
+                  {!current.result.success && !rerollUsedForSave && disciplinedSurvivorAvailable && (
+                    <button className="sp-stroke-btn" onClick={handleDisciplinedSurvivor} type="button">
+                      <i className="fa-solid fa-rotate"></i> Reroll Save (1 Focus Point)
+                    </button>
+                  )}
                   {!current.result.success && !rerollUsedForSave && livingLegendAvailable && (
                     <button className="sp-stroke-btn" onClick={async () => {
                       if (!current) return;
@@ -451,6 +561,28 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
                           ? { ...p, result: { success, roll: finalRoll, total, saveBonus: localSaveBonus + aura.bonus, rawRolls: [roll1, roll2], mode: current.disadvantage ? 'disadvantage' : 'normal' } }
                           : p
                       ));
+
+                      addEntry(campaignName, {
+                        type: 'roll',
+                        rollType: 'save-damage',
+                        name: current.sourceName || 'Unknown',
+                        formula: current.damageFormula || '',
+                        rolls: [finalRoll],
+                        total,
+                        modifier: localSaveBonus + aura.bonus,
+                        damageType: current.damageType || null,
+                        targetName: current.targetName,
+                        saveType: current.saveType || null,
+                        saveDc: current.saveDc,
+                        saveResult: success ? 'success' : 'failure',
+                        saveRoll: finalRoll,
+                        saveBonus: localSaveBonus + aura.bonus,
+                        saveRawRolls: [roll1, roll2],
+                        finalDamage: null,
+                        note: 'living_legend_reroll',
+                        timestamp: Date.now(),
+                      }).catch((e) => { console.error('[SavePromptModal] Error logging reroll:', e); });
+
                       clearSavePrompt(campaignName, current.targetName);
                     }} type="button">
                       <i className="fa-solid fa-rotate"></i> Reroll Save

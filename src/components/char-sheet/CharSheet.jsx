@@ -360,11 +360,6 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             conditionEffects.autoRerollForSaves = false;
             conditionEffects.autoRerollBonus = null;
         }
-        const disciplinedSurvivorUsed = getRuntimeValue(playerStats.name, 'disciplinedSurvivorUsed', campaignName);
-        if (disciplinedSurvivorUsed && conditionEffects.autoRerollForSaves) {
-            conditionEffects.autoRerollForSaves = false;
-            conditionEffects.autoRerollBonus = null;
-        }
         const strokeOfLuckUsed = getRuntimeValue(playerStats.name, 'strokeOfLuckUsed', campaignName);
         if (strokeOfLuckUsed && conditionEffects.strokeOfLuck) {
             conditionEffects.strokeOfLuck = false;
@@ -495,7 +490,6 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                     return;
                 }
                 setRuntimeValue(playerStats.name, 'focusPoints', currentFocus - 1, campaignName);
-                setRuntimeValue(playerStats.name, 'disciplinedSurvivorUsed', true, campaignName);
             } else {
                 const current = Number(getRuntimeValue(playerStats.name, 'indomitableUses', campaignName) ?? 0);
                 setRuntimeValue(playerStats.name, 'indomitableUses', current + 1, campaignName);

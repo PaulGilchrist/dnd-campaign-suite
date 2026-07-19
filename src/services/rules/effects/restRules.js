@@ -460,13 +460,16 @@ export async function applyLongRest(playerStats, campaignName) {
     // Clear Avenging Angel active state on long rest
      charData.avengingAngelActive = null;
 
-       // Clear Peerless Athlete active state on long rest
-       charData.peerlessAthleteActive = null;
+     // Clear Peerless Athlete active state on long rest
+        charData.peerlessAthleteActive = null;
 
-      // Clear Trance of Order active state on long rest
-      charData.tranceOfOrderActive = null;
+       // Clear Trance of Order active state on long rest
+       charData.tranceOfOrderActive = null;
 
-      // Clear Wild Magic Surge badge on long rest
+       // Clear Fanatical Focus used state on long rest (Barbarian feature, per long rest)
+       charData.fanaticalFocusUsed = null;
+
+       // Clear Wild Magic Surge badge on long rest
       charData.wildMagicSurgeEffects = null;
 
       // Clear Vow of Enmity active state on long rest
