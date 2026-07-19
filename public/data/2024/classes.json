@@ -5972,21 +5972,15 @@
                         "description": "Remove Charmed, Frightened, or Poisoned condition from yourself at end of each turn. Forgoing food and drink doesn't give Exhaustion.",
                         "level": 10,
                         "type": "class_feature",
-                        "automation": [
-                            {
-                                "type": "passive_immunity",
-                                "conditionImmunity": "charmed frightened poisoned"
-                            },
-                            {
-                                "type": "passive_rule",
-                                "effect": "end_of_turn_condition_removal",
-                                "conditions": [
-                                    "charmed",
-                                    "frightened",
-                                    "poisoned"
-                                ]
-                            }
-                        ]
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "end_of_turn_condition_removal",
+                            "conditions": [
+                                "charmed",
+                                "frightened",
+                                "poisoned"
+                            ]
+                        }
                     }
                 ]
             },
