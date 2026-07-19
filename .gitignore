@@ -3,6 +3,21 @@ docs/spells-2024.pdf
 public/campaigns/*/data/character-change-data.json
 public/campaigns/*/data/campaign-log.json
 
+# Ignore all campaigns except the kept ones
+public/campaigns/*
+!public/campaigns/Testing\ G1
+!public/campaigns/Testing\ G2
+!public/campaigns/Testing\ G3
+!public/campaigns/Frostfall
+public/campaigns/Testing\ G1/*
+public/campaigns/Testing\ G2/*
+public/campaigns/Testing\ G3/*
+public/campaigns/Frostfall/*
+!public/campaigns/Testing\ G1/**
+!public/campaigns/Testing\ G2/**
+!public/campaigns/Testing\ G3/**
+!public/campaigns/Frostfall/**
+
 # Logs
 logs
 *.log
