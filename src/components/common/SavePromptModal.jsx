@@ -141,6 +141,16 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
       }
     }
 
+    // Dodge: advantage on Dexterity saving throws only
+    if (!hasAdvantage && !current.disadvantage) {
+      const targetActiveBuffs = getRuntimeValue(current?.targetName, 'activeBuffs', campaignName) || [];
+      const isDodgeActive = Array.isArray(targetActiveBuffs) && targetActiveBuffs.some(b => b.effect === 'dodge');
+      const isDexSave = (current.saveType || '').toUpperCase() === 'DEX';
+      if (isDodgeActive && isDexSave) {
+        hasAdvantage = true;
+      }
+    }
+
     // Source-restricted save advantage (e.g. Holy Nimbus: advantage against Fiends/Undead for allies)
     if (!hasAdvantage && !current.disadvantage && current.attackerName) {
       const targetName = current.targetName;

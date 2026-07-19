@@ -177,6 +177,7 @@ describe('createSaves (useLoggedDiceRollSaves) - Evasion & Shields', () => {
                 },
             }];
             getRuntimeValue.mockReturnValueOnce([])
+                .mockReturnValueOnce([])
                 .mockReturnValueOnce(['incapacitated'])
                 .mockReturnValueOnce(null);
             rollSaveForCreature.mockReturnValue({ success: true, roll: 18, total: 21, bonus: 3 });

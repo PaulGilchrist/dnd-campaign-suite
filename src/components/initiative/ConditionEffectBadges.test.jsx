@@ -30,6 +30,7 @@ const defaultEffects = {
     autoFailSaves: [],
     resistantToAll: false,
     attackDisadvantageCount: 0,
+    attackDisadvantageReasons: [],
     abilityCheckDisadvantage: false,
     strCheckDisadvantage: false,
     rayOfEnfeebleDamageReduction: false,
@@ -40,6 +41,13 @@ const defaultEffects = {
     riderCannotOpportunityAttack: false,
     riderNoReactions: false,
     noAdvantageAgainst: false,
+    attackAdvantageCount: 0,
+    attackAdvantageReasons: [],
+    saveAdvantageCount: 0,
+    saveAdvantageReasons: [],
+    saveAdvantageAbilities: null,
+    saveDisadvantageCount: 0,
+    dexSaveAdvantageCount: 0,
 };
 
 function makeEffects(overrides = {}) {
@@ -154,6 +162,29 @@ describe('ConditionEffectBadges', () => {
             } else {
                 expect(badge).not.toBeInTheDocument();
             }
+        });
+    });
+
+    describe('badges from buffs', () => {
+        it('renders Disadv vs and Adv DEX Save badges when Dodge buff is active', () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (name === 'Alice' && key === 'activeBuffs') return [{ name: 'Dodge', effect: 'dodge' }];
+                return null;
+            });
+            computeConditionEffects.mockReturnValue(makeEffects({}));
+            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
+            expect(screen.getByText('Disadv vs')).toBeInTheDocument();
+            expect(screen.getByText('Adv DEX Save')).toBeInTheDocument();
+        });
+
+        it('renders Adv badge when vow_of_enmity buff is active', () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (name === 'Alice' && key === 'activeBuffs') return [{ name: 'Vow of Enmity', effect: 'vow_of_enmity' }];
+                return null;
+            });
+            computeConditionEffects.mockReturnValue(makeEffects({}));
+            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
+            expect(screen.getByText('Adv')).toBeInTheDocument();
         });
     });
 

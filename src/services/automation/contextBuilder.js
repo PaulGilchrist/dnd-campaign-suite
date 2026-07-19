@@ -182,6 +182,14 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             }
         }
 
+        // Dodge: attackers have disadvantage on attacks against the target
+        if (targetName && forcedMode === undefined) {
+            const targetBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
+            if (Array.isArray(targetBuffs) && targetBuffs.some(b => b.effect === 'dodge')) {
+                dis++;
+            }
+        }
+
         // Resolve accumulated adv/dis to forcedMode (they cancel per rules)
         if (forcedMode === undefined) {
             if (adv > dis) {

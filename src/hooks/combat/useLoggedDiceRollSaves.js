@@ -149,7 +149,11 @@ export function createSaves(deps) {
         const targetChar = (charactersRef.current || []).find(c => c.name === pending.targetName);
         const targetSaveModifiers = targetChar?.saveModifiers || targetChar?.computedStats?.saveModifiers || [];
         const advantage = targetSaveModifiers.some(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');
-        const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage, advantage);
+        const targetActiveBuffs = getRuntimeValue(pending.targetName, 'activeBuffs', campaignName) || [];
+        const isDodging = Array.isArray(targetActiveBuffs) && targetActiveBuffs.some(b => b.effect === 'dodge');
+        const isDexSave = saveType.toUpperCase() === 'DEX';
+        const dodgeAdvantage = isDodging && isDexSave;
+        const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage, advantage || dodgeAdvantage);
 
         const normalizedSaveType = normalizeSaveType(saveType);
         const targetConditions = getRuntimeValue(pending.targetName, 'activeConditions', campaignName) || [];
@@ -167,7 +171,6 @@ export function createSaves(deps) {
         const hasEvasion = hasOwnEvasion || hasSelectedEvasion || hasSharedEvasion;
         let finalDamage = computeDamageAfterEvasion(pending.rawDamage, saveResult.success, pending.dcSuccess, hasEvasion);
 
-        const targetActiveBuffs = getRuntimeValue(pending.targetName, 'activeBuffs', campaignName) || [];
         const isShieldActive = Array.isArray(targetActiveBuffs) && targetActiveBuffs.some(b => b.effect === 'shield');
         const isMagicMissile = pending.name && pending.name.toLowerCase() === 'magic missile';
         if (isShieldActive && isMagicMissile) {

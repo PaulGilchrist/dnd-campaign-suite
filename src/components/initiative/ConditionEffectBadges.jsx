@@ -25,6 +25,10 @@ function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, c
                 effects.attackAdvantageCount = (effects.attackAdvantageCount || 0) + 1
                 effects.attackAdvantageReasons.push(buff.name)
             }
+            if (buff.effect === 'dodge') {
+                effects.targetDisadvantageCount = (effects.targetDisadvantageCount || 0) + 1
+                effects.dexSaveAdvantageCount = (effects.dexSaveAdvantageCount || 0) + 1
+            }
         }
     }
     const badges = []
@@ -56,6 +60,9 @@ function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, c
     if (effects.saveAdvantageCount > 0) {
         const reasons = (effects.saveAdvantageReasons || []).length > 0 ? effects.saveAdvantageReasons.join(', ') : 'Advantage on saving throws'
         badges.push({ label: 'Adv Save', cls: 'effect-target-adv', icon: 'fa-shield-halved', removable: false, tooltip: `Advantage on saving throws${reasons !== 'Advantage on saving throws' ? ' (' + reasons + ')' : ''}` })
+    }
+    if (effects.dexSaveAdvantageCount > 0) {
+        badges.push({ label: 'Adv DEX Save', cls: 'effect-target-adv', icon: 'fa-shield-halved', removable: false, tooltip: 'Advantage on Dexterity saving throws' })
     }
     if (effects.riderSaveDisadvantage) badges.push({ label: 'Save Disadv', cls: 'effect-disadvantage', icon: 'fa-shield', removable: false })
     if (effects.riderAttackBonus > 0) badges.push({ label: `+${effects.riderAttackBonus} to hit`, cls: 'effect-target-adv', icon: 'fa-bullseye', removable: true, effectType: 'damage_bonus' })

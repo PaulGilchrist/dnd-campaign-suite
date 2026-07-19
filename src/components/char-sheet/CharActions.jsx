@@ -1649,6 +1649,41 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             </React.Fragment>
                         );
                     }
+                    if (actionName === 'Dodge') {
+                        return (
+                            <React.Fragment key={idx}>
+                                {idx > 0 && ', '}
+                                <span className="clickable" onClick={async () => {
+                                    if (cannotAct) return;
+                                    const result = toggleBuff(
+                                        playerStats.name,
+                                        'Dodge',
+                                        { effect: 'dodge', duration: 'until_start_of_next_turn' },
+                                        campaignName,
+                                        playerStats.name
+                                    );
+                                    if (!result.wasActive) {
+                                        addExpiration(playerStats.name, playerStats.name, [
+                                            { type: 'remove_active_buff', buffName: 'Dodge' }
+                                        ], campaignName, undefined, playerStats.name);
+                                        await addEntry(campaignName, {
+                                            type: 'ability_use',
+                                            characterName: playerStats.name,
+                                            abilityName: 'Dodge',
+                                            description: `${playerStats.name} takes the Dodge action. Attackers have disadvantage on attacks against you until the start of your next turn. You have advantage on Dexterity saving throws.`,
+                                        }).catch(() => { });
+                                    }
+                                    setPopupHtml({
+                                        type: 'automation_info',
+                                        name: 'Dodge',
+                                        description: result.wasActive
+                                            ? 'Dodge deactivated.'
+                                            : 'Dodge activated. Attackers have disadvantage on attacks against you until the start of your next turn. You have advantage on Dexterity saving throws.',
+                                    });
+                                }}>{actionName}</span>
+                            </React.Fragment>
+                        );
+                    }
                     return <React.Fragment key={idx}>{idx > 0 && ', '}{actionName}</React.Fragment>;
                 })}</div>
             </div>

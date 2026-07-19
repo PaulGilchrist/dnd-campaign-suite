@@ -697,6 +697,8 @@ function CharClassFeatures({ playerStats, campaignName }) {
     const hasAdrenalineRush = (playerStats?.automation?.specialActions ?? []).some(a => a.effect === 'bonus_action_dash');
     const hasStonecunning = (playerStats?.race?.traits || []).some(t => t.name === 'Stonecunning' && t.automation);
     const [modalState, setModalState] = React.useState({});
+    const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+    const dodgeActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'dodge');
 
     const handleWeaponMasteryClick = () => {
         const existing = getRuntimeValue(playerStats.name, '_Weapon_Kind_Mastery_chosenWeapons', campaignName);
@@ -711,6 +713,7 @@ function CharClassFeatures({ playerStats, campaignName }) {
 
     return (
         <>
+            {dodgeActive && <span className="automation-badge">Dodge — Disadv on attacks vs you, Adv on DEX saves</span>}
             {hasAdrenalineRush && (
                 <TrackedResourceInput label="Adrenaline Rush" resourceKey="adrenalineRushUses" playerName={playerStats.name} getMax={() => playerStats.proficiency || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
             )}

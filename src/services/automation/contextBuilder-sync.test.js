@@ -567,6 +567,43 @@ describe('contextBuilder: buildAttackContextSync', () => {
     });
   });
 
+  describe('Dodge action', () => {
+    it('sets forcedMode to disadvantage when target has Dodge active', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'activeBuffs' && name === 'Orc') return [{ name: 'Dodge', effect: 'dodge', duration: 'until_start_of_next_turn' }];
+        return undefined;
+      });
+
+      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+
+      expect(result.forcedMode).toBe('disadvantage');
+    });
+
+    it('does not set disadvantage when target does not have Dodge active', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'activeBuffs' && name === 'Orc') return [];
+        return undefined;
+      });
+
+      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+
+      expect(result.forcedMode).toBeUndefined();
+    });
+
+    it('cancels dodge disadvantage with reckless attack advantage', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'targetEffects') return [{ effect: 'reckless_attack', target: 'Orc' }];
+        if (key === 'activeBuffs' && name === 'Orc') return [{ name: 'Dodge', effect: 'dodge' }];
+        if (key === 'activeBuffs') return [{ effect: 'advantage_attacks_advantage_against' }];
+        return undefined;
+      });
+
+      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+
+      expect(result.forcedMode).toBe('advantage');
+    });
+  });
+
   describe('activeBuffs — sacred weapon', () => {
     it('adds Charisma bonus to sacredWeaponBonus and hitBonus for melee attacks', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
