@@ -312,7 +312,10 @@ const MonkFeatures = function MonkFeatures({ playerStats, campaignName }) {
     const cloakOfShadowsActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'cloak_of_shadows');
     const elementalAttunementActive = useRuntimeValue(playerStats.name, 'elementalAttunementActive', campaignName);
     const elementalAttunementElement = useRuntimeValue(playerStats.name, 'elementalAttunementElement', campaignName);
+    const elementalEpitomeActive = useRuntimeValue(playerStats.name, 'elementalEpitomeActive', campaignName);
+    const epitomeResistanceType = useRuntimeValue(playerStats.name, 'epitomeResistanceType', campaignName);
     const strideBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.name === 'Stride of the Elements') : null;
+    const destructiveStrideActive = useRuntimeValue(playerStats.name, 'destructiveStrideActive', campaignName);
     const STRIDE_LABELS = {
         'ice_walk': 'Ice Walk',
         'speed_boost': '+10 Speed',
@@ -331,6 +334,8 @@ const MonkFeatures = function MonkFeatures({ playerStats, campaignName }) {
                 {cloakOfShadowsActive && <span className="automation-badge">Cloak of Shadows</span>}
                 {elementalAttunementActive && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-wand-magic-sparkles"></i> Elemental Attunement: {elementalAttunementElement}</span>}
                 {strideBuff && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-person-walking"></i> Stride: {STRIDE_LABELS[strideBuff.effect] || 'Stride'}</span>}
+                {elementalEpitomeActive && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-shield-halved"></i> Elemental Epitome: Resistance to {epitomeResistanceType || 'not chosen'}</span>}
+                {destructiveStrideActive && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-person-running"></i> Destructive Stride: +20 Speed</span>}
            </div>
       );
 };

@@ -6682,9 +6682,23 @@
                         }
                     },
                     {
-                        "name": "Elemental Epitome",
-                        "description": "While your Elemental Attunement is active, you also gain the following benefits. <ul><li><b>Damage Resistance:</b> You gain Resistance to one of the following damage types of your choice: Acid, Cold, Fire, Lightning, or Thunder. At the start of each of your turns, you can change this choice.</li><li><b>Destructive Stride:</b> When you use your Step of the Wind, your Speed increases by 20 feet until the end of the turn. For that duration, any creature of your choice takes damage equal to one roll of your Martial Arts die when you enter a space within 5 feet of it. The damage type is your choice of Acid, Cold, Fire, Lightning, or Thunder. A creature can take this damage only once per turn.</li><li><b>Empowered Strikes:</b> Once on each of your turns, you can deal extra damage to a target equal to one roll of your Martial Arts die when you hit it with an Unarmed Strike. The extra damage is the same type dealt by that strike.</li></ul>",
-                        "level": 17
+                          "name": "Elemental Epitome",
+                          "description": "While your Elemental Attunement is active, you also gain the following benefits. <ul><li><b>Damage Resistance:</b> You gain Resistance to one of the following damage types of your choice: Acid, Cold, Fire, Lightning, or Thunder. At the start of each of your turns, you can change this choice.</li><li><b>Destructive Stride:</b> When you use your Step of the Wind, your Speed increases by 20 feet until the end of the turn. For that duration, any creature of your choice takes damage equal to one roll of your Martial Arts die when you enter a space within 5 feet of it. The damage type is your choice of Acid, Cold, Fire, Lightning, or Thunder. A creature can take this damage only once per turn.</li><li><b>Empowered Strikes:</b> Once on each of your turns, you can deal extra damage to a target equal to one roll of your Martial Arts die when you hit it with an Unarmed Strike. The extra damage is the same type dealt by that strike.</li></ul>",
+                          "level": 17,
+                          "automation": {
+                              "type": "elemental_epitome",
+                              "casting_time": "passive",
+                              "condition": "elemental_attunement_active"
+                          }
+                     },
+                    {
+                        "name": "Destructive Stride",
+                        "description": "When you use your Step of the Wind, your Speed increases by 20 feet until the end of the turn. Any creature of your choice takes damage equal to your Martial Arts die when you enter a space within 5 feet of it.",
+                        "level": 17,
+                        "automation": {
+                            "type": "destructive_stride",
+                            "casting_time": "passive"
+                        }
                     }
                 ],
                 "spells": [

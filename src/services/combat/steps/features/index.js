@@ -17,6 +17,7 @@ import { tavernBrawlerPush } from './tavernBrawlerPush.js';
 import { sacredWeapon } from './sacredWeapon.js';
 import { remarkableAthlete } from './remarkableAthlete.js';
 import { huntersMarkDamage } from './huntersMarkDamage.js';
+import { epitomeEmpoweredStrikes } from './epitomeEmpoweredStrikes.js';
 
 export const featureModules = [
   assassinate,
@@ -38,4 +39,5 @@ export const featureModules = [
   sacredWeapon,
   remarkableAthlete,
   huntersMarkDamage,
+  epitomeEmpoweredStrikes,
 ];

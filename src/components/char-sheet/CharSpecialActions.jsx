@@ -25,6 +25,9 @@ import CircleOfTheLandSpellsModal from './modals/CircleOfTheLandSpellsModal.jsx'
 import ElementalAffinityModal from './modals/ElementalAffinityModal.jsx';
 import WildMagicSurgeModal from './modals/WildMagicSurgeModal.jsx';
 import StrideOfTheElementsModal from './modals/StrideOfTheElementsModal.jsx';
+import ElementalEpitomeModal from './modals/ElementalEpitomeModal.jsx';
+import DestructiveStrideModal from './modals/DestructiveStrideModal.jsx';
+import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx';
 import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
 import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
 import { onSavantSelected } from '../../services/automation/handlers/class-wizard/SavantHandler.js';
@@ -48,6 +51,9 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
     const [elementalAffinityModal, setElementalAffinityModal] = useState(null);
     const [wildMagicSurgeModal, setWildMagicSurgeModal] = useState(null);
     const [strideModal, setStrideModal] = useState(null);
+    const [epitomeModal, setEpitomeModal] = useState(null);
+    const [destructiveStrideModal, setDestructiveStrideModal] = useState(null);
+    const [destructiveStrideTargetModal, setDestructiveStrideTargetModal] = useState(null);
     const [fightingStylesMap, setFightingStylesMap] = useState(null);
     const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats?.name, campaignName, {
@@ -235,6 +241,12 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                 setWildMagicSurgeModal(result.payload);
             } else if (result.modalName === 'strideOfTheElements') {
                 setStrideModal(result.payload);
+            } else if (result.modalName === 'elementalEpitome') {
+                setEpitomeModal(result.payload);
+            } else if (result.modalName === 'destructiveStride') {
+                setDestructiveStrideModal(result.payload);
+            } else if (result.modalName === 'destructiveStrideTarget') {
+                setDestructiveStrideTargetModal(result.payload);
             }
         } else if (result.type === 'popup') {
             const payload = result.payload;
@@ -243,9 +255,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
             const html = `<b>${name}</b><br/>${description}<br/><span class="dice-roll-hint">click to dismiss</span>`;
             setPopupHtml(html);
         }
-    }, [playerStats, campaignName, cannotAct, setCombatSuperiorityModal, setPopupHtml]);
-
-    const handleStrideConfirm = useCallback(async (optionName, buffEntry) => {
+    }, [playerStats, campaignName, cannotAct, setCombatSuperiorityModal, setPopupHtml]);    const handleStrideConfirm = useCallback(async (optionName, buffEntry) => {
         if (!strideModal) return;
         const { action, playerStats: modalPlayerStats, campaignName: modalCampaign } = strideModal;
         setStrideModal(null);
@@ -276,6 +286,47 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
         const html = `<b>${action.name}</b><br/>Chose <strong>${optionName}</strong>. ${descriptions[optionName] || optionName}<br/><span class="dice-roll-hint">click to dismiss</span>`;
         setPopupHtml(html);
     }, [strideModal, setPopupHtml]);
+
+    const handleEpitomeConfirm = useCallback(async (payload) => {
+        if (!epitomeModal) return;
+        const { action } = epitomeModal;
+        setEpitomeModal(null);
+        const html = `<b>${action.name}</b><br/>${payload?.description || 'Elemental Epitome activated.'}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+        setPopupHtml(html);
+    }, [epitomeModal, setPopupHtml]);
+
+    const handleEpitomeClose = useCallback(() => {
+        setEpitomeModal(null);
+    }, []);
+
+    const handleDestructiveStrideConfirm = useCallback(async (result) => {
+        if (!destructiveStrideModal) return;
+        setDestructiveStrideModal(null);
+        if (result?.type === 'modal' && result.modalName === 'destructiveStrideTarget') {
+            setDestructiveStrideTargetModal(result.payload);
+        } else if (result?.type === 'popup') {
+            const html = `<b>${result.payload?.name || 'Destructive Stride'}</b><br/>${result.payload?.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+            setPopupHtml(html);
+        }
+    }, [destructiveStrideModal, setPopupHtml]);
+
+    const handleDestructiveStrideTargetConfirm = useCallback(async (targetName) => {
+        if (!destructiveStrideTargetModal) return;
+        const { action, playerStats: modalPlayerStats, campaignName: modalCampaign, chosenType, martialArtsDie } = destructiveStrideTargetModal;
+        setDestructiveStrideTargetModal(null);
+
+        const { applyTargetChoice } = await import('../../services/automation/handlers/combat/destructiveStrideHandler.js');
+        const result = await applyTargetChoice(action, modalPlayerStats, modalCampaign, targetName, chosenType, martialArtsDie);
+
+        if (result?.type === 'popup') {
+            const html = `<b>${result.payload?.name || 'Destructive Stride'}</b><br/>${result.payload?.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+            setPopupHtml(html);
+        }
+    }, [destructiveStrideTargetModal, setPopupHtml]);
+
+    const handleDestructiveStrideTargetSkip = useCallback(() => {
+        setDestructiveStrideTargetModal(null);
+    }, []);
 
     const handleMoonlightStepFallbackConfirm = useCallback(async () => {
         if (!moonlightStepFallback) return;
@@ -490,6 +541,37 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                     campaignName={strideModal.campaignName}
                     onConfirm={handleStrideConfirm}
                     onClose={() => setStrideModal(null)}
+                />
+            )}
+            {epitomeModal && (
+                <ElementalEpitomeModal
+                    action={epitomeModal.action}
+                    playerStats={epitomeModal.playerStats}
+                    campaignName={epitomeModal.campaignName}
+                    currentResistance={epitomeModal.currentResistance}
+                    onConfirm={handleEpitomeConfirm}
+                    onClose={handleEpitomeClose}
+                />
+            )}
+            {destructiveStrideModal && (
+                <DestructiveStrideModal
+                    action={destructiveStrideModal.action}
+                    playerStats={destructiveStrideModal.playerStats}
+                    campaignName={destructiveStrideModal.campaignName}
+                    onConfirm={handleDestructiveStrideConfirm}
+                    onClose={() => setDestructiveStrideModal(null)}
+                />
+            )}
+            {destructiveStrideTargetModal && (
+                <SecondaryTargetModal
+                    title="Destructive Stride"
+                    icon="fa-person-running"
+                    targets={destructiveStrideTargetModal.targets || []}
+                    description="Choose a creature within 5 ft. that you entered a space near while striding. A creature can take this damage only once per turn."
+                    confirmLabel="Strike"
+                    confirmIcon="fa-person-running"
+                    onTargetSelected={handleDestructiveStrideTargetConfirm}
+                    onSkip={handleDestructiveStrideTargetSkip}
                 />
             )}
             {featureChoiceModal && (

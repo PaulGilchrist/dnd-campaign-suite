@@ -239,6 +239,8 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
             .flatMap(b => b.resistanceTypes || [])
         : [];
 
+    const epitomeResistanceType = getRuntimeValue(playerStats.name, 'epitomeResistanceType', campaignName);
+
     const rageActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Rage');
     const rageConditionalImmunities = rageActive
         ? (playerStats.automationConditionalImmunities || [])
@@ -248,7 +250,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
 
     const allImmunities = [...new Set([...baseImmunities, ...auraImmunities, ...rageConditionalImmunities])];
 
-    const allResistances = [...new Set([...baseResistances, ...auraResistances, ...stormbornResistancesActive, ...rageResistances, ...wildHeartResistances, ...rageOfTheGodsResistances, ...superiorDefenseResistances])];
+    const allResistances = [...new Set([...baseResistances, ...auraResistances, ...stormbornResistancesActive, ...rageResistances, ...wildHeartResistances, ...rageOfTheGodsResistances, ...superiorDefenseResistances, ...(epitomeResistanceType ? [epitomeResistanceType] : [])])];
 
     let flySpeed = null;
     let hasFlySpeedBuff = false;

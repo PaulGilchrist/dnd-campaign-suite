@@ -404,6 +404,13 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
     updates.elementalAttunementActive = null;
     updates.elementalAttunementElement = null;
 
+    // Clear Elemental Epitome active state on short rest
+    updates.elementalEpitomeActive = null;
+    updates.epitomeResistanceType = null;
+    updates.epitomeEmpoweredUsedRound = null;
+    updates.destructiveStrideActive = null;
+    updates.destructiveStrideDamageType = null;
+
     setRuntimeBatch(name, updates, campaignName)
 
   clearAllExpirationEffects(name, campaignName)
@@ -590,6 +597,13 @@ export async function applyLongRest(playerStats, campaignName) {
     // Clear Elemental Attunement active state on long rest
     setRuntimeValue(name, 'elementalAttunementActive', null, campaignName, true)
     setRuntimeValue(name, 'elementalAttunementElement', null, campaignName, true)
+
+    // Clear Elemental Epitome active state on long rest
+    setRuntimeValue(name, 'elementalEpitomeActive', null, campaignName, true)
+    setRuntimeValue(name, 'epitomeResistanceType', null, campaignName, true)
+    setRuntimeValue(name, 'epitomeEmpoweredUsedRound', null, campaignName, true)
+    setRuntimeValue(name, 'destructiveStrideActive', null, campaignName, true)
+    setRuntimeValue(name, 'destructiveStrideDamageType', null, campaignName, true)
 
     // Reset Undying Sentinel (Oath of Glory level 15) on long rest
     setRuntimeValue(name, 'undyingSentinelUsed', false, campaignName, true)
