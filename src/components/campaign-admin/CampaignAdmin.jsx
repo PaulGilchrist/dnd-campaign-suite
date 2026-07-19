@@ -122,8 +122,6 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
             </div>
 
             <div className="admin-section">
-                <h3>Campaign Management</h3>
-
                 <div className="admin-action">
                     <h3>Rename Campaign</h3>
                     <p>
