@@ -86,11 +86,12 @@ export async function resolveAttackDamageStandalone(attack, ctxOverrides, { play
  * @returns {{ attack: object, ctx: object }}
  */
 export function normalizeAutoDamage(autoDamage, isCrit, playerStats) {
+  const isUnarmed = autoDamage.name?.includes('Unarmed Strike');
   const attack = {
     name: autoDamage.name,
     damage: autoDamage.formula,
     damageType: autoDamage.damageType,
-    weaponType: 'weapon',
+    weaponType: isUnarmed ? 'unarmed' : 'weapon',
     properties: [],
   };
 
