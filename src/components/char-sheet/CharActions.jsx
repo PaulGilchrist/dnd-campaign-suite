@@ -1037,16 +1037,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             }
         }
 
-        // For save_attack features with element options (e.g. Elemental Attunement)
-        if (auto?.type === 'save_attack' && auto?.hasOptions && auto?.options?.length > 0) {
-            const optionKey = `_${action.name.replace(/\s+/g, '_')}_option`;
-            const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
-            if (!chosenOption) {
-                setModalState({ featureChoice: { action, options: auto.options, optionKey } });
-                return;
-            }
-        }
-
         // Spend 1 focus point for monk Ki features before dispatching
         // Skip FP cost for Hand of Healing and Flurry of Blows when Flurry of Healing and Harm is active
         // Skip FP cost for Flurry of Blows when Cloak of Shadows (Shadow Flurry) is active
@@ -1107,6 +1097,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'saveAttackAoe':
                         setModalState({ saveAttackAoeModal: result.payload });
                         break;
+                    case 'elementalAttunement': setModalState({ elementalAttunementModal: result.payload }); break;
                     case 'divineSpark': setModalState({ divineSparkModal: result.payload }); break;
                     case 'divineIntervention':
                         setModalState({ divineInterventionAction: action, divineInterventionModal: result.payload });

@@ -399,6 +399,10 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
     // Clear Wild Magic Surge badge on short rest
     updates.wildMagicSurgeEffects = null;
 
+    // Clear Elemental Attunement active state on short rest
+    updates.elementalAttunementActive = null;
+    updates.elementalAttunementElement = null;
+
     setRuntimeBatch(name, updates, campaignName)
 
   clearAllExpirationEffects(name, campaignName)
@@ -575,6 +579,10 @@ export async function applyLongRest(playerStats, campaignName) {
 
     // Reset Uncanny Metabolism tracking on long rest
     setRuntimeValue(name, 'uncannyMetabolismUsed', false, campaignName, true)
+
+    // Clear Elemental Attunement active state on long rest
+    setRuntimeValue(name, 'elementalAttunementActive', null, campaignName, true)
+    setRuntimeValue(name, 'elementalAttunementElement', null, campaignName, true)
 
     // Reset Undying Sentinel (Oath of Glory level 15) on long rest
     setRuntimeValue(name, 'undyingSentinelUsed', false, campaignName, true)

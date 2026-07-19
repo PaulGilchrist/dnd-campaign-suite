@@ -121,6 +121,7 @@ import { handle as handleBonusActionChoice } from './handlers/combat/bonusAction
 import { handle as handleBonusAttacks } from './handlers/combat/bonusAttacksHandler.js';
 import { handle as handlePatientDefense } from './handlers/combat/patientDefenseHandler.js';
 import { handle as handleStepOfTheWind } from './handlers/combat/stepOfTheWindHandler.js';
+import { handle as handleElementalAttunement } from './handlers/combat/elementalAttunementHandler.js';
 import { handle as handleSteadyAim } from './handlers/class-fighter-rogue/steadyAimHandler.js';
 import { handle as handleStrokeOfLuck } from './handlers/class-fighter-rogue/strokeOfLuckHandler.js';
 import { handle as handleMageHandControl } from './handlers/class-fighter-rogue/mageHandControlHandler.js';
@@ -405,8 +406,9 @@ const HANDLER_MAP = {
             wild_magic_tamed: handleWildMagicTamed,
             feats_of_chaos: handleFeatsOfChaosAdvantage,
             wild_magic_tamed_selected: onWildMagicTamedSelected,
-            wild_magic_double_roll_selected: onDoubleRollSelected,
-            magical_cunning: handleMagicalCunning,
+             wild_magic_double_roll_selected: onDoubleRollSelected,
+             elemental_attunement: handleElementalAttunement,
+             magical_cunning: handleMagicalCunning,
             contact_patron: handleContactPatron,
              steps_of_the_fey: handleStepsOfTheFey,
              celestial_resilience: handleCelestialResilience,
