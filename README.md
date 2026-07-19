@@ -16,9 +16,10 @@
   <strong>📋 Full campaign activity log</strong> &nbsp;·&nbsp;
   <strong>⚔️ Condition, exhaustion &amp; cover tracking</strong> &nbsp;·&nbsp;
   <strong>🌦️ Overland travel with weather</strong> &nbsp;·&nbsp;
-  <strong>🧙 Metamagic, auras &amp; automation</strong> &nbsp;·&nbsp;
+  <strong>🧙 Metamagic, auras &amp; 200+ automations</strong> &nbsp;·&nbsp;
   <strong>🎯 Multi-target spell targeting</strong> &nbsp;·&nbsp;
-  <strong>🔄 Comprehensive rest system</strong>
+  <strong>🗺️ Adjacent dungeon generation</strong> &nbsp;·&nbsp;
+  <strong>🎲 13 log entry types with full tracking</strong>
 </p>
 
 ---
@@ -31,7 +32,7 @@ A **complete D&D character sheet and campaign management suite** that runs on yo
 
 **As a printable sheet:** The app creates **beautiful, well-organized character sheets that fit on a single page**. All the critical stats you need during combat are front and center. Print it out, keep it at the table, and have everything you need at a glance — no flipping through rulebooks.
 
-**As a GM toolkit:** Indoor maps with fog of war and spell overlays, outdoor hex maps with procedural terrain and overland travel, encounter and loot builders, a procedural dungeon generator, quest tracking, faction management, NPC management with full stat blocks, campaign notes, and a full activity log — everything you need to run a campaign from one app.
+**As a GM toolkit:** Indoor maps with fog of war and spell overlays, outdoor hex maps with procedural terrain and overland travel, encounter and loot builders, a BSP dungeon generator and adjacent dungeon generator, procedural terrain and settlement generators, quest tracking, faction management, NPC management with full stat blocks, campaign notes, a comprehensive activity log with 13 entry types, a 4-level cover system, a full metamagic engine for Sorcerers, range validation, Paladin and Druid aura systems, a combat automation engine with 200+ handlers, and everything else you need to run a campaign from one app.
 
 > **No computer expertise required.** If you can open a web browser, you can use this app. The setup instructions at the bottom are written for complete beginners.
 
@@ -77,7 +78,7 @@ No more "Wait, how many hit points do you have?" mid-combat! No more passing aro
 | 📋 **Campaign Activity Log** | Dice rolls with full details, manual notes, travel events, loot awards, condition tracking — all with timestamps |
 | 🎲 **Built-In Dice Roller** | Advantage, disadvantage, custom expressions, animated rolls, auto-crit/fumble detection, resistance notices |
 | 🎲 **Dice Tray** | Inline d4, d6, d8, d10, d12, d20, d100 dice buttons in the sidebar for quick reference rolls |
-| 🎯 **Advanced Dice Results** | Indomitable Will reroll, Fanatical Focus, Stroke of Luck, Lucky feat, Potent Cantrip, Glorious Defense, Shield spell immunity, graze damage, Unbreakable Majesty, Veer (Mounted Combatant) |
+| 🎯 **Advanced Dice Results** | Indomitable Will reroll, Fanatical Focus, Disciplined Survivor, Stroke of Luck, Lucky feat, Potent Cantrip, Glorious Defense, Shield spell immunity, graze damage, Unbreakable Majesty, Veer (Mounted Combatant), Restore Balance, Quick-roll player saves |
 | 🎯 **Multi-Target Spell Targeting** | Select multiple targets for Magic Missile, Aid, Heroes' Feast, Greater/Lesser Restoration, Remove Curse, Mage Armor, Shield of Faith, Protection from Energy, and Resistance |
 | 📥 **Character Import/Export** | Download/upload JSON files for between-session work |
 | 🎨 **Dark/Light Theme** | Toggle for late-night sessions |
@@ -86,13 +87,13 @@ No more "Wait, how many hit points do you have?" mid-combat! No more passing aro
 | 🗡️ **Loot Generator** | CR-tiered treasure tables — currency, gems, jewelry, equipment, and magic items by rarity |
 | 🗺️ **Map Manager** | Create, rename, activate, delete maps, indoor/outdoor type selection, markdown descriptions, dungeon/terrain generation |
 | 🛡️ **Cover System** | 4-level cover (none, half, three-quarter, full) computed from walls, doors, and furniture using line-of-sight ray casting |
-| ✨ **Metamagic Engine** | 8 metamagic options with SP costs, Arcane Apotheosis, Font of Magic slot conversion, pre/post-cast filtering |
-| 💫 **Aura Systems** | Paladin Aura of Protection, plus Auras of Alacrity, Courage, Devotion, and Warding — range-aware with map positions |
-| 🤖 **Automation Engine** | Automated save prompts, auto-damage with saves, concentration checks, condition effects, critical hit dice doubling, and more — with 100+ class-specific feature modals (weapon masteries, divine interventions, elemental affinities, teleports, wild companions, and more) |
+| ✨ **Metamagic Engine** | 8 metamagic options with SP costs, Arcane Apotheosis, Font of Magic slot conversion, pre/post-cast filtering, max-per-spell limits |
+| 💫 **Aura Systems** | Paladin Aura of Protection, plus Auras of Alacrity, Courage, Devotion, and Warding — range-aware with map positions, condition-awareness |
+| 🤖 **Automation Engine** | Automated save prompts, auto-damage with saves, concentration checks, condition effects, critical hit dice doubling, 100+ class-specific feature modals (weapon masteries, divine interventions, elemental affinities, teleports, wild companions, and more), and 200+ automation handlers covering every class feature interaction |
 | 🎯 **Range Validation** | Melee/ranged checks with disadvantage, long-range penalties, and feat-based range effects (e.g., Crossbow Expert) |
 | 🔄 **Rest System** | Short rest with Hit Dice, Song of Rest, Arcane Recovery, Font of Inspiration, Sorcerous Restoration, Bolstering Treats, Memorize Spell; Long rest with full restore and exhaustion reduction |
-| 🎭 **Character Advancement** | Feats with prerequisite validation, multiclass features, feature choice selectors (Spell Mastery, Signature Spells) |
-| 🎭 **Reaction Features** | Haste extra actions, Nick weapon mastery, Horde Breaker, Revivification, Stand (Power Word Heal), and more — auto-surface based on active buffs |
+| 🎭 **Character Advancement** | Feats with prerequisite validation, multiclass features, feature choice selectors (Spell Mastery, Signature Spells, Defensive Tactics, Hunter's Prey, and more) |
+| 🎭 **Reaction Features** | Haste extra actions, Nick weapon mastery, Horde Breaker, Revivification, Stand (Power Word Heal), Arcane Ward Restore, Bastion of Law, Bend Fate, and more — auto-surface based on active buffs |
 | 🤝 **Aura Combo Effects** | Multiple character auras combine — speed bonuses, resistances, immunities, and protection stack when overlapping |
 | 📋 **Prompt Queuing** | Multiple save prompts and concentration prompts are queued so you never lose a roll |
 
@@ -156,9 +157,11 @@ The app creates **beautiful, well-organized character sheets that fit on a singl
 - **Race/subrace** with creature type annotation
 - **Class/subclass** with domain/type annotation
 - **Alignment**, **proficiencies**, and **languages**
-- **Senses** — Darkvision, blindsight, tremorsense, etc.
+- **Senses** — Darkvision, blindsight, tremorsense, truesight, passive perception, passive investigation, passive insight
 - **Resistances, vulnerabilities, and immunities** — At a glance
 - **Auto-integrated buffs** — Passive bonuses from races, backgrounds, and feats are automatically applied to stats (ability scores, saves, AC, HP, skills, etc.)
+- **Breath Weapon tracker** — Dragonborn and similar traits show tracked resource input for remaining uses
+- **Trance support** — Races with Trance (like elves) show "4 hours" label on long rest and gain immunity to magical sleep
 
 ### Core Stats (All Calculated Automatically)
 
@@ -201,24 +204,24 @@ The app creates **beautiful, well-organized character sheets that fit on a singl
 
 ### Class-Specific Resources (Tracked During Play)
 
-- **Barbarian**: Rage points (max/current), extra attacks, rage damage bonus, weapon mastery
-- **Bard**: Bardic Inspiration die size and uses, Song of Rest die, Font of Inspiration (regain on short rest), Magical Secrets count, expertise skills
-- **Cleric**: Channel Divinity charges, Destroy Undead CR, Divine Spark, Divine Intervention spell selection
-- **Druid**: Wild Shape uses, Wild Shape Max CR, Beast Forms Known, Wild Shape Limitations, Wild Companion, Evergreen Wild Shape, Aspect of the Wilds
-- **Fighter**: Fighting styles, extra attacks, weapon mastery, Second Wind, Action Surge, Psi Warrior energy pool, Battle Master superiority dice, War Magic cantrip/spell
+- **Barbarian**: Rage points (max/current), extra attacks, rage damage bonus, weapon mastery, Reckless Attack with Brutal Strike effects (push, knock prone, shove), Persistent Rage (restore all rage on long rest), Zealous Presence (grant advantage to allies)
+- **Bard**: Bardic Inspiration die size and uses, Song of Rest die, Font of Inspiration (regain on short rest), Magical Secrets count, expertise skills, Bardic Inspiration Defense (add to AC as reaction), Bardic Inspiration Offense (add to damage as reaction), Countercharm (remove charmed/frightened, reroll d20), Agile Strike
+- **Cleric**: Channel Divinity charges, Destroy Undead CR, Divine Spark, Divine Intervention spell selection, Holy Nimbus, Elder Champion (transform with re-use), Avenging Angel, Radiance of Dawn, Relentless Endurance (drop to 1 HP instead of 0), Cloak of Shadows (invisibility), Hand of Ultimate Mercy, Corona of Light, Divine Order
+- **Druid**: Wild Shape uses, Wild Shape Max CR, Beast Forms Known, Wild Shape Limitations, Wild Companion, Evergreen Wild Shape, Aspect of the Wilds (Owl/Panther/Salmon), Circle of the Land spells, Oceanic Gift, Wrath of the Sea
+- **Fighter**: Fighting styles, extra attacks, weapon mastery, Second Wind, Action Surge, Psi Warrior energy pool, Battle Master superiority dice, War Magic cantrip/spell, War Bond (summon bonded weapon), Tactical Mind (Second Wind on ability checks)
 - **Monk**: Martial Arts die, Focus Points, Focus Save DC, Unarmored Movement increase, Open Hand Technique, Supreme Sneak, Cunning Strike, Favored Foe, Perfect Focus, Third Eye, Soulstitch Spells, Illusory Reality
-- **Paladin**: Fighting styles, extra attacks, Channel Divinity, Aura Range, Sacred Weapon damage type, Lay on Hands pool, Eldritch Knight arcane recovery
-- **Ranger**: Fighting styles, extra attacks, Favored Enemies, Ranger spell list, Primeval Awareness
-- **Rogue**: Sneak Attack damage, expertise skills, Uncanny Dodge, Evasion, Assassin abilities, Thief abilities, Soulknife psychic blades
-- **Sorcerer**: Sorcery Points, Metamagic Known, spell slot creation costs, Font of Magic conversion, Sorcerous Restoration (2024), Innate Sorcery buff, Arcane Apotheosis (level 20)
-- **Warlock**: Arcanums Known (per level 6/7/8/9), Eldritch Invocations Known, Pact Boon, Mystic Arcanum
-- **Wizard**: Arcane Recovery Levels, spell preparation, Spell Mastery, Signature Spells, Divination Savant, Illusion Savant, Portent Dice, Wizard Memorize Spell (swap from spellbook on short rest)
+- **Paladin**: Fighting styles, extra attacks, Channel Divinity, Aura Range, Sacred Weapon damage type, Lay on Hands pool, Eldritch Knight arcane recovery, Vow of Enmity (advantage on marked target), Soul of Vengeance (counterattack), Smite of Protection (half cover), Inspiring Smite (temp HP on allies), Relentless Avenger (reduce target speed), Glorious Defense (Cha to AC), Peerless Athlete, Undying Sentinel, Bastion of Law, Trance of Order, Living Legend
+- **Ranger**: Fighting styles, extra attacks, Favored Enemies, Ranger spell list, Primeval Awareness, Nature's Veil (invisibility), Dread Ambush (extra damage), Superior Hunter's Defense (damage reduction + temp HP), Defensive Tactics (Escape the Horde / Multiattack Defense), Beguiling Twist (charm redirection), Tireless (temp HP), Nature's Sanctuary (disadvantage on attacks in wild shape), Primal Companion Spell Share
+- **Rogue**: Sneak Attack damage, expertise skills, Uncanny Dodge, Evasion, Assassin abilities, Thief abilities, Soulknife psychic blades, Stealth Attack (preserve invisibility), Spell Thief (block and steal spells), Steady Aim (advantage on next attack), Stroke of Luck (force natural 20), Knowledge is Power (learn enemy resistances), War Bond, Fast Hands
+- **Sorcerer**: Sorcery Points, Metamagic Known, spell slot creation costs, Font of Magic conversion, Sorcerous Restoration (2024), Innate Sorcery buff, Arcane Apotheosis (level 20), Elemental Affinity (add Cha to spell damage), Dragon Wings (fly speed), Dragon Companion (summon), Celestial Revelation, Cosmic Omen, Clockwork Cavalcade, Psionic Strike/Thrust/Leap/Movement/Teleportation, Guarded Mind, Protective Field, Starry Form/Twinkling Constellations, Bulwark of Force, Arcane Charge, Warping Implosion, Restore Balance, Wild Magic Surge (full table)
+- **Warlock**: Arcanums Known (per level 6/7/8/9), Eldritch Invocations Known, Pact Boon, Mystic Arcanum, Shadowy Dodge (teleport + disadvantage), Misty Escape (reaction teleport + invisibility), Steps of the Fey, Fiendish Resilience, Psychic Spells, Beguiling Defenses/Twist, Hurl Through Hell, Celestial Resilience, Dark One's Look, Clairvoyant Combatant, Revelation in Flesh, Bewitching Magic, Teleportation variants (Shadow Step/Moonlight Step), Create Thrall Temp HP
+- **Wizard**: Arcane Recovery Levels, spell preparation, Spell Mastery, Signature Spells, Divination Savant, Illusion Savant, Portent Dice, Wizard Memorize Spell (swap from spellbook on short rest), Expert Divination (regain slot), Illusory Self (auto-miss reaction), Soulstitch Spells, Overchannel (max damage), Phantasmal Creatures, Magical Cunning (Eldritch Master)
 
 ### Character Advancement
 
 - **Feats** — Select feats with prerequisite validation; feats grant passive buffs auto-integrated into stats
 - **Multiclass features** — Track multiclass abilities and feature choices
-- **Feature choice selectors** — Spell Mastery, Signature Spells, and other selectable features
+- **Feature choice selectors** — Spell Mastery, Signature Spells, Defensive Tactics, Hunter's Prey, Aspect of the Wilds, and other selectable features with interactive click-to-select UI on the character sheet
 
 ### Spell Management
 
@@ -240,11 +243,14 @@ The app creates **beautiful, well-organized character sheets that fit on a singl
 ### Combat Readiness
 
 - **Actions** — Attacks with hit bonuses, damage, and damage types (click to roll vs target's AC with HIT/MISS determination; successful hits auto-advance to damage roll)
+- **Base Actions** — Standard D&D actions: Hide (auto-applies Invisible on success), Dodge (gives attackers disadvantage), Dash, Disengage, Use an Object
 - **Bonus actions** — Clearly separated from regular actions, including Horde Breaker conditional display
-- **Reactions** — Opportunity attacks (with Inspiring Movement / Tactical Shift / Agile Movement awareness), reaction spells, Revivification, and Stand (Power Word Heal)
+- **Reactions** — Opportunity attacks (with Inspiring Movement / Tactical Shift / Agile Movement awareness), reaction spells, Revivification, Stand (Power Word Heal), Arcane Ward Restore, Bastion of Law, Bend Fate
 - **Special actions** — Class features, fighting styles, auto-integrated from rules data (Great Weapon Fighting, Protection), and custom abilities with markdown descriptions
 - **Haste Extra Action** — When Haste buff is active, gain an extra attack, dash, disengage, hide, or use an object
+- **Weapon Mastery Column** — 2024 rules show mastery effects (Slowed, Topple, Paralyzed, etc.) per attack with click-to-popup details
 - **Nick weapon mastery** — Tracking for finesse weapon bonus damage
+- **Reckless Attack + Brutal Strike Modal** — Barbarian attack modal: activate Reckless Attack and select Brutal Strike effects (push, knock prone, shove)
 - **Auto-damage with saving throws** — Dealing damage to a target automatically prompts a saving throw when applicable, with a die roller popup showing full results
 - **Prompt queuing** — Multiple save prompts and concentration prompts are queued so you never lose a roll
 
@@ -258,6 +264,7 @@ The app creates **beautiful, well-organized character sheets that fit on a singl
   - **Font of Inspiration** — Regain Bardic Inspiration uses on short rest
   - **Bolstering Treats** — Temporary HP from short rest
   - **Arcane Recovery** — Regain expended wizard spell slots on short rest
+  - **Natural Recovery** — Regain expended druid spell slots on short rest (level-based budget, +/- controls)
   - **Wizard Memorize Spell** — Swap prepared spells from spellbook on short rest
 - **Long Rest** — One-click full restoration of HP, spell slots (levels 1-9), hit dice, all class resources
 - **Exhaustion reduction** — Long rest decreases exhaustion by 1 level
@@ -623,6 +630,14 @@ A comprehensive running record of everything that happens during play — synced
 - **Travel Events** — Advance, arrive, camp, forced march, event triggered, event accepted/skipped/re-rolled, extreme weather halt, budget exhausted, travel cancelled — each with terrain, weather, hex coordinates, and event details
 - **Loot Awards** — XP per character and itemized loot list
 - **Condition Changes** — "Condition Applied" / "Condition Broken" with character name, condition name, DC, and ability
+- **Encounter Entries** — "Encounter Started" / "Encounter Completed" with monster lists, XP per character awarded, and loot items
+- **HP Changes** — Damage/healing with per-type breakdown, resistance/immunity notes, current/max HP, and special notes (e.g., "Dice maximized by Supreme Healing")
+- **Save Results** — Dedicated saving throw entries showing character, target, save type, DC, success/failure, and description
+- **Ability Uses** — Non-attack abilities with source class, save roll details, and HP gain tracking
+- **Healing Pool Entries** — Lay on Hands, Hand of Healing, etc. with source, target, amount healed, and remaining pool size
+- **Automation Entries** — Automation-triggered events with creature name, automation type, and description
+- **Psionic Sorcery Entries** — Psionic spell casting with SP cost and replaced spell level
+- **Summons Entries** — Summoning spells with creature names, descriptions, and duration
 
 All entries are timestamped and displayed in reverse chronological order with color-coded left borders by type.
 
@@ -680,6 +695,14 @@ Paladin and party auras that compute bonuses based on actual map positions:
 - **Aura of Courage** — Frightened immunity for nearby allies
 - **Aura of Devotion** — Charmed immunity for nearby allies
 - **Aura of Warding** — Damage resistances for nearby allies
+- **Aura Combo Effects** — Multiple character auras combine: speed bonuses, resistances, immunities, and protection stack when overlapping
+- **Duplicity Aura** — Cleric's Improved Duplicity grants attackers targeting the illusionary duplicate disadvantage on attack rolls
+- **Elder Champion Aura** — Circle of the Shepherd Druid: attackers targeting allies within range have disadvantage
+- **Lion Aura** — Circle of the Moon Druid (Lion Wild Shape): attackers within 5 ft have disadvantage
+- **Wolf Aura** — Rage of the Wilds (Wolf): advantage on attacks against enemies within 5 ft
+- **Corona of Light** — Targets in aura list take disadvantage on saves vs radiant damage from the paladin
+- **Unbreakable Majesty** — Paladin stance that modifies attack/save DCs against the paladin (one use per attacker per round)
+- **Bardic Inspiration State** — Defense mode (add to AC), offense mode (add to damage), and combat options with reaction modal
 - **Range-aware** — All auras use actual map positions to determine who's in range
 - **Condition-aware** — Auras from incapacitated, paralyzed, petrified, stunned, or unconscious characters are disabled
 
@@ -687,7 +710,7 @@ Paladin and party auras that compute bonuses based on actual map positions:
 
 ## 🤖 Combat Automation Engine
 
-A comprehensive automation system handles the mechanical heavy lifting during combat:
+A comprehensive automation system with **200+ handlers** and **87 per-spell services** handles the mechanical heavy lifting during combat:
 
 - **Automated save prompts** — When a spell or effect requires a save, the target receives an SSE-pushed prompt with DC, damage, and type
 - **Auto-damage with saves** — Dealing damage to a target automatically prompts saving throws when applicable
@@ -699,6 +722,12 @@ A comprehensive automation system handles the mechanical heavy lifting during co
 - **Critical/fumble automation** — Natural 20 doubles damage dice; natural 1 triggers fumble
 - **Resistance notices** — Cross-references target resistances with damage type and logs warnings
 - **Auto-award XP** — Post-encounter XP summary with per-character split
+- **Class-specific automations** — Every class feature has dedicated handlers: Persistent Rage, Zealous Presence, Countercharm, Vow of Enmity, Soul of Vengeance, Relentless Endurance, Glorious Defense, Elder Champion, Cloak of Shadows, Hand of Ultimate Mercy, Dragon Wings, Celestial Revelation, Cosmic Omen, Clockwork Cavalcade, Psionic abilities, Starry Form, Shadowy Dodge, Misty Escape, Steps of the Fey, and 100+ more
+- **Spell-specific automations** — 50+ spell handlers: sleep, invisibility, silence, slow, fear, Hold Monster, Otto's Dance, Globe of Invulnerability, Power Word Stun, and more — each with full save resolution, AoE detection, and post-cast riders
+- **Healing automations** — Lay on Hands pools, Mass Cure Wounds, Mass Healing Word, Prayer of Healing, Revivification, Mass Heal, and healing pool tracking with campaign log entries
+- **Reaction automations** — Shield, Shield of Faith, Warding Bond, Intervention, Reaction debuffs, reaction damage, reaction save healing, and reaction spell handling
+- **Buff automations** — Mage Armor, Blade Ward, False Life, Heroes' Feast, Holy Aura, Protection from Energy/Evil and Good/Poison, Resistance, Stone Skin, Temp HP, Longstrider, Pass Without Trace, Encouraging Song, and more
+- **Metamagic routing** — All 8 metamagic options (Careful, Distant, Empowered, Extended, Heightened, Quickened, Subtle, Twinned) automatically route through the automation engine
 
 ---
 
@@ -738,8 +767,10 @@ This app supports **both** the classic 5th Edition rules and the new 2024 Essent
 | Feats | Standard feats | Updated feats |
 | Magic Items | Standard items | Updated items |
 | Backgrounds | Basic support | Full background system |
-| Weapon Mastery | Not included | Included |
+| Weapon Mastery | Not included | Full mastery system (Push, Cleave, Graze, Nick, Vex, and more) |
 | Spell Preparation | Required | Not required (always known) |
+| Trance | 4-hour rest, magical sleep immunity | Magical sleep immunity |
+| Sorcerous Restoration | Not included | 4 SP restored on long rest |
 
 **Which should you choose?**
 - Use **5e** if you play with the original 5th Edition rulebooks
@@ -790,7 +821,7 @@ Want to level up, buy gear, or prepare spells between sessions?
 
 **No More Boring Maps** — Interactive indoor maps with fog of war and spell overlays, outdoor hex maps with overland travel, a BSP dungeon generator, and encounter-map transitions make your table feel alive.
 
-**No More Manual Combat Math** — The automation engine handles save prompts, concentration checks, cover calculation, range validation, auto-damage with saves, critical hit dice doubling, and condition propagation — so you can focus on tactics, not arithmetic.
+**No More Manual Combat Math** — The automation engine with 200+ handlers handles save prompts, concentration checks, cover calculation, range validation, auto-damage with saves, critical hit dice doubling, condition propagation, healing pool tracking, buff management, and reaction automations — so you can focus on tactics, not arithmetic.
 
 **No More Blank NPC Pages** — The procedural NPC generator creates fully fleshed-out NPCs with names, personalities, stat blocks, and traits in seconds. The settlement generator builds entire towns with services, NPCs, and rumors.
 
@@ -806,11 +837,15 @@ Want to level up, buy gear, or prepare spells between sessions?
 
 **No Accounts, No Subscriptions** — The DM runs the app, players open a link. No sign-ups, no paywalls, no feature tiers. Everything is included.
 
-**No More Manual Rest Tracking** — Short rest recovers hit dice, Song of Rest, Sorcerous Restoration, Font of Inspiration, Bolstering Treats, Arcane Recovery, and Memorize Spell in one workflow. Long rest fully restores everything and reduces exhaustion.
+**No More Manual Rest Tracking** — Short rest recovers hit dice, Song of Rest, Sorcerous Restoration, Font of Inspiration, Bolstering Treats, Arcane Recovery, Natural Recovery, and Memorize Spell in one workflow. Long rest fully restores everything and reduces exhaustion.
 
-**No More Aura Math** — Paladin and party auras (Protection, Alacrity, Courage, Devotion, Warding) compute bonuses based on actual map positions, with condition-awareness and combo effects when multiple auras overlap.
+**No More Aura Math** — Paladin and party auras (Protection, Alacrity, Courage, Devotion, Warding), Druid auras (Duplicity, Elder Champion, Lion, Wolf), and Corona of Light compute bonuses based on actual map positions, with condition-awareness and combo effects when multiple auras overlap.
 
-**No More Forgotten Reactions** — Haste extra actions, Nick weapon mastery tracking, Horde Breaker conditional display, Revivification, Stand (Power Word Heal), and reaction spells all surface automatically based on your character's active buffs.
+**No More Forgotten Reactions** — Haste extra actions, Nick weapon mastery tracking, Horde Breaker conditional display, Revivification, Stand (Power Word Heal), Arcane Ward Restore, Bastion of Law, Bend Fate, and reaction spells all surface automatically based on your character's active buffs.
+
+**No More Forgotten Class Features** — 200+ automation handlers cover every class feature interaction: Persistent Rage, Zealous Presence, Countercharm, Vow of Enmity, Soul of Vengeance, Relentless Endurance, Glorious Defense, Elder Champion, Dragon Wings, Celestial Revelation, Shadowy Dodge, Misty Escape, and 100+ more — all automated with proper save resolution and campaign log entries.
+
+**No More Forgotten Base Actions** — Standard D&D actions (Hide, Dodge, Dash, Disengage, Use an Object) are interactive buttons on your character sheet with automated effects.
 
 ---
 
@@ -863,7 +898,7 @@ The app validates your character against the rules and shows warnings if somethi
 Yes! Download your character as a JSON file, work on it at home, then upload it before the next session.
 
 **What campaign tools are available?**
-The app includes an initiative tracker with passive resource recovery on initiative roll, encounter builder with auto-generation and loot tables, interactive indoor maps with fog of war and spell overlays, outdoor hex maps with overland travel and weather, a BSP dungeon generator and fractal terrain generator, a procedural settlement generator, quest tracking, faction management, NPC management with full stat blocks and a procedural NPC generator, settlement management, campaign notes with private notes and location tracking, a comprehensive campaign activity log, a 4-level cover system, a full metamagic engine for Sorcerers, range validation, Paladin aura systems with combo effects, a combat automation engine that handles save prompts, concentration checks, auto-damage, condition propagation, and 100+ class-specific feature modals (weapon masteries, divine interventions, elemental affinities, teleports, wild companions, and more) — everything a DM needs to run a great session.
+The app includes an initiative tracker with passive resource recovery on initiative roll, encounter builder with auto-generation and loot tables, interactive indoor maps with fog of war and spell overlays, outdoor hex maps with overland travel and weather, a BSP dungeon generator and fractal terrain generator, an adjacent dungeon generator, a procedural settlement generator, quest tracking, faction management, NPC management with full stat blocks and a procedural NPC generator, settlement management, campaign notes with private notes and location tracking, a comprehensive campaign activity log with 13 entry types, a 4-level cover system, a full metamagic engine for Sorcerers, range validation, Paladin aura systems with combo effects, Druid and Cleric auras (Duplicity, Elder Champion, Lion, Wolf, Corona), a combat automation engine with 200+ handlers and 87 per-spell services that handles save prompts, concentration checks, auto-damage, condition propagation, healing pool tracking, buff management, reaction automations, and 100+ class-specific feature modals (weapon masteries, divine interventions, elemental affinities, teleports, wild companions, and more) — everything a DM needs to run a great session.
 
 **How does real-time sync work?**
 The app uses Server-Sent Events (SSE) — a lightweight, one-way push protocol. When the DM or a player changes something (HP, spell slots, position on a map, fog of war updates), the server broadcasts the update to every connected browser instantly. No polling, no refresh lag.
@@ -878,10 +913,10 @@ Spells like Magic Missile, Aid, Heroes' Feast, Greater Restoration, Lesser Resto
 The sidebar includes clickable d4, d6, d8, d10, d12, d20, and d100 buttons for quick reference rolls without navigating to a character sheet.
 
 **What are reaction features?**
-When your character has active buffs that grant reactions (like Haste's extra action, Revivification, Stand from Power Word Heal, or Inspiring Movement), they automatically appear in the reactions section.
+When your character has active buffs that grant reactions (like Haste's extra action, Revivification, Stand from Power Word Heal, Inspiring Movement, Arcane Ward Restore, Bastion of Law, or Bend Fate), they automatically appear in the reactions section.
 
 **How do auras work?**
-Paladin and party auras (Protection, Alacrity, Courage, Devotion, Warding) compute bonuses based on actual map positions. If multiple characters have overlapping auras, the bonuses combine. Auras from incapacitated or otherwise disabled characters are automatically disabled.
+Paladin and party auras (Protection, Alacrity, Courage, Devotion, Warding), Druid auras (Duplicity, Elder Champion, Lion, Wolf), and Corona of Light compute bonuses based on actual map positions. If multiple characters have overlapping auras, the bonuses combine. Auras from incapacitated or otherwise disabled characters are automatically disabled.
 
 ---
 
