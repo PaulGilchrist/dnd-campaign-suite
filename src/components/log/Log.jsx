@@ -403,19 +403,21 @@ function HpChangeEntry({ entry }) {
 }
 
 function HealingEntry({ entry }) {
+  const isResurrection = entry.resurrection;
   return (
-    <div className="log-entry log-healing">
+    <div className={`log-entry log-healing${isResurrection ? ' log-resurrection' : ''}`}>
       <div className="log-entry-header">
         <span className="log-icon">
-          <i className="fas fa-heart"></i>
+          <i className={`fas ${isResurrection ? 'fa-dove' : 'fa-heart'}`}></i>
         </span>
         <span className="log-character">{entry.targetName}</span>
-        <span className="log-name">Healed ({entry.sourceName || entry.healingName})</span>
+        <span className="log-name">{isResurrection ? 'Brought Back to Life' : `Healed (${entry.sourceName || entry.healingName})`}</span>
+        {isResurrection && <span className="log-resurrection-badge">Resurrection</span>}
         <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
       </div>
       <div className="log-hp-details">
         {entry.popupText && <span>{entry.popupText}</span>}
-        {entry.amount !== undefined && <span>Healed for {entry.amount} HP ({entry.currentHp}/{entry.maxHp})</span>}
+        {entry.amount !== undefined && <span>{isResurrection ? 'Returns to life with' : 'Healed for'} {entry.amount} HP</span>}
       </div>
     </div>
   );

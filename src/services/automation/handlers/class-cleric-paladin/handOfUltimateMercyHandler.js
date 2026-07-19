@@ -5,7 +5,7 @@ import { addEntry } from '../../../ui/logService.js';
 
 import storage from '../../../ui/storage.js';
 import { resolveTarget } from '../../common/targetResolver.js';
-import { hasHealingMaximization } from '../../../combat/automation/automationService.js';
+import { hasHealingMaximization, resolveDiceExpression } from '../../../combat/automation/automationService.js';
 
 const CUREABLE_CONDITIONS = ['Blinded', 'Deafened', 'Paralyzed', 'Poisoned', 'Stunned'];
 
@@ -71,7 +71,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     const maximize = hasHealingMaximization(playerStats);
-    const rollResult = maximize ? rollExpressionMaximized(auto.healExpression || '4d10') : rollExpression(auto.healExpression || '4d10');
+    const resolvedExpression = resolveDiceExpression(auto.healExpression || '4d10', playerStats);
+    const rollResult = maximize ? rollExpressionMaximized(resolvedExpression) : rollExpression(resolvedExpression);
     if (!rollResult) {
         return {
             type: 'popup',
@@ -114,12 +115,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     addEntry(campaignName, {
-        type: 'heal',
+        type: 'healing',
         characterName: playerName,
         targetName: targetName,
         amount: healAmount,
+        sourceName: action.name,
         abilityName: action.name,
         timestamp: Date.now(),
+        resurrection: true,
     }).catch((e) => { console.error("[handOfUltimateMercy] Error:", e); });
 
     const cureMsg = cureConditions.length > 0

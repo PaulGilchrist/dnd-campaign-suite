@@ -30,6 +30,11 @@ vi.mock('../../common/targetResolver.js', () => ({
   resolveTarget: vi.fn(),
 }));
 
+vi.mock('../../../combat/automation/automationService.js', () => ({
+  hasHealingMaximization: vi.fn().mockReturnValue(false),
+  resolveDiceExpression: vi.fn((expr) => expr),
+}));
+
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './handOfUltimateMercyHandler.js';
@@ -425,11 +430,13 @@ describe('handOfUltimateMercyHandler.handle', () => {
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(logPoster.addEntry).toHaveBeenCalledWith(campaignName, {
-        type: 'heal',
+        type: 'healing',
         characterName: 'TestCleric',
         targetName: 'DownedAlly',
         amount: 7,
+        sourceName: 'Hand of Ultimate Mercy',
         abilityName: 'Hand of Ultimate Mercy',
+        resurrection: true,
         timestamp: now,
       });
       dateSpy.mockRestore();
