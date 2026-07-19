@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 export async function handle(action, playerStats, campaignName, mapName) {
     const elementalAttunementActive = getRuntimeValue(playerStats.name, 'elementalAttunementActive', campaignName);
@@ -30,9 +30,6 @@ export async function handle(action, playerStats, campaignName, mapName) {
             },
         };
     }
-
-    await setRuntimeValue(playerStats.name, 'focusPoints', currentFP - 1, campaignName);
-    window.dispatchEvent(new CustomEvent('focus-points-updated'));
 
     const targetName = action.targetName;
     let activeOverlay = null;

@@ -332,9 +332,13 @@ const MonkFeatures = function MonkFeatures({ playerStats, campaignName }) {
                <div><b>Martial Arts Die:</b> d{monkFeatures?.martialArtsDie || 0}</div>
                <div><b>Unarmored Movement:</b> +{monkFeatures?.unarmoredMovementIncrease || 0} ft.</div>
                 {cloakOfShadowsActive && <span className="automation-badge">Cloak of Shadows</span>}
+                <div className="automation-spacer"></div>
                 {elementalAttunementActive && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-wand-magic-sparkles"></i> Elemental Attunement: {elementalAttunementElement}</span>}
+                <div className="automation-spacer"></div>
                 {strideBuff && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-person-walking"></i> Stride: {STRIDE_LABELS[strideBuff.effect] || 'Stride'}</span>}
+                <div className="automation-spacer"></div>
                 {elementalEpitomeActive && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-shield-halved"></i> Elemental Epitome: Resistance to {epitomeResistanceType || 'not chosen'}</span>}
+                <div className="automation-spacer"></div>
                 {destructiveStrideActive && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-person-running"></i> Destructive Stride: +20 Speed</span>}
            </div>
       );

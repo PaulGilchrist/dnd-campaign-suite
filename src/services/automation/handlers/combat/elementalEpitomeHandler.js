@@ -5,10 +5,9 @@ const RESISTANCE_TYPES = ['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder'];
 
 export async function handle(action, playerStats, campaignName) {
     const playerName = playerStats.name;
-    const epitomeActive = getRuntimeValue(playerName, 'elementalEpitomeActive', campaignName);
-    const currentResistance = getRuntimeValue(playerName, 'epitomeResistanceType', campaignName);
+    const attunementActive = getRuntimeValue(playerName, 'elementalAttunementActive', campaignName);
 
-    if (!epitomeActive) {
+    if (!attunementActive) {
         return {
             type: 'popup',
             payload: {
@@ -20,6 +19,10 @@ export async function handle(action, playerStats, campaignName) {
             },
         };
     }
+
+    const currentResistance = getRuntimeValue(playerName, 'epitomeResistanceType', campaignName);
+
+    await setRuntimeValue(playerName, 'elementalEpitomeActive', true, campaignName);
 
     return {
         type: 'modal',

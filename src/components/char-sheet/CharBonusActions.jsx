@@ -194,15 +194,15 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
               )}
              {(popupHtml && hasBonusActions) && <br />}
                {hasBonusActions && <div>
-                 {((playerStats.bonusActions || []).filter(a => getCategories(playerStats.rules || '5e').featuresToIgnore.includes(a.name) === false)).map((bonusAction) => {
-                        const isBonusClickable = bonusAction.details || hasAutomation(bonusAction);
-                        const handleBonusClick = () => {
-                           if (hasAutomation(bonusAction)) {
-                               onAutomationAction(bonusAction);
-                            } else {
-                               setPopupHtml(buildFeatureDetailHtml(bonusAction));
-                            }
-                        };
+                  {((playerStats.bonusActions || []).filter(a => getCategories(playerStats.rules || '5e').featuresToIgnore.includes(a.name) === false)).map((bonusAction) => {
+                         const isBonusClickable = bonusAction.details || hasAutomation(bonusAction);
+                         const handleBonusClick = () => {
+                            if (hasAutomation(bonusAction)) {
+                                onAutomationAction(bonusAction);
+                             } else {
+                                setPopupHtml(buildFeatureDetailHtml(bonusAction));
+                             }
+                         };
                        return <div key={bonusAction.name}>
                             <b className={isBonusClickable ? "clickable" : ""} onClick={handleBonusClick}>{bonusAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(bonusAction.description) }}></span>
                             {hasAutomation(bonusAction) && bonusAction.automation?.type === 'healing_pool' && <span className="automation-badge"> Pool: {bonusAction.automation.pool} HP</span>}

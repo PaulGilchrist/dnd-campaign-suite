@@ -75,6 +75,10 @@
     color: #a78bfa;
 }
 
+.automation-spacer {
+    height: 2px;
+}
+
 .automation-actions {
     margin-top: 6px;
     display: flex;

@@ -66,7 +66,11 @@ import PrayerOfHealingModal from './modals/PrayerOfHealingModal.jsx'
 import PowerWordFortifyModal from './modals/PowerWordFortifyModal.jsx'
 import MassHealingWordModal from './modals/MassHealingWordModal.jsx'
 import FlurryOfBlowsTargetPopup from './popups/FlurryOfBlowsTargetPopup.jsx'
+import ElementalEpitomeModal from './modals/ElementalEpitomeModal.jsx'
+import DestructiveStrideModal from './modals/DestructiveStrideModal.jsx'
 import { handleApply } from '../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js'
+import { applyResistanceChoice } from '../../services/automation/handlers/combat/elementalEpitomeHandler.js'
+import { applyDamageTypeChoice, applyTargetChoice, skipTargetChoice } from '../../services/automation/handlers/combat/destructiveStrideHandler.js'
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { sanitizeHtml } from '../../services/ui/sanitize.js'
@@ -1048,6 +1052,37 @@ export default function CharActionModals({
                     onSkip={() => handleOceanicGiftConfirm(null)}
                 />
             )}
+            {mergedModalState.epitomeModal && (
+                <ElementalEpitomeModal
+                    action={mergedModalState.epitomeModal.action}
+                    playerStats={mergedModalState.epitomeModal.playerStats}
+                    campaignName={mergedModalState.epitomeModal.campaignName}
+                    currentResistance={mergedModalState.epitomeModal.currentResistance}
+                    onConfirm={handleEpitomeConfirm}
+                    onClose={() => setModalState({ epitomeModal: null })}
+                />
+            )}
+            {mergedModalState.destructiveStrideModal && (
+                <DestructiveStrideModal
+                    action={mergedModalState.destructiveStrideModal.action}
+                    playerStats={mergedModalState.destructiveStrideModal.playerStats}
+                    campaignName={mergedModalState.destructiveStrideModal.campaignName}
+                    onConfirm={handleDestructiveStrideConfirm}
+                    onClose={() => setModalState({ destructiveStrideModal: null })}
+                />
+            )}
+            {mergedModalState.destructiveStrideTargetModal && (
+                <SecondaryTargetModal
+                    title="Destructive Stride — Choose Target"
+                    targets={mergedModalState.destructiveStrideTargetModal.targets || []}
+                    confirmLabel="Deal Damage"
+                    confirmIcon="fa-person-running"
+                    description="Choose a creature only if the monk comes within 5 ft. of them while striding."
+                    showHp={true}
+                    onTargetSelected={handleDestructiveStrideTargetConfirm}
+                    onSkip={handleDestructiveStrideTargetSkip}
+                />
+            )}
             {mergedModalState.recklessAttackModal && (
                 <RecklessAttackModal
                     playerStats={playerStats}
@@ -1106,5 +1141,41 @@ export default function CharActionModals({
                 />
             )}
         </>
-    )
+    );
+
+    async function handleEpitomeConfirm(chosenType) {
+        setModalState({ epitomeModal: null });
+        const result = await applyResistanceChoice(mergedModalState.epitomeModal?.action, playerStats, campaignName, chosenType);
+        if (result?.payload) {
+            setPopupHtml(result.payload);
+        }
+    }
+
+    async function handleDestructiveStrideConfirm(chosenType) {
+        setModalState({ destructiveStrideModal: null });
+        const result = await applyDamageTypeChoice(mergedModalState.destructiveStrideModal?.action, playerStats, campaignName, chosenType);
+        if (result?.type === 'modal') {
+            setModalState({ destructiveStrideTargetModal: result.payload });
+        } else if (result?.payload) {
+            setPopupHtml(result.payload);
+        }
+    }
+
+    async function handleDestructiveStrideTargetConfirm(targetName) {
+        const payload = mergedModalState.destructiveStrideTargetModal;
+        setModalState({ destructiveStrideTargetModal: null });
+        const result = await applyTargetChoice(payload?.action, playerStats, campaignName, targetName, payload?.chosenType, payload?.martialArtsDie);
+        if (result?.payload) {
+            setPopupHtml(result.payload);
+        }
+    }
+
+    async function handleDestructiveStrideTargetSkip() {
+        const payload = mergedModalState.destructiveStrideTargetModal;
+        setModalState({ destructiveStrideTargetModal: null });
+        const result = await skipTargetChoice(payload?.action, playerStats, campaignName);
+        if (result?.payload) {
+            setPopupHtml(result.payload);
+        }
+    }
 }

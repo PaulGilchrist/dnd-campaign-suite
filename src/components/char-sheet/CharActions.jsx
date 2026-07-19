@@ -1259,6 +1259,15 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'flurryOfBlows':
                         setModalState({ flurryOfBlowsModal: result.payload });
                         break;
+                    case 'elementalEpitome':
+                        setModalState({ epitomeModal: result.payload });
+                        break;
+                    case 'destructiveStride':
+                        setModalState({ destructiveStrideModal: result.payload });
+                        break;
+                    case 'destructiveStrideTarget':
+                        setModalState({ destructiveStrideTargetModal: result.payload });
+                        break;
                 }
                 break;
             case 'roll':
