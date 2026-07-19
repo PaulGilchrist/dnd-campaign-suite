@@ -268,7 +268,8 @@ export async function getSpellSources(formData, version = '5e') {
     if (classData) {
       // Check if this class has spellcasting
       const hasSpellcasting = classData.class_levels?.some(level => level.spellcasting) ||
-                            classData.subclass?.features?.some(feature => feature.spellcasting);
+                            classData.subclass?.features?.some(feature => feature.spellcasting) ||
+                            classData.subclasses?.some(sub => sub.class_levels?.some(level => level.spellcasting));
       
       sources.class.isSpellcaster = !!hasSpellcasting;
       sources.class.spellList = [formData.class.name];
@@ -390,7 +391,8 @@ export async function validateSpells(formData, selectedSpells, allSpells, versio
     // Check if spell is allowed by class
     const isClassSpell = spellClasses.includes(className) ||
        (className === 'Fighter' && spellClasses.includes('Wizard')) ||
-       (className === 'Rogue' && spellClasses.includes('Wizard'));
+       (className === 'Rogue' && spellClasses.includes('Wizard')) ||
+       (className === 'Monk' && ['Darkness', 'Darkvision', 'Pass Without Trace', 'Silence'].includes(spellData.name));
     // 2024 Bard Magical Secrets: allow spells from Bard, Cleric, Druid, and Wizard lists
     const isMagicalSecretsSpell = isMagicalSecretsBard && 
       magicalSecretsLevelEntry?.class_specific?.magical_secrets != null && 

@@ -7059,21 +7059,17 @@
                 "name": "Shadow Arts",
                 "level": 3,
                 "prerequisites": [],
-                "description": "You can use your ki to duplicate the effects of certain spells. As an action, you can spend 2 ki points to cast darkness, darkvision, pass without trace, or silence, without providing material components. Additionally, you gain the minorillusion cantrip ifyou don't already know it.",
-                "automation": {
-                  "type": "free_spell",
-                  "spell": [
-                    "Darkness",
-                    "Darkvision",
-                    "Pass Without Trace",
-                    "Silence"
-                  ],
-                  "perSpellTracking": true,
-                  "recharge": "long_rest",
-                  "casting_time": "1 action"
-                }
+                "description": "You can use your ki to duplicate the effects of certain spells. As an action, you can spend 2 ki points to cast darkness, darkvision, pass without trace, or silence, without providing material components. Additionally, you gain the minorillusion cantrip ifyou don't already know it."
               }
-            ]
+            ],
+            "spellcasting": {
+              "cantrips_known": 0,
+              "spells_known": 4,
+              "spell_slots_level_1": 0,
+              "spell_slots_level_2": 4,
+              "spell_slots_level_3": 0,
+              "spell_slots_level_4": 0
+            }
           },
           {
             "level": 6,
@@ -7092,7 +7088,15 @@
                   "casting_time": "1 bonus action"
                 }
               }
-            ]
+            ],
+            "spellcasting": {
+              "cantrips_known": 0,
+              "spells_known": 4,
+              "spell_slots_level_1": 0,
+              "spell_slots_level_2": 4,
+              "spell_slots_level_3": 0,
+              "spell_slots_level_4": 0
+            }
           },
           {
             "level": 11,
@@ -7103,12 +7107,26 @@
                 "prerequisites": [],
                 "description": "You have learned to become one with the shadows. When you are in an area of dim light or darkness, you can use your action to become invisible. You remain invisible until you make an attack, cast a spell, or are in an area of bright light."
               }
-            ]
+            ],
+            "spellcasting": {
+              "cantrips_known": 0,
+              "spells_known": 4,
+              "spell_slots_level_1": 0,
+              "spell_slots_level_2": 4,
+              "spell_slots_level_3": 0,
+              "spell_slots_level_4": 0
+            }
           },
           {
             "level": 17,
             "features": []
           }
+        ],
+        "spells": [
+          { "spell": { "name": "Darkness" }, "prerequisites": [{ "index": "level-3" }] },
+          { "spell": { "name": "Darkvision" }, "prerequisites": [{ "index": "level-3" }] },
+          { "spell": { "name": "Pass Without Trace" }, "prerequisites": [{ "index": "level-3" }] },
+          { "spell": { "name": "Silence" }, "prerequisites": [{ "index": "level-3" }] }
         ],
         "description": "Monks of the Way of Shadow follow a tradition that values stealth and subterfuge. These monks might be called ninjas or shadowdancers, and they serve as spies and assassins. Sometimes the members of a ninja monastery are family members, forming a clan sworn to secrecy about their arts and missions. Other monasteries are more like thieves' guilds, hiring out their services to nobles, rich merchants, or anyone else who can pay their fees. Regardless of their methods, the heads of these monasteries expect the unquestioning obedience of their students."
       },
@@ -7137,6 +7155,7 @@
     "description": "A master of martial arts, harnessing the power of the body in pursuit of physical and spiritual perfection",
     "page": 76,
     "starting_wealth": "5d4",
+    "spell_casting_ability": "Wisdom",
     "features": []
   },
   {
@@ -10389,6 +10408,14 @@
               "sorcery_point_cost": 7
             }
           ]
+        },
+        "spellcasting": {
+          "cantrips_known": 0,
+          "spells_known": 4,
+          "spell_slots_level_1": 0,
+          "spell_slots_level_2": 4,
+          "spell_slots_level_3": 0,
+          "spell_slots_level_4": 0
         }
       },
       {

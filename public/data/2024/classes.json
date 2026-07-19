@@ -5765,7 +5765,17 @@
                             "casting_time": "1 reaction"
                         }
                     }
-                ]
+                ],
+                "spellcasting": {
+                    "required_major": "Warrior of Shadow",
+                    "cantrips_known": 0,
+                    "spells_known": 4,
+                    "spell_slots_level_1": 0,
+                    "spell_slots_level_2": 4,
+                    "spell_slots_level_3": 0,
+                    "spell_slots_level_4": 0,
+                    "spell_type": "known"
+                }
             },
             {
                 "level": 4,
@@ -5781,7 +5791,17 @@
                         "level": 4,
                         "type": "class_feature"
                     }
-                ]
+                ],
+                "spellcasting": {
+                    "required_major": "Warrior of Shadow",
+                    "cantrips_known": 0,
+                    "spells_known": 4,
+                    "spell_slots_level_1": 0,
+                    "spell_slots_level_2": 4,
+                    "spell_slots_level_3": 0,
+                    "spell_slots_level_4": 0,
+                    "spell_type": "known"
+                }
             },
             {
                 "level": 5,
@@ -5818,7 +5838,17 @@
                             "casting_time": "1 action"
                         }
                     }
-                ]
+                ],
+                "spellcasting": {
+                    "required_major": "Warrior of Shadow",
+                    "cantrips_known": 0,
+                    "spells_known": 4,
+                    "spell_slots_level_1": 0,
+                    "spell_slots_level_2": 4,
+                    "spell_slots_level_3": 0,
+                    "spell_slots_level_4": 0,
+                    "spell_type": "known"
+                }
             },
             {
                 "level": 6,
@@ -5852,7 +5882,17 @@
                             "casting_time": "passive"
                         }
                     }
-                ]
+                ],
+                "spellcasting": {
+                    "required_major": "Warrior of Shadow",
+                    "cantrips_known": 0,
+                    "spells_known": 4,
+                    "spell_slots_level_1": 0,
+                    "spell_slots_level_2": 4,
+                    "spell_slots_level_3": 0,
+                    "spell_slots_level_4": 0,
+                    "spell_type": "known"
+                }
             },
             {
                 "level": 7,
@@ -5872,7 +5912,17 @@
                             "saveType": "DEX"
                         }
                     }
-                ]
+                ],
+                "spellcasting": {
+                    "required_major": "Warrior of Shadow",
+                    "cantrips_known": 0,
+                    "spells_known": 4,
+                    "spell_slots_level_1": 0,
+                    "spell_slots_level_2": 4,
+                    "spell_slots_level_3": 0,
+                    "spell_slots_level_4": 0,
+                    "spell_type": "known"
+                }
             },
             {
                 "level": 8,
@@ -5888,7 +5938,17 @@
                         "level": 8,
                         "type": "class_feature"
                     }
-                ]
+                ],
+                "spellcasting": {
+                    "required_major": "Warrior of Shadow",
+                    "cantrips_known": 0,
+                    "spells_known": 4,
+                    "spell_slots_level_1": 0,
+                    "spell_slots_level_2": 4,
+                    "spell_slots_level_3": 0,
+                    "spell_slots_level_4": 0,
+                    "spell_type": "known"
+                }
             },
             {
                 "level": 9,
@@ -5910,7 +5970,17 @@
                             "casting_time": "passive"
                         }
                     }
-                ]
+                ],
+                "spellcasting": {
+                    "required_major": "Warrior of Shadow",
+                    "cantrips_known": 0,
+                    "spells_known": 4,
+                    "spell_slots_level_1": 0,
+                    "spell_slots_level_2": 4,
+                    "spell_slots_level_3": 0,
+                    "spell_slots_level_4": 0,
+                    "spell_type": "known"
+                }
             },
             {
                 "level": 10,
@@ -5982,7 +6052,17 @@
                             ]
                         }
                     }
-                ]
+                ],
+                "spellcasting": {
+                    "required_major": "Warrior of Shadow",
+                    "cantrips_known": 0,
+                    "spells_known": 4,
+                    "spell_slots_level_1": 0,
+                    "spell_slots_level_2": 4,
+                    "spell_slots_level_3": 0,
+                    "spell_slots_level_4": 0,
+                    "spell_type": "known"
+                }
             },
             {
                 "level": 11,
@@ -5998,7 +6078,17 @@
                         "level": 11,
                         "type": "subclass_feature"
                     }
-                ]
+                ],
+                "spellcasting": {
+                    "required_major": "Warrior of Shadow",
+                    "cantrips_known": 0,
+                    "spells_known": 4,
+                    "spell_slots_level_1": 0,
+                    "spell_slots_level_2": 4,
+                    "spell_slots_level_3": 0,
+                    "spell_slots_level_4": 0,
+                    "spell_type": "known"
+                }
             },
             {
                 "level": 12,
@@ -6014,7 +6104,17 @@
                         "level": 12,
                         "type": "class_feature"
                     }
-                ]
+                ],
+                "spellcasting": {
+                    "required_major": "Warrior of Shadow",
+                    "cantrips_known": 0,
+                    "spells_known": 4,
+                    "spell_slots_level_1": 0,
+                    "spell_slots_level_2": 4,
+                    "spell_slots_level_3": 0,
+                    "spell_slots_level_4": 0,
+                    "spell_type": "known"
+                }
             },
             {
                 "level": 13,
@@ -6044,7 +6144,17 @@
                             "casting_time": "1 reaction"
                         }
                     }
-                ]
+                ],
+                "spellcasting": {
+                    "required_major": "Warrior of Shadow",
+                    "cantrips_known": 0,
+                    "spells_known": 4,
+                    "spell_slots_level_1": 0,
+                    "spell_slots_level_2": 4,
+                    "spell_slots_level_3": 0,
+                    "spell_slots_level_4": 0,
+                    "spell_type": "known"
+                }
             },
             {
                 "level": 14,
@@ -6067,7 +6177,17 @@
                             "casting_time": "passive"
                         }
                     }
-                ]
+                ],
+                "spellcasting": {
+                    "required_major": "Warrior of Shadow",
+                    "cantrips_known": 0,
+                    "spells_known": 4,
+                    "spell_slots_level_1": 0,
+                    "spell_slots_level_2": 4,
+                    "spell_slots_level_3": 0,
+                    "spell_slots_level_4": 0,
+                    "spell_type": "known"
+                }
             },
             {
                 "level": 15,
@@ -6090,7 +6210,17 @@
                             "focusPointsThreshold": 3
                         }
                     }
-                ]
+                ],
+                "spellcasting": {
+                    "required_major": "Warrior of Shadow",
+                    "cantrips_known": 0,
+                    "spells_known": 4,
+                    "spell_slots_level_1": 0,
+                    "spell_slots_level_2": 4,
+                    "spell_slots_level_3": 0,
+                    "spell_slots_level_4": 0,
+                    "spell_type": "known"
+                }
             },
             {
                 "level": 16,
@@ -6106,7 +6236,17 @@
                         "level": 16,
                         "type": "class_feature"
                     }
-                ]
+                ],
+                "spellcasting": {
+                    "required_major": "Warrior of Shadow",
+                    "cantrips_known": 0,
+                    "spells_known": 4,
+                    "spell_slots_level_1": 0,
+                    "spell_slots_level_2": 4,
+                    "spell_slots_level_3": 0,
+                    "spell_slots_level_4": 0,
+                    "spell_type": "known"
+                }
             },
             {
                 "level": 17,
@@ -6122,7 +6262,17 @@
                         "level": 17,
                         "type": "subclass_feature"
                     }
-                ]
+                ],
+                "spellcasting": {
+                    "required_major": "Warrior of Shadow",
+                    "cantrips_known": 0,
+                    "spells_known": 4,
+                    "spell_slots_level_1": 0,
+                    "spell_slots_level_2": 4,
+                    "spell_slots_level_3": 0,
+                    "spell_slots_level_4": 0,
+                    "spell_type": "known"
+                }
             },
             {
                 "level": 18,
@@ -6147,7 +6297,17 @@
                             "endsOnCondition": "incapacitated"
                         }
                     }
-                ]
+                ],
+                "spellcasting": {
+                    "required_major": "Warrior of Shadow",
+                    "cantrips_known": 0,
+                    "spells_known": 4,
+                    "spell_slots_level_1": 0,
+                    "spell_slots_level_2": 4,
+                    "spell_slots_level_3": 0,
+                    "spell_slots_level_4": 0,
+                    "spell_type": "known"
+                }
             },
             {
                 "level": 19,
@@ -6163,7 +6323,17 @@
                         "level": 19,
                         "type": "class_feature"
                     }
-                ]
+                ],
+                "spellcasting": {
+                    "required_major": "Warrior of Shadow",
+                    "cantrips_known": 0,
+                    "spells_known": 4,
+                    "spell_slots_level_1": 0,
+                    "spell_slots_level_2": 4,
+                    "spell_slots_level_3": 0,
+                    "spell_slots_level_4": 0,
+                    "spell_type": "known"
+                }
             },
             {
                 "level": 20,
@@ -6179,7 +6349,17 @@
                         "level": 20,
                         "type": "class_feature"
                     }
-                ]
+                ],
+                "spellcasting": {
+                    "required_major": "Warrior of Shadow",
+                    "cantrips_known": 0,
+                    "spells_known": 4,
+                    "spell_slots_level_1": 0,
+                    "spell_slots_level_2": 4,
+                    "spell_slots_level_3": 0,
+                    "spell_slots_level_4": 0,
+                    "spell_type": "known"
+                }
             }
         ],
         "majors": [
@@ -6308,19 +6488,7 @@
                     {
                         "name": "Shadow Arts",
                         "description": "You can cast the Darkness, Darkvision, Pass Without Trace, and Silence spells without expending spell slots or preparing them, using Wisdom as your spellcasting ability. Each of these spells can be cast in this way once per Long Rest.",
-                        "level": 3,
-                        "automation": {
-                            "type": "free_spell",
-                            "spell": [
-                                "Darkness",
-                                "Darkvision",
-                                "Pass Without Trace",
-                                "Silence"
-                            ],
-                            "perSpellTracking": true,
-                            "recharge": "long_rest",
-                            "casting_time": "1 action"
-                        }
+                        "level": 3
                     },
                     {
                         "name": "Shadow Step",
@@ -6359,11 +6527,19 @@
                 "spells": [
                     {
                         "name": "Darkness",
-                        "level": 0
+                        "level": 2
                     },
                     {
-                        "name": "Minor Illusion",
-                        "level": 0
+                        "name": "Darkvision",
+                        "level": 2
+                    },
+                    {
+                        "name": "Pass Without Trace",
+                        "level": 2
+                    },
+                    {
+                        "name": "Silence",
+                        "level": 2
                     }
                 ]
             },

@@ -96,10 +96,7 @@
     "Religion"
   ],
   "specialActions": [],
-  "spells": [
-    "True Strike",
-    "Minor Illusion"
-  ],
+  "spells": [],
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
