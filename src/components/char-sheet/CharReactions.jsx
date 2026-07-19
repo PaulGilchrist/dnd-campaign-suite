@@ -209,6 +209,8 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                 setModalState({ bastionOfLawSpendModal: result.payload });
             } else if (result.modalName === 'bendFateChoice') {
                 setModalState({ bendFateModal: result.payload });
+            } else if (result.modalName === 'deflectRedirect') {
+                setModalState({ deflectRedirectModal: result.payload });
             } else {
                 const html = buildFeatureDetailHtml(reaction);
                 if (html) setPopupHtml(html);
@@ -219,6 +221,19 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         const html = buildFeatureDetailHtml(reaction);
         if (html) setPopupHtml(html);
     };
+
+    const handleRedirectConfirm = React.useCallback(async (targetName) => {
+        if (!modalState.deflectRedirectModal) return;
+        setModalState({ deflectRedirectModal: null });
+        if (!targetName) return;
+        await modalState.deflectRedirectModal.onTargetSelected(targetName);
+    }, [modalState.deflectRedirectModal, setModalState]);
+
+    const handleRedirectSkip = React.useCallback(async () => {
+        if (!modalState.deflectRedirectModal) return;
+        setModalState({ deflectRedirectModal: null });
+        await modalState.deflectRedirectModal.onSkip?.();
+    }, [modalState.deflectRedirectModal, setModalState]);
 
     const getTargetInfo = React.useCallback(async () => {
         const cs = await getCombatContext(campaignName);
@@ -480,6 +495,18 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                 <BendFateModal
                     {...modalState.bendFateModal}
                     onClose={() => setModalState({ bendFateModal: null })}
+                />
+            )}
+            {modalState.deflectRedirectModal && (
+                <SecondaryTargetModal
+                    title={modalState.deflectRedirectModal.title}
+                    targets={modalState.deflectRedirectModal.targets}
+                    confirmLabel={modalState.deflectRedirectModal.confirmLabel || 'Redirect Force'}
+                    confirmIcon={modalState.deflectRedirectModal.confirmIcon || 'fa-bolt'}
+                    featureDescription={modalState.deflectRedirectModal.featureDescription}
+                    description={modalState.deflectRedirectModal.description}
+                    onTargetSelected={handleRedirectConfirm}
+                    onSkip={handleRedirectSkip}
                 />
             )}
             {reactions.filter(r => !getCategories(playerStats.rules || '5e').featuresToIgnore.includes(r.name)).map((reaction) => {

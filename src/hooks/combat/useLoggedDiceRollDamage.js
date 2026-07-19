@@ -612,18 +612,20 @@ export function createLogDamageAndShow(deps) {
             });
         }
 
-        const hpEntry = {
-            type: 'hp_change',
-            targetName: target.name,
-            delta: -(totalDamageDealt),
-            currentHp: newHp,
-            maxHp,
-            isHealing: false,
-            isUnconscious: isDead,
-            damageBreakdown,
-        };
-        if (threshold) hpEntry.threshold = threshold;
-        addEntry(campaignName, hpEntry).catch((e) => { console.error("[useLoggedDiceRollDamage] Error:", e); });
+        if (totalDamageDealt > 0) {
+            const hpEntry = {
+                type: 'hp_change',
+                targetName: target.name,
+                delta: -(totalDamageDealt),
+                currentHp: newHp,
+                maxHp,
+                isHealing: false,
+                isUnconscious: isDead,
+                damageBreakdown,
+            };
+            if (threshold) hpEntry.threshold = threshold;
+            addEntry(campaignName, hpEntry).catch((e) => { console.error("[useLoggedDiceRollDamage] Error:", e); });
+        }
 
         if (target.type === 'player') {
             setRuntimeValue(target.name, 'currentHitPoints', newHp, campaignName);

@@ -6,6 +6,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../combat/automation/automationService.js', () => ({
   evaluateAutoExpression: vi.fn(),
+  resolveDiceExpression: vi.fn((expr) => expr),
+}));
+
+vi.mock('../../../dice/diceRoller.js', () => ({
+  rollExpression: vi.fn(),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
@@ -17,12 +22,28 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('../../common/damageRollback.js', () => ({
+  findLastAttack: vi.fn(),
+}));
+
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+  getCombatContext: vi.fn(),
+}));
+
+vi.mock('../../../rules/combat/applyHealing.js', () => ({
+  applyHealingToTarget: vi.fn(),
+}));
+
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './damageReductionHandler.js';
 import * as automationService from '../../../combat/automation/automationService.js';
 import * as logService from '../../../ui/logService.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
+import * as damageRollback from '../../common/damageRollback.js';
+import * as damageUtils from '../../../rules/combat/damageUtils.js';
+import * as applyHealing from '../../../rules/combat/applyHealing.js';
+import * as diceRoller from '../../../dice/diceRoller.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -47,7 +68,16 @@ function makeAction(automation = {}) {
 
 function setupMocks() {
   automationService.evaluateAutoExpression.mockReturnValue(5);
+  diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
   logService.addEntry.mockResolvedValue({});
+  damageRollback.findLastAttack.mockResolvedValue({
+    attackEvent: { targetName: 'TestHero' },
+    targetName: 'TestHero',
+    totalDamage: 10,
+    damageTypes: ['Slashing'],
+  });
+  damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
+  applyHealing.applyHealingToTarget.mockResolvedValue({ actualHeal: 5 });
 }
 
 // ── Tests ──────────────────────────────────────────────────────
@@ -76,6 +106,12 @@ describe('damageReductionHandler', () => {
 
     it('proceeds when player has a shield equipped', async () => {
       automationService.evaluateAutoExpression.mockReturnValue(5);
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: { targetName: 'TestHero' },
+        targetName: 'TestHero',
+        totalDamage: 10,
+        damageTypes: ['Slashing'],
+      });
       const ps = makePlayerStats({
         inventory: { equipped: ['Shield'] },
         equipment: [{ name: 'Shield', armor_category: 'Shield' }],
@@ -90,6 +126,12 @@ describe('damageReductionHandler', () => {
 
     it('proceeds when player has a magic shield equipped', async () => {
       automationService.evaluateAutoExpression.mockReturnValue(5);
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: { targetName: 'TestHero' },
+        targetName: 'TestHero',
+        totalDamage: 10,
+        damageTypes: ['Slashing'],
+      });
       const ps = makePlayerStats({
         inventory: { equipped: ['+2 Shield'] },
         equipment: [{ name: 'Shield', armor_category: 'Shield' }],
@@ -131,6 +173,12 @@ describe('damageReductionHandler', () => {
 
     it('proceeds when player has a weapon equipped', async () => {
       automationService.evaluateAutoExpression.mockReturnValue(5);
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: { targetName: 'TestHero' },
+        targetName: 'TestHero',
+        totalDamage: 10,
+        damageTypes: ['Slashing'],
+      });
       const ps = makePlayerStats({
         inventory: { equipped: ['Longsword'] },
         equipment: [{ name: 'Longsword', equipment_category: 'Weapon' }],
@@ -145,6 +193,12 @@ describe('damageReductionHandler', () => {
 
     it('proceeds when player has a shield equipped', async () => {
       automationService.evaluateAutoExpression.mockReturnValue(5);
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: { targetName: 'TestHero' },
+        targetName: 'TestHero',
+        totalDamage: 10,
+        damageTypes: ['Slashing'],
+      });
       const ps = makePlayerStats({
         inventory: { equipped: ['Shield'] },
         equipment: [{ name: 'Shield', armor_category: 'Shield' }],
@@ -159,6 +213,12 @@ describe('damageReductionHandler', () => {
 
     it('proceeds when player has a magic weapon equipped', async () => {
       automationService.evaluateAutoExpression.mockReturnValue(5);
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: { targetName: 'TestHero' },
+        targetName: 'TestHero',
+        totalDamage: 10,
+        damageTypes: ['Slashing'],
+      });
       const ps = makePlayerStats({
         inventory: { equipped: ['+1 Longsword'] },
         equipment: [{ name: 'Longsword', equipment_category: 'Weapon' }],
@@ -269,6 +329,7 @@ describe('damageReductionHandler', () => {
   describe('normal damage reduction', () => {
     it('evaluates reduction expression and returns popup with result', async () => {
       automationService.evaluateAutoExpression.mockReturnValue(7);
+      applyHealing.applyHealingToTarget.mockResolvedValue({ actualHeal: 7 });
       const ps = makePlayerStats();
       const action = makeAction({ reductionExpression: '2d6+1' });
 
@@ -276,13 +337,25 @@ describe('damageReductionHandler', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('Reduce damage by <strong>7</strong>');
+      expect(result.payload.description).toContain('2d6+1 = 7');
       expect(result.payload.automation).toBe(action.automation);
       expect(result.payload.automationType).toBe('damage_reduction');
     });
 
+    it('includes roll details in popup', async () => {
+      automationService.evaluateAutoExpression.mockReturnValue(7);
+      applyHealing.applyHealingToTarget.mockResolvedValue({ actualHeal: 7 });
+      const ps = makePlayerStats();
+      const action = makeAction({ reductionExpression: '2d6+1' });
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.payload.description).toContain('2d6+1 = 7');
+    });
+
     it('includes trigger text when auto.trigger is set', async () => {
       automationService.evaluateAutoExpression.mockReturnValue(3);
+      applyHealing.applyHealingToTarget.mockResolvedValue({ actualHeal: 3 });
       const ps = makePlayerStats();
       const action = makeAction({ reductionExpression: '1d4', trigger: 'When hit by an attack' });
 
@@ -293,6 +366,7 @@ describe('damageReductionHandler', () => {
 
     it('omits trigger text when auto.trigger is not set', async () => {
       automationService.evaluateAutoExpression.mockReturnValue(4);
+      applyHealing.applyHealingToTarget.mockResolvedValue({ actualHeal: 4 });
       const ps = makePlayerStats();
       const action = makeAction({ reductionExpression: '1d4' });
 
@@ -301,23 +375,28 @@ describe('damageReductionHandler', () => {
       expect(result.payload.description).not.toContain('Trigger:');
     });
 
-    it('falls back to string expression when evaluateAutoExpression returns non-number', async () => {
+    it('falls back to zero when evaluateAutoExpression returns non-number and rollExpression fails', async () => {
       const nonNumericValues = [null, undefined, ''];
       for (const nonNumericValue of nonNumericValues) {
         vi.resetAllMocks();
         setupMocks();
         automationService.evaluateAutoExpression.mockReturnValue(nonNumericValue);
+        diceRoller.rollExpression.mockReturnValue(null);
+        applyHealing.applyHealingToTarget.mockResolvedValue({ actualHeal: 0 });
         const ps = makePlayerStats();
         const action = makeAction({ reductionExpression: '2d6+1' });
 
         const result = await handle(action, ps, campaignName, null);
 
-        expect(result.payload.description).toContain('2d6+1');
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toContain('Deflect roll:</b> 0');
       }
     });
 
     it('adds log entry with ability_use type', async () => {
       automationService.evaluateAutoExpression.mockReturnValue(5);
+      diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
+      applyHealing.applyHealingToTarget.mockResolvedValue({ actualHeal: 5 });
       const ps = makePlayerStats();
       const action = makeAction({ reductionExpression: '2d4' });
 
@@ -327,12 +406,20 @@ describe('damageReductionHandler', () => {
         type: 'ability_use',
         characterName: 'TestHero',
         abilityName: 'Defensive Reaction',
-        description: 'TestHero used Defensive Reaction to reduce damage by 5.',
+        description: 'TestHero used Defensive Reaction to reduce damage by 2d4 = 5 (healed for 5 HP).',
       });
     });
 
     it('uses correct character and ability names in log entry', async () => {
       automationService.evaluateAutoExpression.mockReturnValue(2);
+      diceRoller.rollExpression.mockReturnValue({ total: 2, rolls: [2], modifier: 0 });
+      applyHealing.applyHealingToTarget.mockResolvedValue({ actualHeal: 2 });
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: { targetName: 'ElvenRogue' },
+        targetName: 'ElvenRogue',
+        totalDamage: 10,
+        damageTypes: ['Slashing'],
+      });
       const ps = makePlayerStats({ name: 'ElvenRogue' });
       const action = {
         name: 'Armor of Agathys',
@@ -345,18 +432,22 @@ describe('damageReductionHandler', () => {
         type: 'ability_use',
         characterName: 'ElvenRogue',
         abilityName: 'Armor of Agathys',
-        description: 'ElvenRogue used Armor of Agathys to reduce damage by 2.',
+        description: 'ElvenRogue used Armor of Agathys to reduce damage by 1d4 = 2 (healed for 2 HP).',
       });
     });
 
-    it('propagates error when addEntry rejects', async () => {
+    it('does not throw when addEntry rejects (fire-and-forget logging)', async () => {
       automationService.evaluateAutoExpression.mockReturnValue(5);
+      applyHealing.applyHealingToTarget.mockResolvedValue({ actualHeal: 5 });
       const ps = makePlayerStats();
       const action = makeAction({ reductionExpression: '2d6' });
       const testError = new Error('log save failed');
-      logService.addEntry.mockRejectedValue(testError);
+      logService.addEntry.mockImplementation(() => Promise.reject(testError));
 
-      await expect(handle(action, ps, campaignName, null)).rejects.toThrow('log save failed');
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
     });
   });
 });

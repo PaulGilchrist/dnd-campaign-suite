@@ -1,7 +1,20 @@
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 export function modifyHitPoints(combatSummary, targetName, delta, campaignName) {
-  if (!combatSummary || !combatSummary.creatures) return null;
+  if (!combatSummary || !combatSummary.creatures) {
+    const playerMaxHp = getRuntimeValue(targetName, 'hitPoints');
+    if (playerMaxHp != null) {
+      const oldHp = getRuntimeValue(targetName, 'currentHitPoints') ?? 0;
+      const newHp = Math.min(playerMaxHp, Math.max(0, oldHp + delta));
+      if (newHp !== oldHp) {
+        setRuntimeValue(targetName, 'currentHitPoints', newHp, campaignName);
+      }
+      const actualDelta = newHp - oldHp;
+      return { oldHp, newHp, delta: actualDelta, isPlayer: true, maxHp: playerMaxHp };
+    }
+    return null;
+  }
+
   const creature = combatSummary.creatures.find(c => c.name === targetName);
   if (!creature) return null;
 
@@ -13,7 +26,10 @@ export function modifyHitPoints(combatSummary, targetName, delta, campaignName) 
   let oldHp, newHp;
   if (isPlayer) {
     oldHp = getRuntimeValue(creature.name, 'currentHitPoints') ?? 0;
-    newHp = Math.min(maxHp, Math.max(0, oldHp + delta));
+    newHp = Math.max(0, oldHp + delta);
+    if (maxHp != null) {
+      newHp = Math.min(maxHp, newHp);
+    }
     setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
   } else {
     oldHp = creature.currentHp;

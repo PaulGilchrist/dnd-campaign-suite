@@ -527,6 +527,8 @@ function logDamageApplication(creature, damage, oldHp, newHp, campaignName) {
   else if (!wasBloodied && isBloodied) threshold = 'bloodied';
   else if (wasBloodied && !isBloodied && newHp > 0) threshold = 'recovering';
 
+  if (delta === 0) return;
+
   const entry = {
     type: 'hp_change',
     targetName: creature.name,

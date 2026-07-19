@@ -160,18 +160,20 @@ export function setupEventListeners(deps) {
                 });
             }
 
-            const hpEntry = {
-                type: 'hp_change',
-                targetName: pendingTargetName,
-                delta: -(totalDamageDealt),
-                currentHp: hpAfterDamage,
-                maxHp,
-                isHealing: false,
-                isUnconscious: isUnconscious,
-                damageBreakdown,
-            };
-            if (threshold) hpEntry.threshold = threshold;
-            addEntry(pending.campaignName, hpEntry).catch((e) => { console.error("[useLoggedDiceRollEventHandlers] Error:", e); });
+            if (totalDamageDealt > 0) {
+                const hpEntry = {
+                    type: 'hp_change',
+                    targetName: pendingTargetName,
+                    delta: -(totalDamageDealt),
+                    currentHp: hpAfterDamage,
+                    maxHp,
+                    isHealing: false,
+                    isUnconscious: isUnconscious,
+                    damageBreakdown,
+                };
+                if (threshold) hpEntry.threshold = threshold;
+                addEntry(pending.campaignName, hpEntry).catch((e) => { console.error("[useLoggedDiceRollEventHandlers] Error:", e); });
+            }
 
             if (pendingTargetName.startsWith('player-')) {
                 setRuntimeValue(pendingTargetName, 'currentHitPoints', newHp, pending.campaignName);

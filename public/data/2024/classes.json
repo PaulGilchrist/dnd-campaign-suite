@@ -6032,7 +6032,7 @@
                 "features": [
                     {
                         "name": "Deflect Energy",
-                        "description": "Now use Deflect Attacks against any damage type, not just Bludgeoning, Piercing, or Slashing.",
+                        "description": "When an attack roll hits you, regardless of damage type, you can take a Reaction to reduce the damage by 1d10 + Dexterity modifier + Monk level. If damage reduced to 0, expend 1 Focus Point to redirect force to a creature within 5 feet (melee) or 60 feet (ranged). Target makes Dexterity save or takes damage equal to two Martial Arts die + Dexterity modifier.",
                         "level": 13,
                         "type": "class_feature",
                         "automation": {
