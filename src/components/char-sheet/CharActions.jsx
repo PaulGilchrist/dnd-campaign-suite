@@ -33,7 +33,7 @@ import { getClassFeatures } from '../../services/character/classFeatures.js';
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js'
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
 import { getTargetFromAttacker, getCombatContext, getAttackerTargetName } from '../../services/rules/combat/damageUtils.js';
-import { getActiveCreatureName } from '../../services/encounters/combatData.js';
+import { getActiveCreatureName, loadCombatSummary } from '../../services/encounters/combatData.js';
 import { executeSweepingAttack, executeBaitAndSwitchChoice, executeCommanderStrikeChoice, executeRallyChoice } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { activateBulwarkOfForce } from '../../services/automation/handlers/class-sorcerer/bulwarkOfForceHandler.js';
 import { confirmTelepathicSpeech } from '../../services/automation/handlers/buffs/buffHandler.js';
@@ -67,7 +67,7 @@ import { isEqual } from 'lodash';
 
 const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextProps.playerStats) && prevProps.conditionAttackMode === nextProps.conditionAttackMode && prevProps.exhaustionPenalty === nextProps.exhaustionPenalty && prevProps.cannotAct === nextProps.cannotAct;
 
-const CharActions = React.memo(function CharActions({ playerStats, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName, onBuffsChange, characters, onSpellModalStateChange, spellModalState }) {
+const CharActions = React.memo(function CharActions({ playerStats, campaignName, exhaustionPenalty = 0, conditionAttackMode, conditionEffects, cannotAct, mapName, onBuffsChange, characters, onSpellModalStateChange, spellModalState }) {
     const [actions, setActions] = useState([]);
     const [selectedActionSpell, setSelectedActionSpell] = useState(null);
     const [featRangeEffects, setFeatRangeEffects] = useState(null);
@@ -105,7 +105,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             .catch(error => console.error('Error loading actions:', error));
     }, []);
 
-    const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, {
+    const { rollAttack, rollDamage, rollSkillCheck } = useLoggedDiceRoll(playerStats.name, campaignName, {
         characters,
         autoDamageSource: 'char-actions',
         autoDamageRoll: async (autoDamage, isCrit) => {
@@ -1632,19 +1632,70 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                         setPopupHtml({ type: 'automation_info', name: 'Hide', description: 'You are already hidden (Invisible condition active).' });
                                         return;
                                     }
-                                    const newConditions = [...currentConditions, 'invisible'];
-                                    await setRuntimeValue(playerStats.name, 'activeConditions', newConditions, campaignName);
-                                    const activeBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || [];
-                                    const hasAdvantageOnStealth = activeBuffs.some(b => b.effect === 'advantage_on_stealth');
-                                    const newBuffs = hasAdvantageOnStealth ? activeBuffs : [...activeBuffs, { name: 'Hide', effect: 'advantage_on_stealth' }];
-                                    await setRuntimeValue(playerStats.name, 'activeBuffs', newBuffs, campaignName);
-                                    setPopupHtml({ type: 'automation_info', name: 'Hide', description: 'You attempt to Hide. You gain the Invisible condition and advantage on Dexterity (Stealth) checks until you attack, take damage, or use Lesser Restoration to remove the condition.' });
-                                    await addEntry(campaignName, {
-                                        type: 'ability_use',
-                                        characterName: playerStats.name,
-                                        abilityName: 'Hide',
-                                        description: 'Gained Invisible condition and advantage on Stealth checks.',
-                                    }).catch(() => { });
+                                    const stealthSkill = playerStats?.abilities?.flatMap(a => a.skills || []).find(s => s.name === 'Stealth');
+                                    let stealthBonus = stealthSkill?.bonus ?? 0 - exhaustionPenalty;
+                                    const isCharismaSkill = ['Deception', 'Intimidation', 'Performance', 'Persuasion'].includes('Stealth');
+                                    if (conditionEffects?.wisCheckReplace && isCharismaSkill) {
+                                        const wisAbility = playerStats?.abilities?.find(a => a.name === 'Wisdom');
+                                        const wisMod = wisAbility?.bonus || 0;
+                                        const wisBonus = Math.max(1, wisMod);
+                                        const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
+                                        const isProficient = playerStats.skillProficiencies?.includes('Stealth');
+                                        const isExpert = playerStats.expertise?.includes('Stealth');
+                                        let newBonus = wisBonus;
+                                        if (isProficient) newBonus += proficiency;
+                                        if (isExpert) newBonus += proficiency;
+                                        stealthBonus = newBonus - exhaustionPenalty;
+                                    }
+                                    const isJackOfAllTrades = playerStats?.automation?.passives?.some(p => p.type === 'jack_of_all_trades');
+                                    const isNotProficient = !playerStats?.skillProficiencies?.includes('Stealth');
+                                    if (isJackOfAllTrades && isNotProficient) {
+                                        const prof = Math.floor((playerStats.level - 1) / 4 + 2);
+                                        stealthBonus += Math.floor(prof / 2);
+                                    }
+                                    if (conditionEffects?.passWithoutTraceBonus && 'Stealth' === 'Stealth') {
+                                        stealthBonus += parseInt(conditionEffects.passWithoutTraceBonus, 10);
+                                    }
+                                    let checkContext = {};
+                                    if (conditionEffects?.abilityCheckDisadvantage) checkContext.forcedMode = 'disadvantage';
+                                    if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === 'Stealth')) {
+                                        checkContext.forcedMode = checkContext.forcedMode === 'disadvantage' ? undefined : 'advantage';
+                                    }
+                                    if (conditionEffects?.peerlessAthleteAdvantageSkills && conditionEffects.peerlessAthleteAdvantageSkills.includes('Stealth')) {
+                                        checkContext.forcedMode = checkContext.forcedMode === 'disadvantage' ? undefined : 'advantage';
+                                    }
+                                    await rollSkillCheck('Stealth', stealthBonus, checkContext);
+                                    await new Promise(resolve => setTimeout(resolve, 50));
+                                    const cs = await loadCombatSummary(campaignName);
+                                    const lastAttack = cs?.lastAttack;
+                                    const rollTotal = lastAttack?.total;
+                                    const dc = 15;
+                                    const success = rollTotal >= dc;
+                                    if (success) {
+                                        const newConditions = [...currentConditions, 'invisible'];
+                                        await setRuntimeValue(playerStats.name, 'activeConditions', newConditions, campaignName);
+                                        const activeBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || [];
+                                        const hasAdvantageOnStealth = activeBuffs.some(b => b.effect === 'advantage_on_stealth');
+                                        const newBuffs = hasAdvantageOnStealth ? activeBuffs : [...activeBuffs, { name: 'Hide', effect: 'advantage_on_stealth' }];
+                                        await setRuntimeValue(playerStats.name, 'activeBuffs', newBuffs, campaignName);
+                                        const d20Val = lastAttack?.d20 ?? '?';
+                                        setPopupHtml({ type: 'automation_info', name: 'Hide', description: `Hide successful! (d20: ${d20Val} + ${stealthBonus} = ${rollTotal}) You gain the Invisible condition and advantage on Dexterity (Stealth) checks until you attack, take damage, or use Lesser Restoration to remove the condition.` });
+                                        await addEntry(campaignName, {
+                                            type: 'ability_use',
+                                            characterName: playerStats.name,
+                                            abilityName: 'Hide',
+                                            description: `Stealth check: ${rollTotal} (d20: ${d20Val} + ${stealthBonus}) vs DC ${dc} — Success. Gained Invisible condition and advantage on Stealth checks.`,
+                                        }).catch(() => { });
+                                    } else {
+                                        const d20Val = lastAttack?.d20 ?? '?';
+                                        setPopupHtml({ type: 'automation_info', name: 'Hide', description: `Hide failed! (d20: ${d20Val} + ${stealthBonus} = ${rollTotal}) You remain visible.` });
+                                        await addEntry(campaignName, {
+                                            type: 'ability_use',
+                                            characterName: playerStats.name,
+                                            abilityName: 'Hide',
+                                            description: `Stealth check: ${rollTotal} (d20: ${d20Val} + ${stealthBonus}) vs DC ${dc} — Failure. Did not gain the Invisible condition.`,
+                                        }).catch(() => { });
+                                    }
                                 }}>{actionName}</span>
                             </React.Fragment>
                         );

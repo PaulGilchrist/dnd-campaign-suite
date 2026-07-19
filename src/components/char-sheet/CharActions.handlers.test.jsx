@@ -9,6 +9,8 @@ import { endInvisibilityOnHostileAction } from '../../services/rules/features/in
 import { addEntry } from '../../services/ui/logService.js';
 import { buildAttackContext, buildAttackContextSync } from '../../services/automation/contextBuilder.js';
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
+import { loadCombatSummary } from '../../services/encounters/combatData.js';
+import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 
 const _syncedStore = new Map();
 
@@ -33,7 +35,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
   default: vi.fn(() => ({
-    popupHtml: null, setPopupHtml: vi.fn(), rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
+    popupHtml: null, setPopupHtml: vi.fn(), rollAttack: vi.fn(), rollDamage: vi.fn(), rollSkillCheck: vi.fn(), quickRollPlayerSave: vi.fn(),
   })),
 }));
 
@@ -100,6 +102,7 @@ vi.mock('../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => ({ creatures: [] })),
   getCurrentCombatRound: vi.fn(() => 1),
   getActiveCreatureName: vi.fn(() => 'TestCharacter'),
+  loadCombatSummary: vi.fn(() => Promise.resolve({ lastAttack: null })),
 }));
 
 vi.mock('../../services/rules/core/attackCalc.js', () => ({
@@ -489,8 +492,9 @@ describe('CharActions handlers', () => {
       });
     });
 
-    it('Hide sets invisible condition and stealth buff when clicked', async () => {
+    it('Hide rolls Stealth check and sets invisible condition on success (>= DC 15)', async () => {
       const mockSetPopupHtml = vi.fn();
+      const mockRollSkillCheck = vi.fn().mockResolvedValue(undefined);
       const wrapper = ({ children }) => (
         <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
           {children}
@@ -504,24 +508,98 @@ describe('CharActions handlers', () => {
         return null;
       });
 
+      const stealthSkillBonus = 5;
+      const stats = createStats({ actions: ['Hide'], skillProficiencies: ['Stealth'], level: 5 });
+      stats.abilities = [
+        { name: 'Dexterity', bonus: 2, skills: [{ name: 'Stealth', bonus: stealthSkillBonus }] },
+        { name: 'Strength', bonus: 0, skills: [] },
+        { name: 'Constitution', bonus: 0, skills: [] },
+        { name: 'Intelligence', bonus: 0, skills: [] },
+        { name: 'Wisdom', bonus: 0, skills: [] },
+        { name: 'Charisma', bonus: 0, skills: [] },
+      ];
+
+      useLoggedDiceRoll.mockReturnValue({
+        popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), rollSkillCheck: mockRollSkillCheck, quickRollPlayerSave: vi.fn(),
+      });
+      loadCombatSummary.mockResolvedValue({ lastAttack: { d20: 12, bonus: stealthSkillBonus, total: 12 + stealthSkillBonus } });
+
       await act(async () => {
-        render(<CharActions playerStats={createStats({ actions: ['Hide'] })} campaignName="my-campaign" />, { wrapper });
+        render(<CharActions playerStats={stats} campaignName="my-campaign" />, { wrapper });
       });
 
       const hideBtn = screen.getByText('Hide');
       await act(async () => { fireEvent.click(hideBtn); });
 
       await waitFor(() => {
+        expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', expect.any(Number), expect.any(Object));
+      });
+
+      await waitFor(() => {
         expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'activeConditions', expect.arrayContaining(['invisible']), 'my-campaign');
         expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
           name: 'Hide',
-          description: expect.stringContaining('Invisible condition'),
+          description: expect.stringContaining('Hide successful'),
         }));
       });
     });
 
-    it('Hide does not add duplicate stealth buff when advantage already active', async () => {
+    it('Hide rolls Stealth check but does NOT set invisible on failure (< DC 15)', async () => {
       const mockSetPopupHtml = vi.fn();
+      const mockRollSkillCheck = vi.fn().mockResolvedValue(undefined);
+      const wrapper = ({ children }) => (
+        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+          {children}
+        </DiceRollContext.Provider>
+      );
+
+      getRuntimeValue.mockImplementation((_name, key) => {
+        if (key === 'activeBuffs') return [];
+        if (key === 'hasteExtraActionUsed') return false;
+        if (key === 'activeConditions') return [];
+        return null;
+      });
+
+      const stealthSkillBonus = 5;
+      const stats = createStats({ actions: ['Hide'], skillProficiencies: ['Stealth'], level: 5 });
+      stats.abilities = [
+        { name: 'Dexterity', bonus: 2, skills: [{ name: 'Stealth', bonus: stealthSkillBonus }] },
+        { name: 'Strength', bonus: 0, skills: [] },
+        { name: 'Constitution', bonus: 0, skills: [] },
+        { name: 'Intelligence', bonus: 0, skills: [] },
+        { name: 'Wisdom', bonus: 0, skills: [] },
+        { name: 'Charisma', bonus: 0, skills: [] },
+      ];
+
+      useLoggedDiceRoll.mockReturnValue({
+        popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), rollSkillCheck: mockRollSkillCheck, quickRollPlayerSave: vi.fn(),
+      });
+      loadCombatSummary.mockResolvedValue({ lastAttack: { d20: 3, bonus: stealthSkillBonus, total: 3 + stealthSkillBonus } });
+
+      await act(async () => {
+        render(<CharActions playerStats={stats} campaignName="my-campaign" />, { wrapper });
+      });
+
+      const hideBtn = screen.getByText('Hide');
+      await act(async () => { fireEvent.click(hideBtn); });
+
+      await waitFor(() => {
+        expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', expect.any(Number), expect.any(Object));
+      });
+
+      await waitFor(() => {
+        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+          name: 'Hide',
+          description: expect.stringContaining('Hide failed'),
+        }));
+      });
+
+      expect(setRuntimeValue).not.toHaveBeenCalledWith('TestCharacter', 'activeConditions', expect.arrayContaining(['invisible']), 'my-campaign');
+    });
+
+    it('Hide does not add duplicate stealth buff when advantage already active and succeeds', async () => {
+      const mockSetPopupHtml = vi.fn();
+      const mockRollSkillCheck = vi.fn().mockResolvedValue(undefined);
       const wrapper = ({ children }) => (
         <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
           {children}
@@ -535,17 +613,37 @@ describe('CharActions handlers', () => {
         return null;
       });
 
+      const stealthSkillBonus = 5;
+      const stats = createStats({ actions: ['Hide'], skillProficiencies: ['Stealth'], level: 5 });
+      stats.abilities = [
+        { name: 'Dexterity', bonus: 2, skills: [{ name: 'Stealth', bonus: stealthSkillBonus }] },
+        { name: 'Strength', bonus: 0, skills: [] },
+        { name: 'Constitution', bonus: 0, skills: [] },
+        { name: 'Intelligence', bonus: 0, skills: [] },
+        { name: 'Wisdom', bonus: 0, skills: [] },
+        { name: 'Charisma', bonus: 0, skills: [] },
+      ];
+
+      useLoggedDiceRoll.mockReturnValue({
+        popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), rollSkillCheck: mockRollSkillCheck, quickRollPlayerSave: vi.fn(),
+      });
+      loadCombatSummary.mockResolvedValue({ lastAttack: { d20: 12, bonus: stealthSkillBonus, total: 12 + stealthSkillBonus } });
+
       await act(async () => {
-        render(<CharActions playerStats={createStats({ actions: ['Hide'] })} campaignName="my-campaign" />, { wrapper });
+        render(<CharActions playerStats={stats} campaignName="my-campaign" />, { wrapper });
       });
 
       const hideBtn = screen.getByText('Hide');
       await act(async () => { fireEvent.click(hideBtn); });
 
-      // First call: sets activeConditions with invisible
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'activeConditions', ['invisible'], 'my-campaign');
-      // Second call: sets activeBuffs - preserves existing advantage_on_stealth, does NOT add duplicate
-      expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'TestCharacter', 'activeBuffs', [{ effect: 'advantage_on_stealth' }], 'my-campaign');
+      await waitFor(() => {
+        expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', expect.any(Number), expect.any(Object));
+      });
+
+      await waitFor(() => {
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'activeConditions', ['invisible'], 'my-campaign');
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'TestCharacter', 'activeBuffs', [{ effect: 'advantage_on_stealth' }], 'my-campaign');
+      });
     });
 
     it('Hide does nothing when cannotAct is true', async () => {

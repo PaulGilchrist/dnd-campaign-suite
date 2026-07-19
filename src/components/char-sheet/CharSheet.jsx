@@ -766,6 +766,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                     campaignName={campaignName}
                     exhaustionPenalty={exhaustionPenalty}
                     conditionAttackMode={conditionAttackMode}
+                    conditionEffects={conditionEffects}
                     cannotAct={cannotAct}
                     mapName={activeMapName}
                     onBuffsChange={handleBuffsChange}
