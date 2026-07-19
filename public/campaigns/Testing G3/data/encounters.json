@@ -85,15 +85,6 @@
     {
       "name": "Webbed Depths",
       "savedAt": "2026-05-23T00:00:00Z",
-      "description": "**Location:** Mega Dungeon — Deep Foundations\n\nThe lowest levels of Thornfast Keep were built directly into the bedrock, and the Feywild seal's three anchor points were housed here. The corruption has attracted giant spiders and an ettercap from the Feywild, who have spun massive webs throughout the foundation chambers. The air is thick with webbing, and the walls pulse with an unnatural amber glow from the seal anchors.\n\n**Skill Challenge: Navigating the Web Tunnels**\nBefore the combat encounter, the party must navigate a maze of web-choked passages (DC 12 Survival to find the safe path, DC 14 Acrobatics to squeeze through tight gaps, DC 12 Perception to spot traps). Each character must succeed on at least one check; the group needs 3 successes before 3 failures. Failure triggers a surprise round for the spiders.\n\n**Terrain Features:** The chamber is a **web-filled cavern** (web squares are difficult terrain; webs can be burned away with fire). Four **web strands** connect to the ceiling — cutting them drops heavy debris on enemies below (DC 13 Dexterity save or 2d6 bludgeoning). The central pillar houses **Seal Anchor #3** (glowing crystal, AC 12, HP 15, needs 10+ damage in one hit or DC 13 Arcana to shatter).\n\n**Tactics:** The Ettercap hides in the webs above, ambushing with its Web attack. Giant Spiders climb walls and ceiling, targeting isolated characters. The spiders avoid the web-strand traps (they know where to stand). If the Ettercap is killed, the spiders flee.\n\n**Treasure:** In the webbed-over chest behind the seal anchor: a **Bag of Holding** and 80 gp.",
-      "rulesVersion": "2024",
-      "difficulty": 2,
-      "playerLevels": [
-        3,
-        3,
-        3,
-        3
-      ],
       "selectedMonsters": [
         {
           "index": "ettercap",
@@ -104,9 +95,22 @@
           "index": "giant-spider",
           "name": "Giant Spider",
           "qty": 2
+        },
+        {
+          "index": "marilith",
+          "name": "Marilith",
+          "qty": 1
         }
       ],
-      "effectiveXP": 1275
+      "description": "**Location:** Mega Dungeon — Deep Foundations\n\nThe lowest levels of Thornfast Keep were built directly into the bedrock, and the Feywild seal's three anchor points were housed here. The corruption has attracted giant spiders and an ettercap from the Feywild, who have spun massive webs throughout the foundation chambers. The air is thick with webbing, and the walls pulse with an unnatural amber glow from the seal anchors.\n\n**Skill Challenge: Navigating the Web Tunnels**\nBefore the combat encounter, the party must navigate a maze of web-choked passages (DC 12 Survival to find the safe path, DC 14 Acrobatics to squeeze through tight gaps, DC 12 Perception to spot traps). Each character must succeed on at least one check; the group needs 3 successes before 3 failures. Failure triggers a surprise round for the spiders.\n\n**Terrain Features:** The chamber is a **web-filled cavern** (web squares are difficult terrain; webs can be burned away with fire). Four **web strands** connect to the ceiling — cutting them drops heavy debris on enemies below (DC 13 Dexterity save or 2d6 bludgeoning). The central pillar houses **Seal Anchor #3** (glowing crystal, AC 12, HP 15, needs 10+ damage in one hit or DC 13 Arcana to shatter).\n\n**Tactics:** The Ettercap hides in the webs above, ambushing with its Web attack. Giant Spiders climb walls and ceiling, targeting isolated characters. The spiders avoid the web-strand traps (they know where to stand). If the Ettercap is killed, the spiders flee.\n\n**Treasure:** In the webbed-over chest behind the seal anchor: a **Bag of Holding** and 80 gp.",
+      "lootData": {
+        "lootEntries": [
+          "No loot for these monsters"
+        ],
+        "totalEncounterXp": 850
+      },
+      "encounterCompleted": true,
+      "effectiveXP": 23775
     },
     {
       "name": "The Thorned One's Sanctum",
@@ -162,11 +166,6 @@
       "savedAt": "2026-07-15T20:02:12.746Z",
       "selectedMonsters": [
         {
-          "index": "lich",
-          "name": "Lich",
-          "qty": 1
-        },
-        {
           "index": "dracolich",
           "name": "Dracolich",
           "qty": 1
@@ -180,6 +179,11 @@
           "index": "adult-blue-dracolich",
           "name": "Adult Blue Dracolich",
           "qty": 1
+        },
+        {
+          "index": "marilith",
+          "name": "Marilith",
+          "qty": 1
         }
       ],
       "description": "",
@@ -188,7 +192,7 @@
         "totalEncounterXp": 0
       },
       "encounterCompleted": false,
-      "effectiveXP": 133500
+      "effectiveXP": 106500
     }
   ]
 }

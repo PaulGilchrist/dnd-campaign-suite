@@ -780,9 +780,41 @@ export function buildAttackRollDamageSteps() {
           const stored = getRuntimeValue(ps.name, 'empoweredStrikesDamageType', ctx.campaignName);
           if (stored) { ctx.attack.damageType = stored; setRuntimeValue(ps.name, 'empoweredStrikesDamageType', null, ctx.campaignName); break; }
           if (mod.options?.length > 0) {
-            return {
-              modal: { type: 'damageTypeChoice', props: { title: `${mod.name} — Damage Type`, types: mod.options.map(o => o.damageType) } },
-            };
+            const normalOption = mod.options.find(o => o.name !== 'Force');
+            const forceOption = mod.options.find(o => o.name === 'Force');
+            let chosenType = normalOption?.damageType || ctx.attack.damageType;
+
+            const cs = await getCombatContext(ctx.campaignName);
+            const target = cs ? getTargetFromAttacker(cs, ps.name) : null;
+
+            if (target && normalOption && forceOption) {
+              const lower = normalOption.damageType.toLowerCase();
+              const isImmune = target.immunities?.some(i => i.toLowerCase() === lower);
+              const isResisted = target.resistances?.some(r => r.toLowerCase() === lower);
+
+              if (isImmune || isResisted) {
+                chosenType = forceOption.damageType;
+                ctx.attack.damageType = chosenType;
+                const reason = isImmune ? 'immune to' : 'resists';
+                addEntry(ctx.campaignName, {
+                  type: 'ability_use',
+                  characterName: ps.name,
+                  abilityName: mod.name,
+                  description: `${mod.name} — auto-selected ${chosenType} damage (${target.name} ${reason} ${normalOption.damageType})`,
+                  targetName: target.name,
+                }).catch(() => {});
+
+                ctx.attack.damageType = chosenType;
+                console.log('[DEBUG3] returning popup, chosenType:', chosenType);
+                return {
+                  data: { formula, total, rolls },
+                  popup: `<b>${mod.name}</b><br/>${target.name} ${reason} ${normalOption.damageType} — using <b>${chosenType}</b>`,
+                };
+              }
+            }
+
+            ctx.attack.damageType = chosenType;
+            break;
           }
         }
 

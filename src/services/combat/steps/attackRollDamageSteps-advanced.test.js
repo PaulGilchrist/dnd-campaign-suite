@@ -127,6 +127,7 @@ const { rollExpression } = await import('../../dice/diceRoller.js');
 const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
 const { loadCombatSummary, getCurrentCombatRound } = await import('../../encounters/combatData.js');
 const { addEntry } = await import('../../ui/logService.js');
+const { getCombatContext, getTargetFromAttacker } = await import('../../rules/combat/damageUtils.js');
 const { featureModules } = await import('./features/index.js');
 const { applyDamageToTarget } = await import('../../rules/combat/applyDamage.js');
 const { getActiveBuffs } = await import('../../automation/common/buffToggle.js');
@@ -923,11 +924,13 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation, fe
         );
       });
 
-      it('prompts for damage type choice when options exist and no stored value', async () => {
+      it('auto-selects Force when target resists Bludgeoning', async () => {
         getRuntimeValue.mockReturnValue(null);
+        getCombatContext.mockResolvedValue({ creatures: [] });
+        getTargetFromAttacker.mockReturnValue({ resistances: ['Bludgeoning'], immunities: [] });
 
         const ctx = makeCtx({
-          attack: { weaponType: 'unarmed' },
+          attack: { weaponType: 'unarmed', damageType: 'bludgeoning' },
           playerStats: {
             name: 'TestChar',
             automation: {
@@ -937,23 +940,173 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation, fe
                   type: 'damage_type_modifier',
                   trigger: 'unarmed_strike_hit',
                   options: [
-                    { damageType: 'force' },
-                    { damageType: 'psychic' },
+                    { name: 'Force', damageType: 'Force' },
+                    { name: 'Bludgeoning', damageType: 'Bludgeoning' },
                   ],
                 },
               ],
             },
           },
+          formula: '1d4',
+          total: 4,
+          rolls: [4],
         });
         const result = await steps[15].handler(ctx);
 
-        expect(result.modal).toEqual({
-          type: 'damageTypeChoice',
-          props: {
-            title: expect.stringContaining('— Damage Type'),
-            types: ['force', 'psychic'],
+        expect(ctx.attack.damageType).toBe('Force');
+        expect(result.popup).toContain('resists Bludgeoning');
+        expect(result.popup).toContain('using <b>Force</b>');
+        expect(addEntry).toHaveBeenCalledWith(
+          'test-campaign',
+          expect.objectContaining({
+            type: 'ability_use',
+            abilityName: 'Empowered Strikes',
+            description: expect.stringContaining('auto-selected Force'),
+            targetName: undefined,
+          }),
+        );
+      });
+
+      it('auto-selects Force when target is immune to Bludgeoning', async () => {
+        getRuntimeValue.mockReturnValue(null);
+        getCombatContext.mockResolvedValue({ creatures: [] });
+        getTargetFromAttacker.mockReturnValue({ resistances: [], immunities: ['Bludgeoning'] });
+
+        const ctx = makeCtx({
+          attack: { weaponType: 'unarmed', damageType: 'bludgeoning' },
+          playerStats: {
+            name: 'TestChar',
+            automation: {
+              passives: [
+                {
+                  name: 'Empowered Strikes',
+                  type: 'damage_type_modifier',
+                  trigger: 'unarmed_strike_hit',
+                  options: [
+                    { name: 'Force', damageType: 'Force' },
+                    { name: 'Bludgeoning', damageType: 'Bludgeoning' },
+                  ],
+                },
+              ],
+            },
           },
+          formula: '1d4',
+          total: 4,
+          rolls: [4],
         });
+        const result = await steps[15].handler(ctx);
+
+        expect(ctx.attack.damageType).toBe('Force');
+        expect(result.popup).toContain('immune to Bludgeoning');
+        expect(result.popup).toContain('using <b>Force</b>');
+        expect(addEntry).toHaveBeenCalledWith(
+          'test-campaign',
+          expect.objectContaining({
+            type: 'ability_use',
+            abilityName: 'Empowered Strikes',
+            description: expect.stringMatching(/auto-selected Force.*immune to Bludgeoning/),
+            targetName: undefined,
+          }),
+        );
+      });
+
+      it('auto-selects normal type when target has no relevant resistances', async () => {
+        getRuntimeValue.mockReturnValue(null);
+        getCombatContext.mockResolvedValue({ creatures: [] });
+        getTargetFromAttacker.mockReturnValue({ resistances: ['Piercing'], immunities: [] });
+
+        const ctx = makeCtx({
+          attack: { weaponType: 'unarmed', damageType: 'bludgeoning' },
+          playerStats: {
+            name: 'TestChar',
+            automation: {
+              passives: [
+                {
+                  name: 'Empowered Strikes',
+                  type: 'damage_type_modifier',
+                  trigger: 'unarmed_strike_hit',
+                  options: [
+                    { name: 'Force', damageType: 'Force' },
+                    { name: 'Bludgeoning', damageType: 'Bludgeoning' },
+                  ],
+                },
+              ],
+            },
+          },
+          formula: '1d4',
+          total: 4,
+          rolls: [4],
+        });
+        const result = await steps[15].handler(ctx);
+
+        expect(ctx.attack.damageType).toBe('Bludgeoning');
+        expect(result).not.toHaveProperty('popup');
+        expect(addEntry).not.toHaveBeenCalled();
+      });
+
+      it('falls back to normal type when target not found', async () => {
+        getRuntimeValue.mockReturnValue(null);
+        getTargetFromAttacker.mockReturnValue(null);
+
+        const ctx = makeCtx({
+          attack: { weaponType: 'unarmed', damageType: 'bludgeoning' },
+          playerStats: {
+            name: 'TestChar',
+            automation: {
+              passives: [
+                {
+                  name: 'Empowered Strikes',
+                  type: 'damage_type_modifier',
+                  trigger: 'unarmed_strike_hit',
+                  options: [
+                    { name: 'Force', damageType: 'Force' },
+                    { name: 'Bludgeoning', damageType: 'Bludgeoning' },
+                  ],
+                },
+              ],
+            },
+          },
+          formula: '1d4',
+          total: 4,
+          rolls: [4],
+        });
+        const result = await steps[15].handler(ctx);
+
+        expect(ctx.attack.damageType).toBe('Bludgeoning');
+        expect(result).not.toHaveProperty('popup');
+      });
+
+      it('uses case-insensitive comparison for resistances', async () => {
+        getRuntimeValue.mockReturnValue(null);
+        getCombatContext.mockResolvedValue({ creatures: [] });
+        getTargetFromAttacker.mockReturnValue({ resistances: ['BLUDGEONING'], immunities: [] });
+
+        const ctx = makeCtx({
+          attack: { weaponType: 'unarmed', damageType: 'bludgeoning' },
+          playerStats: {
+            name: 'TestChar',
+            automation: {
+              passives: [
+                {
+                  name: 'Empowered Strikes',
+                  type: 'damage_type_modifier',
+                  trigger: 'unarmed_strike_hit',
+                  options: [
+                    { name: 'Force', damageType: 'Force' },
+                    { name: 'Bludgeoning', damageType: 'Bludgeoning' },
+                  ],
+                },
+              ],
+            },
+          },
+          formula: '1d4',
+          total: 4,
+          rolls: [4],
+        });
+        const result = await steps[15].handler(ctx);
+
+        expect(ctx.attack.damageType).toBe('Force');
+        expect(result).toHaveProperty('popup');
       });
 
       it('prompts for chosen option when stored and effect is damage_bonus', async () => {
