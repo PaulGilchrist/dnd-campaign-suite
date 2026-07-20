@@ -253,7 +253,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
 
     const cs = getCombatSummary(campaignName);
     if (cs) {
-      cs.lastAttack = {
+      const lastAttackData = {
         attackerName: current.attackerName || current.targetName,
         targetName: current.targetName,
         d20: finalRoll,
@@ -275,7 +275,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
         damageApplied: (current.rawDamage || 0) > 0,
         timestamp: Date.now(),
       };
-      storage.set('combatSummary', cs, campaignName);
+      storage.setProperty('combatSummary', 'lastAttack', lastAttackData, campaignName);
     }
 
     setPrompts(prev => prev.map((p, i) =>

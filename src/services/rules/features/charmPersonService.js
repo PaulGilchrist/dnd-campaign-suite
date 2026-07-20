@@ -58,7 +58,7 @@ export async function triggerCharmPerson(spell, metaCtx, playerStats, campaignNa
 
     // Check if caster/target are in combat to determine if target gets advantage on save
     const cs = await getCombatContext(campaignName);
-    const targetInCombat = cs?.creatures.some(c => c.name === targetName && c.name !== playerStats.name) ?? false;
+    const targetInCombat = cs?.creatures?.some(c => c.name === targetName && c.name !== playerStats.name) ?? false;
 
     const spellSaveDc = metaCtx?.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
     const slotLevel = metaCtx?.slotLevel || spell.level || 1;

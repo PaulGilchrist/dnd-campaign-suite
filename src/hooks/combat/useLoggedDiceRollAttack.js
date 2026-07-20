@@ -591,7 +591,7 @@ export function createLogAndShow(deps) {
 
             // Save unified last attack to combat summary for all reaction features
             if (combatSummary && targetName) {
-                combatSummary.lastAttack = {
+                const lastAttackData = {
                     attackerName: characterName,
                     targetName,
                     d20: effectiveD20,
@@ -640,7 +640,7 @@ export function createLogAndShow(deps) {
 
                     baitAndSwitchBonus: context?.baitAndSwitchBonus || 0,
                 };
-                storage.set('combatSummary', combatSummary, campaignName);
+                storage.setProperty('combatSummary', 'lastAttack', lastAttackData, campaignName);
             }
 
             setRuntimeValue(characterName, '_lastRollContext', {
@@ -948,7 +948,7 @@ export function createLogAndShow(deps) {
 
             // Save unified last attack to combat summary for all reaction features
             if (combatSummary) {
-                combatSummary.lastAttack = {
+                storage.setProperty('combatSummary', 'lastAttack', {
                     attackerName: characterName,
                     targetName,
                     d20: reliableD20,
@@ -958,8 +958,7 @@ export function createLogAndShow(deps) {
                     checkName: name,
                     rollType,
                     timestamp: Date.now(),
-                };
-                storage.set('combatSummary', combatSummary, campaignName);
+                }, campaignName);
             }
 
             setRuntimeValue(characterName, '_lastRollContext', {
@@ -1016,7 +1015,7 @@ export function createLogAndShow(deps) {
 
                 if (combatSummary) {
                     console.log('[useLoggedDiceRollAttack] SAVE lastAttack (player):', { attackerName, targetName: target?.name || context?.targetName, characterName });
-                    combatSummary.lastAttack = {
+                    storage.setProperty('combatSummary', 'lastAttack', {
                         attackerName,
                         targetName: target?.name || context?.targetName,
                         d20: effectiveD20ForSave,
@@ -1032,8 +1031,7 @@ export function createLogAndShow(deps) {
                         rollType: 'save',
                         saveConditions: context?.saveConditions || [],
                         timestamp: Date.now(),
-                    };
-                    storage.set('combatSummary', combatSummary, campaignName);
+                    }, campaignName);
                 }
 
                 logEntry({
@@ -1097,7 +1095,7 @@ export function createLogAndShow(deps) {
 
                 if (saveDc != null && combatSummary) {
                     console.log('[useLoggedDiceRollAttack] SAVE lastAttack (NPC):', { attackerName, targetName: target?.name || context?.targetName, characterName });
-                    combatSummary.lastAttack = {
+                    storage.setProperty('combatSummary', 'lastAttack', {
                         attackerName,
                         targetName: target?.name || context?.targetName,
                         d20: effectiveD20ForSave,
@@ -1113,8 +1111,7 @@ export function createLogAndShow(deps) {
                         rollType: 'save',
                         saveConditions: context?.saveConditions || [],
                         timestamp: Date.now(),
-                    };
-                    storage.set('combatSummary', combatSummary, campaignName);
+                    }, campaignName);
                 }
 
                 logEntry({

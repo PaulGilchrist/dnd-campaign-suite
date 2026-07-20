@@ -101,17 +101,12 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     const lastAttackSchool = (spell.school || '').toLowerCase();
     if (lastAttackSchool) {
         try {
-            const cs = await getCombatContext(campaignName);
-            const merged = {
-                ...(cs || {}),
-                lastAttack: {
-                    attackerName: playerStats.name,
-                    targetName: playerStats.name,
-                    spellSchool: lastAttackSchool,
-                    timestamp: Date.now(),
-                },
-            };
-            await storage.set('combatSummary', merged, campaignName);
+            storage.setProperty('combatSummary', 'lastAttack', {
+                attackerName: playerStats.name,
+                targetName: playerStats.name,
+                spellSchool: lastAttackSchool,
+                timestamp: Date.now(),
+            }, campaignName);
             console.log('[spellCast] SET lastAttack.spellSchool=', lastAttackSchool);
         } catch (err) {
             console.error('[spellCast] Failed to set lastAttack with spellSchool:', err);

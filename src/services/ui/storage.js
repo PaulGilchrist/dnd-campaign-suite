@@ -1,4 +1,5 @@
 import utils from './utils.js'
+import { getCombatContext } from '../rules/combat/damageUtils.js'
 
 // Sequential write queue for combatSummary to prevent race conditions
 // when multiple applyDamageToTarget calls fire storage.set in quick succession.
@@ -72,6 +73,16 @@ const storage = {
       },
     setProperty: async (name, propertyName, value, campaignName) => {
         const firstName = utils.getName(name);
+        // For combatSummary.lastAttack, merge with the full combatSummary from server
+        if (name === 'combatSummary' && propertyName === 'lastAttack') {
+            const cs = await getCombatContext(campaignName);
+            const merged = { ...(cs || {}), lastAttack: { ...(cs?.lastAttack || {}), ...value } };
+            await storage.set(name, merged, campaignName);
+            if (name === 'combatSummary' && propertyName === 'lastAttack') {
+                console.log(`[storage] ★ setProperty combatSummary.lastAttack - merged keys:`, Object.keys(merged.lastAttack || {}).join(', '));
+            }
+            return;
+        }
         let obj = await storage.get(firstName, campaignName);
         if(!obj) {
             obj = {};

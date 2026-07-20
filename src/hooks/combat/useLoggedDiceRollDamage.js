@@ -717,7 +717,7 @@ export function createLogDamageAndShow(deps) {
         if (!context?.attackerName || !target?.name) {
             console.error('[useLoggedDiceRollDamage] lastAttack missing required fields:', { attackerName: context?.attackerName, targetName: target?.name, characterName });
         }
-        combatSummary.lastAttack = {
+        const lastAttackData = {
             attackerName: context?.attackerName || null,
             targetName: target.name,
             d20: saveResult.roll,
@@ -739,7 +739,7 @@ export function createLogDamageAndShow(deps) {
             timestamp: Date.now(),
         };
         console.log('[useLoggedDiceRollDamage] lastAttack overwrite (NPC save):', { attackerName: context?.attackerName, targetName: target.name, saveType, saveDc });
-        storage.set('combatSummary', combatSummary, campaignName);
+        storage.setProperty('combatSummary', 'lastAttack', lastAttackData, campaignName);
 
         setPopupHtml(popupData);
 
