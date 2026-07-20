@@ -54,19 +54,19 @@ describe('magicalCunningHandler', () => {
             expect(result.payload.description).toContain('already been used')
         })
 
-        it('returns info popup when no Pact Magic slots configured', async () => {
+        it('returns info popup when no Pact Magic spell slots available', async () => {
             getRuntimeValue.mockReturnValue(null)
 
             const result = await handle(
                 defaultAction,
-                makePlayerStats({ resources: { warlockPactMagic: { max: 0 } } }),
+                makePlayerStats({ resources: { warlockPactMagic: { max: 0 } }, spellAbilities: {} }),
                 campaignName,
                 null,
             )
 
             expect(result.type).toBe('popup')
             expect(result.payload.type).toBe('automation_info')
-            expect(result.payload.description).toContain('requires Pact Magic')
+            expect(result.payload.description).toContain('requires Pact Magic spell slots')
         })
 
         it('returns info popup when no spell slots available', async () => {

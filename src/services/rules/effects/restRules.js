@@ -153,7 +153,8 @@ export const LONG_REST_RESOURCES = [
   'tranceOfOrderUses',
   'tamedSurgeUses',
   'featsOfChaosUses',
-  'featsOfChaosActive'
+  'featsOfChaosActive',
+  'magicalCunningUsed'
 ]
 
 export function getLongRestResources() {
@@ -719,6 +720,7 @@ export async function applyLongRest(playerStats, campaignName) {
     const hasCelestialResilience = playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron';
     if (hasCelestialResilience && playerStats.specialActions?.some(f => f.name === 'Celestial Resilience')) resources.push('Celestial Resilience (temp HP)');
     if (hasNaturalRecovery) resources.push('Natural Recovery (spell slots)');
+    if (playerStats.class?.name === 'Warlock') resources.push('Magical Cunning (feature reset)');
     if (resources.length > 0) {
         logEntries.push(`Resources restored: ${resources.join(', ')}`);
     }

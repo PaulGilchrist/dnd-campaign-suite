@@ -632,7 +632,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 result.passives.push(info)
                 break
             case 'magical_cunning':
-                result.actions.push(info)
+                result.specialActions.push(info)
                 break
             case 'holy_nimbus_radiant_damage':
                 result.passives.push(info)

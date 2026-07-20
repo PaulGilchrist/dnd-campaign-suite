@@ -27,23 +27,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const isEldritchMaster = action.automation?.eldritchMaster === true
         || playerStats.specialActions?.some(f => f.name === 'Eldritch Master');
 
-    // Get max Pact Magic slots
-    const maxPactMagic = playerStats.resources?.warlockPactMagic?.max ?? 0;
-    if (maxPactMagic <= 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${action.name} requires Pact Magic spell slots.`,
-                automation: auto,
-            },
-        };
-    }
-
-    // Calculate max regain: half maximum (round up)
-    const maxRegain = Math.ceil(maxPactMagic / 2);
-
     // Find the highest spell slot level the warlock has
     const slotLevels = [1, 2, 3, 4, 5, 6, 7, 8, 9];
     let highestSlotLevel = 0;
@@ -65,8 +48,15 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
+    // Get max Pact Magic slots: from resource if available, otherwise derive from highest spell slot level
+    const maxPactMagic = playerStats.resources?.warlockPactMagic?.max ?? 0;
+    const maxSlots = playerStats.spellAbilities?.[`spell_slots_level_${highestSlotLevel}`] ?? 0;
+    const effectiveMaxPactMagic = maxPactMagic > 0 ? maxPactMagic : maxSlots;
+
+    // Calculate max regain: half maximum (round up)
+    const maxRegain = Math.ceil(effectiveMaxPactMagic / 2);
+
     const slotKey = `spell_slots_level_${highestSlotLevel}`;
-    const maxSlots = playerStats.spellAbilities?.[slotKey] ?? 0;
     const currentSlots = Number(getRuntimeValue(playerName, slotKey, campaignName) ?? maxSlots);
     const expendedSlots = maxSlots - currentSlots;
 

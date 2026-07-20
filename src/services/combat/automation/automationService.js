@@ -37,6 +37,7 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     'feats_of_chaos',
     'initiative_action',
     'quivering_palm',
+    'magical_cunning',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([

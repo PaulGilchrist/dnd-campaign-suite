@@ -557,7 +557,7 @@
                 "automation": {
                     "type": "large_form",
                     "duration": "10_minutes",
-                    "casting_time": "1_bonus_action",
+                    "casting_time": "1 bonus action",
                     "resourceCost": "long_rest"
                 }
             },
@@ -568,7 +568,8 @@
                     "type": "conditional_advantage",
                     "target": "ability_check",
                     "condition": "grappled",
-                    "effect": "advantage"
+                    "effect": "advantage",
+                    "casting_time": "passive"
                 }
             },
             {
