@@ -12026,7 +12026,8 @@
               "action": "bonus_action",
               "recharge": "long_rest",
               "range": "60_ft",
-              "casting_time": "1 bonus action"
+              "casting_time": "1 bonus action",
+              "maxDicePerUse": "cha_mod"
             }
           },
           {

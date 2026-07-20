@@ -547,6 +547,7 @@ function MetamagicEntry({ entry }) {
 }
 
 function HealingPoolEntry({ entry }) {
+  const isDicePool = Array.isArray(entry.rolls) && entry.rolls.length > 0;
   return (
     <div className="log-entry log-healing">
       <div className="log-entry-header">
@@ -556,8 +557,18 @@ function HealingPoolEntry({ entry }) {
         <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
       </div>
       <div className="log-hp-details">
-        <span className="log-hp-delta">Used {entry.amount} HP point from from pool with </span>
-        <span className="log-hp-current"> {entry.poolAfter} remaining</span>
+        {isDicePool ? (
+          <>
+            <span className="log-hp-delta">Rolled {entry.diceUsed}d{entry.dieType || 6}: </span>
+            <span className="log-dice-rolls">{entry.rolls.join(' + ')}</span>
+            <span className="log-hp-current"> = {entry.amount} HP from pool, {entry.poolAfter} remaining</span>
+          </>
+        ) : (
+          <>
+            <span className="log-hp-delta">Used {entry.amount} HP point from pool with </span>
+            <span className="log-hp-current"> {entry.poolAfter} remaining</span>
+          </>
+        )}
       </div>
     </div>
   );

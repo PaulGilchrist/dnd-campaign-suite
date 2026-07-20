@@ -3,10 +3,11 @@ import React from 'react'
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js'
 import useTrackedResource from '../../../../hooks/runtime/useTrackedResource.js'
 import { addEntry } from '../../../../services/ui/logService.js'
-import { getTargetFromAttacker, getCombatContext } from '../../../../services/rules/combat/damageUtils.js'
+import { getCombatContext } from '../../../../services/rules/combat/damageUtils.js'
 import { applyHealingToTarget } from '../../../../services/rules/combat/applyHealing.js'
 import { CONDITIONS } from '../../../../services/combat/conditions/conditionUtils.js'
 import utils from '../../../../services/ui/utils.js'
+import SecondaryTargetModal from '../shared/SecondaryTargetModal.jsx'
 import '../../CharSheet.css'
 
 function conditionMatches(c, targetCondition) {
@@ -31,7 +32,7 @@ function conditionLabel(name) {
     return name;
 }
 
-function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay On Hands', poolMax: poolMaxProp = 0, _poolExpression, isDicePool = false, dieType = null, resourceKey: resourceKeyProp, alsoCures, cureCost, restoringTouchConditions, bloodiedOnly = false, maxDicePerUse: maxDicePerUseProp = '', onClose }) {
+function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay On Hands', poolMax: poolMaxProp = 0, _poolExpression, isDicePool = false, dieType = null, resourceKey: resourceKeyProp, alsoCures, cureCost, restoringTouchConditions, bloodiedOnly = false, maxDicePerUse: maxDicePerUseProp = '', creatureTargets, onClose }) {
     const layOnHandsPoolMax = 5 * (playerStats.level || 1);
     const effectivePoolMax = isDicePool ? poolMaxProp : layOnHandsPoolMax;
     const effectiveResourceKey = resourceKeyProp || (isDicePool ? featureName.toLowerCase().replace(/\s+/g, '') + 'Pool' : 'layOnHandsPool');
@@ -51,6 +52,8 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
     const [loading, setLoading] = React.useState(true);
     const [accumulatedTotal, setAccumulatedTotal] = React.useState(0);
     const [rolledFaces, setRolledFaces] = React.useState([]);
+    const [selectedTargetName, setSelectedTargetName] = React.useState(null);
+    const [showTargetSelection, setShowTargetSelection] = React.useState(!!(creatureTargets && creatureTargets.length > 1));
 
     const chaMod = (() => {
         const chaScore = playerStats.abilities?.CHA || 10;
@@ -68,31 +71,48 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
             setLoading(false);
         });
     }, [campaignName]);
-    const target = combatSummary ? getTargetFromAttacker(combatSummary, playerStats.name) : null;
-    const targetName = target ? target.name : playerStats.name;
-    const targetMaxHp = target
-      ? (target.type === 'player' ? (getRuntimeValue(target.name, 'hitPoints') ?? 0) : target.maxHp)
-      : playerStats.hitPoints;
+
+    const handleTargetSelected = (targetName) => {
+        setSelectedTargetName(targetName);
+        setShowTargetSelection(false);
+    };
+
+    const handleTargetSkip = () => {
+        setSelectedTargetName(playerStats.name);
+        setShowTargetSelection(false);
+    };
+
+    const resolvedTargetName = selectedTargetName || playerStats.name;
+    const targetMaxHp = (() => {
+        const creature = combatSummary?.creatures?.find(c => c.name === resolvedTargetName);
+        if (creature) {
+            return creature.type === 'player' ? (getRuntimeValue(creature.name, 'hitPoints') ?? 0) : creature.maxHp;
+        }
+        return playerStats.hitPoints;
+    })();
     const targetCurrentHp = (() => {
-          if (target) {
-            const stored = getRuntimeValue(target.name, 'currentHitPoints');
-            if (stored != null && stored !== '') return Number(stored);
-            if (target.type === 'npc') return target.currentHp;
-            return targetMaxHp;
-          }
-          const stored = getRuntimeValue(playerStats.name, 'currentHitPoints');
-          return stored != null && stored !== '' ? Number(stored) : playerStats.hitPoints;
-        })();
+        const creature = combatSummary?.creatures?.find(c => c.name === resolvedTargetName);
+        if (creature) {
+            if (creature.type === 'player') {
+                const stored = getRuntimeValue(creature.name, 'currentHitPoints');
+                if (stored != null && stored !== '') return Number(stored);
+            } else {
+                return creature.currentHp;
+            }
+        }
+        const stored = getRuntimeValue(playerStats.name, 'currentHitPoints');
+        return stored != null && stored !== '' ? Number(stored) : playerStats.hitPoints;
+    })();
 
     const isTargetBloodied = targetCurrentHp > 0 && targetCurrentHp <= Math.floor(targetMaxHp / 2);
 
     const getTargetConditions = React.useCallback(() => {
-        const runtimeConditions = getRuntimeValue(targetName, 'activeConditions') || [];
+        const runtimeConditions = getRuntimeValue(resolvedTargetName, 'activeConditions') || [];
 
         if (combatSummary) {
             try {
                 if (combatSummary) {
-                    const creature = combatSummary.creatures?.find(c => utils.getName(c.name) === utils.getName(targetName));
+                    const creature = combatSummary.creatures?.find(c => utils.getName(c.name) === utils.getName(resolvedTargetName));
                     if (creature && Array.isArray(creature.conditions)) {
                         const csKeys = creature.conditions.map(c => c.key);
                         const seen = new Set(runtimeConditions.map(c => String(c).toLowerCase()));
@@ -110,7 +130,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
         }
 
         return runtimeConditions;
-    }, [targetName, combatSummary]);
+    }, [resolvedTargetName, combatSummary]);
 
     const targetConditions = getTargetConditions();
     const allCurableEntries = [...(alsoCures || []), ...(restoringTouchConditions || [])];
@@ -142,38 +162,40 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
         const newPool = safePool - amount;
         setPoolRemaining(newPool);
 
-        if (target && combatSummary) {
-            const result = applyHealingToTarget(combatSummary, target.name, amount, campaignName);
+        const targetCreature = combatSummary?.creatures?.find(c => c.name === resolvedTargetName);
+        if (targetCreature && combatSummary) {
+            const result = applyHealingToTarget(combatSummary, resolvedTargetName, amount, campaignName);
             if (result) {
                 addEntry(campaignName, {
                     type: 'healing_pool',
                     sourceName: playerStats.name,
                     featureName,
-                    targetName: target.name,
+                    targetName: resolvedTargetName,
                     amount: result.actualHeal,
                     poolAfter: newPool,
                 }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
-                setLog(prev => [...prev, { action: 'Heal', target: target.name, amount: result.actualHeal, poolAfter: newPool }]);
+                setLog(prev => [...prev, { action: 'Heal', target: resolvedTargetName, amount: result.actualHeal, poolAfter: newPool }]);
                 setHealAmount(Math.min(healAmount, newPool));
             }
         } else {
             const newHp = Math.min(playerStats.hitPoints, targetCurrentHp + amount);
-            setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
+            setRuntimeValue(resolvedTargetName, 'currentHitPoints', newHp, campaignName);
             addEntry(campaignName, {
                 type: 'healing_pool',
                 sourceName: playerStats.name,
                 featureName,
-                targetName: playerStats.name,
+                targetName: resolvedTargetName,
                 amount,
                 poolAfter: newPool,
             }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
-            setLog(prev => [...prev, { action: 'Heal', target: playerStats.name, amount, poolAfter: newPool }]);
+            setLog(prev => [...prev, { action: 'Heal', target: resolvedTargetName, amount, poolAfter: newPool }]);
             setHealAmount(Math.min(healAmount, newPool));
         }
     };
 
     const applyDiceHeal = () => {
         if (safePool <= 0) return;
+        if (effectiveMaxDicePerUse < Infinity && rolledFaces.length >= effectiveMaxDicePerUse) return;
 
         const roll = Math.floor(Math.random() * dieType) + 1;
         const newPool = safePool - 1;
@@ -190,28 +212,31 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
 
         const newPool = safePool;
 
-        const newHp = Math.min(playerStats.hitPoints, targetCurrentHp + accumulatedTotal);
-        setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
+        const targetCreature = combatSummary?.creatures?.find(c => c.name === resolvedTargetName);
+        const targetMax = targetCreature ? (targetCreature.type === 'player' ? (getRuntimeValue(targetCreature.name, 'hitPoints') ?? 0) : targetCreature.maxHp) : playerStats.hitPoints;
+        const newHp = Math.min(targetMax, targetCurrentHp + accumulatedTotal);
+        setRuntimeValue(resolvedTargetName, 'currentHitPoints', newHp, campaignName);
         addEntry(campaignName, {
             type: 'healing_pool',
             sourceName: playerStats.name,
             featureName,
-            targetName: playerStats.name,
+            targetName: resolvedTargetName,
             amount: accumulatedTotal,
             diceUsed: rolledFaces.length,
+            dieType: dieType,
             rolls: rolledFaces,
             poolAfter: newPool,
         }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
         setLog(prev => [...prev, {
             action: `Roll ${rolledFaces.length}d${dieType}`,
-            target: playerStats.name,
+            target: resolvedTargetName,
             amount: accumulatedTotal,
             poolAfter: newPool,
             rolls: rolledFaces.join(' + ')
         }]);
         setAccumulatedTotal(0);
         setRolledFaces([]);
-    }, [accumulatedTotal, safePool, rolledFaces, playerStats.hitPoints, targetCurrentHp, playerStats.name, campaignName, featureName, dieType]);
+    }, [accumulatedTotal, safePool, rolledFaces, playerStats.hitPoints, targetCurrentHp, playerStats.name, campaignName, featureName, dieType, resolvedTargetName, combatSummary]);
 
     const handleClose = () => {
         if (isDicePool && accumulatedTotal > 0) {
@@ -225,22 +250,23 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
         const newPool = safePool - cureCost;
         setPoolRemaining(newPool);
 
-        const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+        const conditions = getRuntimeValue(resolvedTargetName, 'activeConditions') || [];
         const filtered = conditions.filter(c => !conditionMatches(c, condition));
-        setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
+        setRuntimeValue(resolvedTargetName, 'activeConditions', filtered, campaignName);
 
-            if (combatSummary && target && target.type === 'npc') {
-                const creature = combatSummary.creatures?.find(c => c.name === targetName);
-                if (creature && Array.isArray(creature.conditions)) {
-                    const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
-                    const filtered = conditions.filter(c => !conditionMatches(String(c).toLowerCase(), condition.toLowerCase()));
-                    setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
-                }
+        const targetCreature = combatSummary?.creatures?.find(c => c.name === resolvedTargetName);
+        if (combatSummary && targetCreature && targetCreature.type === 'npc') {
+            const creature = combatSummary.creatures?.find(c => c.name === resolvedTargetName);
+            if (creature && Array.isArray(creature.conditions)) {
+                const conditions = getRuntimeValue(resolvedTargetName, 'activeConditions') || [];
+                const filtered = conditions.filter(c => !conditionMatches(String(c).toLowerCase(), condition.toLowerCase()));
+                setRuntimeValue(resolvedTargetName, 'activeConditions', filtered, campaignName);
             }
+        }
 
             addEntry(campaignName, {
                 type: 'condition',
-                characterName: targetName,
+                characterName: resolvedTargetName,
                 condition: condition,
                 action: 'broken',
                 sourceName: playerStats.name,
@@ -248,7 +274,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                 timestamp: Date.now(),
               }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
 
-            setLog(prev => [...prev, { action: `Cure ${condition}`, target: targetName, amount: cureCost, poolAfter: newPool }]);
+            setLog(prev => [...prev, { action: `Cure ${condition}`, target: resolvedTargetName, amount: cureCost, poolAfter: newPool }]);
             setHealAmount(Math.min(healAmount, newPool));
          };
 
@@ -259,23 +285,25 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
         const newPool = safePool - totalCost;
         setPoolRemaining(newPool);
 
-        selectedConditions.forEach((condition) => {
-            const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
-            const filtered = conditions.filter(c => !conditionMatches(c, condition));
-            setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
+        const targetCreature = combatSummary?.creatures?.find(c => c.name === resolvedTargetName);
 
-            if (combatSummary && target && target.type === 'npc') {
-                const creature = combatSummary.creatures?.find(c => c.name === targetName);
+        selectedConditions.forEach((condition) => {
+            const conditions = getRuntimeValue(resolvedTargetName, 'activeConditions') || [];
+            const filtered = conditions.filter(c => !conditionMatches(c, condition));
+            setRuntimeValue(resolvedTargetName, 'activeConditions', filtered, campaignName);
+
+            if (combatSummary && targetCreature && targetCreature.type === 'npc') {
+                const creature = combatSummary.creatures?.find(c => c.name === resolvedTargetName);
                 if (creature && Array.isArray(creature.conditions)) {
-                    const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+                    const conditions = getRuntimeValue(resolvedTargetName, 'activeConditions') || [];
                     const filtered = conditions.filter(c => !conditionMatches(String(c).toLowerCase(), condition.toLowerCase()));
-                    setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
+                    setRuntimeValue(resolvedTargetName, 'activeConditions', filtered, campaignName);
                 }
             }
 
             addEntry(campaignName, {
                 type: 'condition',
-                characterName: targetName,
+                characterName: resolvedTargetName,
                 condition: condition,
                 action: 'broken',
                 sourceName: playerStats.name,
@@ -283,7 +311,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                 timestamp: Date.now(),
             }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
 
-            setLog(prev => [...prev, { action: `Cure ${condition}`, target: targetName, amount: cureCost, poolAfter: newPool }]);
+            setLog(prev => [...prev, { action: `Cure ${condition}`, target: resolvedTargetName, amount: cureCost, poolAfter: newPool }]);
         });
 
         setSelectedConditions([]);
@@ -306,6 +334,20 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
 
     return (
         <div className="short-rest-overlay no-print" onClick={handleClose}>
+            {showTargetSelection ? (
+                <div className="short-rest-modal" onClick={(e) => e.stopPropagation()}>
+                    <SecondaryTargetModal
+                        title={`Choose target for ${featureName}`}
+                        targets={creatureTargets}
+                        onTargetSelected={handleTargetSelected}
+                        onSkip={handleTargetSkip}
+                        featureDescription={`Choose a creature within range to heal with ${featureName}.`}
+                        confirmLabel="Heal"
+                        confirmIcon="fa-hand-holding-heart"
+                        showHp={true}
+                    />
+                </div>
+            ) : (
             <div className="short-rest-modal" onClick={(e) => e.stopPropagation()}>
                 <h3><i className="fas fa-hands-helping"></i> {featureName}</h3>
 
@@ -322,7 +364,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
 
                 {!isDicePool && (
                     <div className="short-rest-section">
-                        <h4>Heal — {targetName} ({targetCurrentHp} / {targetMaxHp} HP){bloodiedOnly && <span className="bloodied-badge"> (Bloodied only)</span>}</h4>
+                        <h4>Heal — {resolvedTargetName} ({targetCurrentHp} / {targetMaxHp} HP){bloodiedOnly && <span className="bloodied-badge"> (Bloodied only)</span>}</h4>
                         <div className="short-rest-dice-row">
                             <label>
                                 Amount:
@@ -350,9 +392,9 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
 
                 {isDicePool && (
                     <div className="short-rest-section">
-                        <h4>Roll Dice — {playerStats.name} ({targetCurrentHp} / {targetMaxHp} HP){effectiveMaxDicePerUse < Infinity && <span className="bloodied-badge"> (Max {effectiveMaxDicePerUse} dice)</span>}</h4>
+                        <h4>Roll Dice — {resolvedTargetName} ({targetCurrentHp} / {targetMaxHp} HP){effectiveMaxDicePerUse < Infinity && <span className="bloodied-badge"> (Max {effectiveMaxDicePerUse} dice)</span>}</h4>
                         <div className="short-rest-dice-row">
-                            <button className="char-btn" onClick={applyDiceHeal} disabled={safePool <= 0}>
+                            <button className="char-btn" onClick={applyDiceHeal} disabled={safePool <= 0 || (effectiveMaxDicePerUse < Infinity && rolledFaces.length >= effectiveMaxDicePerUse)}>
                                 <i className="fas fa-dice-d12"></i> Roll a d{dieType}
                             </button>
                         </div>
@@ -372,7 +414,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                 {hasRestoringTouch && curableEntries.length > 0 && (
                     <div className="short-rest-section">
                         <h4>Cure Conditions ({cureCost} HP each)</h4>
-                        <p>Select conditions affecting {targetName} to cure:</p>
+                        <p>Select conditions affecting {resolvedTargetName} to cure:</p>
                         <div className="healing-cure-options">
                             {curableEntries.map((entry) => {
                                 const isSelected = selectedConditions.includes(entry.key);
@@ -452,6 +494,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                 </div>
                 </>}
             </div>
+            )}
         </div>
     );
 }

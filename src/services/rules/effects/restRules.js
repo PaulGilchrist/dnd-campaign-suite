@@ -156,7 +156,8 @@ export const LONG_REST_RESOURCES = [
     'featsOfChaosActive',
     'magicalCunningUsed',
     '_Steps_of_the_Fey_freeCastCount',
-    'beguilingDefensesUses'
+    'beguilingDefensesUses',
+    'healinglightPool'
 ]
 
 export function getLongRestResources() {

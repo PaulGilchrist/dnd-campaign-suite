@@ -60,8 +60,9 @@ export const ALL_TRACKED_RESOURCES = [
    'mysticArcanumLevel8',
    'mysticArcanumLevel9',
    'isDead',
-   '_Steps_of_the_Fey_freeCastCount',
-]
+    '_Steps_of_the_Fey_freeCastCount',
+    'healinglightPool',
+ ]
 
 const SPELL_SLOT_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
@@ -187,6 +188,11 @@ export function computeTrackedResources(playerStats) {
     resources.mysticArcanumLevel8 = { current: features.arcanumLevels.level8 || 0, max: features.arcanumLevels.level8 || 0 }
     resources.mysticArcanumLevel9 = { current: features.arcanumLevels.level9 || 0, max: features.arcanumLevels.level9 || 0 }
   }
+
+  // Healing Light: Celestial Patron dice pool (1 + warlock level dice)
+  const isCelestialPatron = isWarlock && (playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron')
+  const maxHealingLight = isCelestialPatron ? (1 + (playerStats.level || 0)) : 0
+  resources.healinglightPool = { current: maxHealingLight, max: maxHealingLight }
 
   const hasRestoration = (playerStats.automation?.passives ?? [])
     .some(a => a.type === 'resource_restoration')

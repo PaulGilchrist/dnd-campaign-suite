@@ -254,6 +254,7 @@ export default function CharActionModals({
                     bloodiedOnly={mergedModalState.healingPoolModal.bloodiedOnly}
                     restoringTouchConditions={mergedModalState.healingPoolModal.restoringTouchConditions}
                     maxDicePerUse={mergedModalState.healingPoolModal.maxDicePerUse}
+                    creatureTargets={mergedModalState.healingPoolModal.creatureTargets}
                     onClose={() => setModalState({ healingPoolModal: null })}
                 />
             )}

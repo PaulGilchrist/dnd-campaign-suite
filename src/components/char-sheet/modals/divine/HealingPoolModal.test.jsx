@@ -186,12 +186,18 @@ describe('HealingPoolModal', () => {
   // ── Target display ──
 
   it('shows target name with current and max HP', async () => {
+    damageUtils.getCombatContext.mockResolvedValue(mockCombatSummary);
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'currentHitPoints') return 15;
+      if (key === 'activeConditions') return [];
+      return null;
+    });
     await renderModal({ current: 15, max: 20 });
     expect(screen.getByText(/Heal — Orc Warrior \(15 \/ 30 HP\)/)).toBeInTheDocument();
   });
 
   it('uses player stats as fallback when no target found', async () => {
-    damageUtils.getTargetFromAttacker.mockReturnValue(null);
+    damageUtils.getCombatContext.mockResolvedValue(null);
     useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'currentHitPoints') return 30;
       if (key === 'activeConditions') return [];
@@ -202,7 +208,7 @@ describe('HealingPoolModal', () => {
   });
 
   it('uses playerStats.hitPoints when currentHitPoints runtime value is missing', async () => {
-    damageUtils.getTargetFromAttacker.mockReturnValue(null);
+    damageUtils.getCombatContext.mockResolvedValue(null);
     useRuntimeState.getRuntimeValue.mockReturnValue(null);
     await renderModal({ current: 15, max: 20 });
     expect(screen.getByText(/Heal — Paladin1 \(40 \/ 40 HP\)/)).toBeInTheDocument();
@@ -262,6 +268,12 @@ describe('HealingPoolModal', () => {
       oldHp: 15,
       newHp: 20,
     });
+    damageUtils.getCombatContext.mockResolvedValue(mockCombatSummary);
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'currentHitPoints') return 15;
+      if (key === 'activeConditions') return [];
+      return null;
+    });
 
     await renderModal({ current: 20, max: 20 });
     const input = screen.getByRole('spinbutton');
@@ -282,6 +294,12 @@ describe('HealingPoolModal', () => {
       actualHeal: 5,
       oldHp: 15,
       newHp: 20,
+    });
+    damageUtils.getCombatContext.mockResolvedValue(mockCombatSummary);
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'currentHitPoints') return 15;
+      if (key === 'activeConditions') return [];
+      return null;
     });
 
     await renderModal({ current: 20, max: 20 });
@@ -331,8 +349,10 @@ describe('HealingPoolModal', () => {
   });
 
   it('applies individual cure when cure button clicked', async () => {
+    damageUtils.getCombatContext.mockResolvedValue(mockCombatSummary);
     useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'activeConditions') return ['blinded'];
+      if (key === 'currentHitPoints') return 15;
       return null;
     });
 
@@ -354,6 +374,12 @@ describe('HealingPoolModal', () => {
   });
 
   it('individual cure adds log entry with capitalized condition label', async () => {
+    damageUtils.getCombatContext.mockResolvedValue(mockCombatSummary);
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'activeConditions') return ['blinded'];
+      if (key === 'currentHitPoints') return 15;
+      return null;
+    });
     await renderModal({ current: 10, max: 20 });
 
     fireEvent.click(screen.getByRole('button', { name: /Blinded/i }));
@@ -469,8 +495,10 @@ describe('HealingPoolModal', () => {
   });
 
   it('applies batch cure for all selected conditions', async () => {
+    damageUtils.getCombatContext.mockResolvedValue(mockCombatSummary);
     useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'activeConditions') return ['blinded'];
+      if (key === 'currentHitPoints') return 15;
       return null;
     });
 
@@ -619,11 +647,15 @@ describe('HealingPoolModal', () => {
   });
 
   it('disables apply heal when target is not bloodied and bloodiedOnly is true', async () => {
-    damageUtils.getTargetFromAttacker.mockReturnValue({
-      name: 'Orc Warrior',
-      type: 'npc',
-      maxHp: 30,
-      currentHp: 25, // not bloodied (above half)
+    damageUtils.getCombatContext.mockResolvedValue({
+      creatures: [
+        { name: 'Orc Warrior', type: 'npc', maxHp: 30, currentHp: 25 },
+      ],
+    });
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'currentHitPoints') return 25;
+      if (key === 'activeConditions') return [];
+      return null;
     });
 
     await renderModal({ current: 15, max: 20 }, { bloodiedOnly: true });
@@ -634,11 +666,15 @@ describe('HealingPoolModal', () => {
   });
 
   it('enables apply heal when target is bloodied and bloodiedOnly is true', async () => {
-    damageUtils.getTargetFromAttacker.mockReturnValue({
-      name: 'Orc Warrior',
-      type: 'npc',
-      maxHp: 30,
-      currentHp: 15, // bloodied (exactly half)
+    damageUtils.getCombatContext.mockResolvedValue({
+      creatures: [
+        { name: 'Orc Warrior', type: 'npc', maxHp: 30, currentHp: 15 },
+      ],
+    });
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'currentHitPoints') return 15;
+      if (key === 'activeConditions') return [];
+      return null;
     });
 
     await renderModal({ current: 15, max: 20 }, { bloodiedOnly: true });
@@ -649,11 +685,15 @@ describe('HealingPoolModal', () => {
   });
 
   it('shows restriction note when target is not bloodied', async () => {
-    damageUtils.getTargetFromAttacker.mockReturnValue({
-      name: 'Orc Warrior',
-      type: 'npc',
-      maxHp: 30,
-      currentHp: 25,
+    damageUtils.getCombatContext.mockResolvedValue({
+      creatures: [
+        { name: 'Orc Warrior', type: 'npc', maxHp: 30, currentHp: 25 },
+      ],
+    });
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'currentHitPoints') return 25;
+      if (key === 'activeConditions') return [];
+      return null;
     });
 
     await renderModal({ current: 15, max: 20 }, { bloodiedOnly: true });
