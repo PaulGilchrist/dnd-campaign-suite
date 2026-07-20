@@ -211,7 +211,9 @@ export default function useModalHandlers({
         if (!applyResult) return;
 
         if (applyResult.openHandTargets && applyResult.openHandTargets.length > 0) {
-            const saveDc = buildSaveDc(action.automation, playerStats);
+            const firstTarget = applyResult.openHandTargets[0];
+            const ohAuto = firstTarget.action;
+            const saveDc = buildSaveDc(ohAuto, playerStats);
             setModalState({
                 openHandFromFlurry: {
                     targets: applyResult.openHandTargets,

@@ -46,8 +46,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 }
 
 export async function applyOpenHandTechnique(action, playerStats, campaignName, targetName, selectedOptionName, saveDc) {
-    const auto = action.automation;
-    const options = auto.options || [];
+    const auto = action.automation || {};
+    const options = auto.options || action.options || [];
     const chosenOption = options.find(o => o.name === selectedOptionName);
     if (!chosenOption) return null;
 
@@ -68,6 +68,16 @@ export async function applyOpenHandTechnique(action, playerStats, campaignName, 
 
     if (chosenOption.effect === 'addled') {
         await applyOpenHandEffect(action, playerStats, campaignName, targetName, chosenOption);
+        addEntry(campaignName, {
+            type: 'roll',
+            name: action.name,
+            characterName: playerStats.name,
+            rollType: 'save-damage',
+            targetName,
+            saveDc,
+            description: `${action.name} — ${chosenOption.name}: ${targetName} cannot make Opportunity Attacks until the start of its next turn.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[openHandTechnique] Error:", e); });
         return {
             type: 'popup',
             payload: {
@@ -95,7 +105,7 @@ export async function applyOpenHandTechnique(action, playerStats, campaignName, 
         targetName,
         saveDc,
         saveType: optionSaveType,
-        description: `${action.name} — ${targetName} must make a ${optionSaveType} saving throw (DC ${saveDc}).`,
+        description: `${action.name} — ${chosenOption.name}: ${targetName} must make a ${optionSaveType} saving throw (DC ${saveDc}).`,
     }).catch((e) => { console.error("[openHandTechnique] Error:", e); });
 
     const saveResult = await promise;
@@ -114,6 +124,7 @@ export async function applyOpenHandTechnique(action, playerStats, campaignName, 
         rolls: [saveResult.roll ?? 0],
         bonus: saveResult.saveBonus ?? 0,
         formula: `1d20${saveResult.saveBonus !== 0 ? '+' + saveResult.saveBonus : ''}`,
+        description: `${chosenOption.name} — ${targetName} ${success ? 'succeeded' : 'failed'} the ${optionSaveType} save (DC ${saveDc}).${!success ? ' Effect applied.' : ''}`,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[openHandTechnique] Error:", e); });
 
@@ -150,6 +161,22 @@ async function applyOpenHandEffect(action, playerStats, campaignName, targetName
     };
     const updatedEffects = [...storedEffects, newEffect];
     setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
+
+    if (option.effect === 'prone') {
+        const conditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+        const alreadyProne = conditions.some(c => String(c).toLowerCase() === 'prone');
+        if (!alreadyProne) {
+            setRuntimeValue(targetName, 'activeConditions', [...conditions, 'prone'], campaignName);
+        }
+    }
+
+    if (option.noOpportunityAttacks) {
+        const conditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+        const alreadyAddled = conditions.some(c => String(c).toLowerCase() === 'addled');
+        if (!alreadyAddled) {
+            setRuntimeValue(targetName, 'activeConditions', [...conditions, 'addled'], campaignName);
+        }
+    }
 }
 
 function buildResultMessage(actionName, targetName, option, saveDc, saveType, success) {
