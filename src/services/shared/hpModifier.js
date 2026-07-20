@@ -16,7 +16,19 @@ export function modifyHitPoints(combatSummary, targetName, delta, campaignName) 
   }
 
   const creature = combatSummary.creatures.find(c => c.name === targetName);
-  if (!creature) return null;
+  if (!creature) {
+    const playerMaxHp = getRuntimeValue(targetName, 'hitPoints');
+    if (playerMaxHp != null) {
+      const oldHp = getRuntimeValue(targetName, 'currentHitPoints') ?? 0;
+      const newHp = Math.min(playerMaxHp, Math.max(0, oldHp + delta));
+      if (newHp !== oldHp) {
+        setRuntimeValue(targetName, 'currentHitPoints', newHp, campaignName);
+      }
+      const actualDelta = newHp - oldHp;
+      return { oldHp, newHp, delta: actualDelta, isPlayer: true, maxHp: playerMaxHp };
+    }
+    return null;
+  }
 
   const isPlayer = creature.type === 'player';
   const maxHp = isPlayer

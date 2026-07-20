@@ -2,6 +2,8 @@ import { addEntry } from '../../../ui/logService.js';
 import { buildSaveDc } from '../../common/savePrompt.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { evaluateAutoExpression } from '../../../combat/automation/automationExpressions.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -22,6 +24,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             },
         };
     }
+
+    // Read Steps of the Fey count for the modal
+    const usesMax = evaluateAutoExpression(auto.uses_expression || 'CHA modifier_min_1', playerStats) || 1;
+    const freeCastCountKey = '_Steps_of_the_Fey_freeCastCount';
+    const currentCount = Number(getRuntimeValue(playerName, freeCastCountKey, campaignName) ?? usesMax);
 
     // Get combat context for eligible targets (creatures within 5 ft of the space you left/appear in)
     const cs = await getCombatContext(campaignName);
@@ -48,6 +55,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             campaignName,
             saveDc,
             featureName,
+            newCount: currentCount,
+            freeCastCountKey,
         },
     };
 }

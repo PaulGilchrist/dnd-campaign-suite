@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationExpressions.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 
@@ -23,9 +23,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    const newCount = currentCount - 1;
-    await setRuntimeValue(playerName, freeCastCountKey, newCount, campaignName);
-
     // Get combat context for eligible targets
     const cs = await getCombatContext(campaignName);
     if (!cs?.creatures || cs.creatures.length === 0) {
@@ -34,7 +31,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             payload: {
                 type: 'automation_info',
                 name: featureName,
-                description: `${featureName}: Cast Misty Step without expending a spell slot (${newCount} remaining).<br/><br/>No creatures in combat for Taunting Step.`,
+                description: `${featureName}: Cast Misty Step without expending a spell slot (${currentCount} remaining).<br/><br/>No creatures in combat for Taunting Step.`,
                 automation: auto,
                 triggerMistyStep: true,
             },
@@ -48,7 +45,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             payload: {
                 type: 'automation_info',
                 name: featureName,
-                description: `${featureName}: Cast Misty Step without expending a spell slot (${newCount} remaining).<br/><br/>No other creatures in combat for Taunting Step.`,
+                description: `${featureName}: Cast Misty Step without expending a spell slot (${currentCount} remaining).<br/><br/>No other creatures in combat for Taunting Step.`,
                 automation: auto,
                 triggerMistyStep: true,
             },
@@ -68,7 +65,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             campaignName,
             saveDc,
             featureName,
-            newCount,
+            newCount: currentCount,
+            freeCastCountKey,
         },
     };
 }

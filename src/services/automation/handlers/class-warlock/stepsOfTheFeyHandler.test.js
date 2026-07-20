@@ -103,7 +103,8 @@ describe('stepsOfTheFeyHandler.handle', () => {
       expect(result.payload.targets).toEqual(combatCreatures);
       expect(result.payload.saveDc).toBe(13); // 8 + 2 (CHA) + 3 (prof)
       expect(result.payload.featureName).toBe('Steps of the Fey');
-      expect(result.payload.newCount).toBe(0);
+      expect(result.payload.newCount).toBe(1);
+      expect(result.payload.freeCastCountKey).toBe('_Steps_of_the_Fey_freeCastCount');
       expect(result.payload.tempHpRoll).toBeUndefined();
     });
 

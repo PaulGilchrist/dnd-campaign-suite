@@ -8,12 +8,13 @@ import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.
 import { getCombatContext } from '../../../services/rules/combat/damageUtils.js';
 import '../CharSheet.css';
 
-function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, campaignName, saveDc, featureName, newCount, onClose }) {
+function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, campaignName, saveDc, featureName, newCount, freeCastCountKey, onClose }) {
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
     const [choice, setChoice] = useState(null);
 
     const playerName = playerStats.name;
+    const hasUses = newCount > 0;
 
     const options = [
         {
@@ -46,22 +47,32 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
         setChoice(selectedKey);
     };
 
-    const handleSkipChoice = () => {
-        handleSkip();
+    const handleCancel = () => {
+        setChoice(null);
+    };
+
+    const decrementCount = async () => {
+        if (freeCastCountKey) {
+            const remaining = newCount - 1;
+            await setRuntimeValue(playerName, freeCastCountKey, remaining, campaignName);
+        }
     };
 
     const applyRefreshingStep = async () => {
+        await decrementCount();
         const tempHpRoll = Math.floor(Math.random() * 10) + 1;
         const existingTempHp = Number(getRuntimeValue(playerName, 'tempHp', campaignName) ?? 0);
         const newTempHp = Math.max(existingTempHp, tempHpRoll);
         await setRuntimeValue(playerName, 'tempHp', newTempHp, campaignName);
 
-        const description = `${featureName}: Cast Misty Step without expending a spell slot (${newCount} remaining).<br/><br/><b>Refreshing Step:</b> Gained ${tempHpRoll} Temporary Hit Points.`;
+        const remaining = newCount - 1;
+        const description = `${featureName}: Cast Misty Step without expending a spell slot (${remaining} remaining).<br/><br/><b>Refreshing Step:</b> Gained ${tempHpRoll} Temporary Hit Points.`;
         setResult({ description });
         setApplied(true);
     };
 
     const applyDisappearingStep = async () => {
+        await decrementCount();
         const storedConditions = getRuntimeValue(playerName, 'activeConditions', campaignName) || [];
         const conditions = Array.isArray(storedConditions) ? storedConditions : [];
         if (!conditions.some(c => String(c).toLowerCase() === 'invisible')) {
@@ -72,7 +83,8 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
             { type: 'condition', condition: 'invisible' }
         ], campaignName, undefined, playerName);
 
-        const description = `${featureName}: Cast Misty Step without expending a spell slot (${newCount} remaining).<br/><br/><b>Disappearing Step:</b> You have the Invisible condition until the start of your next turn.`;
+        const remaining = newCount - 1;
+        const description = `${featureName}: Cast Misty Step without expending a spell slot (${remaining} remaining).<br/><br/><b>Disappearing Step:</b> You have the Invisible condition until the start of your next turn.`;
         setResult({ description });
         setApplied(true);
     };
@@ -84,7 +96,18 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
         setApplied(true);
     };
 
+    const handleFreeCastSkip = () => {
+        const description = `${featureName}: Cast Misty Step without expending a spell slot (${newCount} remaining).`;
+        setResult({ description });
+        setApplied(true);
+    };
+
+    const handleSkipChoice = () => {
+        handleFreeCastSkip();
+    };
+
     const handleTauntConfirm = async (selectedTargets) => {
+        await decrementCount();
         const promptIds = [];
 
         for (const target of selectedTargets) {
@@ -176,12 +199,14 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
             }
         }
 
-        const description = `${featureName}: Cast Misty Step without expending a spell slot (${newCount} remaining).<br/><br/><b>Taunting Step:</b> ${selectedTargets.length} creature(s) targeted. ${failedCount} failed save — Disadvantage on attack rolls vs others. ${savedCount} saved.`;
+        const remaining = newCount - 1;
+        const description = `${featureName}: Cast Misty Step without expending a spell slot (${remaining} remaining).<br/><br/><b>Taunting Step:</b> ${selectedTargets.length} creature(s) targeted. ${failedCount} failed save — Disadvantage on attack rolls vs others. ${savedCount} saved.`;
         setResult({ description });
         setApplied(true);
     };
 
     const handleDreadfulConfirm = async (selectedTargets) => {
+        await decrementCount();
         const promptIds = [];
         const combatContext = await getCombatContext(campaignName);
         const characters = combatContext?.creatures || [];
@@ -269,7 +294,8 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
             }
         }
 
-        const description = `${featureName}: Cast Misty Step without expending a spell slot (${newCount} remaining).<br/><br/><b>Dreadful Step:</b> ${selectedTargets.length} creature(s) targeted. ${failedCount} failed save — ${totalDamage} Psychic damage. ${savedCount} saved.`;
+        const remaining = newCount - 1;
+        const description = `${featureName}: Cast Misty Step without expending a spell slot (${remaining} remaining).<br/><br/><b>Dreadful Step:</b> ${selectedTargets.length} creature(s) targeted. ${failedCount} failed save — ${totalDamage} Psychic damage. ${savedCount} saved.`;
         setResult({ description });
         setApplied(true);
     };
@@ -286,13 +312,15 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
                         {options.map(option => (
                             <div
                                 key={option.key}
-                                className="clickable"
-                                onClick={() => handleChoice(option.key)}
+                                className={hasUses ? "clickable" : ""}
+                                onClick={hasUses ? () => handleChoice(option.key) : undefined}
                                 style={{
                                     padding: '12px',
                                     border: '1px solid #555',
                                     borderRadius: '6px',
                                     backgroundColor: '#1a1a2e',
+                                    opacity: hasUses ? 1 : 0.4,
+                                    cursor: hasUses ? 'pointer' : 'default',
                                 }}
                             >
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
@@ -302,10 +330,15 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
                                 <div style={{ fontSize: '0.9em', color: '#ccc' }}>{option.description}</div>
                             </div>
                         ))}
+                        {!hasUses && (
+                            <p style={{ fontSize: '0.85em', color: '#999', textAlign: 'center', marginTop: '8px' }}>
+                                No uses remaining — finish a Long Rest to regain.
+                            </p>
+                        )}
                     </div>
                 </div>
                 <div className="sp-actions">
-                    <button className="sp-dismiss-btn" onClick={handleSkipChoice} type="button">Skip</button>
+                    <button className="sp-dismiss-btn" onClick={handleSkipChoice} type="button">{mode === 'mistyEscape' || title === 'Bewitching Magic' ? 'Misty Step only (free cast)' : 'Skip'}</button>
                 </div>
             </div>
         </div>
@@ -325,7 +358,7 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
                     <button className="sp-roll-btn" onClick={applyDisappearingStep}>
                         <i className="fa-solid fa-eye-slash"></i> Disappear
                     </button>
-                    <button className="sp-dismiss-btn" onClick={handleSkipChoice} type="button">Cancel</button>
+                    <button className="sp-dismiss-btn" onClick={handleCancel} type="button">Cancel</button>
                 </div>
             </div>
         </div>
@@ -345,7 +378,7 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
                     <button className="sp-roll-btn" onClick={applyRefreshingStep}>
                         <i className="fa-solid fa-heart-pulse"></i> Refresh
                     </button>
-                    <button className="sp-dismiss-btn" onClick={handleSkipChoice} type="button">Cancel</button>
+                    <button className="sp-dismiss-btn" onClick={handleCancel} type="button">Cancel</button>
                 </div>
             </div>
         </div>

@@ -18,10 +18,20 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
 }));
 
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
+    getRuntimeValue: vi.fn(),
+}));
+
+vi.mock('../../../combat/automation/automationExpressions.js', () => ({
+    evaluateAutoExpression: vi.fn(),
+}));
+
 const { findLastAttack } = await import('../../common/damageRollback.js');
 const { addEntry } = await import('../../../ui/logService.js');
 const { buildSaveDc } = await import('../../common/savePrompt.js');
 const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+const { getRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js');
+const { evaluateAutoExpression } = await import('../../../combat/automation/automationExpressions.js');
 
 function makePlayerStats(overrides = {}) {
     return {
@@ -61,6 +71,7 @@ beforeEach(() => {
     vi.clearAllMocks();
     buildSaveDc.mockReturnValue(15);
     getCombatContext.mockResolvedValue({ creatures: [] });
+    evaluateAutoExpression.mockReturnValue(1);
 });
 
 describe('mistyEscapeHandler', () => {
@@ -94,6 +105,7 @@ describe('mistyEscapeHandler', () => {
                     { name: 'WarlockGirl', type: 'player', currentHp: 20, maxHp: 20 },
                 ],
             });
+            getRuntimeValue.mockReturnValue(1);
         }
 
         it('returns modal with mode and targets when damage was taken', async () => {
@@ -107,6 +119,8 @@ describe('mistyEscapeHandler', () => {
             expect(result.payload.title).toBe('Misty Step');
             expect(result.payload.saveDc).toBe(15);
             expect(result.payload.featureName).toBe('Misty Escape');
+            expect(result.payload.newCount).toBe(1);
+            expect(result.payload.freeCastCountKey).toBe('_Steps_of_the_Fey_freeCastCount');
             // Should filter out the warlock from targets
             expect(result.payload.targets.length).toBe(1);
             expect(result.payload.targets[0].name).toBe('Goblin');
@@ -121,6 +135,18 @@ describe('mistyEscapeHandler', () => {
             expect(result.type).toBe('modal');
             expect(result.payload.mode).toBe('mistyEscape');
             expect(result.payload.targets).toEqual([]);
+        });
+
+        it('returns modal with zero count when no uses remaining', async () => {
+            setupSuccessfulHandler();
+            getRuntimeValue.mockReturnValue(0);
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+
+            expect(result.type).toBe('modal');
+            expect(result.payload.mode).toBe('mistyEscape');
+            expect(result.payload.newCount).toBe(0);
+            expect(result.payload.freeCastCountKey).toBe('_Steps_of_the_Fey_freeCastCount');
         });
 
         it('respects custom saveType and feature name from automation config', async () => {
@@ -143,6 +169,7 @@ describe('mistyEscapeHandler', () => {
         it('logs ability use with correct type, character, and feature name', async () => {
             findLastAttack.mockResolvedValue(makeRecentAttack());
             buildSaveDc.mockReturnValue(15);
+            getRuntimeValue.mockReturnValue(1);
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
@@ -156,6 +183,7 @@ describe('mistyEscapeHandler', () => {
         it('logs with custom feature name', async () => {
             findLastAttack.mockResolvedValue(makeRecentAttack());
             buildSaveDc.mockReturnValue(15);
+            getRuntimeValue.mockReturnValue(1);
 
             await handle(makeAction({ name: 'My Misty Escape' }), makePlayerStats(), 'test-campaign', null);
 

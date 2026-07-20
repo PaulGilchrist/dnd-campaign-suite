@@ -29,6 +29,7 @@ import ElementalEpitomeModal from './modals/ElementalEpitomeModal.jsx';
 import DestructiveStrideModal from './modals/DestructiveStrideModal.jsx';
 import QuiveringPalmModal from './modals/QuiveringPalmModal.jsx';
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx';
+import StepsOfTheFeyTauntModal from './modals/StepsOfTheFeyTauntModal.jsx';
 import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
 import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
 import { onSavantSelected } from '../../services/automation/handlers/class-wizard/SavantHandler.js';
@@ -56,6 +57,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
     const [destructiveStrideModal, setDestructiveStrideModal] = useState(null);
     const [destructiveStrideTargetModal, setDestructiveStrideTargetModal] = useState(null);
     const [quiveringPalmModal, setQuiveringPalmModal] = useState(null);
+    const [stepsOfTheFeyTauntModal, setStepsOfTheFeyTauntModal] = useState(null);
     const [fightingStylesMap, setFightingStylesMap] = useState(null);
     const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats?.name, campaignName, {
@@ -251,6 +253,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                 setDestructiveStrideTargetModal(result.payload);
             } else if (result.modalName === 'quiveringPalm') {
                 setQuiveringPalmModal(result.payload);
+            } else if (result.modalName === 'stepsOfTheFeyTaunt') {
+                setStepsOfTheFeyTauntModal(result.payload);
             }
         } else if (result.type === 'popup') {
             const payload = result.payload;
@@ -582,6 +586,12 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                 <QuiveringPalmModal
                     {...quiveringPalmModal}
                     onClose={() => setQuiveringPalmModal(null)}
+                />
+            )}
+            {stepsOfTheFeyTauntModal && (
+                <StepsOfTheFeyTauntModal
+                    {...stepsOfTheFeyTauntModal}
+                    onClose={() => setStepsOfTheFeyTauntModal(null)}
                 />
             )}
             {featureChoiceModal && (

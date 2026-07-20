@@ -38,6 +38,7 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     'initiative_action',
     'quivering_palm',
     'magical_cunning',
+    'bewitching_magic',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([
