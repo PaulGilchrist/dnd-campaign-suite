@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { applyQuiveringPalmShockwave, applyQuiveringPalmRelease } from '../../../services/automation/handlers/class-monk/quiveringPalmHandler.js';
+import { applyShockwave, applyRelease } from '../../../services/automation/handlers/class-monk/quiveringPalmHandler.js';
 import '../CharSheet.css';
 
 function QuiveringPalmModal({ action, playerStats, campaignName, targetName, isRelease, onClose }) {
@@ -8,26 +8,31 @@ function QuiveringPalmModal({ action, playerStats, campaignName, targetName, isR
 
     const handleShockwave = async () => {
         setLoading(true);
-        const res = await applyQuiveringPalmShockwave(action, playerStats, campaignName, targetName);
+        const res = await applyShockwave(action, playerStats, campaignName, targetName);
         setResult(res);
         setLoading(false);
     };
 
     const handleRelease = async () => {
         setLoading(true);
-        const res = await applyQuiveringPalmRelease(action, playerStats, campaignName, targetName);
+        const res = await applyRelease(action, playerStats, campaignName, targetName);
         setResult(res);
         setLoading(false);
     };
 
     if (result) {
+        const p = result.payload;
+        const saveText = p.success ? 'Success' : 'Failure';
         return (
             <div className="sp-overlay" onClick={onClose}>
                 <div className="sp-modal" onClick={e => e.stopPropagation()}>
                     <div className="sp-header">
                         <i className="fa-solid fa-hand-fist"></i> {action.name}
                     </div>
-                    <div className="sp-body" dangerouslySetInnerHTML={{ __html: result.payload.description }}>
+                    <div className="sp-body">
+                        <p>{action.name} — {targetName} rolled a {p.saveType || 'CON'} save (DC {p.saveDc}): <strong>{saveText}</strong>.</p>
+                        <p>{p.damageExpression}: {p.rawDamage}<span className="log-dice-values-inline">({p.diceDisplay?.replace(/^\s*\(/, '').replace(/\)$/, '') || '?'})</span></p>
+                        <p>{p.success ? 'Half damage' : 'Full damage'}: <strong>{p.finalDamage}</strong> {p.damageType} damage.</p>
                     </div>
                     <div className="sp-actions">
                         <button className="sp-roll-btn" onClick={onClose}>Done</button>

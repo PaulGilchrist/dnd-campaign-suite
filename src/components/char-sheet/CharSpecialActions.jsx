@@ -27,6 +27,7 @@ import WildMagicSurgeModal from './modals/WildMagicSurgeModal.jsx';
 import StrideOfTheElementsModal from './modals/StrideOfTheElementsModal.jsx';
 import ElementalEpitomeModal from './modals/ElementalEpitomeModal.jsx';
 import DestructiveStrideModal from './modals/DestructiveStrideModal.jsx';
+import QuiveringPalmModal from './modals/QuiveringPalmModal.jsx';
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx';
 import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
 import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
@@ -54,6 +55,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
     const [epitomeModal, setEpitomeModal] = useState(null);
     const [destructiveStrideModal, setDestructiveStrideModal] = useState(null);
     const [destructiveStrideTargetModal, setDestructiveStrideTargetModal] = useState(null);
+    const [quiveringPalmModal, setQuiveringPalmModal] = useState(null);
     const [fightingStylesMap, setFightingStylesMap] = useState(null);
     const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats?.name, campaignName, {
@@ -247,6 +249,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                 setDestructiveStrideModal(result.payload);
             } else if (result.modalName === 'destructiveStrideTarget') {
                 setDestructiveStrideTargetModal(result.payload);
+            } else if (result.modalName === 'quiveringPalm') {
+                setQuiveringPalmModal(result.payload);
             }
         } else if (result.type === 'popup') {
             const payload = result.payload;
@@ -572,6 +576,12 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                     confirmIcon="fa-person-running"
                     onTargetSelected={handleDestructiveStrideTargetConfirm}
                     onSkip={handleDestructiveStrideTargetSkip}
+                />
+            )}
+            {quiveringPalmModal && (
+                <QuiveringPalmModal
+                    {...quiveringPalmModal}
+                    onClose={() => setQuiveringPalmModal(null)}
                 />
             )}
             {featureChoiceModal && (

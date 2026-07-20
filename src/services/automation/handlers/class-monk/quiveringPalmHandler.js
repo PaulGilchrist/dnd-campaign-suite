@@ -180,7 +180,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             type: 'automation_info',
             name: action.name,
             automationType: auto.type,
-            description: `Quivering Palm set in ${targetName}. Use the feature again to release the vibrations or trigger a shockwave.`,
+            description: `Quivering Palm set on ${targetName}. Use the feature again to release the vibrations or trigger a shockwave.`,
             automation: auto,
         },
     };
@@ -220,14 +220,19 @@ export async function applyShockwave(action, playerStats, campaignName, targetNa
     const saveResult = await promise;
     const success = saveResult.success;
 
-    const rawDamage = rollExpression(damageExpression)?.total || 0;
+    const damageRoll = rollExpression(damageExpression);
+    const rawDamage = damageRoll?.total || 0;
     const finalDamage = success ? Math.floor(rawDamage / 2) : rawDamage;
 
     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
     const cs = getCombatSummary(campaignName);
 
     if (cs) {
-        applyDamageToTarget(cs, targetName, rawDamage, [damageType], campaignName, characters, false, playerName);
+        const applyResult = applyDamageToTarget(cs, targetName, finalDamage, [damageType], campaignName, characters, false, playerName);
+        const actualDamage = applyResult?.finalDamage ?? finalDamage;
+        if (actualDamage !== finalDamage) {
+            console.error(`[quiveringPalm] Damage adjusted by resistances: ${finalDamage} → ${actualDamage}`);
+        }
     }
 
     addEntry(campaignName, {
@@ -239,13 +244,20 @@ export async function applyShockwave(action, playerStats, campaignName, targetNa
         saveDc,
         saveType,
         saveResult: success ? 'success' : 'failure',
-        total: saveResult.total ?? 0,
-        rolls: [saveResult.roll ?? 0],
-        bonus: saveResult.saveBonus ?? 0,
-        formula: `1d20${saveResult.saveBonus !== 0 ? '+' + saveResult.saveBonus : ''}`,
-        description: `${action.name} — ${targetName} ${success ? 'succeeded' : 'failed'} the CON save (DC ${saveDc}). ${success ? 'Half damage (' + finalDamage + ' ' + damageType + ')' : 'Full damage (' + finalDamage + ' ' + damageType + ')'}${!success ? '' : ''}.`,
+        saveRoll: saveResult.roll ?? 0,
+        saveBonus: saveResult.saveBonus ?? 0,
+        saveFormula: `1d20${saveResult.saveBonus !== 0 ? '+' + saveResult.saveBonus : ''}`,
+        formula: damageExpression,
+        rolls: damageRoll?.rolls || [],
+        total: rawDamage,
+        modifier: damageRoll?.modifier || 0,
+        damageType,
+        finalDamage,
+        description: `${action.name} — ${targetName} ${success ? 'succeeded' : 'failed'} the CON save (DC ${saveDc}). ${success ? 'Half damage' : 'Full damage'}: **${finalDamage}** ${damageType} damage.`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[quiveringPalm] Error:', e); });
+
+    const diceDisplay = damageRoll?.rolls?.length > 0 ? ` (${damageRoll.rolls.join(', ')})` : '';
 
     return {
         type: 'popup',
@@ -253,8 +265,18 @@ export async function applyShockwave(action, playerStats, campaignName, targetNa
             type: 'automation_info',
             name: action.name,
             automationType: auto.type,
-            description: `${targetName} rolled a ${saveType} save (DC ${saveDc}): <strong>${success ? 'Success' : 'Failure'}</strong>.<br/>${success ? 'Half damage: ' : 'Full damage: '}${finalDamage} ${damageType} damage.`,
+            description: `${targetName} rolled a ${saveType} save (DC ${saveDc}): <strong>${success ? 'Success' : 'Failure'}</strong>.<br/>${damageExpression}: ${rawDamage}${diceDisplay}<br/>${success ? 'Half damage' : 'Full damage'}: <strong>${finalDamage}</strong> ${damageType} damage.`,
             automation: auto,
+            success,
+            saveType,
+            saveDc,
+            rawDamage,
+            finalDamage,
+            damageExpression,
+            damageType,
+            diceDisplay,
+            saveRoll: saveResult.roll ?? 0,
+            saveBonus: saveResult.saveBonus ?? 0,
         },
     };
 }

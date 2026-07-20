@@ -111,7 +111,7 @@ describe('quiveringPalmHandler.handle', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('Quivering Palm set in Goblin');
+      expect(result.payload.description).toContain('Quivering Palm set on Goblin');
       expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         type: 'ability_use',
         characterName: 'TestMonk',
@@ -275,7 +275,7 @@ describe('quiveringPalmHandler.applyShockwave', () => {
         success: false,
       }),
     });
-    rollExpression.mockReturnValue({ total: 55 });
+    rollExpression.mockReturnValue({ total: 55, rolls: [10, 10, 10, 10, 10, 5, 0, 0, 0, 0], modifier: 0 });
     applyDamageToTarget.mockReturnValue({ finalDamage: 55 });
 
     const result = await applyShockwave(action, ps, campaignName, 'Goblin');
@@ -283,7 +283,12 @@ describe('quiveringPalmHandler.applyShockwave', () => {
     expect(result.type).toBe('popup');
     expect(result.payload.type).toBe('automation_info');
     expect(result.payload.description).toContain('Failure');
-    expect(result.payload.description).toContain('55 Force damage');
+    expect(result.payload.description).toContain('55');
+    expect(result.payload.description).toContain('Force');
+    expect(result.payload.rawDamage).toBe(55);
+    expect(result.payload.finalDamage).toBe(55);
+    expect(result.payload.damageExpression).toBe('10d12');
+    expect(result.payload.damageType).toBe('Force');
     expect(setRuntimeValue).toHaveBeenCalledWith(campaignName, 'quivering_palm', null, campaignName);
   });
 
@@ -303,13 +308,16 @@ describe('quiveringPalmHandler.applyShockwave', () => {
         success: true,
       }),
     });
-    rollExpression.mockReturnValue({ total: 50 });
+    rollExpression.mockReturnValue({ total: 50, rolls: [5, 5, 5, 5, 5, 5, 5, 5, 5, 5], modifier: 0 });
     applyDamageToTarget.mockReturnValue({ finalDamage: 25 });
 
     const result = await applyShockwave(action, ps, campaignName, 'Goblin');
 
     expect(result.payload.description).toContain('Success');
-    expect(result.payload.description).toContain('25 Force damage');
+    expect(result.payload.description).toContain('25');
+    expect(result.payload.description).toContain('Force');
+    expect(result.payload.rawDamage).toBe(50);
+    expect(result.payload.finalDamage).toBe(25);
   });
 });
 
