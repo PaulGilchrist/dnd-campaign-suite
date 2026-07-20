@@ -151,7 +151,7 @@ import { handle as handleBeguilingDefenses } from './handlers/class-warlock/begu
 import { handle as handleBewitchingMagic } from './handlers/class-warlock/bewitchingMagicHandler.js';
 import { handle as handleStepsOfTheFey } from './handlers/class-warlock/stepsOfTheFeyHandler.js';
 import { handle as handleCelestialResilience } from './handlers/class-warlock/celestialResilienceHandler.js';
-import { handle as handleSearingVengeance } from './handlers/class-cleric-paladin/searingVengeanceHandler.js';
+import { handle as handleSearingVengeance } from './handlers/class-warlock/searingVengeanceHandler.js';
 import { handle as handleDarkOnesBlessing } from './handlers/class-warlock/darkOnesBlessingHandler.js';
 import { handle as handleDarkOnesLook } from './handlers/class-warlock/darkOnesLookHandler.js';
 import { handle as handleFiendishResilience } from './handlers/class-warlock/fiendishResilienceHandler.js';
@@ -527,6 +527,7 @@ export { confirmMassCureWounds } from './handlers/healing/massCureWoundsHandler.
 export { confirmPrayerOfHealing } from './handlers/healing/prayerOfHealingHandler.js';
 export { confirmMassHealingWord } from './handlers/healing/massHealingWordHandler.js';
 export { confirmPowerWordFortify } from './handlers/buffs/powerWordFortifyHandler.js';
+export { confirmSearingVengeance, skipSearingVengeance } from './handlers/class-warlock/searingVengeanceHandler.js';
 export async function executeHandler(action, playerStats, campaignName, mapName, characters) {
     if (!action?.automation) {
         return null;

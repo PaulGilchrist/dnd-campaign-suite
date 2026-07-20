@@ -7,6 +7,7 @@ import BastionOfLawSpendModal from './modals/divine/BastionOfLawSpendModal.jsx'
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx'
 import BendFateModal from './modals/BendFateModal.jsx'
 import StepsOfTheFeyTauntModal from './modals/StepsOfTheFeyTauntModal.jsx'
+import SearingVengeanceModal from './modals/SearingVengeanceModal.jsx'
 import { getReactionSpellNames } from '../../services/ui/spellSectionUtils.js'
 import { getCategories } from '../../services/character/featureCategories.js'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
@@ -17,7 +18,7 @@ import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/combat/base
 import { hasAutomation, hasTacticalShift, hasSpeedyOpportunityDisadvantage } from '../../services/combat/automation/automationService.js'
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
 import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
-import { executeHandler } from '../../services/automation/index.js'
+import { executeHandler, confirmSearingVengeance, skipSearingVengeance } from '../../services/automation/index.js'
 import { createSaveListener } from '../../services/automation/common/savePrompt.js'
 import { addEntry } from '../../services/ui/logService.js'
 import { addExpiration } from '../../services/rules/effects/expirations.js'
@@ -214,6 +215,8 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                 setModalState({ deflectRedirectModal: result.payload });
             } else if (result.modalName === 'stepsOfTheFeyTaunt') {
                 setModalState({ stepsOfTheFeyTauntModal: result.payload });
+            } else if (result.modalName === 'searingVengeance') {
+                setModalState({ searingVengeanceModal: { ...result.payload, reaction, campaignName, characters } });
             } else {
                 const html = buildFeatureDetailHtml(reaction);
                 if (html) setPopupHtml(html);
@@ -237,6 +240,31 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         setModalState({ deflectRedirectModal: null });
         await modalState.deflectRedirectModal.onSkip?.();
     }, [modalState.deflectRedirectModal, setModalState]);
+
+    const handleSearingVengeanceConfirm = React.useCallback(async (selectedTargets) => {
+        if (!modalState.searingVengeanceModal) return;
+        setModalState({ searingVengeanceModal: null });
+        const { campaignName: modalCampaign, characters: modalCharacters, automation } = modalState.searingVengeanceModal;
+        if (!selectedTargets || selectedTargets.length === 0) return;
+        const result = await confirmSearingVengeance(automation, playerStats, modalCampaign, mapName, modalCharacters, { ...modalState.searingVengeanceModal, selectedTargets });
+        if (result) {
+            if (result.type === 'popup') {
+                setPopupHtml(result.payload);
+            }
+        }
+    }, [modalState.searingVengeanceModal, setModalState, playerStats, mapName, setPopupHtml]);
+
+    const handleSearingVengeanceSkip = React.useCallback(async () => {
+        if (!modalState.searingVengeanceModal) return;
+        setModalState({ searingVengeanceModal: null });
+        const { campaignName: modalCampaign, automation } = modalState.searingVengeanceModal;
+        const result = await skipSearingVengeance(automation, playerStats, modalCampaign, modalState.searingVengeanceModal);
+        if (result) {
+            if (result.type === 'popup') {
+                setPopupHtml(result.payload);
+            }
+        }
+    }, [modalState.searingVengeanceModal, setModalState, playerStats, setPopupHtml]);
 
     const getTargetInfo = React.useCallback(async () => {
         const cs = await getCombatContext(campaignName);
@@ -516,6 +544,13 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                 <StepsOfTheFeyTauntModal
                     {...modalState.stepsOfTheFeyTauntModal}
                     onClose={() => setModalState({ stepsOfTheFeyTauntModal: null })}
+                />
+            )}
+            {modalState.searingVengeanceModal && (
+                <SearingVengeanceModal
+                    creatureTargets={modalState.searingVengeanceModal.creatureTargets}
+                    onConfirm={handleSearingVengeanceConfirm}
+                    onSkip={handleSearingVengeanceSkip}
                 />
             )}
             {reactions.filter(r => !getCategories(playerStats.rules || '5e').featuresToIgnore.includes(r.name)).map((reaction) => {

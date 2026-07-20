@@ -157,7 +157,8 @@ export const LONG_REST_RESOURCES = [
     'magicalCunningUsed',
     '_Steps_of_the_Fey_freeCastCount',
     'beguilingDefensesUses',
-    'healinglightPool'
+    'healinglightPool',
+    'searingvengeanceUses'
 ]
 
 export function getLongRestResources() {
