@@ -6982,19 +6982,21 @@
                   "type": "open_hand_technique",
                   "options": [
                     {
+                      "name": "Addle",
+                      "effect": "addled",
+                      "noOpportunityAttacks": true
+                    },
+                    {
                       "name": "Push",
-                      "effect": "push_15ft"
+                      "effect": "push_15ft",
+                      "saveType": "STR"
                     },
                     {
-                      "name": "Disadvantage Next Attack",
-                      "effect": "disadvantage_next_attack"
-                    },
-                    {
-                      "name": "No Reactions",
-                      "effect": "no_reactions"
+                      "name": "Topple",
+                      "effect": "prone",
+                      "saveType": "DEX"
                     }
                   ],
-                  "saveType": "STR",
                   "saveDc": "ability",
                   "saveAbility": "WIS",
                   "trigger": "flurry_of_blows_unarmed_strike_hit"

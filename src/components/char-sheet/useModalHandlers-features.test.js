@@ -359,7 +359,7 @@ describe('useModalHandlers - features & constellation', () => {
         it('returns all expected handler functions', () => {
             const deps = createDeps();
             const handlers = useModalHandlers(deps);
-            expect(Object.keys(handlers)).toHaveLength(16);
+            expect(Object.keys(handlers)).toHaveLength(18);
             expect(Object.keys(handlers)).toEqual([
                 'handleMasteryClose',
                 'handleWeaponMasteryChoice',
@@ -377,6 +377,8 @@ describe('useModalHandlers - features & constellation', () => {
                 'handleWeaponKindMasteryClose',
                 'handleFlurryOfBlowsConfirm',
                 'handleFlurryOfBlowsSkip',
+                'handleOpenHandFromFlurryConfirm',
+                'handleOpenHandFromFlurrySkip',
             ]);
             for (const handler of Object.values(handlers)) {
                 expect(typeof handler).toBe('function');

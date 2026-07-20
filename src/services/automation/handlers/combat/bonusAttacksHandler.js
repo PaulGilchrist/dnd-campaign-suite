@@ -93,6 +93,9 @@ export async function applyFlurryOfBlows(action, playerStats, campaignName, mapN
 
     const attackResults = [];
     let totalDamage = 0;
+    const pendingOpenHandTargets = new Map();
+
+    const openHandFeature = playerStats.automation?.actions?.find(a => a.type === 'open_hand_technique');
 
     for (const [targetName, attackCount] of Object.entries(distribution)) {
         if (!attackCount || attackCount <= 0) continue;
@@ -139,6 +142,16 @@ export async function applyFlurryOfBlows(action, playerStats, campaignName, mapN
 
                 if (finalDamage > 0) {
                     endInvisibilityOnHostileAction(playerName, campaignName);
+                }
+
+                if (openHandFeature && !pendingOpenHandTargets.has(targetName)) {
+                    pendingOpenHandTargets.set(targetName, {
+                        targetName,
+                        action: openHandFeature,
+                        playerStats,
+                        campaignName,
+                        mapName,
+                    });
                 }
             }
 
@@ -234,7 +247,7 @@ export async function applyFlurryOfBlows(action, playerStats, campaignName, mapN
         description += `</div>`;
     }
 
-    return {
+    const result = {
         type: 'popup',
         payload: {
             type: 'automation_info',
@@ -242,4 +255,17 @@ export async function applyFlurryOfBlows(action, playerStats, campaignName, mapN
             description,
         },
     };
+
+    if (pendingOpenHandTargets.size > 0) {
+        const openHandTargets = Array.from(pendingOpenHandTargets.values()).map(target => ({
+            targetName: target.targetName,
+            action: target.action,
+            playerStats: target.playerStats,
+            campaignName: target.campaignName,
+            mapName: target.mapName,
+        }));
+        result.openHandTargets = openHandTargets;
+    }
+
+    return result;
 }

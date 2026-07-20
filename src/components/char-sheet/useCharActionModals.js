@@ -49,6 +49,8 @@ export default function useCharActionModals({
         handleConstellationSelect,
         handleFlurryOfBlowsConfirm,
         handleFlurryOfBlowsSkip,
+        handleOpenHandFromFlurryConfirm,
+        handleOpenHandFromFlurrySkip,
     } = useModalHandlers({
         playerStats, campaignName,
         rollDamage, proceedWithDamage,
@@ -84,5 +86,7 @@ export default function useCharActionModals({
         handleConstellationSelect,
         handleFlurryOfBlowsConfirm,
         handleFlurryOfBlowsSkip,
+        handleOpenHandFromFlurryConfirm,
+        handleOpenHandFromFlurrySkip,
     };
 }

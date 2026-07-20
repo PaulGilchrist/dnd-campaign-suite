@@ -4,6 +4,8 @@ import { setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { applyConstellationOption } from '../../services/automation/handlers/class-sorcerer/starryFormHandler.js';
 import { applyConstellationOption as twinklingApply } from '../../services/automation/handlers/class-sorcerer/twinklingConstellationHandler.js';
 import { applyFlurryOfBlows } from '../../services/automation/handlers/combat/bonusAttacksHandler.js';
+import { applyOpenHandTechnique } from '../../services/automation/handlers/class-fighter-rogue/openHandTechniqueHandler.js';
+import { buildSaveDc } from '../../services/automation/common/savePrompt.js';
 
 export default function useModalHandlers({
     playerStats, campaignName,
@@ -206,6 +208,21 @@ export default function useModalHandlers({
         setModalState({ flurryOfBlowsModal: null });
 
         const applyResult = await applyFlurryOfBlows(action, playerStats, campaignName, mapName, result.distribution, numAttacks);
+        if (!applyResult) return;
+
+        if (applyResult.openHandTargets && applyResult.openHandTargets.length > 0) {
+            const saveDc = buildSaveDc(action.automation, playerStats);
+            setModalState({
+                openHandFromFlurry: {
+                    targets: applyResult.openHandTargets,
+                    saveDc,
+                    currentIndex: 0,
+                    popupHtml: applyResult.payload,
+                },
+            });
+            return;
+        }
+
         if (applyResult?.type === 'popup') {
             setPopupHtml(applyResult.payload);
         }
@@ -213,6 +230,62 @@ export default function useModalHandlers({
 
     const handleFlurryOfBlowsSkip = () => {
         setModalState({ flurryOfBlowsModal: null });
+    };
+
+    const handleOpenHandFromFlurryConfirm = async (result) => {
+        const openHandState = modalState.openHandFromFlurry;
+        if (!openHandState) return;
+
+        const { targets, saveDc, currentIndex, popupHtml } = openHandState;
+        const currentTarget = targets[currentIndex];
+        if (!currentTarget) return;
+
+        const { action, playerStats: ps, campaignName: cn } = currentTarget;
+
+        const applyRes = await applyOpenHandTechnique(
+            action, ps, cn, currentTarget.targetName, result.optionName, saveDc
+        );
+
+        const nextIndex = currentIndex + 1;
+        if (nextIndex < targets.length) {
+            setModalState({
+                openHandFromFlurry: {
+                    targets,
+                    saveDc,
+                    currentIndex: nextIndex,
+                    popupHtml,
+                },
+            });
+        } else {
+            setModalState({ openHandFromFlurry: null });
+            if (applyRes?.type === 'popup') {
+                setPopupHtml(applyRes.payload);
+            }
+        }
+    };
+
+    const handleOpenHandFromFlurrySkip = () => {
+        const openHandState = modalState.openHandFromFlurry;
+        if (!openHandState) return;
+
+        const { targets, saveDc, currentIndex, popupHtml } = openHandState;
+        const nextIndex = currentIndex + 1;
+
+        if (nextIndex < targets.length) {
+            setModalState({
+                openHandFromFlurry: {
+                    targets,
+                    saveDc,
+                    currentIndex: nextIndex,
+                    popupHtml,
+                },
+            });
+        } else {
+            setModalState({ openHandFromFlurry: null });
+            if (popupHtml) {
+                setPopupHtml(popupHtml);
+            }
+        }
     };
 
     return {
@@ -232,5 +305,7 @@ export default function useModalHandlers({
         handleWeaponKindMasteryClose,
         handleFlurryOfBlowsConfirm,
         handleFlurryOfBlowsSkip,
+        handleOpenHandFromFlurryConfirm,
+        handleOpenHandFromFlurrySkip,
     };
 }

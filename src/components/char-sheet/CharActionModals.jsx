@@ -220,6 +220,8 @@ export default function CharActionModals({
     handlePowerWordFortifyConfirm,
     handleMassHealingWordConfirm,
     handleFlurryOfBlowsConfirm,
+    handleOpenHandFromFlurryConfirm,
+    handleOpenHandFromFlurrySkip,
 }) {
     const [combatSummary, setCombatSummary] = React.useState(null);
     const mergedModalState = React.useMemo(() => {
@@ -401,6 +403,17 @@ export default function CharActionModals({
                 <OpenHandTechniqueModal
                     {...mergedModalState.openHandTechniqueModal}
                     onClose={() => { setModalState({ openHandTechniqueModal: null }); window.dispatchEvent(new CustomEvent('target-effects-updated')); window.dispatchEvent(new CustomEvent('combat-summary-updated')); }}
+                />
+            )}
+            {mergedModalState.openHandFromFlurry && (
+                <OpenHandTechniqueModal
+                    action={mergedModalState.openHandFromFlurry.targets[mergedModalState.openHandFromFlurry.currentIndex]?.action}
+                    playerStats={mergedModalState.openHandFromFlurry.targets[mergedModalState.openHandFromFlurry.currentIndex]?.playerStats}
+                    campaignName={mergedModalState.openHandFromFlurry.targets[mergedModalState.openHandFromFlurry.currentIndex]?.campaignName}
+                    targetName={mergedModalState.openHandFromFlurry.targets[mergedModalState.openHandFromFlurry.currentIndex]?.targetName}
+                    saveDc={mergedModalState.openHandFromFlurry.saveDc}
+                    onClose={() => { handleOpenHandFromFlurrySkip(); window.dispatchEvent(new CustomEvent('target-effects-updated')); window.dispatchEvent(new CustomEvent('combat-summary-updated')); }}
+                    onConfirm={(optionName) => { handleOpenHandFromFlurryConfirm({ optionName }); window.dispatchEvent(new CustomEvent('target-effects-updated')); window.dispatchEvent(new CustomEvent('combat-summary-updated')); }}
                 />
             )}
             {mergedModalState.weaponMasteryModal && (

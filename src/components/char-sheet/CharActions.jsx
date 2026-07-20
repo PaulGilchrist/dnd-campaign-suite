@@ -149,6 +149,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         handleCombatSuperiorityConfirm,
         handleFlurryOfBlowsConfirm,
         handleFlurryOfBlowsSkip,
+        handleOpenHandFromFlurryConfirm,
+        handleOpenHandFromFlurrySkip,
     } = useCharActionModals({
         playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects,
         popupHtml, setPopupHtml, rollDamage, rollAttack, buildCtx, buildCtxSync,
@@ -1574,6 +1576,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleMassHealingWordConfirm={handleMassHealingWordConfirm}
                     handleFlurryOfBlowsConfirm={handleFlurryOfBlowsConfirm}
                     handleFlurryOfBlowsSkip={handleFlurryOfBlowsSkip}
+                    handleOpenHandFromFlurryConfirm={handleOpenHandFromFlurryConfirm}
+                    handleOpenHandFromFlurrySkip={handleOpenHandFromFlurrySkip}
                 />
                 <CharActionSpellPopups
                     playerStats={playerStats}

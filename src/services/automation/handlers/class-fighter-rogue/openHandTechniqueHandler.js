@@ -29,7 +29,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 campaignName,
                 targetName,
                 saveDc,
-                saveType: auto.saveType || 'STR',
             },
         };
     }
@@ -40,13 +39,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             type: 'automation_info',
             name: action.name,
             automationType: auto.type,
-            description: `${action.name} — target must succeed on a ${auto.saveType || 'STR'} saving throw (DC ${saveDc}) or be affected by one of the Open Hand Technique effects.`,
+            description: `${action.name} — target must succeed on a saving throw (DC ${saveDc}) or be affected by one of the Open Hand Technique effects.`,
             automation: auto,
         },
     };
 }
 
-export async function applyOpenHandTechnique(action, playerStats, campaignName, targetName, selectedOptionName, saveDc, saveType) {
+export async function applyOpenHandTechnique(action, playerStats, campaignName, targetName, selectedOptionName, saveDc) {
     const auto = action.automation;
     const options = auto.options || [];
     const chosenOption = options.find(o => o.name === selectedOptionName);
@@ -67,9 +66,24 @@ export async function applyOpenHandTechnique(action, playerStats, campaignName, 
         };
     }
 
+    if (chosenOption.effect === 'addled') {
+        await applyOpenHandEffect(action, playerStats, campaignName, targetName, chosenOption);
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description: `${chosenOption.name} — ${targetName} cannot make Opportunity Attacks until the start of its next turn.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const optionSaveType = chosenOption.saveType || 'STR';
     const { promise } = createSaveListener(campaignName, {
         targetName,
-        saveType,
+        saveType: optionSaveType,
         saveDc,
     });
 
@@ -80,8 +94,8 @@ export async function applyOpenHandTechnique(action, playerStats, campaignName, 
         rollType: 'save-damage',
         targetName,
         saveDc,
-        saveType,
-        description: `${action.name} — ${targetName} must make a ${saveType} saving throw (DC ${saveDc}).`,
+        saveType: optionSaveType,
+        description: `${action.name} — ${targetName} must make a ${optionSaveType} saving throw (DC ${saveDc}).`,
     }).catch((e) => { console.error("[openHandTechnique] Error:", e); });
 
     const saveResult = await promise;
@@ -94,7 +108,7 @@ export async function applyOpenHandTechnique(action, playerStats, campaignName, 
         rollType: 'save-damage',
         targetName,
         saveDc,
-        saveType,
+        saveType: optionSaveType,
         saveResult: success ? 'success' : 'failure',
         total: saveResult.total ?? 0,
         rolls: [saveResult.roll ?? 0],
@@ -113,7 +127,7 @@ export async function applyOpenHandTechnique(action, playerStats, campaignName, 
             type: 'automation_info',
             name: action.name,
             automationType: auto.type,
-            description: buildResultMessage(action.name, targetName, chosenOption, saveDc, saveType, success),
+            description: buildResultMessage(action.name, targetName, chosenOption, saveDc, optionSaveType, success),
             automation: auto,
         },
     };
@@ -130,6 +144,9 @@ async function applyOpenHandEffect(action, playerStats, campaignName, targetName
         effect: option.effect,
         value: option.value || null,
         duration: 'until_start_of_next_turn',
+        noOpportunityAttacks: option.noOpportunityAttacks || false,
+        saveType: option.saveType || null,
+        condition: option.condition || null,
     };
     const updatedEffects = [...storedEffects, newEffect];
     setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
@@ -145,6 +162,8 @@ function buildResultMessage(actionName, targetName, option, saveDc, saveType, su
 
 function getEffectDescription(option) {
     if (option.effect === 'push_15ft') return `${option.name} — target pushed 15 ft away`;
+    if (option.effect === 'prone') return `${option.name} — target gains the Prone condition`;
+    if (option.effect === 'addled') return `${option.name} — target cannot make Opportunity Attacks`;
     if (option.effect === 'disadvantage_next_attack') return `${option.name} — target has Disadvantage on its next attack roll`;
     if (option.effect === 'no_reactions') return `${option.name} — target can't take Reactions until the start of your next turn`;
     return option.name;

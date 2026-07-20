@@ -6895,25 +6895,27 @@
                 "features": [
                     {
                         "name": "Open Hand Technique",
-                        "description": "Whenever you hit a Creature with a11 attack granted by your Flurry of Blows, you can impose one of the following effects on that target. <ul><li><b>Addle:</b> The target can't make Opportunity Attacks until the start of its next turn.</li><li><b>Push:</b> The target must succeed on a Strength saving throw or be pushed up to 15 feet away from you.</li><li><b>Topple:</b> The target must succeed on a Dexterity saving throw or have the Prone condition.</li></ul>",
+                        "description": "Whenever you hit a Creature with an attack granted by your Flurry of Blows, you can impose one of the following effects on that target. <ul><li><b>Addle:</b> The target can't make Opportunity Attacks until the start of its next turn.</li><li><b>Push:</b> The target must succeed on a Strength saving throw or be pushed up to 15 feet away from you.</li><li><b>Topple:</b> The target must succeed on a Dexterity saving throw or have the Prone condition.</li></ul>",
                         "level": 3,
                         "automation": {
                             "type": "open_hand_technique",
                             "options": [
                                 {
+                                    "name": "Addle",
+                                    "effect": "addled",
+                                    "noOpportunityAttacks": true
+                                },
+                                {
                                     "name": "Push",
-                                    "effect": "push_15ft"
+                                    "effect": "push_15ft",
+                                    "saveType": "STR"
                                 },
                                 {
-                                    "name": "Disadvantage Next Attack",
-                                    "effect": "disadvantage_next_attack"
-                                },
-                                {
-                                    "name": "No Reactions",
-                                    "effect": "no_reactions"
+                                    "name": "Topple",
+                                    "effect": "prone",
+                                    "saveType": "DEX"
                                 }
                             ],
-                            "saveType": "STR",
                             "saveDc": "ability",
                             "saveAbility": "WIS",
                             "trigger": "flurry_of_blows_unarmed_strike_hit"
@@ -6939,7 +6941,7 @@
                     },
                     {
                         "name": "Quivering Palm",
-                        "description": "You gain the ability to set up lethal vibrations in someone's body. When you hit a creature with an Unarmed Strike, you can expend 4 Focus Points to start these imperceptible vibrations, which last for a number of days equal to your Monk level. The vibrations are harmless unless you take an action to end them. Alternatively, when you take the Attack action on your turn, you can forgo one of the attacks to end the vibrations. To end them, you and the target must be on the same plane of existence.",
+                        "description": "You gain the ability to set up lethal vibrations in someone's body. When you hit a creature with an Unarmed Strike, you can expend 4 Focus Points to start these imperceptible vibrations, which last for a number of days equal to your Monk level. The vibrations are harmless unless you take an action to end them. Alternatively, when you take the Attack action on your turn, you can forgo one of the attacks to end the vibrations. To end them, you and the target must be on the same plane of existence. When you end them, the target must make a Constitution saving throw, taking 10d12 Force damage on a failed save or half as much damage on a successful one. You can have only one creature under the effect of this feature at a time. You can end the vibrations harmlessly (no action required).",
                         "level": 17
                     }
                 ],

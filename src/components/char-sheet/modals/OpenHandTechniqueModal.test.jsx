@@ -63,10 +63,10 @@ describe('OpenHandTechniqueModal', () => {
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
 
-    it('renders instruction text with target name and save info', () => {
+    it('renders instruction text with target name', () => {
       renderModal();
       expect(screen.getByText('Goblin')).toBeInTheDocument();
-      expect(screen.getByText(/DEX saving throw \(DC 13\)/)).toBeInTheDocument();
+      expect(screen.getByText(/Choose an effect against/)).toBeInTheDocument();
     });
 
     it('omits target reference when targetName is null', () => {
@@ -187,6 +187,21 @@ describe('OpenHandTechniqueModal', () => {
           13,
           'DEX'
         );
+      });
+    });
+
+    it('calls onConfirm with selected option name when onConfirm is provided', async () => {
+      const onConfirm = vi.fn();
+
+      renderModal({ onConfirm });
+      const radios = document.querySelectorAll('input[type="radio"]');
+      fireEvent.click(radios[1]);
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
+      });
+
+      await waitFor(() => {
+        expect(onConfirm).toHaveBeenCalledWith('Disrupt Attack');
       });
     });
 

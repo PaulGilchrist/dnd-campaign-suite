@@ -5,7 +5,7 @@ import { applyHealingDirectly, logHealingToSSE } from '../../common/healingRoll.
 import { resolveHealingBonuses, hasHealingMaximization, hasRerollHealingOnes } from '../../../combat/automation/automationService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getHitDieSize, computeHitDieRecovery } from '../../../rules/effects/restRules.js';
-import { resolveDiceExpression } from '../../../combat/automation/automationExpressions.js';
+import { resolveDiceExpression, evaluateAutoExpression } from '../../../combat/automation/automationExpressions.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -141,7 +141,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
         const maximize = hasHealingMaximization(playerStats);
         const rerollOnes = hasRerollHealingOnes(playerStats);
-        const rollResult = maximize ? rollExpressionMaximized(resolvedExpression) : rerollOnes ? rollExpression(resolvedExpression, { rerollOnes: true }) : rollExpression(resolvedExpression);
+        const evaluated = evaluateAutoExpression(resolvedExpression, playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel);
+        let rollResult;
+        if (typeof evaluated === 'number') {
+            rollResult = { total: evaluated, rolls: [evaluated], formula: resolvedExpression };
+        } else {
+            rollResult = maximize ? rollExpressionMaximized(resolvedExpression) : rerollOnes ? rollExpression(resolvedExpression, { rerollOnes: true }) : rollExpression(resolvedExpression);
+        }
         if (!rollResult) {
             console.error(`[healingHandler] ${action.name}: rollExpression returned null for resolved expression "${resolvedExpression}" (original: "${auto.healExpression}")`);
             return null;
@@ -223,7 +229,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 const resolvedExpression = resolveDiceExpression(auto.healExpression, playerStats, slotLevel);
                 const maximize = hasHealingMaximization(playerStats);
                 const rerollOnes = hasRerollHealingOnes(playerStats);
-                const rollResult = maximize ? rollExpressionMaximized(resolvedExpression) : rerollOnes ? rollExpression(resolvedExpression, { rerollOnes: true }) : rollExpression(resolvedExpression);
+                const evaluated = evaluateAutoExpression(resolvedExpression, playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel);
+                let rollResult;
+                if (typeof evaluated === 'number') {
+                    rollResult = { total: evaluated, rolls: [evaluated], formula: resolvedExpression };
+                } else {
+                    rollResult = maximize ? rollExpressionMaximized(resolvedExpression) : rerollOnes ? rollExpression(resolvedExpression, { rerollOnes: true }) : rollExpression(resolvedExpression);
+                }
                 if (!rollResult) {
                     console.error(`[healingHandler] ${action.name}: rollExpression returned null for resolved expression "${resolvedExpression}" (original: "${auto.healExpression}")`);
                     return null;

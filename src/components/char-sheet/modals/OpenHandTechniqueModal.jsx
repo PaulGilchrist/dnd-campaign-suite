@@ -2,15 +2,21 @@ import { useState } from 'react';
 import { applyOpenHandTechnique } from '../../../services/automation/handlers/class-fighter-rogue/openHandTechniqueHandler.js';
 import '../CharSheet.css';
 
-function OpenHandTechniqueModal({ action, playerStats, campaignName, targetName, saveDc, saveType, onClose }) {
+function OpenHandTechniqueModal({ action, playerStats, campaignName, targetName, saveDc, saveType, onClose, onConfirm }) {
     const [selected, setSelected] = useState(null);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
 
-    const options = action.automation?.options || [];
+    const options = action.automation?.options || action.options || [];
 
     const handleApply = async () => {
         if (!selected) return;
+
+        if (onConfirm) {
+            onConfirm(selected);
+            return;
+        }
+
         const res = await applyOpenHandTechnique(action, playerStats, campaignName, targetName, selected, saveDc, saveType);
         setResult(res);
         setApplied(true);
@@ -34,8 +40,8 @@ function OpenHandTechniqueModal({ action, playerStats, campaignName, targetName,
     }
 
     const labelText = targetName
-        ? `Choose an effect against <b>${targetName}</b>. The target must succeed on a ${saveType} saving throw (DC ${saveDc}) or be affected:`
-        : `Choose an effect. The target must succeed on a ${saveType} saving throw (DC ${saveDc}) or be affected:`;
+        ? `Choose an effect against <b>${targetName}</b>.`
+        : 'Choose an effect.';
 
     return (
         <div className="sp-overlay" onClick={onClose}>
@@ -48,7 +54,9 @@ function OpenHandTechniqueModal({ action, playerStats, campaignName, targetName,
                     <div style={{ textAlign: 'left', marginTop: '12px' }}>
                         {options.map((opt, i) => {
                             const effects = [];
-                            if (opt.effect === 'push_15ft') effects.push('Push 15 ft away');
+                            if (opt.effect === 'push_15ft') effects.push('Push 15 ft away (STR save)');
+                            if (opt.effect === 'prone') effects.push('Gain Prone condition (DEX save)');
+                            if (opt.effect === 'addled') effects.push('Cannot make Opportunity Attacks');
                             if (opt.effect === 'disadvantage_next_attack') effects.push('Disadvantage on next attack roll');
                             if (opt.effect === 'no_reactions') effects.push("Can't take Reactions until start of your next turn");
                             const isSelected = selected === opt.name;
