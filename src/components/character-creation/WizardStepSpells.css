@@ -38,3 +38,213 @@
     border-radius: 6px;
     border: 1px solid var(--border-color);
 }
+
+.wizard-step-spells .arcanum-selection-section {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background-color: var(--background-color-card);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.wizard-step-spells .arcanum-selection-section h3 {
+    color: var(--color-text);
+    margin: 0 0 0.25rem 0;
+}
+
+.wizard-step-spells .arcanum-description {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    margin: 0 0 0.75rem 0;
+    line-height: 1.3;
+}
+
+.wizard-step-spells .arcanum-slot {
+    margin-bottom: 0.75rem;
+    padding: 0.5rem;
+    background-color: var(--background-color-surface);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.wizard-step-spells .arcanum-slot:last-child {
+    margin-bottom: 0;
+}
+
+.wizard-step-spells .arcanum-slot-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.wizard-step-spells .arcanum-slot-label {
+    font-weight: bold;
+    color: var(--color-text);
+    font-size: 0.9rem;
+}
+
+.wizard-step-spells .arcanum-slot-count {
+    font-size: 0.8rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 12px;
+    background-color: var(--background-color-card);
+    border: 1px solid var(--border-color);
+    line-height: 1.4;
+}
+
+.wizard-step-spells .arcanum-slot-count.selected {
+    color: var(--color-success);
+    font-weight: bold;
+    border-color: var(--color-success);
+}
+
+.wizard-step-spells .arcanum-slot-count.available {
+    color: var(--color-text-secondary);
+    border-color: var(--border-color);
+}
+
+.wizard-step-spells .arcanum-slot-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.wizard-step-spells .arcanum-option {
+    border-radius: 4px;
+    transition: background-color 0.15s;
+}
+
+.wizard-step-spells .arcanum-option:hover {
+    background-color: var(--background-color-card);
+}
+
+.wizard-step-spells .arcanum-option.selected {
+    background-color: var(--background-color-card);
+    border: 1px solid var(--color-primary);
+}
+
+.wizard-step-spells .arcanum-option.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.wizard-step-spells .arcanum-option-row {
+    display: flex;
+    align-items: center;
+    padding: 0.3rem 0.5rem;
+    cursor: pointer;
+    border-radius: 4px;
+    gap: 0.5rem;
+}
+
+.wizard-step-spells .arcanum-option-name {
+    flex: 1;
+    color: var(--color-text);
+    font-size: 0.9rem;
+    line-height: 1.3;
+}
+
+.wizard-step-spells .arcanum-option-level {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    min-width: 1.2rem;
+    text-align: center;
+    line-height: 1.3;
+}
+
+.wizard-step-spells .arcanum-option-check {
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+    width: 1.2rem;
+    text-align: center;
+    line-height: 1.3;
+}
+
+.wizard-step-spells .arcanum-option-check.checked {
+    color: var(--color-success);
+    font-weight: bold;
+}
+
+.wizard-step-spells .arcanum-option-info {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    padding: 0.1rem 0.3rem;
+    line-height: 1;
+}
+
+.wizard-step-spells .arcanum-option-info:hover {
+    color: var(--color-primary);
+}
+
+.wizard-step-spells .arcanum-option-details {
+    padding: 0.5rem 0.5rem 0.6rem 0.5rem;
+    margin-top: 0.15rem;
+    background-color: var(--background-color-surface);
+    border-radius: 0 0 4px 4px;
+    border-top: 1px solid var(--border-color);
+}
+
+.wizard-step-spells .arcanum-option-desc {
+    font-size: 0.8rem;
+    color: var(--color-text);
+    margin-bottom: 0.4rem;
+    line-height: 1.35;
+}
+
+.wizard-step-spells .arcanum-option-desc p {
+    margin: 0.2rem 0;
+}
+
+.wizard-step-spells .arcanum-option-desc ul,
+.wizard-step-spells .arcanum-option-desc ol {
+    margin: 0.2rem 0;
+    padding-left: 1.2rem;
+}
+
+.wizard-step-spells .arcanum-option-desc li {
+    margin: 0.1rem 0;
+}
+
+.wizard-step-spells .arcanum-option-desc strong,
+.wizard-step-spells .arcanum-option-desc b {
+    font-weight: 600;
+}
+
+.wizard-step-spells .arcanum-option-desc em,
+.wizard-step-spells .arcanum-option-desc i {
+    font-style: italic;
+}
+
+.wizard-step-spells .arcanum-option-desc code {
+    font-size: 0.75rem;
+    background-color: var(--background-color-card);
+    padding: 0.05rem 0.25rem;
+    border-radius: 3px;
+}
+
+.wizard-step-spells .arcanum-option-desc hr {
+    margin: 0.4rem 0;
+    border: none;
+    border-top: 1px solid var(--border-color);
+}
+
+.wizard-step-spells .arcanum-option-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    line-height: 1.3;
+}
+
+.wizard-step-spells .no-arcanum-spells {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    font-style: italic;
+    padding: 0.3rem 0;
+}

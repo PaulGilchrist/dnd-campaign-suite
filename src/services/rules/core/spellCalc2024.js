@@ -326,6 +326,16 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
                 }
             }
 
+            // Mystic Arcanum: add player-chosen Warlock arcanum spells as always prepared
+            if (playerStats.class?.arcanums && Array.isArray(playerStats.class.arcanums) && allSpells) {
+                playerStats.class.arcanums.forEach(spellName => {
+                    const spellDetail = allSpells.find(s => s.name === spellName);
+                    if (spellDetail && !spellAbilities.spells.find(s => s.name === spellName)) {
+                        spellAbilities.spells.push({ ...spellDetail, prepared: 'Always' });
+                    }
+                });
+            }
+
             // Improved Illusions: grant Minor Illusion cantrip to Illusionist subclass
             const hasImprovedIllusions = playerStats.automation?.passives?.some(p => p.type === 'improved_illusions');
             if (hasImprovedIllusions && allSpells) {

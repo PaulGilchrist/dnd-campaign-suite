@@ -519,18 +519,32 @@ const SorcererFeatures = function SorcererFeatures({ playerStats, campaignName }
 };
 
 /* ─── Warlock ─── */
-const WarlockFeatures = function WarlockFeatures({ playerStats }) {
+const WarlockFeatures = function WarlockFeatures({ playerStats, campaignName }) {
     const warlockFeatures = getClassFeatures(playerStats);
+    const arcanumLevels = warlockFeatures.arcanumLevels || {};
+
     return (
          <div data-testid="char-class-warlock">
-             {warlockFeatures?.hasArcanum && (
-                 <React.Fragment>
-                     {warlockFeatures.arcanums && Array.isArray(warlockFeatures.arcanums) && (
-                         <div><b>Arcanums: </b>{[...warlockFeatures.arcanums].sort().join(', ')}</div>
-                     )}
-                     <div><b>Arcanums Known (levels 6-9): </b>{warlockFeatures.arcanumLevels?.level6 || 0}, {warlockFeatures.arcanumLevels?.level7 || 0}, {warlockFeatures.arcanumLevels?.level8 || 0}, {warlockFeatures.arcanumLevels?.level9 || 0}</div>
-                 </React.Fragment>
-             )}
+              {warlockFeatures?.hasArcanum && (
+                  <React.Fragment>
+                      {[6, 7, 8, 9].map(level => {
+                          const hasArcanum = arcanumLevels[`level${level}`] > 0;
+                          if (!hasArcanum) return null;
+                          return (
+                              <TrackedResourceInput
+                                  key={level}
+                                  label={`${level}th Level Arcanum`}
+                                  resourceKey={`mysticArcanumLevel${level}`}
+                                  playerName={playerStats.name}
+                                  getMax={() => 1}
+                                  deps={[playerStats]}
+                                  campaignName={campaignName}
+                                  playerStats={playerStats}
+                              />
+                          );
+                      })}
+                  </React.Fragment>
+              )}
              <div><b>{(warlockFeatures?.invocationsKnown ?? 0) > 0 ? 'Eldritch Invocations' : 'Invocations Known'}: </b>{warlockFeatures.invocationsKnown}</div>
              {warlockFeatures?.invocations && Array.isArray(warlockFeatures.invocations) && (
                  <div><b>Invocations: </b>{[...warlockFeatures.invocations].sort().join(', ')}</div>

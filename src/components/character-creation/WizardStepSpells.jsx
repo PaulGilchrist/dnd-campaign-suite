@@ -3,9 +3,48 @@ import SelectableList from './SelectableList.jsx';
 import WarningList from '../common/WarningList.jsx';
 import { getSpellLimits, validateSpellSelection } from '../../services/rules/spells/spellLimits.js';
 import { getSpellValidationInfo } from '../../services/rules/spells/spellValidation.js';
+import { renderMarkdown } from '../../services/ui/sanitize.js';
 import './WizardStepSpells.css';
+
+// Mystic Arcanum level requirements for Warlock
+const ARCANUM_LEVEL_REQUIREMENTS = [
+  { level: 6, charLevel: 11 },
+  { level: 7, charLevel: 13 },
+  { level: 8, charLevel: 15 },
+  { level: 9, charLevel: 17 },
+];
+
+// Get qualifying arcanum levels for a given character level
+function getQualifyingArcanumLevels(charLevel) {
+  return ARCANUM_LEVEL_REQUIREMENTS.filter(req => charLevel >= req.charLevel);
+}
+
+// Mystic Arcanum selection component for Warlock
 function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelectedSpells }) {
   const preSelected = useMemo(() => preSelectedSpells || [], [preSelectedSpells]);
+  const isWarlock = formData?.class?.name === 'Warlock';
+  const charLevel = parseInt(formData?.level) || 1;
+  const [expandedArcanumSpell, setExpandedArcanumSpell] = useState(null);
+  const qualifyingArcanumLevels = useMemo(() => {
+    if (!isWarlock) return [];
+    return getQualifyingArcanumLevels(charLevel);
+  }, [isWarlock, charLevel]);
+  const arcanumSpells = formData?.class?.arcanums || [];
+
+  // Get Warlock spells at specific levels for Mystic Arcanum
+  const arcanumSpellByLevel = useMemo(() => {
+    if (!allSpells) return {};
+    const result = {};
+    qualifyingArcanumLevels.forEach(({ level }) => {
+      result[level] = (allSpells || []).filter(spell => {
+        const spellLevel = spell.level !== undefined ? spell.level : 0;
+        return spellLevel === level && (spell.classes || []).includes('Warlock');
+      });
+    });
+    return result;
+  }, [allSpells, qualifyingArcanumLevels]);
+
+  // Calculate spell counts by level (excluding pre-selected spells)
   const [spellCounts, setSpellCounts] = useState({ cantrip: 0, level1: 0, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0 });
   const [spellLimits, setSpellLimits] = useState({ cantrip: 0, level1: 0, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0 });
   const [spellWarnings, setSpellWarnings] = useState([]);
@@ -42,113 +81,113 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
     fetchSpellLimits();
   }, [formData, formData.class, formData.level, formData.rules]);
 
-   // Calculate spell counts by level (excluding pre-selected spells)
-   useEffect(() => {   
-     const counts = { cantrip: 0, level1: 0, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0 };
-     
-     if (formData.spells && formData.spells.length > 0) {
-       formData.spells.forEach(spellName => {
-         if (preSelected.includes(spellName)) return;
-         const spell = allSpells.find(s => s.name === spellName || s.index === spellName);
-         if (spell) {
-           const level = spell.level !== undefined ? spell.level : 0;
-           const levelKey = level === 0 ? 'cantrip' : `level${level}`;
-           counts[levelKey] = (counts[levelKey] || 0) + 1;
-          }
-        });
-      }
-     
-     setSpellCounts(counts);
-    }, [formData.spells, allSpells, preSelected]);
+    // Calculate spell counts by level (excluding pre-selected spells)
+    useEffect(() => {   
+      const counts = { cantrip: 0, level1: 0, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0 };
+      
+      if (formData.spells && formData.spells.length > 0) {
+        formData.spells.forEach(spellName => {
+          if (preSelected.includes(spellName)) return;
+          const spell = allSpells.find(s => s.name === spellName || s.index === spellName);
+          if (spell) {
+            const level = spell.level !== undefined ? spell.level : 0;
+            const levelKey = level === 0 ? 'cantrip' : `level${level}`;
+            counts[levelKey] = (counts[levelKey] || 0) + 1;
+           }
+         });
+       }
+      
+      setSpellCounts(counts);
+     }, [formData.spells, allSpells, preSelected]);
 
-    // Filter spells to only those of levels for which the character has at least one spell slot.
-   // Cantrips are always available since they don't require spell slots.
-   const availableSpells = useMemo(() => {
-      if (!spellLimits.spellType) return allSpells || [];
+     // Filter spells to only those of levels for which the character has at least one spell slot.
+    // Cantrips are always available since they don't require spell slots.
+    const availableSpells = useMemo(() => {
+       if (!spellLimits.spellType) return allSpells || [];
 
-      let maxSlotLevel = 0;
-      for (let i = 9; i >= 1; i--) {
-        if ((spellLimits[`level${i}`] || 0) > 0) {
-          maxSlotLevel = i;
-          break;
-        }
-      }
+       let maxSlotLevel = 0;
+       for (let i = 9; i >= 1; i--) {
+         if ((spellLimits[`level${i}`] || 0) > 0) {
+           maxSlotLevel = i;
+           break;
+         }
+       }
 
-      return (allSpells || []).filter(spell => {
-        const level = spell.level !== undefined ? spell.level : 0;
-        if (level === 0) return true;
-        return level <= maxSlotLevel;
-      });
-    }, [allSpells, spellLimits]);
+       return (allSpells || []).filter(spell => {
+         const level = spell.level !== undefined ? spell.level : 0;
+         if (level === 0) return true;
+         return level <= maxSlotLevel;
+       });
+     }, [allSpells, spellLimits]);
 
-     // Calculate total prepared spells (non-cantrip), for classes with spellType === 'prepared'
-    const totalPrepared = useMemo(() => {
-     if (spellLimits.spellType !== 'prepared') return 0;
-     return (
-      spellCounts.level1 +
-      spellCounts.level2 +
-      spellCounts.level3 +
-      spellCounts.level4 +
-      spellCounts.level5 +
-      spellCounts.level6 +
-      spellCounts.level7 +
-      spellCounts.level8 +
-      spellCounts.level9
-    );
-   }, [spellLimits.spellType, spellCounts]);
+      // Calculate total prepared spells (non-cantrip), for classes with spellType === 'prepared'
+     const totalPrepared = useMemo(() => {
+      if (spellLimits.spellType !== 'prepared') return 0;
+      return (
+       spellCounts.level1 +
+       spellCounts.level2 +
+       spellCounts.level3 +
+       spellCounts.level4 +
+       spellCounts.level5 +
+       spellCounts.level6 +
+       spellCounts.level7 +
+       spellCounts.level8 +
+       spellCounts.level9
+     );
+    }, [spellLimits.spellType, spellCounts]);
 
-   // Render summary
-   const renderSummary = () => {
-     const isPrepared = spellLimits.spellType === 'prepared';
-     
-     if (isPrepared) {
-       return (
-         <div className="spells-summary">
-           <h4>Spell Selection Summary</h4>
-           <div className="spell-levels-summary">
-              <div className="level-summary-item">
-                <span className="level-label">Cantrips:</span>
-                <span className={`level-count ${spellCounts.cantrip > (spellLimits.cantrip || 0) ? 'exceeded' : ''}`}>
-                   {spellCounts.cantrip}/{spellLimits.cantrip || 0}
-                  </span>
-               </div>
-              <div className="level-summary-item">
-                 <span className="level-label">Prepared Spells:</span>
-                  <span className={`level-count ${totalPrepared > (spellLimits.preparedSpells || 0) ? 'exceeded' : ''}`}>
-                     {totalPrepared}/{spellLimits.preparedSpells || 0}
-                    </span>
-                 </div>
-             </div>
-           
-             {spellWarnings.length > 0 && <WarningList warnings={spellWarnings} showIcons />}
-          </div>
-        );
-      }
-
-     return (
-       <div className="spells-summary">
-         <h4>Spell Selection Summary</h4>
-         <div className="spell-levels-summary">
-           <div className="level-summary-item">
-             <span className="level-label">Cantrips:</span>
-             <span className={`level-count ${spellCounts.cantrip > (spellLimits.cantrip || 0) ? 'exceeded' : ''}`}>
-               {spellCounts.cantrip}/{spellLimits.cantrip || 0}
-              </span>
+    // Render summary
+    const renderSummary = () => {
+      const isPrepared = spellLimits.spellType === 'prepared';
+      
+      if (isPrepared) {
+        return (
+          <div className="spells-summary">
+            <h4>Spell Selection Summary</h4>
+            <div className="spell-levels-summary">
+               <div className="level-summary-item">
+                 <span className="level-label">Cantrips:</span>
+                 <span className={`level-count ${spellCounts.cantrip > (spellLimits.cantrip || 0) ? 'exceeded' : ''}`}>
+                    {spellCounts.cantrip}/{spellLimits.cantrip || 0}
+                   </span>
+                </div>
+               <div className="level-summary-item">
+                  <span className="level-label">Prepared Spells:</span>
+                   <span className={`level-count ${totalPrepared > (spellLimits.preparedSpells || 0) ? 'exceeded' : ''}`}>
+                      {totalPrepared}/{spellLimits.preparedSpells || 0}
+                     </span>
+                  </div>
+              </div>
+            
+              {spellWarnings.length > 0 && <WarningList warnings={spellWarnings} showIcons />}
            </div>
-          {['level1', 'level2', 'level3', 'level4', 'level5', 'level6', 'level7', 'level8', 'level9'].map(levelKey => (
-            <div key={levelKey} className="level-summary-item">
-              <span className="level-label">{levelKey.replace('level', '')}th level:</span>
-               <span className={`level-count ${spellCounts[levelKey] > (spellLimits[levelKey] || 0) ? 'exceeded' : ''}`}>
-                 {spellCounts[levelKey] || 0}/{spellLimits[levelKey] || 0}
-                </span>
+         );
+       }
+
+      return (
+        <div className="spells-summary">
+          <h4>Spell Selection Summary</h4>
+          <div className="spell-levels-summary">
+            <div className="level-summary-item">
+              <span className="level-label">Cantrips:</span>
+              <span className={`level-count ${spellCounts.cantrip > (spellLimits.cantrip || 0) ? 'exceeded' : ''}`}>
+                {spellCounts.cantrip}/{spellLimits.cantrip || 0}
+               </span>
             </div>
-          ))}
+           {['level1', 'level2', 'level3', 'level4', 'level5', 'level6', 'level7', 'level8', 'level9'].map(levelKey => (
+             <div key={levelKey} className="level-summary-item">
+               <span className="level-label">{levelKey.replace('level', '')}th level:</span>
+                <span className={`level-count ${spellCounts[levelKey] > (spellLimits[levelKey] || 0) ? 'exceeded' : ''}`}>
+                  {spellCounts[levelKey] || 0}/{spellLimits[levelKey] || 0}
+                 </span>
+             </div>
+           ))}
+          </div>
+          
+          {spellWarnings.length > 0 && <WarningList warnings={spellWarnings} showIcons />}
          </div>
-         
-         {spellWarnings.length > 0 && <WarningList warnings={spellWarnings} showIcons />}
-        </div>
-       );
-      };
+        );
+       };
   const getValidationMessage = useCallback(async () => {
     if (!formData || !formData.class) {
       return '';
@@ -331,25 +370,123 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
         },
         renderOption: (cls) => cls
        },
-   ];
+    ];
 
-   return (
-       <SelectableList
-      items={availableSpells}
-      fieldName="spells"
-      formData={formData}
-      onArrayFieldChange={onArrayFieldChange}
-      title="Step 9: Spells"
-      searchPlaceholder="Search spells..."
-      filters={filters}
-      renderItem={renderItem}
-      renderSummary={renderSummary}
-      loadingMessage="Spell data not yet loaded. Please try again."
-      preSelectedItems={preSelected}
-      className="wizard-step-spells"
-      resultLabel="spell"
-     />
-   );
+    // Mystic Arcanum spell selection rendering
+    const renderArcanumSelection = () => {
+      if (!isWarlock || qualifyingArcanumLevels.length === 0) return null;
+
+      return (
+        <div className="arcanum-selection-section">
+          <h3>Mystic Arcanum</h3>
+          <p className="arcanum-description">
+            Your patron bestows upon you a magical secret called an arcanum. Choose one warlock spell of the specified level.
+            You can cast each of your arcanum spells once without using a spell slot. You must finish a long rest before you can cast an arcanum spell this way again.
+          </p>
+          {qualifyingArcanumLevels.map(({ level }) => {
+            const availableSpellsForLevel = arcanumSpellByLevel[level] || [];
+            const selectedSpell = arcanumSpells.find(s => {
+              const spell = allSpells?.find(sp => sp.name === s || sp.index === s);
+              return spell && spell.level === level;
+            });
+            const isSelected = !!selectedSpell;
+
+            return (
+              <div key={level} className="arcanum-slot">
+                <div className="arcanum-slot-header">
+                  <span className="arcanum-slot-label">{level}th Level Arcanum:</span>
+                  <span className={`arcanum-slot-count ${isSelected ? 'selected' : 'available'}`}>
+                    {isSelected ? '1/1' : '0/1'}
+                  </span>
+                </div>
+                <div className="arcanum-slot-options">
+                  {availableSpellsForLevel.length === 0 ? (
+                    <span className="no-arcanum-spells">No warlock spells available at this level.</span>
+                  ) : (
+                    availableSpellsForLevel.map(spell => {
+                      const isCurrentlySelected = arcanumSpells.includes(spell.name);
+                      const isExpanded = expandedArcanumSpell === spell.index;
+                      return (
+                        <div
+                          key={spell.index}
+                          className={`arcanum-option ${isCurrentlySelected ? 'selected' : ''}`}
+                        >
+                          <div className="arcanum-option-row" onClick={() => {
+                            const currentArcanums = [...arcanumSpells];
+                            if (isCurrentlySelected) {
+                              onArrayFieldChange('class.arcanums', currentArcanums.filter(s => s !== spell.name));
+                            } else {
+                              const newArcanums = currentArcanums.filter(s => {
+                                const existingSpell = allSpells?.find(sp => sp.name === s || sp.index === s);
+                                return !existingSpell || existingSpell.level !== level;
+                              });
+                              newArcanums.push(spell.name);
+                              onArrayFieldChange('class.arcanums', newArcanums);
+                            }
+                          }}>
+                            <div className="arcanum-option-name">{spell.name}</div>
+                            <div className="arcanum-option-level">{spell.level}</div>
+                            <div className={`arcanum-option-check ${isCurrentlySelected ? 'checked' : ''}`}>
+                              {isCurrentlySelected ? '✓' : ''}
+                            </div>
+                            <i
+                              className="fa-solid fa-circle-info arcanum-option-info"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedArcanumSpell(isExpanded ? null : spell.index);
+                              }}
+                              title="View spell details"
+                            />
+                          </div>
+                          {isExpanded && (
+                            <div className="arcanum-option-details">
+                              {spell.description && spell.description[0] && (
+                                <div
+                                  className="arcanum-option-desc"
+                                  dangerouslySetInnerHTML={{ __html: renderMarkdown(spell.description[0]) }}
+                                />
+                              )}
+                              <div className="arcanum-option-meta">
+                                {spell.school && <span>School: {spell.school}</span>}
+                                {spell.casting_time && <span>Casting: {spell.casting_time}</span>}
+                                {spell.ritual && <span>Ritual</span>}
+                                {spell.concentration && <span>Concentration</span>}
+                                {spell.duration && <span>Duration: {spell.duration}</span>}
+                                {spell.components && <span>Components: {spell.components.join(', ')}</span>}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    };
+
+    return (
+        <div className="wizard-step-spells">
+      {renderArcanumSelection()}
+        <SelectableList
+       items={availableSpells}
+       fieldName="spells"
+       formData={formData}
+       onArrayFieldChange={onArrayFieldChange}
+       title="Step 9: Spells"
+       searchPlaceholder="Search spells..."
+       filters={filters}
+       renderItem={renderItem}
+       renderSummary={renderSummary}
+       loadingMessage="Spell data not yet loaded. Please try again."
+       preSelectedItems={preSelected}
+       resultLabel="spell"
+      />
+      </div>
+    );
 }
 
 export default WizardStepSpells;

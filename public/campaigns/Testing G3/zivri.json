@@ -50,13 +50,17 @@
   "class": {
     "name": "Warlock",
     "subclass": {
-      "name": "Archfey Patron",
+      "name": "Great Old One Patron",
       "type": ""
     },
     "divineOrder": "",
     "primalOrder": "",
     "arcanums": [
-      "Conjure Fey"
+      "Circle of Death",
+      "Finger of Death",
+      "Feeblemind",
+      "Power Word Kill",
+      "Befuddlement"
     ],
     "invocations": [
       "Agonizing Blast",

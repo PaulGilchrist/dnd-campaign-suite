@@ -55,6 +55,10 @@ export const ALL_TRACKED_RESOURCES = [
   'spell_slots_level_9',
   'tamedSurgeUses',
   'featsOfChaosUses',
+  'mysticArcanumLevel6',
+  'mysticArcanumLevel7',
+  'mysticArcanumLevel8',
+  'mysticArcanumLevel9',
   'isDead',
 ]
 
@@ -174,6 +178,14 @@ export function computeTrackedResources(playerStats) {
       : (classLevel?.class_specific?.pact_slots || 0)
   }
   resources.warlockPactMagic = { current: maxPM, max: maxPM }
+
+  // Mystic Arcanum: one free cast per long rest for levels 6-9
+  if (isWarlock && features?.arcanumLevels) {
+    resources.mysticArcanumLevel6 = { current: features.arcanumLevels.level6 || 0, max: features.arcanumLevels.level6 || 0 }
+    resources.mysticArcanumLevel7 = { current: features.arcanumLevels.level7 || 0, max: features.arcanumLevels.level7 || 0 }
+    resources.mysticArcanumLevel8 = { current: features.arcanumLevels.level8 || 0, max: features.arcanumLevels.level8 || 0 }
+    resources.mysticArcanumLevel9 = { current: features.arcanumLevels.level9 || 0, max: features.arcanumLevels.level9 || 0 }
+  }
 
   const hasRestoration = (playerStats.automation?.passives ?? [])
     .some(a => a.type === 'resource_restoration')

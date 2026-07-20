@@ -38,6 +38,18 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
     if (!used) return true;
   }
 
+  // Mystic Arcanum: check tracked resources for Warlock spell selections
+  const arcanums = playerStats?.class?.arcanums || [];
+  if (arcanums.includes(spellName)) {
+    const arcanumLevels = [6, 7, 8, 9];
+    for (const level of arcanumLevels) {
+      const resourceKey = `mysticArcanumLevel${level}`;
+      const count = Number(getRuntimeValue(playerName, resourceKey) ?? 1);
+      if (count > 0) return true;
+    }
+    return false;
+  }
+
   // Phantasmal Creatures: check runtime state for free cast of Summon Beast or Summon Fey
   const hasPhantasmalCreatures = playerStats?.automation?.passives?.some(p => p.type === 'phantasmal_creatures');
   if (hasPhantasmalCreatures) {
@@ -370,6 +382,19 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
         // At-will casting, no tracking needed
       } else {
         // Decrement counter-based free cast (single source of truth — must stay in sync with isFreeCastAuthorized)
+        const arcanums = playerStats?.class?.arcanums || [];
+        if (arcanums.includes(spell.name)) {
+          const arcanumLevels = [6, 7, 8, 9];
+          for (const level of arcanumLevels) {
+            const resourceKey = `mysticArcanumLevel${level}`;
+            const count = Number(getRuntimeValue(playerStats.name, resourceKey) ?? 1);
+            if (count > 0) {
+              setRuntimeValue(playerStats.name, resourceKey, count - 1, campaignName);
+              break;
+            }
+          }
+        }
+
         const allActions = [
           ...(playerStats?.automation?.actions || []),
           ...(playerStats?.automation?.bonusActions || []),

@@ -185,6 +185,22 @@ export function getSpellAbilities(allSpells, playerStats) {
                 }
             });
         }
+        // Add Mystic Arcanum spells (Warlock class.arcanums)
+        if (playerStats.class?.arcanums && Array.isArray(playerStats.class.arcanums) && allSpells) {
+            playerStats.class.arcanums.forEach(spellName => {
+                const spellDetail = allSpells.find(s => s.name === spellName);
+                const existing = spellAbilities.spells.find(s => s.name === spellName);
+                if (existing) {
+                    existing.prepared = 'Always';
+                } else if (spellDetail) {
+                    if(spellAbilities.spells_known) spellAbilities.spells_known += 1;
+                    spellAbilities.spells.push({
+                        ...spellDetail,
+                        prepared: 'Always'
+                    });
+                }
+            });
+        }
         switch (playerStats.class.name) {
             case 'Cleric':
             case 'Druid':

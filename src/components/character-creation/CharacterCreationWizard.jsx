@@ -140,7 +140,7 @@ const WizardStepRenderer = React.memo(({
 });
 WizardStepRenderer.displayName = 'WizardStepRenderer';
 
-function CharacterCreationWizard({ onComplete, onCancel, allSpells, allClasses, characterData, isEditing = false, campaignName }) {
+function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterData, isEditing = false, campaignName }) {
   // Core form state
   const {
     formData,
@@ -156,6 +156,24 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, allClasses, 
 
   // Ruleset state (needed by data hook)
   const [ruleset, setRuleset] = useState(characterData?.rules ?? null);
+
+  // Load spells based on character's ruleset
+  const [allSpells, setAllSpells] = useState([]);
+  useEffect(() => {
+    const loadSpells = async () => {
+      const spellRuleset = ruleset || '5e';
+      const path = spellRuleset === '2024' ? '/data/2024/spells.json' : '/data/spells.json';
+      try {
+        const response = await fetch(path);
+        const spells = await response.json();
+        setAllSpells(spells);
+      } catch (error) {
+        console.error('Error loading spells:', error);
+        setAllSpells([]);
+      }
+    };
+    loadSpells();
+  }, [ruleset]);
 
   // Load data based on ruleset
   const {
