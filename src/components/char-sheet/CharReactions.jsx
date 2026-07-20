@@ -6,6 +6,7 @@ import ArcaneWardRestoreModal from './modals/arcane/ArcaneWardRestoreModal.jsx'
 import BastionOfLawSpendModal from './modals/divine/BastionOfLawSpendModal.jsx'
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx'
 import BendFateModal from './modals/BendFateModal.jsx'
+import StepsOfTheFeyTauntModal from './modals/StepsOfTheFeyTauntModal.jsx'
 import { getReactionSpellNames } from '../../services/ui/spellSectionUtils.js'
 import { getCategories } from '../../services/character/featureCategories.js'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
@@ -211,6 +212,8 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                 setModalState({ bendFateModal: result.payload });
             } else if (result.modalName === 'deflectRedirect') {
                 setModalState({ deflectRedirectModal: result.payload });
+            } else if (result.modalName === 'stepsOfTheFeyTaunt') {
+                setModalState({ stepsOfTheFeyTauntModal: result.payload });
             } else {
                 const html = buildFeatureDetailHtml(reaction);
                 if (html) setPopupHtml(html);
@@ -507,6 +510,12 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                     description={modalState.deflectRedirectModal.description}
                     onTargetSelected={handleRedirectConfirm}
                     onSkip={handleRedirectSkip}
+                />
+            )}
+            {modalState.stepsOfTheFeyTauntModal && (
+                <StepsOfTheFeyTauntModal
+                    {...modalState.stepsOfTheFeyTauntModal}
+                    onClose={() => setModalState({ stepsOfTheFeyTauntModal: null })}
                 />
             )}
             {reactions.filter(r => !getCategories(playerStats.rules || '5e').featuresToIgnore.includes(r.name)).map((reaction) => {

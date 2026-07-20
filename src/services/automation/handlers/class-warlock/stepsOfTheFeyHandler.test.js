@@ -77,48 +77,6 @@ describe('stepsOfTheFeyHandler.handle', () => {
     });
   });
 
-  describe('temp HP gain and use decrement', () => {
-    function setupTempHpMocks(existingTempHp = 0) {
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('freeCastCount')) return 1;
-        if (key === 'tempHp') return existingTempHp;
-        return null;
-      });
-      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
-    }
-
-    it('decrements use count and sets temp HP', async () => {
-      setupTempHpMocks(0);
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 10 }],
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const setCalls = useRuntimeState.setRuntimeValue.mock.calls;
-      const countCall = setCalls.find(c => c[1] === '_Steps_of_the_Fey_freeCastCount');
-      expect(countCall).toBeDefined();
-      expect(countCall[2]).toBe(0);
-
-      const tempHpCall = setCalls.find(c => c[1] === 'tempHp');
-      expect(tempHpCall).toBeDefined();
-    });
-
-    it('preserves existing temp HP when rolled value is lower', async () => {
-      setupTempHpMocks(10);
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 10 }],
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const setCalls = useRuntimeState.setRuntimeValue.mock.calls;
-      const tempHpCall = setCalls.find(c => c[1] === 'tempHp');
-      expect(tempHpCall).toBeDefined();
-      expect(tempHpCall[2]).toBe(10);
-    });
-  });
-
   describe('modal return for creature selection', () => {
     function setupModalMocks() {
       useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
@@ -129,7 +87,7 @@ describe('stepsOfTheFeyHandler.handle', () => {
       automationExpressions.evaluateAutoExpression.mockReturnValue(1);
     }
 
-    it('returns modal with eligible targets when combat has creatures', async () => {
+    it('returns modal with mode and eligible targets when combat has creatures', async () => {
       setupModalMocks();
       const combatCreatures = [
         { name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 10 },
@@ -141,11 +99,12 @@ describe('stepsOfTheFeyHandler.handle', () => {
 
       expect(result.type).toBe('modal');
       expect(result.modalName).toBe('stepsOfTheFeyTaunt');
+      expect(result.payload.mode).toBe('stepsOfTheFey');
       expect(result.payload.targets).toEqual(combatCreatures);
       expect(result.payload.saveDc).toBe(13); // 8 + 2 (CHA) + 3 (prof)
       expect(result.payload.featureName).toBe('Steps of the Fey');
-      expect(result.payload.tempHpRoll).toBeDefined();
       expect(result.payload.newCount).toBe(0);
+      expect(result.payload.tempHpRoll).toBeUndefined();
     });
 
     it('filters out the warlock from eligible targets', async () => {

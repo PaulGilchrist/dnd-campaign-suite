@@ -2,11 +2,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './mistyEscapeHandler.js';
 
-vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
-    getRuntimeValue: vi.fn(),
-    setRuntimeValue: vi.fn(async () => {}),
-}));
-
 vi.mock('../../common/damageRollback.js', () => ({
     findLastAttack: vi.fn(),
 }));
@@ -15,19 +10,18 @@ vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../rules/effects/expirations.js', () => ({
-    addExpiration: vi.fn(),
-}));
-
 vi.mock('../../common/savePrompt.js', () => ({
     buildSaveDc: vi.fn(),
 }));
 
-const { getRuntimeValue, setRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js');
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+    getCombatContext: vi.fn(),
+}));
+
 const { findLastAttack } = await import('../../common/damageRollback.js');
 const { addEntry } = await import('../../../ui/logService.js');
-const { addExpiration } = await import('../../../rules/effects/expirations.js');
 const { buildSaveDc } = await import('../../common/savePrompt.js');
+const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
 
 function makePlayerStats(overrides = {}) {
     return {
@@ -65,8 +59,8 @@ function makeRecentAttack(overrides = {}) {
 
 beforeEach(() => {
     vi.clearAllMocks();
-    getRuntimeValue.mockReturnValue([]);
     buildSaveDc.mockReturnValue(15);
+    getCombatContext.mockResolvedValue({ creatures: [] });
 });
 
 describe('mistyEscapeHandler', () => {
@@ -90,69 +84,43 @@ describe('mistyEscapeHandler', () => {
         });
     });
 
-    describe('disappearing step: invisible condition', () => {
-        it('adds invisible condition to existing conditions', async () => {
-            findLastAttack.mockResolvedValue(makeRecentAttack());
-            getRuntimeValue.mockReturnValue(['fatigued']);
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'WarlockGirl',
-                'activeConditions',
-                ['fatigued', 'invisible'],
-                'test-campaign'
-            );
-        });
-
-        it('skips setting conditions when invisible is already present', async () => {
-            findLastAttack.mockResolvedValue(makeRecentAttack());
-            getRuntimeValue.mockReturnValue(['invisible']);
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
-
-        it('registers expiration for invisible condition after 1 round', async () => {
-            findLastAttack.mockResolvedValue(makeRecentAttack());
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(addExpiration).toHaveBeenCalledWith(
-                'WarlockGirl',
-                'WarlockGirl',
-                [{ type: 'condition', condition: 'invisible' }],
-                'test-campaign',
-                undefined,
-                'WarlockGirl'
-            );
-        });
-    });
-
-    describe('popup result payload', () => {
+    describe('modal return', () => {
         function setupSuccessfulHandler() {
             findLastAttack.mockResolvedValue(makeRecentAttack());
-            getRuntimeValue.mockReturnValue([]);
             buildSaveDc.mockReturnValue(15);
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 10 },
+                    { name: 'WarlockGirl', type: 'player', currentHp: 20, maxHp: 20 },
+                ],
+            });
         }
 
-        it('includes full description and save/damage info for default action', async () => {
+        it('returns modal with mode and targets when damage was taken', async () => {
             setupSuccessfulHandler();
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(result.payload.name).toBe('Misty Escape');
-            expect(result.payload.description).toContain('Misty Step');
-            expect(result.payload.description).toContain('Invisible condition');
-            expect(result.payload.description).toContain('Dreadful Step');
-            expect(result.payload.description).toContain('2d10 Psychic damage');
-            expect(result.payload.saveType).toBe('WIS');
+            expect(result.type).toBe('modal');
+            expect(result.modalName).toBe('stepsOfTheFeyTaunt');
+            expect(result.payload.mode).toBe('mistyEscape');
+            expect(result.payload.title).toBe('Misty Step');
             expect(result.payload.saveDc).toBe(15);
-            expect(result.payload.damageType).toBe('Psychic');
-            expect(result.payload.damageExpression).toBe('2d10');
-            expect(result.payload.aoeRange).toBe('5_ft');
-            expect(result.payload.triggerMistyStep).toBe(true);
+            expect(result.payload.featureName).toBe('Misty Escape');
+            // Should filter out the warlock from targets
+            expect(result.payload.targets.length).toBe(1);
+            expect(result.payload.targets[0].name).toBe('Goblin');
+        });
+
+        it('returns modal with empty targets when no creatures in combat', async () => {
+            setupSuccessfulHandler();
+            getCombatContext.mockResolvedValue({ creatures: [] });
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+
+            expect(result.type).toBe('modal');
+            expect(result.payload.mode).toBe('mistyEscape');
+            expect(result.payload.targets).toEqual([]);
         });
 
         it('respects custom saveType and feature name from automation config', async () => {
@@ -166,9 +134,7 @@ describe('mistyEscapeHandler', () => {
                 null
             );
 
-            expect(result.payload.name).toBe('Shadow Blink');
-            expect(result.payload.description).toContain('Shadow Blink');
-            expect(result.payload.saveType).toBe('CHA');
+            expect(result.payload.featureName).toBe('Shadow Blink');
             expect(result.payload.saveDc).toBe(17);
         });
     });

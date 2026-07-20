@@ -2,10 +2,6 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { evaluateAutoExpression } from '../../../combat/automation/automationExpressions.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 
-function rollDie(sides) {
-    return Math.floor(Math.random() * sides) + 1;
-}
-
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -30,12 +26,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const newCount = currentCount - 1;
     await setRuntimeValue(playerName, freeCastCountKey, newCount, campaignName);
 
-    // Refreshing Step: gain 1d10 Temporary Hit Points
-    const tempHpRoll = rollDie(10);
-    const existingTempHp = Number(getRuntimeValue(playerName, 'tempHp', campaignName) ?? 0);
-    const newTempHp = Math.max(existingTempHp, tempHpRoll);
-    await setRuntimeValue(playerName, 'tempHp', newTempHp, campaignName);
-
     // Get combat context for eligible targets
     const cs = await getCombatContext(campaignName);
     if (!cs?.creatures || cs.creatures.length === 0) {
@@ -44,7 +34,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             payload: {
                 type: 'automation_info',
                 name: featureName,
-                description: `${featureName}: Cast Misty Step without expending a spell slot (${newCount} remaining).<br/><br/><b>Refreshing Step:</b> Gained ${tempHpRoll} Temporary Hit Points.<br/><br/>No creatures in combat for Taunting Step.`,
+                description: `${featureName}: Cast Misty Step without expending a spell slot (${newCount} remaining).<br/><br/>No creatures in combat for Taunting Step.`,
                 automation: auto,
                 triggerMistyStep: true,
             },
@@ -58,7 +48,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             payload: {
                 type: 'automation_info',
                 name: featureName,
-                description: `${featureName}: Cast Misty Step without expending a spell slot (${newCount} remaining).<br/><br/><b>Refreshing Step:</b> Gained ${tempHpRoll} Temporary Hit Points.<br/><br/>No other creatures in combat for Taunting Step.`,
+                description: `${featureName}: Cast Misty Step without expending a spell slot (${newCount} remaining).<br/><br/>No other creatures in combat for Taunting Step.`,
                 automation: auto,
                 triggerMistyStep: true,
             },
@@ -71,13 +61,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         type: 'modal',
         modalName: 'stepsOfTheFeyTaunt',
         payload: {
+            mode: 'stepsOfTheFey',
             targets: eligibleTargets,
             action,
             playerStats,
             campaignName,
             saveDc,
             featureName,
-            tempHpRoll,
             newCount,
         },
     };
