@@ -306,6 +306,7 @@ export async function triggerBewitchingMagic(spell, metaCtx, playerStats, campai
                 type: 'bewitching_magic',
                 casting_time: 'passive',
             },
+            school: spell.school,
         };
 
         try {

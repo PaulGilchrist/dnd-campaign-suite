@@ -13,6 +13,7 @@ import { getCombatContext } from '../combat/damageUtils.js';
 import { addEntry } from '../../ui/logService.js';
 import { executeHandler } from '../../automation/index.js';
 import { rollExpressionMaximized } from '../../dice/diceRoller.js';
+import storage from '../../ui/storage.js';
 import { addExpiration } from '../effects/expirations.js';
 import { triggerFalseLife } from '../features/falseLifeService.js';
 import { triggerHealingWord } from '../features/healingWordService.js';
@@ -95,6 +96,26 @@ function applyEldritchHex(spell, playerStats, campaignName, targetName) {
 export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, featEffects, campaignName, mapName, characters }) {
     if (getActiveBuffs(playerStats.name, campaignName).some(b => b.blocksSpellcasting)) {
         return;
+    }
+
+    // Set lastAttack with spell school so features like Bewitching Magic can find it
+    const lastAttackSchool = (spell.school || '').toLowerCase();
+    if (lastAttackSchool) {
+        try {
+            const cs = await getCombatContext(campaignName);
+            const merged = {
+                ...(cs || {}),
+                lastAttack: {
+                    attackerName: playerStats.name,
+                    targetName: playerStats.name,
+                    spellSchool: lastAttackSchool,
+                    timestamp: Date.now(),
+                },
+            };
+            await storage.set('combatSummary', merged, campaignName);
+        } catch (err) {
+            console.error('[spellCast] Failed to set lastAttack with spellSchool:', err);
+        }
     }
 
     // Compute hasInvisible early so it's available for all spell paths

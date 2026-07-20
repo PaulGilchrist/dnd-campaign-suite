@@ -242,9 +242,21 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
     return currentSP;
   })();
 
-  const hasAnySlots = isCantrip || freeCastAuthorized || upcastLevels.some(l => l.availableSlots > 0) || _psionicSorceryAvailable > 0;
-
   const isWarlock = playerStats.class?.name === 'Warlock';
+  const getWarlockSlotLevel = (minLevel) => {
+    if (!isWarlock) return null;
+    for (let lv = minLevel; lv <= 9; lv++) {
+      const key = `spell_slots_level_${lv}`;
+      const max = (playerStats.spellAbilities && playerStats.spellAbilities[key]) || 0;
+      const current = getRuntimeValue(playerStats.name, key);
+      const available = current != null ? current : max;
+      if (available > 0) return lv;
+    }
+    return null;
+  };
+  const warlockSlotLevel = getWarlockSlotLevel(spell.level);
+  const hasAnySlots = isCantrip || freeCastAuthorized || upcastLevels.some(l => l.availableSlots > 0) || (isWarlock && warlockSlotLevel !== null) || _psionicSorceryAvailable > 0;
+
   const hasPsychicSpells = playerStats.automation?.passives?.some(p => p.type === 'psychic_spells');
   const hasSpellBreaker = playerStats.automation?.passives?.some(p => p.type === 'spell_breaker');
   const hasImprovedIllusions = playerStats.automation?.passives?.some(p => p.type === 'improved_illusions');
@@ -484,12 +496,22 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
         }
       }
     } else if (!metaCtx._psionicUsed) {
-      const spellSlotKey = `spell_slots_level_${spell.level}`;
-      const currentSlots = getRuntimeValue(playerStats.name, spellSlotKey);
-      const maxSlots = (playerStats.spellAbilities && playerStats.spellAbilities[spellSlotKey]) || 0;
-      const availableSlots = currentSlots != null ? currentSlots : maxSlots;
-      if (availableSlots > 0) {
-        setRuntimeValue(playerStats.name, spellSlotKey, availableSlots - 1, campaignName);
+      const baseSlotKey = `spell_slots_level_${spell.level}`;
+      let availableSlots = getRuntimeValue(playerStats.name, baseSlotKey);
+      const maxSlots = (playerStats.spellAbilities && playerStats.spellAbilities[baseSlotKey]) || 0;
+      availableSlots = availableSlots != null ? availableSlots : maxSlots;
+
+      if (isWarlock && availableSlots <= 0 && warlockSlotLevel !== null) {
+        effectiveSpellLevel = warlockSlotLevel;
+        const slotKey = `spell_slots_level_${warlockSlotLevel}`;
+        const currentSlots = getRuntimeValue(playerStats.name, slotKey);
+        const slotMax = (playerStats.spellAbilities && playerStats.spellAbilities[slotKey]) || 0;
+        availableSlots = currentSlots != null ? currentSlots : slotMax;
+        if (availableSlots > 0) {
+          setRuntimeValue(playerStats.name, slotKey, availableSlots - 1, campaignName);
+        }
+      } else if (availableSlots > 0) {
+        setRuntimeValue(playerStats.name, baseSlotKey, availableSlots - 1, campaignName);
       }
     }
 
@@ -553,7 +575,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
     const stored = getRuntimeValue(playerStats.name, baseKey);
     const max = (playerStats.spellAbilities && playerStats.spellAbilities[baseKey]) || 0;
     return (stored != null ? stored : max) > 0;
-  })())) || (_psionicSorceryAvailable >= (isUpcastable ? Number(selectedUpcastLvl) || spell.level : spell.level)));
+  })() || (isWarlock && warlockSlotLevel !== null))) || (_psionicSorceryAvailable >= (isUpcastable ? Number(selectedUpcastLvl) || spell.level : spell.level)));
 
   const showUpcastSelector = isUpcastable && upcastLevels.length > 1;
 
@@ -569,17 +591,17 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
           <span><b>Duration:</b> {spell.duration || '—'}</span>
           {spell.school && <span><b>School:</b> {spell.school}</span>}
           {spell.area_of_effect && <span><b>Area:</b> {spell.area_of_effect.type || spell.area_of_effect.shape}{spell.area_of_effect.size ? ` - ${spell.area_of_effect.size}` : ''}</span>}
-          {!isCantrip && !showUpcastSelector && (
-            <span><b>Slots Remaining:</b> {(() => {
-              const baseKey = `spell_slots_level_${spell.level}`;
-              const stored = getRuntimeValue(playerStats.name, baseKey);
-              const max = (playerStats.spellAbilities && playerStats.spellAbilities[baseKey]) || 0;
-              const slots = stored != null ? stored : max;
-              return slots > 0 ? `${slots} slot${slots !== 1 ? 's' : ''}` : slots;
-            })()}{!isCantrip && !showUpcastSelector && _psionicSorceryAvailable > 0 && (() => {
-              const baseKey = `spell_slots_level_${spell.level}`;
-              const stored = getRuntimeValue(playerStats.name, baseKey);
-              const max = (playerStats.spellAbilities && playerStats.spellAbilities[baseKey]) || 0;
+           {!isCantrip && !showUpcastSelector && (
+             <span><b>Slots Remaining:</b> {(() => {
+               const displayKey = isWarlock && warlockSlotLevel ? `spell_slots_level_${warlockSlotLevel}` : `spell_slots_level_${spell.level}`;
+               const stored = getRuntimeValue(playerStats.name, displayKey);
+               const max = (playerStats.spellAbilities && playerStats.spellAbilities[displayKey]) || 0;
+               const slots = stored != null ? stored : max;
+               return slots > 0 ? `${slots} slot${slots !== 1 ? 's' : ''}` : slots;
+             })()}{!isCantrip && !showUpcastSelector && _psionicSorceryAvailable > 0 && (() => {
+               const baseKey = `spell_slots_level_${spell.level}`;
+               const stored = getRuntimeValue(playerStats.name, baseKey);
+               const max = (playerStats.spellAbilities && playerStats.spellAbilities[baseKey]) || 0;
               const slots = stored != null ? stored : max;
               return slots > 0 ? ` or ${_psionicSorceryAvailable} SP` : `${_psionicSorceryAvailable} SP`;
             })()}</span>

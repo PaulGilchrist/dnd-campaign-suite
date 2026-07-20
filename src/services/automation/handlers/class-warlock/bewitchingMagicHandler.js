@@ -40,7 +40,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     // Check spell school is enchantment or illusion
-    const school = (cs.lastAttack.damageSchool || '').toLowerCase();
+    const school = (cs.lastAttack.spellSchool || action.school || cs.lastAttack.damageSchool || '').toLowerCase();
     if (school !== 'enchantment' && school !== 'illusion') {
         return {
             type: 'popup',
