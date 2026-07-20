@@ -151,6 +151,7 @@ describe('createSaveListener', () => {
         expect(sendSavePrompt).toHaveBeenCalledWith(campaignName, {
             promptId: 'prompt-abc',
             targetName: 'Orc',
+            attackerName: null,
             saveType: 'CON',
             advantage: false,
             disadvantage: false,
@@ -173,6 +174,7 @@ describe('createSaveListener', () => {
         expect(sendSavePrompt).toHaveBeenCalledWith(campaignName, {
             promptId: 'prompt-full',
             targetName: 'Orc',
+            attackerName: null,
             saveType: 'DEX',
             saveDc: 15,
             dcSuccess: 'The orc falls prone.',

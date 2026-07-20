@@ -194,6 +194,9 @@ export function createLogAndShow(deps) {
         let hit = isAutoMiss ? false : (target ? (effectiveD20Roll + effectiveBonus >= effectiveAc) : undefined);
         const targetName = (rollType === 'attack' || rollType === 'save') ? (target?.name || context?.targetName) : undefined;
         const attackerName = context?.attackerName || characterName;
+        if (rollType === 'save' && !context?.attackerName) {
+            console.error('[useLoggedDiceRollAttack] Save roll missing context.attackerName:', { characterName, targetName, name, context });
+        }
 
         let unerringStrikeApplied = false;
         if (!hit && !isAutoMiss && rollType === 'attack' && context?.isWeaponAttack) {
@@ -1012,9 +1015,10 @@ export function createLogAndShow(deps) {
                 }, campaignName);
 
                 if (combatSummary) {
+                    console.log('[useLoggedDiceRollAttack] SAVE lastAttack (player):', { attackerName, targetName: target?.name || context?.targetName, characterName });
                     combatSummary.lastAttack = {
                         attackerName,
-                        targetName: characterName,
+                        targetName: target?.name || context?.targetName,
                         d20: effectiveD20ForSave,
                         d20Rolls: [saveResult.roll, ...(saveResult.rawRolls || [])],
                         bonus: saveResult.saveBonus,
@@ -1092,9 +1096,10 @@ export function createLogAndShow(deps) {
                 }, campaignName);
 
                 if (saveDc != null && combatSummary) {
+                    console.log('[useLoggedDiceRollAttack] SAVE lastAttack (NPC):', { attackerName, targetName: target?.name || context?.targetName, characterName });
                     combatSummary.lastAttack = {
                         attackerName,
-                        targetName: characterName,
+                        targetName: target?.name || context?.targetName,
                         d20: effectiveD20ForSave,
                         d20Rolls: [r1, r2],
                         bonus,

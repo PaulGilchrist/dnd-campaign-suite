@@ -714,8 +714,11 @@ export function createLogDamageAndShow(deps) {
             popupData.secondaryFinalDamage = secondaryResult.finalDamage;
         }
 
+        if (!context?.attackerName || !target?.name) {
+            console.error('[useLoggedDiceRollDamage] lastAttack missing required fields:', { attackerName: context?.attackerName, targetName: target?.name, characterName });
+        }
         combatSummary.lastAttack = {
-            attackerName: characterName,
+            attackerName: context?.attackerName || null,
             targetName: target.name,
             d20: saveResult.roll,
             d20Rolls: saveResult.rawRolls || [saveResult.roll],
@@ -735,6 +738,7 @@ export function createLogDamageAndShow(deps) {
             damageApplied: (primaryApplyResult?.finalDamage ?? finalDamage) > 0,
             timestamp: Date.now(),
         };
+        console.log('[useLoggedDiceRollDamage] lastAttack overwrite (NPC save):', { attackerName: context?.attackerName, targetName: target.name, saveType, saveDc });
         storage.set('combatSummary', combatSummary, campaignName);
 
         setPopupHtml(popupData);

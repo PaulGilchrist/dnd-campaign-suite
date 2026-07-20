@@ -111,6 +111,7 @@ describe('charmPersonHandler.handle', () => {
 
       expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
         targetName: 'Goblin',
+        attackerName: 'TestCaster',
         saveType: 'WIS',
         saveDc: 15,
         dcSuccess: 'none',

@@ -198,13 +198,15 @@ describe('friendsHandler.handle', () => {
             expect(result.payload.targetName).toBe('Goblin');
         });
 
-        it('sets lastAttack on combatSummary even when save fails', async () => {
+        it('does not write lastAttack directly — that is handled by the dice roll hooks', async () => {
             defaultSaveListener(false);
             getRuntimeValue.mockReturnValue([]);
 
             await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
 
-            expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.objectContaining({ lastAttack: expect.any(Object) }), campaignName);
+            // lastAttack is now written by useLoggedDiceRollAttack.js or useLoggedDiceRollDamage.js
+            // when the save is processed through the proper dice roll path
+            expect(storage.set).not.toHaveBeenCalledWith('combatSummary', expect.any(Object), campaignName);
         });
     });
 
@@ -323,6 +325,7 @@ describe('friendsHandler.handle', () => {
 
             expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
                 targetName: 'Goblin',
+                attackerName: 'Bard1',
                 saveType: 'WIS',
                 saveDc: 10,
                 dcSuccess: 'none',

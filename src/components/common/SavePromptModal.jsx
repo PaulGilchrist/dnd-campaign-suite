@@ -53,9 +53,9 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
 
     setPrompts(prev => {
       if (prev.some(p => p.promptId === event.data.promptId)) return prev;
-      const { sourceAttackerName, targetName: dataTargetName, ...restData } = event.data;
+      const { sourceAttackerName, attackerName: eventDataAttackerName, targetName: dataTargetName, ...restData } = event.data;
       const targetName = dataTargetName || event.key.slice(prefix.length) || null;
-      const newPrompt = { targetName, attackerName: sourceAttackerName, ...restData };
+      const newPrompt = { targetName, attackerName: eventDataAttackerName || sourceAttackerName, ...restData };
 
       const pendingSaves = getRuntimeValue(campaignName, 'pendingSavePrompts') || {};
       const fullPrompt = { ...newPrompt, campaignName };

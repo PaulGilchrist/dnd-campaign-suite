@@ -98,7 +98,6 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         return;
     }
 
-    // Set lastAttack with spell school so features like Bewitching Magic can find it
     const lastAttackSchool = (spell.school || '').toLowerCase();
     if (lastAttackSchool) {
         try {
@@ -113,6 +112,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                 },
             };
             await storage.set('combatSummary', merged, campaignName);
+            console.log('[spellCast] SET lastAttack.spellSchool=', lastAttackSchool);
         } catch (err) {
             console.error('[spellCast] Failed to set lastAttack with spellSchool:', err);
         }

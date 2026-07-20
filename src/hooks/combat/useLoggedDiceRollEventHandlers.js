@@ -89,7 +89,10 @@ export function setupEventListeners(deps) {
                 if (t) targetMaxHp = t.type === 'player' ? (getRuntimeValue(t.name, 'hitPoints') ?? 0) : t.maxHp;
             }
             const ignoreResistance = (pending.playerStats && hasIgnoreResistance(pending.playerStats, pending.damageType)) || false;
-            const attacker = pending.attackerName || pending.sourceAttackerName || characterName;
+            const attacker = pending.attackerName || pending.sourceAttackerName || null;
+            if (!attacker) {
+                console.error('[save-result-handler] Missing attacker in pending save:', { promptId: e.detail.promptId, pendingKeys: Object.keys(pending), characterName });
+            }
 
             // Compute secondary damage info first (dice rolls only, no damage application)
             // so we can use the combined total for the concentration DC
@@ -296,7 +299,10 @@ export function setupEventListeners(deps) {
                 const effectsToExpire = [];
                 for (const effect of pending.statusEffects) {
                     const condKey = String(effect).toLowerCase();
-                    const attackerName = pending.attackerName || pending.sourceAttackerName || characterName;
+                    const attackerName = pending.attackerName || pending.sourceAttackerName || null;
+                    if (!attackerName) {
+                        console.error('[save-result-handler] Status effect missing attacker for', condKey, ':', { promptId: e.detail.promptId, pendingKeys: Object.keys(pending), characterName });
+                    }
                     const attackerCreature = combatSummary?.creatures?.find(c => c.name === attackerName);
                     if (targetStats && playerIsImmuneToCondition({
                         conditionKey: condKey,

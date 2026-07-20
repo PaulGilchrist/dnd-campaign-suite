@@ -7,8 +7,6 @@ import { addExpiration } from '../../../rules/effects/expirations.js';
 import { rollSaveForCreature } from '../../../rules/combat/applyDamage.js';
 import { rollD20 } from '../../../dice/diceRoller.js';
 import { sendSaveResult } from '../../../combat/conditions/savePromptService.js';
-import storage from '../../../ui/storage.js';
-import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 
 function dispatchSaveResult(campaignName, promptId, targetName, saveType, saveDc, saveResult) {
     sendSaveResult(campaignName, targetName, {
@@ -57,6 +55,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const { promptId, promise } = createSaveListener(campaignName, {
         targetName,
+        attackerName: casterName,
         saveType: 'WIS',
         saveDc: dc,
         dcSuccess: 'none',
@@ -91,34 +90,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     const saveResult = await promise;
-
-    // Set combatSummary.lastAttack so Countercharm can find this save
-    if (saveResult) {
-        const lastAttackData = {
-            attackerName: casterName,
-            targetName,
-            d20: saveResult.roll,
-            d20Rolls: [saveResult.roll, ...(saveResult.rawRolls || [])],
-            bonus: saveResult.saveBonus,
-            total: saveResult.total,
-            saveType: 'WIS',
-            saveDc: dc,
-            saveResult: saveResult.success ? 'success' : 'failure',
-            isNatural20: saveResult.roll === 20,
-            isNatural1: saveResult.roll === 1,
-            actionName: 'Charm Person',
-            rollType: 'save',
-            saveConditions: ['charmed'],
-            timestamp: Date.now(),
-        };
-        try {
-            const cs = await getCombatContext(campaignName);
-            const merged = { ...(cs || {}), lastAttack: lastAttackData };
-            await storage.set('combatSummary', merged, campaignName);
-        } catch (err) {
-            console.error('[charmPerson] Failed to set lastAttack:', err);
-        }
-    }
 
     if (saveResult.success) {
         addEntry(campaignName, {

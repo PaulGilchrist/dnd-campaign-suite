@@ -1,6 +1,7 @@
 export function sendSavePrompt(campaignName, promptData) {
   const key = `savePrompt-${promptData.targetName}`;
-  fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${key}`, {
+  const url = `/api/campaigns/${encodeURIComponent(campaignName)}/${key}`;
+  fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: promptData }),
