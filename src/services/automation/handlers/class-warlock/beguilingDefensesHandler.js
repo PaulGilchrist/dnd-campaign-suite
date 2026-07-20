@@ -3,10 +3,13 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { findLastAttack } from '../../common/damageRollback.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
+import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
+import storage from '../../../ui/storage.js';
 
 const USES_KEY = 'beguilingDefensesUses';
 
-export async function handle(action, playerStats, campaignName, _mapName) {
+export async function handle(action, playerStats, campaignName, _mapName, characters) {
     const auto = action.automation;
     const playerName = playerStats.name;
     const featureName = action.name || 'Beguiling Defenses';
@@ -27,6 +30,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     const attackerName = attackResult.attackerName || 'Attacker';
+    const totalDamage = attackResult.totalDamage || 0;
+    const halfDamage = Math.floor(totalDamage / 2);
 
     // 2. Check uses remaining (1 per Long Rest)
     let currentUses = Number(getRuntimeValue(playerName, USES_KEY, campaignName) ?? 0);
@@ -79,11 +84,32 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // 3. Increment use counter
     await setRuntimeValue(playerName, USES_KEY, currentUses + 1, campaignName);
 
-    // 4. Get the attacker from combat context for the save prompt
+    // 4. Heal warlock for half the attack damage
     const cs = await getCombatContext(campaignName);
+    let healedAmount = 0;
+    if (cs && halfDamage > 0) {
+        const healResult = await applyHealingToTarget(cs, playerName, halfDamage, campaignName);
+        healedAmount = healResult?.actualHeal ?? 0;
+    }
+    if (healedAmount > 0) {
+        const currentHp = getRuntimeValue(playerName, 'currentHitPoints', campaignName) ?? playerStats.computedStats?.currentHp ?? 0;
+        const maxHp = getRuntimeValue(playerName, 'hitPoints', campaignName) ?? playerStats.computedStats?.maxHp ?? 0;
+        await addEntry(campaignName, {
+            type: 'hp_change',
+            targetName: playerName,
+            delta: healedAmount,
+            currentHp,
+            maxHp,
+            isHealing: true,
+            sourceName: featureName,
+            note: `Halved damage from ${attackerName}'s attack`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[beguilingDefenses] Error:", e); });
+    }
+
+    // 5. Resolve attacker from combat context
     let targetName = attackerName;
     if (cs) {
-        // The attacker is the creature that targeted the player
         const attackerCreature = cs.creatures?.find(c =>
             c.targetName === playerName || c.name === attackerName
         );
@@ -92,7 +118,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         }
     }
 
-    // 5. Build save DC and create save listener for the attacker
+    // 6. Build save DC and create save listener for the attacker
     const saveDc = buildSaveDc(auto, playerStats);
     const saveType = auto.saveType || 'WIS';
 
@@ -102,11 +128,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         saveDc,
     });
 
-    addEntry(campaignName, {
+    await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
         abilityName: featureName,
-        description: `${featureName} triggered — ${targetName} was hit with attack, damage halved. ${targetName} must make ${saveType} save (DC ${saveDc}) or take Psychic damage equal to damage dealt to ${playerName} (after halving).`,
+        description: `${playerName} activated ${featureName} against ${attackerName}. Attack dealt ${totalDamage} damage (${(attackEvent.damageTypes || []).length > 0 ? attackEvent.damageTypes.join(', ') : 'unknown'}). Damage halved — ${playerName} healed for ${healedAmount} HP. ${targetName} must make ${saveType} save (DC ${saveDc}) or take ${halfDamage} Psychic damage.`,
         targetName,
         promptId,
         timestamp: Date.now(),
@@ -114,19 +140,48 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const handleSaveResult = async (event) => {
         if (event.detail.promptId !== promptId) return;
+        window.removeEventListener('save-result', handleSaveResult);
 
-        if (!event.detail.success) {
-            // The Psychic damage is equal to the damage the player takes (after halving)
-            // Since we can't know the exact damage at this point, describe it as a prompt
+        const { success, total, roll, bonus } = event.detail;
+
+        // Update combat summary lastAttack with save result for display
+        const csUpdate = await getCombatContext(campaignName);
+        if (csUpdate) {
+            csUpdate.lastAttack = {
+                ...csUpdate.lastAttack,
+                saveResult: success ? 'success' : 'failure',
+                saveDc,
+                saveType,
+                saveRoll: roll,
+                saveBonus: bonus,
+                saveTotal: total,
+                timestamp: Date.now(),
+            };
+            storage.set('combatSummary', csUpdate, campaignName);
+        }
+
+        if (!success) {
+            // Apply psychic damage to attacker equal to halved damage
+            let psychicDamage = 0;
+            if (csUpdate && halfDamage > 0) {
+                await applyDamageToTarget(csUpdate, targetName, halfDamage, ['Psychic'], campaignName, characters || [], false, playerName);
+                psychicDamage = halfDamage;
+            }
             addEntry(campaignName, {
                 type: 'roll',
                 characterName: playerName,
                 rollType: 'damage',
-                name: featureName + ' Damage',
+                name: featureName + ' Psychic Retaliation',
                 targetName,
                 damageType: 'Psychic',
-                formula: 'equal to damage taken (after halving)',
-                description: `${targetName} failed ${saveType} save against ${featureName} and takes Psychic damage equal to the damage dealt to ${playerName} (after halving).`,
+                formula: `${halfDamage}`,
+                total: psychicDamage,
+                saveResult: 'failure',
+                saveDc,
+                saveType: 'WIS',
+                saveRoll: roll,
+                saveBonus: bonus,
+                description: `${targetName} failed ${saveType} save (DC ${saveDc}) against ${featureName}. Takes ${psychicDamage} Psychic damage.`,
                 timestamp: Date.now(),
             }).catch((e) => { console.error("[beguilingDefenses] Error:", e); });
         } else {
@@ -137,22 +192,21 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveDc,
                 saveType,
                 success: true,
-                description: `${targetName} succeeded on ${saveType} save — no Psychic damage from ${featureName}.`,
+                saveRoll: roll,
+                saveBonus: bonus,
+                description: `${targetName} succeeded on ${saveType} save (DC ${saveDc}) — no Psychic damage from ${featureName}.`,
                 timestamp: Date.now(),
             }).catch((e) => { console.error("[beguilingDefenses] Error:", e); });
         }
-
-        window.removeEventListener('save-result', handleSaveResult);
     };
 
     window.addEventListener('save-result', handleSaveResult);
 
-    // 6. Build the popup description
-    let description = `<b>${featureName}</b><br/><br/>`;
-    description += `Attacker: <b>${targetName}</b><br/>`;
-    description += `After being hit by the attack roll, you use your Reaction to reduce the damage by half.<br/><br/>`;
-    description += `<b>Damage Reduction:</b> The damage from the triggering attack is reduced by half.<br/><br/>`;
-    description += `<b>Psychic Retaliation:</b> ${targetName} must make a <b>Wisdom</b> saving throw (DC ${saveDc}). On a failure, they take <b>Psychic damage</b> equal to the damage you took (after halving).<br/><br/>`;
+    // 7. Build the popup description
+    let description = `Attacker: <b>${targetName}</b><br/>`;
+    description += `Attack dealt <b>${totalDamage}</b> damage (${(attackEvent.damageTypes || []).length > 0 ? attackEvent.damageTypes.join(', ') : 'unknown'}).<br/>`;
+    description += `<b>Damage Halved:</b> You heal for <b>${halfDamage}</b> HP (half of ${totalDamage}).<br/><br/>`;
+    description += `<b>Psychic Retaliation:</b> ${targetName} must make a <b>${saveType}</b> saving throw (DC ${saveDc}). On a failure, they take <b>${halfDamage} Psychic damage</b>.<br/><br/>`;
     description += `<em>Uses remaining: ${maxUses - currentUses - 1} / ${maxUses} (Long Rest).</em>`;
 
     return {

@@ -11912,7 +11912,7 @@
           },
           {
             "name": "Misty Escape",
-            "description": "Cast Misty Step as Reaction in response to taking damage. Additional effects:<ul><li><b>Disappearing Step:</b> Have Invisible condition until start of next turn or after attacking/dealing damage/casting spell)</li><li><b>Dreadful Step:</b> Creatures within 5 feet of space you left or appear in make Wisdom save or take 2d10 Psychic damage.</li></ul>",
+            "description": "You can cast Misty Step as a Reaction in response to taking damage. In addition, the following effects are now among your Steps of the Fey options.<ul><li><b>Disappearing Step:</b> You have the Invisible condition until the start of your next turn or, until immediately after you make an attack roll, deal damage, or cast a spell.</li><li><b>Dreadful Step:</b> Creatures within 5 feet of the space you left or the space you appear in (your choice) must succeed on a Wisdom saving throw against your spell save DC or take 2d10 Psychic damage.</li></ul>",
             "level": 6,
             "automation": {
               "type": "misty_escape",

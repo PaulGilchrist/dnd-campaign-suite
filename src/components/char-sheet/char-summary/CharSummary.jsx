@@ -248,7 +248,8 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
             .flatMap(ci => ci.immunities || [])
         : [];
 
-    const allImmunities = [...new Set([...baseImmunities, ...auraImmunities, ...rageConditionalImmunities])];
+    const automationImmunities = playerStats.automationConditionImmunities || [];
+    const allImmunities = [...new Set([...baseImmunities, ...auraImmunities, ...automationImmunities, ...rageConditionalImmunities])];
 
     const allResistances = [...new Set([...baseResistances, ...auraResistances, ...stormbornResistancesActive, ...rageResistances, ...wildHeartResistances, ...rageOfTheGodsResistances, ...superiorDefenseResistances, ...(epitomeResistanceType ? [epitomeResistanceType] : [])])];
 
