@@ -39,6 +39,7 @@ vi.mock('../../../services/ui/logService.js', () => ({
 import { getRuntimeValue, setRuntimeBatch, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { clearAllExpirationEffects } from './expirations.js'
 import { rollD20 } from '../../../services/dice/diceRoller.js'
+import { addEntry } from '../../../services/ui/logService.js'
 
 const CAMPAIGN = 'test-campaign'
 
@@ -289,7 +290,24 @@ describe('restRules', () => {
         specialActions: [{ name: 'Celestial Resilience' }],
       })
       await applyShortRest(celestialStats, CAMPAIGN)
-      expect(getBatchUpdates().tempHp).toBe(15)
+      expect(getBatchUpdates().tempHp).toBe(10)
+
+      // Celestial Resilience logs ability_use on short rest
+      vi.clearAllMocks()
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+        if (key === 'tempHp') return 5
+        return undefined
+      })
+      await applyShortRest(celestialStats, CAMPAIGN)
+      expect(addEntry).toHaveBeenCalledWith(
+        CAMPAIGN,
+        expect.objectContaining({
+          type: 'ability_use',
+          characterName: 'Test Hero',
+          abilityName: 'Celestial Resilience',
+          description: expect.stringContaining('10 temporary hit points'),
+        }),
+      )
 
       // Improved Warding Flare
       vi.clearAllMocks()
@@ -400,7 +418,24 @@ describe('restRules', () => {
       })
       await applyLongRest(celestialStats, CAMPAIGN)
       expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Hero', 'tempHp', 13, CAMPAIGN, true,
+        'Test Hero', 'tempHp', 10, CAMPAIGN, true,
+      )
+
+      // Celestial Resilience logs ability_use on long rest
+      vi.clearAllMocks()
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+        if (key === 'tempHp') return 3
+        return undefined
+      })
+      await applyLongRest(celestialStats, CAMPAIGN)
+      expect(addEntry).toHaveBeenCalledWith(
+        CAMPAIGN,
+        expect.objectContaining({
+          type: 'ability_use',
+          characterName: 'Test Hero',
+          abilityName: 'Celestial Resilience',
+          description: expect.stringContaining('10 temporary hit points'),
+        }),
       )
 
       // Improved Warding Flare

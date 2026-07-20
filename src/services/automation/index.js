@@ -528,6 +528,7 @@ export { confirmPrayerOfHealing } from './handlers/healing/prayerOfHealingHandle
 export { confirmMassHealingWord } from './handlers/healing/massHealingWordHandler.js';
 export { confirmPowerWordFortify } from './handlers/buffs/powerWordFortifyHandler.js';
 export { confirmSearingVengeance, skipSearingVengeance } from './handlers/class-warlock/searingVengeanceHandler.js';
+export { confirmCelestialResilience, skipCelestialResilience } from './handlers/class-warlock/celestialResilienceHandler.js';
 export async function executeHandler(action, playerStats, campaignName, mapName, characters) {
     if (!action?.automation) {
         return null;

@@ -13,12 +13,12 @@ vi.mock('../../../ui/logService.js', () => ({
 }))
 
 vi.mock('../class-warlock/celestialResilienceHandler.js', () => ({
-    grantCelestialResilience: vi.fn().mockResolvedValue(null),
+    handle: vi.fn().mockResolvedValue(null),
 }))
 
 // Re-import after mocking
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js'
-import { grantCelestialResilience } from '../class-warlock/celestialResilienceHandler.js'
+import { handle as celestialResilienceHandle } from '../class-warlock/celestialResilienceHandler.js'
 import { addEntry } from '../../../ui/logService.js'
 
 const campaignName = 'test-campaign'

@@ -176,16 +176,18 @@ describe('Dark One\'s Blessing', () => {
     expect(setRuntimeValue).toHaveBeenCalledWith('LowStatWarlock', 'tempHp', 1, 'TestCampaign');
   });
 
-  it('stacks temp HP with existing temp HP value', () => {
+  it('uses Math.max instead of stacking temp HP', () => {
     const goblin = createCreature('Goblin', 5, 5);
     const cs = makeCombatSummary([goblin]);
     const warlock = createFiendWarlock('FiendWarlock', 5, 16, 5); // 3 + 5 = 8
+    const warlock2 = createFiendWarlock('FiendWarlock2', 5, 16, 5); // 3 + 5 = 8
 
     stubPlayerRuntime(0, [], { tempHp: 3 }); // already has 3 temp HP
-    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')]);
+    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, warlock2, createMinimalCharacter('Goblin')]);
 
-    // existing 3 + 8 = 11
-    expect(setRuntimeValue).toHaveBeenCalledWith('FiendWarlock', 'tempHp', 11, 'TestCampaign');
+    // Math.max(3, 8) = 8
+    expect(setRuntimeValue).toHaveBeenCalledWith('FiendWarlock', 'tempHp', 8, 'TestCampaign');
+    expect(setRuntimeValue).toHaveBeenCalledWith('FiendWarlock2', 'tempHp', 8, 'TestCampaign');
   });
 
   it('does not grant temp HP to non-Fiend Patron warlocks', () => {

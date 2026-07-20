@@ -336,24 +336,31 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
     }
   }
 
- // Celestial Resilience: Grant temp HP on short rest for Celestial Patron
- if (playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron') {
-    const features = playerStats.specialActions || []
-    const feature = features.find(f => f.name === 'Celestial Resilience')
-   if (feature) {
-      if (playerStats.level == null) {
-        console.error('[restRules] applyShortRest: playerStats.level is missing for celestial patron temp HP')
-        throw new Error('playerStats.level is required for celestial patron temp HP')
+  // Celestial Resilience: Grant temp HP on short rest for Celestial Patron
+  if (playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron') {
+     const features = playerStats.specialActions || []
+     const feature = features.find(f => f.name === 'Celestial Resilience')
+    if (feature) {
+       if (playerStats.level == null) {
+         console.error('[restRules] applyShortRest: playerStats.level is missing for celestial patron temp HP')
+         throw new Error('playerStats.level is required for celestial patron temp HP')
+       }
+       const warlockLevel = playerStats.level
+       const chaMod = (playerStats.abilities || []).find(a => a.name === 'Charisma')?.bonus || 0
+       const selfTempHp = warlockLevel + chaMod
+       if (selfTempHp > 0) {
+          const existingTempHp = Number(getRuntimeValue(name, 'tempHp', campaignName) || 0)
+          updates.tempHp = Math.max(existingTempHp, selfTempHp)
+          addEntry(campaignName, {
+           type: 'ability_use',
+           characterName: name,
+           abilityName: 'Celestial Resilience',
+           description: `${name} gains ${selfTempHp} temporary hit points from Celestial Resilience (short rest).`,
+           timestamp: Date.now(),
+         }).catch((e) => { console.error('[celestialResilience] Error:', e); });
       }
-      const warlockLevel = playerStats.level
-      const chaMod = (playerStats.abilities || []).find(a => a.name === 'Charisma')?.bonus || 0
-      const selfTempHp = warlockLevel + chaMod
-      if (selfTempHp > 0) {
-        const existingTempHp = Number(getRuntimeValue(name, 'tempHp', campaignName) || 0)
-        updates.tempHp = existingTempHp + selfTempHp
-     }
-   }
- }
+    }
+  }
 
   // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
   updates.activeBuffs = [];
@@ -625,22 +632,29 @@ export async function applyLongRest(playerStats, campaignName) {
 
     // Celestial Resilience: Grant temp HP on long rest for Celestial Patron
      if (playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron') {
-      const features = playerStats.specialActions || []
-        const feature = features.find(f => f.name === 'Celestial Resilience')
-       if (feature) {
-          if (playerStats.level == null) {
-            console.error('[restRules] applyLongRest: playerStats.level is missing for celestial patron temp HP')
-            throw new Error('playerStats.level is required for celestial patron temp HP')
+       const features = playerStats.specialActions || []
+         const feature = features.find(f => f.name === 'Celestial Resilience')
+        if (feature) {
+           if (playerStats.level == null) {
+             console.error('[restRules] applyLongRest: playerStats.level is missing for celestial patron temp HP')
+             throw new Error('playerStats.level is required for celestial patron temp HP')
+           }
+           const warlockLevel = playerStats.level
+           const chaMod = (playerStats.abilities || []).find(a => a.name === 'Charisma')?.bonus || 0
+           const selfTempHp = warlockLevel + chaMod
+           if (selfTempHp > 0) {
+             const existingTempHp = Number(getRuntimeValue(name, 'tempHp', campaignName) || 0)
+             setRuntimeValue(name, 'tempHp', Math.max(existingTempHp, selfTempHp), campaignName, true)
+             addEntry(campaignName, {
+               type: 'ability_use',
+               characterName: name,
+               abilityName: 'Celestial Resilience',
+               description: `${name} gains ${selfTempHp} temporary hit points from Celestial Resilience (long rest).`,
+               timestamp: Date.now(),
+             }).catch((e) => { console.error('[celestialResilience] Error:', e); });
           }
-          const warlockLevel = playerStats.level
-          const chaMod = (playerStats.abilities || []).find(a => a.name === 'Charisma')?.bonus || 0
-          const selfTempHp = warlockLevel + chaMod
-          if (selfTempHp > 0) {
-            const existingTempHp = Number(getRuntimeValue(name, 'tempHp', campaignName) || 0)
-            setRuntimeValue(name, 'tempHp', existingTempHp + selfTempHp, campaignName, true)
-         }
-       }
-     }
+        }
+      }
 
        // Reset Bastion of Law ward on long rest
      const wardTarget = getRuntimeValue(name, 'bastionOfLawWardTarget', campaignName)

@@ -59,6 +59,7 @@ import ZealousPresenceModal from './modals/ZealousPresenceModal.jsx'
 import CoronaEnemySelectionModal from './modals/CoronaEnemySelectionModal.jsx'
 import RadianceOfDawnModal from './modals/RadianceOfDawnModal.jsx'
 import MantleOfInspirationModal from './modals/MantleOfInspirationModal.jsx'
+import CelestialResilienceModal from './modals/CelestialResilienceModal.jsx'
 import VitalityOfTheTreeModal from './modals/VitalityOfTheTreeModal.jsx'
 import InspiringSmiteModal from './modals/InspiringSmiteModal.jsx'
 import RecklessAttackModal from './modals/shared/RecklessAttackModal.jsx'
@@ -184,6 +185,8 @@ export default function CharActionModals({
     handleCoronaEnemySelectionConfirm,
     handleRadianceOfDawnConfirm,
     handleMantleOfInspirationConfirm,
+    handleCelestialResilienceConfirm,
+    handleCelestialResilienceSkip,
     handleVitalityOfTheTreeConfirm,
     handleInspiringSmiteConfirm,
     handleTricksterBlessingConfirm,
@@ -1012,6 +1015,16 @@ export default function CharActionModals({
                     maxTargets={mergedModalState.mantleOfInspirationTarget.maxTargets}
                     onConfirm={handleMantleOfInspirationConfirm}
                     onSkip={() => setModalState({ mantleOfInspirationTarget: null })}
+                />
+            )}
+            {mergedModalState.celestialResilienceModal && (
+                <CelestialResilienceModal
+                    creatureTargets={mergedModalState.celestialResilienceModal.creatureTargets}
+                    allyTempHp={mergedModalState.celestialResilienceModal.allyTempHp}
+                    selfTempHp={mergedModalState.celestialResilienceModal.selfTempHp}
+                    maxTargets={mergedModalState.celestialResilienceModal.maxTargets}
+                    onConfirm={handleCelestialResilienceConfirm}
+                    onSkip={handleCelestialResilienceSkip}
                 />
             )}
             {mergedModalState.vitalityOfTheTreeTarget && (

@@ -116,7 +116,7 @@ describe('darkOnesBlessingHandler', () => {
                 );
             });
 
-            it('adds to existing temp HP', async () => {
+            it('keeps existing temp HP when new amount is lower', async () => {
                 runtimeState.getRuntimeValue.mockReturnValue('3');
 
                 const result = await grantDarkOnesBlessing(makeFiendWarlockStats(), 'campaign', null, null);
@@ -126,7 +126,22 @@ describe('darkOnesBlessingHandler', () => {
                 expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                     'TestWarlock',
                     'tempHp',
-                    8,
+                    5,
+                    'campaign'
+                );
+            });
+
+            it('uses new temp HP when higher than existing', async () => {
+                runtimeState.getRuntimeValue.mockReturnValue('3');
+
+                const result = await grantDarkOnesBlessing(makeFiendWarlockStats(), 'campaign', null, null);
+
+                expect(result).not.toBeNull();
+                expect(result.amount).toBe(5);
+                expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+                    'TestWarlock',
+                    'tempHp',
+                    5,
                     'campaign'
                 );
             });

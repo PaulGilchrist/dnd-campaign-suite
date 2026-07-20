@@ -1,10 +1,10 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { grantCelestialResilience } from '../class-warlock/celestialResilienceHandler.js';
+import * as celestialResilienceHandler from '../class-warlock/celestialResilienceHandler.js';
 
 const MAGICAL_CUNNING_KEY = 'magicalCunningUsed';
 
-export async function handle(action, playerStats, campaignName, _mapName) {
+export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
 
@@ -103,11 +103,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     // Apply Celestial Resilience if the warlock has the Celestial Patron
     let celestText = '';
-    const celestialResult = await grantCelestialResilience(playerStats, campaignName, 'magical_cunning');
+    let celestialModal = null;
+    const celestialResult = await celestialResilienceHandler.handle(action, playerStats, campaignName, mapName);
     if (celestialResult) {
-        celestText = `<br/>Celestial Resilience: ${celestialResult.message}`;
-        if (celestialResult.allyTempHp && celestialResult.allyTempHp > 0) {
-            celestText += ` Up to ${celestialResult.maxAllies} creatures you can see may gain ${celestialResult.allyTempHp} temporary hit points.`;
+        if (celestialResult.type === 'modal') {
+            celestialModal = celestialResult;
+        } else if (celestialResult.payload?.description) {
+            celestText = `<br/>Celestial Resilience: ${celestialResult.payload.description}`;
         }
     }
 
@@ -121,6 +123,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         description: `${playerName} used Magical Cunning, regaining ${slotsToRegain} expended Pact Magic spell slot(s).`,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[magicalCunning] Error:", e); });
+
+    if (celestialModal) {
+        return celestialModal;
+    }
 
     return {
         type: 'popup',

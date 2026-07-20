@@ -34,6 +34,7 @@ import { onSignatureSpellsSelected } from '../../services/automation/handlers/cl
 import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
 import { onSavantSelected } from '../../services/automation/handlers/class-wizard/SavantHandler.js';
 import { addEntry } from '../../services/ui/logService.js';
+import CreatureSelectionModal from './modals/shared/CreatureSelectionModal.jsx';
 import './CharSpecialActions.css';
 
 
@@ -57,6 +58,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
     const [destructiveStrideModal, setDestructiveStrideModal] = useState(null);
     const [destructiveStrideTargetModal, setDestructiveStrideTargetModal] = useState(null);
     const [quiveringPalmModal, setQuiveringPalmModal] = useState(null);
+    const [celestialResilienceModal, setCelestialResilienceModal] = useState(null);
     const [stepsOfTheFeyTauntModal, setStepsOfTheFeyTauntModal] = useState(null);
     const [fightingStylesMap, setFightingStylesMap] = useState(null);
     const { setPopupHtml } = useDiceRollPopup();
@@ -255,6 +257,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                 setQuiveringPalmModal(result.payload);
             } else if (result.modalName === 'stepsOfTheFeyTaunt') {
                 setStepsOfTheFeyTauntModal(result.payload);
+            } else if (result.modalName === 'celestialResilienceModal') {
+                setCelestialResilienceModal({ ...result.payload, playerStats, campaignName });
             }
         } else if (result.type === 'popup') {
             const payload = result.payload;
@@ -294,6 +298,40 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
         const html = `<b>${action.name}</b><br/>Chose <strong>${optionName}</strong>. ${descriptions[optionName] || optionName}<br/><span class="dice-roll-hint">click to dismiss</span>`;
         setPopupHtml(html);
     }, [strideModal, setPopupHtml]);
+
+    const handleCelestialResilienceConfirm = useCallback(async (selectedTargets) => {
+        if (!celestialResilienceModal) return;
+        const { action, playerStats: modalPlayerStats, campaignName: modalCampaign, allyTempHp } = celestialResilienceModal;
+
+        if (!selectedTargets || selectedTargets.length === 0) {
+            setPopupHtml(`<b>${action.name}</b><br/>No allies selected.<br/><span class="dice-roll-hint">click to dismiss</span>`);
+            setCelestialResilienceModal(null);
+            return;
+        }
+
+        for (const targetName of selectedTargets) {
+            await setRuntimeValue(targetName, 'tempHp', allyTempHp, modalCampaign);
+        }
+
+        await addEntry(modalCampaign, {
+            type: 'ability_use',
+            characterName: modalPlayerStats.name,
+            abilityName: action.name,
+            description: `${modalPlayerStats.name} grants ${allyTempHp} temporary hit points to ${selectedTargets.join(', ')}.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[celestialResilience] Error logging:', e); });
+
+        const html = `<b>${action.name}</b><br/>Granted ${allyTempHp} temporary hit points to ${selectedTargets.join(', ')}.<br/><span class="dice-roll-hint">click to dismiss</span>`;
+        setPopupHtml(html);
+        setCelestialResilienceModal(null);
+    }, [celestialResilienceModal, setPopupHtml]);
+
+    const handleCelestialResilienceSkip = useCallback(() => {
+        if (!celestialResilienceModal) return;
+        const { action } = celestialResilienceModal;
+        setPopupHtml(`<b>${action.name}</b><br/>No allies selected.<br/><span class="dice-roll-hint">click to dismiss</span>`);
+        setCelestialResilienceModal(null);
+    }, [celestialResilienceModal, setPopupHtml]);
 
     const handleEpitomeConfirm = useCallback(async (payload) => {
         if (!epitomeModal) return;
@@ -592,6 +630,20 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                 <StepsOfTheFeyTauntModal
                     {...stepsOfTheFeyTauntModal}
                     onClose={() => setStepsOfTheFeyTauntModal(null)}
+                />
+            )}
+            {celestialResilienceModal && (
+                <CreatureSelectionModal
+                    title="Celestial Resilience"
+                    icon="fa-shield-hart"
+                    targets={celestialResilienceModal.creatureTargets}
+                    maxTargets={celestialResilienceModal.maxTargets}
+                    description="Choose up to 5 allies to gain temporary hit points from your Celestial Resilience."
+                    note={`You gain ${celestialResilienceModal.selfTempHp} temporary hit points. Each selected ally gains ${celestialResilienceModal.allyTempHp} temporary hit points.`}
+                    confirmLabel="Grant Resilience"
+                    confirmIcon="fa-shield-hart"
+                    onConfirm={handleCelestialResilienceConfirm}
+                    onSkip={handleCelestialResilienceSkip}
                 />
             )}
             {featureChoiceModal && (

@@ -26,7 +26,7 @@ export function checkDarkOnesBlessing(characters, creature, finalDamage, isPlaye
             let amount = chaMod + warlockLevel;
             amount = Math.max(1, amount);
             const existingTempHp = Number(getRuntimeValue(charStats.name, 'tempHp', campaignName) || 0);
-            setRuntimeValue(charStats.name, 'tempHp', existingTempHp + amount, campaignName);
+            setRuntimeValue(charStats.name, 'tempHp', Math.max(existingTempHp, amount), campaignName);
         }
     }
 }

@@ -20,7 +20,7 @@ export async function grantDarkOnesBlessing(playerStats, campaignName, attackerN
     if (minimumAmount <= 0) return null;
 
     const existingTempHp = Number(getRuntimeValue(playerStats.name, 'tempHp', campaignName) || 0);
-    await setRuntimeValue(playerStats.name, 'tempHp', existingTempHp + minimumAmount, campaignName);
+    await setRuntimeValue(playerStats.name, 'tempHp', Math.max(existingTempHp, minimumAmount), campaignName);
 
     const result = {
         message: `Dark One's Blessing: You gain ${minimumAmount} temporary hit points.`,

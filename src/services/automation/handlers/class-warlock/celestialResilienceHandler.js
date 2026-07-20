@@ -22,11 +22,11 @@ export async function grantCelestialResilience(playerStats, campaignName, source
     if (typeof selfTempHp !== 'number' || selfTempHp <= 0) return null;
 
     const existingTempHp = Number(getRuntimeValue(playerStats.name, 'tempHp', campaignName) || 0);
-    await setRuntimeValue(playerStats.name, 'tempHp', existingTempHp + selfTempHp, campaignName);
+    await setRuntimeValue(playerStats.name, 'tempHp', Math.max(existingTempHp, selfTempHp), campaignName);
 
     const result = {
         selfTempHp,
-        message: `Celestial Resilience: You gain ${selfTempHp} temporary hit points.`,
+        message: `${playerStats.name} gains ${selfTempHp} temporary hit points from Celestial Resilience.`,
     };
 
     if (source === 'magical_cunning') {
@@ -34,30 +34,23 @@ export async function grantCelestialResilience(playerStats, campaignName, source
         if (typeof allyTempHp === 'number' && allyTempHp > 0) {
             const maxAllies = auto.maxAllies || 5;
             const rangeFt = rangeToFeet(auto.range || '60_ft');
-            const targets = [];
+            const allies = [];
 
-            if (rangeFt != null) {
+            if (rangeFt != null && mapName) {
                 const mapPlayers = (await loadMapData(campaignName, mapName))?.players || [];
                 for (const p of mapPlayers) {
                     if (p.name === playerStats.name) continue;
-                    if (targets.length >= maxAllies) break;
+                    if (allies.length >= maxAllies) break;
                     const inRange = await isWithinRange(playerStats.name, p.name, rangeFt);
                     if (inRange) {
-                        targets.push(p.name);
+                        allies.push({ name: p.name, type: 'player', currentHp: p.currentHp || 0, maxHp: p.maxHp || 0 });
                     }
                 }
             }
 
-            for (const targetName of targets) {
-                await setRuntimeValue(targetName, 'tempHp', allyTempHp, campaignName);
-            }
-
             result.allyTempHp = allyTempHp;
             result.maxAllies = maxAllies;
-            result.allies = targets;
-            result.allyMessage = targets.length > 0
-                ? ` Up to ${maxAllies} creatures you can see gain ${allyTempHp} temporary hit points (${targets.join(', ')}).`
-                : ` Up to ${maxAllies} creatures you can see may gain ${allyTempHp} temporary hit points.`;
+            result.allies = allies;
         }
     }
 
@@ -65,6 +58,18 @@ export async function grantCelestialResilience(playerStats, campaignName, source
 }
 
 export async function handle(action, playerStats, campaignName, mapName) {
+    if (!mapName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${playerStats.name} gains temporary hit points from Celestial Resilience when using Magical Cunning or finishing a Short or Long Rest.`,
+                automation: action.automation,
+            },
+        };
+    }
+
     const result = await grantCelestialResilience(playerStats, campaignName, 'magical_cunning', mapName);
     if (!result) return null;
 
@@ -72,7 +77,74 @@ export async function handle(action, playerStats, campaignName, mapName) {
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: action.name,
-        description: `${playerStats.name} gained ${result.selfTempHp} temporary hit points from Celestial Resilience.`,
+        description: result.message,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[celestialResilience] Error:", e); });
+
+    if (result.allyTempHp && result.maxAllies && result.allies && result.allies.length > 0) {
+        return {
+            type: 'modal',
+            modalName: 'celestialResilienceModal',
+            payload: {
+                creatureTargets: result.allies,
+                allyTempHp: result.allyTempHp,
+                selfTempHp: result.selfTempHp,
+                maxTargets: result.maxAllies,
+                action: action,
+            },
+        };
+    }
+
+    let popupMessage = result.message;
+    if (result.allies && result.allies.length === 0 && result.allyTempHp) {
+        popupMessage += ` No allies in range to gain ${result.allyTempHp} temporary hit points.`;
+    }
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            description: popupMessage,
+            automation: action.automation,
+        },
+    };
+}
+
+export async function confirmCelestialResilience(action, playerStats, campaignName, selectedTargets) {
+    if (!selectedTargets || selectedTargets.length === 0) {
+        await addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: action.name,
+            description: `${playerStats.name} selected no allies for Celestial Resilience.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[celestialResilience] Error:", e); });
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${playerStats.name} selected no allies.`,
+                automation: action.automation,
+            },
+        };
+    }
+
+    const features = playerStats.specialActions || [];
+    const feature = features.find(f => f.name === 'Celestial Resilience');
+    const auto = feature?.automation;
+    const allyTempHp = evaluateAutoExpression(auto?.allyTempHpExpression || 'floor(warlock level / 2) + CHA modifier', playerStats);
+
+    for (const targetName of selectedTargets) {
+        await setRuntimeValue(targetName, 'tempHp', allyTempHp, campaignName);
+    }
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: action.name,
+        description: `${playerStats.name} grants ${allyTempHp} temporary hit points to ${selectedTargets.length} ally(ies): ${selectedTargets.join(', ')}.`,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[celestialResilience] Error:", e); });
 
@@ -81,7 +153,27 @@ export async function handle(action, playerStats, campaignName, mapName) {
         payload: {
             type: 'automation_info',
             name: action.name,
-            description: result.message + (result.allyMessage || ''),
+            description: `${playerStats.name} grants ${allyTempHp} temporary hit points to ${selectedTargets.join(', ')}.`,
+            automation: action.automation,
+        },
+    };
+}
+
+export async function skipCelestialResilience(action, playerStats, campaignName) {
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: action.name,
+        description: `${playerStats.name} skipped granting temporary hit points to allies via Celestial Resilience.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[celestialResilience] Error:", e); });
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            description: `${playerStats.name} skipped granting temporary hit points to allies.`,
             automation: action.automation,
         },
     };

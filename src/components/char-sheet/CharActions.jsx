@@ -44,6 +44,7 @@ import { confirmRadianceOfDawn } from '../../services/automation/handlers/class-
 import { applyBardicInspiration } from '../../services/automation/handlers/class-bard/bardicInspirationHandler.js';
 import { applyInspiringMovement } from '../../services/automation/handlers/reactions/reactionBonusHandler.js';
  import { confirmMantleOfInspiration, confirmVitalityOfTheTree } from '../../services/automation/handlers/buffs/tempHpBuffHandler.js';
+ import { confirmCelestialResilience, skipCelestialResilience } from '../../services/automation/handlers/class-warlock/celestialResilienceHandler.js';
 import { confirmOceanicGift } from '../../services/automation/handlers/class-druid/oceanicGiftHandler.js';
 import { endFriendsOnHostileAction } from '../../services/rules/features/friendsService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
@@ -891,6 +892,33 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         setModalState({ mantleOfInspirationTarget: null });
     }, [setPopupHtml, modalState.mantleOfInspirationTarget, setModalState]);
 
+    const handleCelestialResilienceConfirm = React.useCallback(async (selectedTargets) => {
+        if (!selectedTargets || !modalState.celestialResilienceModal) return;
+        const result = await confirmCelestialResilience(
+            modalState.celestialResilienceModal.action,
+            modalState.celestialResilienceModal.playerStats,
+            modalState.celestialResilienceModal.campaignName,
+            selectedTargets
+        );
+        if (result?.payload) {
+            setPopupHtml(result.payload);
+        }
+        setModalState({ celestialResilienceModal: null });
+    }, [setPopupHtml, modalState.celestialResilienceModal, setModalState]);
+
+    const handleCelestialResilienceSkip = React.useCallback(async () => {
+        if (!modalState.celestialResilienceModal) return;
+        const result = await skipCelestialResilience(
+            modalState.celestialResilienceModal.action,
+            modalState.celestialResilienceModal.playerStats,
+            modalState.celestialResilienceModal.campaignName
+        );
+        if (result?.payload) {
+            setPopupHtml(result.payload);
+        }
+        setModalState({ celestialResilienceModal: null });
+    }, [setPopupHtml, modalState.celestialResilienceModal, setModalState]);
+
     const handleInspiringSmiteConfirm = React.useCallback(async (distribution) => {
         if (!distribution || !modalState.inspiringSmiteModal) return;
         const { action, playerStats: ps, campaignName: cn, channelDivinityCharges } = modalState.inspiringSmiteModal;
@@ -1169,6 +1197,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         break;
                     case 'celestialRevelation':
                         setModalState({ celestialRevelationModal: result.payload });
+                        break;
+                    case 'celestialResilienceModal':
+                        setModalState({ celestialResilienceModal: { ...result.payload, playerStats, campaignName } });
                         break;
                     case 'elfishLineage':
                         setModalState({ elfishLineageModal: result.payload });
@@ -1539,6 +1570,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleCoronaEnemySelectionConfirm={handleCoronaEnemySelectionConfirm}
                     handleRadianceOfDawnConfirm={handleRadianceOfDawnConfirm}
                     handleMantleOfInspirationConfirm={handleMantleOfInspirationConfirm}
+                    handleCelestialResilienceConfirm={handleCelestialResilienceConfirm}
+                    handleCelestialResilienceSkip={handleCelestialResilienceSkip}
                     handleInspiringSmiteConfirm={handleInspiringSmiteConfirm}
                     handleVitalityOfTheTreeConfirm={handleVitalityOfTheTreeConfirm}
                     handleTricksterBlessingConfirm={handleTricksterBlessingConfirm}
