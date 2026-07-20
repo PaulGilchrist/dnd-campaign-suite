@@ -1117,6 +1117,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'primalCompanionBonusActionCommand': setModalState({ primalCompanionBonusActionModal: result.payload }); break;
                     case 'mistyWanderer': setModalState({ mistyWandererModal: result.payload }); break;
                     case 'feyReinforcements': setModalState({ feyReinforcementsModal: result.payload }); break;
+                    case 'stepsOfTheFeyTaunt': setModalState({ stepsOfTheFeyTauntModal: result.payload }); break;
                     case 'bonusActionChoice': setModalState({ bonusActionChoiceModal: result.payload }); break;
                     case 'stealthAttack': setModalState({ stealthAttackModal: result.payload }); break;
                     case 'revelationInFlesh': setModalState({ revelationInFleshModal: result.payload }); break;

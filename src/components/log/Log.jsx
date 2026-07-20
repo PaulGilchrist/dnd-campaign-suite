@@ -642,7 +642,7 @@ function AutomationEntry({ entry }) {
 function SaveResultEntry({ entry }) {
   const isSuccess = entry.success;
   return (
-    <div className={`log-entry log-save-result ${isSuccess ? 'log-save-result-success' : 'log-save-result-failure'}`}>
+    <div className={`log-entry log-save-result-entry ${isSuccess ? 'log-save-result-success' : 'log-save-result-failure'}`}>
       <div className="log-entry-header">
         <span className="log-icon"><i className="fas fa-shield-halved"></i></span>
         <span className="log-character">{entry.characterName}</span>

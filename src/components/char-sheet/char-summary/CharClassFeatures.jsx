@@ -522,6 +522,8 @@ const SorcererFeatures = function SorcererFeatures({ playerStats, campaignName }
 const WarlockFeatures = function WarlockFeatures({ playerStats, campaignName }) {
     const warlockFeatures = getClassFeatures(playerStats);
     const arcanumLevels = warlockFeatures.arcanumLevels || {};
+    const hasStepsOfTheFey = (playerStats.automation?.bonusActions ?? []).some(a => a.type === 'steps_of_the_fey');
+    const chaMod = playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0;
 
     return (
          <div data-testid="char-class-warlock">
@@ -544,6 +546,9 @@ const WarlockFeatures = function WarlockFeatures({ playerStats, campaignName }) 
                           );
                       })}
                   </React.Fragment>
+              )}
+              {hasStepsOfTheFey && (
+                  <TrackedResourceInput label="Steps of the Fey" resourceKey="_Steps_of_the_Fey_freeCastCount" playerName={playerStats.name} getMax={() => Math.max(chaMod, 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
               )}
              <div><b>{(warlockFeatures?.invocationsKnown ?? 0) > 0 ? 'Eldritch Invocations' : 'Invocations Known'}: </b>{warlockFeatures.invocationsKnown}</div>
              {warlockFeatures?.invocations && Array.isArray(warlockFeatures.invocations) && (

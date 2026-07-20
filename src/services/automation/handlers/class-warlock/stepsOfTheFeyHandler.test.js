@@ -12,21 +12,12 @@ vi.mock('../../../combat/automation/automationExpressions.js', () => ({
   evaluateAutoExpression: vi.fn(),
 }));
 
-vi.mock('../../common/savePrompt.js', () => ({
-  buildSaveDc: vi.fn(),
-  createSaveListener: vi.fn(),
-}));
-
-vi.mock('../../common/targetResolver.js', () => ({
-  resolveTarget: vi.fn(),
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+  getCombatContext: vi.fn(),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock('../../../rules/effects/expirations.js', () => ({
-  addExpiration: vi.fn(),
 }));
 
 // ── Imports ────────────────────────────────────────────────────
@@ -34,10 +25,7 @@ vi.mock('../../../rules/effects/expirations.js', () => ({
 import { handle } from './stepsOfTheFeyHandler.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as automationExpressions from '../../../combat/automation/automationExpressions.js';
-import * as savePrompt from '../../common/savePrompt.js';
-import * as targetResolver from '../../common/targetResolver.js';
-import * as logService from '../../../ui/logService.js';
-import * as expirations from '../../../rules/effects/expirations.js';
+import * as damageUtils from '../../../rules/combat/damageUtils.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -62,12 +50,6 @@ function makeAction(automation = {}) {
       ...automation,
     },
   };
-}
-
-function dispatchSaveResult(promptId, success) {
-  window.dispatchEvent(new CustomEvent('save-result', {
-    detail: { promptId, success },
-  }));
 }
 
 // ── Tests ──────────────────────────────────────────────────────
@@ -95,7 +77,7 @@ describe('stepsOfTheFeyHandler.handle', () => {
     });
   });
 
-  describe('temp HP gain', () => {
+  describe('temp HP gain and use decrement', () => {
     function setupTempHpMocks(existingTempHp = 0) {
       useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
         if (key.includes('freeCastCount')) return 1;
@@ -103,21 +85,30 @@ describe('stepsOfTheFeyHandler.handle', () => {
         return null;
       });
       automationExpressions.evaluateAutoExpression.mockReturnValue(1);
-      targetResolver.resolveTarget.mockResolvedValue(null);
     }
 
-    it('sets temp HP to rolled value when higher than existing', async () => {
+    it('decrements use count and sets temp HP', async () => {
       setupTempHpMocks(0);
+      damageUtils.getCombatContext.mockResolvedValue({
+        creatures: [{ name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 10 }],
+      });
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       const setCalls = useRuntimeState.setRuntimeValue.mock.calls;
+      const countCall = setCalls.find(c => c[1] === '_Steps_of_the_Fey_freeCastCount');
+      expect(countCall).toBeDefined();
+      expect(countCall[2]).toBe(0);
+
       const tempHpCall = setCalls.find(c => c[1] === 'tempHp');
       expect(tempHpCall).toBeDefined();
     });
 
     it('preserves existing temp HP when rolled value is lower', async () => {
       setupTempHpMocks(10);
+      damageUtils.getCombatContext.mockResolvedValue({
+        creatures: [{ name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 10 }],
+      });
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -128,219 +119,98 @@ describe('stepsOfTheFeyHandler.handle', () => {
     });
   });
 
-  describe('taunting step with target', () => {
-    function setupTargetMocks(promptId = 'test-prompt', customSaveDc = undefined) {
+  describe('modal return for creature selection', () => {
+    function setupModalMocks() {
       useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
         if (key.includes('freeCastCount')) return 1;
         if (key === 'tempHp') return 0;
         return null;
       });
       automationExpressions.evaluateAutoExpression.mockReturnValue(1);
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      savePrompt.buildSaveDc.mockReturnValue(customSaveDc ?? 13);
-      savePrompt.createSaveListener.mockReturnValue({ promptId });
     }
 
-    it('resolves target and creates save listener with correct parameters', async () => {
-      setupTargetMocks('taunt-prompt-1');
+    it('returns modal with eligible targets when combat has creatures', async () => {
+      setupModalMocks();
+      const combatCreatures = [
+        { name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 10 },
+        { name: 'Orc', type: 'npc', currentHp: 15, maxHp: 20 },
+      ];
+      damageUtils.getCombatContext.mockResolvedValue({ creatures: combatCreatures });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.triggerMistyStep).toBe(true);
-      expect(result.payload.description).toContain('Taunting Step');
-      expect(result.payload.description).toContain('Goblin');
-      expect(result.payload.description).toContain('DC 13');
-      expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
-        targetName: 'Goblin',
-        saveType: 'WIS',
-        saveDc: 13,
-      });
+      expect(result.type).toBe('modal');
+      expect(result.modalName).toBe('stepsOfTheFeyTaunt');
+      expect(result.payload.targets).toEqual(combatCreatures);
+      expect(result.payload.saveDc).toBe(13); // 8 + 2 (CHA) + 3 (prof)
+      expect(result.payload.featureName).toBe('Steps of the Fey');
+      expect(result.payload.tempHpRoll).toBeDefined();
+      expect(result.payload.newCount).toBe(0);
     });
 
-    it('uses custom saveDc from automation config', async () => {
-      setupTargetMocks('custom-dc-prompt', 17);
-
-      await handle(makeAction({ saveDc: 17 }), makePlayerStats(), campaignName, null);
-
-      expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
-        targetName: 'Goblin',
-        saveType: 'WIS',
-        saveDc: 17,
-      });
-    });
-
-    it('registers save-result event listener for the prompt', async () => {
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-
-      setupTargetMocks('listener-prompt');
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(addEventListenerSpy).toHaveBeenCalledWith(
-        'save-result',
-        expect.any(Function),
-      );
-      addEventListenerSpy.mockRestore();
-    });
-  });
-
-  describe('save result handling', () => {
-    function setupSaveMocks(promptId, targetName = 'Goblin') {
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('freeCastCount')) return 1;
-        if (key === 'tempHp') return 0;
-        if (key === 'activeConditions') return [];
-        return null;
-      });
-      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: targetName } });
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      savePrompt.createSaveListener.mockReturnValue({ promptId });
-    }
-
-    it('applies condition on failed save', async () => {
-      setupSaveMocks('fail-prompt');
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      dispatchSaveResult('fail-prompt', false);
-
-      // The handler is async; flush microtasks for the await inside
-      await Promise.resolve();
-      await Promise.resolve();
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        expect.arrayContaining([expect.stringContaining('taunted_by_testcleric')]),
-        campaignName,
-      );
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        'TestCleric',
-        'Goblin',
-        expect.arrayContaining([
-          expect.objectContaining({ type: 'condition' }),
-        ]),
-        campaignName,
-        undefined,
-        'TestCleric',
-      );
-    });
-
-    it('logs save_result on failed save', async () => {
-      setupSaveMocks('fail-log-prompt', 'Orc');
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      dispatchSaveResult('fail-log-prompt', false);
-
-      await Promise.resolve();
-      await Promise.resolve();
-
-      expect(logService.addEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          type: 'save_result',
-          targetName: 'Orc',
-          success: false,
-          saveType: 'WIS',
-        }),
-      );
-    });
-
-    it('logs save_result on successful save', async () => {
-      setupSaveMocks('success-prompt', 'Hobgoblin');
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      dispatchSaveResult('success-prompt', true);
-
-      await Promise.resolve();
-      await Promise.resolve();
-
-      expect(logService.addEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          type: 'save_result',
-          targetName: 'Hobgoblin',
-          success: true,
-        }),
-      );
-    });
-
-    it('removes event listener after handling save result', async () => {
-      const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-
-      setupSaveMocks('cleanup-prompt');
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const savedCallback = addEventListenerSpy.mock.calls[0][1];
-
-      dispatchSaveResult('cleanup-prompt', false);
-
-      await Promise.resolve();
-      await Promise.resolve();
-
-      expect(removeEventListenerSpy).toHaveBeenCalledWith(
-        'save-result',
-        savedCallback,
-      );
-      addEventListenerSpy.mockRestore();
-      removeEventListenerSpy.mockRestore();
-    });
-
-  });
-
-  describe('taunting step without target', () => {
-    function setupNoTargetMocks() {
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('freeCastCount')) return 1;
-        if (key === 'tempHp') return 0;
-        return null;
-      });
-      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
-      targetResolver.resolveTarget.mockResolvedValue(null);
-    }
-
-    it('returns popup without taunting when no target is selected', async () => {
-      setupNoTargetMocks();
+    it('filters out the warlock from eligible targets', async () => {
+      setupModalMocks();
+      const combatCreatures = [
+        { name: 'TestCleric', type: 'player', currentHp: 20, maxHp: 20 },
+        { name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 10 },
+      ];
+      damageUtils.getCombatContext.mockResolvedValue({ creatures: combatCreatures });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No target selected');
-      expect(result.payload.triggerMistyStep).toBe(true);
-      expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
+      expect(result.payload.targets.length).toBe(1);
+      expect(result.payload.targets[0].name).toBe('Goblin');
     });
-  });
 
-  describe('popup payload structure', () => {
-    function setupPayloadMocks() {
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('freeCastCount')) return 1;
-        if (key === 'tempHp') return 0;
-        return null;
-      });
-      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      savePrompt.createSaveListener.mockReturnValue({ promptId: 'payload-prompt' });
-    }
+    it('returns popup with no creatures message when combat is empty', async () => {
+      setupModalMocks();
+      damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
 
-    it('payload contains correct keys for target case', async () => {
-      setupPayloadMocks();
-
-      const action = makeAction();
-      const result = await handle(action, makePlayerStats(), campaignName, null);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Steps of the Fey');
-      expect(result.payload.triggerMistyStep).toBe(true);
-      expect(result.payload.automation).toBe(action.automation);
+      expect(result.payload.description).toContain('No creatures in combat');
+    });
+
+    it('returns popup with no other creatures when only warlock is in combat', async () => {
+      setupModalMocks();
+      damageUtils.getCombatContext.mockResolvedValue({
+        creatures: [{ name: 'TestCleric', type: 'player', currentHp: 20, maxHp: 20 }],
+      });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toContain('No other creatures in combat');
+    });
+
+    it('returns popup when combat context fetch fails', async () => {
+      setupModalMocks();
+      damageUtils.getCombatContext.mockResolvedValue(null);
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toContain('No creatures in combat');
+    });
+
+    describe('popup payload structure', () => {
+      it('payload contains correct keys for empty combat case', async () => {
+        setupModalMocks();
+        damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
+
+        const action = makeAction();
+        const result = await handle(action, makePlayerStats(), campaignName, null);
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.name).toBe('Steps of the Fey');
+        expect(result.payload.triggerMistyStep).toBe(true);
+        expect(result.payload.automation).toBe(action.automation);
+      });
     });
   });
 });

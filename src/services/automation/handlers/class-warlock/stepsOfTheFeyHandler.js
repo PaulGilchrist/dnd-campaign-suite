@@ -1,9 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationExpressions.js';
-import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
-import { resolveTarget } from '../../common/targetResolver.js';
-import { addEntry } from '../../../ui/logService.js';
-import { addExpiration } from '../../../rules/effects/expirations.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 
 function rollDie(sides) {
     return Math.floor(Math.random() * sides) + 1;
@@ -39,97 +36,49 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const newTempHp = Math.max(existingTempHp, tempHpRoll);
     await setRuntimeValue(playerName, 'tempHp', newTempHp, campaignName);
 
-    // Build description
-    let description = `${featureName}: Cast Misty Step without expending a spell slot (${newCount} remaining).<br/><br/>`;
-    description += `<b>Refreshing Step:</b> Gained ${tempHpRoll} Temporary Hit Points.`;
-
-    // Taunting Step: attempt to target the selected creature for a WIS save
-    const saveDc = buildSaveDc(auto, playerStats);
-    const targetInfo = await resolveTarget(campaignName, playerName);
-    const targetName = targetInfo?.target?.name;
-
-    if (targetName) {
-        const { promptId } = createSaveListener(campaignName, {
-            targetName,
-            saveType: 'WIS',
-            saveDc,
-        });
-
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerName,
-            abilityName: featureName,
-            description: `${featureName} triggered — ${targetName} must make WIS save (DC ${saveDc}) or have Disadvantage on attack rolls against creatures other than ${playerName}.`,
-            promptId,
-        }).catch((e) => { console.error("[stepsOfTheFey] Error:", e); });
-
-        const handleSaveResult = async (event) => {
-            if (event.detail.promptId !== promptId) return;
-
-            const isSuccessful = event.detail.success;
-
-            if (!isSuccessful) {
-                const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-                const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-                const conditionKey = 'taunted_by_' + playerName.replace(/\s+/g, '_').toLowerCase();
-                if (!conditions.some(c => String(c).toLowerCase() === conditionKey)) {
-                    await setRuntimeValue(targetName, 'activeConditions', [...conditions, conditionKey], campaignName);
-                }
-
-                addEntry(campaignName, {
-                    type: 'save_result',
-                    characterName: playerName,
-                    rollType: `save-${auto.type}`,
-                    targetName,
-                    saveDc,
-                    saveType: 'WIS',
-                    success: false,
-                    description: `${targetName} failed WIS save. ${targetName} has Disadvantage on attack rolls against creatures other than ${playerName} until start of ${playerName}'s next turn.`,
-                }).catch((e) => { console.error("[stepsOfTheFey] Error:", e); });
-
-                // Duration: until start of taunter's next turn
-                addExpiration(playerName, targetName, [
-                    { type: 'condition', condition: conditionKey }
-                ], campaignName, undefined, playerName);
-            } else {
-                addEntry(campaignName, {
-                    type: 'save_result',
-                    characterName: playerName,
-                    rollType: `save-${auto.type}`,
-                    targetName,
-                    saveDc,
-                    saveType: 'WIS',
-                    success: true,
-                    description: `${targetName} succeeded on WIS save from ${featureName}. No effect.`,
-                }).catch((e) => { console.error("[stepsOfTheFey] Error:", e); });
-            }
-
-            window.removeEventListener('save-result', handleSaveResult);
+    // Get combat context for eligible targets
+    const cs = await getCombatContext(campaignName);
+    if (!cs?.creatures || cs.creatures.length === 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: `${featureName}: Cast Misty Step without expending a spell slot (${newCount} remaining).<br/><br/><b>Refreshing Step:</b> Gained ${tempHpRoll} Temporary Hit Points.<br/><br/>No creatures in combat for Taunting Step.`,
+                automation: auto,
+                triggerMistyStep: true,
+            },
         };
-
-        window.addEventListener('save-result', handleSaveResult);
-
-        description += `<br/><br/><b>Taunting Step:</b> ${targetName} must make a WIS save (DC ${saveDc}). On a failed save, ${targetName} has Disadvantage on attack rolls against creatures other than ${playerName} until the start of ${playerName}'s next turn.`;
-    } else {
-        description += `<br/><br/><b>Taunting Step:</b> No target selected. Creatures within 5 feet of the space you left must make a WIS save (DC ${saveDc}) or have Disadvantage on attack rolls against creatures other than you.`;
     }
 
-    // Log the full action
-    addEntry(campaignName, {
-        type: 'ability_use',
-        characterName: playerName,
-        abilityName: featureName,
-        description: `${playerName} used ${featureName} — free Misty Step cast (${newCount} remaining), gained ${tempHpRoll} temp HP, Taunting Step triggered.`,
-    }).catch(() => {});
+    const eligibleTargets = cs.creatures.filter(c => c.name !== playerName);
+    if (eligibleTargets.length === 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: `${featureName}: Cast Misty Step without expending a spell slot (${newCount} remaining).<br/><br/><b>Refreshing Step:</b> Gained ${tempHpRoll} Temporary Hit Points.<br/><br/>No other creatures in combat for Taunting Step.`,
+                automation: auto,
+                triggerMistyStep: true,
+            },
+        };
+    }
+
+    const saveDc = 8 + (playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0) + (playerStats.proficiency || 0);
 
     return {
-        type: 'popup',
+        type: 'modal',
+        modalName: 'stepsOfTheFeyTaunt',
         payload: {
-            type: 'automation_info',
-            name: featureName,
-            description,
-            automation: auto,
-            triggerMistyStep: true,
+            targets: eligibleTargets,
+            action,
+            playerStats,
+            campaignName,
+            saveDc,
+            featureName,
+            tempHpRoll,
+            newCount,
         },
     };
 }

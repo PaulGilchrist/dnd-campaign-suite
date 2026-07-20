@@ -152,9 +152,10 @@ export const LONG_REST_RESOURCES = [
   'restorebalanceUses',
   'tranceOfOrderUses',
   'tamedSurgeUses',
-  'featsOfChaosUses',
-  'featsOfChaosActive',
-  'magicalCunningUsed'
+   'featsOfChaosUses',
+   'featsOfChaosActive',
+   'magicalCunningUsed',
+   '_Steps_of_the_Fey_freeCastCount'
 ]
 
 export function getLongRestResources() {

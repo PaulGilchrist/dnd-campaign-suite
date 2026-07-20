@@ -54,12 +54,13 @@ export const ALL_TRACKED_RESOURCES = [
   'spell_slots_level_8',
   'spell_slots_level_9',
   'tamedSurgeUses',
-  'featsOfChaosUses',
-  'mysticArcanumLevel6',
-  'mysticArcanumLevel7',
-  'mysticArcanumLevel8',
-  'mysticArcanumLevel9',
-  'isDead',
+   'featsOfChaosUses',
+   'mysticArcanumLevel6',
+   'mysticArcanumLevel7',
+   'mysticArcanumLevel8',
+   'mysticArcanumLevel9',
+   'isDead',
+   '_Steps_of_the_Fey_freeCastCount',
 ]
 
 const SPELL_SLOT_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -258,6 +259,11 @@ export function computeTrackedResources(playerStats) {
   const isDruidStars = playerStats.class?.name === 'Druid' && isCircleOfTheStars
   const maxStarMap = isDruidStars && playerStats.level >= 3 ? Math.max(wis?.bonus || 0, 1) : 0
   resources._Star_Map_freeCastCount = { current: maxStarMap, max: maxStarMap }
+
+  const isWarlockArchfey = playerStats.class?.name === 'Warlock' && (playerStats.class?.subclass?.name === 'Archfey Patron' || playerStats.class?.major?.name === 'Archfey Patron')
+  const hasStepsOfTheFey = (playerStats.automation?.bonusActions ?? []).some(a => a.type === 'steps_of_the_fey')
+  const maxStepsOfTheFey = isWarlockArchfey && hasStepsOfTheFey ? Math.max(charisma?.bonus || 0, 1) : 0
+  resources._Steps_of_the_Fey_freeCastCount = { current: maxStepsOfTheFey, max: maxStepsOfTheFey }
 
   return resources
 }

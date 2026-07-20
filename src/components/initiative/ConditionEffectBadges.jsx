@@ -109,6 +109,10 @@ function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, c
     if (coronaDisadvantage) {
         badges.push({ label: 'Disadv Fire/Radiant', cls: 'effect-disadvantage', icon: 'fa-sun', removable: true, removeAction: 'corona_disadvantage' })
     }
+    const tauntingStepEffect = targetEffects?.find(te => te.effect === 'taunting_step' && te.target === creatureName)
+    if (tauntingStepEffect) {
+        badges.push({ label: 'Taunted', cls: 'effect-disadvantage', icon: 'fa-wand-sparkles', removable: true, removeAction: 'taunting_step', effectType: 'taunting_step', tooltip: `Disadvantage on attack rolls vs creatures other than ${tauntingStepEffect.source || 'you'}` })
+    }
 
     const handleRemoveEffect = (badge) => {
         switch (badge.removeAction) {
@@ -132,6 +136,9 @@ function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, c
                 break
             case 'corona_disadvantage':
                 setRuntimeValue(creatureName, 'coronaDisadvantage', false, campaignName)
+                break
+            case 'taunting_step':
+                removeTargetEffect(creatureName, badge.effectType, campaignName)
                 break
             case 'stealth_attack':
                 setRuntimeValue(creatureName, 'stealthAttackCost', 0, campaignName)

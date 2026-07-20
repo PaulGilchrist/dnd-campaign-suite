@@ -539,6 +539,18 @@
     border-radius: 3px;
 }
 
+.log-save-result-entry {
+    border-left: 3px solid #6495ed;
+}
+
+.log-save-result-entry.log-save-result-success {
+    border-left-color: #2ecc71;
+}
+
+.log-save-result-entry.log-save-result-failure {
+    border-left-color: #e74c3c;
+}
+
 .log-save-result.log-condition-success {
     color: #2ecc71;
     background: rgba(46, 204, 113, 0.15);
@@ -547,6 +559,35 @@
 .log-save-result.log-condition-failure {
     color: #e74c3c;
     background: rgba(231, 76, 60, 0.15);
+}
+
+.log-save-result-details {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+
+.log-save-info {
+    font-size: 0.85rem;
+    color: var(--color-text);
+}
+
+.log-save-result-description {
+    font-size: 0.85rem;
+    color: var(--color-text);
+}
+
+.log-save-result-description b,
+.log-save-result-description strong {
+    font-weight: 700;
+    color: var(--color-header);
+}
+
+.log-save-result-description i {
+    font-style: italic;
+    color: var(--color-text-muted);
 }
 
 .log-final-damage {
