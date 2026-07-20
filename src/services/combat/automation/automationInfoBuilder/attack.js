@@ -154,6 +154,18 @@ export const attackHandlers = {
         }
     },
 
+    'quivering_palm': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'quivering_palm',
+            name: feature.name,
+            damageExpression: auto.damageExpression || '10d12',
+            damageType: auto.damageType || 'Force',
+            casting_time: auto.casting_time || 'passive',
+            hasAutomation: true
+        }
+    },
+
     'mastery_rider': (feature, _playerStats) => {
         const auto = feature.automation
         return {

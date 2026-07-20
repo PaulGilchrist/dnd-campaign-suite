@@ -57,6 +57,7 @@ import { handle as handleBonusActionAttack } from './handlers/combat/bonusAction
 import { handle as handleExtraAction } from './handlers/combat/extraActionHandler.js';
 import { handle as handleDamageReduction } from './handlers/combat/damageReductionHandler.js';
 import { handle as handleOpenHandTechnique } from './handlers/class-fighter-rogue/openHandTechniqueHandler.js';
+import { handle as handleQuiveringPalm } from './handlers/class-monk/quiveringPalmHandler.js';
 import { handle as handleReactionSaveHeal } from './handlers/reactions/reactionSaveHealHandler.js';
 import { handle as handleCountercharm } from './handlers/class-bard/countercharmHandler.js';
 import { handle as handleFontOfInspiration } from './handlers/class-bard/fontOfInspirationHandler.js';
@@ -296,7 +297,8 @@ const HANDLER_MAP = {
     arcane_ward: handleArcaneWard,
     projected_ward: handleArcaneWard,
     arcane_ward_bonus_action: handleArcaneWardBonusActionRestore,
-    open_hand_technique: handleOpenHandTechnique,
+     open_hand_technique: handleOpenHandTechnique,
+     quivering_palm: handleQuiveringPalm,
     reaction_save_heal: handleReactionSaveHeal,
         mastery_rider: handleWeaponMastery,
         weapon_mastery_choice: handleWeaponMasteryChoice,

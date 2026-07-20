@@ -506,6 +506,9 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'tactical_mind':
                 result.specialActions.push(info)
                 break
+            case 'quivering_palm':
+                result.specialActions.push(info)
+                break
             case 'combat_superiority':
                 if (info.oncePerTurn) {
                     result.actions.push(info)

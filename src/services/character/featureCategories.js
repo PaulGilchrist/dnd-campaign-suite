@@ -51,7 +51,7 @@ const categories5e = {
         // "Improved War Magic",
         // "Master Transmuter",
         // "Primeval Awareness",
-        // "Quivering Palm",
+        "Quivering Palm",
         // "Sneak Attack",
         // "Stillness of Mind",
         // "The Third Eye",

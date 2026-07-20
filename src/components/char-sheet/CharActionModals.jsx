@@ -12,6 +12,7 @@ import EyebiteEffectModal from './modals/EyebiteEffectModal.jsx'
 import AttackRiderModal from './modals/shared/AttackRiderModal.jsx'
 import StealthAttackModal from './modals/shared/StealthAttackModal.jsx'
 import OpenHandTechniqueModal from './modals/OpenHandTechniqueModal.jsx'
+import QuiveringPalmModal from './modals/QuiveringPalmModal.jsx'
 import WeaponMasteryModal from './modals/WeaponMasteryModal.jsx'
 import WeaponMasteryChoiceModal from './modals/WeaponMasteryChoiceModal.jsx'
 import WeaponKindMasteryModal from './modals/WeaponKindMasteryModal.jsx'
@@ -403,6 +404,12 @@ export default function CharActionModals({
                 <OpenHandTechniqueModal
                     {...mergedModalState.openHandTechniqueModal}
                     onClose={() => { setModalState({ openHandTechniqueModal: null }); window.dispatchEvent(new CustomEvent('target-effects-updated')); window.dispatchEvent(new CustomEvent('combat-summary-updated')); }}
+                />
+            )}
+            {mergedModalState.quiveringPalmModal && (
+                <QuiveringPalmModal
+                    {...mergedModalState.quiveringPalmModal}
+                    onClose={() => { setModalState({ quiveringPalmModal: null }); window.dispatchEvent(new CustomEvent('target-effects-updated')); window.dispatchEvent(new CustomEvent('combat-summary-updated')); }}
                 />
             )}
             {mergedModalState.openHandFromFlurry && (

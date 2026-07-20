@@ -1089,6 +1089,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'eyebiteEffect': setModalState({ eyebiteEffectModal: result.payload }); break;
                     case 'attackRider': setModalState({ attackRiderModal: result.payload }); break;
                     case 'openHandTechnique': setModalState({ openHandTechniqueModal: result.payload }); break;
+                    case 'quiveringPalm': setModalState({ quiveringPalmModal: result.payload }); break;
                     case 'combatStance': setModalState({ combatStanceModal: result.payload }); break;
                     case 'teleport': setModalState({ teleportModal: result.payload }); break;
                     case 'healingIllusion': setModalState({ healingIllusionModal: result.payload }); break;
