@@ -506,7 +506,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
       </div>
           {allResistances.length > 0 && <div>
               <b>Resistances: </b>
-              {allResistances.map((r, i) => (
+              {allResistances.filter(r => typeof r === 'string').map((r, i) => (
                 <span key={r}>
                   {i > 0 ? ', ' : ''}{r.charAt(0).toUpperCase() + r.slice(1)}
                   {auraResistances.includes(r) && auraResistanceSource && <span className="aura-source" title={`From ${auraResistanceSource}'s Aura of Warding`}>*</span>}
@@ -515,7 +515,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
           </div>}
           {allImmunities.length > 0 && <div>
               <b>Immunities: </b>
-              {allImmunities.map((imm, i) => (
+              {allImmunities.filter(imm => typeof imm === 'string').map((imm, i) => (
                 <span key={imm}>
                   {i > 0 ? ', ' : ''}{imm.charAt(0).toUpperCase() + imm.slice(1)}
 

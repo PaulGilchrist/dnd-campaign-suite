@@ -738,7 +738,6 @@ export function createLogDamageAndShow(deps) {
             damageApplied: (primaryApplyResult?.finalDamage ?? finalDamage) > 0,
             timestamp: Date.now(),
         };
-        console.log('[useLoggedDiceRollDamage] lastAttack overwrite (NPC save):', { attackerName: context?.attackerName, targetName: target.name, saveType, saveDc });
         storage.setProperty('combatSummary', 'lastAttack', lastAttackData, campaignName);
 
         setPopupHtml(popupData);

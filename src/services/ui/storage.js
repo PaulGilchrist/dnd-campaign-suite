@@ -78,9 +78,6 @@ const storage = {
             const cs = await getCombatContext(campaignName);
             const merged = { ...(cs || {}), lastAttack: { ...(cs?.lastAttack || {}), ...value } };
             await storage.set(name, merged, campaignName);
-            if (name === 'combatSummary' && propertyName === 'lastAttack') {
-                console.log(`[storage] ★ setProperty combatSummary.lastAttack - merged keys:`, Object.keys(merged.lastAttack || {}).join(', '));
-            }
             return;
         }
         let obj = await storage.get(firstName, campaignName);
@@ -88,13 +85,7 @@ const storage = {
             obj = {};
           }
         obj[propertyName] = value;
-        if (name === 'combatSummary' && propertyName === 'lastAttack') {
-            console.log(`[storage] ★ setProperty combatSummary.lastAttack - obj keys before write:`, Object.keys(obj).join(', '));
-        }
         await storage.set(firstName, obj, campaignName);
-        if (name === 'combatSummary' && propertyName === 'lastAttack') {
-            console.log(`[storage] ★ setProperty combatSummary.lastAttack - write complete for key: ${firstName}`);
-        }
       }
 }
 

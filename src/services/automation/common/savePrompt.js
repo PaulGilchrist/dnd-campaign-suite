@@ -38,7 +38,6 @@ export function createSaveListener(campaignName, config) {
     };
     setRuntimeValue(campaignName, 'pendingSavePrompts', pendingSaves, campaignName);
 
-    console.log('[savePrompt] sendSavePrompt target=', config.targetName, 'attacker=', config.attackerName);
     sendSavePrompt(campaignName, {
         promptId,
         targetName: config.targetName,

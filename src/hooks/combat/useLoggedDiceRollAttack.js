@@ -1014,7 +1014,6 @@ export function createLogAndShow(deps) {
                 }, campaignName);
 
                 if (combatSummary) {
-                    console.log('[useLoggedDiceRollAttack] SAVE lastAttack (player):', { attackerName, targetName: target?.name || context?.targetName, characterName });
                     storage.setProperty('combatSummary', 'lastAttack', {
                         attackerName,
                         targetName: target?.name || context?.targetName,
@@ -1094,7 +1093,6 @@ export function createLogAndShow(deps) {
                 }, campaignName);
 
                 if (saveDc != null && combatSummary) {
-                    console.log('[useLoggedDiceRollAttack] SAVE lastAttack (NPC):', { attackerName, targetName: target?.name || context?.targetName, characterName });
                     storage.setProperty('combatSummary', 'lastAttack', {
                         attackerName,
                         targetName: target?.name || context?.targetName,

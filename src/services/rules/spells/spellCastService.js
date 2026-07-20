@@ -107,7 +107,6 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                 spellSchool: lastAttackSchool,
                 timestamp: Date.now(),
             }, campaignName);
-            console.log('[spellCast] SET lastAttack.spellSchool=', lastAttackSchool);
         } catch (err) {
             console.error('[spellCast] Failed to set lastAttack with spellSchool:', err);
         }
