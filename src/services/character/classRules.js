@@ -157,12 +157,17 @@ const classRules = {
                   level9: 0
               };
               const arcanums = playerStats.class?.arcanums || [];
-              return {
-                  invocationsKnown,
-                  hasArcanum,
-                  arcanumLevels,
-                  arcanums
-              };
+               const pactBoon = playerStats.class?.pactBoon || null;
+               const invocations = playerStats.class?.invocations || [];
+
+               return {
+                   invocationsKnown,
+                   hasArcanum,
+                   arcanumLevels,
+                   arcanums,
+                   pactBoon,
+                   invocations
+               };
            },
            getWizardFeatures: (playerStats) => {
                 const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);

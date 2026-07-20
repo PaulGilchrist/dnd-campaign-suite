@@ -11370,7 +11370,7 @@
             "type": "class_feature",
             "automation": {
               "type": "magical_cunning",
-              "casting_time": "1 action",
+              "casting_time": "passive",
               "duration": "1_minute",
               "recharge": "long_rest"
             }

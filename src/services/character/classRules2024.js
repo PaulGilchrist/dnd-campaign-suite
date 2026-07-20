@@ -335,7 +335,6 @@ const classRules = {
                 hasArcanum,
                 arcanumLevels,
                 arcanums: playerStats.class?.arcanums || [],
-                pactBoon: playerStats.class?.pactBoon || null,
                 invocations: playerStats.class?.invocations || []
             };
         },
