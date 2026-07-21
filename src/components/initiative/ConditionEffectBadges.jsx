@@ -165,8 +165,8 @@ function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, c
 
     return (
         <>
-            {badges.map(b => (
-                <div key={b.label} style={{position: 'relative'}}>
+            {badges.map((b, i) => (
+                <div key={`${b.label}-${i}`} style={{position: 'relative'}}>
                     <div className={`condition-effect-badge ${b.cls}`} title={b.tooltip || getEffectDescription(b.label)}>
                         <i className={`fa-solid ${b.icon}`}></i> {b.label}
                     </div>

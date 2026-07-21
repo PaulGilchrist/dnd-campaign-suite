@@ -43,9 +43,9 @@ function ConditionChoiceModal() {
                     </p>
                 </div>
                 <div className="cc-actions">
-                    {current.conditions.map((condition) => (
+                    {[...new Set(current.conditions)].map((condition, i) => (
                         <button
-                            key={condition}
+                            key={`${condition}-${i}`}
                             className="cc-choice-btn"
                             onClick={() => handleChoice(condition)}
                             type="button"

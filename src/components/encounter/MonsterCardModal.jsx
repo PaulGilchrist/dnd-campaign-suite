@@ -599,8 +599,8 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
                 ))}
               </div>
               <div className="mc-conditions-effects">
-                {condEffectBadges.map(b => (
-                  <span key={b.label} className={`mc-effect-badge ${b.cls}`} title={EFFECT_DESCRIPTIONS[b.label] || b.label}>
+                {condEffectBadges.map((b, i) => (
+                  <span key={`${b.label}-${i}`} className={`mc-effect-badge ${b.cls}`} title={EFFECT_DESCRIPTIONS[b.label] || b.label}>
                     <i className={`fa-solid ${b.icon}`}></i> {b.label}
                   </span>
                 ))}

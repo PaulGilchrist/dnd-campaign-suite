@@ -207,7 +207,7 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
         </Popup>
       )}
       <div className="char-conditions-grid">
-        {hasConditions && activeConditions.map(key => {
+        {hasConditions && [...new Set(activeConditions)].map(key => {
           const meta = conditionMeta[key] || {}
           const label = key.charAt(0).toUpperCase() + key.slice(1)
           const hasSave = !!(meta.dc && meta.ability)

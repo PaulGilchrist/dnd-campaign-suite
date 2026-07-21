@@ -156,7 +156,7 @@ function CreatureCard({
                     if (!cond || typeof cond !== 'object') return null;
                     const canRoll = creature.type === 'player' || isLocalhost
                     return (
-                        <div key={cond.id} className='condition-badge-wrapper'>
+                        <div key={cond.id || cond.key} className='condition-badge-wrapper'>
                             <button
                                 className='condition-badge initiative-condition-badge'
                                 onClick={() => canRoll && onRollConditionSave(creature.name, cond)}

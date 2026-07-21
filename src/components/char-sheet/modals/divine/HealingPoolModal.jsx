@@ -455,8 +455,8 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                     <div className="short-rest-section">
                         <h4>Cure Conditions ({cureCost} HP each)</h4>
                         <div className="short-rest-dice-row">
-                            {alsoCures.map((condition) => (
-                                <button key={condition} className="char-btn" onClick={() => applyCure(condition)} disabled={safePool < cureCost}>
+                            {[...new Set(alsoCures)].map((condition, i) => (
+                                <button key={`${condition}-${i}`} className="char-btn" onClick={() => applyCure(condition)} disabled={safePool < cureCost}>
                                     <i className="fas fa-shield-alt"></i> {condition}
                                 </button>
                             ))}

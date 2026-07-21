@@ -130,8 +130,8 @@ function HandOfHealingModal({ healName, formula, rolls, bonus, healAmount, monkN
                            <h4><i className="fas fa-shield-virus"></i> Physician&apos;s Touch</h4>
                            <p>Target has multiple conditions. Select one to remove:</p>
                            <div className="healing-cure-options">
-                               {cureableConditions.map((condition) => (
-                                   <button key={condition} className="char-btn" onClick={() => removeCondition(condition)}>
+                                {[...new Set(cureableConditions)].map((condition, i) => (
+                                    <button key={`${condition}-${i}`} className="char-btn" onClick={() => removeCondition(condition)}>
                                        <i className="fas fa-check-circle"></i> Remove {condition}
                                    </button>
                                ))}
