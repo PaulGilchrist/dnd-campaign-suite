@@ -525,7 +525,9 @@ const WarlockFeatures = function WarlockFeatures({ playerStats, campaignName }) 
     const hasStepsOfTheFey = (playerStats.automation?.bonusActions ?? []).some(a => a.type === 'steps_of_the_fey');
     const isCelestialPatron = playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron';
     const isFiendPatron = playerStats.class?.major?.name === 'Fiend' || playerStats.class?.subclass?.name === 'Fiend' || playerStats.class?.major?.name === 'Fiend Patron' || playerStats.class?.subclass?.name === 'Fiend Patron';
+    const isGreatOldOnePatron = playerStats.class?.major?.name === 'Great Old One Patron' || playerStats.class?.subclass?.name === 'Great Old One Patron';
     const chaMod = playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0;
+    const awakenedMindTarget = useRuntimeValue(playerStats.name, 'awakenedMindTarget', campaignName);
 
     return (
          <div data-testid="char-class-warlock">
@@ -555,9 +557,12 @@ const WarlockFeatures = function WarlockFeatures({ playerStats, campaignName }) 
                {hasStepsOfTheFey && (
                    <TrackedResourceInput label="Steps of the Fey" resourceKey="_Steps_of_the_Fey_freeCastCount" playerName={playerStats.name} getMax={() => Math.max(chaMod, 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
                )}
-               {isFiendPatron && (
-                   <TrackedResourceInput label="Dark One's Own Luck" resourceKey="darkOnesLuckUses" playerName={playerStats.name} getMax={() => Math.max(1, chaMod)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-               )}
+                {isFiendPatron && (
+                    <TrackedResourceInput label="Dark One's Own Luck" resourceKey="darkOnesLuckUses" playerName={playerStats.name} getMax={() => Math.max(1, chaMod)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+                )}
+                {isGreatOldOnePatron && awakenedMindTarget && (
+                    <span className="automation-badge"><i className="fa-solid fa-brain"></i> Awakened Mind: {awakenedMindTarget}</span>
+                )}
              <div><b>{(warlockFeatures?.invocationsKnown ?? 0) > 0 ? 'Eldritch Invocations' : 'Invocations Known'}: </b>{warlockFeatures.invocationsKnown}</div>
              {warlockFeatures?.invocations && Array.isArray(warlockFeatures.invocations) && (
                  <div><b>Invocations: </b>{[...warlockFeatures.invocations].sort().join(', ')}</div>

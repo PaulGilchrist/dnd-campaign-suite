@@ -96,6 +96,14 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
                 setRuntimeValue(playerStats.name, 'activeBuffs', filteredSuperiorDefense, campaignName);
             }
 
+            // Clear Awakened Mind buff and target on initiative roll (new combat)
+            const awakenedMindBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || [];
+            const filteredAwakenedMind = awakenedMindBuffs.filter(b => b.name !== 'Awakened Mind');
+            if (filteredAwakenedMind.length !== awakenedMindBuffs.length) {
+                setRuntimeValue(playerStats.name, 'activeBuffs', filteredAwakenedMind, campaignName);
+            }
+            setRuntimeValue(playerStats.name, 'awakenedMindTarget', null, campaignName);
+
             const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
 
             // Check for Perfect Focus (Monk level 15)

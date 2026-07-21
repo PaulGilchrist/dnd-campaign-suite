@@ -469,6 +469,14 @@ export async function confirmTelepathicSpeech(action, playerStats, campaignName,
         playerName
     );
 
+    if (action.name === 'Awakened Mind') {
+        if (!wasActive) {
+            setRuntimeValue(playerName, 'awakenedMindTarget', targetName, campaignName);
+        } else {
+            setRuntimeValue(playerName, 'awakenedMindTarget', null, campaignName);
+        }
+    }
+
     if (!wasActive) {
         addExpiration(playerName, playerName, [
             { type: 'remove_active_buff', buffName: featureName }
@@ -479,7 +487,7 @@ export async function confirmTelepathicSpeech(action, playerStats, campaignName,
         type: 'ability_use',
         characterName: playerName,
         abilityName: featureName,
-        description: `${playerName} activated Telepathic Speech with ${targetName} for ${miles} mile${miles !== 1 ? 's' : ''} (duration: ${durationMinutes} minute${durationMinutes !== 1 ? 's' : ''}).`,
+        description: `${playerName} activated ${featureName} with ${targetName} for ${miles} mile${miles !== 1 ? 's' : ''} (duration: ${durationMinutes} minute${durationMinutes !== 1 ? 's' : ''}).`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[buffHandler] Telepathic Speech log error:', e); });
 

@@ -1271,7 +1271,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'telepathicSpeech': {
                         const { action, playerStats, campaignName, creatureTargets } = result.payload;
                         setModalState({ secondaryTargetModal: {
-                            title: 'Telepathic Speech',
+                            title: action.name || 'Telepathic Speech',
                             icon: 'fa-brain',
                             targets: creatureTargets,
                             confirmLabel: 'Establish Link',

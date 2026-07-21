@@ -380,10 +380,13 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
      }
    }
 
-  // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
-  updates.activeBuffs = [];
-  updates.activeConditions = [];
-  updates.activeConditionMeta = {};
+   // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
+   updates.activeBuffs = [];
+   updates.activeConditions = [];
+   updates.activeConditionMeta = {};
+
+   // Clear Awakened Mind target on short rest
+   updates.awakenedMindTarget = null;
 
   // Reset Psionic Strike once-per-turn flag on short rest
   updates.psionicStrikeUsedThisTurn = null;
@@ -483,10 +486,13 @@ export async function applyLongRest(playerStats, campaignName) {
      }
    }
 
-    // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
-    charData.activeBuffs = [];
-    charData.activeConditions = [];
-    charData.activeConditionMeta = {};
+     // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
+     charData.activeBuffs = [];
+     charData.activeConditions = [];
+     charData.activeConditionMeta = {};
+
+     // Clear Awakened Mind target on long rest
+     charData.awakenedMindTarget = null;
 
     // Clear death save state on long rest
     charData.deathSaves = [false, false, false];
