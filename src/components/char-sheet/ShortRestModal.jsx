@@ -9,6 +9,7 @@ import { addEntry } from '../../services/ui/logService.js'
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js'
 import { applyHealingToTarget } from '../../services/rules/combat/applyHealing.js'
 import { loadSpellData } from '../../services/ui/dataLoader.js'
+import CreatureSelectionModal from './modals/shared/CreatureSelectionModal.jsx'
 
 function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const [remainingHitDice, setRemainingHitDice] = React.useState(() => {
@@ -19,6 +20,7 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const [rollLog, setRollLog] = React.useState([]);
     const [songOfRestApplied, setSongOfRestApplied] = React.useState(false);
     const [restorationRequested, setRestorationRequested] = React.useState(false);
+    const [celestialResilienceModal, setCelestialResilienceModal] = React.useState(null);
 
 
     const isSorcerer = playerStats?.class?.name === 'Sorcerer';
@@ -184,11 +186,53 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         setBolsteringTreatsCrafted(true);
        };
 
+    const handleCelestialResilienceConfirm = async (selectedAllies) => {
+        if (!celestialResilienceModal) return;
+        const { allyTempHp } = celestialResilienceModal;
+        for (const ally of selectedAllies) {
+            const existingTempHp = Number(getRuntimeValue(ally.name, 'tempHp', campaignName) || 0);
+            setRuntimeValue(ally.name, 'tempHp', Math.max(existingTempHp, allyTempHp), campaignName);
+        }
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: 'Celestial Resilience',
+            description: `${playerStats.name} grants ${allyTempHp} temporary hit points to ${selectedAllies.length} ally(ies) from Celestial Resilience (short rest).`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[celestialResilience] Error logging:', e); });
+        setCelestialResilienceModal(null);
+        onComplete && onComplete();
+    };
+
+    const handleCelestialResilienceSkip = () => {
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: 'Celestial Resilience',
+            description: `${playerStats.name} skipped ally selection for Celestial Resilience (short rest).`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[celestialResilience] Error logging:', e); });
+        setCelestialResilienceModal(null);
+        onComplete && onComplete();
+    };
+
     const handleComplete = async () => {
         const hpBeforeRest = Number(getRuntimeValue(playerStats.name, 'currentHitPoints') ?? playerStats.hitPoints);
 
         // Apply base short rest logic (resource clearing, feature clearing, expiration)
-        await applyShortRest(playerStats, campaignName, { skipAutoRecovery: true });
+        const restResult = await applyShortRest(playerStats, campaignName, { skipAutoRecovery: true });
+
+        // Check if Celestial Resilience needs ally selection
+        console.log('[CR/rest-modal] restResult:', restResult ? JSON.stringify(restResult).slice(0, 300) : 'null');
+        if (restResult?.celestialResilienceAllies) {
+            console.log('[CR/rest-modal] showing celestial resilience modal');
+            setCelestialResilienceModal({
+                ...restResult.celestialResilienceAllies,
+                playerStats,
+                campaignName
+            });
+            return;
+        }
 
         // Layer on UI-driven updates: hit dice healing
         let currentHp = hpBeforeRest + recoveredHp;
@@ -531,6 +575,21 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
                                   )}
                             </div>
                         </div>
+                    )}
+
+                    {celestialResilienceModal && (
+                        <CreatureSelectionModal
+                            title="Celestial Resilience"
+                            icon="fa-shield-hart"
+                            targets={celestialResilienceModal.creatureTargets}
+                            maxTargets={celestialResilienceModal.maxTargets}
+                            description="Choose up to 5 allies to gain temporary hit points from your Celestial Resilience."
+                            note={`You gain ${celestialResilienceModal.selfTempHp} temporary hit points. Each selected ally gains ${celestialResilienceModal.allyTempHp} temporary hit points.`}
+                            confirmLabel="Grant Resilience"
+                            confirmIcon="fa-shield-hart"
+                            onConfirm={handleCelestialResilienceConfirm}
+                            onSkip={handleCelestialResilienceSkip}
+                        />
                     )}
 
                 <div className="short-rest-actions">

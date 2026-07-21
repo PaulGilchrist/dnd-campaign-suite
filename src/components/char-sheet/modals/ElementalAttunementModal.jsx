@@ -8,6 +8,7 @@ import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import { addExpiration } from '../../../services/rules/effects/expirations.js';
 import { persistAndNotify } from './shared/AreaEffectTargetModalBase.utils.jsx';
+import { loadMapData } from '../../../services/maps/mapsService.js';
 import CreatureSelectionModal from './shared/CreatureSelectionModal.jsx';
 
 const ELEMENT_DATA = {
@@ -304,30 +305,27 @@ function ElementalAttunementModal({ action, playerStats, campaignName, mapName, 
                 let placedItems = [];
 
                 if (mapName) {
-                    try {
-                        import('../../../services/maps/mapsService.js').then(mapsService => {
-                            mapsService.loadMapData(campaignName, mapName).then(mapData => {
-                                if (mapData) {
-                                    players = mapData.players || [];
-                                    placedItems = (mapData.placedItems || []).filter(item => item.type === 'npc' && item.name);
-                                }
-                                const affected = getAffectedCreatures(activeOverlay, players, placedItems, cs);
-                                const targetList = affected.map(a => ({
-                                    name: a.creature.name,
-                                    type: a.creature.type,
-                                    currentHp: a.creature.currentHp,
-                                    maxHp: a.creature.maxHp,
-                                }));
-                                setTargets(targetList);
-                                setSelectedTargets(new Set(targetList.map(t => t.name)));
-                                setPhase('processing');
-                            });
-                        }).catch(e => {
+                    (async () => {
+                        try {
+                            const mapData = await loadMapData(campaignName, mapName);
+                            if (mapData) {
+                                players = mapData.players || [];
+                                placedItems = (mapData.placedItems || []).filter(item => item.type === 'npc' && item.name);
+                            }
+                            const affected = getAffectedCreatures(activeOverlay, players, placedItems, cs);
+                            const targetList = affected.map(a => ({
+                                name: a.creature.name,
+                                type: a.creature.type,
+                                currentHp: a.creature.currentHp,
+                                maxHp: a.creature.maxHp,
+                            }));
+                            setTargets(targetList);
+                            setSelectedTargets(new Set(targetList.map(t => t.name)));
+                            setPhase('processing');
+                        } catch (e) {
                             console.error('[ElementalAttunementModal] Error loading map data:', e);
-                        });
-                    } catch (e) {
-                        console.error('[ElementalAttunementModal] Error loading map data:', e);
-                    }
+                        }
+                    })();
                 } else {
                     const affected = getAffectedCreatures(activeOverlay, players, placedItems, cs);
                     const targetList = affected.map(a => ({

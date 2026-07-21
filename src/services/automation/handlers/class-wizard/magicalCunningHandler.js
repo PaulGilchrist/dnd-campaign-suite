@@ -1,10 +1,11 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import * as celestialResilienceHandler from '../class-warlock/celestialResilienceHandler.js';
+import { handle as handleCelestialResilience } from '../class-warlock/celestialResilienceHandler.js';
 
 const MAGICAL_CUNNING_KEY = 'magicalCunningUsed';
 
 export async function handle(action, playerStats, campaignName, mapName) {
+    console.log('[MC] handle START:', { actionName: action?.name, mapName, class: playerStats.class?.major?.name });
     const auto = action.automation;
     const playerName = playerStats.name;
 
@@ -102,11 +103,14 @@ export async function handle(action, playerStats, campaignName, mapName) {
     await setRuntimeValue(playerName, MAGICAL_CUNNING_KEY, true, campaignName);
 
     // Apply Celestial Resilience if the warlock has the Celestial Patron
+    console.log('[MC] calling handleCelestialResilience, mapName:', mapName);
     let celestText = '';
     let celestialModal = null;
-    const celestialResult = await celestialResilienceHandler.handle(action, playerStats, campaignName, mapName);
+    const celestialResult = await handleCelestialResilience(action, playerStats, campaignName, mapName);
+    console.log('[MC] celestialResult:', celestialResult ? JSON.stringify(celestialResult).slice(0, 300) : 'null');
     if (celestialResult) {
         if (celestialResult.type === 'modal') {
+            console.log('[MC] celestialModal set, modalName:', celestialResult.modalName);
             celestialModal = celestialResult;
         } else if (celestialResult.payload?.description) {
             celestText = `<br/>Celestial Resilience: ${celestialResult.payload.description}`;
@@ -124,6 +128,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
         timestamp: Date.now(),
     }).catch((e) => { console.error("[magicalCunning] Error:", e); });
 
+    console.log('[MC] returning:', celestialModal ? 'modal' : 'popup');
     if (celestialModal) {
         return celestialModal;
     }

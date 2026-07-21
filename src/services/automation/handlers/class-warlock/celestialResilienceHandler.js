@@ -4,6 +4,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { loadMapData } from '../../../maps/mapsService.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
+import { getCombatSummary } from '../../../encounters/combatData.js';
 
 export async function grantCelestialResilience(playerStats, campaignName, source, mapName) {
     const isCelestial = playerStats.class?.major?.name === 'Celestial Patron'
@@ -29,36 +30,46 @@ export async function grantCelestialResilience(playerStats, campaignName, source
         message: `${playerStats.name} gains ${selfTempHp} temporary hit points from Celestial Resilience.`,
     };
 
-    if (source === 'magical_cunning') {
+    if (source === 'magical_cunning' || source === 'short_rest' || source === 'long_rest') {
         const allyTempHp = evaluateAutoExpression(auto.allyTempHpExpression || 'floor(warlock level / 2) + CHA modifier', playerStats);
         if (typeof allyTempHp === 'number' && allyTempHp > 0) {
             const maxAllies = auto.maxAllies || 5;
             const rangeFt = rangeToFeet(auto.range || '60_ft');
             const allies = [];
 
-            if (rangeFt != null && mapName) {
-                const mapPlayers = (await loadMapData(campaignName, mapName))?.players || [];
-                for (const p of mapPlayers) {
-                    if (p.name === playerStats.name) continue;
-                    if (allies.length >= maxAllies) break;
-                    const inRange = await isWithinRange(playerStats.name, p.name, rangeFt);
+            if (rangeFt != null) {
+                const mapPlayers = mapName ? (await loadMapData(campaignName, mapName))?.players || [] : [];
+                const combatSummary = getCombatSummary(campaignName);
+                const allCreatures = combatSummary?.creatures || [];
+                const candidates = mapPlayers.length > 0
+                    ? mapPlayers.filter(p => p.name !== playerStats.name)
+                    : allCreatures.filter(c => c.name !== playerStats.name);
+                console.log('[CR] candidates count:', candidates.length, 'mapPlayers:', mapPlayers.length, 'allCreatures:', allCreatures.length);
+                for (const creature of candidates) {
+                    const inRange = await isWithinRange(playerStats.name, creature.name, rangeFt);
+                    console.log('[CR] ally check:', creature.name, 'inRange:', inRange);
                     if (inRange) {
-                        allies.push({ name: p.name, type: 'player', currentHp: p.currentHp || 0, maxHp: p.maxHp || 0 });
+                        allies.push({ name: creature.name, type: creature.type || 'player', currentHp: creature.currentHp || 0, maxHp: creature.maxHp || 0 });
                     }
                 }
+                console.log('[CR] allies after filtering:', allies.length, 'maxAllies:', maxAllies);
             }
 
             result.allyTempHp = allyTempHp;
             result.maxAllies = maxAllies;
             result.allies = allies;
+            console.log('[CR] allies collected:', allies.length);
         }
     }
 
+    console.log('[CR] grantCelestialResilience END:', { selfTempHp: result.selfTempHp, allyTempHp: result.allyTempHp, allies: result.allies?.length });
     return result;
 }
 
 export async function handle(action, playerStats, campaignName, mapName) {
+    console.log('[CR] handle START:', { actionName: action?.name, mapName });
     if (!mapName) {
+        console.log('[CR] handle — no mapName, returning popup');
         return {
             type: 'popup',
             payload: {
@@ -71,6 +82,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
     }
 
     const result = await grantCelestialResilience(playerStats, campaignName, 'magical_cunning', mapName);
+    console.log('[CR] handle — grant result:', result ? 'yes' : 'null');
     if (!result) return null;
 
     await addEntry(campaignName, {
@@ -82,6 +94,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
     }).catch((e) => { console.error("[celestialResilience] Error:", e); });
 
     if (result.allyTempHp && result.maxAllies && result.allies && result.allies.length > 0) {
+        console.log('[CR] handle — returning MODAL with', result.allies.length, 'allies');
         return {
             type: 'modal',
             modalName: 'celestialResilienceModal',
@@ -100,6 +113,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
         popupMessage += ` No allies in range to gain ${result.allyTempHp} temporary hit points.`;
     }
 
+    console.log('[CR] handle — returning popup:', popupMessage.slice(0, 100));
     return {
         type: 'popup',
         payload: {

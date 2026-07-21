@@ -3,6 +3,7 @@ import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
 import { useCombatSuperiorityModal } from '../../hooks/combat/useCombatSuperiorityModal.js';
 import { normalizeAutoDamage, resolveAttackDamageStandalone } from './useAttackDamageResolution.js';
+import { applyTargetChoice as applyDestructiveStrideTargetChoice } from '../../services/automation/handlers/combat/destructiveStrideHandler.js';
 import { getCategories } from '../../services/character/featureCategories.js';
 import { renderMarkdownInline, sanitizeHtml } from '../../services/ui/sanitize.js';
 import { loadFightingStyles } from '../../services/ui/dataLoader.js';
@@ -38,7 +39,7 @@ import CreatureSelectionModal from './modals/shared/CreatureSelectionModal.jsx';
 import './CharSpecialActions.css';
 
 
-function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }) {
+function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, mapName }) {
     const [teleportModal, setTeleportModal] = useState(null);
     const [moonlightStepFallback, setMoonlightStepFallback] = useState(null);
     const [signatureSpellsModal, setSignatureSpellsModal] = useState(null);
@@ -183,7 +184,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
     ];
 
     const handleAutomationClick = useCallback(async (action) => {
-        if (cannotAct) return;
+        console.log('[CR/UI] handleAutomationClick START:', action?.name, 'mapName:', mapName, 'cannotAct:', cannotAct);
+        if (cannotAct) { console.log('[CR/UI] blocked by cannotAct'); return; }
         const auto = action.automation;
         if (auto?.type === 'defensive_tactics') {
             const optionKey = `_${action.name.replace(/\s+/g, '_')}_choice`;
@@ -216,9 +218,12 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
             setAspectOfTheWildsModal(true);
             return;
         }
-        const result = await executeHandler(action, playerStats, campaignName, null);
+        console.log('[CR/UI] calling executeHandler for:', action?.name, 'mapName:', mapName);
+        const result = await executeHandler(action, playerStats, campaignName, mapName);
+        console.log('[CR/UI] executeHandler returned:', result ? JSON.stringify(result).slice(0, 300) : 'null');
         if (!result) return;
         if (result.type === 'modal') {
+            console.log('[CR/UI] modal result, modalName:', result.modalName);
             if (result.modalName === 'teleport') {
                 setTeleportModal(result.payload);
             } else if (result.modalName === 'signatureSpells') {
@@ -258,16 +263,19 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
             } else if (result.modalName === 'stepsOfTheFeyTaunt') {
                 setStepsOfTheFeyTauntModal(result.payload);
             } else if (result.modalName === 'celestialResilienceModal') {
+                console.log('[CR/UI] setting celestialResilienceModal state');
                 setCelestialResilienceModal({ ...result.payload, playerStats, campaignName });
             }
         } else if (result.type === 'popup') {
+            console.log('[CR/UI] popup result, description:', (result.payload?.description || '').slice(0, 100));
             const payload = result.payload;
             const name = payload?.name || action?.name || 'Automation';
             const description = payload?.description || '';
             const html = `<b>${name}</b><br/>${description}<br/><span class="dice-roll-hint">click to dismiss</span>`;
             setPopupHtml(html);
         }
-    }, [playerStats, campaignName, cannotAct, setCombatSuperiorityModal, setPopupHtml]);    const handleStrideConfirm = useCallback(async (optionName, buffEntry) => {
+    }, [playerStats, campaignName, cannotAct, mapName, setCombatSuperiorityModal, setPopupHtml]);
+    const handleStrideConfirm = useCallback(async (optionName, buffEntry) => {
         if (!strideModal) return;
         const { action, playerStats: modalPlayerStats, campaignName: modalCampaign } = strideModal;
         setStrideModal(null);
@@ -361,8 +369,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
         const { action, playerStats: modalPlayerStats, campaignName: modalCampaign, chosenType, martialArtsDie } = destructiveStrideTargetModal;
         setDestructiveStrideTargetModal(null);
 
-        const { applyTargetChoice } = await import('../../services/automation/handlers/combat/destructiveStrideHandler.js');
-        const result = await applyTargetChoice(action, modalPlayerStats, modalCampaign, targetName, chosenType, martialArtsDie);
+        const result = await applyDestructiveStrideTargetChoice(action, modalPlayerStats, modalCampaign, targetName, chosenType, martialArtsDie);
 
         if (result?.type === 'popup') {
             const html = `<b>${result.payload?.name || 'Destructive Stride'}</b><br/>${result.payload?.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;

@@ -51,7 +51,7 @@ describe('LongRestButton', () => {
     vi.clearAllMocks();
   });
 
-  it('renders with correct text based on Trance trait and calls onLongRest on click', () => {
+  it('renders with correct text based on Trance trait and calls onLongRest on click', async () => {
     const onLongRest = vi.fn();
     tranceRules.hasTranceTrait.mockReturnValue(false);
     const { rerender } = render(<LongRestButton {...makeProps({ onLongRest })} />);
@@ -63,6 +63,8 @@ describe('LongRestButton', () => {
 
     fireEvent.click(screen.getByRole('button'));
     expect(restRules.applyLongRest).toHaveBeenCalledWith(expect.any(Object), mockCampaignName);
-    expect(onLongRest).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => {
+      expect(onLongRest).toHaveBeenCalledTimes(1);
+    });
   });
 });

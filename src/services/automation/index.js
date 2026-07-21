@@ -530,7 +530,9 @@ export { confirmPowerWordFortify } from './handlers/buffs/powerWordFortifyHandle
 export { confirmSearingVengeance, skipSearingVengeance } from './handlers/class-warlock/searingVengeanceHandler.js';
 export { confirmCelestialResilience, skipCelestialResilience } from './handlers/class-warlock/celestialResilienceHandler.js';
 export async function executeHandler(action, playerStats, campaignName, mapName, characters) {
+    console.log('[EXEC] executeHandler START:', { actionName: action?.name, autoType: action?.automation?.type, mapName });
     if (!action?.automation) {
+        console.log('[EXEC] no automation, returning null');
         return null;
     }
 
@@ -571,7 +573,9 @@ export async function executeHandler(action, playerStats, campaignName, mapName,
     }
 
     try {
+        console.log('[EXEC] calling handler:', auto.type);
         const result = await handler(action, playerStats, campaignName, mapName, characters);
+        console.log('[EXEC] handler returned:', result ? JSON.stringify(result).slice(0, 200) : 'null');
         return result;
       } catch (e) {
           console.error(`[automation] Handler ${auto.type}/${auto.effect} failed:`, e);

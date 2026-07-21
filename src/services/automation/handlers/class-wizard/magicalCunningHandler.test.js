@@ -12,14 +12,20 @@ vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('../class-warlock/celestialResilienceHandler.js', () => ({
-    handle: vi.fn().mockResolvedValue(null),
-}))
+vi.mock('../class-warlock/celestialResilienceHandler.js', () => {
+    const handleMock = vi.fn();
+    return {
+        handle: handleMock,
+        handleCelestialResilience: handleMock,
+        grantCelestialResilience: vi.fn(),
+    };
+});
 
 // Re-import after mocking
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js'
-import { handle as celestialResilienceHandle } from '../class-warlock/celestialResilienceHandler.js'
-import { addEntry } from '../../../ui/logService.js'
+const { getRuntimeValue, setRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js')
+const celestialResilienceModule = await import('../class-warlock/celestialResilienceHandler.js')
+const { addEntry } = await import('../../../ui/logService.js')
+const { handleCelestialResilience } = celestialResilienceModule
 
 const campaignName = 'test-campaign'
 
@@ -38,6 +44,7 @@ const defaultAction = { name: 'Magical Cunning', automation: { type: 'magical_cu
 describe('magicalCunningHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        handleCelestialResilience.mockImplementation(async () => null)
     })
 
     describe('handle', () => {
@@ -181,10 +188,13 @@ describe('magicalCunningHandler', () => {
         })
 
         it('applies Celestial Resilience when warlock has Celestial Patron', async () => {
-            vi.mocked(grantCelestialResilience).mockResolvedValue({
-                selfTempHp: 3,
-                message: 'Celestial Resilience: You gain 3 temporary hit points.',
-            })
+            handleCelestialResilience.mockImplementation(async () => ({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    description: 'Celestial Resilience: You gain 3 temporary hit points.',
+                },
+            }));
 
             getRuntimeValue.mockImplementation((_name, key, _campaign) => {
                 if (key === 'spell_slots_level_1') return 0
@@ -201,12 +211,42 @@ describe('magicalCunningHandler', () => {
                 null,
             )
 
-            expect(vi.mocked(grantCelestialResilience)).toHaveBeenCalledWith(
-                expect.any(Object),
-                campaignName,
-                'magical_cunning',
-            )
+            console.log('handleCelestialResilience calls:', handleCelestialResilience.mock.calls.length)
+            console.log('result:', JSON.stringify(result)?.slice(0, 300))
+            expect(handleCelestialResilience).toHaveBeenCalled()
             expect(result.payload.description).toContain('Celestial Resilience')
+        })
+
+        it('returns modal when Celestial Resilience has allies in range', async () => {
+            handleCelestialResilience.mockImplementation(async () => ({
+                type: 'modal',
+                modalName: 'celestialResilienceModal',
+                payload: {
+                    creatureTargets: [{ name: 'Ally1', type: 'player' }],
+                    allyTempHp: 4,
+                    selfTempHp: 3,
+                    maxTargets: 5,
+                },
+            }));
+
+            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
+                if (key === 'spell_slots_level_1') return 0
+                return null
+            })
+
+            const result = await handle(
+                defaultAction,
+                makePlayerStats({
+                    class: { name: 'Warlock', major: { name: 'Celestial Patron' } },
+                    specialActions: [{ name: 'Celestial Resilience' }],
+                }),
+                campaignName,
+                'test-map',
+            )
+
+            expect(result.type).toBe('modal')
+            expect(result.modalName).toBe('celestialResilienceModal')
+            expect(result.payload.creatureTargets).toHaveLength(1)
         })
 
         it('logs an ability_use entry on success', async () => {

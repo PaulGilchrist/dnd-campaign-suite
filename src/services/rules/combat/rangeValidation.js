@@ -23,17 +23,18 @@ export function rangeToFeet(range) {
   if (!range || typeof range !== 'string') return null
 
   const s = range.toLowerCase().trim()
+  const normalized = s.replace(/_/g, ' ')
 
-  if (s === 'touch') return MELEE_RANGE_FT
-  if (s === 'self' || s.startsWith('self (')) return null
-  if (s === 'sight') return Infinity
-  if (s === 'unlimited') return Infinity
-  if (s === 'special') return null
+  if (normalized === 'touch') return MELEE_RANGE_FT
+  if (normalized === 'self' || normalized.startsWith('self (')) return null
+  if (normalized === 'sight') return Infinity
+  if (normalized === 'unlimited') return Infinity
+  if (normalized === 'special') return null
 
-  const match = s.match(/^(-?\d+(?:\.\d+)?)\s*(feet|foot|ft\.?)?$/)
+  const match = normalized.match(/^(-?\d+(?:\.\d+)?)\s*(feet|foot|ft\.?)?$/)
   if (match) return parseFloat(match[1])
 
-  const mileMatch = s.match(/^(-?\d+(?:\.\d+)?)\s*mile/)
+  const mileMatch = normalized.match(/^(-?\d+(?:\.\d+)?)\s*mile/)
   if (mileMatch) return parseFloat(mileMatch[1]) * 5280
 
   return null
