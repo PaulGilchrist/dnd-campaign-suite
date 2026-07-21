@@ -704,7 +704,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'dark_ones_blessing':
                 result.passives.push(info)
                 break
-            case 'dark_ones_look':
+            case 'dark_ones_luck':
                 result.passives.push(info)
                 break
             case 'hunter_prey':

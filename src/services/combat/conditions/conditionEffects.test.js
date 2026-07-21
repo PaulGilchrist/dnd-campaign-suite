@@ -227,7 +227,7 @@ describe('conditionEffects', () => {
         { modifier: { target: 'ability_check', effect: 'dex_jump' }, field: 'dexJump', value: true },
         { modifier: { target: 'd20', effect: 'restore_balance' }, field: 'restoreBalance', value: true },
         { modifier: { target: 'attack_roll', effect: 'no_advantage_against' }, field: 'noAdvantageAgainst', value: true },
-        { modifier: { target: 'attack_roll', effect: 'dark_ones_look' }, field: 'darkOnesLook', value: true },
+        { modifier: { target: 'attack_roll', effect: 'dark_ones_luck' }, field: 'darkOnesLuck', value: true },
         { modifier: { target: 'attack_roll', effect: 'portent' }, field: 'portent', value: true },
         { modifier: { target: 'attack_roll', effect: 'improved_illusions' }, field: 'improvedIllusions', value: true },
         { modifier: { target: 'attack_roll', effect: 'illusory_reality' }, field: 'illusoryReality', value: true },

@@ -524,6 +524,7 @@ const WarlockFeatures = function WarlockFeatures({ playerStats, campaignName }) 
     const arcanumLevels = warlockFeatures.arcanumLevels || {};
     const hasStepsOfTheFey = (playerStats.automation?.bonusActions ?? []).some(a => a.type === 'steps_of_the_fey');
     const isCelestialPatron = playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron';
+    const isFiendPatron = playerStats.class?.major?.name === 'Fiend' || playerStats.class?.subclass?.name === 'Fiend' || playerStats.class?.major?.name === 'Fiend Patron' || playerStats.class?.subclass?.name === 'Fiend Patron';
     const chaMod = playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0;
 
     return (
@@ -551,9 +552,12 @@ const WarlockFeatures = function WarlockFeatures({ playerStats, campaignName }) 
               {isCelestialPatron && (
                   <TrackedResourceInput label="Healing Light" resourceKey="healinglightPool" playerName={playerStats.name} getMax={() => 1 + playerStats.level} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
               )}
-              {hasStepsOfTheFey && (
-                  <TrackedResourceInput label="Steps of the Fey" resourceKey="_Steps_of_the_Fey_freeCastCount" playerName={playerStats.name} getMax={() => Math.max(chaMod, 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-              )}
+               {hasStepsOfTheFey && (
+                   <TrackedResourceInput label="Steps of the Fey" resourceKey="_Steps_of_the_Fey_freeCastCount" playerName={playerStats.name} getMax={() => Math.max(chaMod, 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+               )}
+               {isFiendPatron && (
+                   <TrackedResourceInput label="Dark One's Own Luck" resourceKey="darkOnesLuckUses" playerName={playerStats.name} getMax={() => Math.max(1, chaMod)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+               )}
              <div><b>{(warlockFeatures?.invocationsKnown ?? 0) > 0 ? 'Eldritch Invocations' : 'Invocations Known'}: </b>{warlockFeatures.invocationsKnown}</div>
              {warlockFeatures?.invocations && Array.isArray(warlockFeatures.invocations) && (
                  <div><b>Invocations: </b>{[...warlockFeatures.invocations].sort().join(', ')}</div>

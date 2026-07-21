@@ -14,7 +14,7 @@ function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, 
   if (modifier.effect === 'reliable_talent') return true;
   if (modifier.effect === 'dex_jump') return true;
   if (modifier.effect === 'restore_balance') return true;
-  if (modifier.effect === 'dark_ones_look') return true;
+  if (modifier.effect === 'dark_ones_luck') return true;
   if (modifier.effect === 'portent') return true;
   if (modifier.effect === 'potent_cantrip') return true;
   if (modifier.effect === 'soulstitch_spells') return true;
@@ -281,8 +281,8 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
     else if (mod.effect === 'no_advantage_against') {
       effects.noAdvantageAgainst = true;
     }
-    else if (mod.effect === 'dark_ones_look') {
-      effects.darkOnesLook = true;
+    else if (mod.effect === 'dark_ones_luck') {
+      effects.darkOnesLuck = true;
     }
     else if (mod.effect === 'portent') {
       effects.portent = true;
@@ -367,7 +367,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     restoreBalance: false,
     d20Floor10: false,
     noAdvantageAgainst: false,
-    darkOnesLook: false,
+    darkOnesLuck: false,
     portent: false,
     potentCantrip: false,
     soulstitchSpells: false,

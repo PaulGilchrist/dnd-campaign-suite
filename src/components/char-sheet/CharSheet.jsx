@@ -616,6 +616,29 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         });
     }, [playerStats, campaignName, popupHtml]);
 
+    const handleDarkOnesLuck = React.useCallback(async (dieValue) => {
+        if (!playerStats) return;
+        const playerName = playerStats.name;
+        const usesKey = 'darkOnesLuckUses';
+        const chaMod = playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0;
+        const maxUses = Math.max(1, chaMod);
+        const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? maxUses);
+        if (currentUses <= 0) return;
+        await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
+        const rollName = popupHtml?.name || 'Ability Check';
+        const d20 = popupHtml?.rolls?.[0] || 0;
+        const bonus = popupHtml?.bonus || 0;
+        const originalTotal = d20 + bonus;
+        const modifiedTotal = originalTotal + dieValue;
+        await addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: "Dark One's Own Luck",
+            description: `${playerName} used Dark One's Own Luck: +1d10(${dieValue}) to ${rollName} (d20 ${d20} + ${bonus} = ${originalTotal} → ${modifiedTotal}). Uses remaining: ${currentUses - 1}/${maxUses}.`,
+            timestamp: Date.now(),
+        });
+    }, [playerStats, campaignName, popupHtml]);
+
     const handleSuperiorityManeuver = React.useCallback(async (maneuverName, dieValue) => {
         if (!playerStats) return;
         try {
@@ -804,6 +827,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                         setPopupHtml={setPopupHtml}
                         onSuperiorityManeuver={popupHtml?.availableSuperiorityManeuvers ? handleSuperiorityManeuver : undefined}
                         onTacticalMind={popupHtml?.tacticalMind ? handleTacticalMind : undefined}
+                        onDarkOnesLuck={popupHtml?.darkOnesLuck ? handleDarkOnesLuck : undefined}
                         onPsiBolsteredKnack={popupHtml?.psiBolsteredKnack ? handlePsiBolsteredKnack : undefined}
                         onBardicInspiration={popupHtml?.bardicInspiration ? handleBardicInspiration : undefined}
                         onBardicInspirationOffense={popupHtml?.bardicInspirationOffense ? handleBardicInspirationOffense : undefined}

@@ -143,11 +143,14 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                ctx.wisCheckReplace = true;
                ctx.wisCheckMinBonus = minBonus
              }
-              if (conditionEffects?.tacticalMind) {
-                ctx.tacticalMind = true;
-                ctx.tacticalMindBonus = conditionEffects.tacticalMindBonus || null
-              }
-              if (conditionEffects?.reliableTalent) {
+               if (conditionEffects?.tacticalMind) {
+                 ctx.tacticalMind = true;
+                 ctx.tacticalMindBonus = conditionEffects.tacticalMindBonus || null
+               }
+               if (conditionEffects?.darkOnesLuck) {
+                 ctx.darkOnesLuck = true;
+               }
+               if (conditionEffects?.reliableTalent) {
                 ctx.reliableTalent = true
               }
                 if (conditionEffects?.strokeOfLuck) {
@@ -209,10 +212,13 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
              const strAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
              return { forcedMode, autoFail: autoFail || undefined, strSaveReplace: true, strScore: strAbility?.totalScore || 10 }
            }
-          if (conditionEffects?.d20Floor10) {
-            return { forcedMode, autoFail: autoFail || undefined, d20Floor10: true }
-          }
-          return { forcedMode, autoFail: autoFail || undefined }
+           if (conditionEffects?.d20Floor10) {
+             return { forcedMode, autoFail: autoFail || undefined, d20Floor10: true }
+           }
+           if (conditionEffects?.darkOnesLuck) {
+             return { forcedMode, autoFail: autoFail || undefined, darkOnesLuck: true }
+           }
+           return { forcedMode, autoFail: autoFail || undefined }
       }
 
 

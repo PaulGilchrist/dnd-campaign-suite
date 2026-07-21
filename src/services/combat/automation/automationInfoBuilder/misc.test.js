@@ -602,14 +602,14 @@ describe('miscHandlers – celestial_resilience', () => {
     })
 })
 
-// ── dark_ones_look ───────────────────────────────────────────────────
+// ── dark_ones_luck ───────────────────────────────────────────────────
 
-describe('miscHandlers – dark_ones_look', () => {
+describe('miscHandlers – dark_ones_luck', () => {
     it('returns defaults', () => {
-        const feature = makeFeature({ type: 'dark_ones_look' })
-        const result = miscHandlers.dark_ones_look(feature, BASE_STATS)
+        const feature = makeFeature({ type: 'dark_ones_luck' })
+        const result = miscHandlers.dark_ones_luck(feature, BASE_STATS)
         expect(result).toMatchObject({
-            type: 'dark_ones_look',
+            type: 'dark_ones_luck',
             diceExpression: '1d10',
             hasAutomation: true,
             name: 'Test Feature'

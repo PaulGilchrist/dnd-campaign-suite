@@ -486,16 +486,16 @@ describe('collectSaveModifiers', () => {
     })
   })
 
-  describe('dark_ones_look type', () => {
+  describe('dark_ones_luck type', () => {
     it('produces two modifiers for saving_throw and ability_check', () => {
       const features = [{
-        name: "Dark One's Look",
-        automation: { type: 'dark_ones_look' }
+        name: "Dark One's Own Luck",
+        automation: { type: 'dark_ones_luck' }
       }]
       const result = collectSaveModifiers(features)
       expect(result).toHaveLength(2)
       expect(result[0].target).toBe('saving_throw')
-      expect(result[0].effect).toBe('dark_ones_look')
+      expect(result[0].effect).toBe('dark_ones_luck')
       expect(result[1].target).toBe('ability_check')
     })
   })

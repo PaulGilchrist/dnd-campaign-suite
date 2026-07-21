@@ -159,7 +159,8 @@ export const LONG_REST_RESOURCES = [
     '_Steps_of_the_Fey_freeCastCount',
     'beguilingDefensesUses',
     'healinglightPool',
-    'searingvengeanceUses'
+    'searingvengeanceUses',
+    'darkOnesLuckUses'
 ]
 
 export function getLongRestResources() {

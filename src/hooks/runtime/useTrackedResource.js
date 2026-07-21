@@ -5,6 +5,7 @@ function resolveCurrent(storageKey, playerName, playerStats, maxGetter) {
   const hasKey = hasRuntimeValue(playerName, storageKey);
   const storedValue = getRuntimeValue(playerName, storageKey);
   if (hasKey && storedValue != null) return storedValue;
+  if (hasKey && storedValue === null) return maxGetter();
   if (playerStats?._trackedResources?.[storageKey]) {
     return playerStats._trackedResources[storageKey].current;
   }

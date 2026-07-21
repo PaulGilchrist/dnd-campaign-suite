@@ -12155,11 +12155,11 @@
             }
           },
           {
-            "name": "Dark One's Own Look",
+            "name": "Dark One's Own Luck",
             "description": "When you make an ability check or saving throw, add 1d10 to your roll after seeing the roll but before any effects occur. Uses = Charisma modifier (minimum once). Regain on Long Rest.",
             "level": 6,
             "automation": {
-              "type": "dark_ones_look",
+              "type": "dark_ones_luck",
               "diceExpression": "1d10"
             }
           },

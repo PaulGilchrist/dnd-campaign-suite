@@ -103,6 +103,11 @@ export function computeTrackedResources(playerStats) {
   const maxBI = isBard ? (charisma?.bonus || 0) : 0
   resources.bardicInspirationUses = { current: maxBI, max: maxBI }
 
+  const isWarlockClass = playerStats.class?.name === 'Warlock'
+  const isFiendPatron = isWarlockClass && (playerStats.class?.major?.name === 'Fiend' || playerStats.class?.subclass?.name === 'Fiend' || playerStats.class?.major?.name === 'Fiend Patron' || playerStats.class?.subclass?.name === 'Fiend Patron')
+  const maxDOL = isFiendPatron ? Math.max(1, charisma?.bonus || 0) : 0
+  resources.darkOnesLuckUses = { current: maxDOL, max: maxDOL }
+
   const maxWS = features?.maxWildShapeUses || 0
   resources.wildShapeUses = { current: maxWS, max: maxWS }
 

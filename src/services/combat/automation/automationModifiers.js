@@ -188,18 +188,18 @@ export function collectSaveModifiers(features) {
                     effect: 'd20_floor_10',
                 })
             }
-            if (auto.type === 'dark_ones_look') {
+            if (auto.type === 'dark_ones_luck') {
                 modifiers.push({
                     source: feature.name,
                     target: 'saving_throw',
                     condition: '',
-                    effect: 'dark_ones_look',
+                    effect: 'dark_ones_luck',
                 })
                 modifiers.push({
                     source: feature.name,
                     target: 'ability_check',
                     condition: '',
-                    effect: 'dark_ones_look',
+                    effect: 'dark_ones_luck',
                 })
             }
             if (auto.type === 'clairvoyant_combatant') {

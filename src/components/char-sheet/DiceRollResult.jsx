@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, total = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, advantageReason, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, isNatural1, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, damageType, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, autoRerollCondition, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, strokeOfLuck, onStrokeOfLuck, defensiveDuelistBonus, baitAndSwitchBonus, isPotentCantrip, luckyAdvantage, luckyDisadvantage, onLuckyAdvantage, onLuckyDisadvantage, secondaryFormula, secondaryRolls, secondaryTotal, secondaryModifier, secondaryDamageType, secondaryFinalDamage, secondarySaveResult, availableSuperiorityManeuvers, onSuperiorityManeuver, onTacticalMind, gwfApplied, gwfOriginalRolls, gwfDisplayRolls, types, baseFormula, baseTotal, baseRolls, bonusFormula, bonusTotal, bonusRolls, finalHeal, healReduced, bonusHeal, bonusHealDetail, psiBolsteredKnack, onPsiBolsteredKnack, psiBolsteredKnackDieSize, bardicInspiration, bardicInspirationDie, onBardicInspiration, luckyRerolled, luckyRerollValue, bardicInspirationDefense, bardicInspirationDefenseDieSize, bardicInspirationDefenseTargetName: _bardicInspirationDefenseTargetName, bardicInspirationOffense, bardicInspirationOffenseDieSize, onBardicInspirationDefense, onBardicInspirationOffense, unerringStrikeApplied, onDone, interceptedFeature, empoweredSpell, _empoweredSpellChaMod, spellName, onEmpoweredSpell, d20Floor10 }) {
+function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, total = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, advantageReason, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, isNatural1, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, damageType, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, autoRerollCondition, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, darkOnesLuck, onDarkOnesLuck, strokeOfLuck, onStrokeOfLuck, defensiveDuelistBonus, baitAndSwitchBonus, isPotentCantrip, luckyAdvantage, luckyDisadvantage, onLuckyAdvantage, onLuckyDisadvantage, secondaryFormula, secondaryRolls, secondaryTotal, secondaryModifier, secondaryDamageType, secondaryFinalDamage, secondarySaveResult, availableSuperiorityManeuvers, onSuperiorityManeuver, onTacticalMind, gwfApplied, gwfOriginalRolls, gwfDisplayRolls, types, baseFormula, baseTotal, baseRolls, bonusFormula, bonusTotal, bonusRolls, finalHeal, healReduced, bonusHeal, bonusHealDetail, psiBolsteredKnack, onPsiBolsteredKnack, psiBolsteredKnackDieSize, bardicInspiration, bardicInspirationDie, onBardicInspiration, luckyRerolled, luckyRerollValue, bardicInspirationDefense, bardicInspirationDefenseDieSize, bardicInspirationDefenseTargetName: _bardicInspirationDefenseTargetName, bardicInspirationOffense, bardicInspirationOffenseDieSize, onBardicInspirationDefense, onBardicInspirationOffense, unerringStrikeApplied, onDone, interceptedFeature, empoweredSpell, _empoweredSpellChaMod, spellName, onEmpoweredSpell, d20Floor10 }) {
     const isD20 = type === 'd20';
     const [mode, setMode] = useState(forcedMode || 'normal');
     const [rerollUsed, setRerollUsed] = useState(false);
@@ -25,6 +25,8 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
     const [psiKnackConsumed, setPsiKnackConsumed] = useState(false);
     const [empoweredSpellUsed, setEmpoweredSpellUsed] = useState(false);
     const [empoweredSpellResult, setEmpoweredSpellResult] = useState(null);
+    const [darkOnesLuckUsed, setDarkOnesLuckUsed] = useState(false);
+    const [darkOnesLuckResult, setDarkOnesLuckResult] = useState(null);
 
     let finalRoll = 0;
     const safeRolls = Array.isArray(rolls) ? rolls : [];
@@ -72,6 +74,14 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
         setTacticalResult({ bonus: dieResult, total: newTotal });
         setTacticalUsed(true);
         if (onTacticalMind) await onTacticalMind(dieResult);
+    };
+
+    const handleDarkOnesLuck = async () => {
+        const dieValue = Math.floor(Math.random() * 10) + 1;
+        const currentTotal = finalRoll + bonus + modifier;
+        setDarkOnesLuckResult({ dieValue, total: currentTotal + dieValue });
+        setDarkOnesLuckUsed(true);
+        if (onDarkOnesLuck) await onDarkOnesLuck(dieValue);
     };
 
     const handleBardicInspiration = async () => {
@@ -407,6 +417,14 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
               </div>
             )}
 
+            {darkOnesLuck && !darkOnesLuckUsed && isD20 && (rollType === 'check' || rollType === 'skill' || rollType === 'save') && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={handleDarkOnesLuck} type="button">
+                  <i className="fa-solid fa-fire"></i> Dark One's Own Luck (1d10)
+                </button>
+              </div>
+            )}
+
             {availableSuperiorityManeuvers && availableSuperiorityManeuvers.length > 0 && !superiorityUsed && (
               <div className="dice-roll-reroll">
                 {availableSuperiorityManeuvers.map(m => (
@@ -521,6 +539,12 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
             {tacticalUsed && tacticalResult !== null && (
               <div className="dice-roll-reroll-result">
                 <i className="fa-solid fa-hand"></i> Tactical Mind: +{tacticalResult.bonus} → <strong>{tacticalResult.total}</strong>
+              </div>
+            )}
+
+            {darkOnesLuckUsed && darkOnesLuckResult !== null && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-fire"></i> Dark One's Own Luck: +{darkOnesLuckResult.dieValue} (d10) → <strong>{darkOnesLuckResult.total}</strong>
               </div>
             )}
 

@@ -152,7 +152,7 @@ import { handle as handleBewitchingMagic } from './handlers/class-warlock/bewitc
 import { handle as handleStepsOfTheFey } from './handlers/class-warlock/stepsOfTheFeyHandler.js';
 import { handle as handleCelestialResilience } from './handlers/class-warlock/celestialResilienceHandler.js';
 import { handle as handleSearingVengeance } from './handlers/class-warlock/searingVengeanceHandler.js';
-import { handle as handleDarkOnesLook } from './handlers/class-warlock/darkOnesLookHandler.js';
+import { handle as handleDarkOnesLuck } from './handlers/class-warlock/darkOnesLuckHandler.js';
 import { handle as handleFiendishResilience } from './handlers/class-warlock/fiendishResilienceHandler.js';
 import { handle as handleHurlThroughHell } from './handlers/class-warlock/hurlThroughHellHandler.js';
 import { handle as handleClairvoyantCombatant } from './handlers/class-warlock/clairvoyantCombatantHandler.js';
@@ -422,7 +422,7 @@ const HANDLER_MAP = {
              steps_of_the_fey: handleStepsOfTheFey,
              celestial_resilience: handleCelestialResilience,
             searing_vengeance: handleSearingVengeance,
-            dark_ones_look: handleDarkOnesLook,
+            dark_ones_luck: handleDarkOnesLuck,
             fiendish_resilience: handleFiendishResilience,
                 hurl_through_hell: handleHurlThroughHell,
                 clairvoyant_combatant: handleClairvoyantCombatant,

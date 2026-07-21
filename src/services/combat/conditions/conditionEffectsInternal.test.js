@@ -46,7 +46,7 @@ describe('saveModifierApplies — effect short-circuits', () => {
     'restore_balance',
     'd20_floor_10',
     'no_advantage_against',
-    'dark_ones_look',
+    'dark_ones_luck',
     'portent',
     'potent_cantrip',
     'soulstitch_spells',
@@ -990,10 +990,10 @@ describe('computeConditionEffects — applied modifier effects', () => {
     expect(result.noAdvantageAgainst).toBe(true);
   });
 
-  it('sets darkOnesLook for dark_ones_look effect', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'dark_ones_look' }];
+  it('sets darkOnesLuck for dark_ones_luck effect', () => {
+    const modifiers = [{ target: 'saving_throw', effect: 'dark_ones_luck' }];
     const result = computeConditionEffects([], modifiers);
-    expect(result.darkOnesLook).toBe(true);
+    expect(result.darkOnesLuck).toBe(true);
   });
 
   it('sets portent for portent effect', () => {

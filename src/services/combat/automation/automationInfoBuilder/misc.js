@@ -467,10 +467,10 @@ export const miscHandlers = {
         }
     },
 
-    'dark_ones_look': (feature, _playerStats) => {
+    'dark_ones_luck': (feature, _playerStats) => {
         const auto = feature.automation
         return {
-            type: 'dark_ones_look',
+            type: 'dark_ones_luck',
             name: feature.name,
             diceExpression: auto.diceExpression || '1d10',
             hasAutomation: true

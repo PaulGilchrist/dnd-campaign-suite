@@ -1,5 +1,5 @@
 // @improved-by-ai
-import { handle } from './darkOnesLookHandler.js';
+import { handle } from './darkOnesLuckHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as logService from '../../../ui/logService.js';
@@ -15,7 +15,7 @@ vi.mock('../../../combat/automation/automationService.js', () => ({
     evaluateAutoExpression: vi.fn(),
 }));
 
-describe('darkOnesLookHandler.handle', () => {
+describe('darkOnesLuckHandler.handle', () => {
     const mockCampaignName = 'TestCampaign';
 
     const createPlayerStats = (overrides = {}) => ({
@@ -27,8 +27,8 @@ describe('darkOnesLookHandler.handle', () => {
     });
 
     const createAction = (overrides = {}) => ({
-        name: "Dark One's Own Look",
-        automation: { type: 'dark_ones_look', diceExpression: '1d10' },
+        name: "Dark One's Own Luck",
+        automation: { type: 'dark_ones_luck', diceExpression: '1d10' },
         ...overrides,
     });
 
@@ -73,7 +73,7 @@ describe('darkOnesLookHandler.handle', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe("Dark One's Own Look");
+            expect(result.payload.name).toBe("Dark One's Own Luck");
             expect(result.payload.description).toContain('no uses remaining');
             expect(result.payload.description).toContain('Long Rest');
             expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
@@ -93,7 +93,7 @@ describe('darkOnesLookHandler.handle', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Modified: d20(8) + 5 + 1d10(5) = <b>18</b>');
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'TestWarlock', 'darkOnesLookUses', 0, mockCampaignName
+                'TestWarlock', 'darkOnesLuckUses', 0, mockCampaignName
             );
         });
     });
@@ -130,7 +130,7 @@ describe('darkOnesLookHandler.handle', () => {
             expect(logService.addEntry).toHaveBeenCalledWith(mockCampaignName, expect.objectContaining({
                 type: 'ability_use',
                 characterName: 'TestWarlock',
-                abilityName: "Dark One's Own Look",
+                abilityName: "Dark One's Own Luck",
                 description: expect.stringContaining('+1d10(7)'),
                 timestamp: expect.any(Number),
             }));
@@ -166,7 +166,7 @@ describe('darkOnesLookHandler.handle', () => {
             await handle(createAction(), createPlayerStats(), mockCampaignName);
 
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'TestWarlock', 'darkOnesLookUses', 4, mockCampaignName
+                'TestWarlock', 'darkOnesLuckUses', 4, mockCampaignName
             );
         });
     });

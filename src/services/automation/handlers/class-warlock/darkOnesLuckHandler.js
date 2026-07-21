@@ -22,7 +22,7 @@ export async function handle(action, playerStats, campaignName) {
     const maxUses = Math.max(1, chaMod);
 
     // Check remaining uses
-    const currentUses = Number(getRuntimeValue(playerName, 'darkOnesLookUses', campaignName) ?? maxUses);
+    const currentUses = Number(getRuntimeValue(playerName, 'darkOnesLuckUses', campaignName) ?? maxUses);
 
     if (currentUses <= 0) {
         return infoPopup(action.name, `${action.name} has no uses remaining. Recharges on a Long Rest.`, auto);
@@ -54,7 +54,7 @@ export async function handle(action, playerStats, campaignName) {
     }
 
     // Consume one use
-    await setRuntimeValue(playerName, 'darkOnesLookUses', currentUses - 1, campaignName);
+    await setRuntimeValue(playerName, 'darkOnesLuckUses', currentUses - 1, campaignName);
 
     addEntry(campaignName, {
         type: 'ability_use',
@@ -62,7 +62,7 @@ export async function handle(action, playerStats, campaignName) {
         abilityName: action.name,
         description: `${playerName} used ${action.name}: +1d10(${dieRoll}) to ability check/saving throw. Uses remaining: ${currentUses - 1}/${maxUses}.`,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[darkOnesLook] Error:", e); });
+    }).catch((e) => { console.error("[darkOnesLuck] Error:", e); });
 
     return infoPopup(action.name, description, auto);
 }
