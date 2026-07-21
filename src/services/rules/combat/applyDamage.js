@@ -5,11 +5,10 @@ import utils from '../../ui/utils.js';
 import { sendDeathSavePrompt, sendConcentrationPrompt } from '../../combat/conditions/savePromptService.js';
 import { rollConcentrationSave } from '../../combat/concentration/concentrationRules.js';
 import { addEntry } from '../../ui/logService.js';
-import { getDamageReduction } from '../../combat/automation/automationPassives.js';
+import { getDamageReduction, getDamageResistances } from '../../combat/automation/automationPassives.js';
 import { isCreatureInSilenceZone } from '../../rules/features/silenceService.js';
 import { processTashasLaughterRepeatSave } from '../../automation/handlers/spells/tashasLaughterHandler.js';
 import { applyWardingBond } from '../../rules/features/wardingBondService.js';
-import { applyThoughtShield } from '../../rules/features/thoughtShieldService.js';
 import { checkPsychicVeil } from '../../rules/features/psychicVeilService.js';
 import { checkHolyAuraDamage } from '../../rules/features/holyAuraDamageService.js';
 import { checkDarkOnesBlessing } from '../../rules/features/darkOnesBlessingService.js';
@@ -137,33 +136,42 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
   };
 
   const isPlayer = creature.type === 'player';
-  if (!Array.isArray(characters)) { console.error('[applyDamage] characters is not an array'); throw new Error('characters must be an array'); }
+  if (!Array.isArray(characters)) { throw new Error('characters must be an array'); }
   const playerStats = isPlayer ? characters.find(c => c.name === targetName || c.name.startsWith(targetName + ' ')) : null;
   const playerComputed = playerStats?.computedStats || playerStats;
   let resistances = isPlayer ? (playerComputed?.resistances || []) : (creature.resistances || []);
+  if (isPlayer && playerStats) {
+    const statsForPassives = playerComputed?.automation || playerStats?.automation;
+    if (statsForPassives?.passives?.length) {
+      const passiveResistances = statsForPassives ? getDamageResistances({ automation: statsForPassives }) : [];
+      if (passiveResistances.length > 0) {
+        resistances = [...new Set([...resistances, ...passiveResistances])];
+      }
+    }
+  }
   const immunities = isPlayer ? (playerComputed?.immunities || []) : (creature.immunities || []);
 
-    if (isPlayer) {
-        const rawBuffs = getRuntimeValue(creature.name, 'activeBuffs', campaignName);
-        const activeBuffs = Array.isArray(rawBuffs) ? rawBuffs : [];
-        for (const buff of activeBuffs) {
-            if (buff.resistanceTypes?.length) {
-                resistances = [...new Set([...resistances, ...buff.resistanceTypes])];
-            }
-        }
-        // Silence — Thunder immunity for creatures in the silence zone
-        for (const buff of activeBuffs) {
-            if (buff.effect === 'silence' && buff.sourceCharacter) {
-                if (isCreatureInSilenceZone(creature.name, buff.sourceCharacter, campaignName)) {
-                    if (!immunities.includes('Thunder')) {
-                        immunities.push('Thunder');
-                    }
-                }
-            }
-        }
-    }
-    if (!Array.isArray(damageTypes)) { console.error('[applyDamage] damageTypes is not an array'); throw new Error('damageTypes must be an array'); }
-    const resResult = computeDamageAfterResistancesWithDetails(rawDamage, damageTypes, resistances, immunities, ignoreResistance);
+  if (isPlayer) {
+    const rawBuffs = getRuntimeValue(creature.name, 'activeBuffs', campaignName);
+    const activeBuffs = Array.isArray(rawBuffs) ? rawBuffs : [];
+    for (const buff of activeBuffs) {
+       if (buff.resistanceTypes?.length) {
+           resistances = [...new Set([...resistances, ...buff.resistanceTypes])];
+       }
+   }
+   // Silence — Thunder immunity for creatures in the silence zone
+   for (const buff of activeBuffs) {
+       if (buff.effect === 'silence' && buff.sourceCharacter) {
+           if (isCreatureInSilenceZone(creature.name, buff.sourceCharacter, campaignName)) {
+               if (!immunities.includes('Thunder')) {
+                   immunities.push('Thunder');
+               }
+           }
+       }
+   }
+}
+if (!Array.isArray(damageTypes)) { throw new Error('damageTypes must be an array'); }
+const resResult = computeDamageAfterResistancesWithDetails(rawDamage, damageTypes, resistances, immunities, ignoreResistance);
     let finalDamage = resResult.finalDamage;
     let resistanceDetails = resResult.typeDetails;
 
@@ -277,9 +285,6 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
     if (wardDamage > 0) {
       if (isPlayer) {
         applyWardingBond(creature, combatSummary, campaignName, wardDamage);
-      }
-      if (isPlayer && attackerName && attackerName !== creature.name) {
-        applyThoughtShield(creature, attackerName, playerComputed, damageTypes, combatSummary, campaignName, wardDamage);
       }
       if (isPlayer) {
         const rawConditions = getRuntimeValue(creature.name, 'activeConditions');

@@ -92,8 +92,8 @@ describe('collectAutomationFromFeatures – handler dispatch', () => {
         const psychicResult = collectAutomationFromFeatures([
             makeFeature({ type: 'reaction_damage', trigger: 'psychic_damage_received' }),
         ], ps)
-        expect(psychicResult.passives).toHaveLength(1)
-        expect(psychicResult.reactions).toHaveLength(0)
+        expect(psychicResult.passives).toHaveLength(0)
+        expect(psychicResult.reactions).toHaveLength(1)
     })
 
     it('routes passive_rule sub-types to correct buckets', () => {

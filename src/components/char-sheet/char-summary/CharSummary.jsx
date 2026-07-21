@@ -31,7 +31,7 @@ const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
 function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters, onLongRest, exhaustionLevel, conditionEffects, onConditionsChange, auraComboEffects }) {
     const { setPopupHtml } = useDiceRollPopup();
-    const { rollInitiative } = useLoggedDiceRoll(playerStats.name, campaignName);
+    const { rollInitiative } = useLoggedDiceRoll(playerStats.name, campaignName, { characters });
     const [showShortRest, setShowShortRest] = React.useState(false);
     const [showXpModal, setShowXpModal] = React.useState(false);
     const [xpDelta, setXpDelta] = React.useState('');

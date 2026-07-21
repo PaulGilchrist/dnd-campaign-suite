@@ -685,7 +685,7 @@ export function createLogDamageAndShow(deps) {
             name,
             formula,
             rolls,
-            total: primaryApplyResult?.finalDamage ?? finalDamage,
+            total: adjustedTotal,
             bonus: 0,
             modifier,
             damageType,

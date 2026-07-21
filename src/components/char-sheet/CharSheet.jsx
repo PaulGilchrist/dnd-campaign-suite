@@ -768,16 +768,17 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                     onConditionsChange={handleConditionsChange}
                     auraComboEffects={auraComboEffects}
                 ></CharSummary>
-                <CharAbilities
-                    allAbilityScores={allAbilityScores}
-                    playerStats={playerStats}
-                    campaignName={campaignName}
-                    exhaustionPenalty={exhaustionPenalty}
-                    conditionEffects={conditionEffects}
-                    isRaging={isRaging}
-                    onReroll={handleReroll}
-                    onStrokeOfLuck={handleStrokeOfLuck}
-                ></CharAbilities>
+                 <CharAbilities
+                     allAbilityScores={allAbilityScores}
+                     playerStats={playerStats}
+                     campaignName={campaignName}
+                     exhaustionPenalty={exhaustionPenalty}
+                     conditionEffects={conditionEffects}
+                     isRaging={isRaging}
+                     onReroll={handleReroll}
+                     onStrokeOfLuck={handleStrokeOfLuck}
+                     characters={characters}
+                 ></CharAbilities>
 
                 <CharActions
                     playerStats={playerStats}

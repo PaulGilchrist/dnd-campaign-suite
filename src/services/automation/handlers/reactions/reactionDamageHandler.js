@@ -6,6 +6,7 @@ import { resolveTarget } from '../../common/targetResolver.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { MELEE_REACH_FEET } from '../../../combat/baseCombatActions.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 
 const POLEARM_WEAPONS = ['Quarterstaff', 'Spear'];
 
@@ -70,6 +71,10 @@ async function consumeResourceCost(auto, playerStats, campaignName, actionName) 
 
 export async function handle(action, playerStats, campaignName, mapName, allEquipment) {
     const auto = action.automation;
+
+    if (auto?.trigger === 'psychic_damage_received') {
+        return await handleThoughtShield(action, playerStats, campaignName);
+    }
 
     if (auto?.trigger === 'creature_enters_reach_while_holding_polearm') {
         const hasWeapon = hasPolearmWeapon(allEquipment, playerStats.inventory?.equipped);
@@ -231,6 +236,153 @@ export async function handle(action, playerStats, campaignName, mapName, allEqui
             targetName,
             description: `${targetName} must make a ${auto.saveType || 'CON'} saving throw (DC ${saveDc}).`,
             automation: auto,
+        },
+    };
+}
+
+async function handleThoughtShield(action, playerStats, campaignName) {
+    const warlockName = playerStats.name;
+    const allFeatures = [
+        ...(playerStats.characterAdvancement || []),
+        ...(playerStats.reactions || []),
+    ];
+    const hasThoughtShield = allFeatures.some(f => f.name === 'Thought Shield');
+    if (!hasThoughtShield) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${warlockName} does not have Thought Shield.`,
+            },
+        };
+    }
+
+    const cs = await getCombatContext(campaignName);
+    if (!cs) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: 'No combat context available.',
+            },
+        };
+    }
+
+    const lastAttack = cs?.lastAttack;
+    if (!lastAttack) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `No recent attack found. Thought Shield requires a creature to have dealt psychic damage to you.`,
+            },
+        };
+    }
+
+    if (lastAttack.targetName !== warlockName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `You were not the target of the last attack (${lastAttack.targetName} was). Thought Shield only works when you take psychic damage.`,
+            },
+        };
+    }
+
+    if (!lastAttack.damageTypes?.some(d => d.toLowerCase() === 'psychic')) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `The last attack dealt ${lastAttack.damageTypes?.join(', ') || 'unknown'} damage, not psychic damage. Thought Shield only reflects psychic damage.`,
+            },
+        };
+    }
+
+    const actualWarlockDamage = lastAttack.actualDamage || lastAttack.rawDamage || 0;
+    if (actualWarlockDamage <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `The attacker dealt no damage to you (immune/resistant). Thought Shield reflects the damage you took, which was 0.`,
+            },
+        };
+    }
+
+    const attackerCreatureName = lastAttack.attackerName;
+    if (!attackerCreatureName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: 'No attacker found to reflect damage to.',
+            },
+        };
+    }
+
+    const attackerCreature = cs.creatures.find(c => c.name === attackerCreatureName);
+    if (!attackerCreature) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `Attacker "${attackerCreatureName}" not found in combat.`,
+            },
+        };
+    }
+
+    if (attackerCreature.currentHp <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${attackerCreatureName} is already defeated. Cannot reflect damage to a creature that's already down.`,
+            },
+        };
+    }
+
+    const reflectedDamage = actualWarlockDamage;
+    attackerCreature.currentHp = Math.max(0, attackerCreature.currentHp - reflectedDamage);
+
+    await addEntry(campaignName, {
+        type: 'hp_change',
+        targetName: attackerCreatureName,
+        delta: -reflectedDamage,
+        currentHp: attackerCreature.currentHp,
+        maxHp: attackerCreature.maxHp,
+        isHealing: false,
+        isUnconscious: attackerCreature.currentHp <= 0,
+        abilityName: action.name,
+    }).catch((e) => { console.error("[thoughtShield] Error logging:", e); });
+
+    if (attackerCreature.concentration && reflectedDamage > 0) {
+        attackerCreature.concentration.dc = Math.max(10, Math.floor(reflectedDamage / 2));
+    }
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: warlockName,
+        abilityName: action.name,
+        description: `${warlockName} reflects ${reflectedDamage} psychic damage back to ${attackerCreatureName} using Thought Shield.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[thoughtShield] Error logging:", e); });
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            description: `${warlockName} reflects ${reflectedDamage} psychic damage back to ${attackerCreatureName}!`,
         },
     };
 }

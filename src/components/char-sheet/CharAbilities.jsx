@@ -11,10 +11,10 @@ const INTERNAL_SKILL_CHECK_EVENT = 'internal-skill-check';
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
-function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustionPenalty = 0, conditionEffects, isRaging = false, _onReroll, _onStrokeOfLuck }) {
-     const abilityDesc = buildAbilityDetailHtml(allAbilityScores);
-     const { setPopupHtml } = useDiceRollPopup();
-     const { rollAbilityCheck, rollSavingThrow, rollSkillCheck } = useLoggedDiceRoll(playerStats.name, campaignName);
+function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustionPenalty = 0, conditionEffects, isRaging = false, _onReroll, _onStrokeOfLuck, characters }) {
+      const abilityDesc = buildAbilityDetailHtml(allAbilityScores);
+      const { setPopupHtml } = useDiceRollPopup();
+      const { rollAbilityCheck, rollSavingThrow, rollSkillCheck } = useLoggedDiceRoll(playerStats.name, campaignName, { characters });
 
      const getAbilityCheckBonus = useCallback((ability, condEffects) => {
         if (condEffects?.wisCheckReplace && ability.name === 'Charisma') {

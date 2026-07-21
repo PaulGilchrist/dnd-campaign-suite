@@ -195,11 +195,11 @@ describe('collectAutomationFromFeatures – reaction types', () => {
         expect(result.reactions[0].type).toBe(type)
     })
 
-    it('categorizes reaction_damage with psychic_damage_received trigger as passive', () => {
+    it('categorizes reaction_damage with psychic_damage_received trigger as reaction', () => {
         const features = [makeFeature({ type: 'reaction_damage', trigger: 'psychic_damage_received' })]
         const result = collectAutomationFromFeatures(features, ps)
-        expect(result.passives).toHaveLength(1)
-        expect(result.reactions).toHaveLength(0)
+        expect(result.passives).toHaveLength(0)
+        expect(result.reactions).toHaveLength(1)
     })
 })
 

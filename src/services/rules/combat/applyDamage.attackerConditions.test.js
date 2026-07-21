@@ -45,6 +45,7 @@ vi.mock('../../rules/features/silenceService.js', () => ({
 
 vi.mock('../../combat/automation/automationPassives.js', () => ({
   getDamageReduction: vi.fn(() => null),
+  getDamageResistances: vi.fn(() => []),
 }));
 
 // ── Globals ─────────────────────────────────────────────────────

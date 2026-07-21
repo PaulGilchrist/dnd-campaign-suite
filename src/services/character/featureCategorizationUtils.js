@@ -55,12 +55,14 @@ export const categorizeFeatures = (items, categories, options = {}) => {
     // Categorize by casting_time for features that have automations with casting_time
     let castingTime = item.casting_time || item.automation?.casting_time;
     let hasReaction = false;
-    if (!castingTime && Array.isArray(item.automation) && item.automation.length > 0) {
-      const firstAuto = item.automation.find(a => a?.casting_time);
-      if (firstAuto) {
-        castingTime = firstAuto.casting_time;
+    if (Array.isArray(item.automation) && item.automation.length > 0) {
+      if (!castingTime) {
+        const firstAuto = item.automation.find(a => a?.casting_time);
+        if (firstAuto) {
+          castingTime = firstAuto.casting_time;
+        }
       }
-      // Check if any automation entry is a reaction
+      // Check if any automation entry is a reaction (takes priority over passive)
       hasReaction = item.automation.some(a => {
         const ct = (a?.casting_time || '').toLowerCase().trim();
         return ct === '1 reaction' || ct === 'reaction';

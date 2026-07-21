@@ -370,7 +370,8 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 break
             case 'reaction_damage':
                 if (auto.trigger === 'psychic_damage_received') {
-                    result.passives.push(info)
+                    // Thought Shield is a manual reaction, not auto-triggered
+                    result.reactions.push(info)
                 } else {
                     result.reactions.push(info)
                 }
