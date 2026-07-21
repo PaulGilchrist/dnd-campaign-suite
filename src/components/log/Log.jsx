@@ -380,14 +380,14 @@ function HpChangeEntry({ entry }) {
             {entry.damageBreakdown && entry.damageBreakdown.length > 0 ? (
               <span className="log-hp-delta">
                 {entry.delta > 0 ? '+' : ''}{entry.delta} HP
-                {' ('}{entry.damageBreakdown.map((db, i) => (
+                {entry.damageBreakdown.map((db, i) => (
                   <span key={i} className="log-damage-breakdown-item">
                     {i > 0 && <span className="log-damage-breakdown-sep">, </span>}
-                    {db.amount} {db.damageType}
-                    {db.status === 'resistant' && <span className="log-resistance-note"> (Resistance)</span>}
-                    {db.status === 'immune' && <span className="log-immunity-note"> (Immune)</span>}
+                    <span className="log-damage-type">{db.damageType}</span>
+                    {db.status === 'resistant' && <span className="log-resistance-badge">Resistance</span>}
+                    {db.status === 'immune' && <span className="log-immunity-badge">Immune</span>}
                   </span>
-                ))}{')'}
+                ))}
               </span>
             ) : (
               <span className="log-hp-delta">{entry.delta > 0 ? '+' : ''}{entry.delta} HP</span>

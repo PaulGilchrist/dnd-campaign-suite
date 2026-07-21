@@ -816,6 +816,26 @@
     background: rgba(243, 156, 18, 0.15);
 }
 
+/* Resistance badge in HP change entries */
+.log-resistance-badge {
+    font-size: 0.72rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+    color: #f39c12;
+    background: rgba(243, 156, 18, 0.15);
+}
+
+/* Immunity badge in HP change entries */
+.log-immunity-badge {
+    font-size: 0.72rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+    color: #e74c3c;
+    background: rgba(231, 76, 60, 0.15);
+}
+
 /* Ability use entries */
 .log-ability-use {
     border-left: 3px solid #f59e0b;
