@@ -739,6 +739,10 @@ export async function applyLongRest(playerStats, campaignName) {
     setRuntimeValue(name, 'stonecunningUses', null, campaignName, true)
     setRuntimeValue(name, 'stonecunningRestTimestamp', null, campaignName, true)
 
+    // Reset Hurl Through Hell uses on long rest
+    setRuntimeValue(name, 'hurlThroughHellUses', null, campaignName, true)
+    setRuntimeValue(name, 'hurlThroughHellTurnUsed', null, campaignName, true)
+
     // Reset Adrenaline Rush uses on long rest
     setRuntimeValue(name, 'adrenalineRushUses', null, campaignName, true)
     setRuntimeValue(name, 'adrenalineRushRestTimestamp', null, campaignName, true)

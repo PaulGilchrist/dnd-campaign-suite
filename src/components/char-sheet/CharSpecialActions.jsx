@@ -32,6 +32,7 @@ import DestructiveStrideModal from './modals/DestructiveStrideModal.jsx';
 import QuiveringPalmModal from './modals/QuiveringPalmModal.jsx';
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx';
 import StepsOfTheFeyTauntModal from './modals/StepsOfTheFeyTauntModal.jsx';
+import HurlThroughHellModal from './modals/HurlThroughHellModal.jsx';
 import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
 import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
 import { onSavantSelected } from '../../services/automation/handlers/class-wizard/SavantHandler.js';
@@ -63,6 +64,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
     const [celestialResilienceModal, setCelestialResilienceModal] = useState(null);
     const [fiendishResilienceModal, setFiendishResilienceModal] = useState(null);
     const [stepsOfTheFeyTauntModal, setStepsOfTheFeyTauntModal] = useState(null);
+    const [hurlThroughHellModal, setHurlThroughHellModal] = useState(null);
     const [fightingStylesMap, setFightingStylesMap] = useState(null);
     const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats?.name, campaignName, {
@@ -260,6 +262,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
                 setQuiveringPalmModal(result.payload);
             } else if (result.modalName === 'stepsOfTheFeyTaunt') {
                 setStepsOfTheFeyTauntModal(result.payload);
+            } else if (result.modalName === 'hurlThroughHell') {
+                setHurlThroughHellModal(result.payload);
             } else if (result.modalName === 'celestialResilienceModal') {
                 setCelestialResilienceModal({ ...result.payload, playerStats, campaignName });
             } else if (result.modalName === 'fiendishResilience') {
@@ -635,6 +639,12 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
                 <StepsOfTheFeyTauntModal
                     {...stepsOfTheFeyTauntModal}
                     onClose={() => setStepsOfTheFeyTauntModal(null)}
+                />
+            )}
+            {hurlThroughHellModal && (
+                <HurlThroughHellModal
+                    {...hurlThroughHellModal}
+                    onClose={() => setHurlThroughHellModal(null)}
                 />
             )}
             {celestialResilienceModal && (
