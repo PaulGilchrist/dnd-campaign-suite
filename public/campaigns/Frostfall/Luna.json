@@ -125,7 +125,5 @@
   "rules": "5e",
   "xp": 0,
   "xpMode": "milestone",
-  "imagePath": "images/Luna.png",
-  "_fileName": "Cleric.json",
-  "originalFileName": "Cleric.json"
+  "imagePath": "images/Luna.png"
 }

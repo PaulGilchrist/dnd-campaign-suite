@@ -40,3 +40,11 @@ export function ensureDataDir(campaign) {
 export function normalizeMapFile(name) {
   return name.endsWith('.json') ? name : `${name}.json`;
 }
+
+export function campaignSnapshotDir() {
+  return path.join(campaignsRoot(), '.snapshots');
+}
+
+export function campaignSnapshotFile(campaign) {
+  return path.join(campaignSnapshotDir(), `${campaign}.zip`);
+}

@@ -9,7 +9,7 @@ const router = express.Router();
 router.get('/api/campaigns', asyncHandler((req, res) => {
     const items = fs.readdirSync(campaignsRoot(), { withFileTypes: true });
     const folders = items
-        .filter(item => item.isDirectory())
+        .filter(item => item.isDirectory() && !item.name.startsWith('.'))
         .map(item => item.name)
         .sort();
 

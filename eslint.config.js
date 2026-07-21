@@ -64,6 +64,8 @@ export default [
         Blob: 'readonly',
         File: 'readonly',
         Image: 'readonly',
+        URL: 'readonly',
+        FormData: 'readonly',
         URLSearchParams: 'readonly',
         EventSource: 'readonly',
         Event: 'readonly',

@@ -17,6 +17,9 @@ public/campaigns/Frostfall/*
 public/campaigns/*/data/character-change-data.json
 public/campaigns/*/data/campaign-log.json
 
+# Campaign snapshots (admin backups)
+public/campaigns/.snapshots/
+
 # Logs
 logs
 *.log

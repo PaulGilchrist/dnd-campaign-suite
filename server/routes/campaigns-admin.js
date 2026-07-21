@@ -1,12 +1,19 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
+import * as archiverLib from 'archiver';
+import extractZip from 'extract-zip';
+import multerLib from 'multer';
 import asyncHandler from '../utils/asyncHandler.js';
-import { campaignDir, campaignMapsDir, campaignImagesDir, campaignDataDir, campaignDataFile } from '../utils/campaignPaths.js';
-import { characterChangeData, spellOverlayData, activeMaps, saveFile, markDirty, publish } from '../utils/changeData.js';
+import { campaignDir, campaignMapsDir, campaignImagesDir, campaignDataDir, campaignDataFile, campaignSnapshotDir, campaignSnapshotFile } from '../utils/campaignPaths.js';
+import { characterChangeData, spellOverlayData, activeMaps, saveFile, markDirty, publish, readFile } from '../utils/changeData.js';
 import { logCache } from './log.js';
 
 const router = express.Router();
+
+const UPLOAD_SIZE_LIMIT = 100 * 1024 * 1024; // 100 MB — adjust as needed
+const upload = multerLib({ storage: multerLib.memoryStorage(), limits: { fileSize: UPLOAD_SIZE_LIMIT } });
 
 function isLocalhost(req) {
     return req.hostname === 'localhost' || req.hostname === '127.0.0.1';
@@ -273,6 +280,211 @@ router.post('/api/campaigns/:campaign/admin/full-reset', asyncHandler((req, res)
     publish(`log-${campaign}`, null);
 
     res.json({ message: 'Full reset complete' });
+}));
+
+// --- Snapshot helpers ---
+
+function createSnapshot(campaign) {
+    return new Promise((resolve, reject) => {
+        saveFile();
+
+        const snapshotDir = campaignSnapshotDir();
+        if (!fs.existsSync(snapshotDir)) {
+            fs.mkdirSync(snapshotDir, { recursive: true });
+        }
+
+        const snapshotPath = campaignSnapshotFile(campaign);
+        const archive = new archiverLib.ZipArchive({ zlib: { level: 9 } });
+        const outputStream = fs.createWriteStream(snapshotPath);
+
+        const rejectWith = (err) => {
+            archive.abort();
+            reject(err);
+        };
+
+        archive.on('error', rejectWith);
+        outputStream.on('error', rejectWith);
+
+        archive.pipe(outputStream);
+        archive.directory(campaignDir(campaign), false, (entry) => {
+            if (entry.name.includes('.snapshots')) {
+                return false;
+            }
+            return entry;
+        });
+        archive.finalize();
+
+        archive.on('end', () => {
+            const size = outputStream.bytesWritten;
+            resolve(size);
+        });
+    });
+}
+
+function extractZipToDir(source, targetDir) {
+    return new Promise((resolve, reject) => {
+        extractZip(source, { dir: targetDir })
+            .then(resolve)
+            .catch(reject);
+    });
+}
+
+function reloadCampaign(campaign) {
+    readFile();
+    logCache.delete(campaign);
+    publish(`reload-${campaign}`, null);
+}
+
+// POST /api/campaigns/:campaign/admin/snapshot
+router.post('/api/campaigns/:campaign/admin/snapshot', asyncHandler(async (req, res) => {
+    if (!isLocalhost(req)) {
+        return res.status(403).json({ error: 'Only available on localhost' });
+    }
+
+    const { campaign } = req.params;
+    const dir = campaignDir(campaign);
+
+    if (!fs.existsSync(dir)) {
+        return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    const size = await createSnapshot(campaign);
+    res.json({ message: 'Snapshot created', size });
+}));
+
+// POST /api/campaigns/:campaign/admin/rollback
+router.post('/api/campaigns/:campaign/admin/rollback', asyncHandler(async (req, res) => {
+    if (!isLocalhost(req)) {
+        return res.status(403).json({ error: 'Only available on localhost' });
+    }
+
+    const { campaign } = req.params;
+    const dir = campaignDir(campaign);
+    const snapshotPath = campaignSnapshotFile(campaign);
+
+    if (!fs.existsSync(dir)) {
+        return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    if (!fs.existsSync(snapshotPath)) {
+        return res.status(404).json({ error: 'No snapshot found' });
+    }
+
+    // Flush in-memory data to disk before extracting snapshot
+    saveFile();
+
+    // Clear campaign folder and extract snapshot
+    fs.rmSync(dir, { recursive: true, force: true });
+    await extractZipToDir(snapshotPath, dir);
+    reloadCampaign(campaign);
+
+    res.json({ message: 'Rollback complete' });
+}));
+
+// GET /api/campaigns/:campaign/admin/download
+router.get('/api/campaigns/:campaign/admin/download', asyncHandler(async (req, res) => {
+    if (!isLocalhost(req)) {
+        return res.status(403).json({ error: 'Only available on localhost' });
+    }
+
+    const { campaign } = req.params;
+    const dir = campaignDir(campaign);
+
+    if (!fs.existsSync(dir)) {
+        return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    // Flush in-memory data before creating zip
+    saveFile();
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${campaign}.zip"`);
+
+    const archive = new archiverLib.ZipArchive({ zlib: { level: 9 } });
+    archive.on('error', (err) => {
+        console.error('Archive error:', err.message);
+        res.status(500).json({ error: 'Failed to create archive' });
+    });
+
+    archive.pipe(res);
+    archive.directory(dir, false, (entry) => {
+        if (entry.name.includes('.snapshots')) {
+            return false;
+        }
+        return entry;
+    });
+    archive.finalize();
+}));
+
+// POST /api/campaigns/:campaign/admin/upload
+router.post('/api/campaigns/:campaign/admin/upload', upload.single('file'), asyncHandler(async (req, res) => {
+    if (!isLocalhost(req)) {
+        return res.status(403).json({ error: 'Only available on localhost' });
+    }
+
+    const { campaign } = req.params;
+    const dir = campaignDir(campaign);
+
+    if (!fs.existsSync(dir)) {
+        return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const tempZipPath = path.join(os.tmpdir(), `campaign-upload-${Date.now()}.zip`);
+
+    try {
+        // Flush in-memory data and create safety snapshot
+        saveFile();
+        await createSnapshot(campaign);
+
+        // Write uploaded buffer to temp file for extraction
+        fs.writeFileSync(tempZipPath, req.file.buffer);
+
+        // Clear campaign folder and extract uploaded zip
+        fs.rmSync(dir, { recursive: true, force: true });
+        await extractZipToDir(tempZipPath, dir);
+
+        // Clean up temp file
+        fs.unlinkSync(tempZipPath);
+
+        // Reload campaign state
+        reloadCampaign(campaign);
+
+        res.json({ message: 'Upload complete' });
+    } catch (err) {
+        console.error(`Upload failed for ${campaign}:`, err.message);
+
+        // Attempt recovery: restore from safety snapshot
+        try {
+            fs.rmSync(dir, { recursive: true, force: true });
+            const snapshotPath = campaignSnapshotFile(campaign);
+            if (fs.existsSync(snapshotPath)) {
+                await extractZipToDir(snapshotPath, dir);
+            }
+        } catch (recoveryErr) {
+            console.error(`Recovery also failed for ${campaign}:`, recoveryErr.message);
+        }
+
+        // Clean up temp file if it still exists
+        try {
+            if (fs.existsSync(tempZipPath)) {
+                fs.unlinkSync(tempZipPath);
+            }
+        } catch (_cleanupErr) {
+            // Ignore cleanup errors
+        }
+
+        // Reload campaign state from recovered files
+        reloadCampaign(campaign);
+
+        res.status(500).json({
+            error: 'Upload failed, rolled back to previous state',
+            details: err.message
+        });
+    }
 }));
 
 export default router;
