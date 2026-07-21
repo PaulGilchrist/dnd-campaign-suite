@@ -60,9 +60,10 @@
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Orc",
+    "name": "Goliath",
     "subrace": {
-      "name": ""
+      "name": "Cloud's Jaunt (Cloud Giant)",
+      "description": ""
     }
   },
   "immunities": [],

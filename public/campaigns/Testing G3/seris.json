@@ -57,7 +57,10 @@
     "primalOrder": ""
   },
   "expertSkills": [],
-  "feats": [],
+  "feats": [
+    "Tough",
+    "Fey Touched"
+  ],
   "fightingStyles": [],
   "race": {
     "name": "Human",
@@ -100,5 +103,11 @@
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
-  "imagePath": "images/Seris.png"
+  "imagePath": "images/Seris.png",
+  "proficiencies": [
+    "3 from: Artisan's Tools"
+  ],
+  "featAbilityChoices": {
+    "0": "Intelligence"
+  }
 }

@@ -4,7 +4,7 @@
  * Supports both 5e and 2024 rulesets
  */
 
-import { loadValidationRules, fetchBackgroundData } from '../ui/dataLoader.js';
+import { loadValidationRules, fetchBackgroundData, fetchRaceData } from '../ui/dataLoader.js';
 import { stripParenthetical } from '../shared/nameUtils.js';
 /**
  * Gets the number of feats allowed based on ruleset, level, and class from JSON
@@ -27,12 +27,24 @@ export async function getFeatLimits(formData) {
         if (level >= featLevel) {
             allowed += 1;
          }
-          }
+           }
+
+    if (ruleset === '2024' && formData.race?.name) {
+        const fullRace = await fetchRaceData(formData.race.name, ruleset);
+        if (fullRace?.traits?.some(t => t.name === 'Versatile' && t.proficiency_choices?.from?.length > 0)) {
+            allowed += 1;
+        }
+    }
       
     let details;
     if (ruleset === '2024') {
+        const fullRace = formData.race?.name ? await fetchRaceData(formData.race.name, ruleset) : null;
+        const hasVersatile = fullRace?.traits?.some(t => t.name === 'Versatile' && t.proficiency_choices?.from?.length > 0);
+        const originCount = originRequired ? 1 : 0;
+        const versatileCount = hasVersatile ? 1 : 0;
+        const totalOrigin = originCount + versatileCount;
         details = originRequired
-            ? `Level 1 2024 characters get 1 Origin feat, plus additional feats at levels ${availableLevels.join(', ')}`
+            ? `Level 1 2024 characters get ${totalOrigin} Origin feat(s)${versatileCount ? ' (including Versatile trait)' : ''}, plus additional feats at levels ${availableLevels.join(', ')}`
             : `In 2024 rules, feats are available at levels ${availableLevels.join(', ')}`;
          } else {
         details = `In 5e, feats are optional and can be taken instead of ability score increases at levels ${availableLevels.join(', ')}`;
@@ -231,9 +243,10 @@ export async function getRaceFeatChoices(formData) {
     const ruleset = formData.rules || '5e';
     const choices = new Set();
 
-    if (formData.race && ruleset === '2024') {
-        if (formData.race.traits) {
-            formData.race.traits.forEach(trait => {
+    if (formData.race?.name && ruleset === '2024') {
+        const fullRace = await fetchRaceData(formData.race.name, ruleset);
+        if (fullRace?.traits) {
+            fullRace.traits.forEach(trait => {
                 if (trait.name === 'Versatile' && trait.proficiency_choices) {
                     const pc = trait.proficiency_choices;
                     if (pc.from && pc.from.length > 0) {

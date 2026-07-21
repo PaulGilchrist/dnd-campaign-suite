@@ -6,6 +6,7 @@ vi.mock('../ui/dataLoader.js', () => ({
   loadWildMagicSurgeTable: vi.fn(async () => []),
     loadValidationRules: vi.fn(),
     fetchBackgroundData: vi.fn(),
+    fetchRaceData: vi.fn(),
 }));
 
 import {
@@ -128,6 +129,30 @@ describe('featValidation', () => {
             expect(result.allowed).toBe(1);
             expect(result.originRequired).toBe(true);
             expect(result.originFeatLevel).toBe(1);
+        });
+
+        it('should add 1 to allowed count for Versatile Human in 2024', async () => {
+            vi.mocked(dataLoader.loadValidationRules).mockResolvedValue({
+                feats: {
+                    available_levels: [1, 4, 8, 12, 16, 19],
+                    origin_feat_required: true,
+                    origin_feat_level: 1
+                }
+            });
+            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
+                name: 'Human',
+                traits: [
+                    { name: 'Resourceful' },
+                    { name: 'Skillful' },
+                    { name: 'Versatile', proficiency_choices: { from: ['Skilled', 'Lucky', 'Tough'] } }
+                ]
+            });
+
+            const result = await getFeatLimits({ rules: '2024', level: 1, race: { name: 'Human' } });
+
+            expect(result.allowed).toBe(2);
+            expect(result.details).toContain('2 Origin feat(s)');
+            expect(result.details).toContain('Versatile trait');
         });
 
         it('should return 0 for level 1 with 5e rules', async () => {
