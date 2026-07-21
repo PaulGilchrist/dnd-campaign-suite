@@ -413,7 +413,9 @@ function App() {
     if (effectiveStoreKey !== 'targetEffects' && actualData && typeof actualData === 'object' && !Array.isArray(actualData)) {
         setRuntimeObject(storeKey, actualData, campaignName, true);
     } else {
-        setRuntimeObject(campaignName, { [effectiveStoreKey]: actualData }, campaignName, true);
+        // Primitive values (boolean, number, string) should be stored under the character store,
+        // not the campaign store. Wrap in an object with the character key.
+        setRuntimeObject(storeKey, { [effectiveStoreKey]: actualData }, campaignName, true);
     }
   }, [campaignName, setCharacters]);
 

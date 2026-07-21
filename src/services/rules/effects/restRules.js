@@ -160,7 +160,8 @@ export const LONG_REST_RESOURCES = [
     'beguilingDefensesUses',
     'healinglightPool',
     'searingvengeanceUses',
-    'darkOnesLuckUses'
+    'darkOnesLuckUses',
+    '_fiendishResilienceUsed'
 ]
 
 export function getLongRestResources() {

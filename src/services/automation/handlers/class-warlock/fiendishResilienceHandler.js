@@ -1,4 +1,5 @@
 import { setChosenRuntimeValue, getChosenRuntimeValue } from '../../common/choiceStorage.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 
 const DAMAGE_TYPES = [
@@ -12,6 +13,19 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const name = action.name;
 
     const chosenType = getChosenRuntimeValue(playerStats, name, 'chosenType', campaignName);
+    const hasUsedThisRest = getRuntimeValue(playerStats.name, '_fiendishResilienceUsed');
+
+    if (hasUsedThisRest) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name,
+                description: `${name} has already been used this long rest. Finish a long rest to use it again.`,
+                automation: auto,
+            },
+        };
+    }
 
     if (chosenType) {
         addEntry(campaignName, {
@@ -62,6 +76,7 @@ export async function applyTypeChoice(action, playerStats, campaignName, chosenT
     const isChange = existingType && existingType !== chosenType;
 
     setChosenRuntimeValue(playerStats, name, chosenType, 'chosenType', campaignName);
+    setRuntimeValue(playerStats.name, '_fiendishResilienceUsed', true, campaignName);
 
     addEntry(campaignName, {
         type: 'ability_use',

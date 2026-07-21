@@ -10,6 +10,11 @@ vi.mock('../../common/choiceStorage.js', () => ({
     setChosenRuntimeValue: vi.fn(),
 }));
 
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
+    getRuntimeValue: vi.fn(),
+    setRuntimeValue: vi.fn(),
+}));
+
 vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
@@ -17,6 +22,7 @@ vi.mock('../../../ui/logService.js', () => ({
 // ── Re-import mocks after mocking ──────────────────────────────
 
 import { getChosenRuntimeValue, setChosenRuntimeValue } from '../../common/choiceStorage.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -47,6 +53,7 @@ describe('fiendishResilienceHandler', () => {
     describe('handle', () => {
         it('returns modal with damageTypes when no type has been chosen', async () => {
             getChosenRuntimeValue.mockReturnValue(null);
+            getRuntimeValue.mockReturnValue(null);
 
             const result = await handle(makeFeature(), makeStats(), CAMPAIGN);
 
@@ -62,6 +69,7 @@ describe('fiendishResilienceHandler', () => {
 
         it('returns modal with existingType and logs ability use when a type has already been chosen', async () => {
             getChosenRuntimeValue.mockReturnValue('Fire');
+            getRuntimeValue.mockReturnValue(null);
 
             const result = await handle(makeFeature(), makeStats(), CAMPAIGN);
 
@@ -77,8 +85,22 @@ describe('fiendishResilienceHandler', () => {
             }));
         });
 
+        it('returns popup when feature has already been used this long rest', async () => {
+            getChosenRuntimeValue.mockReturnValue('Fire');
+            getRuntimeValue.mockReturnValue(true);
+
+            const result = await handle(makeFeature(), makeStats(), CAMPAIGN);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.name).toBe('Fiendish Resilience');
+            expect(result.payload.description).toContain('already been used this long rest');
+            expect(addEntry).not.toHaveBeenCalled();
+        });
+
         it('uses custom damageTypes from feature automation', async () => {
             getChosenRuntimeValue.mockReturnValue(null);
+            getRuntimeValue.mockReturnValue(null);
 
             const customTypes = ['Fire', 'Cold'];
             const result = await handle(makeFeature({ automation: { damageTypes: customTypes } }), makeStats(), CAMPAIGN);
@@ -113,6 +135,24 @@ describe('fiendishResilienceHandler', () => {
             expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
                 description: 'Fiendish Resilience — damage type set to Fire',
             }));
+        });
+
+        it('marks feature as used when type is chosen', async () => {
+            getChosenRuntimeValue.mockReturnValue(null);
+
+            await applyTypeChoice(
+                makeFeature({ automation: { damageTypes: ['Fire', 'Cold'] } }),
+                makeStats(),
+                CAMPAIGN,
+                'Fire',
+            );
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestCharacter',
+                '_fiendishResilienceUsed',
+                true,
+                CAMPAIGN,
+            );
         });
 
         it('rejects invalid damage type', async () => {

@@ -24,6 +24,7 @@ import ResourcePoolModal from './modals/ResourcePoolModal.jsx';
 import NaturalRecoveryModal from './modals/NaturalRecoveryModal.jsx';
 import CircleOfTheLandSpellsModal from './modals/CircleOfTheLandSpellsModal.jsx';
 import ElementalAffinityModal from './modals/ElementalAffinityModal.jsx';
+import FiendishResilienceModal from './modals/FiendishResilienceModal.jsx';
 import WildMagicSurgeModal from './modals/WildMagicSurgeModal.jsx';
 import StrideOfTheElementsModal from './modals/StrideOfTheElementsModal.jsx';
 import ElementalEpitomeModal from './modals/ElementalEpitomeModal.jsx';
@@ -60,6 +61,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
     const [destructiveStrideTargetModal, setDestructiveStrideTargetModal] = useState(null);
     const [quiveringPalmModal, setQuiveringPalmModal] = useState(null);
     const [celestialResilienceModal, setCelestialResilienceModal] = useState(null);
+    const [fiendishResilienceModal, setFiendishResilienceModal] = useState(null);
     const [stepsOfTheFeyTauntModal, setStepsOfTheFeyTauntModal] = useState(null);
     const [fightingStylesMap, setFightingStylesMap] = useState(null);
     const { setPopupHtml } = useDiceRollPopup();
@@ -260,6 +262,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
                 setStepsOfTheFeyTauntModal(result.payload);
             } else if (result.modalName === 'celestialResilienceModal') {
                 setCelestialResilienceModal({ ...result.payload, playerStats, campaignName });
+            } else if (result.modalName === 'fiendishResilience') {
+                setFiendishResilienceModal(result.payload);
             }
         } else if (result.type === 'popup') {
             const payload = result.payload;
@@ -645,6 +649,12 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
                     confirmIcon="fa-shield-hart"
                     onConfirm={handleCelestialResilienceConfirm}
                     onSkip={handleCelestialResilienceSkip}
+                />
+            )}
+            {fiendishResilienceModal && (
+                <FiendishResilienceModal
+                    {...fiendishResilienceModal}
+                    onClose={() => setFiendishResilienceModal(null)}
                 />
             )}
             {featureChoiceModal && (

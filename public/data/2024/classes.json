@@ -9768,7 +9768,8 @@
             "level": 9,
             "automation": {
               "type": "passive_rule",
-              "effect": "magical_ambush"
+              "effect": "magical_ambush",
+               "casting_time": "passive"
             }
           },
           {

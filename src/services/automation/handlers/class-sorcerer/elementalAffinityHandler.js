@@ -7,6 +7,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const name = action.name;
     const damageTypes = action.damageTypes || action.automation?.damageTypes || DAMAGE_TYPES;
 
+    // Fiendish Resilience has its own handler with long rest tracking
+    if (name === 'Fiendish Resilience') {
+        const { handle: handleFiendishResilience } = await import('../class-warlock/fiendishResilienceHandler.js');
+        return handleFiendishResilience(action, playerStats, campaignName, _mapName);
+    }
+
     // Check if a damage type has already been chosen
     const chosenType = getChosenRuntimeValue(playerStats, name, 'chosenType', campaignName);
 
@@ -45,6 +51,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
 export async function applyTypeChoice(action, playerStats, campaignName, chosenType) {
     const name = action.name;
+
+    // Fiendish Resilience has its own handler with long rest tracking
+    if (name === 'Fiendish Resilience') {
+        const { applyTypeChoice: applyFiendishResilience } = await import('../class-warlock/fiendishResilienceHandler.js');
+        return applyFiendishResilience(action, playerStats, campaignName, chosenType);
+    }
+
     const validTypes = action.damageTypes || action.automation?.damageTypes || DAMAGE_TYPES;
 
     if (!validTypes.includes(chosenType)) {
