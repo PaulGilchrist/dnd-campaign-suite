@@ -1,5 +1,6 @@
 import { setChosenRuntimeValue, getChosenRuntimeValue } from '../../common/choiceStorage.js';
 import { addEntry } from '../../../ui/logService.js';
+import { handle as handleFiendishResilience, applyTypeChoice as applyFiendishResilience } from '../class-warlock/fiendishResilienceHandler.js';
 
 const DAMAGE_TYPES = ['Acid', 'Cold', 'Fire', 'Lightning', 'Poison'];
 
@@ -9,7 +10,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     // Fiendish Resilience has its own handler with long rest tracking
     if (name === 'Fiendish Resilience') {
-        const { handle: handleFiendishResilience } = await import('../class-warlock/fiendishResilienceHandler.js');
         return handleFiendishResilience(action, playerStats, campaignName, _mapName);
     }
 
@@ -54,7 +54,6 @@ export async function applyTypeChoice(action, playerStats, campaignName, chosenT
 
     // Fiendish Resilience has its own handler with long rest tracking
     if (name === 'Fiendish Resilience') {
-        const { applyTypeChoice: applyFiendishResilience } = await import('../class-warlock/fiendishResilienceHandler.js');
         return applyFiendishResilience(action, playerStats, campaignName, chosenType);
     }
 

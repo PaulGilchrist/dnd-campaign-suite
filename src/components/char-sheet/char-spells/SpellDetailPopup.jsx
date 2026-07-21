@@ -280,7 +280,6 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
     const firstAvailable = upcastLevels.find(l => l.availableSlots > 0);
     return firstAvailable ? String(firstAvailable.level) : String(upcastLevels[0]?.level || spell.level);
   });
-
    const hasOverchannelPassive = playerStats?.automation?.passives?.some(p => p.type === 'overchannel');
    const isOverchannelApplicable = hasOverchannelPassive && hasDamage && spell.level >= 1 && spell.level <= 5;
    const [useOverchannel, setUseOverchannel] = useState(false);
@@ -524,7 +523,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
     if (shouldSetConcentration) {
       const cs = getCombatSummary(campaignName);
       if (cs) {
-        const targetName = spell.name === "Hunter's Mark"
+        const targetName = (spell.name === "Hunter's Mark" || spell.name === 'Hex')
           ? (cs.creatures.find(c => c.name === playerStats.name)?.targetName || null)
           : null;
         addConcentration(cs, playerStats.name, spell.name, 10, targetName);
@@ -536,6 +535,13 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
     if (shouldSetConcentration && spell.name === "Hunter's Mark") {
       const existingBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || [];
       const newBuffs = Array.isArray(existingBuffs) ? [...existingBuffs, { name: "Hunter's Mark", effect: 'hunters_mark_concentration', duration: 'concentration' }] : [{ name: "Hunter's Mark", effect: 'hunters_mark_concentration', duration: 'concentration' }];
+      setRuntimeValue(playerStats.name, 'activeBuffs', newBuffs, campaignName);
+    }
+
+    // Hex (2024): also store as activeBuff so character sheet shows it
+    if (shouldSetConcentration && spell.name === 'Hex') {
+      const existingBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || [];
+      const newBuffs = Array.isArray(existingBuffs) ? [...existingBuffs, { name: 'Hex', effect: 'hex_concentration', duration: 'concentration' }] : [{ name: 'Hex', effect: 'hex_concentration', duration: 'concentration' }];
       setRuntimeValue(playerStats.name, 'activeBuffs', newBuffs, campaignName);
     }
 

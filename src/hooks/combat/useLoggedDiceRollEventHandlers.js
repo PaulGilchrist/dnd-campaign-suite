@@ -26,11 +26,6 @@ export function setupEventListeners(deps) {
             const pending = getPendingSavePrompt(e.detail.promptId);
             if (!pending) return;
 
-            const isStunningStrike = (pending.name || '').includes('Stunning');
-            if (isStunningStrike) {
-                console.log(`[useLoggedDiceRollEventHandlers] ★ save-result for "${pending.name}" - rawDamage: ${pending.rawDamage}, damageType: ${pending.damageType}, name: ${pending.name}`);
-            }
-
             const createSaveListenerPrompts = new Set(getRuntimeValue(campaignName, 'pendingSaveListenerPrompts') || []);
             if (createSaveListenerPrompts.has(e.detail.promptId)) return;
             const normalizedSaveType = normalizeSaveType(e.detail.saveType || pending.saveType);
@@ -90,9 +85,6 @@ export function setupEventListeners(deps) {
             }
             const ignoreResistance = (pending.playerStats && hasIgnoreResistance(pending.playerStats, pending.damageType)) || false;
             const attacker = pending.attackerName || pending.sourceAttackerName || null;
-            if (!attacker) {
-                console.error('[save-result-handler] Missing attacker in pending save:', { promptId: e.detail.promptId, pendingKeys: Object.keys(pending), characterName });
-            }
 
             // Compute secondary damage info first (dice rolls only, no damage application)
             // so we can use the combined total for the concentration DC

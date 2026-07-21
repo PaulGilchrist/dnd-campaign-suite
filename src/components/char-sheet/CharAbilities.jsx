@@ -130,6 +130,20 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                   forcedMode = 'disadvantage'
                 }
               }
+              // Hex: ability check disadvantage for chosen ability
+              if (!forcedMode && conditionEffects?.abilityCheckDisadvantageAbilities) {
+                const skillToAbility = {
+                  'Athletics': 'STR', 'Acrobatics': 'DEX', 'Sleight of Hand': 'DEX', 'Stealth': 'DEX',
+                  'Arcana': 'INT', 'History': 'INT', 'Investigation': 'INT', 'Nature': 'INT', 'Religion': 'INT',
+                  'Animal Handling': 'WIS', 'Insight': 'WIS', 'Medicine': 'WIS', 'Perception': 'WIS', 'Survival': 'WIS',
+                  'Deception': 'CHA', 'Intimidation': 'CHA', 'Performance': 'CHA', 'Persuasion': 'CHA',
+                  'Strength': 'STR', 'Dexterity': 'DEX', 'Constitution': 'CON', 'Intelligence': 'INT', 'Wisdom': 'WIS', 'Charisma': 'CHA',
+                };
+                const abilityForCheck = skillToAbility[checkName];
+                if (abilityForCheck && conditionEffects.abilityCheckDisadvantageAbilities.includes(abilityForCheck)) {
+                  forcedMode = 'disadvantage';
+                }
+              }
              const ctx = forcedMode ? { forcedMode } : {}
              if (conditionEffects?.strCheckReplace) {
                const strAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
@@ -274,7 +288,7 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                 return <div key={ability.name} className='abilities'>
                     <div className='clickable left' onClick={() => setPopupHtml(abilityDesc(ability.name))}>{ability.name}</div>
                     <div>{ability.totalScore}</div>
-                    <div className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage ? ' stat--penalized' : '')} onClick={() => {
+                    <div className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage || (conditionEffects?.abilityCheckDisadvantageAbilities?.includes(ability.name)) ? ' stat--penalized' : '')} onClick={() => {
                           const checkCtx = { ...makeCheckContext(ability.name) };
                           const biDie = getRuntimeValue(playerStats.name, 'bardicInspirationDie', campaignName);
                           if (biDie) {
@@ -300,7 +314,7 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                            const skillBonus = getSkillBonus(skill);
                            const isExpert = playerStats.expertise?.includes(skill.name);
                            return <span key={skill.name}>
-                                 <span className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage ? ' stat--penalized' : '')} onClick={() => {
+                                  <span className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage || (conditionEffects?.abilityCheckDisadvantageAbilities?.includes(ability.name)) ? ' stat--penalized' : '')} onClick={() => {
                                     const checkCtx = { ...makeCheckContext(skill.name) };
                                     const biDie = getRuntimeValue(playerStats.name, 'bardicInspirationDie', campaignName);
                                     if (biDie) {

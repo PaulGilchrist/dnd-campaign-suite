@@ -1699,6 +1699,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                     }
                                     let checkContext = {};
                                     if (conditionEffects?.abilityCheckDisadvantage) checkContext.forcedMode = 'disadvantage';
+                                    if (!checkContext.forcedMode && conditionEffects?.hexAbilityCheckDisadvantage && conditionEffects?.hexAbilityCheckDisadvantageAbility === 'DEX') checkContext.forcedMode = 'disadvantage';
                                     if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === 'Stealth')) {
                                         checkContext.forcedMode = checkContext.forcedMode === 'disadvantage' ? undefined : 'advantage';
                                     }
@@ -1811,8 +1812,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                     if (isMonk && conditionEffects?.peerlessAthleteAdvantageSkills && conditionEffects.peerlessAthleteAdvantageSkills.includes(useAbility)) {
                                         checkContext.forcedMode = checkContext.forcedMode === 'disadvantage' ? undefined : 'advantage';
                                     }
-                                    else if (conditionEffects?.strCheckDisadvantage) checkContext.forcedMode = 'disadvantage';
-                                    if (conditionEffects?.abilityCheckDisadvantage) checkContext.forcedMode = 'disadvantage';
+                                     else if (conditionEffects?.strCheckDisadvantage) checkContext.forcedMode = 'disadvantage';
+                                     if (conditionEffects?.abilityCheckDisadvantage) checkContext.forcedMode = 'disadvantage';
+                                     if (!checkContext.forcedMode && conditionEffects?.hexAbilityCheckDisadvantage && conditionEffects?.hexAbilityCheckDisadvantageAbility === useAbility) checkContext.forcedMode = 'disadvantage';
                                     if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === useAbility)) {
                                         checkContext.forcedMode = checkContext.forcedMode === 'disadvantage' ? undefined : 'advantage';
                                     }

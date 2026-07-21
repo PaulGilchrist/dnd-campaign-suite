@@ -53,41 +53,50 @@ import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
 import { resolveHealingBonusesWithDetails, hasHealingMaximization } from '../../combat/automation/automationService.js';
 
-function applyEldritchHex(spell, playerStats, campaignName, targetName) {
+function applyHexEffects(spell, playerStats, campaignName, targetName, ability) {
     if (spell.name !== 'Hex') return;
 
-    if (playerStats.automation?.passives == null) {
-        console.error('[spellCast] applyEldritchHex: playerStats.automation.passives is missing');
-        throw new Error('playerStats.automation.passives is required for Eldritch Hex');
-    }
-    const passives = playerStats.automation.passives;
-    const hasEldritchHex = passives.some(p => p.name === 'Eldritch Hex' && p.type === 'conditional_disadvantage');
-    if (!hasEldritchHex) return;
-
-    if (!targetName) return;
+    if (!targetName || !ability) return;
 
     const storedEffects = getRuntimeValue(campaignName, 'targetEffects');
-    if (storedEffects == null || typeof storedEffects !== 'object' || !Array.isArray(storedEffects)) {
-        console.error('[spellCast] applyEldritchHex: targetEffects is not an array');
-        throw new Error('targetEffects must be an array');
-    }
-    const effects = storedEffects;
+    const effects = Array.isArray(storedEffects) ? storedEffects : [];
 
-    const existingHexIndex = effects.findIndex(
-        te => te.target === targetName && te.effect === 'hex_save_disadvantage' && te.source === playerStats.name
+    // Base Hex: apply ability check disadvantage for chosen ability
+    const existingAbilityCheckIndex = effects.findIndex(
+        te => te.target === targetName && te.effect === 'hex_ability_check_disadvantage' && te.source === playerStats.name
     );
-
-    const hexEffect = {
+    const hexAbilityCheckEffect = {
         target: targetName,
-        effect: 'hex_save_disadvantage',
+        effect: 'hex_ability_check_disadvantage',
         source: playerStats.name,
+        ability: ability,
         duration: 'hex_duration',
     };
-
-    if (existingHexIndex >= 0) {
-        effects[existingHexIndex] = hexEffect;
+    if (existingAbilityCheckIndex >= 0) {
+        effects[existingAbilityCheckIndex] = hexAbilityCheckEffect;
     } else {
-        effects.push(hexEffect);
+        effects.push(hexAbilityCheckEffect);
+    }
+
+    // Eldritch Hex (Warlock 10): also apply saving throw disadvantage
+    const passives = playerStats.automation?.passives;
+    const hasEldritchHex = Array.isArray(passives) && passives.some(p => p.name === 'Eldritch Hex' && p.type === 'conditional_disadvantage');
+    if (hasEldritchHex) {
+        const existingSaveIndex = effects.findIndex(
+            te => te.target === targetName && te.effect === 'hex_save_disadvantage' && te.source === playerStats.name
+        );
+        const hexSaveEffect = {
+            target: targetName,
+            effect: 'hex_save_disadvantage',
+            source: playerStats.name,
+            ability: ability,
+            duration: 'hex_duration',
+        };
+        if (existingSaveIndex >= 0) {
+            effects[existingSaveIndex] = hexSaveEffect;
+        } else {
+            effects.push(hexSaveEffect);
+        }
     }
 
     setRuntimeValue(campaignName, 'targetEffects', effects, campaignName);
@@ -609,6 +618,18 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         return;
     }
 
+    // Hex (2024): does not deal damage on cast — adds 1d6 Necrotic damage to weapon attacks via concentration
+    if (spell.name === 'Hex') {
+        const ability = metaCtx?.hexAbility || 'STR';
+        console.log('[Hex] executeSpellCast: metaCtx=', JSON.stringify(metaCtx), 'ability=', ability);
+        const hexTarget = metaCtx?.targetName || (await getTargetInfo())?.name;
+        applyHexEffects(spell, playerStats, campaignName, hexTarget, ability);
+        const hasEldritchHex = playerStats.automation?.passives?.some(p => p.name === 'Eldritch Hex' && p.type === 'conditional_disadvantage');
+        const effects = hasEldritchHex ? 'ability check disadvantage + saving throw disadvantage' : 'ability check disadvantage';
+        addEntry(campaignName, { type: 'spell', characterName: playerStats.name, targetName: hexTarget, spellName: 'Hex', spellLevel: 1, castingTime: '1 bonus action', hexAbility: ability, effectsApplied: effects }).catch(() => {});
+        return;
+    }
+
     const rollContext = { ...metaCtx, damageType };
 
     if (attackerPos && targetPos) {
@@ -843,7 +864,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     });
 
     const hexTarget = metaCtx?.targetName || (await getTargetInfo())?.name;
-    applyEldritchHex(spell, playerStats, campaignName, hexTarget);
+    applyHexEffects(spell, playerStats, campaignName, hexTarget, metaCtx?.hexAbility);
 
     triggerPostCastSelfHeals(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Post-cast self-heal failed:', e);

@@ -289,8 +289,7 @@ describe('conditionEffects', () => {
       it('handles hex_save_disadvantage with ability', () => {
         const effects = [{ effect: 'hex_save_disadvantage', ability: 'WIS' }];
         const result = computeConditionEffects([], [], effects);
-        expect(result.hexSaveDisadvantage).toBe(true);
-        expect(result.hexSaveDisadvantageAbility).toBe('WIS');
+        expect(result.saveDisadvantage).toContain('wis');
         expect(result.saveDisadvantageCount).toBe(1);
       });
 

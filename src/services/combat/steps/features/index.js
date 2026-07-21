@@ -17,6 +17,7 @@ import { tavernBrawlerPush } from './tavernBrawlerPush.js';
 import { sacredWeapon } from './sacredWeapon.js';
 import { remarkableAthlete } from './remarkableAthlete.js';
 import { huntersMarkDamage } from './huntersMarkDamage.js';
+import { hexDamage } from './hexDamage.js';
 import { epitomeEmpoweredStrikes } from './epitomeEmpoweredStrikes.js';
 
 export const featureModules = [
@@ -39,5 +40,6 @@ export const featureModules = [
   sacredWeapon,
   remarkableAthlete,
   huntersMarkDamage,
+  hexDamage,
   epitomeEmpoweredStrikes,
 ];

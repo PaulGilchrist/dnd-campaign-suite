@@ -14,6 +14,7 @@ import MultiTargetCountPopup from '../popups/MultiTargetCountPopup.jsx'
 import TargetWithCheckboxesPopup from '../popups/TargetWithCheckboxesPopup.jsx'
 import SingleTargetPopup from '../popups/SingleTargetPopup.jsx'
 import TargetWithTypePopup from '../popups/TargetWithTypePopup.jsx'
+import HexAbilityModal from '../modals/HexAbilityModal.jsx'
 import { getExcludedSpellNames } from '../../../services/ui/spellSectionUtils.js'
 import MagicMissileTargetPopup from '../popups/MagicMissileTargetPopup.jsx'
 import { getCombatContext, getTargetFromAttacker, getAttackerTargetName } from '../../../services/rules/combat/damageUtils.js';
@@ -47,8 +48,25 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         },
     });
     const [selectedSpell, setSelectedSpell] = React.useState(null);
+    const [showHexAbilityModal, setShowHexAbilityModal] = React.useState(false);
     const isSorcerer = playerStats.class?.name === 'Sorcerer';
     const [pendingSimpleMetamagic, setPendingSimpleMetamagic] = React.useState(null);
+    const [pendingHexSpell, setPendingHexSpell] = React.useState(null);
+
+    const handleHexAbilitySelected = (ability) => {
+      console.log('[Hex] handleHexAbilitySelected: ability=', ability, 'pendingHexSpell=', pendingHexSpell?.name);
+      setShowHexAbilityModal(false);
+      const spell = pendingHexSpell;
+      setPendingHexSpell(null);
+      if (spell) {
+        console.log('[Hex] calling handleSpellCast with hexAbility:', ability);
+        handleSpellCast(spell, { hexAbility: ability });
+      }
+    };
+
+    const handleHexCancel = () => {
+      setShowHexAbilityModal(false);
+    };
 
     const handleSimpleConfirm = React.useCallback((result) => {
       const pending = pendingSimpleMetamagic;
@@ -123,8 +141,8 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     const { pendingUpcast, buildUpcastLevels, gateUpcast, handleUpcastConfirm, handleUpcastCancel, getCantripAutoLevel } = useSpellUpcastFlow(playerStats, campaignName);
 
     const handleSpellCast = React.useCallback(async (spell, metaCtx) => {
+        console.log('[Hex] handleSpellCast: spell=', spell.name, 'metaCtx=', JSON.stringify(metaCtx));
         setSelectedSpell(null);
-
         await resolveSpellPositions();
 
         gateMetamagic(spell, metaCtx);
@@ -242,9 +260,22 @@ return (
                                 playerLevel={playerStats.level}
                                 upcastLevels={buildUpcastLevels(selectedSpell)}
                                 onClose={() => setSelectedSpell(null)}
-                                onCast={handleSpellCast}
+                                onCast={(spell, metaCtx) => {
+                                    if (spell.name === 'Hex') {
+                                        setPendingHexSpell(spell);
+                                        setShowHexAbilityModal(true);
+                                    } else {
+                                        handleSpellCast(spell, metaCtx);
+                                    }
+                                }}
                             />
                         </Popup>
+                    )}
+                    {showHexAbilityModal && (
+                      <HexAbilityModal
+                        onAbilitySelected={handleHexAbilitySelected}
+                        onCancel={handleHexCancel}
+                      />
                     )}
                     {pendingUpcast && (
                       <UpcastPopup

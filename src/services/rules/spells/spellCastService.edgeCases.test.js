@@ -387,8 +387,8 @@ describe('executeSpellCast - utility functions & edge cases', () => {
     })
   })
 
-  describe('applyEldritchHex via Hex spell', () => {
-    it('applies hex_save_disadvantage effect when Eldritch Hex passive exists', async () => {
+  describe('applyHexEffects via Hex spell', () => {
+    it('applies hex_ability_check_disadvantage and hex_save_disadvantage when Eldritch Hex passive exists', async () => {
       mockGetRuntimeValue((_, key) => {
         if (key === 'targetEffects') return [{ target: 'Other', effect: 'other' }]
         if (key === 'activeConditions') return []
@@ -408,21 +408,57 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       delete spell.damage
       delete spell.dc
 
-      await executeSpellCast(spell, makeMetaCtx(), services)
+      await executeSpellCast(spell, makeMetaCtx({ hexAbility: 'STR' }), services)
 
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
         'testCampaign',
         'targetEffects',
         expect.arrayContaining([
-          expect.objectContaining({ effect: 'hex_save_disadvantage', target: 'Target', source: 'TestWizard' }),
+          expect.objectContaining({ effect: 'hex_ability_check_disadvantage', target: 'Target', source: 'TestWizard', ability: 'STR' }),
+          expect.objectContaining({ effect: 'hex_save_disadvantage', target: 'Target', source: 'TestWizard', ability: 'STR' }),
         ]),
         'testCampaign'
       )
     })
 
-    it('updates existing hex effect instead of adding duplicate', async () => {
+    it('applies only hex_ability_check_disadvantage when Eldritch Hex passive is absent', async () => {
       mockGetRuntimeValue((_, key) => {
-        if (key === 'targetEffects') return [{ target: 'Target', effect: 'hex_save_disadvantage', source: 'TestWizard', duration: 'old' }]
+        if (key === 'targetEffects') return [{ target: 'Other', effect: 'other' }]
+        if (key === 'activeConditions') return []
+        return undefined
+      })
+
+      const services = makeServices({
+        playerStats: makePlayerStats({
+          automation: {
+            passives: [],
+          },
+        }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
+      })
+
+      const spell = { ...makeSpell(), name: 'Hex' }
+      delete spell.damage
+      delete spell.dc
+
+      await executeSpellCast(spell, makeMetaCtx({ hexAbility: 'DEX' }), services)
+
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'testCampaign',
+        'targetEffects',
+        expect.arrayContaining([
+          expect.objectContaining({ effect: 'hex_ability_check_disadvantage', target: 'Target', source: 'TestWizard', ability: 'DEX' }),
+        ]),
+        'testCampaign'
+      )
+    })
+
+    it('updates existing hex effects instead of adding duplicates', async () => {
+      mockGetRuntimeValue((_, key) => {
+        if (key === 'targetEffects') return [
+          { target: 'Target', effect: 'hex_ability_check_disadvantage', source: 'TestWizard', duration: 'old', ability: 'STR' },
+          { target: 'Target', effect: 'hex_save_disadvantage', source: 'TestWizard', duration: 'old', ability: 'STR' },
+        ]
         if (key === 'activeConditions') return []
         return undefined
       })
@@ -440,14 +476,15 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       delete spell.damage
       delete spell.dc
 
-      await executeSpellCast(spell, makeMetaCtx(), services)
+      await executeSpellCast(spell, makeMetaCtx({ hexAbility: 'STR' }), services)
 
       const hexCalls = vi.mocked(runtimeState.setRuntimeValue).mock.calls.filter(
         c => c[1] === 'targetEffects'
       )
       expect(hexCalls.length).toBe(1)
       expect(hexCalls[0][2]).toEqual([
-        { target: 'Target', effect: 'hex_save_disadvantage', source: 'TestWizard', duration: 'hex_duration' },
+        { target: 'Target', effect: 'hex_ability_check_disadvantage', source: 'TestWizard', ability: 'STR', duration: 'hex_duration' },
+        { target: 'Target', effect: 'hex_save_disadvantage', source: 'TestWizard', ability: 'STR', duration: 'hex_duration' },
       ])
     })
 

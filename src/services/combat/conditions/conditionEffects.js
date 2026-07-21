@@ -323,8 +323,9 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     attackAdvantageReasons: [],
     attackDisadvantageCount: 0,
     abilityCheckDisadvantage: false,
-    abilityCheckAdvantage: false,
     abilityCheckAdvantageAbilities: null,
+    abilityCheckDisadvantageAbilities: null,
+    abilityCheckAdvantage: false,
     abilityCheckAdvantageSkill: null,
     autoFailSaves: [],
     saveDisadvantage: [],
@@ -758,10 +759,20 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
       effects.abilityCheckAdvantage = true;
       effects.targetDisadvantageCount = (effects.targetDisadvantageCount || 0) + 1;
     }
+    // Handle Hex — target has Disadvantage on ability checks of chosen ability
+    if (te.effect === 'hex_ability_check_disadvantage') {
+      if (!effects.abilityCheckDisadvantageAbilities) {
+        effects.abilityCheckDisadvantageAbilities = [];
+      }
+      if (te.ability && !effects.abilityCheckDisadvantageAbilities.includes(te.ability)) {
+        effects.abilityCheckDisadvantageAbilities.push(te.ability);
+      }
+    }
     // Handle Eldritch Hex — target has Disadvantage on saves of chosen ability
     if (te.effect === 'hex_save_disadvantage') {
-      effects.hexSaveDisadvantage = true;
-      effects.hexSaveDisadvantageAbility = te.ability || null;
+      if (!effects.saveDisadvantage.includes(te.ability?.toLowerCase())) {
+        effects.saveDisadvantage.push(te.ability?.toLowerCase());
+      }
       effects.saveDisadvantageCount = (effects.saveDisadvantageCount || 0) + 1;
     }
     // Handle Ray of Enfeeblement debuff — STR check disadvantage + damage reduction

@@ -816,10 +816,9 @@ describe('computeConditionEffects — targetEffects', () => {
     expect(result.targetDisadvantageCount).toBe(1);
   });
 
-  it('sets hexSaveDisadvantage fields for hex_save_disadvantage', () => {
+  it('sets saveDisadvantage entry for hex_save_disadvantage', () => {
     const result = computeConditionEffects([], [], [{ effect: 'hex_save_disadvantage', ability: 'CON' }]);
-    expect(result.hexSaveDisadvantage).toBe(true);
-    expect(result.hexSaveDisadvantageAbility).toBe('CON');
+    expect(result.saveDisadvantage).toContain('con');
     expect(result.saveDisadvantageCount).toBe(1);
   });
 

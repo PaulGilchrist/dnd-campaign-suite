@@ -94,6 +94,14 @@ function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, c
         badges.push({ label: 'Adv DEX Save', cls: 'effect-target-adv', icon: 'fa-shield-halved', removable: true, removeAction: dodgeBuff ? 'remove_buff' : 'target_effect', tooltip: 'Advantage on Dexterity saving throws' })
     }
     if (effects.riderSaveDisadvantage) badges.push({ label: 'Save Disadv', cls: 'effect-disadvantage', icon: 'fa-shield', removable: true, removeAction: 'target_effect', effectType: 'disadvantage_on_next_save' })
+    if (effects.saveDisadvantageCount > 0) {
+      const reasons = (effects.saveDisadvantage || []).length > 0 ? ` (${effects.saveDisadvantage.join(', ')})` : ''
+      badges.push({ label: `Save Disadv${reasons}`, cls: 'effect-disadvantage', icon: 'fa-shield', removable: true, removeAction: 'target_effect', effectType: 'hex_save_disadvantage' })
+    }
+    if (effects.abilityCheckDisadvantageAbilities?.length > 0) {
+      const abilityNames = effects.abilityCheckDisadvantageAbilities.map(a => a.substring(0, 3).toLowerCase()).join(', ')
+      badges.push({ label: `Check Disadv (${abilityNames})`, cls: 'effect-disadvantage', icon: 'fa-shield', removable: true, removeAction: 'target_effect', effectType: 'hex_ability_check_disadvantage' })
+    }
     if (effects.riderAttackBonus > 0) badges.push({ label: `+${effects.riderAttackBonus} to hit`, cls: 'effect-target-adv', icon: 'fa-bullseye', removable: true, removeAction: 'target_effect', effectType: 'next_attack_bonus' })
     if (effects.riderCannotOpportunityAttack) badges.push({ label: 'No OA', cls: 'effect-cannot-act', icon: 'fa-ban', removable: true, removeAction: 'target_effect', effectType: 'no_opportunity_attacks' })
     const noOA = getRuntimeValue(creatureName, 'inspiringMovementNoOA', campaignName) || hasTacticalShift
