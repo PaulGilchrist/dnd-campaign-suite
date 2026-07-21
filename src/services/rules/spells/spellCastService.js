@@ -51,6 +51,7 @@ import { executeHandler as executeStoneSkin } from '../../automation/index.js';
 import { onAbjurationSpellCast } from '../../automation/handlers/class-wizard/arcaneWardHandler.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
+import { getPsychicSpellsConfig } from '../../automation/handlers/class-warlock/psychicSpellsHandler.js';
 import { resolveHealingBonusesWithDetails, hasHealingMaximization } from '../../combat/automation/automationService.js';
 
 function applyHexEffects(spell, playerStats, campaignName, targetName, ability) {
@@ -146,6 +147,17 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         }
     }
 
+    // Psychic Spells — remove Verbal/Somatic components for Enchantment/Illusion Warlock spells
+    const psychicSpellsConfig = getPsychicSpellsConfig(playerStats);
+    if (psychicSpellsConfig && spell.components) {
+        const spellSchool = (spell.school || '').toLowerCase();
+        const reducedSchools = (psychicSpellsConfig.spellSchools || []).map(s => s.toLowerCase());
+        if (reducedSchools.includes(spellSchool)) {
+            const reducedComponents = (psychicSpellsConfig.componentReduction || []).map(c => c.toUpperCase());
+            spell.components = spell.components.filter(c => !reducedComponents.includes(c.toUpperCase()));
+        }
+    }
+
     // If casting any spell other than Friends, end active Friends early
     // (Friends ends early when you make an attack roll, deal damage, or force a save)
     if (spell.name && spell.name.toLowerCase() !== 'friends') {
@@ -169,6 +181,10 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         (charDmg && Object.keys(charDmg).length ? charDmg[Object.keys(charDmg)[0]] : null) ||
         null;
     const damageType = spell.damage?.damage_type || '';
+    let effectiveDamageType = damageType;
+    if (psychicSpellsConfig && spell.damage && damageType) {
+        effectiveDamageType = psychicSpellsConfig.damageType || 'Psychic';
+    }
 
     const cantripSpellAbility = spell.spellCastingAbility || playerStats.spellAbilities?.spellCastingAbility;
     let spellToHit = playerStats.spellAbilities?.toHit || 0;
@@ -648,7 +664,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         return;
     }
 
-    const rollContext = { ...metaCtx, damageType };
+    const rollContext = { ...metaCtx, damageType: effectiveDamageType };
 
     if (attackerPos && targetPos) {
         let effectiveRange = computeEffectiveSpellRange(spell.range, metaCtx);
@@ -804,7 +820,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                         shape: aoeShape,
                         range: rangeFeet,
                         damage: damageExpression || '0',
-                        damageType: spell.damage?.damage_type || '',
+                        damageType: effectiveDamageType,
                         saveType: spell.dc.dc_type || 'DEX',
                         saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
                         dcSuccess: spell.dc.dc_success === 0 ? 'none' : (spell.dc.dc_success === 0.5 ? 'half' : spell.dc.dc_success),
