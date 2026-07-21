@@ -331,7 +331,7 @@ describe('conditionEffects', () => {
         expect(computeConditionEffects([], [], [{ effect: 'crusher_enhanced_critical' }]).targetAdvantageCount).toBe(1);
         const clairResult = computeConditionEffects([], [], [{ effect: 'clairvoyant_combatant', attackerAdvantage: true, defenderDisadvantage: true }]);
         expect(clairResult.targetAdvantageCount).toBe(1);
-        expect(clairResult.attackDisadvantageCount).toBe(1);
+        expect(clairResult.targetDisadvantageCount).toBe(1);
       });
 
       it('handles multiattack_defense and escape_the_horde', () => {

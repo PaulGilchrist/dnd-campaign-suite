@@ -385,10 +385,14 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
    updates.activeConditions = [];
    updates.activeConditionMeta = {};
 
-   // Clear Awakened Mind target on short rest
-   updates.awakenedMindTarget = null;
+    // Clear Awakened Mind target on short rest
+    updates.awakenedMindTarget = null;
 
-  // Reset Psionic Strike once-per-turn flag on short rest
+    // Clear Clairvoyant Combatant target on short rest
+    updates.clairvoyantCombatantTarget = null;
+    updates.clairvoyantCombatantUses = null;
+
+   // Reset Psionic Strike once-per-turn flag on short rest
   updates.psionicStrikeUsedThisTurn = null;
 
   // Reset Hunter's Prey choice on short rest
@@ -445,6 +449,13 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
 
     setRuntimeBatch(name, updates, campaignName)
 
+    // Clear Clairvoyant Combatant effects from campaign targetEffects on short rest
+    const clairvoyantEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+    const filteredClairvoyantEffects = clairvoyantEffects.filter(e => e.effect !== 'clairvoyant_combatant');
+    if (filteredClairvoyantEffects.length !== clairvoyantEffects.length) {
+      setRuntimeValue(campaignName, 'targetEffects', filteredClairvoyantEffects, campaignName, true)
+    }
+
   clearAllExpirationEffects(name, campaignName)
   clearHuntersMarkConcentration(name, campaignName)
   clearAllConcentrations(campaignName)
@@ -491,10 +502,14 @@ export async function applyLongRest(playerStats, campaignName) {
      charData.activeConditions = [];
      charData.activeConditionMeta = {};
 
-     // Clear Awakened Mind target on long rest
-     charData.awakenedMindTarget = null;
+      // Clear Awakened Mind target on long rest
+      charData.awakenedMindTarget = null;
 
-    // Clear death save state on long rest
+      // Clear Clairvoyant Combatant target on long rest
+      charData.clairvoyantCombatantTarget = null;
+      charData.clairvoyantCombatantUses = null;
+
+     // Clear death save state on long rest
     charData.deathSaves = [false, false, false];
     charData.deathFailures = [false, false, false];
     charData.isDead = 0;
@@ -591,6 +606,13 @@ export async function applyLongRest(playerStats, campaignName) {
 
         // Single atomic write fires ONE SSE event with the complete final state
     setRuntimeBatch(name, charData, campaignName)
+
+    // Clear Clairvoyant Combatant effects from campaign targetEffects on long rest
+    const clairvoyantEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+    const filteredClairvoyantEffects = clairvoyantEffects.filter(e => e.effect !== 'clairvoyant_combatant');
+    if (filteredClairvoyantEffects.length !== clairvoyantEffects.length) {
+      setRuntimeValue(campaignName, 'targetEffects', filteredClairvoyantEffects, campaignName, true)
+    }
 
     // Clear Wrath of the Sea badge on long rest
     setRuntimeValue(name, 'wrathOfTheSeaActive', null, campaignName, true)

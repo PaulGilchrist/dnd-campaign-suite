@@ -41,6 +41,10 @@ function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, c
                 effects.targetDisadvantageCount = (effects.targetDisadvantageCount || 0) + 1
                 effects.dexSaveAdvantageCount = (effects.dexSaveAdvantageCount || 0) + 1
             }
+            if (buff.effect === 'clairvoyant_combatant') {
+                effects.attackAdvantageCount = (effects.attackAdvantageCount || 0) + 1
+                effects.attackAdvantageReasons.push('Clairvoyant Combatant')
+            }
         }
     }
     const badges = []

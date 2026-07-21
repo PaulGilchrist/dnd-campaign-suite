@@ -40,6 +40,7 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     'magical_cunning',
     'bewitching_magic',
     'hurl_through_hell',
+    'clairvoyant_combatant',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([

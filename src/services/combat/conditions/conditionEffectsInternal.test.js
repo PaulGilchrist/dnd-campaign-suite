@@ -800,12 +800,12 @@ describe('computeConditionEffects — targetEffects', () => {
     expect(result.webRepeatSave).toBe(true);
   });
 
-  it('sets targetAdvantageCount and attackDisadvantageCount for clairvoyant_combatant', () => {
+  it('sets targetAdvantageCount and targetDisadvantageCount for clairvoyant_combatant', () => {
     const result = computeConditionEffects([], [], [
       { effect: 'clairvoyant_combatant', attackerAdvantage: true, defenderDisadvantage: true },
     ]);
     expect(result.targetAdvantageCount).toBe(1);
-    expect(result.attackDisadvantageCount).toBe(1);
+    expect(result.targetDisadvantageCount).toBe(1);
   });
 
   it('sets all foresight fields for foresight effect', () => {

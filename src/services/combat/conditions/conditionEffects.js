@@ -746,7 +746,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
         effects.targetAdvantageReasons.push('Clairvoyant Combatant');
       }
       if (te.defenderDisadvantage) {
-        effects.attackDisadvantageCount = (effects.attackDisadvantageCount || 0) + 1;
+        effects.targetDisadvantageCount = (effects.targetDisadvantageCount || 0) + 1;
       }
     }
     // Handle Foresight — the target has Advantage on D20 Tests, and other creatures have Disadvantage on attack rolls against it

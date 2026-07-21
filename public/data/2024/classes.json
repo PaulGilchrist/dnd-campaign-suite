@@ -12296,7 +12296,7 @@
               "saveDc": "ability",
               "saveAbility": "CHA",
               "duration": "1_minute",
-              "casting_time": "1 bonus action",
+              "casting_time": "passive",
               "pactMagicRecharge": true,
               "uses": 1
             }

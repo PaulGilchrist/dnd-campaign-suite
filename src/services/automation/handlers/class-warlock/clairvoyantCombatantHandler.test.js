@@ -15,16 +15,8 @@ vi.mock('../../common/savePrompt.js', () => ({
   createSaveListener: vi.fn(),
 }));
 
-vi.mock('../../../rules/combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(),
-  getTargetFromAttacker: vi.fn(),
-}));
-
 import { handle } from './clairvoyantCombatantHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { addEntry } from '../../../ui/logService.js';
-import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
-import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 const campaignName = 'TestCampaign';
 
@@ -34,6 +26,13 @@ function makePlayerStats(overrides = {}) {
     level: 10,
     proficiency: 4,
     abilities: [{ name: 'Charisma', bonus: 3 }],
+    spellAbilities: {
+      spell_slots_level_1: 2,
+      spell_slots_level_2: 0,
+      spell_slots_level_3: 0,
+      spell_slots_level_4: 0,
+      spell_slots_level_5: 0,
+    },
     ...overrides,
   };
 }
@@ -45,69 +44,16 @@ function makeAction(automation = {}) {
   };
 }
 
-function dispatchSaveResult(promptId, success) {
-  window.dispatchEvent(new CustomEvent('save-result', {
-    detail: { promptId, success },
-  }));
-}
-
-function setupFull(overrides = {}) {
-  getRuntimeValue.mockImplementation((playerName, key, _campaign) => {
-    if (key === 'clairvoyantCombatantTarget') return null;
-    if (key === 'clairvoyantCombatantUses') return 0;
-    if (key === 'targetEffects' && playerName === campaignName) return [];
-    if (key === 'activeBuffs') return [];
-    return null;
-  });
-  getTargetFromAttacker.mockReturnValue({ name: 'EnemyTarget' });
-  buildSaveDc.mockReturnValue(15);
-  createSaveListener.mockReturnValue({ promptId: 'clairvoyant-full' });
-  getCombatContext.mockResolvedValue({ creatures: [{ name: 'EnemyTarget' }] });
-  Object.assign(overrides, {});
-}
-
 describe('clairvoyantCombatantHandler.handle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   describe('early return conditions', () => {
-    it('should return info popup when already active against a target', async () => {
-      getRuntimeValue.mockImplementation((playerName, key) => {
-        if (key === 'clairvoyantCombatantTarget') return 'ExistingTarget';
-        return null;
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Clairvoyant Combatant');
-      expect(result.payload.description).toContain('already active');
-      expect(result.payload.description).toContain('ExistingTarget');
-    });
-
-    it('should use custom feature name when already active', async () => {
-      getRuntimeValue.mockImplementation((playerName, key) => {
-        if (key === 'clairvoyantCombatantTarget') return 'ExistingTarget';
-        return null;
-      });
-
-      const result = await handle(
-        { name: 'Custom Clairvoyance', automation: { type: 'clairvoyant_combatant' } },
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(result.payload.name).toBe('Custom Clairvoyance');
-      expect(result.payload.description).toContain('Custom Clairvoyance');
-    });
-
     it('should return info popup when no uses remaining without pact magic recharge', async () => {
       getRuntimeValue.mockImplementation((playerName, key) => {
-        if (key === 'clairvoyantCombatantTarget') return null;
         if (key === 'clairvoyantCombatantUses') return 1;
+        if (key === 'awakenedMindTarget') return 'AwakenedTarget';
         return null;
       });
 
@@ -120,296 +66,101 @@ describe('clairvoyantCombatantHandler.handle', () => {
     });
 
     it('should return info popup when no uses remaining with pact magic recharge but no slots', async () => {
+      const emptySlotsStats = {
+        name: 'TestWarlock',
+        level: 10,
+        proficiency: 4,
+        abilities: [{ name: 'Charisma', bonus: 3 }],
+        spellAbilities: {
+          spell_slots_level_1: 0,
+          spell_slots_level_2: 0,
+          spell_slots_level_3: 0,
+          spell_slots_level_4: 0,
+          spell_slots_level_5: 0,
+        },
+      };
+
       getRuntimeValue.mockImplementation((playerName, key) => {
-        if (key === 'clairvoyantCombatantTarget') return null;
         if (key === 'clairvoyantCombatantUses') return 1;
-        if (key === 'warlockPactMagic') return 0;
+        if (key === 'awakenedMindTarget') return 'AwakenedTarget';
         return null;
       });
 
-      const result = await handle(makeAction({ pactMagicRecharge: true }), makePlayerStats(), campaignName, null);
+      const result = await handle(makeAction({ pactMagicRecharge: true }), emptySlotsStats, campaignName, null);
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('No uses remaining');
       expect(result.payload.description).toContain('No Pact Magic slots available');
     });
 
-    it('should return info popup when no target selected in combat', async () => {
+    it('should return info popup when no Awakened Mind bond is active', async () => {
       getRuntimeValue.mockImplementation((playerName, key) => {
-        if (key === 'clairvoyantCombatantTarget') return null;
         if (key === 'clairvoyantCombatantUses') return 0;
+        if (key === 'awakenedMindTarget') return null;
         return null;
       });
-      getTargetFromAttacker.mockReturnValue(null);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No target selected');
+      expect(result.payload.description).toContain('requires an active Awakened Mind bond');
+      expect(result.payload.description).toContain('Activate Awakened Mind first');
     });
   });
 
-  describe('uses management', () => {
-    it('should spend a pact magic slot to restore a use and log the expenditure', async () => {
+  describe('modal return', () => {
+    it('should return modal with correct payload for normal use', async () => {
       getRuntimeValue.mockImplementation((playerName, key) => {
-        if (key === 'clairvoyantCombatantTarget') return null;
-        if (key === 'clairvoyantCombatantUses') return 1;
-        if (key === 'warlockPactMagic') return 2;
-        return null;
-      });
-
-      const result = await handle(makeAction({ pactMagicRecharge: true }), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestWarlock', 'warlockPactMagic', 1, campaignName);
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestWarlock', 'clairvoyantCombatantUses', 0, campaignName);
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'ability_use',
-        characterName: 'TestWarlock',
-        abilityName: 'Clairvoyant Combatant',
-        description: expect.stringContaining('Pact Magic'),
-      }));
-    });
-
-    it('should increment use counter from the current value', async () => {
-      getRuntimeValue.mockImplementation((playerName, key) => {
-        if (key === 'clairvoyantCombatantTarget') return null;
-        if (key === 'clairvoyantCombatantUses') return 1;
-        return null;
-      });
-      getTargetFromAttacker.mockReturnValue({ name: 'EnemyTarget' });
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'incr-one' });
-      getCombatContext.mockResolvedValue({ creatures: [{ name: 'EnemyTarget' }] });
-
-      await handle(makeAction({ uses: 3 }), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestWarlock', 'clairvoyantCombatantUses', 2, campaignName);
-    });
-  });
-
-  describe('target effects and buffs', () => {
-    it('should add target effect with correct properties', async () => {
-      setupFull();
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        campaignName,
-        'targetEffects',
-        expect.arrayContaining([
-          expect.objectContaining({
-            target: 'EnemyTarget',
-            source: 'Clairvoyant Combatant',
-            effect: 'clairvoyant_combatant',
-            duration: '1_minute',
-            saveType: 'WIS',
-            saveDc: 15,
-            saveAbility: 'CHA',
-            attackerAdvantage: true,
-            defenderDisadvantage: true,
-          }),
-        ]),
-        campaignName,
-      );
-    });
-
-    it('should append to existing targetEffects and activeBuffs arrays', async () => {
-      getRuntimeValue.mockImplementation((playerName, key, _campaign) => {
-        if (key === 'clairvoyantCombatantTarget') return null;
         if (key === 'clairvoyantCombatantUses') return 0;
-        if (key === 'targetEffects' && playerName === campaignName) return [{ target: 'OldTarget', effect: 'other_effect' }];
-        if (key === 'activeBuffs') return [{ effect: 'old_buff', target: 'OtherTarget' }];
+        if (key === 'awakenedMindTarget') return 'AwakenedTarget';
         return null;
       });
-      getTargetFromAttacker.mockReturnValue({ name: 'EnemyTarget' });
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'append-effects' });
-      getCombatContext.mockResolvedValue({ creatures: [{ name: 'EnemyTarget' }] });
 
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        campaignName,
-        'targetEffects',
-        expect.arrayContaining([
-          expect.objectContaining({ effect: 'other_effect' }),
-          expect.objectContaining({ effect: 'clairvoyant_combatant' }),
-        ]),
-        campaignName,
-      );
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestWarlock',
-        'activeBuffs',
-        expect.arrayContaining([
-          expect.objectContaining({ effect: 'old_buff' }),
-          expect.objectContaining({ effect: 'clairvoyant_combatant' }),
-        ]),
-        campaignName,
-      );
-    });
-
-    it('should store active target for the player', async () => {
-      setupFull();
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestWarlock',
-        'clairvoyantCombatantTarget',
-        'EnemyTarget',
-        campaignName,
-      );
-    });
-
-    it('should add to activeBuffs array', async () => {
-      setupFull();
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestWarlock',
-        'activeBuffs',
-        expect.arrayContaining([
-          expect.objectContaining({
-            name: 'Clairvoyant Combatant',
-            effect: 'clairvoyant_combatant',
-            duration: '1_minute',
-            target: 'EnemyTarget',
-          }),
-        ]),
-        campaignName,
-      );
-    });
-
-    it('should use custom duration and saveType from automation config', async () => {
-      getRuntimeValue.mockImplementation((playerName, key, _campaign) => {
-        if (key === 'clairvoyantCombatantTarget') return null;
-        if (key === 'clairvoyantCombatantUses') return 0;
-        if (key === 'targetEffects' && playerName === campaignName) return [];
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      getTargetFromAttacker.mockReturnValue({ name: 'EnemyTarget' });
-      buildSaveDc.mockReturnValue(17);
-      createSaveListener.mockReturnValue({ promptId: 'custom-config' });
-      getCombatContext.mockResolvedValue({ creatures: [{ name: 'EnemyTarget' }] });
-
-      await handle(makeAction({ duration: '10_minutes', saveType: 'CHA', saveDc: 17 }), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        campaignName,
-        'targetEffects',
-        expect.arrayContaining([
-          expect.objectContaining({ duration: '10_minutes', saveType: 'CHA', saveDc: 17 }),
-        ]),
-        campaignName,
-      );
-    });
-  });
-
-  describe('save listener', () => {
-    it('should log ability_use entry with save prompt details', async () => {
-      setupFull();
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'ability_use',
-        characterName: 'TestWarlock',
-        abilityName: 'Clairvoyant Combatant',
-        targetName: 'EnemyTarget',
-        promptId: 'clairvoyant-full',
-        description: expect.stringContaining('EnemyTarget must make WIS save'),
-      }));
-    });
-
-    it('should handle save failure — effects remain and log is added', async () => {
-      setupFull();
-      const promptId = 'save-fail-test';
-      createSaveListener.mockReturnValue({ promptId });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      dispatchSaveResult(promptId, false);
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'save_result',
-        targetName: 'EnemyTarget',
-        success: false,
-        description: expect.stringContaining('failed'),
-      }));
-    });
-
-    it('should handle save success — remove effects and clear target', async () => {
-      setupFull();
-      const promptId = 'save-success-test';
-      createSaveListener.mockReturnValue({ promptId });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      dispatchSaveResult(promptId, true);
-      await Promise.resolve();
-
-      // Verify targetEffects was set to empty array (no clairvoyant_combatant effects remain)
-      const effectCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-        call => call[1] === 'targetEffects'
-      );
-      const lastEffectCall = effectCalls[effectCalls.length - 1];
-      expect(lastEffectCall).toBeDefined();
-      expect(lastEffectCall[2]).toEqual([]);
-
-      // Active target should be cleared
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestWarlock',
-        'clairvoyantCombatantTarget',
-        null,
-        campaignName,
-      );
-
-      // Verify activeBuffs was set to empty array (no clairvoyant_combatant buffs remain)
-      const buffCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-        call => call[1] === 'activeBuffs'
-      );
-      const lastBuffCall = buffCalls[buffCalls.length - 1];
-      expect(lastBuffCall).toBeDefined();
-      expect(lastBuffCall[2]).toEqual([]);
-
-      // Log entry for save success
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'save_result',
-        targetName: 'EnemyTarget',
-        success: true,
-        description: expect.stringContaining('succeeded'),
-      }));
-    });
-  });
-
-  describe('popup response', () => {
-    it('should return popup with correct structure and description', async () => {
-      setupFull();
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Clairvoyant Combatant');
-      expect(result.payload.targetName).toBe('EnemyTarget');
+      expect(result.type).toBe('modal');
+      expect(result.modalName).toBe('clairvoyantCombatant');
+      expect(result.payload.targetName).toBe('AwakenedTarget');
       expect(result.payload.saveType).toBe('WIS');
       expect(result.payload.saveDc).toBe(15);
-      expect(result.payload.automation).toEqual(expect.objectContaining({
-        type: 'clairvoyant_combatant',
-        saveType: 'WIS',
-        saveDc: 15,
-        uses: 1,
-      }));
-
-      expect(result.payload.description).toContain('EnemyTarget');
-      expect(result.payload.description).toContain('WIS');
-      expect(result.payload.description).toContain('DC 15');
-      expect(result.payload.description).toContain('Disadvantage');
-      expect(result.payload.description).toContain('Advantage');
-      expect(result.payload.description).toContain('0 / 1');
+      expect(result.payload.currentUses).toBe(0);
+      expect(result.payload.maxUses).toBe(1);
+      expect(result.payload.pactMagicRecharge).toBe(false);
     });
 
-    it('should use custom feature name in popup', async () => {
-      setupFull();
+    it('should return modal with pact magic slot info when recharge is available', async () => {
+      const statsWithSlots = {
+        ...makePlayerStats(),
+        spellAbilities: {
+          spell_slots_level_1: 2,
+          spell_slots_level_2: 0,
+          spell_slots_level_3: 0,
+          spell_slots_level_4: 0,
+          spell_slots_level_5: 0,
+        },
+      };
+
+      getRuntimeValue.mockImplementation((playerName, key) => {
+        if (key === 'clairvoyantCombatantUses') return 1;
+        if (key === 'awakenedMindTarget') return 'AwakenedTarget';
+        return null;
+      });
+
+      const result = await handle(makeAction({ pactMagicRecharge: true }), statsWithSlots, campaignName, null);
+
+      expect(result.type).toBe('modal');
+      expect(result.payload.pactSlotLevel).toBe(1);
+      expect(result.payload.pactSlotsAvailable).toBe(true);
+      expect(result.payload.pactMagicRecharge).toBe(true);
+    });
+
+    it('should use custom feature name in modal', async () => {
+      getRuntimeValue.mockImplementation((playerName, key) => {
+        if (key === 'clairvoyantCombatantUses') return 0;
+        if (key === 'awakenedMindTarget') return 'AwakenedTarget';
+        return null;
+      });
+
       const result = await handle(
         { name: 'My Clairvoyance', automation: { type: 'clairvoyant_combatant', saveType: 'WIS', saveDc: 15, uses: 1 } },
         makePlayerStats(),
@@ -417,8 +168,55 @@ describe('clairvoyantCombatantHandler.handle', () => {
         null,
       );
 
-      expect(result.payload.name).toBe('My Clairvoyance');
-      expect(result.payload.description).toContain('My Clairvoyance');
+      expect(result.payload.action.name).toBe('My Clairvoyance');
+    });
+
+    it('should return pactSlotsAvailable false when no pact slots', async () => {
+      const emptySlotsStats = {
+        ...makePlayerStats(),
+        spellAbilities: {
+          spell_slots_level_1: 0,
+          spell_slots_level_2: 0,
+          spell_slots_level_3: 0,
+          spell_slots_level_4: 0,
+          spell_slots_level_5: 0,
+        },
+      };
+
+      getRuntimeValue.mockImplementation((playerName, key) => {
+        if (key === 'clairvoyantCombatantUses') return 1;
+        if (key === 'awakenedMindTarget') return 'AwakenedTarget';
+        return null;
+      });
+
+      const result = await handle(makeAction({ pactMagicRecharge: true }), emptySlotsStats, campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('No Pact Magic slots available');
+    });
+
+    it('should find highest pact magic slot level', async () => {
+      const highLevelStats = {
+        ...makePlayerStats(),
+        spellAbilities: {
+          spell_slots_level_1: 0,
+          spell_slots_level_2: 0,
+          spell_slots_level_3: 2,
+          spell_slots_level_4: 0,
+          spell_slots_level_5: 0,
+        },
+      };
+
+      getRuntimeValue.mockImplementation((playerName, key) => {
+        if (key === 'clairvoyantCombatantUses') return 1;
+        if (key === 'awakenedMindTarget') return 'AwakenedTarget';
+        return null;
+      });
+
+      const result = await handle(makeAction({ pactMagicRecharge: true }), highLevelStats, campaignName, null);
+
+      expect(result.payload.pactSlotLevel).toBe(3);
+      expect(result.payload.pactSlotsAvailable).toBe(true);
     });
   });
 });
