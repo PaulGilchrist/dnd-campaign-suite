@@ -775,6 +775,14 @@ export async function applyLongRest(playerStats, campaignName) {
     setRuntimeValue(name, 'adrenalineRushUses', null, campaignName, true)
     setRuntimeValue(name, 'adrenalineRushRestTimestamp', null, campaignName, true)
 
+    // Reset Giant Ancestry uses on long rest
+    setRuntimeValue(name, 'cloudsJauntUses', null, campaignName, true)
+    setRuntimeValue(name, 'firesBurnUses', null, campaignName, true)
+    setRuntimeValue(name, 'frostsChillUses', null, campaignName, true)
+    setRuntimeValue(name, 'hillsTumbleUses', null, campaignName, true)
+    setRuntimeValue(name, 'stonesEnduranceUses', null, campaignName, true)
+    setRuntimeValue(name, 'stormsThunderUses', null, campaignName, true)
+
     // Reset Overchannel use count on long rest
     setRuntimeValue(name, 'Overchannel_useCount', 0, campaignName, true)
 
