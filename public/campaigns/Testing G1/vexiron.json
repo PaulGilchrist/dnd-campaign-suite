@@ -50,7 +50,7 @@
   "class": {
     "name": "Rogue",
     "subclass": {
-      "name": "Soulknife",
+      "name": "Arcane Trickster",
       "type": ""
     },
     "divineOrder": "",
@@ -113,6 +113,5 @@
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
-  "imagePath": "images/Vexiron.png",
-  "originalFileName": "Vexiron.json"
+  "imagePath": "images/Vexiron.png"
 }

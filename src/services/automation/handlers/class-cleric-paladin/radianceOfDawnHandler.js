@@ -1,5 +1,6 @@
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { registerPendingSavePrompt } from '../../../combat/auras/pendingSaveRegistry.js';
 import { addEntry } from '../../../ui/logService.js';
 import { loadCombatSummary } from '../../../encounters/combatData.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
@@ -181,8 +182,7 @@ export async function confirmRadianceOfDawn(action, playerStats, campaignName, s
             const promptId = `${featureName.replace(/\s+/g, '_')}_${targetName}_${Date.now()}`;
 
             // Store pending save for damage application
-            const pendingSaves = getRuntimeValue(campaignName, 'pendingSavePrompts') || {};
-            pendingSaves[promptId] = {
+            registerPendingSavePrompt(promptId, {
                 targetName,
                 rawDamage: totalDamage,
                 saveDc,
@@ -196,7 +196,7 @@ export async function confirmRadianceOfDawn(action, playerStats, campaignName, s
                 rolls,
                 campaignName,
                 setPopupHtml: () => { },
-            };
+            });
 
             // Send save prompt via SSE
             const key = `savePrompt-${targetName}`;

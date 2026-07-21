@@ -37,7 +37,6 @@ export default function useLog(campaignName) {
                 const event = JSON.parse(e.data);
                if (!event.key.startsWith('log-')) return;
                if (event.data === null) {
-                   console.log('[useLog] Received null log data, clearing entries');
                    setLogEntries([]);
                    return;
                }

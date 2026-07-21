@@ -26,6 +26,7 @@ import {
 } from './loggedDiceRollUtils.js';
 import { getCoronaSaveDisadvantage } from '../../services/combat/auras/coronaAuraUtils.js';
 import { getElderChampionSaveDisadvantage } from '../../services/combat/auras/elderChampionAuraUtils.js';
+import { registerPendingSavePrompt } from '../../services/combat/auras/pendingSaveRegistry.js';
 import { hasBardicInspirationOffense, getBardicInspirationDieSize, getBardicInspirationDieSizeFromClass } from '../../services/combat/auras/bardicInspirationState.js';
 import { hasEmpoweredSpell } from '../../services/rules/spells/empoweredSpellService.js';
 import { getChaModifier } from '../../services/rules/spells/metamagicRules.js';
@@ -1095,7 +1096,7 @@ export function createLogDamageAndShow(deps) {
             saveDisadvantage = disadvantageSources > 1;
         }
 
-        pendingSaves[promptId] = {
+        const pendingData = {
             targetName: target.name, rawDamage: adjustedTotal, saveDc, saveType, dcSuccess,
             damageType, attackerName: attackerName || characterName, name, formula, modifier, rolls, campaignName, setPopupHtml,
             metamagicHeighten: saveDisadvantage,
@@ -1109,6 +1110,8 @@ export function createLogDamageAndShow(deps) {
             autoDamageSecondaryName: context?.autoDamageSecondaryName || null,
             autoDamageSecondaryDamageType: context?.autoDamageSecondaryDamageType || null,
         };
+        pendingSaves[promptId] = pendingData;
+        registerPendingSavePrompt(promptId, pendingData);
         registerPendingPopupSetter(promptId, setPopupHtml);
 
         sendSavePrompt(campaignName, {

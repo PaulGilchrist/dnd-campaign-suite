@@ -28,9 +28,14 @@ vi.mock('../../services/ui/logService.js', () => {
     return { addEntry: mockAddEntry };
 });
 let _registry = {};
+let _pendingSavesRegistry = {};
 vi.mock('../../services/combat/auras/pendingPopupRegistry.js', () => ({
     registerPendingPopupSetter: vi.fn((id, fn) => { _registry[id] = fn; }),
     getPendingPopupSetter: vi.fn((id) => { const fn = _registry[id]; if (fn) { delete _registry[id]; return fn; } return null; }),
+}));
+vi.mock('../../services/combat/auras/pendingSaveRegistry.js', () => ({
+    registerPendingSavePrompt: vi.fn((id, data) => { _pendingSavesRegistry[id] = data; }),
+    getPendingSavePrompt: vi.fn((id) => { const prompt = _pendingSavesRegistry[id]; if (prompt) { delete _pendingSavesRegistry[id]; return prompt; } return null; }),
 }));
 import { registerPendingPopupSetter } from '../../services/combat/auras/pendingPopupRegistry.js';
 
@@ -54,6 +59,7 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
     beforeEach(() => {
         delete window.__pendingResultHandlersInstalled;
         testPendingSaves = {};
+        _pendingSavesRegistry = {};
         getCombatSummary.mockReturnValue(null);
         getRuntimeValue.mockImplementation((key, prop) => {
             if (key === 'test-campaign' && prop === 'pendingSavePrompts') return testPendingSaves;
@@ -87,9 +93,11 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
     function setup() { setupEventListeners(deps); }
 
     function createSavePrompt(promptId, overrides = {}) {
-        return { promptId, targetName: 'Goblin', rawDamage: 15, saveDc: 15, saveType: 'DEX', dcSuccess: 'half',
+        const prompt = { promptId, targetName: 'Goblin', rawDamage: 15, saveDc: 15, saveType: 'DEX', dcSuccess: 'half',
             damageType: 'fire', attackerName: 'TestWizard', name: 'Fireball', formula: '8d6',
             rolls: [3, 4, 5, 2, 3, 3], modifier: 0, campaignName: 'test-campaign', setPopupHtml: vi.fn(), ...overrides };
+        _pendingSavesRegistry[promptId] = prompt;
+        return prompt;
     }
 
     // --- save-result: basic ---
@@ -122,9 +130,13 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
         it('removes pending save after processing', () => {
             setup();
             const pid = 'p3';
-            testPendingSaves = { [pid]: createSavePrompt(pid) };
+            const prompt = { promptId: pid, targetName: 'Goblin', rawDamage: 15, saveDc: 15, saveType: 'DEX', dcSuccess: 'half',
+                damageType: 'fire', attackerName: 'TestWizard', name: 'Fireball', formula: '8d6',
+                rolls: [3, 4, 5, 2, 3, 3], modifier: 0, campaignName: 'test-campaign', setPopupHtml: vi.fn() };
+            _pendingSavesRegistry[pid] = prompt;
+            testPendingSaves = { [pid]: prompt };
             window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: false, roll: 8, total: 11, saveBonus: 3 } }));
-            expect(testPendingSaves[pid]).toBeUndefined();
+            expect(_pendingSavesRegistry[pid]).toBeUndefined();
         });
 
         it('sets popupHtml after processing', () => {

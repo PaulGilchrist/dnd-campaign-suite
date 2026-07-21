@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 let testPendingSaves = {};
+let _pendingSaveRegistry = {};
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
@@ -16,6 +17,10 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => {
     setRuntimeValue: vi.fn(async () => {}),
   };
 });
+
+vi.mock('../../../combat/auras/pendingSaveRegistry.js', () => ({
+  registerPendingSavePrompt: vi.fn((id, data) => { _pendingSaveRegistry[id] = data; }),
+}));
 
 vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(async () => {}),
@@ -278,6 +283,7 @@ describe('radianceOfDawnHandler.confirmRadianceOfDawn', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     testPendingSaves = {};
+    _pendingSaveRegistry = {};
     useRuntimeState.getRuntimeValue.mockImplementation((key, prop) => {
       if (prop === 'pendingSavePrompts') return testPendingSaves;
       return null;
@@ -383,8 +389,8 @@ describe('radianceOfDawnHandler.confirmRadianceOfDawn', () => {
       const action = makeAction({ saveDc: 15, damageType: 'Fire' });
       await confirmRadianceOfDawn(action, makePlayerStats(), campaignName, ['player-1']);
 
-      expect(testPendingSaves).toBeDefined();
-      const pendingSave = Object.values(testPendingSaves)[0];
+      expect(_pendingSaveRegistry).toBeDefined();
+      const pendingSave = Object.values(_pendingSaveRegistry)[0];
       expect(pendingSave.targetName).toBe('player-1');
       expect(pendingSave.saveDc).toBe(15);
       expect(pendingSave.damageType).toBe('Fire');

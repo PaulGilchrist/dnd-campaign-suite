@@ -13,6 +13,7 @@ import { endInvisibilityOnHostileAction } from '../../services/rules/features/in
 import { hasSoulstitchProtection } from './loggedDiceRollUtils.js';
 import utils from '../../services/ui/utils.js';
 import { getPendingPopupSetter } from '../../services/combat/auras/pendingPopupRegistry.js';
+import { getPendingSavePrompt } from '../../services/combat/auras/pendingSaveRegistry.js';
 import storage from '../../services/ui/storage.js';
 
 export function setupEventListeners(deps) {
@@ -22,8 +23,7 @@ export function setupEventListeners(deps) {
         window.__pendingResultHandlersInstalled = true;
 
         window.addEventListener('save-result', (e) => {
-            const pendingSaves = getRuntimeValue(campaignName, 'pendingSavePrompts') || {};
-            const pending = pendingSaves[e.detail.promptId];
+            const pending = getPendingSavePrompt(e.detail.promptId);
             if (!pending) return;
 
             const isStunningStrike = (pending.name || '').includes('Stunning');
@@ -286,10 +286,6 @@ export function setupEventListeners(deps) {
                     });
                 }
             }
-
-            const saves = getRuntimeValue(campaignName, 'pendingSavePrompts') || {};
-            delete saves[e.detail.promptId];
-            setRuntimeValue(campaignName, 'pendingSavePrompts', saves, campaignName);
 
             if (!e.detail.success && pending.statusEffects?.length > 0) {
                 const targetName = pending.targetName;

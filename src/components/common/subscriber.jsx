@@ -25,7 +25,6 @@ const Subscriber = ({ handleEvent, campaignName }) => {
         const eventSource = new EventSource(url);
     eventSource.onmessage = (e) => {
             const event = JSON.parse(e.data);
-            // console.log(`[SSE] event from server: key=${event.key}`);
             handleEventRef.current(event);
           };
         return () => {

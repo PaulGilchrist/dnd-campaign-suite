@@ -6,6 +6,7 @@ import Subscriber from './Subscriber.jsx';
 import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.js';
 import { getAbilitySaveBonus } from '../../services/combat/conditions/conditionUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { registerPendingSavePrompt, getPendingSavePrompt } from '../../services/combat/auras/pendingSaveRegistry.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { getAllyList } from '../../hooks/useAllySelection.js';
 import { normalizeSaveType } from '../../services/rules/combat/applyDamage.js';
@@ -57,12 +58,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
       const targetName = dataTargetName || event.key.slice(prefix.length) || null;
       const newPrompt = { targetName, attackerName: eventDataAttackerName || sourceAttackerName, ...restData };
 
-      const pendingSaves = getRuntimeValue(campaignName, 'pendingSavePrompts') || {};
-      const fullPrompt = { ...newPrompt, campaignName };
-      if (!pendingSaves[newPrompt.promptId]) {
-        pendingSaves[newPrompt.promptId] = fullPrompt;
-        setRuntimeValue(campaignName, 'pendingSavePrompts', pendingSaves, campaignName);
-      }
+      registerPendingSavePrompt(newPrompt.promptId, { ...newPrompt, campaignName });
       return [...prev, newPrompt];
      });
    }, [campaignName]);
@@ -73,9 +69,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
     if (!event.key.startsWith(prefix)) return;
     if (!event.data?.promptId) return;
 
-    const pendingSaves = getRuntimeValue(campaignName, 'pendingSavePrompts') || {};
-    delete pendingSaves[event.data.promptId];
-    setRuntimeValue(campaignName, 'pendingSavePrompts', pendingSaves, campaignName);
+    getPendingSavePrompt(event.data.promptId);
     getPendingPopupSetter(event.data.promptId);
 
     setPrompts(prev => prev.filter(p => p.promptId !== event.data.promptId));

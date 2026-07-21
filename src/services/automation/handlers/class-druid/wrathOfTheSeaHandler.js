@@ -1,5 +1,6 @@
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { registerPendingSavePrompt } from '../../../combat/auras/pendingSaveRegistry.js';
 import { addEntry } from '../../../ui/logService.js';
 import { loadCombatSummary } from '../../../encounters/combatData.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
@@ -144,8 +145,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     } else {
         const promptId = `${action.name.replace(/\s+/g, '_')}_${target.name}_${Date.now()}`;
 
-        const pendingSaves = getRuntimeValue(campaignName, 'pendingSavePrompts') || {};
-        pendingSaves[promptId] = {
+        registerPendingSavePrompt(promptId, {
             targetName: target.name,
             rawDamage: damageResult.total,
             saveDc,
@@ -160,8 +160,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             campaignName,
             setPopupHtml: () => { },
             isAoe: true,
-        };
-        setRuntimeValue(campaignName, 'pendingSavePrompts', pendingSaves, campaignName);
+        });
 
         sendSavePrompt(campaignName, {
             promptId,
