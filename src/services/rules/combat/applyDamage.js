@@ -375,7 +375,8 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
      creature.concentration.dc = Math.max(10, Math.floor(dcDamage / 2));
    }
 
-    checkDarkOnesBlessing(characters, creature, finalDamage, isPlayer, wasAlive, isNowUnconscious, campaignName);
+      console.log('[applyDamage] calling checkDarkOnesBlessing, creature:', creature.name, 'finalDamage:', finalDamage, 'isPlayer:', isPlayer, 'wasAlive:', wasAlive, 'isNowUnconscious:', isNowUnconscious, 'characters.length:', characters?.length, 'attackerName:', attackerName, 'oldHp:', oldHp, 'newHp:', newHp);
+      checkDarkOnesBlessing(characters, creature, finalDamage, isPlayer, wasAlive, isNowUnconscious, campaignName, attackerName);
 
     if (!suppressHpLog) {
         logDamageApplication(creature, finalDamage, oldHp, newHp, campaignName);

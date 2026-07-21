@@ -10,6 +10,10 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
+vi.mock('../../../hooks/useAllySelection.js', () => ({
+  getAllyList: vi.fn(() => []),
+}));
+
 vi.mock('../../dice/diceRoller.js', () => ({
   rollD20: vi.fn(),
   rollExpression: vi.fn(),
@@ -38,8 +42,11 @@ vi.mock('./rangeValidation.js', () => ({
 }));
 
 vi.mock('../../ui/logService.js', () => ({
-  addEntry: vi.fn(),
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
+
+const { getAllyList } = await import('../../../hooks/useAllySelection.js');
+const { addEntry } = await import('../../ui/logService.js');
 
 function makeCombatSummary(creatures) {
   return { round: 1, creatures };
@@ -88,7 +95,7 @@ function createFiendWarlock(name, level, chaScore, warlockLevel) {
         subclass: { name: 'Fiend Patron' },
       },
       class_levels: [{ level: warlockLevel ?? level }],
-      abilities: [{ name: 'Charisma', score: chaScore }],
+      abilities: [{ name: 'Charisma', bonus: Math.floor((chaScore - 10) / 2) }],
       specialActions: [{
         name: "Dark One's Blessing",
         automation: {
@@ -113,10 +120,10 @@ function createNonFiendWarlock(name, level, chaScore, patronName) {
       class: {
         name: 'Warlock',
         class_levels: [{ level }],
-        subclass: { name: patronName },
+        subclass: { name: patronName || 'Celestial Patron' },
       },
       class_levels: [{ level }],
-      abilities: [{ name: 'Charisma', score: chaScore }],
+      abilities: [{ name: 'Charisma', bonus: Math.floor((chaScore - 10) / 2) }],
       specialActions: [{
         name: "Dark One's Blessing",
         automation: {
@@ -150,40 +157,45 @@ describe('Dark One\'s Blessing', () => {
   beforeEach(() => {
     getRuntimeValue.mockClear();
     setRuntimeValue.mockClear();
+    getAllyList.mockClear();
+    addEntry.mockClear();
   });
 
   it('grants temp HP equal to CHA modifier + warlock level when a creature dies', () => {
     // CHA 16 -> modifier = 3, warlock level 5 -> 3 + 5 = 8 temp HP
+    getAllyList.mockReturnValue([]);
     const goblin = createCreature('Goblin', 5, 5);
     const cs = makeCombatSummary([goblin]);
     const warlock = createFiendWarlock('FiendWarlock', 5, 16, 5);
 
     stubPlayerRuntime(0);
-    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')]);
+    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')], false, null, false);
 
     expect(setRuntimeValue).toHaveBeenCalledWith('FiendWarlock', 'tempHp', 8, 'TestCampaign');
   });
 
   it('grants minimum 1 temp HP when CHA modifier + warlock level is 0 or negative', () => {
     // CHA 1 -> modifier = -5, warlock level 1 -> -5 + 1 = -4, clamped to 1
+    getAllyList.mockReturnValue([]);
     const goblin = createCreature('Goblin', 3, 3);
     const cs = makeCombatSummary([goblin]);
     const warlock = createFiendWarlock('LowStatWarlock', 1, 1, 1);
 
     stubPlayerRuntime(0);
-    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')]);
+    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')], false, null, false);
 
     expect(setRuntimeValue).toHaveBeenCalledWith('LowStatWarlock', 'tempHp', 1, 'TestCampaign');
   });
 
   it('uses Math.max instead of stacking temp HP', () => {
+    getAllyList.mockReturnValue([]);
     const goblin = createCreature('Goblin', 5, 5);
     const cs = makeCombatSummary([goblin]);
     const warlock = createFiendWarlock('FiendWarlock', 5, 16, 5); // 3 + 5 = 8
     const warlock2 = createFiendWarlock('FiendWarlock2', 5, 16, 5); // 3 + 5 = 8
 
     stubPlayerRuntime(0, [], { tempHp: 3 }); // already has 3 temp HP
-    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, warlock2, createMinimalCharacter('Goblin')]);
+    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, warlock2, createMinimalCharacter('Goblin')], false, null, false);
 
     // Math.max(3, 8) = 8
     expect(setRuntimeValue).toHaveBeenCalledWith('FiendWarlock', 'tempHp', 8, 'TestCampaign');
@@ -191,12 +203,13 @@ describe('Dark One\'s Blessing', () => {
   });
 
   it('does not grant temp HP to non-Fiend Patron warlocks', () => {
+    getAllyList.mockReturnValue([]);
     const goblin = createCreature('Goblin', 5, 5);
     const cs = makeCombatSummary([goblin]);
     const warlock = createNonFiendWarlock('OtherWarlock', 5, 16, 'Great Old One Patron');
 
     stubPlayerRuntime(0);
-    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')]);
+    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')], false, null, false);
 
     const tempHpCalls = setRuntimeValue.mock.calls.filter(
       (call) => call[1] === 'tempHp'
@@ -205,6 +218,7 @@ describe('Dark One\'s Blessing', () => {
   });
 
   it('does not grant temp HP when the feature is missing or lacks automation config', () => {
+    getAllyList.mockReturnValue([]);
     const goblin = createCreature('Goblin', 5, 5);
     const cs = makeCombatSummary([goblin]);
 
@@ -217,7 +231,7 @@ describe('Dark One\'s Blessing', () => {
       },
     };
     stubPlayerRuntime(0);
-    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlockNoFeature, createMinimalCharacter('Goblin')]);
+    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlockNoFeature, createMinimalCharacter('Goblin')], false, null, false);
 
     let tempHpCalls = setRuntimeValue.mock.calls.filter((call) => call[1] === 'tempHp');
     expect(tempHpCalls).toHaveLength(0);
@@ -234,19 +248,20 @@ describe('Dark One\'s Blessing', () => {
       },
     };
     setRuntimeValue.mockClear();
-    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlockNoAutomation, createMinimalCharacter('Goblin')]);
+    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlockNoAutomation, createMinimalCharacter('Goblin')], false, null, false);
 
     tempHpCalls = setRuntimeValue.mock.calls.filter((call) => call[1] === 'tempHp');
     expect(tempHpCalls).toHaveLength(0);
   });
 
   it('does not grant temp HP when the killing blow dealt 0 damage (immune)', () => {
+    getAllyList.mockReturnValue([]);
     const skeleton = createCreature('Skeleton', 10, 10, { immunities: ['necrotic'] });
     const cs = makeCombatSummary([skeleton]);
     const warlock = createFiendWarlock('FiendWarlock', 5, 16, 5);
 
     stubPlayerRuntime(10);
-    applyDamageToTarget(cs, 'Skeleton', 15, ['Necrotic'], 'TestCampaign', [warlock, createMinimalCharacter('Skeleton')]);
+    applyDamageToTarget(cs, 'Skeleton', 15, ['Necrotic'], 'TestCampaign', [warlock, createMinimalCharacter('Skeleton')], false, null, false);
 
     const tempHpCalls = setRuntimeValue.mock.calls.filter(
       (call) => call[1] === 'tempHp'
@@ -255,12 +270,13 @@ describe('Dark One\'s Blessing', () => {
   });
 
   it('does not grant temp HP when the creature was already at 0 HP', () => {
+    getAllyList.mockReturnValue([]);
     const goblin = createCreature('Goblin', 3, 0);
     const cs = makeCombatSummary([goblin]);
     const warlock = createFiendWarlock('FiendWarlock', 5, 16, 5);
 
     stubPlayerRuntime(0);
-    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')]);
+    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')], false, null, false);
 
     const tempHpCalls = setRuntimeValue.mock.calls.filter(
       (call) => call[1] === 'tempHp'
@@ -270,6 +286,7 @@ describe('Dark One\'s Blessing', () => {
   });
 
   it('falls back to character level when class_levels does not contain a matching entry', () => {
+    getAllyList.mockReturnValue([]);
     // CHA 16 -> modifier = 3, class_levels has level 3 but computed.level is 5
     // find returns undefined, falls back to computed.level (5) -> 3 + 5 = 8 temp HP
     const goblin = createCreature('Goblin', 5, 5);
@@ -277,21 +294,55 @@ describe('Dark One\'s Blessing', () => {
     const warlock = createFiendWarlock('FiendWarlock', 5, 16, 3);
 
     stubPlayerRuntime(0);
-    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')]);
+    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')], false, null, false);
 
     expect(setRuntimeValue).toHaveBeenCalledWith('FiendWarlock', 'tempHp', 8, 'TestCampaign');
   });
 
   it('grants temp HP to each Fiend Patron warlock when multiple are present', () => {
+    getAllyList.mockReturnValue([]);
     const goblin = createCreature('Goblin', 5, 5);
     const cs = makeCombatSummary([goblin]);
     const warlock1 = createFiendWarlock('FiendWarlock1', 5, 16, 5); // 3 + 5 = 8
     const warlock2 = createFiendWarlock('FiendWarlock2', 3, 20, 3); // 5 + 3 = 8
 
     stubPlayerRuntime(0);
-    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock1, warlock2, createMinimalCharacter('Goblin')]);
+    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock1, warlock2, createMinimalCharacter('Goblin')], false, null, false);
 
     expect(setRuntimeValue).toHaveBeenCalledWith('FiendWarlock1', 'tempHp', 8, 'TestCampaign');
     expect(setRuntimeValue).toHaveBeenCalledWith('FiendWarlock2', 'tempHp', 8, 'TestCampaign');
+  });
+
+  it('does not grant temp HP when target is in the warlock\'s ally list', () => {
+    getAllyList.mockReturnValue(['Goblin']);
+    const goblin = createCreature('Goblin', 5, 5);
+    const cs = makeCombatSummary([goblin]);
+    const warlock = createFiendWarlock('FiendWarlock', 5, 16, 5);
+
+    stubPlayerRuntime(0);
+    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')], false, null, false);
+
+    const tempHpCalls = setRuntimeValue.mock.calls.filter(
+      (call) => call[1] === 'tempHp'
+    );
+    expect(tempHpCalls).toHaveLength(0);
+  });
+
+  it('logs to campaign when temp HP is granted', () => {
+    getAllyList.mockReturnValue([]);
+    const goblin = createCreature('Goblin', 5, 5);
+    const cs = makeCombatSummary([goblin]);
+    const warlock = createFiendWarlock('FiendWarlock', 5, 16, 5);
+
+    stubPlayerRuntime(0);
+    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')], false, null, false);
+
+    expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
+      type: 'ability_use',
+      characterName: 'FiendWarlock',
+      abilityName: "Dark One's Blessing",
+      description: expect.stringContaining('FiendWarlock'),
+      timestamp: expect.any(Number),
+    }));
   });
 });

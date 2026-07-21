@@ -152,7 +152,6 @@ import { handle as handleBewitchingMagic } from './handlers/class-warlock/bewitc
 import { handle as handleStepsOfTheFey } from './handlers/class-warlock/stepsOfTheFeyHandler.js';
 import { handle as handleCelestialResilience } from './handlers/class-warlock/celestialResilienceHandler.js';
 import { handle as handleSearingVengeance } from './handlers/class-warlock/searingVengeanceHandler.js';
-import { handle as handleDarkOnesBlessing } from './handlers/class-warlock/darkOnesBlessingHandler.js';
 import { handle as handleDarkOnesLook } from './handlers/class-warlock/darkOnesLookHandler.js';
 import { handle as handleFiendishResilience } from './handlers/class-warlock/fiendishResilienceHandler.js';
 import { handle as handleHurlThroughHell } from './handlers/class-warlock/hurlThroughHellHandler.js';
@@ -423,9 +422,8 @@ const HANDLER_MAP = {
              steps_of_the_fey: handleStepsOfTheFey,
              celestial_resilience: handleCelestialResilience,
             searing_vengeance: handleSearingVengeance,
-            dark_ones_blessing: handleDarkOnesBlessing,
-             dark_ones_look: handleDarkOnesLook,
-              fiendish_resilience: handleFiendishResilience,
+            dark_ones_look: handleDarkOnesLook,
+            fiendish_resilience: handleFiendishResilience,
                 hurl_through_hell: handleHurlThroughHell,
                 clairvoyant_combatant: handleClairvoyantCombatant,
                 psychic_spells: handlePsychicSpells,
@@ -530,7 +528,6 @@ export { confirmPowerWordFortify } from './handlers/buffs/powerWordFortifyHandle
 export { confirmSearingVengeance, skipSearingVengeance } from './handlers/class-warlock/searingVengeanceHandler.js';
 export { confirmCelestialResilience, skipCelestialResilience } from './handlers/class-warlock/celestialResilienceHandler.js';
 export async function executeHandler(action, playerStats, campaignName, mapName, characters) {
-    console.log('[EXEC] executeHandler START:', { actionName: action?.name, autoType: action?.automation?.type, mapName });
     if (!action?.automation) {
         console.log('[EXEC] no automation, returning null');
         return null;
@@ -573,9 +570,7 @@ export async function executeHandler(action, playerStats, campaignName, mapName,
     }
 
     try {
-        console.log('[EXEC] calling handler:', auto.type);
         const result = await handler(action, playerStats, campaignName, mapName, characters);
-        console.log('[EXEC] handler returned:', result ? JSON.stringify(result).slice(0, 200) : 'null');
         return result;
       } catch (e) {
           console.error(`[automation] Handler ${auto.type}/${auto.effect} failed:`, e);
