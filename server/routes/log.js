@@ -10,6 +10,8 @@ const router = express.Router();
 // In-memory cache for logs per campaign
 const logCache = new Map();
 
+export { logCache };
+
 function loadLog(campaign) {
   if (logCache.has(campaign)) return logCache.get(campaign);
   const file = campaignDataFile(campaign, 'campaign-log.json');

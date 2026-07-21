@@ -36,14 +36,19 @@ export default function useLog(campaignName) {
           try {
                 const event = JSON.parse(e.data);
                if (!event.key.startsWith('log-')) return;
-             setLogEntries(prev => {
-                  const updated = [...prev, event.data];
-                 return updated.slice(-MAX_LOG_ENTRIES);
-                 });
-            } catch (_err) {
-              // Ignore parse errors for non-log events
-            }
-          };
+               if (event.data === null) {
+                   console.log('[useLog] Received null log data, clearing entries');
+                   setLogEntries([]);
+                   return;
+               }
+              setLogEntries(prev => {
+                   const updated = [...prev, event.data];
+                  return updated.slice(-MAX_LOG_ENTRIES);
+                  });
+             } catch (_err) {
+               // Ignore parse errors for non-log events
+             }
+           };
 
         return () => eventSource.close();
         }, [campaignName]);
@@ -58,5 +63,15 @@ export default function useLog(campaignName) {
          }
       }, [campaignName]);
 
-    return { logEntries, initialized, addEntry };
+    const reloadLog = useCallback(async () => {
+        if (!campaignName) return;
+        try {
+            const entries = await logService.getLog(campaignName);
+            setLogEntries(entries.slice(-MAX_LOG_ENTRIES));
+        } catch (err) {
+            console.error('Failed to reload log:', err);
+        }
+    }, [campaignName]);
+
+    return { logEntries, initialized, addEntry, reloadLog };
 }

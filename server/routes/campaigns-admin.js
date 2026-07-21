@@ -4,6 +4,7 @@ import path from 'path';
 import asyncHandler from '../utils/asyncHandler.js';
 import { campaignDir, campaignMapsDir, campaignImagesDir, campaignDataDir, campaignDataFile } from '../utils/campaignPaths.js';
 import { characterChangeData, spellOverlayData, activeMaps, saveFile, markDirty, publish } from '../utils/changeData.js';
+import { logCache } from './log.js';
 
 const router = express.Router();
 
@@ -232,6 +233,9 @@ router.post('/api/campaigns/:campaign/admin/clear-log', asyncHandler((req, res) 
         return res.status(500).json({ error: 'Failed to delete log file' });
     }
 
+    logCache.delete(campaign);
+    publish(`log-${campaign}`, null);
+
     res.json({ message: 'Campaign log cleared' });
 }));
 
@@ -265,6 +269,8 @@ router.post('/api/campaigns/:campaign/admin/full-reset', asyncHandler((req, res)
         console.error(`Failed to delete log file for ${campaign}:`, err.message);
         return res.status(500).json({ error: 'Failed to clear log' });
     }
+    logCache.delete(campaign);
+    publish(`log-${campaign}`, null);
 
     res.json({ message: 'Full reset complete' });
 }));
