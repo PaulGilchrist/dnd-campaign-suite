@@ -12,10 +12,11 @@ function LongRestButton({ playerStats, campaignName, onLongRest }) {
 
   const handleCelestialResilienceConfirm = async (selectedAllies) => {
     if (!celestialResilienceModal) return;
-    const { allyTempHp } = celestialResilienceModal;
-    for (const ally of selectedAllies) {
+    const { allyTempHp, creatureTargets } = celestialResilienceModal;
+    for (const allyName of selectedAllies) {
+      const ally = creatureTargets.find(a => a.name === allyName);
+      if (!ally) continue;
       const existingTempHp = Number(getRuntimeValue(ally.name, 'tempHp') || 0);
-      console.log('[CR] setting tempHp for', ally.name, ':', Math.max(existingTempHp, allyTempHp));
       setRuntimeValue(ally.name, 'tempHp', Math.max(existingTempHp, allyTempHp), campaignName);
     }
     addEntry(campaignName, {
