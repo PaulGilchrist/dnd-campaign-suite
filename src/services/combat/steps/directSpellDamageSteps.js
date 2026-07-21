@@ -97,18 +97,15 @@ export function buildDirectSpellDamageSteps() {
           const damageTypes = (radiantSoulPassive.damageTypes || []).map(dt => dt.toLowerCase());
           const oncePerTurnKey = `_radiantSoul_${ps.name.replace(/\s+/g, '_')}_oncePerTurn`;
           const onceUsed = getRuntimeValue(ps.name, oncePerTurnKey, ctx.campaignName);
-          console.error('[directSpellDamageSteps] Radiant Soul check: spellDamageType=', spellDamageType, 'damageTypes=', damageTypes, 'onceUsed=', onceUsed, 'match=', damageTypes.includes(spellDamageType));
           if (!onceUsed && damageTypes.includes(spellDamageType)) {
             const charismaAbility = ps.abilities?.find(a => a.name === 'Charisma');
             const chaMod = Math.max(0, charismaAbility?.bonus || 0);
             if (chaMod > 0) {
               formula = `${formula} + ${chaMod} [Radiant Soul]`;
-              console.error('[directSpellDamageSteps] Radiant Soul APPLIED: formula=', formula, 'chaMod=', chaMod);
             }
           }
         }
 
-        console.error('[directSpellDamageSteps] spellContext final formula=', formula, 'damageType=', ctx.attack?.damageType);
         return { data: { formula } };
       },
     },

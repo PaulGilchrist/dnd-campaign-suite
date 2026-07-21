@@ -675,17 +675,13 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     const damageTypes = (radiantSoulPassive?.damageTypes || []).map(dt => dt.toLowerCase());
     const oncePerTurnKey = `_radiantSoul_${playerStats.name.replace(/\s+/g, '_')}_oncePerTurn`;
     const radiantSoulOnceUsed = getRuntimeValue(playerStats.name, oncePerTurnKey, campaignName);
-    console.error('[spellCastService] Radiant Soul check: spellName=', spell.name, 'spellDamageType=', spellDamageType, 'damageTypes=', damageTypes, 'onceUsed=', radiantSoulOnceUsed, 'match=', damageTypes.includes(spellDamageType));
     if (radiantSoulPassive && radiantSoulPassive.hasAutomation && !radiantSoulOnceUsed && damageTypes.includes(spellDamageType)) {
         const charismaAbility = playerStats.abilities?.find(a => a.name === 'Charisma');
         const chaMod = Math.max(0, charismaAbility?.bonus || 0);
         if (chaMod > 0) {
             finalFormula = `${finalFormula} + ${chaMod} [Radiant Soul]`;
-            console.error('[spellCastService] Radiant Soul APPLIED: formula=', finalFormula, 'chaMod=', chaMod);
         }
     }
-
-    console.error('[spellCastService] finalFormula for spell=', spell.name, 'formula=', finalFormula, 'damageType=', spellDamageType);
 
     // Overchannel: maximize damage for Wizard spells (slot levels 1-5) that deal damage
     let overchannelFormula = formula;
@@ -806,7 +802,6 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
             overchannelResult = rollExpression(finalFormula);
         }
         if (overchannelResult) {
-            console.error('[spellCastService] Calling rollDamage: spell=', spell.name, 'formula=', finalFormula, 'total=', overchannelResult.total, 'damageType=', spell.damage?.damage_type);
             rollDamage(spell.name, finalFormula, overchannelResult.total, overchannelResult.rolls, overchannelResult.modifier, context);
         }
 
