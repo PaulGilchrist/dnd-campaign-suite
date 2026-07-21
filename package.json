@@ -14,13 +14,12 @@
             "last 1 safari version"
         ]
     },
-    "description": "Dungeons and Dragons Character Sheet",
+    "description": "Dungeons and Dragons Campaign Suite",
     "license": "MIT",
-    "name": "dnd-char-sheet",
+    "name": "dnd-campaign-suite",
     "private": true,
     "repository": {
-        "type": "git",
-        "url": "https://github.com/PaulGilchrist/dnd-char-sheet.git"
+        "type": "git"
     },
     "scripts": {
         "api": "node server.js",
