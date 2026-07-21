@@ -1,3 +1,7 @@
+**/campaign-log.json
+**/character-change-data.json
+
+
 docs/spells-2024.pdf
 # Per-campaign character change data (debounced in-memory state)
 public/campaigns/*/data/character-change-data.json

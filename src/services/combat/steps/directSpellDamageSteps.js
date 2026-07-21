@@ -2,7 +2,7 @@ import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '
 import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../rules/spells/postCastRiderService.js';
 import { addEntry } from '../../ui/logService.js';
 import { featureModules } from './features/index.js';
-import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getChosenRuntimeValue } from '../../../services/automation/common/choiceStorage.js';
 
 /**
@@ -90,6 +90,25 @@ export function buildDirectSpellDamageSteps() {
           }
         }
 
+        // Radiant Soul: add CHA mod to spell damage when dealing Radiant or Fire damage
+        const radiantSoulPassive = ps.automation?.passives?.find(p => p.type === 'radiant_soul');
+        if (radiantSoulPassive && radiantSoulPassive.hasAutomation) {
+          const spellDamageType = (ctx.attack?.damageType || '').toLowerCase();
+          const damageTypes = (radiantSoulPassive.damageTypes || []).map(dt => dt.toLowerCase());
+          const oncePerTurnKey = `_radiantSoul_${ps.name.replace(/\s+/g, '_')}_oncePerTurn`;
+          const onceUsed = getRuntimeValue(ps.name, oncePerTurnKey, ctx.campaignName);
+          console.error('[directSpellDamageSteps] Radiant Soul check: spellDamageType=', spellDamageType, 'damageTypes=', damageTypes, 'onceUsed=', onceUsed, 'match=', damageTypes.includes(spellDamageType));
+          if (!onceUsed && damageTypes.includes(spellDamageType)) {
+            const charismaAbility = ps.abilities?.find(a => a.name === 'Charisma');
+            const chaMod = Math.max(0, charismaAbility?.bonus || 0);
+            if (chaMod > 0) {
+              formula = `${formula} + ${chaMod} [Radiant Soul]`;
+              console.error('[directSpellDamageSteps] Radiant Soul APPLIED: formula=', formula, 'chaMod=', chaMod);
+            }
+          }
+        }
+
+        console.error('[directSpellDamageSteps] spellContext final formula=', formula, 'damageType=', ctx.attack?.damageType);
         return { data: { formula } };
       },
     },
@@ -105,6 +124,7 @@ export function buildDirectSpellDamageSteps() {
       handler: async (ctx) => {
         const wasCrit = ctx.isCrit;
         const isOverchannel = ctx.overchannelActive;
+        const ps = ctx.playerStats;
 
         let result;
         if (isOverchannel) {
@@ -113,6 +133,19 @@ export function buildDirectSpellDamageSteps() {
           result = wasCrit ? rollExpressionDoubled(ctx.formula) : rollExpression(ctx.formula);
         }
         if (!result) return null;
+
+        // Mark Radiant Soul as used for this turn
+        if (ps?.automation?.passives) {
+          const radiantSoulPassive = ps.automation.passives.find(p => p.type === 'radiant_soul');
+          if (radiantSoulPassive && radiantSoulPassive.hasAutomation) {
+            const spellDamageType = (ctx.attack?.damageType || '').toLowerCase();
+            const damageTypes = (radiantSoulPassive.damageTypes || []).map(dt => dt.toLowerCase());
+            if (damageTypes.includes(spellDamageType)) {
+              const oncePerTurnKey = `_radiantSoul_${ps.name.replace(/\s+/g, '_')}_oncePerTurn`;
+              setRuntimeValue(ps.name, oncePerTurnKey, true, ctx.campaignName);
+            }
+          }
+        }
 
         return {
           data: { formula: ctx.formula, total: result.total, rolls: result.rolls, modifier: result.modifier },

@@ -189,11 +189,12 @@ describe('HealingPoolModal', () => {
     damageUtils.getCombatContext.mockResolvedValue(mockCombatSummary);
     useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'currentHitPoints') return 15;
+      if (key === 'hitPoints') return 40;
       if (key === 'activeConditions') return [];
       return null;
     });
     await renderModal({ current: 15, max: 20 });
-    expect(screen.getByText(/Heal — Orc Warrior \(15 \/ 30 HP\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Heal — Paladin1 \(15 \/ 40 HP\)/)).toBeInTheDocument();
   });
 
   it('uses player stats as fallback when no target found', async () => {
@@ -282,7 +283,7 @@ describe('HealingPoolModal', () => {
 
     expect(applyHealingService.applyHealingToTarget).toHaveBeenCalledWith(
       mockCombatSummary,
-      npcTarget.name,
+      'Paladin1',
       5,
       mockCampaignName,
     );
@@ -309,7 +310,7 @@ describe('HealingPoolModal', () => {
     const rows = getLogTableRows();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toHaveTextContent('Heal');
-    expect(rows[0]).toHaveTextContent(npcTarget.name);
+    expect(rows[0]).toHaveTextContent('Paladin1');
     expect(rows[0]).toHaveTextContent('5');
   });
 
@@ -360,7 +361,7 @@ describe('HealingPoolModal', () => {
     fireEvent.click(screen.getByRole('button', { name: /Blinded/i }));
 
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      npcTarget.name,
+      'Paladin1',
       'activeConditions',
       expect.any(Array),
       mockCampaignName,
@@ -387,7 +388,7 @@ describe('HealingPoolModal', () => {
     const rows = getLogTableRows();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toHaveTextContent(/Cure/);
-    expect(rows[0]).toHaveTextContent(npcTarget.name);
+    expect(rows[0]).toHaveTextContent('Paladin1');
     expect(rows[0]).toHaveTextContent('3');
   });
 
@@ -510,7 +511,7 @@ describe('HealingPoolModal', () => {
     fireEvent.click(screen.getByRole('button', { name: /Cure Selected/i }));
 
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      npcTarget.name,
+      'Paladin1',
       'activeConditions',
       expect.any(Array),
       mockCampaignName,

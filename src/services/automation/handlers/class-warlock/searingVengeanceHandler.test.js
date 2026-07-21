@@ -249,6 +249,11 @@ describe('confirmSearingVengeance', () => {
       usesMax: 1,
     };
 
+    const playerStats = {
+      ...makePlayerStats(),
+      computedStats: { chaMod: 3 },
+    };
+
     const payload = {
       name: 'Searing Vengeance',
       targetName: 'Ally',
@@ -258,7 +263,7 @@ describe('confirmSearingVengeance', () => {
 
     const result = await confirmSearingVengeance(
       automation,
-      makePlayerStats(),
+      playerStats,
       campaignName,
       null,
       [],
@@ -283,7 +288,7 @@ describe('confirmSearingVengeance', () => {
       false,
       'TestWarlock'
     );
-    expect(diceRoller.rollExpression).toHaveBeenCalledWith('2d8 + CHA modifier');
+    expect(diceRoller.rollExpression).toHaveBeenCalledWith('2d8+3');
     expect(expirations.addExpiration).toHaveBeenCalledWith(
       'TestWarlock',
       'Goblin',

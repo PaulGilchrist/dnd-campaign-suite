@@ -1582,6 +1582,7 @@ export function createLogDamageAndShow(deps) {
     }
 
     return async function logDamageAndShow(name, formula, total, rolls, modifier, context) {
+        console.error('[logDamageAndShow] RECEIVED: name=', name, 'formula=', formula, 'damageType=', context?.damageType, 'total=', total);
         // Apply Feinting Attack superiority die damage bonus
         const feintDieValue = getRuntimeValue(characterName, 'feintingAttackDieValue');
         if (feintDieValue && Number(feintDieValue) > 0) {

@@ -247,11 +247,40 @@ export function buildAttackRollDamageSteps() {
           }
         }
 
+        // Radiant Soul: add CHA mod to spell damage when dealing Radiant or Fire damage
+        const radiantSoulPassive = ps.automation?.passives?.find(p => p.type === 'radiant_soul');
+        if (radiantSoulPassive && radiantSoulPassive.hasAutomation) {
+          const spellDamageType = (ctx.attack?.damageType || '').toLowerCase();
+          const damageTypes = (radiantSoulPassive.damageTypes || []).map(dt => dt.toLowerCase());
+          const oncePerTurnKey = `_radiantSoul_${ps.name.replace(/\s+/g, '_')}_oncePerTurn`;
+          const onceUsed = getRuntimeValue(ps.name, oncePerTurnKey, ctx.campaignName);
+          if (!onceUsed && damageTypes.includes(spellDamageType)) {
+            const charismaAbility = ps.abilities?.find(a => a.name === 'Charisma');
+            const chaMod = Math.max(0, charismaAbility?.bonus || 0);
+            if (chaMod > 0) {
+              formula = `${formula} + ${chaMod} [Radiant Soul]`;
+            }
+          }
+        }
+
         const isOverchannel = ctx.overchannelActive;
         const result = isOverchannel
           ? rollExpressionMaximized(formula)
           : (wasCrit ? rollExpressionDoubled(formula) : rollExpression(formula));
         if (!result) return null;
+
+        // Mark Radiant Soul as used for this turn
+        if (ps?.automation?.passives) {
+          const radiantSoulPassive = ps.automation.passives.find(p => p.type === 'radiant_soul');
+          if (radiantSoulPassive && radiantSoulPassive.hasAutomation) {
+            const spellDamageType = (ctx.attack?.damageType || '').toLowerCase();
+            const damageTypes = (radiantSoulPassive.damageTypes || []).map(dt => dt.toLowerCase());
+            if (damageTypes.includes(spellDamageType)) {
+              const oncePerTurnKey = `_radiantSoul_${ps.name.replace(/\s+/g, '_')}_oncePerTurn`;
+              setRuntimeValue(ps.name, oncePerTurnKey, true, ctx.campaignName);
+            }
+          }
+        }
 
         return {
           data: { formula, total: result.total, rolls: result.rolls, modifier: result.modifier },

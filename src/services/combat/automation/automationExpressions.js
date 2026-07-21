@@ -139,9 +139,9 @@ export function evaluateAutoExpression(expression, playerStats, prof, level, slo
 
     try {
         let evalExpr = expr
-        evalExpr = evalExpr.replace(/\bfloor\b/g, 'Math.floor')
-        evalExpr = evalExpr.replace(/\bceil\b/g, 'Math.ceil')
-        evalExpr = evalExpr.replace(/\bround\b/g, 'Math.round')
+        evalExpr = evalExpr.replace(/(?<!Math\.)floor\b/g, 'Math.floor')
+        evalExpr = evalExpr.replace(/(?<!Math\.)ceil\b/g, 'Math.ceil')
+        evalExpr = evalExpr.replace(/(?<!Math\.)round\b/g, 'Math.round')
         const result = new Function(`"use strict"; return (${evalExpr})`)()
         if (typeof result === 'number' && !isNaN(result)) return result
     } catch (_e) { /* not a simple expression, return as string */ }
