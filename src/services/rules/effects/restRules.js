@@ -684,11 +684,12 @@ export async function applyLongRest(playerStats, campaignName) {
                  maxTargets: celestialResult.maxAllies,
                };
              }
-           }
-         }
-       }
+            }
+            }
+          }
+        }
 
-       // Reset Bastion of Law ward on long rest
+        // Reset Bastion of Law ward on long rest
      const wardTarget = getRuntimeValue(name, 'bastionOfLawWardTarget', campaignName)
      setRuntimeValue(name, 'bastionOfLawActive', false, campaignName, true)
      setRuntimeValue(name, 'bastionOfLawWardDice', [], campaignName, true)

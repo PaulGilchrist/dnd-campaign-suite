@@ -190,14 +190,15 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         if (!celestialResilienceModal) return;
         const { allyTempHp } = celestialResilienceModal;
         for (const ally of selectedAllies) {
-            const existingTempHp = Number(getRuntimeValue(ally.name, 'tempHp', campaignName) || 0);
+            const existingTempHp = Number(getRuntimeValue(ally.name, 'tempHp') || 0);
+            console.log('[CR] setting tempHp for', ally.name, ':', Math.max(existingTempHp, allyTempHp));
             setRuntimeValue(ally.name, 'tempHp', Math.max(existingTempHp, allyTempHp), campaignName);
         }
         addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerStats.name,
             abilityName: 'Celestial Resilience',
-            description: `${playerStats.name} grants ${allyTempHp} temporary hit points to ${selectedAllies.length} ally(ies) from Celestial Resilience (short rest).`,
+            description: `${playerStats.name} grants ${allyTempHp} temporary hit points to ${selectedAllies.join(', ')}.`,
             timestamp: Date.now(),
         }).catch((e) => { console.error('[celestialResilience] Error logging:', e); });
         setCelestialResilienceModal(null);

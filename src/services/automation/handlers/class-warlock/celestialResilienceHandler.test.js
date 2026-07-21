@@ -267,7 +267,7 @@ describe('celestialResilienceHandler', () => {
             expect(result.allies[0].name).toBe('Ally1');
         });
 
-        it('limits ally count to maxAllies', async () => {
+        it('collects all allies in range (maxAllies limits selection, not display)', async () => {
             evaluateAutoExpression
                 .mockReturnValueOnce(5)
                 .mockReturnValueOnce(2);
@@ -302,8 +302,8 @@ describe('celestialResilienceHandler', () => {
 
             const result = await grantCelestialResilience(stats, CAMPAIGN, 'magical_cunning', MAP);
 
-            expect(result.allies.length).toBe(3);
-            expect(result.allies.map(a => a.name)).toEqual(['Ally1', 'Ally2', 'Ally3']);
+            expect(result.allies.length).toBe(6);
+            expect(result.maxAllies).toBe(3);
         });
 
         it('filters allies by range', async () => {
