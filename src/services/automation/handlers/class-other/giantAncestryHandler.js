@@ -123,6 +123,342 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 }
 
+// Direct handlers for individual giant ancestry traits (no selection flow)
+export async function handleCloudsJauntDirect(action, playerStats, campaignName) {
+    const usesKey = getRuntimeUsesKey("Cloud's Jaunt");
+    const usesMax = playerStats.proficiency || 0;
+    const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
+
+    if (currentUses <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: "Cloud's Jaunt",
+                description: "Cloud's Jaunt has no uses remaining. Recharges on a Long Rest.",
+                automation: action.automation,
+            },
+        };
+    }
+
+    return {
+        type: 'modal',
+        modalName: 'teleport',
+        payload: {
+            action: {
+                ...action,
+                name: "Cloud's Jaunt",
+                automation: {
+                    ...action.automation,
+                    type: 'teleport',
+                    effect: 'teleport',
+                    distance: '30 ft',
+                    range: '30_ft',
+                },
+            },
+            playerStats,
+            campaignName,
+        },
+    };
+}
+
+export async function handleFiresBurnDirect(action, playerStats, campaignName) {
+    const usesKey = getRuntimeUsesKey("Fire's Burn");
+    const usesMax = playerStats.proficiency || 0;
+    const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
+
+    if (currentUses <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: "Fire's Burn",
+                description: "Fire's Burn has no uses remaining. Recharges on a Long Rest.",
+                automation: action.automation,
+            },
+        };
+    }
+
+    const targetInfo = await resolveTarget(campaignName, playerStats.name);
+    if (!targetInfo?.target) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: "Fire's Burn",
+                description: "Fire's Burn requires a target. Select a creature in combat.",
+                automation: action.automation,
+            },
+        };
+    }
+
+    const targetName = targetInfo.target.name;
+    const damageResult = rollExpression(action.automation.damage || '1d10');
+    const damageDisplay = damageResult ? damageResult.total : (action.automation.damage || '1d10');
+    const damageType = action.automation.damageType || 'Fire';
+
+    await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+
+    await addEntry(campaignName, {
+        type: 'roll',
+        characterName: playerStats.name,
+        rollType: 'damage',
+        name: "Fire's Burn" + ' Damage',
+        targetName,
+        damageType,
+        total: damageResult?.total ?? 0,
+        formula: action.automation.damage || '1d10',
+        rolls: damageResult?.rolls,
+        description: `${playerStats.name} used Fire's Burn to deal ${damageDisplay} fire damage to ${targetName}.`,
+    }).catch((e) => { console.error("[giantAncestry] Error:", e); });
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: "Fire's Burn",
+            automationType: 'fire_burn',
+            description: `Fire's Burn: Dealt <strong>${damageDisplay}</strong> fire damage to ${targetName}.`,
+            automation: action.automation,
+        },
+    };
+}
+
+export async function handleFrostsChillDirect(action, playerStats, campaignName) {
+    const usesKey = getRuntimeUsesKey("Frost's Chill");
+    const usesMax = playerStats.proficiency || 0;
+    const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
+
+    if (currentUses <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: "Frost's Chill",
+                description: "Frost's Chill has no uses remaining. Recharges on a Long Rest.",
+                automation: action.automation,
+            },
+        };
+    }
+
+    const targetInfo = await resolveTarget(campaignName, playerStats.name);
+    if (!targetInfo?.target) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: "Frost's Chill",
+                description: "Frost's Chill requires a target. Select a creature in combat.",
+                automation: action.automation,
+            },
+        };
+    }
+
+    const targetName = targetInfo.target.name;
+    const damageResult = rollExpression(action.automation.damage || '1d6');
+    const damageDisplay = damageResult ? damageResult.total : (action.automation.damage || '1d6');
+    const damageType = action.automation.damageType || 'Cold';
+    const speedReduction = parseInt(action.automation.value?.replace('_ft', ''), 10) || 10;
+
+    await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+
+    const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+    const speedEffect = {
+        target: targetName,
+        source: "Frost's Chill",
+        effect: 'speed_reduction',
+        value: speedReduction,
+        duration: 'until_end_of_next_turn',
+    };
+    await setRuntimeValue(campaignName, 'targetEffects', [...storedEffects, speedEffect], campaignName);
+
+    await addEntry(campaignName, {
+        type: 'roll',
+        characterName: playerStats.name,
+        rollType: 'damage',
+        name: "Frost's Chill" + ' Damage',
+        targetName,
+        damageType,
+        total: damageResult?.total ?? 0,
+        formula: action.automation.damage || '1d6',
+        rolls: damageResult?.rolls,
+        description: `${playerStats.name} used Frost's Chill to deal ${damageDisplay} cold damage and reduce ${targetName}'s speed by ${speedReduction} feet.`,
+    }).catch((e) => { console.error("[giantAncestry] Error:", e); });
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: "Frost's Chill",
+            automationType: 'frosts_chill',
+            description: `Frost's Chill: Dealt <strong>${damageDisplay}</strong> cold damage to ${targetName}. Speed reduced by ${speedReduction} ft for 1 round.`,
+            automation: action.automation,
+        },
+    };
+}
+
+export async function handleHillsTumbleDirect(action, playerStats, campaignName) {
+    const usesKey = getRuntimeUsesKey("Hill's Tumble");
+    const usesMax = playerStats.proficiency || 0;
+    const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
+
+    if (currentUses <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: "Hill's Tumble",
+                description: "Hill's Tumble has no uses remaining. Recharges on a Long Rest.",
+                automation: action.automation,
+            },
+        };
+    }
+
+    const cs = await getCombatContext(campaignName);
+    const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+    const targetName = target?.name || null;
+
+    if (!targetName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: "Hill's Tumble",
+                description: "Hill's Tumble: No target found. Use this after hitting a creature with a melee attack.",
+                automation: action.automation,
+            },
+        };
+    }
+
+    await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+
+    const storedConds = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const newConds = Array.isArray(storedConds) ? [...storedConds, 'prone'] : ['prone'];
+    await setRuntimeValue(targetName, 'activeConditions', newConds, campaignName);
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: "Hill's Tumble",
+        description: `${playerStats.name} used Hill's Tumble to knock ${targetName} prone.`,
+    }).catch(() => {});
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: "Hill's Tumble",
+            automationType: 'hills_tumble',
+            description: `Hill's Tumble: Knocked <strong>${targetName}</strong> prone.`,
+            automation: action.automation,
+        },
+    };
+}
+
+export async function handleStonesEnduranceDirect(action, playerStats, campaignName) {
+    const usesKey = getRuntimeUsesKey("Stone's Endurance");
+    const usesMax = playerStats.proficiency || 0;
+    const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
+
+    if (currentUses <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: "Stone's Endurance",
+                description: "Stone's Endurance has no uses remaining. Recharges on a Long Rest.",
+                automation: action.automation,
+            },
+        };
+    }
+
+    const reduction = evaluateAutoExpression(action.automation.reductionExpression || '1d12 + CON modifier', playerStats);
+    const reductionDisplay = typeof reduction === 'number' ? String(reduction) : (reduction || action.automation.reductionExpression || '1d12 + CON modifier');
+
+    await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: "Stone's Endurance",
+        description: `${playerStats.name} used Stone's Endurance to reduce damage by ${reductionDisplay}.`,
+    });
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: "Stone's Endurance",
+            automationType: 'stones_endurance',
+            description: `Stone's Endurance: Reduce damage by <strong>${reductionDisplay}</strong>.`,
+            automation: action.automation,
+        },
+    };
+}
+
+export async function handleStormsThunderDirect(action, playerStats, campaignName, _mapName) {
+    const usesKey = getRuntimeUsesKey("Storm's Thunder");
+    const usesMax = playerStats.proficiency || 0;
+    const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
+
+    if (currentUses <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: "Storm's Thunder",
+                description: "Storm's Thunder has no uses remaining. Recharges on a Long Rest.",
+                automation: action.automation,
+            },
+        };
+    }
+
+    const targetInfo = await resolveTarget(campaignName, playerStats.name);
+    if (!targetInfo?.target) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: "Storm's Thunder",
+                description: "Storm's Thunder requires a target. Select a creature in combat.",
+                automation: action.automation,
+            },
+        };
+    }
+
+    const targetName = targetInfo.target.name;
+
+    await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+
+    const damageResult = rollExpression(action.automation.damage || '1d8');
+    const damageDisplay = damageResult ? damageResult.total : (action.automation.damage || '1d8');
+    const damageType = action.automation.damageType || 'Thunder';
+
+    await addEntry(campaignName, {
+        type: 'roll',
+        characterName: playerStats.name,
+        rollType: 'damage',
+        name: "Storm's Thunder" + ' Damage',
+        targetName,
+        damageType,
+        total: damageResult?.total ?? 0,
+        formula: action.automation.damage || '1d8',
+        rolls: damageResult?.rolls,
+        description: `${playerStats.name} used Storm's Thunder to deal ${damageDisplay} thunder damage to ${targetName} as a reaction.`,
+    }).catch((e) => { console.error("[giantAncestry] Error:", e); });
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: "Storm's Thunder",
+            automationType: 'storms_thunder',
+            description: `Storm's Thunder: Dealt <strong>${damageDisplay}</strong> thunder damage to ${targetName}.`,
+            automation: action.automation,
+        },
+    };
+}
+
 // Direct handlers for when the automation type is called directly (teleport, damage, etc.)
 export async function handleDirectType(action, playerStats, campaignName, _mapName) {
     const storedSelection = getRuntimeValue(playerStats.name, GIANT_ANCESTRY_KEY, campaignName);
@@ -470,7 +806,8 @@ export async function handleStonesEndurance(action, playerStats, campaignName, o
 }
 
 export async function handleStormsThunder(action, playerStats, campaignName, _mapName, option) {
-    const usesKey = getRuntimeUsesKey(option.name);
+    const opt = option || getOptionByName("Storm's Thunder");
+    const usesKey = getRuntimeUsesKey(opt.name);
     const usesMax = playerStats.proficiency || 0;
     const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
 
@@ -479,8 +816,8 @@ export async function handleStormsThunder(action, playerStats, campaignName, _ma
             type: 'popup',
             payload: {
                 type: 'automation_info',
-                name: option.name,
-                description: `${option.name} has no uses remaining. Recharges on a Short or Long Rest.`,
+                name: opt.name,
+                description: `${opt.name} has no uses remaining. Recharges on a Short or Long Rest.`,
                 automation: action.automation,
             },
         };
@@ -492,8 +829,8 @@ export async function handleStormsThunder(action, playerStats, campaignName, _ma
             type: 'popup',
             payload: {
                 type: 'automation_info',
-                name: option.name,
-                description: `${option.name} requires a target. Select a creature in combat.`,
+                name: opt.name,
+                description: `${opt.name} requires a target. Select a creature in combat.`,
                 automation: action.automation,
             },
         };
@@ -504,29 +841,29 @@ export async function handleStormsThunder(action, playerStats, campaignName, _ma
     // Consume the use
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
-    const damageResult = rollExpression(option.damage);
-    const damageDisplay = damageResult ? damageResult.total : option.damage;
+    const damageResult = rollExpression(opt.damage);
+    const damageDisplay = damageResult ? damageResult.total : opt.damage;
 
     await addEntry(campaignName, {
         type: 'roll',
         characterName: playerStats.name,
         rollType: 'damage',
-        name: option.name + ' Damage',
+        name: opt.name + ' Damage',
         targetName,
-        damageType: option.damageType,
+        damageType: opt.damageType,
         total: damageResult?.total ?? 0,
-        formula: option.damage,
+        formula: opt.damage,
         rolls: damageResult?.rolls,
-        description: `${playerStats.name} used ${option.name} to deal ${damageDisplay} ${option.damageType} damage to ${targetName} as a reaction.`,
+        description: `${playerStats.name} used ${opt.name} to deal ${damageDisplay} ${opt.damageType} damage to ${targetName} as a reaction.`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
-            name: option.name,
-            automationType: option.type,
-            description: `${option.name}: Dealt <strong>${damageDisplay}</strong> ${option.damageType} damage to ${targetName}.`,
+            name: opt.name,
+            automationType: opt.type,
+            description: `${opt.name}: Dealt <strong>${damageDisplay}</strong> ${opt.damageType} damage to ${targetName}.`,
             automation: action.automation,
         },
     };

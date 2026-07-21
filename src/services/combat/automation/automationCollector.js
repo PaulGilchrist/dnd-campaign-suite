@@ -368,6 +368,30 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'nature_sanctuary':
                 result.actions.push(info)
                 break
+            case 'clouds_jaunt':
+                if (info.casting_time === '1 bonus action') {
+                    result.bonusActions.push(info)
+                } else {
+                    result.actions.push(info)
+                }
+                break
+            case 'fire_burn':
+            case 'frosts_chill':
+            case 'hills_tumble':
+                if (info.casting_time === '1 action') {
+                    result.actions.push(info)
+                } else {
+                    result.passives.push(info)
+                }
+                break
+            case 'stones_endurance':
+            case 'storms_thunder':
+                if (info.casting_time === '1 reaction') {
+                    result.reactions.push(info)
+                } else {
+                    result.reactions.push(info)
+                }
+                break
             case 'reaction_damage':
                 if (auto.trigger === 'psychic_damage_received') {
                     // Thought Shield is a manual reaction, not auto-triggered

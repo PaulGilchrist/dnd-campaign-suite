@@ -503,50 +503,141 @@
         "subraces": [
             {
                 "name": "Cloud's Jaunt (Cloud Giant)",
-                "description": "As a Bonus Action, you magically teleport up to 30 feet to an unoccupied space you can see.",
+                "description": "As a Bonus Action, you magically teleport up to 30 feet to an unoccupied space you can see. You can use this a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
                 "languages": [
                     "Common",
                     "Giant"
+                ],
+                "traits": [
+                    {
+                        "name": "Cloud's Jaunt",
+                        "description": "As a Bonus Action, you magically teleport up to 30 feet to an unoccupied space you can see. You can use this a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
+                        "automation": {
+                            "type": "teleport",
+                            "effect": "teleport",
+                            "distance": "30 ft",
+                            "range": "30_ft",
+                            "uses": "proficiency_bonus",
+                            "recharge": "long_rest",
+                            "casting_time": "1 bonus action"
+                        }
+                    }
                 ]
             },
             {
                 "name": "Fire's Burn (Fire Giant)",
-                "description": "When you hit a target with an attack roll and deal damage to it, you can also deal 1d10 Fire damage to that target.",
+                "description": "When you hit a target with an attack roll and deal damage to it, you can also deal 1d10 Fire damage to that target. You can use this a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
                 "languages": [
                     "Common",
                     "Giant"
+                ],
+                "traits": [
+                    {
+                        "name": "Fire's Burn",
+                        "description": "When you hit a target with an attack roll and deal damage to it, you can also deal 1d10 Fire damage to that target. You can use this a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
+                        "automation": {
+                            "type": "fire_burn",
+                            "damage": "1d10",
+                            "damageType": "Fire",
+                            "trigger": "hit",
+                            "uses": "proficiency_bonus",
+                            "recharge": "long_rest",
+                            "casting_time": "1 action"
+                        }
+                    }
                 ]
             },
             {
                 "name": "Frost's Chill (Frost Giant)",
-                "description": "When you hit a target with an attack roll and deal damage to it, you can also deal 1d6 Cold damage to that target and reduce its Speed by 10 feet until the start of your next turn.",
+                "description": "When you hit a target with an attack roll and deal damage to it, you can also deal 1d6 Cold damage to that target and reduce its Speed by 10 feet until the start of your next turn. You can use this a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
                 "languages": [
                     "Common",
                     "Giant"
+                ],
+                "traits": [
+                    {
+                        "name": "Frost's Chill",
+                        "description": "When you hit a target with an attack roll and deal damage to it, you can also deal 1d6 Cold damage to that target and reduce its Speed by 10 feet until the start of your next turn. You can use this a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
+                        "automation": {
+                            "type": "frosts_chill",
+                            "damage": "1d6",
+                            "damageType": "Cold",
+                            "condition": "speed_reduction",
+                            "value": "10_ft",
+                            "trigger": "hit",
+                            "uses": "proficiency_bonus",
+                            "recharge": "long_rest",
+                            "casting_time": "1 action"
+                        }
+                    }
                 ]
             },
             {
                 "name": "Hill's Tumble (Hill Giant)",
-                "description": "When you hit a Large or smaller creature with an attack roll and deal damage to it, you can give that target the Prone condition.",
+                "description": "When you hit a Large or smaller creature with an attack roll and deal damage to it, you can give that target the Prone condition. You can use this a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
                 "languages": [
                     "Common",
                     "Giant"
+                ],
+                "traits": [
+                    {
+                        "name": "Hill's Tumble",
+                        "description": "When you hit a Large or smaller creature with an attack roll and deal damage to it, you can give that target the Prone condition. You can use this a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
+                        "automation": {
+                            "type": "hills_tumble",
+                            "trigger": "melee_hit",
+                            "effect": "prone",
+                            "uses": "proficiency_bonus",
+                            "recharge": "long_rest",
+                            "casting_time": "1 action"
+                        }
+                    }
                 ]
             },
             {
                 "name": "Stone's Endurance (Stone Giant)",
-                "description": "When you take damage, you can take a Reaction to roll 1d12. Add your Constitution modifier to the number rolled and reduce the damage by that total.",
+                "description": "When you take damage, you can take a Reaction to roll 1d12. Add your Constitution modifier to the number rolled and reduce the damage by that total. You can use this a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
                 "languages": [
                     "Common",
                     "Giant"
+                ],
+                "traits": [
+                    {
+                        "name": "Stone's Endurance",
+                        "description": "When you take damage, you can take a Reaction to roll 1d12. Add your Constitution modifier to the number rolled and reduce the damage by that total. You can use this a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
+                        "automation": {
+                            "type": "stones_endurance",
+                            "reductionExpression": "1d12 + CON modifier",
+                            "trigger": "damage_received",
+                            "uses": "proficiency_bonus",
+                            "recharge": "long_rest",
+                            "casting_time": "1 reaction"
+                        }
+                    }
                 ]
             },
             {
                 "name": "Storm's Thunder (Storm Giant)",
-                "description": "When you take damage from a creature within 60 feet of you, you can take a Reaction to deal 1d8 Thunder damage to that creature.",
+                "description": "When you take damage from a creature within 60 feet of you, you can take a Reaction to deal 1d8 Thunder damage to that creature. You can use this a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
                 "languages": [
                     "Common",
                     "Giant"
+                ],
+                "traits": [
+                    {
+                        "name": "Storm's Thunder",
+                        "description": "When you take damage from a creature within 60 feet of you, you can take a Reaction to deal 1d8 Thunder damage to that creature. You can use this a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
+                        "automation": {
+                            "type": "storms_thunder",
+                            "damage": "1d8",
+                            "damageType": "Thunder",
+                            "range": "60_ft",
+                            "trigger": "damage_received_within_range",
+                            "uses": "proficiency_bonus",
+                            "recharge": "long_rest",
+                            "casting_time": "1 reaction"
+                        }
+                    }
                 ]
             }
         ],
@@ -570,66 +661,6 @@
                     "condition": "grappled",
                     "effect": "advantage",
                     "casting_time": "passive"
-                }
-            },
-            {
-                "name": "Giant Ancestry",
-                "description": "You are descended from Giants. Choose one of the following benefits-a supernatural boon from your ancestry; you can use the chosen benefit a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest:",
-                "automation": {
-                    "type": "resource_pool",
-                    "options": [
-                        {
-                            "name": "Cloud's Jaunt",
-                            "type": "teleport",
-                            "range": "30_ft",
-                            "uses": "proficiency_bonus",
-                            "recharge": "short_rest"
-                        },
-                        {
-                            "name": "Fire's Burn",
-                            "type": "damage",
-                            "damage": "1d10",
-                            "damageType": "Fire",
-                            "uses": "proficiency_bonus",
-                            "recharge": "short_rest"
-                        },
-                        {
-                            "name": "Frost's Chill",
-                            "type": "damage_with_condition",
-                            "damage": "1d6",
-                            "damageType": "Cold",
-                            "condition": "speed_reduction",
-                            "value": "10_ft",
-                            "uses": "proficiency_bonus",
-                            "recharge": "short_rest"
-                        },
-                        {
-                            "name": "Hill's Tumble",
-                            "type": "auto_effect",
-                            "trigger": "melee_hit",
-                            "effect": "prone",
-                            "uses": "proficiency_bonus",
-                            "recharge": "short_rest"
-                        },
-                        {
-                            "name": "Stone's Endurance",
-                            "type": "damage_reduction",
-                            "reductionExpression": "1d10 + CON modifier",
-                            "uses": "proficiency_bonus",
-                            "recharge": "short_rest"
-                        },
-                        {
-                            "name": "Storm's Thunder",
-                            "type": "reaction_damage",
-                            "damage": "1d8",
-                            "damageType": "Thunder",
-                            "range": "60_ft",
-                            "uses": "proficiency_bonus",
-                            "recharge": "short_rest"
-                        }
-                    ],
-                    "recharge": "short_rest",
-                    "casting_time": "1 action"
                 }
             }
         ],

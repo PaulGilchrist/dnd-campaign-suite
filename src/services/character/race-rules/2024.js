@@ -231,9 +231,9 @@ const raceRules = {
                             description: selectedLineage.description,
                             details: null
                          });
-                     }
-                 }
-             });
+                      }
+                  }
+              });
 
             if (lineageTraits.length > 0) {
                 const categorizedLineageTraits = raceRules.addTraits(lineageTraits);
@@ -241,8 +241,14 @@ const raceRules = {
              }
         }
 
+            // Handle subrace traits (e.g., Goliath giant ancestry traits)
+        if (playerStats.race?.subrace && playerStats.race.subrace.traits) {
+            const subraceTraits = raceRules.addTraits(playerStats.race.subrace.traits);
+            traits = mergeCategorizedFeatures(traits, subraceTraits);
+        }
+
         return traits;
-         }
+          }
 };
 
 function extractDarkvisionFeet(value) {

@@ -84,7 +84,7 @@ import { handle as handleTelekineticThrust } from './handlers/class-sorcerer/tel
 import { handle as handleGuardedMind } from './handlers/class-sorcerer/guardedMindHandler.js';
 import { handle as handleBulwarkOfForce } from './handlers/class-sorcerer/bulwarkOfForceHandler.js';
 import { handle as handleConcentrationBonusAttack } from './handlers/combat/concentrationBonusAttackHandler.js';
-import { handle as handleGiantAncestry } from './handlers/class-other/giantAncestryHandler.js';
+import { handle as handleGiantAncestry, handleCloudsJauntDirect as handleCloudsJaunt, handleFiresBurnDirect as handleFiresBurn, handleFrostsChillDirect as handleFrostsChill, handleHillsTumbleDirect as handleHillsTumble, handleStonesEnduranceDirect as handleStonesEndurance, handleStormsThunderDirect as handleStormsThunder } from './handlers/class-other/giantAncestryHandler.js';
 import { handle as handleDamageTypeModifier } from './handlers/combat/damageTypeModifierHandler.js';
 import { handle as handleSuperiorDefense } from './handlers/superiorDefenseHandler.js';
 import { handle as handleHandOfUltimateMercy } from './handlers/class-cleric-paladin/handOfUltimateMercyHandler.js';
@@ -447,11 +447,13 @@ const HANDLER_MAP = {
                      gnomish_lineage: handleGnomishLineage,
                     large_form: handleLargeForm,
                     fiendish_legacy: handleFiendishLegacy,
-                    giant_ancestry: handleGiantAncestry,
-                     teleport: handleGiantAncestry,
-                     damage: handleGiantAncestry,
-                      damage_with_condition: handleGiantAncestry,
-                      auto_effect_giant: handleGiantAncestry,
+                     giant_ancestry: handleGiantAncestry,
+                      clouds_jaunt: handleCloudsJaunt,
+                      fire_burn: handleFiresBurn,
+                      frosts_chill: handleFrostsChill,
+                      hills_tumble: handleHillsTumble,
+                      stones_endurance: handleStonesEndurance,
+                      storms_thunder: handleStormsThunder,
                        aid: handleAid,
         aura_of_purity: handleAuraOfPurity,
         holy_aura: handleHolyAura,

@@ -10,6 +10,12 @@ import {
     handleHillsTumble,
     handleStonesEndurance,
     handleStormsThunder,
+    handleCloudsJauntDirect,
+    handleFiresBurnDirect,
+    handleFrostsChillDirect,
+    handleHillsTumbleDirect,
+    handleStonesEnduranceDirect,
+    handleStormsThunderDirect,
 } from './giantAncestryHandler.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -68,7 +74,7 @@ function makePlayerStats(overrides = {}) {
 
 describe('giantAncestryHandler', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
+        vi.resetAllMocks();
     });
 
     describe('handle', () => {
@@ -390,7 +396,287 @@ describe('giantAncestryHandler', () => {
 
         it('returns info popup when no uses remaining', async () => {
             makeUsesMock("storm'sthunderUses", 0);
-            const result = await handleStormsThunder(makeAction(), makePlayerStats(), 'campaign', 'map', option);
+            const result = await handleStormsThunder(makeAction(), makePlayerStats(), 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('no uses remaining');
+        });
+    });
+
+    describe('handleCloudsJauntDirect', () => {
+        const directAction = {
+            name: "Cloud's Jaunt",
+            automation: {
+                type: 'clouds_jaunt',
+                distance: '30 ft',
+                range: '30_ft',
+                uses: 'proficiency_bonus',
+                recharge: 'long_rest',
+                casting_time: '1 bonus action',
+            },
+        };
+
+        it('returns modal for teleport with uses available', async () => {
+            makeUsesMock("cloud'sjauntUses", 3);
+            const result = await handleCloudsJauntDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('modal');
+            expect(result.modalName).toBe('teleport');
+            expect(result.payload.action.name).toBe("Cloud's Jaunt");
+        });
+
+        it('returns info popup when no uses remaining', async () => {
+            makeUsesMock("cloud'sjauntUses", 0);
+            const result = await handleCloudsJauntDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.description).toContain('no uses remaining');
+            expect(result.payload.description).toContain('Long Rest');
+        });
+    });
+
+    describe('handleFiresBurnDirect', () => {
+        const directAction = {
+            name: "Fire's Burn",
+            automation: {
+                type: 'fire_burn',
+                damage: '1d10',
+                damageType: 'Fire',
+                trigger: 'hit',
+                uses: 'proficiency_bonus',
+                recharge: 'long_rest',
+                casting_time: '1 action',
+            },
+        };
+
+        it('deals damage and consumes use', async () => {
+            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
+                if (key === "fire'sburnUses") return 3;
+                return null;
+            });
+            const result = await handleFiresBurnDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain("Fire's Burn");
+            expect(result.payload.description).toContain('Fire');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', "fire'sburnUses", 2, 'campaign');
+            expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'roll',
+                rollType: 'damage',
+                characterName: 'TestHero',
+                targetName: 'Goblin',
+                damageType: 'Fire',
+            }));
+        });
+
+        it('returns popup when no target', async () => {
+            makeUsesMock("fire'sburnUses", 3);
+            resolveTarget.mockResolvedValue(null);
+
+            const result = await handleFiresBurnDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('requires a target');
+        });
+
+        it('returns info popup when no uses remaining', async () => {
+            makeUsesMock("fire'sburnUses", 0);
+            const result = await handleFiresBurnDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('no uses remaining');
+        });
+    });
+
+    describe('handleFrostsChillDirect', () => {
+        const directAction = {
+            name: "Frost's Chill",
+            automation: {
+                type: 'frosts_chill',
+                damage: '1d6',
+                damageType: 'Cold',
+                condition: 'speed_reduction',
+                value: '10_ft',
+                trigger: 'hit',
+                uses: 'proficiency_bonus',
+                recharge: 'long_rest',
+                casting_time: '1 action',
+            },
+        };
+
+        it('deals damage and applies speed reduction', async () => {
+            getRuntimeValue.mockImplementation((_name, key, campaign) => {
+                if (key === "frost'schillUses") return 3;
+                if (key === 'targetEffects' && campaign === 'campaign') return [];
+                return null;
+            });
+            resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+            const result = await handleFrostsChillDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain("Frost's Chill");
+            expect(result.payload.description).toContain('cold');
+            expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', expect.any(Array), 'campaign');
+            expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'roll',
+                rollType: 'damage',
+                targetName: 'Goblin',
+                damageType: 'Cold',
+            }));
+        });
+
+        it('returns popup when no target', async () => {
+            makeUsesMock("frost'schillUses", 3);
+            resolveTarget.mockResolvedValue(null);
+
+            const result = await handleFrostsChillDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('requires a target');
+        });
+
+        it('returns info popup when no uses remaining', async () => {
+            makeUsesMock("frost'schillUses", 0);
+            const result = await handleFrostsChillDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('no uses remaining');
+        });
+    });
+
+    describe('handleHillsTumbleDirect', () => {
+        const directAction = {
+            name: "Hill's Tumble",
+            automation: {
+                type: 'hills_tumble',
+                trigger: 'melee_hit',
+                effect: 'prone',
+                uses: 'proficiency_bonus',
+                recharge: 'long_rest',
+                casting_time: '1 action',
+            },
+        };
+
+        it('knocks target prone', async () => {
+            getRuntimeValue.mockImplementation((_name, key, campaign) => {
+                if (key === "hill'stumbleUses") return 3;
+                if (campaign && key === 'activeConditions') return [];
+                return null;
+            });
+            getCombatContext.mockResolvedValue({});
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+            const result = await handleHillsTumbleDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('Goblin');
+            expect(result.payload.description).toContain('prone');
+            expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'ability_use',
+                abilityName: "Hill's Tumble",
+            }));
+        });
+
+        it('returns popup when no target found', async () => {
+            makeUsesMock("hill'stumbleUses", 3);
+            getCombatContext.mockResolvedValue({});
+            getTargetFromAttacker.mockReturnValue(null);
+            const result = await handleHillsTumbleDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('No target found');
+        });
+
+        it('returns info popup when no uses remaining', async () => {
+            makeUsesMock("hill'stumbleUses", 0);
+            const result = await handleHillsTumbleDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('no uses remaining');
+        });
+    });
+
+    describe('handleStonesEnduranceDirect', () => {
+        const directAction = {
+            name: "Stone's Endurance",
+            automation: {
+                type: 'stones_endurance',
+                reductionExpression: '1d12 + CON modifier',
+                trigger: 'damage_received',
+                uses: 'proficiency_bonus',
+                recharge: 'long_rest',
+                casting_time: '1 reaction',
+            },
+        };
+
+        it('reduces damage and returns popup', async () => {
+            makeUsesMock("stone'senduranceUses", 3);
+            const result = await handleStonesEnduranceDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain("Stone's Endurance");
+            expect(result.payload.description).toContain('Reduce damage by');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', "stone'senduranceUses", 2, 'campaign');
+            expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'ability_use',
+                abilityName: "Stone's Endurance",
+            }));
+        });
+
+        it('returns info popup when no uses remaining', async () => {
+            makeUsesMock("stone'senduranceUses", 0);
+            const result = await handleStonesEnduranceDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('no uses remaining');
+        });
+    });
+
+    describe('handleStormsThunderDirect', () => {
+        const directAction = {
+            name: "Storm's Thunder",
+            automation: {
+                type: 'storms_thunder',
+                damage: '1d8',
+                damageType: 'Thunder',
+                range: '60_ft',
+                trigger: 'damage_received_within_range',
+                uses: 'proficiency_bonus',
+                recharge: 'long_rest',
+                casting_time: '1 reaction',
+            },
+        };
+
+        it('deals thunder damage as reaction', async () => {
+            makeUsesMock("storm'sthunderUses", 3);
+            resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+            const result = await handleStormsThunderDirect(directAction, makePlayerStats(), 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain("Storm's Thunder");
+            expect(result.payload.description).toContain('Thunder');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', "storm'sthunderUses", 2, 'campaign');
+            expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'roll',
+                rollType: 'damage',
+                targetName: 'Goblin',
+                damageType: 'Thunder',
+            }));
+        });
+
+        it('returns popup when no target', async () => {
+            makeUsesMock("storm'sthunderUses", 3);
+            resolveTarget.mockResolvedValue(null);
+
+            const result = await handleStormsThunderDirect(directAction, makePlayerStats(), 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('requires a target');
+        });
+
+        it('returns info popup when no uses remaining', async () => {
+            makeUsesMock("storm'sthunderUses", 0);
+            const result = await handleStormsThunderDirect(directAction, makePlayerStats(), 'campaign', 'map');
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('no uses remaining');
