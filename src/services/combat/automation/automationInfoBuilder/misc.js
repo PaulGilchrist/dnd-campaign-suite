@@ -811,6 +811,7 @@ export const miscHandlers = {
             uses: auto.uses || null,
             recharge: auto.recharge || 'long_rest',
             casting_time: auto.casting_time || '1 bonus action',
+            automation: auto,
             hasAutomation: true
         }
     },

@@ -60,7 +60,8 @@ const GIANT_OPTIONS = [
 ];
 
 function getRuntimeUsesKey(featureName) {
-    return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
+    const cleaned = featureName.toLowerCase().replace(/'/g, '');
+    return cleaned.replace(/ (\w)/g, (_, c) => c.toUpperCase()) + 'Uses';
 }
 
 function getOptionByName(name) {
@@ -135,29 +136,29 @@ export async function handleCloudsJauntDirect(action, playerStats, campaignName)
             payload: {
                 type: 'automation_info',
                 name: "Cloud's Jaunt",
-                description: "Cloud's Jaunt has no uses remaining. Recharges on a Long Rest.",
+                description: "Cloud's Jaunt has no uses remaining. Uses will reset on the next Long Rest.",
                 automation: action.automation,
             },
         };
     }
 
+    await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: "Cloud's Jaunt",
+        description: `${playerStats.name} used Cloud's Jaunt to teleport up to 30 feet to an unoccupied space they can see.`,
+    }).catch((e) => { console.error("[giantAncestry] Error:", e); });
+
     return {
-        type: 'modal',
-        modalName: 'teleport',
+        type: 'popup',
         payload: {
-            action: {
-                ...action,
-                name: "Cloud's Jaunt",
-                automation: {
-                    ...action.automation,
-                    type: 'teleport',
-                    effect: 'teleport',
-                    distance: '30 ft',
-                    range: '30_ft',
-                },
-            },
-            playerStats,
-            campaignName,
+            type: 'automation_info',
+            name: "Cloud's Jaunt",
+            automationType: 'teleport',
+            description: `Cloud's Jaunt: Teleported up to 30 feet to an unoccupied space they can see.`,
+            automation: action.automation,
         },
     };
 }
@@ -531,7 +532,8 @@ export async function handleDirectType(action, playerStats, campaignName, _mapNa
 }
 
 export async function handleCloudsJaunt(action, playerStats, campaignName, option) {
-    const usesKey = getRuntimeUsesKey(option.name);
+    const optName = (option?.name || action.name || "Cloud's Jaunt");
+    const usesKey = getRuntimeUsesKey(optName);
     const usesMax = playerStats.proficiency || 0;
     const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
 
@@ -540,36 +542,38 @@ export async function handleCloudsJaunt(action, playerStats, campaignName, optio
             type: 'popup',
             payload: {
                 type: 'automation_info',
-                name: option.name,
-                description: `${option.name} has no uses remaining. Recharges on a Short or Long Rest.`,
+                name: optName,
+                description: `${optName} has no uses remaining. Uses will reset on the next Long Rest.`,
                 automation: action.automation,
             },
         };
     }
 
+    await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: optName,
+        description: `${playerStats.name} used ${optName} to teleport up to 30 feet to an unoccupied space they can see.`,
+    }).catch((e) => { console.error("[giantAncestry] Error:", e); });
+
     return {
-        type: 'modal',
-        modalName: 'teleport',
+        type: 'popup',
         payload: {
-            action: {
-                ...action,
-                name: option.name,
-                automation: {
-                    ...action.automation,
-                    type: 'teleport',
-                    effect: 'teleport',
-                    distance: option.range.replace('_ft', ' ft') || '30 ft',
-                    range: option.range,
-                },
-            },
-            playerStats,
-            campaignName,
+            type: 'automation_info',
+            name: optName,
+            automationType: 'teleport',
+            description: `${optName}: Teleported up to 30 feet to an unoccupied space they can see.`,
+            automation: action.automation,
         },
     };
 }
 
 export async function handleFiresBurn(action, playerStats, campaignName, option) {
-    const usesKey = getRuntimeUsesKey(option.name);
+    const optName = (option?.name || action.name || "Fire's Burn");
+    const opt = option || action.automation;
+    const usesKey = getRuntimeUsesKey(optName);
     const usesMax = playerStats.proficiency || 0;
     const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
 
@@ -578,8 +582,8 @@ export async function handleFiresBurn(action, playerStats, campaignName, option)
             type: 'popup',
             payload: {
                 type: 'automation_info',
-                name: option.name,
-                description: `${option.name} has no uses remaining. Recharges on a Short or Long Rest.`,
+                name: optName,
+                description: `${optName} has no uses remaining. Recharges on a Long Rest.`,
                 automation: action.automation,
             },
         };
@@ -591,16 +595,16 @@ export async function handleFiresBurn(action, playerStats, campaignName, option)
             type: 'popup',
             payload: {
                 type: 'automation_info',
-                name: option.name,
-                description: `${option.name} requires a target. Select a creature in combat.`,
+                name: optName,
+                description: `${optName} requires a target. Select a creature in combat.`,
                 automation: action.automation,
             },
         };
     }
 
     const targetName = targetInfo.target.name;
-    const damageResult = rollExpression(option.damage);
-    const damageDisplay = damageResult ? damageResult.total : option.damage;
+    const damageResult = rollExpression(opt.damage);
+    const damageDisplay = damageResult ? damageResult.total : opt.damage;
 
     // Consume the use
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
@@ -609,29 +613,30 @@ export async function handleFiresBurn(action, playerStats, campaignName, option)
         type: 'roll',
         characterName: playerStats.name,
         rollType: 'damage',
-        name: option.name + ' Damage',
+        name: optName + ' Damage',
         targetName,
-        damageType: option.damageType,
+        damageType: opt.damageType,
         total: damageResult?.total ?? 0,
-        formula: option.damage,
+        formula: opt.damage,
         rolls: damageResult?.rolls,
-        description: `${playerStats.name} used ${option.name} to deal ${damageDisplay} ${option.damageType} damage to ${targetName}.`,
+        description: `${playerStats.name} used ${optName} to deal ${damageDisplay} ${opt.damageType} damage to ${targetName}.`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
-            name: option.name,
-            automationType: option.type,
-            description: `${option.name}: Dealt <strong>${damageDisplay}</strong> ${option.damageType} damage to ${targetName}.`,
+            name: optName,
+            automationType: opt.type,
+            description: `${optName}: Dealt <strong>${damageDisplay}</strong> ${opt.damageType} damage to ${targetName}.`,
             automation: action.automation,
         },
     };
 }
-
 export async function handleFrostsChill(action, playerStats, campaignName, option) {
-    const usesKey = getRuntimeUsesKey(option.name);
+    const optName = (option?.name || action.name || "Frost's Chill");
+    const opt = option || action.automation;
+    const usesKey = getRuntimeUsesKey(optName);
     const usesMax = playerStats.proficiency || 0;
     const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
 
@@ -640,8 +645,8 @@ export async function handleFrostsChill(action, playerStats, campaignName, optio
             type: 'popup',
             payload: {
                 type: 'automation_info',
-                name: option.name,
-                description: `${option.name} has no uses remaining. Recharges on a Short or Long Rest.`,
+                name: optName,
+                description: `${optName} has no uses remaining. Recharges on a Long Rest.`,
                 automation: action.automation,
             },
         };
@@ -653,27 +658,28 @@ export async function handleFrostsChill(action, playerStats, campaignName, optio
             type: 'popup',
             payload: {
                 type: 'automation_info',
-                name: option.name,
-                description: `${option.name} requires a target. Select a creature in combat.`,
+                name: optName,
+                description: `${optName} requires a target. Select a creature in combat.`,
                 automation: action.automation,
             },
         };
     }
 
     const targetName = targetInfo.target.name;
-    const damageResult = rollExpression(option.damage);
-    const damageDisplay = damageResult ? damageResult.total : option.damage;
+    const damageResult = rollExpression(opt.damage);
+    const damageDisplay = damageResult ? damageResult.total : opt.damage;
 
     // Consume the use
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
     // Apply speed reduction to target
+
     const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
     const speedEffect = {
         target: targetName,
-        source: option.name,
+        source: optName,
         effect: 'speed_reduction',
-        value: parseInt(option.value.replace('_ft', ''), 10) || 10,
+        value: parseInt(opt.value.replace('_ft', ''), 10) || 10,
         duration: 'until_end_of_next_turn',
     };
     await setRuntimeValue(campaignName, 'targetEffects', [...storedEffects, speedEffect], campaignName);
@@ -682,29 +688,30 @@ export async function handleFrostsChill(action, playerStats, campaignName, optio
         type: 'roll',
         characterName: playerStats.name,
         rollType: 'damage',
-        name: option.name + ' Damage',
+        name: optName + ' Damage',
         targetName,
-        damageType: option.damageType,
+        damageType: opt.damageType,
         total: damageResult?.total ?? 0,
-        formula: option.damage,
+        formula: opt.damage,
         rolls: damageResult?.rolls,
-        description: `${playerStats.name} used ${option.name} to deal ${damageDisplay} ${option.damageType} damage and reduce ${targetName}'s speed by 10 feet.`,
+        description: `${playerStats.name} used ${optName} to deal ${damageDisplay} ${opt.damageType} damage and reduce ${targetName}'s speed by 10 feet.`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
-            name: option.name,
-            automationType: option.type,
-            description: `${option.name}: Dealt <strong>${damageDisplay}</strong> ${option.damageType} damage to ${targetName}. Speed reduced by ${(parseInt(option.value.replace('_ft', ''), 10) || 10)} ft for 1 round.`,
+            name: optName,
+            automationType: opt.type,
+            description: `${optName}: Dealt <strong>${damageDisplay}</strong> ${opt.damageType} damage to ${targetName}. Speed reduced by ${(parseInt(opt.value.replace('_ft', ''), 10) || 10)} ft for 1 round.`,
             automation: action.automation,
         },
     };
 }
 
 export async function handleHillsTumble(action, playerStats, campaignName, option) {
-    const usesKey = getRuntimeUsesKey(option.name);
+    const optName = (option?.name || action.name || "Hill's Tumble");
+    const usesKey = getRuntimeUsesKey(optName);
     const usesMax = playerStats.proficiency || 0;
     const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
 
@@ -713,8 +720,8 @@ export async function handleHillsTumble(action, playerStats, campaignName, optio
             type: 'popup',
             payload: {
                 type: 'automation_info',
-                name: option.name,
-                description: `${option.name} has no uses remaining. Recharges on a Short or Long Rest.`,
+                name: optName,
+                description: `${optName} has no uses remaining. Recharges on a Long Rest.`,
                 automation: action.automation,
             },
         };
@@ -730,8 +737,8 @@ export async function handleHillsTumble(action, playerStats, campaignName, optio
             type: 'popup',
             payload: {
                 type: 'automation_info',
-                name: option.name,
-                description: `${option.name}: No target found. Use this after hitting a creature with a melee attack.`,
+                name: optName,
+                description: `${optName}: No target found. Use this after hitting a creature with a melee attack.`,
                 automation: action.automation,
             },
         };
@@ -747,24 +754,26 @@ export async function handleHillsTumble(action, playerStats, campaignName, optio
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,
-        abilityName: option.name,
-        description: `${playerStats.name} used ${option.name} to knock ${targetName} prone.`,
+        abilityName: optName,
+        description: `${playerStats.name} used ${optName} to knock ${targetName} prone.`,
     }).catch(() => {});
 
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
-            name: option.name,
-            automationType: option.type,
-            description: `${option.name}: Knocked <strong>${targetName}</strong> prone.`,
+            name: optName,
+            automationType: action.automation.type,
+            description: `${optName}: Knocked <strong>${targetName}</strong> prone.`,
             automation: action.automation,
         },
     };
 }
 
 export async function handleStonesEndurance(action, playerStats, campaignName, option) {
-    const usesKey = getRuntimeUsesKey(option.name);
+    const optName = (option?.name || action.name || "Stone's Endurance");
+    const opt = option || action.automation;
+    const usesKey = getRuntimeUsesKey(optName);
     const usesMax = playerStats.proficiency || 0;
     const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
 
@@ -773,15 +782,15 @@ export async function handleStonesEndurance(action, playerStats, campaignName, o
             type: 'popup',
             payload: {
                 type: 'automation_info',
-                name: option.name,
-                description: `${option.name} has no uses remaining. Recharges on a Short or Long Rest.`,
+                name: optName,
+                description: `${optName} has no uses remaining. Recharges on a Long Rest.`,
                 automation: action.automation,
             },
         };
     }
 
-    const reduction = evaluateAutoExpression(option.reductionExpression, playerStats);
-    const reductionDisplay = typeof reduction === 'number' ? String(reduction) : (reduction || option.reductionExpression);
+    const reduction = evaluateAutoExpression(opt.reductionExpression, playerStats);
+    const reductionDisplay = typeof reduction === 'number' ? String(reduction) : (reduction || opt.reductionExpression);
 
     // Consume the use
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
@@ -789,25 +798,26 @@ export async function handleStonesEndurance(action, playerStats, campaignName, o
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,
-        abilityName: option.name,
-        description: `${playerStats.name} used ${option.name} to reduce damage by ${reductionDisplay}.`,
+        abilityName: optName,
+        description: `${playerStats.name} used ${optName} to reduce damage by ${reductionDisplay}.`,
     });
 
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
-            name: option.name,
-            automationType: option.type,
-            description: `${option.name}: Reduce damage by <strong>${reductionDisplay}</strong>.`,
+            name: optName,
+            automationType: opt.type,
+            description: `${optName}: Reduce damage by <strong>${reductionDisplay}</strong>.`,
             automation: action.automation,
         },
     };
 }
 
 export async function handleStormsThunder(action, playerStats, campaignName, _mapName, option) {
-    const opt = option || getOptionByName("Storm's Thunder");
-    const usesKey = getRuntimeUsesKey(opt.name);
+    const optName = (option?.name || action.name || "Storm's Thunder");
+    const opt = option || action.automation;
+    const usesKey = getRuntimeUsesKey(optName);
     const usesMax = playerStats.proficiency || 0;
     const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
 
@@ -816,8 +826,8 @@ export async function handleStormsThunder(action, playerStats, campaignName, _ma
             type: 'popup',
             payload: {
                 type: 'automation_info',
-                name: opt.name,
-                description: `${opt.name} has no uses remaining. Recharges on a Short or Long Rest.`,
+                name: optName,
+                description: `${optName} has no uses remaining. Recharges on a Long Rest.`,
                 automation: action.automation,
             },
         };
@@ -829,8 +839,8 @@ export async function handleStormsThunder(action, playerStats, campaignName, _ma
             type: 'popup',
             payload: {
                 type: 'automation_info',
-                name: opt.name,
-                description: `${opt.name} requires a target. Select a creature in combat.`,
+                name: optName,
+                description: `${optName} requires a target. Select a creature in combat.`,
                 automation: action.automation,
             },
         };
@@ -848,22 +858,22 @@ export async function handleStormsThunder(action, playerStats, campaignName, _ma
         type: 'roll',
         characterName: playerStats.name,
         rollType: 'damage',
-        name: opt.name + ' Damage',
+        name: optName + ' Damage',
         targetName,
         damageType: opt.damageType,
         total: damageResult?.total ?? 0,
         formula: opt.damage,
         rolls: damageResult?.rolls,
-        description: `${playerStats.name} used ${opt.name} to deal ${damageDisplay} ${opt.damageType} damage to ${targetName} as a reaction.`,
+        description: `${playerStats.name} used ${optName} to deal ${damageDisplay} ${opt.damageType} damage to ${targetName} as a reaction.`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
-            name: opt.name,
+            name: optName,
             automationType: opt.type,
-            description: `${opt.name}: Dealt <strong>${damageDisplay}</strong> ${opt.damageType} damage to ${targetName}.`,
+            description: `${optName}: Dealt <strong>${damageDisplay}</strong> ${opt.damageType} damage to ${targetName}.`,
             automation: action.automation,
         },
     };
@@ -890,7 +900,7 @@ export async function confirmGiantAncestry(playerStats, chosenOption, campaignNa
         payload: {
             type: 'automation_info',
             name: 'Giant Ancestry',
-            description: `Selected ${chosenOption}. Uses equal to Proficiency Bonus. Recharges on a Short or Long Rest.`,
+            description: `Selected ${chosenOption}. Uses equal to Proficiency Bonus. Recharges on a Long Rest.`,
             automation: { type: 'resource_pool' },
         },
     };
