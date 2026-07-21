@@ -12,22 +12,27 @@ function HexAbilityModal({ onAbilitySelected, onCancel }) {
   ];
 
   return (
-    <div className="hex-ability-modal">
-      <div className="hex-ability-modal-content">
-        <h3 className="hex-ability-modal-title">Choose an ability for Hex</h3>
-        <div className="hex-ability-buttons">
-          {abilities.map(({ key, label }) => (
-            <button
-              key={key}
-              className="char-btn"
-              onClick={() => onAbilitySelected(key)}
-            >
-              {label} ({key})
-            </button>
-          ))}
+    <div className="sp-overlay" onClick={onCancel}>
+      <div className="sp-modal sp-modal--wide" onClick={(e) => e.stopPropagation()}>
+        <div className="sp-header">
+          <i className="fa-solid fa-eye"></i> Hex — Choose Ability
         </div>
-        <div className="hex-ability-modal-actions">
-          <button className="char-btn char-btn-secondary" onClick={onCancel}>
+        <div className="sp-body">
+          <p>Choose an ability check for the target to have disadvantage on:</p>
+          <div className="hex-ability-buttons">
+            {abilities.map(({ key, label }) => (
+              <button
+                key={key}
+                className="hex-ability-btn"
+                onClick={() => onAbilitySelected(key)}
+              >
+                {label} ({key})
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="sp-actions">
+          <button className="sp-dismiss-btn" onClick={onCancel}>
             <i className="fa-solid fa-times"></i> Cancel
           </button>
         </div>

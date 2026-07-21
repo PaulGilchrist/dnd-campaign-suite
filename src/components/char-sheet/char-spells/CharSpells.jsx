@@ -54,12 +54,10 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     const [pendingHexSpell, setPendingHexSpell] = React.useState(null);
 
     const handleHexAbilitySelected = (ability) => {
-      console.log('[Hex] handleHexAbilitySelected: ability=', ability, 'pendingHexSpell=', pendingHexSpell?.name);
       setShowHexAbilityModal(false);
       const spell = pendingHexSpell;
       setPendingHexSpell(null);
       if (spell) {
-        console.log('[Hex] calling handleSpellCast with hexAbility:', ability);
         handleSpellCast(spell, { hexAbility: ability });
       }
     };
@@ -118,7 +116,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         metamagic: [],
         spCost: 0,
         timestamp: Date.now(),
-      });
+      }).catch(() => {});
 
       pending.action({});
     }, [pendingSimpleMetamagic, playerStats, campaignName]);
@@ -141,7 +139,6 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     const { pendingUpcast, buildUpcastLevels, gateUpcast, handleUpcastConfirm, handleUpcastCancel, getCantripAutoLevel } = useSpellUpcastFlow(playerStats, campaignName);
 
     const handleSpellCast = React.useCallback(async (spell, metaCtx) => {
-        console.log('[Hex] handleSpellCast: spell=', spell.name, 'metaCtx=', JSON.stringify(metaCtx));
         setSelectedSpell(null);
         await resolveSpellPositions();
 

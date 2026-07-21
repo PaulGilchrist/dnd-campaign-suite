@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import Popup from '../common/popup.jsx'
 import MetamagicPopup from './popups/MetamagicPopup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
+import HexAbilityModal from './modals/HexAbilityModal.jsx'
 
 import { getCategories } from '../../services/character/featureCategories.js'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
@@ -25,6 +26,11 @@ import './CharActions.css'
 function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, characters, onAttackClick, onResolveSpellDamage, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo, setModalState }) {
     const { popupHtml, setPopupHtml } = useDiceRollPopup();
     const [selectedBonusSpell, setSelectedBonusSpell] = useState(null);
+    const [pendingHexSpell, setPendingHexSpell] = useState(null);
+
+    const handleHexCancel = React.useCallback(() => {
+      setPendingHexSpell(null);
+    }, []);
 
     const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
     const _activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName); (void _activeBuffs);
@@ -65,11 +71,26 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
     const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
 
     const handleBonusSpellCast = React.useCallback(async (spell, metaCtx) => {
+      if (spell.name === 'Hex') {
+        setPendingHexSpell(spell);
+        return;
+      }
       setSelectedBonusSpell(null);
 
       await resolveBonusSpellPositions();
       gateMetamagic(spell, metaCtx);
     }, [gateMetamagic, resolveBonusSpellPositions]);
+
+    const handleHexAbilitySelected = React.useCallback((hexAbility) => {
+      const spell = pendingHexSpell;
+      setPendingHexSpell(null);
+      if (spell) {
+        setSelectedBonusSpell(null);
+        resolveBonusSpellPositions().then(() => {
+          gateMetamagic(spell, { hexAbility });
+        });
+      }
+    }, [pendingHexSpell, gateMetamagic, resolveBonusSpellPositions]);
 
     const bonusActionAttacks = playerStats.attacks.filter((attack) => {
         if (attack.type !== 'Bonus Action') return false;
@@ -230,6 +251,13 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                         </div>
                     );
                 })()}
+
+                {pendingHexSpell && (
+                    <HexAbilityModal
+                        onAbilitySelected={handleHexAbilitySelected}
+                        onCancel={handleHexCancel}
+                    />
+                )}
 
             </div>
         );

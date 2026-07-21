@@ -661,6 +661,42 @@
     font-style: italic;
 }
 
+.log-damage {
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(255, 87, 34, 0.15);
+    color: #ff5722;
+}
+
+.log-save-dc {
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(255, 193, 7, 0.15);
+    color: #ffc107;
+}
+
+.log-concentration {
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(156, 39, 176, 0.15);
+    color: #9c27b0;
+}
+
+.log-targets {
+    font-size: 0.78rem;
+    color: #ffcc00;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: rgba(255, 204, 0, 0.1);
+}
+
 .log-metamagic-list {
     display: inline-flex;
     align-items: center;

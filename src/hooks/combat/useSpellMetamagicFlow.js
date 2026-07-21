@@ -237,13 +237,12 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
               addEntry(campaignName, {
                 type: 'spell',
                 characterName: playerStats.name,
+                targetName: secondTargetName,
                 spellName: spell.name,
                 spellLevel: spell.level || 0,
                 castingTime: spell.casting_time,
-                metamagic: ['Words of Creation'],
-                spCost: 0,
                 timestamp: Date.now(),
-              });
+              }).catch(() => {});
               const metaCtx = { multiTarget: secondTargetName };
               onExecute(spell, metaCtx);
               setSecondaryTargetModal(null);
@@ -255,10 +254,8 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
                 spellName: spell.name,
                 spellLevel: spell.level || 0,
                 castingTime: spell.casting_time,
-                metamagic: [],
-                spCost: 0,
                 timestamp: Date.now(),
-              });
+              }).catch(() => {});
               onExecute(spell, {});
               setSecondaryTargetModal(null);
             },
@@ -293,16 +290,6 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
           }
         }
       }
-      addEntry(campaignName, {
-        type: 'spell',
-        characterName: playerStats.name,
-        spellName: spell.name,
-        spellLevel: castSpell.level || 0,
-        castingTime: spell.casting_time,
-        metamagic: [],
-        spCost: 0,
-        timestamp: Date.now(),
-      });
       onExecute(castSpell, metaCtx);
       return;
     }
@@ -369,13 +356,14 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
     addEntry(campaignName, {
       type: 'spell',
       characterName: playerStats.name,
+      targetName: pending._metaCtx?.multiTarget || null,
       spellName: pending.spellName,
       spellLevel: pending.spellLevel || 0,
       castingTime: pending.castingTime,
       metamagic: metamagicOptions,
       spCost: totalCost,
       timestamp: Date.now(),
-    });
+    }).catch(() => {});
 
     const metaCtx = { ...pending._metaCtx };
     if (result?.options) {
@@ -406,7 +394,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
       metamagic: [],
       spCost: 0,
       timestamp: Date.now(),
-    });
+    }).catch(() => {});
 
     onExecute(pending.spell, {});
   }, [pendingMetamagic, playerStats.name, campaignName, onExecute, cfClearPending]);
@@ -417,16 +405,17 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
 
     cfClearPending('multiTarget');
 
+    const targets = pending.creatureTargets || [];
     addEntry(campaignName, {
       type: 'spell',
       characterName: playerStats.name,
+      targetName: targets[0] || null,
+      targets: targets,
       spellName: pending.spellName,
       spellLevel: pending.spellLevel || 0,
       castingTime: pending.castingTime,
-      metamagic: ['Words of Creation'],
-      spCost: 0,
       timestamp: Date.now(),
-    });
+    }).catch(() => {});
 
     const metaCtx = {};
     if (result?.secondTarget) {
@@ -442,16 +431,17 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
 
     cfClearPending('multiTarget');
 
+    const targets = pending.creatureTargets || [];
     addEntry(campaignName, {
       type: 'spell',
       characterName: playerStats.name,
+      targetName: targets[0] || null,
+      targets: targets,
       spellName: pending.spellName,
       spellLevel: pending.spellLevel || 0,
       castingTime: pending.castingTime,
-      metamagic: [],
-      spCost: 0,
       timestamp: Date.now(),
-    });
+    }).catch(() => {});
 
     onExecute(pending.spell, {});
   }, [pendingMultiTarget, playerStats, campaignName, onExecute, cfClearPending]);
@@ -464,9 +454,9 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
       null,
       result
     );
-  });
+  }, (pending) => pending.creatureTargets);
 
-  const handleAidSkip = createSkipHandler('aid');
+  const handleAidSkip = createSkipHandler('aid', (pending) => pending.creatureTargets);
 
   const handleHeroesFeastConfirm = createConfirmHandler('heroesFeast', async (pending, result) => {
     await applyHeroesFeastEffect(
@@ -476,9 +466,9 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
       null,
       result
     );
-  });
+  }, (pending) => pending.creatureTargets);
 
-  const handleHeroesFeastSkip = createSkipHandler('heroesFeast');
+  const handleHeroesFeastSkip = createSkipHandler('heroesFeast', (pending) => pending.creatureTargets);
 
   const handleGreaterRestorationConfirm = createConfirmHandler('greaterRestoration', async (pending, result) => {
     await confirmGreaterRestoration(
@@ -488,9 +478,9 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
       null,
       result
     );
-  });
+  }, (pending) => pending.creatureTargets);
 
-  const handleGreaterRestorationSkip = createSkipHandler('greaterRestoration');
+  const handleGreaterRestorationSkip = createSkipHandler('greaterRestoration', (pending) => pending.creatureTargets);
 
   const handleLesserRestorationConfirm = createConfirmHandler('lesserRestoration', async (pending, result) => {
     await applyLesserRestorationEffect(
@@ -500,9 +490,9 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
       null,
       result
     );
-  });
+  }, (pending) => pending.creatureTargets);
 
-  const handleLesserRestorationSkip = createSkipHandler('lesserRestoration');
+  const handleLesserRestorationSkip = createSkipHandler('lesserRestoration', (pending) => pending.creatureTargets);
 
   const handleRemoveCurseConfirm = createConfirmHandler('removeCurse', async (pending, result) => {
     await confirmRemoveCurse(
@@ -512,9 +502,9 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
       null,
       result
     );
-  });
+  }, (pending) => pending.creatureTargets);
 
-  const handleRemoveCurseSkip = createSkipHandler('removeCurse');
+  const handleRemoveCurseSkip = createSkipHandler('removeCurse', (pending) => pending.creatureTargets);
 
   const handleMageArmorConfirm = createConfirmHandler('mageArmor', async (pending, result) => {
     await applyMageArmorEffect(
@@ -524,9 +514,9 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
       null,
       result
     );
-  });
+  }, (pending) => pending.creatureTargets);
 
-  const handleMageArmorSkip = createSkipHandler('mageArmor');
+  const handleMageArmorSkip = createSkipHandler('mageArmor', (pending) => pending.creatureTargets);
 
   const handleShieldOfFaithConfirm = createConfirmHandler('shieldOfFaith', async (pending, result) => {
     await applyShieldOfFaithEffect(
@@ -536,9 +526,9 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
       null,
       result
     );
-  });
+  }, (pending) => pending.creatureTargets);
 
-  const handleShieldOfFaithSkip = createSkipHandler('shieldOfFaith');
+  const handleShieldOfFaithSkip = createSkipHandler('shieldOfFaith', (pending) => pending.creatureTargets);
 
   const handleProtectionFromEnergyConfirm = createConfirmHandler('protectionFromEnergy', async (pending, result) => {
     await applyProtectionFromEnergyHandler(
@@ -548,21 +538,21 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
       result.targetName,
       result.damageType
     );
-  });
+  }, (pending) => pending.creatureTargets);
 
-  const handleProtectionFromEnergySkip = createSkipHandler('protectionFromEnergy');
+  const handleProtectionFromEnergySkip = createSkipHandler('protectionFromEnergy', (pending) => pending.creatureTargets);
 
   const handleResistanceConfirm = createConfirmHandler('resistance', async (pending, result) => {
     await applyResistanceEffect(
       { name: pending.spellName, spell: pending.spell, automation: { type: 'damage_reduction', reductionExpression: '1d4', damageTypes: [], trigger: 'damage_taken_of_chosen_resistance_type' } },
       playerStats,
       campaignName,
-      result.targetName,
-      result.damageType
+      result.damageType,
+      result.targetName
     );
-  });
+  }, (pending) => pending.creatureTargets);
 
-  const handleResistanceSkip = createSkipHandler('resistance');
+  const handleResistanceSkip = createSkipHandler('resistance', (pending) => pending.creatureTargets);
 
   const handleMagicMissileConfirm = React.useCallback((result) => {
     const pending = pendingMagicMissile;

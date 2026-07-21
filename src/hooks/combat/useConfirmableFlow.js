@@ -12,7 +12,7 @@ export function useConfirmableFlow(playerStats, campaignName) {
 
   const getPending = useCallback((type) => pendingOps[type] || null, [pendingOps]);
 
-  const createConfirmHandler = useCallback((type, applyFn) => {
+  const createConfirmHandler = useCallback((type, applyFn, getTargets) => {
     return async (result) => {
       const pending = pendingOpsRef.current[type];
       if (!pending) return;
@@ -23,16 +23,17 @@ export function useConfirmableFlow(playerStats, campaignName) {
         return next;
       });
 
+      const targets = getTargets ? getTargets(pending, result) : null;
       addEntry(campaignName, {
         type: 'spell',
         characterName: playerStats.name,
+        targetName: targets?.[0] || null,
+        targets: targets,
         spellName: pending.spellName,
         spellLevel: pending.spellLevel || 0,
         castingTime: pending.castingTime,
-        metamagic: [],
-        spCost: 0,
         timestamp: Date.now(),
-      });
+      }).catch(() => {});
 
       if (applyFn) {
         await applyFn(pending, result);
@@ -40,7 +41,7 @@ export function useConfirmableFlow(playerStats, campaignName) {
     };
   }, [playerStats, campaignName]);
 
-  const createSkipHandler = useCallback((type) => {
+  const createSkipHandler = useCallback((type, getTargets) => {
     return () => {
       const pending = pendingOpsRef.current[type];
       if (!pending) return;
@@ -51,16 +52,17 @@ export function useConfirmableFlow(playerStats, campaignName) {
         return next;
       });
 
+      const targets = getTargets ? getTargets(pending, {}) : null;
       addEntry(campaignName, {
         type: 'spell',
         characterName: playerStats.name,
+        targetName: targets?.[0] || null,
+        targets: targets,
         spellName: pending.spellName,
         spellLevel: pending.spellLevel || 0,
         castingTime: pending.castingTime,
-        metamagic: [],
-        spCost: 0,
         timestamp: Date.now(),
-      });
+      }).catch(() => {});
     };
   }, [playerStats, campaignName]);
 

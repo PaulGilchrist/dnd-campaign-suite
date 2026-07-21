@@ -197,7 +197,19 @@ describe('executeSpellCast - Magic Missile', () => {
         services
       )
 
-      expect(logService.addEntry).not.toHaveBeenCalled()
+      expect(logService.addEntry).toHaveBeenCalledWith('testCampaign', {
+        type: 'spell',
+        characterName: 'TestWizard',
+        targetName: 'Target',
+        spellName: 'Magic Missile',
+        spellLevel: 1,
+        castingTime: '1 action',
+        damageType: 'Force',
+        damageFormula: '1d4 + 1',
+        saveDC: 17,
+        concentration: false,
+        timestamp: expect.any(Number),
+      })
       expect(applyDamage.applyDamageToTarget).not.toHaveBeenCalled()
     })
   })

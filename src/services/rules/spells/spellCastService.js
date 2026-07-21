@@ -200,6 +200,26 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         spellCastingMod = playerStats.spellAbilities.modifier || 0;
     }
 
+    // Generic spell cast log — fires for ALL spells with target and effect details
+    // (Hex has its own custom log below, skip it here to avoid duplicates)
+    if (spell.name !== 'Hex') {
+        const resolvedTarget = await getTargetInfo();
+        const resolvedTargetName = resolvedTarget?.name || null;
+        addEntry(campaignName, {
+          type: 'spell',
+          characterName: playerStats.name,
+          targetName: resolvedTargetName,
+          spellName: spell.name,
+          spellLevel: spell.level || 0,
+          castingTime: spell.casting_time,
+          damageType: damageType || null,
+          damageFormula: formula || null,
+          saveDC: spellSaveDc || null,
+          concentration: !!spell.concentration,
+          timestamp: Date.now(),
+        }).catch(() => {});
+    }
+
     if (spell.name.toLowerCase() === 'power word heal') {
         if (metaCtx?.multiTarget) {
             await applyPowerWordHealToTarget(metaCtx.multiTarget, playerStats, campaignName);
@@ -614,14 +634,12 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
 
     // Hunter's Mark: does not deal damage on cast — adds 1d6 Force damage to weapon attacks via concentration
     if (spell.name === "Hunter's Mark") {
-        addEntry(campaignName, { type: 'spell', characterName: playerStats.name, spellName: "Hunter's Mark", spellLevel: 1, castingTime: '1 bonus action' }).catch(() => {});
         return;
     }
 
     // Hex (2024): does not deal damage on cast — adds 1d6 Necrotic damage to weapon attacks via concentration
     if (spell.name === 'Hex') {
         const ability = metaCtx?.hexAbility || 'STR';
-        console.log('[Hex] executeSpellCast: metaCtx=', JSON.stringify(metaCtx), 'ability=', ability);
         const hexTarget = metaCtx?.targetName || (await getTargetInfo())?.name;
         applyHexEffects(spell, playerStats, campaignName, hexTarget, ability);
         const hasEldritchHex = playerStats.automation?.passives?.some(p => p.name === 'Eldritch Hex' && p.type === 'conditional_disadvantage');

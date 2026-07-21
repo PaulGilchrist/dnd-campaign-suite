@@ -119,11 +119,11 @@ describe('useSpellMetamagicFlow — handleMultiTarget', () => {
     expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
       type: 'spell',
       characterName: 'TestSorcerer',
+      targetName: 'Goblin A',
+      targets: ['Goblin A', 'Goblin B'],
       spellName: 'Word of Radiance',
       spellLevel: 3,
       castingTime: '1 Action',
-      metamagic: ['Words of Creation'],
-      spCost: 0,
       timestamp: expect.any(Number),
     });
     expect(onExecute).toHaveBeenCalledWith(spell, { multiTarget: 'Goblin B' });
@@ -147,6 +147,17 @@ describe('useSpellMetamagicFlow — handleMultiTarget', () => {
     });
 
     expect(onExecute).toHaveBeenCalledWith(spell, {});
+
+    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
+      type: 'spell',
+      characterName: 'TestSorcerer',
+      targetName: 'Goblin A',
+      targets: ['Goblin A', 'Goblin B'],
+      spellName: 'Word of Radiance',
+      spellLevel: 3,
+      castingTime: '1 Action',
+      timestamp: expect.any(Number),
+    });
     vi.clearAllMocks();
 
     // Skip
@@ -165,11 +176,11 @@ describe('useSpellMetamagicFlow — handleMultiTarget', () => {
     expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
       type: 'spell',
       characterName: 'TestSorcerer',
+      targetName: 'Goblin A',
+      targets: ['Goblin A', 'Goblin B'],
       spellName: 'Word of Radiance',
       spellLevel: 3,
       castingTime: '1 Action',
-      metamagic: [],
-      spCost: 0,
       timestamp: expect.any(Number),
     });
     expect(onExecute).toHaveBeenCalledWith(spell, {});
@@ -297,11 +308,11 @@ describe('useSpellMetamagicFlow — spell confirm handlers', () => {
       expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
         type: 'spell',
         characterName: 'TestSorcerer',
+        targetName: 'Goblin A',
+        targets: ['Goblin A', 'Goblin B'],
         spellName: config.name,
         spellLevel: config.level,
         castingTime: '1 Action',
-        metamagic: [],
-        spCost: 0,
         timestamp: expect.any(Number),
       });
       await config.verify(automation);
@@ -344,11 +355,11 @@ describe('useSpellMetamagicFlow — spell skip handlers', () => {
       expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
         type: 'spell',
         characterName: 'TestSorcerer',
+        targetName: 'Goblin A',
+        targets: ['Goblin A', 'Goblin B'],
         spellName: config.name,
         spellLevel: config.level,
         castingTime: '1 Action',
-        metamagic: [],
-        spCost: 0,
         timestamp: expect.any(Number),
       });
       expect(result.current[config.pendingKey]).toBeNull();
@@ -446,6 +457,7 @@ describe('useSpellMetamagicFlow — handleConfirm with psionic sorcery', () => {
     expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
       type: 'spell',
       characterName: 'TestSorcerer',
+      targetName: null,
       spellName: 'Mind Sliver',
       spellLevel: 2,
       castingTime: '1 Action',
@@ -472,6 +484,7 @@ describe('useSpellMetamagicFlow — handleConfirm with psionic sorcery', () => {
     expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
       type: 'spell',
       characterName: 'TestSorcerer',
+      targetName: null,
       spellName: 'Mind Sliver',
       spellLevel: 2,
       castingTime: '1 Action',
@@ -500,6 +513,7 @@ describe('useSpellMetamagicFlow — handleConfirm with psionic sorcery', () => {
     expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
       type: 'spell',
       characterName: 'TestSorcerer',
+      targetName: null,
       spellName: 'Fireball',
       spellLevel: 3,
       castingTime: '1 Action',

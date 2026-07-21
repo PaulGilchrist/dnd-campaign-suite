@@ -119,7 +119,7 @@ export function useActionSpellMetamagic({
             metamagic: metamagicOptions,
             spCost: totalCost,
             timestamp: Date.now(),
-        });
+        }).catch(() => {});
 
         const metaCtx = {};
         if (result?.options) {
@@ -165,7 +165,7 @@ export function useActionSpellMetamagic({
                 metamagic: [],
                 spCost: 0,
                 timestamp: Date.now(),
-            });
+            }).catch(() => {});
             const wasCrit = popupHtml?.isCrit;
             if (wasCrit && setPopupHtml) setPopupHtml(null);
             const rawResult = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);

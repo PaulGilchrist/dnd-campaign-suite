@@ -462,17 +462,28 @@ function DeathSaveEntry({ entry }) {
 
 function SpellEntry({ entry }) {
   const hasMetamagic = entry.metamagic && entry.metamagic.length > 0;
+  const hasTargets = entry.targets && entry.targets.length > 0;
+  const hasTarget = entry.targetName;
+  const hasDamage = entry.damageFormula && entry.damageType;
+  const hasSaveDC = entry.saveDC;
+  const isConcentration = entry.concentration;
+
   return (
     <div className="log-entry log-spell">
       <div className="log-entry-header">
         <span className="log-icon"><i className="fas fa-wand-magic-sparkles"></i></span>
         <span className="log-character">{entry.characterName}</span>
         <span className="log-name">Cast {entry.spellName}</span>
+        {hasTarget && <span className="log-target">→ {entry.targetName}</span>}
+        {hasTargets && <span className="log-targets">→ {entry.targets.join(', ')}</span>}
         <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
       </div>
       <div className="log-spell-details">
         <span className="log-spell-level">Level {entry.spellLevel}</span>
         <span className="log-spell-casting-time">{entry.castingTime}</span>
+        {hasDamage && <span className="log-damage">{entry.damageFormula} {entry.damageType}</span>}
+        {hasSaveDC && <span className="log-save-dc">Save DC {entry.saveDC}</span>}
+        {isConcentration && <span className="log-concentration"><i className="fas fa-link"></i> Concentration</span>}
         {hasMetamagic ? (
           <span className="log-metamagic-list">
             {entry.metamagic.map((opt, i) => (
