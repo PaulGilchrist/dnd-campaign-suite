@@ -225,9 +225,7 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         const restResult = await applyShortRest(playerStats, campaignName, { skipAutoRecovery: true });
 
         // Check if Celestial Resilience needs ally selection
-        console.log('[CR/rest-modal] restResult:', restResult ? JSON.stringify(restResult).slice(0, 300) : 'null');
         if (restResult?.celestialResilienceAllies) {
-            console.log('[CR/rest-modal] showing celestial resilience modal');
             setCelestialResilienceModal({
                 ...restResult.celestialResilienceAllies,
                 playerStats,

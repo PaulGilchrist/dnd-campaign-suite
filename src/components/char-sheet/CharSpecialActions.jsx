@@ -184,8 +184,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
     ];
 
     const handleAutomationClick = useCallback(async (action) => {
-        console.log('[CR/UI] handleAutomationClick START:', action?.name, 'mapName:', mapName, 'cannotAct:', cannotAct);
-        if (cannotAct) { console.log('[CR/UI] blocked by cannotAct'); return; }
+        if (cannotAct) return;
         const auto = action.automation;
         if (auto?.type === 'defensive_tactics') {
             const optionKey = `_${action.name.replace(/\s+/g, '_')}_choice`;
@@ -218,12 +217,9 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
             setAspectOfTheWildsModal(true);
             return;
         }
-        console.log('[CR/UI] calling executeHandler for:', action?.name, 'mapName:', mapName);
         const result = await executeHandler(action, playerStats, campaignName, mapName);
-        console.log('[CR/UI] executeHandler returned:', result ? JSON.stringify(result).slice(0, 300) : 'null');
         if (!result) return;
         if (result.type === 'modal') {
-            console.log('[CR/UI] modal result, modalName:', result.modalName);
             if (result.modalName === 'teleport') {
                 setTeleportModal(result.payload);
             } else if (result.modalName === 'signatureSpells') {
@@ -263,11 +259,9 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
             } else if (result.modalName === 'stepsOfTheFeyTaunt') {
                 setStepsOfTheFeyTauntModal(result.payload);
             } else if (result.modalName === 'celestialResilienceModal') {
-                console.log('[CR/UI] setting celestialResilienceModal state');
                 setCelestialResilienceModal({ ...result.payload, playerStats, campaignName });
             }
         } else if (result.type === 'popup') {
-            console.log('[CR/UI] popup result, description:', (result.payload?.description || '').slice(0, 100));
             const payload = result.payload;
             const name = payload?.name || action?.name || 'Automation';
             const description = payload?.description || '';
