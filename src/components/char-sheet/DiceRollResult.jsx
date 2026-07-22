@@ -311,6 +311,15 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
               </div>
             )}
 
+            {rollType === 'condition-save' && success !== undefined && (
+              <div className={`dice-roll-save-result ${success ? 'save-success' : 'save-failure'}`}>
+                {success ? '✓ SAVE SUCCESS' : '✗ SAVE FAILURE'} ({finalTotal} vs DC {dc})
+                <span className="dice-roll-save-detail"> (d20 {safeRolls[0] || 0} + {bonus})</span>
+                {mode === 'disadvantage' && <span className="dice-roll-save-detail"> [Disadvantage]</span>}
+                {mode === 'advantage' && <span className="dice-roll-save-detail"> [Advantage]</span>}
+              </div>
+            )}
+
             {resistanceNotice && (
               <div className="dice-roll-resistance">{resistanceNotice}</div>
             )}

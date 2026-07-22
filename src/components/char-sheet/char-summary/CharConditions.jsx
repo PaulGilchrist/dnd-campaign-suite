@@ -197,7 +197,11 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
   const hasConcentration = !!concentration
 
   if (!hasConditions && !hasExhaustion && !hasConcentration) {
-    return null
+    return popupHtml ? (
+      <Popup onClickOrKeyDown={() => setPopupHtml(null)}>
+        <DiceRollResult {...popupHtml} />
+      </Popup>
+    ) : null
   }
 
   return (
