@@ -576,6 +576,30 @@ describe('restRules', () => {
       expect(rollD20).not.toHaveBeenCalled()
     })
 
+    it('restores Arcane Ward HP to full for Abjurer on long rest', async () => {
+      const abjurerStats = makeStats({
+        class: { name: 'Wizard', subclass: { name: 'Abjuration' }, class_levels: [{ level: 5 }] },
+        abilities: [{ name: 'Intelligence', bonus: 3 }],
+        automation: { passives: [{ type: 'arcane_ward', name: 'Arcane Ward' }] },
+      })
+      await applyLongRest(abjurerStats, CAMPAIGN)
+
+      const wardMax = (2 * 5) + 3
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'arcaneWardActive', false, CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'arcaneWardHp', wardMax, CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'arcaneWardMax', wardMax, CAMPAIGN, true)
+    })
+
+    it('does not reset Arcane Ward for non-Abjurer wizard', async () => {
+      const evokerStats = makeStats({
+        class: { name: 'Wizard', subclass: { name: 'Evocation' }, class_levels: [{ level: 5 }] },
+        abilities: [{ name: 'Intelligence', bonus: 3 }],
+      })
+      await applyLongRest(evokerStats, CAMPAIGN)
+
+      expect(setRuntimeValue).not.toHaveBeenCalledWith('Test Hero', 'arcaneWardActive', false, CAMPAIGN, true)
+    })
+
     it('resets system features on long rest', async () => {
       await applyLongRest(makeStats(), CAMPAIGN)
 
@@ -587,10 +611,8 @@ describe('restRules', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith('WardTarget', 'bastionOfLawWardDice', [], CAMPAIGN, true)
       expect(setRuntimeValue).toHaveBeenCalledWith('WardTarget', 'bastionOfLawWardSource', null, CAMPAIGN, true)
 
-      // Arcane Ward
-      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'arcaneWardActive', false, CAMPAIGN, true)
-      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'arcaneWardHp', 0, CAMPAIGN, true)
-      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'arcaneWardMax', 0, CAMPAIGN, true)
+      // Arcane Ward - should NOT be called for non-Abjurer
+      expect(setRuntimeValue).not.toHaveBeenCalledWith('Test Hero', 'arcaneWardActive', false, CAMPAIGN, true)
 
       // Stonecunning
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'stonecunningUses', null, CAMPAIGN, true)

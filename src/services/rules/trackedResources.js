@@ -170,9 +170,9 @@ export function computeTrackedResources(playerStats) {
   const maxNR = isDruid ? Math.floor(playerStats.level / 2) : 0
   resources.naturalRecoverySlots = { current: maxNR, max: maxNR }
 
-  const isWizard = playerStats.class?.name === 'Wizard'
+  const hasArcaneWard = playerStats.automation?.passives?.some(p => p.type === 'arcane_ward')
   let maxWard = 0
-  if (isWizard) {
+  if (hasArcaneWard) {
     const intMod = playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus || 0
     maxWard = (2 * playerStats.level) + intMod
   }

@@ -668,10 +668,11 @@ const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
     }
 
     if ((wizardFeatures?.showWizardFeatures ?? true) === false) return null;
+    const wardMax = playerStats.class?.name === 'Wizard' ? (2 * playerStats.level) + (playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus || 0) : 0;
     return (
          <div data-testid="char-class-wizard">
               <TrackedResourceInput label="Arcane Recovery Levels" resourceKey="arcaneRecoveryLevels" playerName={playerStats.name} getMax={() => wizardFeatures?.arcaneRecoveryLevels || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-             <TrackedResourceInput label="Arcane Ward HP" resourceKey="arcaneWardHp" playerName={playerStats.name} getMax={() => playerStats._trackedResources?.arcaneWardMax?.current || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+             {wardMax > 0 && <TrackedResourceInput label="Arcane Ward HP" resourceKey="arcaneWardHp" playerName={playerStats.name} getMax={() => wardMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />}
              {portentPopup && <Popup html={portentPopup} onClickOrKeyDown={() => setPortentPopup(null)} />}
              {portentModal && (
                  <div className="portent-modal-overlay" onClick={() => setPortentModal(null)}>

@@ -169,14 +169,22 @@ const classRules = {
                    invocations
                };
            },
-           getWizardFeatures: (playerStats) => {
-                const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-                const arcaneRecoveryLevels = classLevel?.class_specific?.arcane_recovery_levels || 0;
-               return {
-                   arcaneRecoveryLevels,
-                   showWizardFeatures: true
-               };
-            },
+            getWizardFeatures: (playerStats) => {
+                 const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+                 const arcaneRecoveryLevels = classLevel?.class_specific?.arcane_recovery_levels || 0;
+                 const hasArcaneWard = (playerStats.automation?.passives ?? []).some(p => p.type === 'arcane_ward');
+                 let wardMax = 0;
+                 if (hasArcaneWard) {
+                     const intMod = playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus || 0;
+                     wardMax = (2 * playerStats.level) + intMod;
+                 }
+                return {
+                    arcaneRecoveryLevels,
+                    arcaneWard: hasArcaneWard,
+                    arcaneWardMax: wardMax,
+                    showWizardFeatures: true
+                };
+             },
              getMonkFeatures: () => {
                 return {
                     martialArtsDie: 4,

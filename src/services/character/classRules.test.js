@@ -398,7 +398,17 @@ describe('classRules', () => {
         class: { name: 'Wizard', class_levels: [{ level: 4, class_specific: { arcane_recovery_levels: 3 } }] },
         level: 4,
       };
-      expect(classRules.getWizardFeatures(playerStats)).toEqual({ arcaneRecoveryLevels: 3, showWizardFeatures: true });
+      expect(classRules.getWizardFeatures(playerStats)).toEqual({ arcaneRecoveryLevels: 3, arcaneWard: false, arcaneWardMax: 0, showWizardFeatures: true });
+    });
+
+    it('getWizardFeatures returns arcaneWard: true for Abjurer', () => {
+      const playerStats = {
+        class: { name: 'Wizard', subclass: { name: 'Abjuration' }, class_levels: [{ level: 4 }] },
+        level: 4,
+        abilities: [{ name: 'Intelligence', bonus: 3 }],
+        automation: { passives: [{ type: 'arcane_ward', name: 'Arcane Ward' }] },
+      };
+      expect(classRules.getWizardFeatures(playerStats)).toEqual({ arcaneRecoveryLevels: 0, arcaneWard: true, arcaneWardMax: 11, showWizardFeatures: true });
     });
 
     it('getMonkFeatures returns hardcoded values', () => {
