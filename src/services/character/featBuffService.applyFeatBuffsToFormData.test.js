@@ -77,7 +77,7 @@ describe('applyFeatBuffsToFormData', () => {
       const result = applyFeatBuffsToFormData(formData, []);
 
       expect(result.abilityScoreIncreases).toEqual([
-        { name: 'Strength', amount: 2, isChoice: false },
+        { name: 'Strength', amount: 2, isChoice: false, max_value: 20 },
       ]);
     });
 
@@ -299,7 +299,7 @@ describe('applyFeatBuffsToFormData', () => {
       const result = applyFeatBuffsToFormData(formData, []);
 
       expect(result.abilityScoreIncreases).toEqual([
-        { name: 'Strength', amount: 2, isChoice: false },
+        { name: 'Strength', amount: 2, isChoice: false, max_value: 20 },
       ]);
     });
 
@@ -316,7 +316,7 @@ describe('applyFeatBuffsToFormData', () => {
       const result = applyFeatBuffsToFormData(formData, []);
 
       expect(result.abilityScoreIncreases).toEqual([
-        { name: 'Strength', amount: 1, isChoice: false, description: '+1 STR' },
+        { name: 'Strength', amount: 1, isChoice: false, description: '+1 STR', max_value: 20 },
       ]);
     });
   });

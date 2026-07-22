@@ -20,7 +20,7 @@
     {
       "name": "Constitution",
       "baseScore": 15,
-      "featIncrease": 1,
+      "featIncrease": 2,
       "backgroundIncrease": 1,
       "miscIncrease": 0
     },
@@ -41,7 +41,7 @@
     {
       "name": "Charisma",
       "baseScore": 10,
-      "featIncrease": 1,
+      "featIncrease": 0,
       "backgroundIncrease": 0,
       "miscIncrease": 0
     }
@@ -62,7 +62,7 @@
     "Ability Score Improvement",
     "Tough",
     "Ability Score Improvement",
-    "Athlete"
+    "Boon Of Combat Prowess"
   ],
   "fightingStyles": [],
   "race": {
@@ -134,7 +134,7 @@
       "assignment": "Intelligence"
     },
     "Ability Score Improvement-1": {
-      "mode": "dual",
+      "mode": "single",
       "assignments": {
         "single": "Constitution",
         "dual": [
@@ -155,6 +155,9 @@
     },
     "Athlete-3": {
       "assignment": "Strength"
+    },
+    "Boon Of Combat Prowess-3": {
+      "assignment": "Intelligence"
     }
   }
 }

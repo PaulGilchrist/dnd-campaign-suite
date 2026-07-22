@@ -42,18 +42,34 @@ function CharFeats({ playerStats, showPopup }) {
     if (!playerStats.feats || playerStats.feats.length === 0) {
         return null;
     }
-    
+
+    const grouped = {};
+    const order = [];
+    for (const featName of playerStats.feats) {
+        if (!grouped[featName]) {
+            grouped[featName] = 0;
+            order.push(featName);
+        }
+        grouped[featName]++;
+    }
+
     return (
          <div className="char-feats-section">
               {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml(null)} />}
               <div className="feats-container">
                  <b>Feats: </b>
-                 {playerStats.feats.map((featName, index) => (
-                     <span key={index} className="feat-name clickable" onClick={() => handleFeatClick(featName)}>
-                         {featName}
-                         {index < playerStats.feats.length - 1 ? ', ' : ''}
-                     </span>
-                 ))}
+                 {order.map((featName, index) => {
+                     const count = grouped[featName];
+                     const displayName = count > 1 ? `${featName} * ${count}` : featName;
+                     return (
+                         <div key={featName}>
+                             {index > 0 && <span>, </span>}
+                             <span className="feat-name clickable" onClick={() => handleFeatClick(featName)}>
+                                 {displayName}
+                             </span>
+                         </div>
+                    );
+                 })}
              </div>
          </div>
      );

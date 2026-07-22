@@ -79,9 +79,11 @@ describe('computeAllFeatBuffs', () => {
     it('should aggregate buffs from multiple 5e feats', () => {
       findFeat
         .mockReturnValueOnce({
+          name: 'Tough',
           benefits: ['Increase your Strength score by 2'],
         })
         .mockReturnValueOnce({
+          name: 'Alert',
           benefits: ['You gain proficiency with shields'],
         });
 
@@ -91,7 +93,7 @@ describe('computeAllFeatBuffs', () => {
       );
 
       expect(result.abilityScoreIncreases).toEqual([
-        { name: 'Strength', amount: 2, isChoice: false, featName: 'Tough', featDescription: undefined },
+        { name: 'Strength', amount: 2, isChoice: false, featName: 'Tough', featDescription: undefined, max_value: 20 },
       ]);
       expect(result.proficiencies).toEqual([
         { name: 'shields' },
@@ -103,6 +105,7 @@ describe('computeAllFeatBuffs', () => {
     it('should aggregate multiple 2024 feat buffs', () => {
       findFeat
         .mockReturnValueOnce({
+          name: 'ASI Feat',
           benefits: [
             {
               type: 'ability_score_increase',
@@ -112,6 +115,7 @@ describe('computeAllFeatBuffs', () => {
           ability_score_increase: { scores: ['Strength'], amount: 1 },
         })
         .mockReturnValueOnce({
+          name: 'Prof Feat',
           benefits: [
             {
               type: 'proficiency',
@@ -135,6 +139,7 @@ describe('computeAllFeatBuffs', () => {
           description: '+1 STR',
           featName: 'ASI Feat',
           featDescription: undefined,
+          max_value: 20,
         },
       ]);
       expect(result.proficiencies).toEqual([
@@ -147,6 +152,7 @@ describe('computeAllFeatBuffs', () => {
   describe('5e ruleset', () => {
     it('should find and parse a single 5e feat with ability score increase', () => {
       findFeat.mockReturnValue({
+        name: 'Tough',
         benefits: ['Increase your Strength score by 2'],
       });
 
@@ -156,12 +162,13 @@ describe('computeAllFeatBuffs', () => {
       );
 
       expect(result.abilityScoreIncreases).toEqual([
-        { name: 'Strength', amount: 2, isChoice: false, featName: 'Tough', featDescription: undefined },
+        { name: 'Strength', amount: 2, isChoice: false, featName: 'Tough', featDescription: undefined, max_value: 20 },
       ]);
     });
 
     it('should parse ability score choice (OR pattern) in 5e', () => {
       findFeat.mockReturnValue({
+        name: 'Custom Feat',
         benefits: [
           'Increase your Strength or Dexterity score by 1',
         ],
@@ -173,13 +180,14 @@ describe('computeAllFeatBuffs', () => {
       );
 
       expect(result.abilityScoreIncreases).toEqual([
-        { name: 'Strength', amount: 1, isChoice: true, featName: 'Custom Feat', featDescription: undefined },
-        { name: 'Dexterity', amount: 1, isChoice: true, featName: 'Custom Feat', featDescription: undefined },
+        { name: 'Strength', amount: 1, isChoice: true, featName: 'Custom Feat', featDescription: undefined, max_value: 20 },
+        { name: 'Dexterity', amount: 1, isChoice: true, featName: 'Custom Feat', featDescription: undefined, max_value: 20 },
       ]);
     });
 
     it('should parse choose-one ability increase in 5e', () => {
       findFeat.mockReturnValue({
+        name: 'Custom Feat',
         benefits: [
           'Choose one ability score. Increase it by 1',
         ],
@@ -196,6 +204,9 @@ describe('computeAllFeatBuffs', () => {
           amount: 1,
           isChoice: true,
           description: 'Choose one ability score. Increase it by 1',
+          featName: 'Custom Feat',
+          featDescription: undefined,
+          max_value: 20,
         },
       ]);
     });
@@ -384,6 +395,7 @@ describe('computeAllFeatBuffs', () => {
   describe('2024 ruleset', () => {
     it('should parse single-score ability_score_increase in 2024', () => {
       findFeat.mockReturnValue({
+        name: 'Tough',
         benefits: [
           { type: 'ability_score_increase', description: '+1 STR' },
         ],
@@ -403,12 +415,14 @@ describe('computeAllFeatBuffs', () => {
           description: '+1 STR',
           featName: 'Tough',
           featDescription: undefined,
+          max_value: 20,
         },
       ]);
     });
 
     it('should parse two-score ability_score_increase as choice in 2024', () => {
       findFeat.mockReturnValue({
+        name: 'Custom Feat',
         benefits: [
           {
             type: 'ability_score_increase',
@@ -435,12 +449,14 @@ describe('computeAllFeatBuffs', () => {
           description: '+1 to two abilities',
           featName: 'Custom Feat',
           featDescription: undefined,
+          max_value: 20,
         },
       ]);
     });
 
     it('should parse variable amount ability_score_increase in 2024', () => {
       findFeat.mockReturnValue({
+        name: 'Custom Feat',
         benefits: [
           {
             type: 'ability_score_increase',
@@ -466,6 +482,7 @@ describe('computeAllFeatBuffs', () => {
           description: 'Variable increase',
           featName: 'Custom Feat',
           featDescription: undefined,
+          max_value: 20,
         },
       ]);
     });

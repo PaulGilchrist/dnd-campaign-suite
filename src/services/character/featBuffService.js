@@ -29,30 +29,35 @@ function parse5eBenefitText(text) {
 
   let match = text.match(ABILITY_OR_PATTERN);
   if (match) {
+    const maxVal = text.toLowerCase().includes('maximum of 30') || text.toLowerCase().includes('maximum of 30.') ? 30 : 20;
     buffs.abilityScoreIncreases.push(
-      { name: match[1], amount: parseInt(match[3], 10), isChoice: true },
-      { name: match[2], amount: parseInt(match[3], 10), isChoice: true }
+      { name: match[1], amount: parseInt(match[3], 10), isChoice: true, max_value: maxVal },
+      { name: match[2], amount: parseInt(match[3], 10), isChoice: true, max_value: maxVal }
     );
     return buffs;
   }
 
   match = text.match(ABILITY_PATTERN);
   if (match) {
+    const maxVal = text.toLowerCase().includes('maximum of 30') || text.toLowerCase().includes('maximum of 30.') ? 30 : 20;
     buffs.abilityScoreIncreases.push({
       name: match[1],
       amount: parseInt(match[2], 10),
       isChoice: text.includes(' or '),
+      max_value: maxVal,
     });
     return buffs;
   }
 
   match = text.match(ABILITY_CHOOSE_PATTERN);
   if (match) {
+    const maxVal = text.toLowerCase().includes('maximum of 30') || text.toLowerCase().includes('maximum of 30.') ? 30 : 20;
     buffs.abilityScoreIncreases.push({
       name: 'any',
       amount: parseInt(match[1], 10),
       isChoice: true,
       description: text,
+      max_value: maxVal,
     });
     return buffs;
   }
@@ -150,6 +155,7 @@ function parse2024Benefit(benefit, feat) {
   switch (benefit.type) {
     case 'ability_score_increase': {
       const asi = feat.ability_score_increase;
+      const maxVal = asi?.max_value || 20;
       if (asi && asi.scores) {
         if (asi.amount === 'variable') {
           buffs.abilityScoreIncreases.push({
@@ -157,6 +163,7 @@ function parse2024Benefit(benefit, feat) {
             amount: [1, 2],
             isChoice: true,
             description: benefit.description,
+            max_value: maxVal,
           });
         } else if (asi.scores.length > 2) {
           buffs.abilityScoreIncreases.push({
@@ -164,6 +171,7 @@ function parse2024Benefit(benefit, feat) {
             amount: Array.isArray(asi.amount) ? asi.amount : [asi.amount],
             isChoice: true,
             description: benefit.description,
+            max_value: maxVal,
           });
         } else if (asi.scores.length === 2) {
           const amount = typeof asi.amount === 'number' ? asi.amount : 1;
@@ -173,6 +181,7 @@ function parse2024Benefit(benefit, feat) {
             isChoice: true,
             scores: asi.scores,
             description: benefit.description,
+            max_value: maxVal,
           });
         } else {
           const amount = typeof asi.amount === 'number' ? asi.amount : 1;
@@ -182,6 +191,7 @@ function parse2024Benefit(benefit, feat) {
               amount,
               isChoice: false,
               description: benefit.description,
+              max_value: maxVal,
             });
           });
         }

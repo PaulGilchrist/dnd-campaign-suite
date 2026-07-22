@@ -239,6 +239,36 @@ function WizardStepAbilities({
 
   const hasFeatsWithChoices = featAbilityChoices.length > 0;
 
+  const effectiveAbilityScoreCap = useMemo(() => {
+    if (!allFeats || allFeats.length === 0 || !formData.feats || formData.feats.length === 0) {
+      return 20;
+    }
+
+    const ruleset = formData.rules || '5e';
+    let highestMaxValue = 20;
+
+    formData.feats.forEach(featName => {
+      const feat = typeof featName === 'object' ? featName.name : featName;
+      const foundFeat = allFeats.find(f => f.name === feat);
+      if (!foundFeat) return;
+
+      if (ruleset === '2024' && foundFeat.ability_score_increase) {
+        const maxVal = foundFeat.ability_score_increase.max_value;
+        if (maxVal && maxVal > highestMaxValue) {
+          highestMaxValue = maxVal;
+        }
+      } else if (ruleset === '5e' && foundFeat.description) {
+        const desc = foundFeat.description.toLowerCase();
+        const hasMax30 = desc.includes('maximum of 30') || desc.includes('maximum of 30.');
+        if (hasMax30) {
+          highestMaxValue = 30;
+        }
+      }
+    });
+
+    return highestMaxValue;
+  }, [allFeats, formData.feats, formData.rules]);
+
   return (
     <div className="wizard-step wizard-step-abilities wizard-step-4">
       <h2>Step 5: Ability Scores</h2>
@@ -247,7 +277,7 @@ function WizardStepAbilities({
         (Total points allowed: {pointsAllowed})
       </div>
       <div className="step-description">
-        Total score (base + feat + background + racial + misc) cannot exceed 20 for any ability.
+        Total score (base + feat + background + racial + misc) cannot exceed {effectiveAbilityScoreCap} for any ability.
       </div>
 
       {effectiveBackgroundAbilityChoices.length > 0 && (
@@ -430,9 +460,9 @@ function WizardStepAbilities({
                 />
                 {errors[`ability_${index}_miscIncrease`] && <span className="error-message">{errors[`ability_${index}_miscIncrease`]}</span>}
               </div>
-              <div className={`total-score ${totalScore > 20 ? 'error' : ''}`}>
+              <div className={`total-score ${totalScore > effectiveAbilityScoreCap ? 'error' : ''}`}>
                 Total: <strong>{totalScore}</strong>
-                {totalScore > 20 && <span className="error-message"> (max 20)</span>}
+                {totalScore > effectiveAbilityScoreCap && <span className="error-message"> (max {effectiveAbilityScoreCap})</span>}
               </div>
             </div>
           );

@@ -13,7 +13,7 @@
     "image": "",
     "imageName": "",
     "imagePath": "images/Elder Kito.png",
-    "armorClass": 18,
+    "armorClass": 30,
     "hitPoints": "45",
     "hitDice": "6d8",
     "initiativeBonus": "0",
