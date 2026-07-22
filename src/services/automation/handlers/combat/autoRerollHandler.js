@@ -9,8 +9,6 @@ import { getClassFeatures } from '../../../../services/character/classFeatures.j
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
-import { checkOncePerTurn, markOncePerTurn } from '../../common/oncePerTurn.js';
-
 async function handleAttackRoll(action, bonus, lastAttack, playerStats, campaignName, skipDamageRoll = false) {
     const auto = action.automation;
     if (!lastAttack || lastAttack.rollType !== 'attack') {
@@ -353,69 +351,6 @@ export async function handle(action, playerStats, campaignName, mapName) {
         }).catch((e) => { console.error("[autoReroll] Error:", e); });
 
         return result;
-    }
-
-    if (auto.effect === 'convert_miss_to_hit') {
-        if (auto.oncePerTurn) {
-            const skip = await checkOncePerTurn(action.name, '_fearlessAim_usedRound', campaignName);
-            if (skip) return skip;
-        }
-
-        const isAttack = lastAttack?.rollType === 'attack';
-        const isPlayerAttack = lastAttack?.attackerName === playerName;
-
-        if (!isAttack || !isPlayerAttack) {
-            return infoPopup(action.name, `No recent attack roll found for ${playerName}. This feature can only be used shortly after an attack roll.`, auto);
-        }
-
-        if (lastAttack.hit !== false) {
-            return infoPopup(action.name, `The last attack already hit — ${action.name} only works when you miss.`, auto);
-        }
-
-        if (auto.oncePerTurn) {
-            await markOncePerTurn(action.name, '_fearlessAim_usedRound', playerStats, campaignName);
-        }
-
-        const damageFormula = lastAttack.damageFormula;
-        if (damageFormula) {
-            const damageResult = rollExpression(damageFormula);
-            if (damageResult && damageResult.total > 0) {
-                const cs = await getCombatContext(campaignName);
-                const characters = [playerStats];
-                try {
-                    const appliedDmg = applyDamageToTarget(cs, lastAttack.targetName, damageResult.total, [lastAttack.damageType || 'unknown'], characters, false, playerName);
-                    if (appliedDmg) {
-                        addEntry(campaignName, {
-                            type: 'roll',
-                            characterName: playerName,
-                            rollType: 'damage',
-                            name: action.name,
-                            formula: damageFormula,
-                            rolls: damageResult.rolls,
-                            total: damageResult.total,
-                            modifier: damageResult.modifier,
-                            damageType: lastAttack.damageType || 'unknown',
-                            targetName: lastAttack.targetName,
-                            finalDamage: appliedDmg.finalDamage,
-                        }).catch((e) => { console.error("[autoReroll] Damage log error:", e); });
-                    }
-                } catch (e) {
-                    console.error('[autoReroll] applyDamageToTarget failed:', e);
-                }
-            }
-        }
-
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerName,
-            abilityName: action.name,
-            description: `${playerName} used ${action.name} to convert a miss into a hit.`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[autoReroll] Error:", e); });
-
-        return infoPopup(action.name, `<b>${action.name}</b><br/>` +
-            `d20(${lastAttack.d20}) + ${lastAttack.bonus} = ${lastAttack.d20 + lastAttack.bonus} vs AC ${lastAttack.targetAc || '—'} → <b>MISS</b><br/>` +
-            `<br/><i>Miss converted to hit!</i>`, auto);
     }
 
     if (auto.bonus != null) {

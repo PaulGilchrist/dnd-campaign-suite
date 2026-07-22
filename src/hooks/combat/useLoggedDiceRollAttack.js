@@ -407,7 +407,7 @@ export function createLogAndShow(deps) {
         }
         const isCrit = !isAutoMiss && (effectiveD20Roll === 20 || context?.isAutoCrit || rollsInCriticalRange) && (hit || rollsInCriticalRange);
 
-        const autoDamage = hit && context?.autoDamageFormula ? {
+        const autoDamage = context?.autoDamageFormula ? {
             name: context.autoDamageName || name,
             formula: context.autoDamageFormula,
             autoDamageSchool: context.autoDamageSchool,
@@ -542,6 +542,7 @@ export function createLogAndShow(deps) {
                 autoReroll: context?.autoReroll,
                 autoRerollBonus: context?.autoRerollBonus,
                 autoRerollCondition: context?.autoRerollCondition,
+                autoRerollForAttack: context?.autoRerollForAttack || context?.boonOfCombatProwess,
                 strSaveReplace: context?.strSaveReplace,
                 strScore: context?.strScore,
                 strCheckReplace: context?.strCheckReplace,

@@ -128,7 +128,6 @@ import { handle as handleStepOfTheWind } from './handlers/combat/stepOfTheWindHa
 import { handle as handleElementalAttunement } from './handlers/combat/elementalAttunementHandler.js';
 import { handle as handleElementalBurst } from './handlers/combat/elementalBurstHandler.js';
 import { handle as handleSteadyAim } from './handlers/class-fighter-rogue/steadyAimHandler.js';
-import { handle as handleStrokeOfLuck } from './handlers/class-fighter-rogue/strokeOfLuckHandler.js';
 import { handle as handleMageHandControl } from './handlers/class-fighter-rogue/mageHandControlHandler.js';
 import { handle as handleSpellThief } from './handlers/class-fighter-rogue/spellThiefHandler.js';
 import { handle as handlePsychicTeleportation } from './handlers/class-sorcerer/psychicTeleportationHandler.js';
@@ -392,7 +391,6 @@ const HANDLER_MAP = {
         patient_defense: handlePatientDefense,
         step_of_the_wind: handleStepOfTheWind,
         steady_aim: handleSteadyAim,
-        stroke_of_luck: handleStrokeOfLuck,
         mage_hand_control: handleMageHandControl,
         spell_thief: handleSpellThief,
         psychic_teleportation: handlePsychicTeleportation,

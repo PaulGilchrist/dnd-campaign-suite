@@ -501,6 +501,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const handleStrokeOfLuck = React.useCallback(() => {
         if (playerStats) {
             setRuntimeValue(playerStats.name, 'strokeOfLuckUsed', true, campaignName);
+            setRuntimeValue(playerStats.name, 'boonOfCombatProwessUsed', true, campaignName);
         }
     }, [playerStats, campaignName]);
 

@@ -82,7 +82,8 @@ export const SHORT_REST_RESOURCES = [
   'adrenalineRushUses',
   '_celestialRevelationUses',
   '_War_Gods_Blessing_active',
-  'spellthiefUses'
+  'spellthiefUses',
+  'strokeOfLuckUsed'
 ]
 
 export function getShortRestResources() {
@@ -161,7 +162,9 @@ export const LONG_REST_RESOURCES = [
     'healinglightPool',
     'searingvengeanceUses',
     'darkOnesLuckUses',
-    '_fiendishResilienceUsed'
+    '_fiendishResilienceUsed',
+    'boonOfCombatProwessUsed',
+    'strokeOfLuckUsed'
 ]
 
 export function getLongRestResources() {

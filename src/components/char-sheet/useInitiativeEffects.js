@@ -31,6 +31,10 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
                 updates.relentlessUsedRound = null;
             }
 
+            // Reset Boon of Combat Prowess and Stroke of Luck on initiative (new combat)
+            updates.boonOfCombatProwessUsed = null;
+            updates.strokeOfLuckUsed = null;
+
             if (!e.detail || !e.detail.characterName) return;
             const rollingName = utils.getName(e.detail.characterName);
             const myName = utils.getName(playerStats.name);

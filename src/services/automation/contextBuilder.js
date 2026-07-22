@@ -468,6 +468,18 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
         const strokeOfLuckUsed = hasStrokeOfLuck ? getRuntimeValue(playerName, 'strokeOfLuckUsed', campaignName) : false;
         const strokeOfLuckAvailable = hasStrokeOfLuck && !strokeOfLuckUsed;
 
+        // Boon of Combat Prowess: check if the player has auto_reroll for attacks (stored in actions/reactions, not passives)
+        const allAutomation = [
+            ...(playerStats.automation?.actions || []),
+            ...(playerStats.automation?.reactions || []),
+            ...(playerStats.automation?.passives || []),
+        ];
+        const hasBoonOfCombatProwess = allAutomation.some(
+            p => p.type === 'auto_reroll' && (p.effect === 'convert_miss_to_hit' || p.automation?.effect === 'convert_miss_to_hit')
+        );
+        const boonOfCombatProwessUsed = hasBoonOfCombatProwess ? getRuntimeValue(playerName, 'boonOfCombatProwessUsed', campaignName) : false;
+        const boonOfCombatProwessAvailable = hasBoonOfCombatProwess && !boonOfCombatProwessUsed;
+
         // Graze: check if the player has Graze weapon mastery for this weapon
         let grazeDamage = false;
         let grazeAbilityName = null;
@@ -556,6 +568,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             defensiveDuelistBonus,
             baitAndSwitchBonus,
             strokeOfLuck: strokeOfLuckAvailable,
+            boonOfCombatProwess: boonOfCombatProwessAvailable,
             boonOfFate: boonOfFateAvailable,
             isPsychicBlade: attack.isPsychicBlade === true,
             playerStats,

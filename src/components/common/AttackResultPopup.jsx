@@ -1,19 +1,28 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../services/ui/logService.js';
 import Popup from './popup.jsx';
 import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
 
-function AttackResultPopup({ popupHtml, onClose, campaignName, attackerName, setPopupHtml, onBeforeBiDefense, onAfterBiDefense, ...callbacks }) {
+function AttackResultPopup({ popupHtml, onClose, campaignName, attackerName, setPopupHtml, onBeforeBiDefense, onAfterBiDefense, onStrokeOfLuck, ...callbacks }) {
+  const [missToHitApplied, setMissToHitApplied] = useState(false);
+
   const handleDone = useCallback(() => {
-    if (popupHtml?.autoDamage && popupHtml?.hit) {
+    const hit = missToHitApplied || popupHtml?.hit;
+    if (popupHtml?.autoDamage && hit) {
       window.dispatchEvent(new CustomEvent('dice-roll-done', {
-        detail: { autoDamage: popupHtml.autoDamage, isCrit: popupHtml.isCrit, hit: popupHtml.hit },
+        detail: { autoDamage: popupHtml.autoDamage, isCrit: popupHtml.isCrit, hit: true },
       }));
     }
     if (onClose) onClose();
-  }, [popupHtml, onClose]);
+  }, [popupHtml, onClose, missToHitApplied]);
+
+  const handleMissToHit = useCallback(() => {
+    if (!popupHtml) return;
+    setMissToHitApplied(true);
+    if (onStrokeOfLuck) onStrokeOfLuck();
+  }, [popupHtml, onStrokeOfLuck]);
 
   const handleBardicInspirationDefense = useCallback(async (dieValue, dieSize, newAc, willMiss) => {
     if (!popupHtml) return;
@@ -63,8 +72,11 @@ function AttackResultPopup({ popupHtml, onClose, campaignName, attackerName, set
       ) : (
         <DiceRollResult
           {...popupHtml}
+          hit={missToHitApplied || popupHtml?.hit}
+          autoDamage={popupHtml?.autoDamage && (missToHitApplied || popupHtml?.hit) ? popupHtml.autoDamage : undefined}
           onBardicInspirationDefense={popupHtml?.bardicInspirationDefense ? handleBardicInspirationDefense : undefined}
-          onDone={popupHtml?.autoDamage && popupHtml?.hit ? handleDone : undefined}
+          onDone={popupHtml?.autoDamage && (popupHtml?.hit || missToHitApplied) ? handleDone : undefined}
+          onStrokeOfLuck={popupHtml?.strokeOfLuck || popupHtml?.autoRerollForAttack ? handleMissToHit : undefined}
           {...callbacks}
         />
       )}

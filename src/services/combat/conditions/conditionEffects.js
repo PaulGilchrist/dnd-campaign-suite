@@ -237,6 +237,8 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
         effects.autoRerollForSaves = true;
       } else if (mod.target === 'ability_check' || mod.target === 'check' || mod.target === 'd20') {
         effects.autoRerollForChecks = true;
+      } else if (mod.target === 'attack' || mod.target === 'attack_roll') {
+        effects.autoRerollForAttack = true;
       }
       effects.autoRerollCondition = mod.condition;
       if (mod.bonusExpression) {
@@ -356,6 +358,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     autoReroll: false,
     autoRerollForSaves: false,
     autoRerollForChecks: false,
+    autoRerollForAttack: false,
     autoRerollCondition: null,
     autoRerollBonus: null,
     strSaveReplace: false,
