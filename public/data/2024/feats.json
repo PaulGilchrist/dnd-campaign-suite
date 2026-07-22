@@ -345,14 +345,13 @@
                 "description": "When you or another creature within 60 feet of you succeeds on or fails a d20 Test, you can roll 2d4 and apply the total rolled as a bonus or penalty to the d20 roll. Once you use this benefit, you can't use it again until you roll Initiative or finish a Short or Long Rest.",
                 "type": "utility",
                 "automation": {
-                    "type": "buff_ally",
+                    "type": "modify_d20_roll",
                     "trigger": "d20_test_by_self_or_ally_in_60ft",
-                    "effect": "modify_d20_roll",
                     "modifier": "2d4",
                     "canBeBonusOrPenalty": true,
                     "range": "60 ft",
                     "recharge": "initiative_or_short_or_long_rest",
-                    "casting_time": "1 bonus action"
+                    "casting_time": "1 reaction"
                 }
             }
         ],

@@ -780,7 +780,13 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 result.reactions.push(info)
                 break
             case 'modify_d20_roll':
-                result.passives.push(info)
+                if (info.casting_time === '1 reaction' || info.casting_time === 'reaction') {
+                    result.reactions.push(info)
+                } else if (info.casting_time === '1 bonus action' || info.casting_time === 'bonus action') {
+                    result.bonusActions.push(info)
+                } else {
+                    result.passives.push(info)
+                }
                 break
             case 'spell_thief':
                 result.reactions.push(info)

@@ -345,6 +345,9 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
     }
   }
 
+  // Reset Boon of Fate (Epic Boon) on short rest
+  updates.boonOfFateUsed = false
+
   // Celestial Resilience: Grant temp HP on short rest for Celestial Patron
   let celestialResilienceAllies = null;
   if (playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron') {
@@ -688,6 +691,9 @@ export async function applyLongRest(playerStats, campaignName) {
 
     // Reset Relentless Endurance (Orc race trait) on long rest
     setRuntimeValue(name, 'relentlessEnduranceUsed', false, campaignName, true)
+
+    // Reset Boon of Fate (Epic Boon) on long rest
+    setRuntimeValue(name, 'boonOfFateUsed', false, campaignName, true)
 
     // Reset Signature Spells on long rest
     const selection = getRuntimeValue(name, 'SignatureSpells_selection', campaignName)

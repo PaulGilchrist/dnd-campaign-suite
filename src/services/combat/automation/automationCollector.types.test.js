@@ -235,7 +235,7 @@ describe('collectAutomationFromFeatures – passive types', () => {
         'naturally_stealthy', 'cantrip_spellcasting_ability',
         'dark_ones_blessing', 'dark_ones_luck',
         'superior_hunter_prey', 'stroke_of_luck',
-        'modify_d20_roll', 'supreme_sneak', 'save_proficiency',
+        'supreme_sneak', 'save_proficiency',
         'damage_type_choice', 'radiant_soul', 'hurl_through_hell',
         'create_thrall_temp_hp', 'sentinel', 'potent_cantrip',
         'soulstitch_spells', 'empowered_evocation', 'improved_illusions',
@@ -248,6 +248,28 @@ describe('collectAutomationFromFeatures – passive types', () => {
         const features = [makeFeature({ type })]
         const result = collectAutomationFromFeatures(features, ps)
         expect(result.passives).toHaveLength(1)
+    })
+})
+
+// ── Casting-time-conditional types ──
+
+describe('collectAutomationFromFeatures – casting_time-conditional types', () => {
+    it('categorizes modify_d20_roll with reaction casting_time as reaction', () => {
+        const features = [makeFeature({ type: 'modify_d20_roll', casting_time: '1 reaction' })]
+        const result = collectAutomationFromFeatures(features, ps)
+        expect(result.reactions).toHaveLength(1)
+    })
+
+    it('categorizes modify_d20_roll with bonus_action casting_time as bonus action', () => {
+        const features = [makeFeature({ type: 'modify_d20_roll', casting_time: '1 bonus action' })]
+        const result = collectAutomationFromFeatures(features, ps)
+        expect(result.bonusActions).toHaveLength(1)
+    })
+
+    it('categorizes modify_d20_roll without casting_time as reaction (default)', () => {
+        const features = [makeFeature({ type: 'modify_d20_roll' })]
+        const result = collectAutomationFromFeatures(features, ps)
+        expect(result.reactions).toHaveLength(1)
     })
 })
 

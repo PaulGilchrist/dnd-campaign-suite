@@ -6,6 +6,7 @@ import ArcaneWardRestoreModal from './modals/arcane/ArcaneWardRestoreModal.jsx'
 import BastionOfLawSpendModal from './modals/divine/BastionOfLawSpendModal.jsx'
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx'
 import BendFateModal from './modals/BendFateModal.jsx'
+import BoonFateModal from './modals/BoonFateModal.jsx'
 import StepsOfTheFeyTauntModal from './modals/StepsOfTheFeyTauntModal.jsx'
 import SearingVengeanceModal from './modals/SearingVengeanceModal.jsx'
 import { getReactionSpellNames } from '../../services/ui/spellSectionUtils.js'
@@ -231,6 +232,8 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                 setModalState({ bastionOfLawSpendModal: result.payload });
             } else if (result.modalName === 'bendFateChoice') {
                 setModalState({ bendFateModal: result.payload });
+            } else if (result.modalName === 'boonFateChoice') {
+                setModalState({ boonFateModal: result.payload });
             } else if (result.modalName === 'deflectRedirect') {
                 setModalState({ deflectRedirectModal: result.payload });
             } else if (result.modalName === 'stepsOfTheFeyTaunt') {
@@ -564,6 +567,12 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                 <BendFateModal
                     {...modalState.bendFateModal}
                     onClose={() => setModalState({ bendFateModal: null })}
+                />
+            )}
+            {modalState.boonFateModal && (
+                <BoonFateModal
+                    {...modalState.boonFateModal}
+                    onClose={() => setModalState({ boonFateModal: null })}
                 />
             )}
             {modalState.deflectRedirectModal && (

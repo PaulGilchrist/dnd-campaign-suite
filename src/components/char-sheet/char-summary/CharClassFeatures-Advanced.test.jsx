@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
-import { getRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getClassFeatures } from '../../../services/character/classFeatures.js';
 
 vi.mock('./TrackedResourceInput.jsx', () => ({

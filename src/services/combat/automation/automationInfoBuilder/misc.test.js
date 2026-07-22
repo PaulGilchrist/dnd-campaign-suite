@@ -455,7 +455,7 @@ describe('miscHandlers – modify_d20_roll', () => {
             range: '60 ft',
             canBeBonusOrPenalty: false,
             recharge: 'initiative_or_short_or_long_rest',
-            casting_time: '1 bonus action',
+            casting_time: '1 reaction',
             hasAutomation: true,
             name: 'Test Feature'
         })

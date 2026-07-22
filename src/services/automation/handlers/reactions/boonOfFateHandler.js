@@ -1,19 +1,11 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { addEntry } from '../../../ui/logService.js';
-import { findLastAttack } from '../../common/damageRollback.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { rollExpression } from '../../../dice/diceRoller.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
+import { applyD20Modifier } from './reactionBonusHandler.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
-function buildBoonOfFateDescription(action, d20, bonus, label, modifier) {
-    const originalTotal = d20 + bonus;
-    const newTotal = originalTotal + modifier;
-
-    const modifierLabel = modifier >= 0 ? `+${modifier}` : `${modifier}`;
-    let description = `<b>${action.name}</b><br/>`;
-    description += `${label}: d20(${d20}) + ${bonus} = ${originalTotal}`;
-    description += ` → ${modifierLabel}: d20(${d20}) + ${bonus} + ${modifierLabel} = <strong>${newTotal}</strong>`;
-
-    return description;
-}
+const RANGE_FT = 60;
 
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation;
@@ -25,28 +17,79 @@ export async function handle(action, playerStats, campaignName) {
         return infoPopup(action.name, `${action.name} has no uses remaining. Recharges on Initiative or Short or Long Rest.`, auto);
     }
 
-    const attackResult = await findLastAttack(campaignName);
-    const attackEvent = attackResult.attackEvent;
-    const attackFresh = attackEvent && attackResult.targetName === playerName;
+    const cs = await getCombatContext(campaignName);
+    const lastAttack = cs?.lastAttack || null;
 
-    if (!attackFresh) {
-        return infoPopup(action.name, `No recent D20 test found for ${playerName}. This feature can only be used shortly after a failed attack roll, ability check, or saving throw.`, auto);
+    if (!lastAttack) {
+        return infoPopup(action.name, `${action.name}: No recent D20 test found. This feature can only be used shortly after a creature rolls a d20.`, auto);
     }
 
-    const modifier = Math.floor(Math.random() * 4) + Math.floor(Math.random() * 4) + 1;
+    const attackerName = lastAttack.attackerName;
+    if (!attackerName) {
+        return infoPopup(action.name, `${action.name}: No attacker found in recent D20 test.`, auto);
+    }
 
-    const { d20, bonus, targetName } = attackEvent;
-    const description = buildBoonOfFateDescription(action, d20, bonus, `Attack vs AC ${targetName || 'unknown'}`, modifier);
+    const inRange = await isWithinRange(playerName, attackerName, RANGE_FT);
+    if (!inRange) {
+        return infoPopup(action.name, `${action.name}: ${attackerName} is out of range (must be within ${RANGE_FT} ft).`, auto);
+    }
 
-    await setRuntimeValue(playerName, boonKey, true, campaignName);
+    const roll2d4 = rollExpression('2d4');
+    if (!roll2d4) {
+        return infoPopup(action.name, `${action.name}: Roll failed.`, auto);
+    }
 
-    addEntry(campaignName, {
-        type: 'ability_use',
-        characterName: playerName,
-        abilityName: action.name,
-        description: `${playerName} used ${action.name} to add ${modifier} to a D20 test.`,
-        timestamp: Date.now(),
-    }).catch((e) => { console.error("[boonOfFate] Error:", e); });
+    const rollType = lastAttack.rollType || 'attack';
+    const isAttack = rollType === 'attack';
+    const isSave = rollType === 'save' || (rollType === 'attack' && lastAttack.saveDc != null && lastAttack.saveResult != null);
+    const isCheck = rollType === 'check' || rollType === 'skill';
 
-    return infoPopup(action.name, description, auto);
+    let eventLabel;
+    if (isAttack) {
+        eventLabel = `Attack by ${attackerName}`;
+    } else if (isCheck) {
+        eventLabel = `${lastAttack.checkName || 'Ability check'} by ${attackerName}`;
+    } else {
+        const saveLabel = lastAttack.saveType ? lastAttack.saveType.toUpperCase() : 'Save';
+        eventLabel = `${saveLabel} by ${attackerName}`;
+    }
+
+    const originalTotal = (lastAttack.d20 || 0) + (lastAttack.bonus || 0);
+    const hitStatus = isAttack && lastAttack.targetAc != null
+        ? (originalTotal >= lastAttack.targetAc ? 'Hit' : 'Miss')
+        : null;
+    const saveStatus = isSave && lastAttack.saveDc != null
+        ? (originalTotal >= lastAttack.saveDc ? 'Success' : 'Failure')
+        : null;
+
+    return {
+        type: 'modal',
+        modalName: 'boonFateChoice',
+        payload: {
+            action,
+            playerStats,
+            campaignName,
+            roll2d4,
+            lastAttack,
+            attackerName,
+            eventLabel,
+            hitStatus,
+            saveStatus,
+            isAttack,
+            isSave,
+            isCheck,
+        },
+    };
+}
+
+export async function applyBoonFateChoice(action, playerStats, campaignName, roll2d4, lastAttack, mode) {
+    const playerName = playerStats.name;
+    const diceValue = typeof roll2d4 === 'object' ? roll2d4.total : roll2d4;
+
+    await setRuntimeValue(playerName, 'boonOfFateUsed', true, campaignName);
+
+    return applyD20Modifier(action, playerName, campaignName, diceValue, lastAttack, mode, {
+        featureName: action.name || 'Improve Fate',
+        onSpent: () => {},
+    });
 }

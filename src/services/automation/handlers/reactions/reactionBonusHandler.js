@@ -112,16 +112,14 @@ async function handleBendFate(action, playerStats, campaignName, _mapName) {
     };
 }
 
-export async function applyBendFateChoice(action, playerStats, campaignName, d4Roll, lastAttack, mode) {
-    const playerName = playerStats.name;
-    const featureName = action.name || 'Bend Fate';
+export async function applyD20Modifier(action, playerName, campaignName, diceValue, lastAttack, mode, options) {
+    const featureName = options.featureName || 'Modify D20';
     const auto = action.automation;
 
     const d20 = lastAttack.d20 || 0;
     const bonus = lastAttack.bonus || 0;
     const originalTotal = d20 + bonus;
-    const d4Value = typeof d4Roll === 'object' ? d4Roll.total : d4Roll;
-    const modifier = mode === 'bonus' ? d4Value : -d4Value;
+    const modifier = mode === 'bonus' ? diceValue : -diceValue;
     const newTotal = originalTotal + modifier;
 
     const cs = await getCombatContext(campaignName);
@@ -139,17 +137,16 @@ export async function applyBendFateChoice(action, playerStats, campaignName, d4R
 
     if (isAttack && cs) {
         const targetAc = lastAttack.targetAc || lastAttack.effectiveAc;
-        const oldHit = (originalTotal >= targetAc);
-        const newHit = (newTotal >= targetAc);
+        const oldHit = lastAttack.hit ?? (targetAc != null ? originalTotal >= targetAc : null);
+        const newHit = targetAc != null ? newTotal >= targetAc : null;
 
         cs.lastAttack = {
             ...cs.lastAttack,
-            d20: newTotal - bonus,
             total: newTotal,
             hit: newHit,
             bendFateApplied: true,
             bendFateModifier: modifier,
-            bendFateD4: d4Value,
+            bendFateD4: diceValue,
             bendFateMode: mode,
             timestamp: Date.now(),
         };
@@ -170,7 +167,7 @@ export async function applyBendFateChoice(action, playerStats, campaignName, d4R
             if (damageFormula) {
                 const dmgResult = rollExpression(damageFormula);
                 if (dmgResult && dmgResult.total > 0) {
-                    const characters = [playerStats];
+                    const characters = [action._playerStats || { name: playerName }];
                     const appliedDmg = applyDamageToTarget(cs, targetName, dmgResult.total, [lastAttack.damageType || 'unknown'], campaignName, characters, false, attackerName);
                     if (appliedDmg) {
                         outcomeNote += ` Rolled ${appliedDmg.finalDamage} damage.`;
@@ -179,8 +176,10 @@ export async function applyBendFateChoice(action, playerStats, campaignName, d4R
             }
         } else if (oldHit && newHit) {
             outcomeNote = ' → The attack still hits.';
-        } else {
+        } else if (oldHit !== null && newHit !== null) {
             outcomeNote = ' → The attack still misses.';
+        } else {
+            outcomeNote = ' → No change in outcome.';
         }
     } else if (isSave && cs) {
         const saveDc = lastAttack.saveDc;
@@ -193,7 +192,7 @@ export async function applyBendFateChoice(action, playerStats, campaignName, d4R
             saveResult: newSuccess ? 'success' : 'failure',
             bendFateApplied: true,
             bendFateModifier: modifier,
-            bendFateD4: d4Value,
+            bendFateD4: diceValue,
             bendFateMode: mode,
             timestamp: Date.now(),
         };
@@ -228,7 +227,7 @@ export async function applyBendFateChoice(action, playerStats, campaignName, d4R
             total: newTotal,
             bendFateApplied: true,
             bendFateModifier: modifier,
-            bendFateD4: d4Value,
+            bendFateD4: diceValue,
             bendFateMode: mode,
             timestamp: Date.now(),
         };
@@ -236,7 +235,9 @@ export async function applyBendFateChoice(action, playerStats, campaignName, d4R
         outcomeNote = ` New total: ${newTotal}.`;
     }
 
-    spendSorceryPoints(playerName, 1, campaignName);
+    if (options.onSpent) {
+        options.onSpent();
+    }
 
     const logConditions = (arr, verb) => {
         if (arr.length === 0) return '';
@@ -247,18 +248,21 @@ export async function applyBendFateChoice(action, playerStats, campaignName, d4R
         type: 'ability_use',
         characterName: playerName,
         abilityName: featureName,
-        description: `${playerName} used ${featureName} on ${attackerName}. Rolled 1d4: ${d4Value}. Applied as ${mode}. ${attackerName}'s roll: d20(${d20}) + ${bonus} = ${originalTotal} → ${newTotal}. Outcome changed: ${outcomeNote.replace(' → ', '')}.${logConditions(conditionsAdded, 'Added')}${logConditions(conditionsRemoved, 'Removed')}`,
+        description: `${playerName} used ${featureName} on ${attackerName}. Dice: ${diceValue}. Applied as ${mode}. ${attackerName}'s roll: d20(${d20}) + ${bonus} = ${originalTotal} → ${newTotal}. Outcome: ${outcomeNote.replace(' → ', '')}.${logConditions(conditionsAdded, 'Added')}${logConditions(conditionsRemoved, 'Removed')}`,
         timestamp: Date.now(),
     }).catch((e) => { console.error(`[${featureName}] Error:`, e); });
 
     let description = `Target: ${attackerName}<br/>`;
-    description += `Rolled 1d4: <b>${d4Value}</b><br/>`;
+    description += `Rolled <b>${diceValue}</b><br/>`;
     description += `Applied as <b>${mode}</b>: <b>${modifierLabel}</b><br/><br/>`;
 
     if (isAttack) {
         const ac = lastAttack.targetAc || lastAttack.effectiveAc || '—';
         const hitStatus = (newTotal >= (lastAttack.targetAc || lastAttack.effectiveAc)) ? 'HIT' : 'MISS';
         description += `Attack: d20(${d20}) + ${bonus}${modifierLabel} = <strong>${newTotal}</strong> vs AC ${ac} → ${hitStatus}${outcomeNote}`;
+        if (lastAttack.targetAc == null && lastAttack.effectiveAc == null && lastAttack.hit) {
+            description += ` (Original was a hit)`;
+        }
     } else if (isSave) {
         const saveLabel = lastAttack.saveType ? lastAttack.saveType.toUpperCase() : 'Save';
         const dc = lastAttack.saveDc || '—';
@@ -275,6 +279,17 @@ export async function applyBendFateChoice(action, playerStats, campaignName, d4R
     }
 
     return infoPopup(featureName, description, auto);
+}
+
+export async function applyBendFateChoice(action, playerStats, campaignName, d4Roll, lastAttack, mode) {
+    const playerName = playerStats.name;
+    const d4Value = typeof d4Roll === 'object' ? d4Roll.total : d4Roll;
+    action._playerStats = playerStats;
+    return applyD20Modifier(action, playerName, campaignName, d4Value, lastAttack, mode, {
+        featureName: action.name || 'Bend Fate',
+        logDescription: `${playerName} used ${action.name || 'Bend Fate'}`,
+        onSpent: () => spendSorceryPoints(playerName, 1, campaignName),
+    });
 }
 
 async function handleAcBonus(action, playerStats, campaignName) {

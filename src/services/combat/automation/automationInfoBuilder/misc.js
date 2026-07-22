@@ -352,7 +352,7 @@ export const miscHandlers = {
             range: auto.range || '60 ft',
             canBeBonusOrPenalty: !!auto.canBeBonusOrPenalty,
             recharge: auto.recharge || 'initiative_or_short_or_long_rest',
-            casting_time: auto.casting_time || '1 bonus action',
+            casting_time: auto.casting_time || '1 reaction',
             hasAutomation: true
         }
     },
