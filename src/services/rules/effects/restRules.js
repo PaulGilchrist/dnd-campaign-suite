@@ -165,7 +165,9 @@ export const LONG_REST_RESOURCES = [
     'darkOnesLuckUses',
     '_fiendishResilienceUsed',
     'boonOfCombatProwessUsed',
-    'strokeOfLuckUsed'
+    'strokeOfLuckUsed',
+      '_boonOfEnergyResistanceUsedThisRest',
+      '_Energy_Resistances_chosenTypes'
 ]
 
 export function getLongRestResources() {
@@ -490,11 +492,11 @@ export async function applyLongRest(playerStats, campaignName) {
 
     charData.shortRestHitDice = playerStats.level
 
-     getLongRestResources().forEach((key) => {
-      charData[key] = null
-       })
+      getLongRestResources().forEach((key) => {
+       charData[key] = null
+        })
 
-   // Clear post-cast rider uses on long rest (e.g. Beguiling Magic)
+    // Clear post-cast rider uses on long rest (e.g. Beguiling Magic)
    const passives = playerStats.automation?.passives ?? []
    for (const p of passives) {
      if ((p.type === 'post_cast_rider' || (p.type === 'passive_rule' && p.riderSave)) && p.riderSave?.recharge === 'long_rest') {
@@ -674,6 +676,9 @@ export async function applyLongRest(playerStats, campaignName) {
     setRuntimeValue(name, 'epitomeEmpoweredUsedRound', null, campaignName, true)
     setRuntimeValue(name, 'destructiveStrideActive', null, campaignName, true)
     setRuntimeValue(name, 'destructiveStrideDamageType', null, campaignName, true)
+
+    // Reset Boon Of Energy Resistance chosen types on long rest
+    setRuntimeValue(name, '_Energy_Resistances_chosenTypes', null, campaignName, true)
 
     // Reset Undying Sentinel (Oath of Glory level 15) on long rest
     setRuntimeValue(name, 'undyingSentinelUsed', false, campaignName, true)

@@ -137,8 +137,8 @@ vi.mock('./modals/RevelationInFleshModal.jsx', () => ({
 vi.mock('./modals/ElementalAffinityModal.jsx', () => ({
   default: function TestModal() { return <div data-testid="elemental-affinity-modal">ElementalAffinityModal</div>; },
 }));
-vi.mock('./modals/FiendishResilienceModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="fiendish-resilience-modal">FiendishResilienceModal</div>; },
+vi.mock('./modals/SingleResistanceSelectionModal.jsx', () => ({
+  default: function TestModal() { return <div data-testid="single-resistance-selection-modal">SingleResistanceSelectionModal</div>; },
 }));
 vi.mock('./modals/shared/ChoiceListModal.jsx', () => ({
   ChoiceListModal: function TestModal() { return <div data-testid="choice-list-modal">ChoiceListModal</div>; },

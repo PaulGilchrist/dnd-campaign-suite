@@ -2,7 +2,7 @@
 // @improved-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import FiendishResilienceModal from './FiendishResilienceModal.jsx';
+import SingleResistanceSelectionModal from './SingleResistanceSelectionModal.jsx';
 
 // ── Mocked modules ──
 
@@ -65,7 +65,7 @@ async function clickApplyButton(buttonName) {
 
 // ── Tests ──
 
-describe('FiendishResilienceModal', () => {
+describe('SingleResistanceSelectionModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -74,18 +74,18 @@ describe('FiendishResilienceModal', () => {
 
   describe('initial render', () => {
     it('renders the modal overlay and content', () => {
-      render(<FiendishResilienceModal {...defaultProps} />);
+      render(<SingleResistanceSelectionModal {...defaultProps} />);
       expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
       expect(document.querySelector('.sp-modal')).toBeInTheDocument();
     });
 
     it('renders the header with the action name', () => {
-      render(<FiendishResilienceModal {...defaultProps} />);
+      render(<SingleResistanceSelectionModal {...defaultProps} />);
       expect(screen.getByText('Fiendish Resilience')).toBeInTheDocument();
     });
 
     it('renders the instruction paragraph for a new selection', () => {
-      render(<FiendishResilienceModal {...defaultProps} />);
+      render(<SingleResistanceSelectionModal {...defaultProps} />);
       expect(
         screen.getByText(/Choose one damage type/)
       ).toBeInTheDocument();
@@ -93,14 +93,14 @@ describe('FiendishResilienceModal', () => {
 
     it('renders the instruction paragraph with current type when existingType is set', () => {
       const actionWithExisting = { ...baseAction, existingType: 'Fire' };
-      render(<FiendishResilienceModal {...makeProps({ action: actionWithExisting })} />);
+      render(<SingleResistanceSelectionModal {...makeProps({ action: actionWithExisting })} />);
       expect(
         screen.getByText(/Change damage type \(currently Fire\)/)
       ).toBeInTheDocument();
     });
 
     it('renders radio options for each damage type', () => {
-      render(<FiendishResilienceModal {...defaultProps} />);
+      render(<SingleResistanceSelectionModal {...defaultProps} />);
       expect(screen.getByLabelText('Acid')).toBeInTheDocument();
       expect(screen.getByLabelText('Fire')).toBeInTheDocument();
       expect(screen.getByLabelText('Cold')).toBeInTheDocument();
@@ -108,47 +108,47 @@ describe('FiendishResilienceModal', () => {
 
     it('marks the existing type with "(current)" label when no selection is made', () => {
       const actionWithExisting = { ...baseAction, existingType: 'Fire' };
-      render(<FiendishResilienceModal {...makeProps({ action: actionWithExisting })} />);
+      render(<SingleResistanceSelectionModal {...makeProps({ action: actionWithExisting })} />);
       expect(screen.getByText('(current)')).toBeInTheDocument();
     });
 
     it('removes the "(current)" label after a type is selected', () => {
       const actionWithExisting = { ...baseAction, existingType: 'Fire' };
-      render(<FiendishResilienceModal {...makeProps({ action: actionWithExisting })} />);
+      render(<SingleResistanceSelectionModal {...makeProps({ action: actionWithExisting })} />);
       selectDamageType('Acid');
       expect(screen.queryByText('(current)')).not.toBeInTheDocument();
     });
 
     it('falls back to default damage types when automation is missing', () => {
-      render(<FiendishResilienceModal {...makeProps({ action: { name: 'Fiendish Resilience' } })} />);
+      render(<SingleResistanceSelectionModal {...makeProps({ action: { name: 'Fiendish Resilience' } })} />);
       DEFAULT_DAMAGE_TYPES.forEach(type => {
         expect(screen.getByLabelText(type)).toBeInTheDocument();
       });
     });
 
     it('falls back to default damage types when automation is an empty object', () => {
-      render(<FiendishResilienceModal {...makeProps({ action: { name: 'Fiendish Resilience', automation: {} } })} />);
+      render(<SingleResistanceSelectionModal {...makeProps({ action: { name: 'Fiendish Resilience', automation: {} } })} />);
       DEFAULT_DAMAGE_TYPES.forEach(type => {
         expect(screen.getByLabelText(type)).toBeInTheDocument();
       });
     });
 
     it('renders no radio options when damageTypes is an empty array', () => {
-      render(<FiendishResilienceModal {...makeProps({ action: { name: 'Fiendish Resilience', automation: { damageTypes: [] } } })} />);
+      render(<SingleResistanceSelectionModal {...makeProps({ action: { name: 'Fiendish Resilience', automation: { damageTypes: [] } } })} />);
       expect(document.querySelectorAll('input[type="radio"]').length).toBe(0);
     });
 
     it('renders only the provided damage types', () => {
-      render(<FiendishResilienceModal {...makeProps({ action: { name: 'Fiendish Resilience', automation: { damageTypes: ['Fire', 'Cold'] } } })} />);
+      render(<SingleResistanceSelectionModal {...makeProps({ action: { name: 'Fiendish Resilience', automation: { damageTypes: ['Fire', 'Cold'] } } })} />);
       expect(screen.getByLabelText('Fire')).toBeInTheDocument();
       expect(screen.getByLabelText('Cold')).toBeInTheDocument();
       expect(screen.queryByLabelText('Acid')).not.toBeInTheDocument();
     });
 
     it('does not have a selected option on initial render', () => {
-      render(<FiendishResilienceModal {...defaultProps} />);
+      render(<SingleResistanceSelectionModal {...defaultProps} />);
       expect(
-        document.querySelector('input[name="fiendishResilienceOption"]:checked')
+        document.querySelector('input[name="resistanceSelectionOption"]:checked')
       ).toBeNull();
     });
   });
@@ -157,16 +157,16 @@ describe('FiendishResilienceModal', () => {
 
   describe('radio selection', () => {
     it('selects a radio option when clicked', () => {
-      render(<FiendishResilienceModal {...defaultProps} />);
+      render(<SingleResistanceSelectionModal {...defaultProps} />);
       selectDamageType('Acid');
       expect(screen.getByLabelText('Acid')).toBeChecked();
     });
 
     it('allows selecting the existing type', () => {
       const actionWithExisting = { ...baseAction, existingType: 'Fire' };
-      render(<FiendishResilienceModal {...makeProps({ action: actionWithExisting })} />);
-      const fireRadio = document.querySelector('input[name="fiendishResilienceOption"][value="Fire"]') ||
-        [...document.querySelectorAll('input[name="fiendishResilienceOption"]')].find(input => {
+      render(<SingleResistanceSelectionModal {...makeProps({ action: actionWithExisting })} />);
+      const fireRadio = document.querySelector('input[name="resistanceSelectionOption"][value="Fire"]') ||
+        [...document.querySelectorAll('input[name="resistanceSelectionOption"]')].find(input => {
           const label = input.closest('label');
           return label && label.textContent.includes('Fire');
         });
@@ -179,29 +179,29 @@ describe('FiendishResilienceModal', () => {
 
   describe('buttons', () => {
     it('renders the apply button with correct text when no existing type', () => {
-      render(<FiendishResilienceModal {...defaultProps} />);
+      render(<SingleResistanceSelectionModal {...defaultProps} />);
       expect(screen.getByRole('button', { name: 'Choose Damage Type' })).toBeInTheDocument();
     });
 
     it('renders the apply button with correct text when existing type is set', () => {
       const actionWithExisting = { ...baseAction, existingType: 'Fire' };
-      render(<FiendishResilienceModal {...makeProps({ action: actionWithExisting })} />);
+      render(<SingleResistanceSelectionModal {...makeProps({ action: actionWithExisting })} />);
       expect(screen.getByRole('button', { name: 'Change Damage Type' })).toBeInTheDocument();
     });
 
     it('disables the apply button when no option is selected', () => {
-      render(<FiendishResilienceModal {...defaultProps} />);
+      render(<SingleResistanceSelectionModal {...defaultProps} />);
       expect(screen.getByRole('button', { name: 'Choose Damage Type' })).toBeDisabled();
     });
 
     it('enables the apply button when an option is selected', () => {
-      render(<FiendishResilienceModal {...defaultProps} />);
+      render(<SingleResistanceSelectionModal {...defaultProps} />);
       selectDamageType('Acid');
       expect(screen.getByRole('button', { name: 'Choose Damage Type' })).toBeEnabled();
     });
 
     it('renders the Cancel button', () => {
-      render(<FiendishResilienceModal {...defaultProps} />);
+      render(<SingleResistanceSelectionModal {...defaultProps} />);
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
   });
@@ -211,7 +211,7 @@ describe('FiendishResilienceModal', () => {
   describe('close behavior', () => {
     it('calls onClose when the Cancel button is clicked', () => {
       const onClose = vi.fn();
-      render(<FiendishResilienceModal {...makeProps({ onClose })} />);
+      render(<SingleResistanceSelectionModal {...makeProps({ onClose })} />);
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
       expect(onClose).toHaveBeenCalledTimes(1);
     });
@@ -226,7 +226,7 @@ describe('FiendishResilienceModal', () => {
           description: 'Fiendish Resilience: Acid selected. You gain resistance to Acid damage.',
         },
       });
-      render(<FiendishResilienceModal {...makeProps({ onClose })} />);
+      render(<SingleResistanceSelectionModal {...makeProps({ onClose })} />);
       selectDamageType('Acid');
       await clickApplyButton('Choose Damage Type');
       await waitFor(() => {
@@ -250,7 +250,7 @@ describe('FiendishResilienceModal', () => {
 
     it('calls applyTypeChoice with correct parameters on apply', async () => {
       fiendishResilienceHandler.applyTypeChoice.mockResolvedValue(mockSuccessResult);
-      render(<FiendishResilienceModal {...defaultProps} />);
+      render(<SingleResistanceSelectionModal {...defaultProps} />);
       selectDamageType('Acid');
       await clickApplyButton('Choose Damage Type');
       expect(fiendishResilienceHandler.applyTypeChoice).toHaveBeenCalledWith(
@@ -264,7 +264,7 @@ describe('FiendishResilienceModal', () => {
     it('calls applyTypeChoice with existingType when changing damage type', async () => {
       const actionWithExisting = { ...baseAction, existingType: 'Fire' };
       fiendishResilienceHandler.applyTypeChoice.mockResolvedValue(mockSuccessResult);
-      render(<FiendishResilienceModal {...makeProps({ action: actionWithExisting })} />);
+      render(<SingleResistanceSelectionModal {...makeProps({ action: actionWithExisting })} />);
       selectDamageType('Acid');
       await clickApplyButton('Change Damage Type');
       expect(fiendishResilienceHandler.applyTypeChoice).toHaveBeenCalledWith(
@@ -276,7 +276,7 @@ describe('FiendishResilienceModal', () => {
     });
 
     it('does not call applyTypeChoice when no option is selected', async () => {
-      render(<FiendishResilienceModal {...defaultProps} />);
+      render(<SingleResistanceSelectionModal {...defaultProps} />);
       await clickApplyButton('Choose Damage Type');
       expect(fiendishResilienceHandler.applyTypeChoice).not.toHaveBeenCalled();
     });
@@ -284,7 +284,7 @@ describe('FiendishResilienceModal', () => {
     it('passes playerStats to applyTypeChoice', async () => {
       const customPlayerStats = { name: 'Warlock2', level: 10, hitPoints: 50 };
       fiendishResilienceHandler.applyTypeChoice.mockResolvedValue(mockSuccessResult);
-      render(<FiendishResilienceModal {...makeProps({ playerStats: customPlayerStats })} />);
+      render(<SingleResistanceSelectionModal {...makeProps({ playerStats: customPlayerStats })} />);
       selectDamageType('Fire');
       await clickApplyButton('Choose Damage Type');
       expect(fiendishResilienceHandler.applyTypeChoice).toHaveBeenCalledWith(
@@ -297,7 +297,7 @@ describe('FiendishResilienceModal', () => {
 
     it('transitions to the result screen after successful apply', async () => {
       fiendishResilienceHandler.applyTypeChoice.mockResolvedValue(mockSuccessResult);
-      render(<FiendishResilienceModal {...defaultProps} />);
+      render(<SingleResistanceSelectionModal {...defaultProps} />);
       selectDamageType('Acid');
       await clickApplyButton('Choose Damage Type');
       await waitFor(() => {
@@ -321,7 +321,7 @@ describe('FiendishResilienceModal', () => {
 
     it('displays the result description from applyTypeChoice', async () => {
       fiendishResilienceHandler.applyTypeChoice.mockResolvedValue(mockResult);
-      render(<FiendishResilienceModal {...defaultProps} />);
+      render(<SingleResistanceSelectionModal {...defaultProps} />);
       selectDamageType('Acid');
       await clickApplyButton('Choose Damage Type');
       await waitFor(() => {
@@ -341,7 +341,7 @@ describe('FiendishResilienceModal', () => {
         },
       };
       fiendishResilienceHandler.applyTypeChoice.mockResolvedValue(htmlResult);
-      render(<FiendishResilienceModal {...defaultProps} />);
+      render(<SingleResistanceSelectionModal {...defaultProps} />);
       selectDamageType('Acid');
       await clickApplyButton('Choose Damage Type');
       await waitFor(() => {
@@ -362,7 +362,7 @@ describe('FiendishResilienceModal', () => {
         },
       };
       fiendishResilienceHandler.applyTypeChoice.mockResolvedValue(customResult);
-      render(<FiendishResilienceModal {...makeProps({ action: customAction })} />);
+      render(<SingleResistanceSelectionModal {...makeProps({ action: customAction })} />);
       selectDamageType('Fire');
       await clickApplyButton('Choose Damage Type');
       await waitFor(() => {
@@ -376,7 +376,7 @@ describe('FiendishResilienceModal', () => {
   describe('null result handling', () => {
     it('does not show result view when applyTypeChoice returns null', async () => {
       fiendishResilienceHandler.applyTypeChoice.mockResolvedValue(null);
-      render(<FiendishResilienceModal {...defaultProps} />);
+      render(<SingleResistanceSelectionModal {...defaultProps} />);
       selectDamageType('Acid');
       await clickApplyButton('Choose Damage Type');
       await waitFor(() => {
@@ -387,7 +387,7 @@ describe('FiendishResilienceModal', () => {
 
     it('does not show result view when applyTypeChoice returns undefined', async () => {
       fiendishResilienceHandler.applyTypeChoice.mockResolvedValue(undefined);
-      render(<FiendishResilienceModal {...defaultProps} />);
+      render(<SingleResistanceSelectionModal {...defaultProps} />);
       selectDamageType('Cold');
       await clickApplyButton('Choose Damage Type');
       await waitFor(() => {
@@ -401,12 +401,12 @@ describe('FiendishResilienceModal', () => {
 
   describe('edge cases', () => {
     it('renders without crashing when action is null', () => {
-      render(<FiendishResilienceModal {...makeProps({ action: null })} />);
-      expect(screen.getByText('Fiendish Resilience')).toBeInTheDocument();
+      render(<SingleResistanceSelectionModal {...makeProps({ action: null })} />);
+      expect(screen.getByText('Resistance Selection')).toBeInTheDocument();
     });
 
     it('renders default damage types when action is null and falls back', () => {
-      render(<FiendishResilienceModal {...makeProps({ action: null })} />);
+      render(<SingleResistanceSelectionModal {...makeProps({ action: null })} />);
       DEFAULT_DAMAGE_TYPES.forEach(type => {
         expect(screen.getByLabelText(type)).toBeInTheDocument();
       });

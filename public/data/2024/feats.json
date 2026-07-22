@@ -269,7 +269,7 @@
                 "description": "You gain Resistance to two of the following damage types of your choice: Acid, Cold, Fire, Lightning, Necrotic, Poison, Psychic, Radiant, or Thunder. Whenever you finish a Long Rest, you can change your choices.",
                 "type": "resistance",
                 "automation": {
-                    "type": "passive_buff",
+                    "type": "boon_of_energy_resistance",
                     "effect": "damage_resistance",
                     "resistanceType": [
                         "player_choice_2_from_list"
@@ -286,7 +286,7 @@
                         "Thunder"
                     ],
                     "recharge": "long_rest",
-                    "casting_time": "1 action"
+                    "casting_time": "passive"
                 }
             },
             {

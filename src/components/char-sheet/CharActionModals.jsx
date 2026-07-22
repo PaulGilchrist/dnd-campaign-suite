@@ -36,7 +36,7 @@ import StepsOfTheFeyTauntModal from './modals/StepsOfTheFeyTauntModal.jsx'
 import BonusActionChoiceModal from './modals/shared/BonusActionChoiceModal.jsx'
 import RevelationInFleshModal from './modals/RevelationInFleshModal.jsx'
 import ElementalAffinityModal from './modals/ElementalAffinityModal.jsx'
-import FiendishResilienceModal from './modals/FiendishResilienceModal.jsx'
+import SingleResistanceSelectionModal from './modals/SingleResistanceSelectionModal.jsx'
 import DragonCompanionModal from './modals/DragonCompanionModal.jsx'
 import WildMagicSurgeModal from './modals/WildMagicSurgeModal.jsx'
 import BendFateModal from './modals/BendFateModal.jsx'
@@ -655,7 +655,7 @@ export default function CharActionModals({
                 />
             )}
             {mergedModalState.fiendishResilienceModal && (
-                <FiendishResilienceModal
+                <SingleResistanceSelectionModal
                     {...mergedModalState.fiendishResilienceModal}
                     onClose={() => setModalState({ fiendishResilienceModal: null })}
                 />

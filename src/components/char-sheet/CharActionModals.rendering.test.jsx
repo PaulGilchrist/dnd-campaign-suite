@@ -127,8 +127,8 @@ vi.mock('./modals/RevelationInFleshModal.jsx', () => ({
 vi.mock('./modals/ElementalAffinityModal.jsx', () => ({
   default: function TestModal() { return <div data-testid="elemental-affinity-modal">ElementalAffinityModal</div>; },
 }));
-vi.mock('./modals/FiendishResilienceModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="fiendish-resilience-modal">FiendishResilienceModal</div>; },
+vi.mock('./modals/SingleResistanceSelectionModal.jsx', () => ({
+  default: function TestModal() { return <div data-testid="single-resistance-selection-modal">SingleResistanceSelectionModal</div>; },
 }));
 vi.mock('./modals/shared/ChoiceListModal.jsx', () => ({
   ChoiceListModal: function TestModal() { return <div data-testid="choice-list-modal">ChoiceListModal</div>; },
@@ -275,7 +275,7 @@ describe('CharActionModals', () => {
       { name: 'bonus-action-choice', prop: 'bonusActionChoiceModal', payload: {}, testid: 'bonus-action-choice-modal' },
       { name: 'revelation-in-flesh', prop: 'revelationInFleshModal', payload: {}, testid: 'revelation-in-flesh-modal' },
       { name: 'elemental-affinity', prop: 'elementalAffinityModal', payload: {}, testid: 'elemental-affinity-modal' },
-      { name: 'fiendish-resilience', prop: 'fiendishResilienceModal', payload: {}, testid: 'fiendish-resilience-modal' },
+      { name: 'fiendish-resilience', prop: 'fiendishResilienceModal', payload: {}, testid: 'single-resistance-selection-modal' },
       { name: 'dragon-companion', prop: 'dragonCompanionModal', payload: {}, testid: 'dragon-companion-modal' },
        { name: 'wild-magic-surge', prop: 'wildMagicSurgeModal', payload: { surgeTable: [], mode: 'roll' }, testid: 'wild-magic-surge-modal' },
        { name: 'third-eye', prop: 'thirdEyeModal', payload: { action: {}, playerStats: {}, campaignName: 'test' }, testid: 'third-eye-modal' },

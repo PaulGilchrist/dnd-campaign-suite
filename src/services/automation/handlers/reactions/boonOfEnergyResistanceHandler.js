@@ -1,4 +1,5 @@
 import { setChosenRuntimeValue, getChosenRuntimeValue } from '../../common/choiceStorage.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 
 const ENERGY_TYPES = [
@@ -11,24 +12,22 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const name = action.name;
 
     const chosenTypes = getChosenRuntimeValue(playerStats, name, 'chosenTypes', campaignName);
+    const hasUsedThisRest = getRuntimeValue(playerStats.name, '_boonOfEnergyResistanceUsedThisRest');
 
-    const validTypes = auto.validTypes || ENERGY_TYPES;
-    const maxSelections = auto.count || 2;
-
-    if (chosenTypes && chosenTypes.length > 0) {
+    if (chosenTypes && chosenTypes.length > 0 && hasUsedThisRest) {
         return {
-            type: 'modal',
-            modalName: 'boonOfEnergyResistance',
+            type: 'popup',
             payload: {
-                action,
-                playerStats,
-                campaignName,
-                damageTypes: validTypes,
-                existingTypes: chosenTypes,
-                maxSelections,
+                type: 'automation_info',
+                name,
+                description: `Already changed this rest. You can change again after a Long Rest.`,
+                automation: auto,
             },
         };
     }
+
+    const validTypes = auto.validTypes || ENERGY_TYPES;
+    const maxSelections = auto.count || 2;
 
     return {
         type: 'modal',
@@ -38,6 +37,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             playerStats,
             campaignName,
             damageTypes: validTypes,
+            existingTypes: chosenTypes || undefined,
             maxSelections,
         },
     };
@@ -57,6 +57,10 @@ export async function applyTypeChoice(action, playerStats, campaignName, chosenT
     const isChange = existingTypes && existingTypes.length > 0 && JSON.stringify(existingTypes.sort()) !== JSON.stringify([...filtered].sort());
 
     await setChosenRuntimeValue(playerStats, name, filtered, 'chosenTypes', campaignName);
+
+    if (isChange) {
+        setRuntimeValue(playerStats.name, '_boonOfEnergyResistanceUsedThisRest', true, campaignName);
+    }
 
     addEntry(campaignName, {
         type: 'ability_use',

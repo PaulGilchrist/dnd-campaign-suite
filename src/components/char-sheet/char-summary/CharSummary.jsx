@@ -241,6 +241,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
 
     const epitomeResistanceType = getRuntimeValue(playerStats.name, 'epitomeResistanceType', campaignName);
     const fiendishResilienceType = getRuntimeValue(playerStats.name, '_Fiendish_Resilience_chosenType', campaignName);
+    const boonEnergyResistanceTypes = useRuntimeValue(playerStats.name, '_Energy_Resistances_chosenTypes', campaignName) || [];
 
     const rageActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Rage');
     const rageConditionalImmunities = rageActive
@@ -252,7 +253,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const automationImmunities = playerStats.automationConditionImmunities || [];
     const allImmunities = [...new Set([...baseImmunities, ...auraImmunities, ...automationImmunities, ...rageConditionalImmunities])];
 
-    const allResistances = [...new Set([...baseResistances, ...auraResistances, ...stormbornResistancesActive, ...rageResistances, ...wildHeartResistances, ...rageOfTheGodsResistances, ...superiorDefenseResistances, ...(epitomeResistanceType ? [epitomeResistanceType] : []), ...(fiendishResilienceType ? [fiendishResilienceType] : [])])];
+    const allResistances = [...new Set([...baseResistances, ...auraResistances, ...stormbornResistancesActive, ...rageResistances, ...wildHeartResistances, ...rageOfTheGodsResistances, ...superiorDefenseResistances, ...(epitomeResistanceType ? [epitomeResistanceType] : []), ...(fiendishResilienceType ? [fiendishResilienceType] : []), ...boonEnergyResistanceTypes])];
 
     let flySpeed = null;
     let hasFlySpeedBuff = false;

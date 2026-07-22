@@ -50,7 +50,7 @@
   "class": {
     "name": "Monk",
     "subclass": {
-      "name": "Warrior of Mercy",
+      "name": "Warrior of the Elements",
       "type": ""
     },
     "divineOrder": "",
@@ -108,6 +108,9 @@
     "3 from: Artisan's Tools"
   ],
   "featAbilityChoices": {
-    "0": "Intelligence"
+    "0": "Intelligence",
+    "Fey Touched-0": {
+      "assignment": "Intelligence"
+    }
   }
 }

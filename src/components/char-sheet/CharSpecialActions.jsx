@@ -24,7 +24,9 @@ import ResourcePoolModal from './modals/ResourcePoolModal.jsx';
 import NaturalRecoveryModal from './modals/NaturalRecoveryModal.jsx';
 import CircleOfTheLandSpellsModal from './modals/CircleOfTheLandSpellsModal.jsx';
 import ElementalAffinityModal from './modals/ElementalAffinityModal.jsx';
-import FiendishResilienceModal from './modals/FiendishResilienceModal.jsx';
+import SingleResistanceSelectionModal from './modals/SingleResistanceSelectionModal.jsx';
+import MultiResistanceSelectionModal from './modals/MultiResistanceSelectionModal.jsx';
+import { applyTypeChoice as applyBoonOfEnergyResistance } from '../../services/automation/handlers/reactions/boonOfEnergyResistanceHandler.js';
 import WildMagicSurgeModal from './modals/WildMagicSurgeModal.jsx';
 import StrideOfTheElementsModal from './modals/StrideOfTheElementsModal.jsx';
 import ElementalEpitomeModal from './modals/ElementalEpitomeModal.jsx';
@@ -64,6 +66,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
     const [quiveringPalmModal, setQuiveringPalmModal] = useState(null);
     const [celestialResilienceModal, setCelestialResilienceModal] = useState(null);
     const [fiendishResilienceModal, setFiendishResilienceModal] = useState(null);
+    const [multiResistanceModal, setMultiResistanceModal] = useState(null);
     const [stepsOfTheFeyTauntModal, setStepsOfTheFeyTauntModal] = useState(null);
     const [hurlThroughHellModal, setHurlThroughHellModal] = useState(null);
     const [clairvoyantCombatantModal, setClairvoyantCombatantModal] = useState(null);
@@ -272,6 +275,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
                 setCelestialResilienceModal({ ...result.payload, playerStats, campaignName });
             } else if (result.modalName === 'fiendishResilience') {
                 setFiendishResilienceModal(result.payload);
+            } else if (result.modalName === 'boonOfEnergyResistance') {
+                setMultiResistanceModal(result.payload);
             }
         } else if (result.type === 'popup') {
             const payload = result.payload;
@@ -672,9 +677,32 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
                 />
             )}
             {fiendishResilienceModal && (
-                <FiendishResilienceModal
+                <SingleResistanceSelectionModal
                     {...fiendishResilienceModal}
                     onClose={() => setFiendishResilienceModal(null)}
+                />
+            )}
+            {multiResistanceModal && (
+                <MultiResistanceSelectionModal
+                    title={multiResistanceModal.action?.name || 'Energy Resistances'}
+                    icon="fa-shield-halved"
+                    damageTypes={multiResistanceModal.damageTypes}
+                    existingTypes={multiResistanceModal.existingTypes}
+                    maxSelections={multiResistanceModal.maxSelections || 2}
+                    action={multiResistanceModal.action}
+                    playerStats={multiResistanceModal.playerStats}
+                    campaignName={multiResistanceModal.campaignName}
+                    onConfirm={async (selected) => {
+                        const payload = multiResistanceModal;
+                        setMultiResistanceModal(null);
+                        const res = await applyBoonOfEnergyResistance(payload.action, payload.playerStats, payload.campaignName, selected);
+                        if (res?.type === 'popup') {
+                            const html = `<b>${res.payload?.name || payload.action?.name}</b><br/>${res.payload?.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+                            setPopupHtml(html);
+                        }
+                        return res;
+                    }}
+                    onClose={() => setMultiResistanceModal(null)}
                 />
             )}
             {featureChoiceModal && (

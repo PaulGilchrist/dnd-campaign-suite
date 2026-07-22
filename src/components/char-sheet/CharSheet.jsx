@@ -78,6 +78,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const spellThiefCasterBlockRuntime = useRuntimeValue(playerSummary?.name, '_spellThiefCasterBlock', campaignName);
     const cotlLandTypeRuntime = useRuntimeValue(playerSummary?.name, '_circleOfTheLandType', campaignName);
     const fiendishResilienceType = useRuntimeValue(playerSummary?.name, '_Fiendish_Resilience_chosenType', campaignName);
+    const boonEnergyResistanceTypes = useRuntimeValue(playerSummary?.name, '_Energy_Resistances_chosenTypes', campaignName);
     React.useEffect(() => {
         const fetchData = async () => {
             const spellData = playerSummary.rules === '2024' ? allSpells2024 : allSpells;
@@ -253,7 +254,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             setPlayerStats(stats);
         };
         fetchData();
-    }, [allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, biDieRuntime, biCombatOptRuntime, spellThiefStolenRuntime, spellThiefCasterBlockRuntime, cotlLandTypeRuntime, fiendishResilienceType, campaignName]);
+    }, [allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, biDieRuntime, biCombatOptRuntime, spellThiefStolenRuntime, spellThiefCasterBlockRuntime, cotlLandTypeRuntime, fiendishResilienceType, boonEnergyResistanceTypes, campaignName]);
 
     React.useEffect(() => {
         if (!playerStats) return;

@@ -50,7 +50,7 @@
   "class": {
     "name": "Wizard",
     "subclass": {
-      "name": "Illusionist",
+      "name": "Diviner",
       "type": ""
     },
     "divineOrder": "",
@@ -62,7 +62,7 @@
     "Ability Score Improvement",
     "Tough",
     "Ability Score Improvement",
-    "Boon Of Dimensional Travel"
+    "Boon Of Energy Resistance"
   ],
   "fightingStyles": [],
   "race": {
@@ -160,6 +160,9 @@
       "assignment": "Intelligence"
     },
     "Boon Of Dimensional Travel-3": {
+      "assignment": "Strength"
+    },
+    "Boon Of Energy Resistance-3": {
       "assignment": "Strength"
     }
   }

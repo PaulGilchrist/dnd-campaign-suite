@@ -27,7 +27,7 @@ function hasPolearmWeapon(allEquipment, equippedWeapons) {
 }
 
 function getChosenResistanceTypes(playerName, campaignName) {
-    const stored = getRuntimeValue(playerName, '_Boon_Of_Energy_Resistance_chosenTypes', campaignName);
+    const stored = getRuntimeValue(playerName, '_Energy_Resistances_chosenTypes', campaignName);
     return Array.isArray(stored) ? stored : [];
 }
 
