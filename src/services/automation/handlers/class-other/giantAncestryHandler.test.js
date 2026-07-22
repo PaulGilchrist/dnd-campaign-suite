@@ -31,10 +31,6 @@ vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(async () => {}),
 }));
 
-vi.mock('../../common/targetResolver.js', () => ({
-    resolveTarget: vi.fn(async () => ({ target: { name: 'Goblin' } })),
-}));
-
 vi.mock('../../../combat/automation/automationService.js', () => ({
     evaluateAutoExpression: vi.fn((_expr) => 5),
 }));
@@ -66,7 +62,6 @@ vi.mock('../../common/damageRollback.js', () => ({
 
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { resolveTarget } from '../../common/targetResolver.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 
 function makeAction(overrides = {}) {
@@ -602,31 +597,57 @@ describe('giantAncestryHandler', () => {
     describe('handleStormsThunder', () => {
         const option = { name: "Storm's Thunder", type: 'reaction_damage', damage: '1d8', damageType: 'Thunder', range: '60_ft' };
 
-        it('deals thunder damage as reaction', async () => {
+        it('deals thunder damage to attacker when giant was target', async () => {
             makeUsesMock('stormsThunderUses', 3);
-            resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack', attackerName: 'Orc' },
+                attackerName: 'Orc',
+                targetName: 'TestHero',
+                totalDamage: 10,
+            });
             const result = await handleStormsThunder(makeAction(), makePlayerStats(), 'campaign', 'map', option);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain("Storm's Thunder");
-            expect(result.payload.description).toContain('Thunder');
+            expect(result.payload.type).toBe('damage');
+            expect(result.payload.targetName).toBe('Orc');
+            expect(result.payload.damageType).toBe('Thunder');
             expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'stormsThunderUses', 2, 'campaign');
             expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
                 type: 'roll',
                 rollType: 'damage',
-                targetName: 'Goblin',
+                targetName: 'Orc',
                 damageType: 'Thunder',
             }));
         });
 
-        it('returns popup when no target', async () => {
+        it('returns popup when player was not the target', async () => {
             makeUsesMock('stormsThunderUses', 3);
-            resolveTarget.mockResolvedValue(null);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack' },
+                attackerName: 'Orc',
+                targetName: 'Goblin',
+                totalDamage: 10,
+            });
 
             const result = await handleStormsThunder(makeAction(), makePlayerStats(), 'campaign', 'map', option);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('requires a target');
+            expect(result.payload.description).toContain('you were the target');
+        });
+
+        it('returns popup when no damage was dealt', async () => {
+            makeUsesMock('stormsThunderUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack' },
+                attackerName: 'Orc',
+                targetName: 'TestHero',
+                totalDamage: 0,
+            });
+
+            const result = await handleStormsThunder(makeAction(), makePlayerStats(), 'campaign', 'map', option);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('took damage');
         });
 
         it('returns info popup when no uses remaining', async () => {
@@ -636,6 +657,16 @@ describe('giantAncestryHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('no uses remaining');
+        });
+
+        it('returns popup when no lastAttack', async () => {
+            makeUsesMock('stormsThunderUses', 3);
+            findLastAttack.mockResolvedValue({ attackEvent: null });
+
+            const result = await handleStormsThunder(makeAction(), makePlayerStats(), 'campaign', 'map', option);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('recent attack');
         });
     });
 
@@ -1093,31 +1124,57 @@ describe('giantAncestryHandler', () => {
             },
         };
 
-        it('deals thunder damage as reaction', async () => {
+        it('deals thunder damage to attacker when giant was target', async () => {
             makeUsesMock('stormsThunderUses', 3);
-            resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack', attackerName: 'Orc' },
+                attackerName: 'Orc',
+                targetName: 'TestHero',
+                totalDamage: 10,
+            });
             const result = await handleStormsThunderDirect(directAction, makePlayerStats(), 'campaign', 'map');
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain("Storm's Thunder");
-            expect(result.payload.description).toContain('Thunder');
+            expect(result.payload.type).toBe('damage');
+            expect(result.payload.targetName).toBe('Orc');
+            expect(result.payload.damageType).toBe('Thunder');
             expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'stormsThunderUses', 2, 'campaign');
             expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
                 type: 'roll',
                 rollType: 'damage',
-                targetName: 'Goblin',
+                targetName: 'Orc',
                 damageType: 'Thunder',
             }));
         });
 
-        it('returns popup when no target', async () => {
+        it('returns popup when player was not the target', async () => {
             makeUsesMock('stormsThunderUses', 3);
-            resolveTarget.mockResolvedValue(null);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack' },
+                attackerName: 'Orc',
+                targetName: 'Goblin',
+                totalDamage: 10,
+            });
 
             const result = await handleStormsThunderDirect(directAction, makePlayerStats(), 'campaign', 'map');
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('requires a target');
+            expect(result.payload.description).toContain('you were the target');
+        });
+
+        it('returns popup when no damage was dealt', async () => {
+            makeUsesMock('stormsThunderUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack' },
+                attackerName: 'Orc',
+                targetName: 'TestHero',
+                totalDamage: 0,
+            });
+
+            const result = await handleStormsThunderDirect(directAction, makePlayerStats(), 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('took damage');
         });
 
         it('returns info popup when no uses remaining', async () => {
@@ -1126,6 +1183,16 @@ describe('giantAncestryHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('no uses remaining');
+        });
+
+        it('returns popup when no lastAttack', async () => {
+            makeUsesMock('stormsThunderUses', 3);
+            findLastAttack.mockResolvedValue({ attackEvent: null });
+
+            const result = await handleStormsThunderDirect(directAction, makePlayerStats(), 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('recent attack');
         });
     });
 });

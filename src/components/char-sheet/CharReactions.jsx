@@ -107,11 +107,22 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
     }
 
     // Update Stone's Endurance description based on remaining uses
-    const stonesEnduranceUses = Number(getRuntimeValue(playerStats.name, 'stonesEnduranceUses', campaignName) ?? playerStats._trackedResources?.stonesEnduranceUses?.current ?? 0);
+    const stonesEnduranceCurrent = getRuntimeValue(playerStats.name, 'stonesEnduranceUses');
+    const stonesEnduranceUses = stonesEnduranceCurrent != null ? stonesEnduranceCurrent : (playerStats._trackedResources?.stonesEnduranceUses?.current ?? 0);
     const stonesEnduranceReaction = reactions.find(r => r.name === "Stone's Endurance");
     if (stonesEnduranceReaction) {
         stonesEnduranceReaction.description = stonesEnduranceUses > 0
             ? `When you take damage, you can take a Reaction to roll 1d12 + CON modifier and heal up to that amount (capped at damage taken). ${stonesEnduranceUses} uses remaining. Recharges on a Long Rest.`
+            : 'No uses remaining. Uses will reset on the next Long Rest.';
+    }
+
+    // Update Storm's Thunder description based on remaining uses
+    const stormsThunderCurrent = getRuntimeValue(playerStats.name, 'stormsThunderUses');
+    const stormsThunderUses = stormsThunderCurrent != null ? stormsThunderCurrent : (playerStats._trackedResources?.stormsThunderUses?.current ?? 0);
+    const stormsThunderReaction = reactions.find(r => r.name === "Storm's Thunder");
+    if (stormsThunderReaction) {
+        stormsThunderReaction.description = stormsThunderUses > 0
+            ? `When you take damage from a creature within 60 feet of you, you can take a Reaction to deal 1d8 thunder damage to that creature. ${stormsThunderUses} uses remaining. Recharges on a Long Rest.`
             : 'No uses remaining. Uses will reset on the next Long Rest.';
     }
 

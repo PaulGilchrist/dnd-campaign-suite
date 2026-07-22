@@ -1,7 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { addEntry } from '../../../ui/logService.js';
-import { resolveTarget } from '../../common/targetResolver.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
@@ -612,7 +611,8 @@ export async function handleStonesEnduranceDirect(action, playerStats, campaignN
 }
 
 export async function handleStormsThunderDirect(action, playerStats, campaignName, _mapName) {
-    const usesKey = getRuntimeUsesKey("Storm's Thunder");
+    const optName = "Storm's Thunder";
+    const usesKey = getRuntimeUsesKey(optName);
     const usesMax = playerStats.proficiency || 0;
     const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
 
@@ -621,55 +621,101 @@ export async function handleStormsThunderDirect(action, playerStats, campaignNam
             type: 'popup',
             payload: {
                 type: 'automation_info',
-                name: "Storm's Thunder",
-                description: "Storm's Thunder has no uses remaining. Recharges on a Long Rest.",
+                name: optName,
+                description: `${optName} has no uses remaining. Uses will reset on the next Long Rest.`,
                 automation: action.automation,
             },
         };
     }
 
-    const targetInfo = await resolveTarget(campaignName, playerStats.name);
-    if (!targetInfo?.target) {
+    const lastAttack = await findLastAttack(campaignName);
+    if (!lastAttack?.attackEvent) {
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
-                name: "Storm's Thunder",
-                description: "Storm's Thunder requires a target. Select a creature in combat.",
+                name: optName,
+                description: `${optName} requires a recent attack where you were the target and took damage.`,
                 automation: action.automation,
             },
         };
     }
 
-    const targetName = targetInfo.target.name;
+    if (lastAttack.targetName !== playerStats.name) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} can only be used when you were the target of the attack and took damage.`,
+                automation: action.automation,
+            },
+        };
+    }
+
+    const totalDamage = lastAttack.totalDamage || 0;
+    if (totalDamage <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} requires that you took damage from the attack. No damage was dealt.`,
+                automation: action.automation,
+            },
+        };
+    }
+
+    const attackerName = lastAttack.attackerName;
+    if (!attackerName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} requires a target. No attacker found from the last attack.`,
+                automation: action.automation,
+            },
+        };
+    }
 
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
     const damageResult = rollExpression(action.automation.damage || '1d8');
-    const damageDisplay = damageResult ? damageResult.total : (action.automation.damage || '1d8');
     const damageType = action.automation.damageType || 'Thunder';
+
+    const cs = await getCombatContext(campaignName);
+    const characters = cs?.creatures?.filter(c => c.type === 'player') || [];
+    const applyResult = applyDamageToTarget(cs, attackerName, damageResult?.total ?? 0, [damageType], campaignName, characters, false, playerStats.name);
+    const actualDamage = applyResult?.finalDamage ?? damageResult?.total ?? 0;
+    const newHp = applyResult?.newHp;
 
     await addEntry(campaignName, {
         type: 'roll',
         characterName: playerStats.name,
         rollType: 'damage',
-        name: "Storm's Thunder" + ' Damage',
-        targetName,
+        name: optName + ' Damage',
+        targetName: attackerName,
         damageType,
-        total: damageResult?.total ?? 0,
+        total: actualDamage,
         formula: action.automation.damage || '1d8',
         rolls: damageResult?.rolls,
-        description: `${playerStats.name} used Storm's Thunder to deal ${damageDisplay} thunder damage to ${targetName} as a reaction.`,
+        description: `${playerStats.name} used ${optName} to deal ${actualDamage} thunder damage to ${attackerName}.`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
     return {
         type: 'popup',
         payload: {
-            type: 'automation_info',
-            name: "Storm's Thunder",
-            automationType: 'storms_thunder',
-            description: `Storm's Thunder: Dealt <strong>${damageDisplay}</strong> thunder damage to ${targetName}.`,
-            automation: action.automation,
+            type: 'damage',
+            name: optName,
+            formula: action.automation.damage || '1d8',
+            rolls: damageResult?.rolls,
+            total: actualDamage,
+            finalDamage: actualDamage,
+            damageApplied: true,
+            targetName: attackerName,
+            targetCurrentHp: newHp,
+            damageType,
         },
     };
 }
@@ -1247,54 +1293,101 @@ export async function handleStormsThunder(action, playerStats, campaignName, _ma
             payload: {
                 type: 'automation_info',
                 name: optName,
-                description: `${optName} has no uses remaining. Recharges on a Long Rest.`,
+                description: `${optName} has no uses remaining. Uses will reset on the next Long Rest.`,
                 automation: action.automation,
             },
         };
     }
 
-    const targetInfo = await resolveTarget(campaignName, playerStats.name);
-    if (!targetInfo?.target) {
+    const lastAttack = await findLastAttack(campaignName);
+    if (!lastAttack?.attackEvent) {
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: optName,
-                description: `${optName} requires a target. Select a creature in combat.`,
+                description: `${optName} requires a recent attack where you were the target and took damage.`,
                 automation: action.automation,
             },
         };
     }
 
-    const targetName = targetInfo.target.name;
+    if (lastAttack.targetName !== playerStats.name) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} can only be used when you were the target of the attack and took damage.`,
+                automation: action.automation,
+            },
+        };
+    }
+
+    const totalDamage = lastAttack.totalDamage || 0;
+    if (totalDamage <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} requires that you took damage from the attack. No damage was dealt.`,
+                automation: action.automation,
+            },
+        };
+    }
+
+    const attackerName = lastAttack.attackerName;
+    if (!attackerName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} requires a target. No attacker found from the last attack.`,
+                automation: action.automation,
+            },
+        };
+    }
 
     // Consume the use
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
     const damageResult = rollExpression(opt.damage);
-    const damageDisplay = damageResult ? damageResult.total : opt.damage;
+    const damageType = opt.damageType || 'Thunder';
+
+    const cs = await getCombatContext(campaignName);
+    const characters = cs?.creatures?.filter(c => c.type === 'player') || [];
+    const applyResult = applyDamageToTarget(cs, attackerName, damageResult?.total ?? 0, [damageType], campaignName, characters, false, playerStats.name);
+    const actualDamage = applyResult?.finalDamage ?? damageResult?.total ?? 0;
+    const newHp = applyResult?.newHp;
 
     await addEntry(campaignName, {
         type: 'roll',
         characterName: playerStats.name,
         rollType: 'damage',
         name: optName + ' Damage',
-        targetName,
-        damageType: opt.damageType,
-        total: damageResult?.total ?? 0,
+        targetName: attackerName,
+        damageType,
+        total: actualDamage,
         formula: opt.damage,
         rolls: damageResult?.rolls,
-        description: `${playerStats.name} used ${optName} to deal ${damageDisplay} ${opt.damageType} damage to ${targetName} as a reaction.`,
+        description: `${playerStats.name} used ${optName} to deal ${actualDamage} ${damageType} damage to ${attackerName}.`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
     return {
         type: 'popup',
         payload: {
-            type: 'automation_info',
+            type: 'damage',
             name: optName,
-            automationType: opt.type,
-            description: `${optName}: Dealt <strong>${damageDisplay}</strong> ${opt.damageType} damage to ${targetName}.`,
-            automation: action.automation,
+            formula: opt.damage,
+            rolls: damageResult?.rolls,
+            total: actualDamage,
+            finalDamage: actualDamage,
+            damageApplied: true,
+            targetName: attackerName,
+            targetCurrentHp: newHp,
+            damageType,
         },
     };
 }
