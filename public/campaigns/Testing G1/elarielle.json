@@ -61,8 +61,8 @@
     "War Caster",
     "Ability Score Improvement",
     "Tough",
-    "Actor",
-    "Ability Score Improvement"
+    "Ability Score Improvement",
+    "Athlete"
   ],
   "fightingStyles": [],
   "race": {
@@ -141,8 +141,7 @@
           "Constitution",
           "Intelligence"
         ]
-      },
-      "assignment": "Intelligence"
+      }
     },
     "Ability Score Improvement-2": {
       "mode": "single",
@@ -153,6 +152,9 @@
           ""
         ]
       }
+    },
+    "Athlete-3": {
+      "assignment": "Strength"
     }
   }
 }

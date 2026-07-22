@@ -291,8 +291,14 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     if (aspectOption === 'Panther') {
         climbSpeed = totalSpeed + buffSpeedBonus;
     }
+    if (!climbSpeed && playerStats.climbSpeed) {
+        climbSpeed = playerStats.climbSpeed;
+    }
     if (aspectOption === 'Salmon' && swimSpeed === null) {
         swimSpeed = totalSpeed + buffSpeedBonus;
+    }
+    if (!swimSpeed && playerStats.swimSpeed) {
+        swimSpeed = playerStats.swimSpeed;
     }
     const hasteActive = activeBuffs.some(b => b.effect === 'haste');
     if (hasteActive) {

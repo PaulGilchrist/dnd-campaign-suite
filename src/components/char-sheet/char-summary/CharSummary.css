@@ -41,6 +41,7 @@
 .summaryGrid {
     display: grid;
     grid-template-columns: auto auto auto;
+    column-gap: 24px;
 }
 
 /* Avatar styles for char sheet header */
