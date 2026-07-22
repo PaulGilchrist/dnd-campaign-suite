@@ -182,6 +182,16 @@ export async function confirmTeleport(action, playerStats, campaignName, useExte
         }
     }
 
+    if (auto.effect === 'bonus_teleport') {
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: action.name,
+            description: `${playerName} used ${action.name} to teleport ${distance}.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[tempTeleport] Error logging Blink Steps:", e); });
+    }
+
     return {
         type: 'popup',
         payload: {
