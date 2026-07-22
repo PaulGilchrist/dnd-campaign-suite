@@ -163,10 +163,13 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
           effects.abilityCheckAdvantage = true;
           effects.abilityCheckAdvantageSkill = 'Performance';
         } else if (mod.target === 'deception_performance_checks') {
-          // Deception/Performance checks: use CHA ability filter
-          effects.abilityCheckAdvantageAbilities = [...new Set([
-            ...(effects.abilityCheckAdvantageAbilities || []),
-            'CHA'
+          // Deception/Performance checks: store specific skills
+          if (!effects.abilityCheckAdvantageSkills) {
+            effects.abilityCheckAdvantageSkills = [];
+          }
+          effects.abilityCheckAdvantageSkills = [...new Set([
+            ...(effects.abilityCheckAdvantageSkills || []),
+            'Deception', 'Performance'
           ])];
         } else {
           effects.abilityCheckAdvantage = true;

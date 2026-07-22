@@ -359,6 +359,14 @@ describe('saveModifierApplies — condition-based boolean checks', () => {
     expect(effects.abilityCheckAdvantageAbilities).toBeNull();
   });
 
+  it('populates abilityCheckAdvantageSkills for deception_performance_checks target', () => {
+    const modifiers = [
+      { target: 'deception_performance_checks', condition: 'disguised', effect: 'advantage', ability: 'Charisma' },
+    ];
+    const effects = computeConditionEffects([], modifiers, []);
+    expect(effects.abilityCheckAdvantageSkills).toEqual(['Deception', 'Performance']);
+  });
+
   it('returns isLargeFormActive when condition is large_form_active', () => {
     expect(saveModifierApplies({ target: 'saving_throw', condition: 'large_form_active' }, 'saving_throw', 'STR', false, false, false, true, null, [])).toBe(true);
     expect(saveModifierApplies({ target: 'saving_throw', condition: 'large_form_active' }, 'saving_throw', 'STR', false, false, false, false, null, [])).toBe(false);

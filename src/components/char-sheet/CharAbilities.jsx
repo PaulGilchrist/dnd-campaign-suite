@@ -123,6 +123,12 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                           forcedMode = 'advantage'
                       }
                   }
+                  // Check skill-specific advantage (e.g., Actor feat for Deception/Performance)
+                  if (!forcedMode && conditionEffects?.abilityCheckAdvantageSkills) {
+                      if (conditionEffects.abilityCheckAdvantageSkills.includes(checkName)) {
+                          forcedMode = 'advantage'
+                      }
+                  }
               // Powerful Build: advantage on STR checks to escape grapple
               if (!forcedMode && conditionEffects?.strCheckAdvantage) {
                 const abbr = checkName.substring(0, 3).toUpperCase();
