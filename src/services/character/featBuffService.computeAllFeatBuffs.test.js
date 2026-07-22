@@ -91,7 +91,7 @@ describe('computeAllFeatBuffs', () => {
       );
 
       expect(result.abilityScoreIncreases).toEqual([
-        { name: 'Strength', amount: 2, isChoice: false },
+        { name: 'Strength', amount: 2, isChoice: false, featName: 'Tough', featDescription: undefined },
       ]);
       expect(result.proficiencies).toEqual([
         { name: 'shields' },
@@ -133,6 +133,8 @@ describe('computeAllFeatBuffs', () => {
           amount: 1,
           isChoice: false,
           description: '+1 STR',
+          featName: 'ASI Feat',
+          featDescription: undefined,
         },
       ]);
       expect(result.proficiencies).toEqual([
@@ -154,7 +156,7 @@ describe('computeAllFeatBuffs', () => {
       );
 
       expect(result.abilityScoreIncreases).toEqual([
-        { name: 'Strength', amount: 2, isChoice: false },
+        { name: 'Strength', amount: 2, isChoice: false, featName: 'Tough', featDescription: undefined },
       ]);
     });
 
@@ -171,8 +173,8 @@ describe('computeAllFeatBuffs', () => {
       );
 
       expect(result.abilityScoreIncreases).toEqual([
-        { name: 'Strength', amount: 1, isChoice: true },
-        { name: 'Dexterity', amount: 1, isChoice: true },
+        { name: 'Strength', amount: 1, isChoice: true, featName: 'Custom Feat', featDescription: undefined },
+        { name: 'Dexterity', amount: 1, isChoice: true, featName: 'Custom Feat', featDescription: undefined },
       ]);
     });
 
@@ -399,6 +401,8 @@ describe('computeAllFeatBuffs', () => {
           amount: 1,
           isChoice: false,
           description: '+1 STR',
+          featName: 'Tough',
+          featDescription: undefined,
         },
       ]);
     });
@@ -429,6 +433,8 @@ describe('computeAllFeatBuffs', () => {
           isChoice: true,
           scores: ['Strength', 'Dexterity'],
           description: '+1 to two abilities',
+          featName: 'Custom Feat',
+          featDescription: undefined,
         },
       ]);
     });
@@ -458,6 +464,8 @@ describe('computeAllFeatBuffs', () => {
           amount: [1, 2],
           isChoice: true,
           description: 'Variable increase',
+          featName: 'Custom Feat',
+          featDescription: undefined,
         },
       ]);
     });

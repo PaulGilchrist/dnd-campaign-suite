@@ -508,6 +508,10 @@ export function computeAllFeatBuffs(formData, allFeats) {
     const feat = findFeat(featName, allFeats);
     if (feat) {
       const buffs = computeFeatBuffs(feat, ruleset);
+      buffs.abilityScoreIncreases.forEach(inc => {
+        inc.featName = feat.name;
+        inc.featDescription = feat.description;
+      });
       aggregated.abilityScoreIncreases.push(...buffs.abilityScoreIncreases);
       aggregated.proficiencies.push(...buffs.proficiencies);
       aggregated.resistances.push(...buffs.resistances);

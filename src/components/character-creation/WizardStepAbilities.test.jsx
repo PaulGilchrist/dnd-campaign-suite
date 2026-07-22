@@ -399,8 +399,21 @@ describe('WizardStepAbilities', () => {
     it('should show feat ability section when there are feat choices', async () => {
       setupFetchMock('5e');
       const props = createMockProps({
-        featAbilityChoices: [{ amount: 1, abilityNames: ['Strength', 'Constitution'] }],
-        featAbilityAssignments: { '0': 'Strength' },
+        featAbilityChoices: [
+          {
+            featName: 'Ability Score Improvement',
+            type: 'choice',
+            mode: 'single',
+            options: {
+              single: { amount: 2, abilityNames: ['Strength', 'Constitution'], assignment: null },
+              dual: { amount: 1, count: 2, abilityNames: ['Strength', 'Constitution'], assignments: [null, null] },
+            },
+            featDescription: 'Increase one ability score of your choice by 2',
+          },
+        ],
+        featAbilityAssignments: {
+          'Ability Score Improvement': { mode: 'single', assignments: { single: 'Strength', dual: ['Strength', ''] } },
+        },
       });
       render(<WizardStepAbilities {...props} />);
 
@@ -408,14 +421,27 @@ describe('WizardStepAbilities', () => {
         expect(screen.getByText(/Feat Ability Score Increases/)).toBeInTheDocument();
       });
 
-      expect(screen.getByText('Feat ASI 1 (+1):')).toBeInTheDocument();
+      expect(screen.getByText('Ability Score Improvement')).toBeInTheDocument();
     });
 
     it('should call onFeatAbilityChoiceChange when feat ability is changed', async () => {
       setupFetchMock('5e');
       const props = createMockProps({
-        featAbilityChoices: [{ amount: 1, abilityNames: ['Strength', 'Constitution'] }],
-        featAbilityAssignments: { '0': 'Strength' },
+        featAbilityChoices: [
+          {
+            featName: 'Ability Score Improvement',
+            type: 'choice',
+            mode: 'single',
+            options: {
+              single: { amount: 2, abilityNames: ['Strength', 'Dexterity', 'Constitution'], assignment: null },
+              dual: { amount: 1, count: 2, abilityNames: ['Strength', 'Dexterity', 'Constitution'], assignments: [null, null] },
+            },
+            featDescription: 'Test description',
+          },
+        ],
+        featAbilityAssignments: {
+          'Ability Score Improvement': { mode: 'single', assignments: { single: 'Strength', dual: ['Strength', ''] } },
+        },
       });
       render(<WizardStepAbilities {...props} />);
 
@@ -424,22 +450,90 @@ describe('WizardStepAbilities', () => {
       });
 
       const selects = screen.getAllByRole('combobox');
-      const featSelect = selects.find((s) => {
-        const parent = s.closest('.bg-ability-assignment');
-        return parent && parent.textContent.includes('Feat ASI');
+      fireEvent.change(selects[0], { target: { value: 'Constitution' } });
+
+      expect(props.onFeatAbilityChoiceChange).toHaveBeenCalledWith('Ability Score Improvement', 0, 'Constitution');
+    });
+
+    it('should call onFeatAbilityModeChange when mode radio changes', async () => {
+      setupFetchMock('5e');
+      const props = createMockProps({
+        featAbilityChoices: [
+          {
+            featName: 'Ability Score Improvement',
+            type: 'choice',
+            mode: 'single',
+            options: {
+              single: { amount: 2, abilityNames: ['Strength', 'Dexterity', 'Constitution'], assignment: null },
+              dual: { amount: 1, count: 2, abilityNames: ['Strength', 'Dexterity', 'Constitution'], assignments: [null, null] },
+            },
+            featDescription: 'Test description',
+          },
+        ],
+        featAbilityAssignments: {
+          'Ability Score Improvement': { mode: 'single', assignments: { single: 'Strength', dual: ['Strength', ''] } },
+        },
+      });
+      render(<WizardStepAbilities {...props} />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Feat Ability Score Increases/)).toBeInTheDocument();
       });
 
-      if (featSelect) {
-        fireEvent.change(featSelect, { target: { value: 'Constitution' } });
-        expect(props.onFeatAbilityChoiceChange).toHaveBeenCalledWith(0, 'Constitution');
-      }
+      const radios = screen.getAllByRole('radio');
+      const dualRadio = radios[1];
+      fireEvent.click(dualRadio);
+
+      expect(props.onFeatAbilityModeChange).toHaveBeenCalledWith('Ability Score Improvement', 'dual');
+    });
+
+    it('should show mode toggle with single and dual options for choice type', async () => {
+      setupFetchMock('5e');
+      const props = createMockProps({
+        featAbilityChoices: [
+          {
+            featName: 'Ability Score Improvement',
+            type: 'choice',
+            mode: 'single',
+            options: {
+              single: { amount: 2, abilityNames: ['Strength', 'Dexterity', 'Constitution'], assignment: null },
+              dual: { amount: 1, count: 2, abilityNames: ['Strength', 'Dexterity', 'Constitution'], assignments: [null, null] },
+            },
+            featDescription: 'Test description',
+          },
+        ],
+        featAbilityAssignments: {
+          'Ability Score Improvement': { mode: 'single', assignments: { single: 'Strength', dual: ['Strength', ''] } },
+        },
+      });
+      render(<WizardStepAbilities {...props} />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Feat Ability Score Increases/)).toBeInTheDocument();
+      });
+
+      expect(screen.getByText('+2 to one ability')).toBeInTheDocument();
+      expect(screen.getByText('+1 to 2 abilities')).toBeInTheDocument();
     });
 
     it('should render all ability options for a feat choice', async () => {
       setupFetchMock('5e');
       const props = createMockProps({
-        featAbilityChoices: [{ amount: 1, abilityNames: ['Strength', 'Dexterity', 'Constitution'] }],
-        featAbilityAssignments: { '0': 'Strength' },
+        featAbilityChoices: [
+          {
+            featName: 'Ability Score Improvement',
+            type: 'choice',
+            mode: 'single',
+            options: {
+              single: { amount: 2, abilityNames: ['Strength', 'Dexterity', 'Constitution'], assignment: null },
+              dual: { amount: 1, count: 2, abilityNames: ['Strength', 'Dexterity', 'Constitution'], assignments: [null, null] },
+            },
+            featDescription: 'Test description',
+          },
+        ],
+        featAbilityAssignments: {
+          'Ability Score Improvement': { mode: 'single', assignments: { single: 'Strength', dual: ['Strength', ''] } },
+        },
       });
       render(<WizardStepAbilities {...props} />);
 

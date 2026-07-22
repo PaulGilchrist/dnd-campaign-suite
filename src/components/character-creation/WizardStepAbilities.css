@@ -239,3 +239,104 @@
   color: var(--color-text);
   font-weight: 600;
 }
+
+/* Feat ASI cards */
+.wizard-step-abilities .feat-asi-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wizard-step-abilities .feat-asi-card {
+  background: var(--background-color-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wizard-step-abilities .feat-asi-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wizard-step-abilities .feat-asi-card-header .bg-ability-select {
+  flex-shrink: 0;
+}
+
+.wizard-step-abilities .feat-asi-card-name {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
+.wizard-step-abilities .feat-asi-card-type {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.wizard-step-abilities .feat-asi-mode-toggle {
+  display: flex;
+  gap: 16px;
+  padding: 8px 12px;
+  background: var(--background-color-card-hover);
+  border-radius: 4px;
+}
+
+.wizard-step-abilities .feat-asi-mode-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.wizard-step-abilities .feat-asi-assignments {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 8px;
+  width: 100%;
+}
+
+.wizard-step-abilities .feat-asi-assignment {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.wizard-step-abilities .feat-asi-assignment-inline {
+  flex-wrap: nowrap;
+}
+
+.wizard-step-abilities .feat-asi-assignment-inline .feat-asi-assignment-label {
+  white-space: nowrap;
+  margin-right: 0;
+  flex-shrink: 0;
+}
+
+.wizard-step-abilities .feat-asi-assignment-inline .bg-ability-select {
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.wizard-step-abilities .feat-asi-assignment-label {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.wizard-step-abilities .feat-asi-assignment-label {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}

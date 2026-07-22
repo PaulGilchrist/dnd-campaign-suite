@@ -17,6 +17,7 @@ function SelectableList({
   renderWarnings,
   loadingMessage,
   preSelectedItems = [],
+  repeatableItems = [],
   className = '',
   resultLabel,
 }) {
@@ -97,22 +98,30 @@ function SelectableList({
   const handleItemToggle = (itemName) => {
     const currentItems = getNestedValue(formData, fieldName) || [];
     const isPreSelected = preSelectedItems.includes(itemName);
-    const isCurrentlySelected = currentItems.includes(itemName);
+    const isRepeatable = repeatableItems.includes(itemName);
 
     // Don't allow toggling of pre-selected items
     if (isPreSelected) {
       return;
     }
 
-    const newItems = isCurrentlySelected
-       ? currentItems.filter(i => i !== itemName)
-       : [...currentItems, itemName];
+    const newItems = isRepeatable
+       ? [...currentItems, itemName]
+       : currentItems.includes(itemName)
+         ? currentItems.filter(i => i !== itemName)
+         : [...currentItems, itemName];
     onArrayFieldChange(fieldName, newItems);
   };
 
   // Check if item is selected
   const itemIsSelected = (itemName) => {
     return (getNestedValue(formData, fieldName) || []).includes(itemName);
+  };
+
+  // Count how many times an item appears in the selection
+  const getItemCount = (itemName) => {
+    const currentItems = getNestedValue(formData, fieldName) || [];
+    return currentItems.filter(i => i === itemName).length;
   };
 
   // Check if item is pre-selected
@@ -224,15 +233,16 @@ function SelectableList({
                  : `No ${resultLabel || 'items'} available.`}
              </div>
            ) : (
-            filteredItems.map((item, index) =>
-              renderItem(item, index, {
-                isSelected: itemIsSelected(item.name),
-                isPreSelected: itemIsPreSelected(item.name),
-                isExpanded: showFullDetails[index],
-                onToggle: () => handleItemToggle(item.name),
-                onToggleExpand: () => toggleFullDetails(index),
-               })
-             )
+             filteredItems.map((item, index) =>
+               renderItem(item, index, {
+                 isSelected: itemIsSelected(item.name),
+                 isPreSelected: itemIsPreSelected(item.name),
+                 isExpanded: showFullDetails[index],
+                 onToggle: () => handleItemToggle(item.name),
+                 onToggleExpand: () => toggleFullDetails(index),
+                 itemCount: getItemCount(item.name),
+                })
+              )
            )}
          </div>
        </div>

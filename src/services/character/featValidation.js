@@ -143,7 +143,10 @@ export async function validateFeats(formData, allFeats) {
          }
 
       // Check for prerequisites on selected feats
+    const warnedFeats = new Set();
     selectedFeats.forEach(featName => {
+        if (warnedFeats.has(featName)) return;
+        warnedFeats.add(featName);
         const feat = allFeats.find(f => f.name === featName);
         if (feat && feat.prerequisites) {
             const prereqs = Array.isArray(feat.prerequisites)

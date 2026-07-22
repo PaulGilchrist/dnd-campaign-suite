@@ -51,7 +51,7 @@ const WizardStepRenderer = React.memo(({
   skillWarnings,
   languageLimits,
   fightingStyleLimits,
-  languageWarnings,
+  languageWarnings: _languageWarnings,
   resistanceWarnings,
   tempInventory,
   onRulesetChange,
@@ -74,6 +74,7 @@ const WizardStepRenderer = React.memo(({
   featAbilityChoices,
   featAbilityAssignments,
   handleFeatAbilityChoice,
+  onFeatAbilityModeChange,
   allClasses: _allClasses,
 }) => {
   const stepConfig = WIZARD_STEPS.find((step) => step.step === currentStep);
@@ -111,7 +112,6 @@ const WizardStepRenderer = React.memo(({
     skillWarnings,
     languageLimits,
     fightingStyleLimits,
-    languageWarnings,
     resistanceWarnings,
     tempInventory,
     onRulesetChange,
@@ -134,6 +134,8 @@ const WizardStepRenderer = React.memo(({
     featAbilityChoices,
     featAbilityAssignments,
     handleFeatAbilityChoice,
+    onFeatAbilityChoiceChange: handleFeatAbilityChoice,
+    onFeatAbilityModeChange,
   });
 
   return <StepComponent {...props} />;
@@ -258,6 +260,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
     const {
       featAbilityChoices,
       handleFeatAbilityChoice,
+      handleFeatAbilityModeChange,
     } = useWizardFeatAbilityChoices(formData, feats, setFormData);
 
     const featAbilityAssignments = useMemo(() => formData.featAbilityChoices || {}, [formData.featAbilityChoices]);
@@ -396,6 +399,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
         featAbilityChoices={featAbilityChoices}
         featAbilityAssignments={featAbilityAssignments}
         handleFeatAbilityChoice={handleFeatAbilityChoice}
+        onFeatAbilityModeChange={handleFeatAbilityModeChange}
       />
     );
   }, [
@@ -446,6 +450,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
     featAbilityChoices,
     featAbilityAssignments,
     handleFeatAbilityChoice,
+    handleFeatAbilityModeChange,
   ]);
 
   const totalSteps = getTotalSteps();

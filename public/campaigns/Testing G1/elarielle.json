@@ -20,7 +20,7 @@
     {
       "name": "Constitution",
       "baseScore": 15,
-      "featIncrease": 0,
+      "featIncrease": 1,
       "backgroundIncrease": 1,
       "miscIncrease": 0
     },
@@ -41,7 +41,7 @@
     {
       "name": "Charisma",
       "baseScore": 10,
-      "featIncrease": 0,
+      "featIncrease": 1,
       "backgroundIncrease": 0,
       "miscIncrease": 0
     }
@@ -60,7 +60,9 @@
   "feats": [
     "War Caster",
     "Ability Score Improvement",
-    "Tough"
+    "Tough",
+    "Actor",
+    "Ability Score Improvement"
   ],
   "fightingStyles": [],
   "race": {
@@ -126,11 +128,31 @@
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
-  "originalFileName": "Elarielle.json",
   "imagePath": "images/Elarielle.png",
   "featAbilityChoices": {
-    "0": "Intelligence",
-    "1": "Intelligence",
-    "2": "Intelligence"
+    "War Caster-0": {
+      "assignment": "Intelligence"
+    },
+    "Ability Score Improvement-1": {
+      "mode": "dual",
+      "assignments": {
+        "single": "Constitution",
+        "dual": [
+          "Constitution",
+          "Intelligence"
+        ]
+      },
+      "assignment": "Intelligence"
+    },
+    "Ability Score Improvement-2": {
+      "mode": "single",
+      "assignments": {
+        "single": "Intelligence",
+        "dual": [
+          "Strength",
+          ""
+        ]
+      }
+    }
   }
 }

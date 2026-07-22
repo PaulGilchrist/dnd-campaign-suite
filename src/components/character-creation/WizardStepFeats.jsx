@@ -9,6 +9,11 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
   const [warnings, setWarnings] = React.useState([]);
   const [raceFeatChoices, setRaceFeatChoices] = React.useState([]);
   const [isVersatile, setIsVersatile] = React.useState(false);
+
+  const repeatableFeats = React.useMemo(() => {
+    if (!allFeats) return [];
+    return allFeats.filter(feat => feat.repeatable === true);
+  }, [allFeats]);
   // Validate feats when selection changes
     React.useEffect(() => {
           const fetchWarnings = async () => {
@@ -56,7 +61,7 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
         };
 
     // Render item function
-  const renderItem = (feat, index, { isSelected, isPreSelected, isExpanded, onToggle, onToggleExpand }) => {
+  const renderItem = (feat, index, { isSelected, isPreSelected, isExpanded, onToggle, onToggleExpand, itemCount = 0 }) => {
     const descData = normalizeFeatDescription(feat);
     const ruleset = formData.rules || '5e';
     const featBuffs = isSelected ? computeFeatBuffs(feat, ruleset) : null;
@@ -64,6 +69,8 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
     const hasAbilityIncrease = featBuffs && featBuffs.abilityScoreIncreases.length > 0;
     const hasProficiencies = featBuffs && featBuffs.proficiencies.length > 0;
     const hasResistances = featBuffs && featBuffs.resistances.length > 0;
+    const isRepeatable = repeatableFeats.some(f => f.name === feat.name);
+    const showCountBadge = isRepeatable && itemCount > 1;
         return (
             <div
                 key={feat.index || index}
@@ -81,18 +88,33 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
                         <div className="list-item-name">
                             {feat.name}
                             {isPreSelected && <span className="pre-selected-label">(Pre-selected)</span>}
+                            {showCountBadge && <span className="feat-count-badge">({itemCount})</span>}
                         </div>
                         {feat.type && <span className="feat-type">{feat.type}</span>}
-                        <div
-                            className={`list-item-checkbox ${isSelected ? 'checked' : ''} list-item-checkbox-trigger`}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                if (!isPreSelected) {
-                                    onToggle();
-                                }
-                            }}
-                        >
-                            {isSelected ? '✓' : ''}
+                        <div className="list-item-checkbox-group">
+                            <div
+                                className={`list-item-checkbox ${isSelected ? 'checked' : ''} list-item-checkbox-trigger`}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (!isPreSelected) {
+                                        onToggle();
+                                    }
+                                }}
+                            >
+                                {isSelected ? '✓' : ''}
+                            </div>
+                            {isRepeatable && isSelected && (
+                                <button
+                                    type="button"
+                                    className="add-another-btn"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onToggle();
+                                    }}
+                                >
+                                    <i className="fa-solid fa-plus" /> Add Another
+                                </button>
+                            )}
                         </div>
                     </div>
 
@@ -214,6 +236,7 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
          renderWarnings={() => warnings.length > 0 && <WarningList warnings={warnings} />}
          loadingMessage="Feat data not yet loaded. Please try again."
          preSelectedItems={preSelectedFeats || []}
+         repeatableItems={repeatableFeats.map(f => f.name)}
          className="wizard-step-feats"
          resultLabel="feat"
           />

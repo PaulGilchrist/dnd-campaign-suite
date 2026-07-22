@@ -24,6 +24,7 @@ function WizardStepAbilities({
   featAbilityChoices = [],
   featAbilityAssignments = {},
   onFeatAbilityChoiceChange,
+  onFeatAbilityModeChange,
   racesData = [],
 }) {
   const { race } = formData;
@@ -187,11 +188,24 @@ function WizardStepAbilities({
     const nonChoice = nonChoiceFeatIncreases[abilityName] || 0;
 
     let choiceIncrease = 0;
-    Object.entries(featAbilityAssignments || {}).forEach(([choiceIdx, chosenAbility]) => {
-      const choice = featAbilityChoices[parseInt(choiceIdx)];
-      if (choice && chosenAbility === abilityName) {
-        const amount = typeof choice.amount === 'number' ? choice.amount : (choice.amount[0] || 1);
-        choiceIncrease += amount;
+    featAbilityChoices.forEach(group => {
+      const saved = featAbilityAssignments[group.id];
+      if (!saved) return;
+
+      if (group.type === 'choice') {
+        const mode = saved.mode || 'single';
+        const assignments = saved.assignments;
+        if (mode === 'single' && assignments.single === abilityName) {
+          choiceIncrease += group.options.single.amount;
+        } else if (mode === 'dual') {
+          assignments.dual.forEach(a => {
+            if (a === abilityName) {
+              choiceIncrease += group.options.dual.amount;
+            }
+          });
+        }
+      } else if (group.type === 'fixed' && saved.assignment === abilityName) {
+        choiceIncrease += group.amount;
       }
     });
 
@@ -215,11 +229,15 @@ function WizardStepAbilities({
     onBackgroundIncreaseChange?.(abilityName, parsedIncrease);
   };
 
-  const handleFeatAbilityChange = (choiceIdx, abilityName) => {
-    onFeatAbilityChoiceChange?.(choiceIdx, abilityName);
+  const handleFeatAbilityChange = (featName, slotIndex, abilityName) => {
+    onFeatAbilityChoiceChange?.(featName, slotIndex, abilityName);
   };
 
-  const hasFeatsWithChoices = Object.keys(featAbilityAssignments || {}).length > 0;
+  const handleFeatAbilityModeChange = (featName, mode) => {
+    onFeatAbilityModeChange?.(featName, mode);
+  };
+
+  const hasFeatsWithChoices = featAbilityChoices.length > 0;
 
   return (
     <div className="wizard-step wizard-step-abilities wizard-step-4">
@@ -272,19 +290,84 @@ function WizardStepAbilities({
           <div className="bg-ability-rule-text">
             Your selected feats grant ability score increases. Choose which ability score to increase.
           </div>
-          <div className="bg-ability-assignments">
-            {featAbilityChoices.map((choice, idx) => (
-              <div key={`feat-${idx}`} className="bg-ability-assignment">
-                <span className="bg-ability-name">Feat ASI {idx + 1} (+{choice.amount}):</span>
-                <select
-                  value={featAbilityAssignments[idx] || choice.abilityNames[0]}
-                  onChange={(e) => handleFeatAbilityChange(idx, e.target.value)}
-                  className="bg-ability-select"
-                >
-                  {choice.abilityNames.map((abilityName) => (
-                    <option key={abilityName} value={abilityName}>{abilityName}</option>
-                  ))}
-                </select>
+          <div className="feat-asi-cards">
+            {featAbilityChoices.map((group) => (
+              <div key={group.id} className="feat-asi-card">
+                {group.type === 'fixed' ? (
+                  <div className="feat-asi-card-header">
+                    <span className="feat-asi-card-name">{group.featName}</span>
+                    <select
+                      value={featAbilityAssignments[group.id]?.assignment || group.abilityNames[0]}
+                      onChange={(e) => handleFeatAbilityChange(group.id, 0, e.target.value)}
+                      className="bg-ability-select"
+                    >
+                      {group.abilityNames.map((abilityName) => (
+                        <option key={abilityName} value={abilityName}>{abilityName}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <>
+                    <div className="feat-asi-card-header">
+                      <span className="feat-asi-card-name">{group.featName}</span>
+                      <div className="feat-asi-mode-toggle">
+                        <label className="feat-asi-mode-option">
+                          <input
+                            type="radio"
+                            name={`mode-${group.id}`}
+                            checked={(featAbilityAssignments[group.id]?.mode || 'single') === 'single'}
+                            onChange={() => handleFeatAbilityModeChange(group.id, 'single')}
+                          />
+                          +{group.options.single.amount} to one ability
+                        </label>
+                        <label className="feat-asi-mode-option">
+                          <input
+                            type="radio"
+                            name={`mode-${group.id}`}
+                            checked={(featAbilityAssignments[group.id]?.mode || 'single') === 'dual'}
+                            onChange={() => handleFeatAbilityModeChange(group.id, 'dual')}
+                          />
+                          +{group.options.dual.amount} to {group.options.dual.count} abilities
+                        </label>
+                      </div>
+                    </div>
+                    <div className="feat-asi-assignments">
+                      {(featAbilityAssignments[group.id]?.mode || 'single') === 'single' && (
+                        <div className="feat-asi-assignment">
+                          <span className="feat-asi-assignment-label">Increase:</span>
+                          <select
+                            value={featAbilityAssignments[group.id]?.assignments?.single || group.options.single.abilityNames[0]}
+                            onChange={(e) => handleFeatAbilityChange(group.id, 0, e.target.value)}
+                            className="bg-ability-select"
+                          >
+                            {group.options.single.abilityNames.map((abilityName) => (
+                              <option key={abilityName} value={abilityName}>{abilityName}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      {(featAbilityAssignments[group.id]?.mode || 'single') === 'dual' && (
+                        (() => {
+                          const savedAssignments = featAbilityAssignments[group.id]?.assignments?.dual || [];
+                          return group.options.dual.assignments.map((_, i) => (
+                            <div key={i} className="feat-asi-assignment">
+                              <span className="feat-asi-assignment-label">Ability {i + 1}:</span>
+                              <select
+                                value={savedAssignments[i] || group.options.dual.abilityNames[0]}
+                                onChange={(e) => handleFeatAbilityChange(group.id, i, e.target.value)}
+                                className="bg-ability-select"
+                              >
+                                {group.options.dual.abilityNames.map((abilityName) => (
+                                  <option key={abilityName} value={abilityName}>{abilityName}</option>
+                                ))}
+                              </select>
+                            </div>
+                          ));
+                        })()
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             ))}
           </div>
