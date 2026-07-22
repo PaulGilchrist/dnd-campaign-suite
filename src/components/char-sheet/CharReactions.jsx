@@ -453,7 +453,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                                         setSelectedSpell(fullSpell);
                                         setIsReactiveSpellFlow(true);
                                     }}>
-                                    {spellData.name}{!spellData.isSingleTarget ? ' <i>(multi-target)</i>' : ''}
+                                    <span>{spellData.name}{!spellData.isSingleTarget ? <> <i>(multi-target)</i></> : ''}</span>
                                 </div>
                             ))}
                         </div>
