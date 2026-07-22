@@ -65,9 +65,7 @@ function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, c
     }
     if (effects.speedReduction) {
         const label = effects.speedReduction >= 1000 ? 'Speed 0' : `Speed -${effects.speedReduction}`
-        const speedConditionKeys = ['grappled', 'paralyzed', 'petrified', 'restrained', 'stunned', 'unconscious', 'speed_zero']
-        const speedCondition = conditions.find(c => speedConditionKeys.includes(c.key))
-        badges.push({ label, cls: 'effect-speed-zero', icon: 'fa-minus', removable: true, removeAction: 'condition', removeKey: speedCondition?.key || 'grappled' })
+        badges.push({ label, cls: 'effect-speed-zero', icon: 'fa-minus', removable: true, removeAction: 'target_effect', effectType: 'speed_reduction' })
     }
     if (effects.noAdvantageAgainst) {
         const noAdvConditionKeys = ['blinded', 'charmed', 'invisible', 'paralyzed', 'petrified', 'restrained', 'stunned', 'unconscious']
