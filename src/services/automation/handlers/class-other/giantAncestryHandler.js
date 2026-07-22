@@ -4,7 +4,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
-import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 
 const GIANT_ANCESTRY_KEY = 'giantAncestrySelection';
@@ -376,6 +376,15 @@ export async function handleFrostsChillDirect(action, playerStats, campaignName)
         description: `${playerStats.name} used Frost's Chill to deal ${actualDamage} cold damage to ${targetName}.`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
+    await addEntry(campaignName, {
+        type: 'condition',
+        characterName: playerStats.name,
+        targetName,
+        condition: 'speed_reduction',
+        source: "Frost's Chill",
+        description: `${playerStats.name} used Frost's Chill to reduce ${targetName}'s speed by ${speedReduction} ft until the end of their next turn.`,
+    }).catch((e) => { console.error("[giantAncestry] Error:", e); });
+
     return {
         type: 'popup',
         payload: {
@@ -394,7 +403,8 @@ export async function handleFrostsChillDirect(action, playerStats, campaignName)
 }
 
 export async function handleHillsTumbleDirect(action, playerStats, campaignName) {
-    const usesKey = getRuntimeUsesKey("Hill's Tumble");
+    const optName = "Hill's Tumble";
+    const usesKey = getRuntimeUsesKey(optName);
     const usesMax = playerStats.proficiency || 0;
     const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
 
@@ -403,24 +413,71 @@ export async function handleHillsTumbleDirect(action, playerStats, campaignName)
             type: 'popup',
             payload: {
                 type: 'automation_info',
-                name: "Hill's Tumble",
-                description: "Hill's Tumble has no uses remaining. Recharges on a Long Rest.",
+                name: optName,
+                description: `${optName} has no uses remaining. Uses will reset on the next Long Rest.`,
                 automation: action.automation,
             },
         };
     }
 
-    const cs = await getCombatContext(campaignName);
-    const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
-    const targetName = target?.name || null;
+    const lastAttack = await findLastAttack(campaignName);
+    if (!lastAttack?.attackEvent) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} requires a recent attack. Use it after hitting a creature.`,
+                automation: action.automation,
+            },
+        };
+    }
 
+    if (lastAttack.attackerName !== playerStats.name) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} can only be used after you make an attack. Wait for your turn.`,
+                automation: action.automation,
+            },
+        };
+    }
+
+    if (lastAttack.attackEvent.rollType !== 'attack') {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} can only be used after an attack roll.`,
+                automation: action.automation,
+            },
+        };
+    }
+
+    const targetName = lastAttack.targetName;
     if (!targetName) {
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
-                name: "Hill's Tumble",
-                description: "Hill's Tumble: No target found. Use this after hitting a creature with a melee attack.",
+                name: optName,
+                description: `${optName} requires a target. No target found from the last attack.`,
+                automation: action.automation,
+            },
+        };
+    }
+
+    const storedConds = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    if (storedConds.includes('prone')) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${targetName} is already prone.`,
                 automation: action.automation,
             },
         };
@@ -428,24 +485,32 @@ export async function handleHillsTumbleDirect(action, playerStats, campaignName)
 
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
-    const storedConds = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
     const newConds = Array.isArray(storedConds) ? [...storedConds, 'prone'] : ['prone'];
     await setRuntimeValue(targetName, 'activeConditions', newConds, campaignName);
 
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,
-        abilityName: "Hill's Tumble",
-        description: `${playerStats.name} used Hill's Tumble to knock ${targetName} prone.`,
-    }).catch(() => {});
+        abilityName: optName,
+        description: `${playerStats.name} used ${optName} to knock ${targetName} prone.`,
+    }).catch((e) => { console.error("[giantAncestry] Error:", e); });
+
+    await addEntry(campaignName, {
+        type: 'condition',
+        characterName: playerStats.name,
+        targetName,
+        condition: 'prone',
+        source: optName,
+        description: `${playerStats.name} used ${optName} to apply the prone condition to ${targetName}.`,
+    }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
-            name: "Hill's Tumble",
+            name: optName,
             automationType: 'hills_tumble',
-            description: `Hill's Tumble: Knocked <strong>${targetName}</strong> prone.`,
+            description: `${optName}: Knocked <strong>${targetName}</strong> prone.`,
             automation: action.automation,
         },
     };
@@ -879,6 +944,15 @@ export async function handleFrostsChill(action, playerStats, campaignName, optio
         description: `${playerStats.name} used ${optName} to deal ${actualDamage} ${damageType} damage to ${targetName}.`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
+    await addEntry(campaignName, {
+        type: 'condition',
+        characterName: playerStats.name,
+        targetName,
+        condition: 'speed_reduction',
+        source: optName,
+        description: `${playerStats.name} used ${optName} to reduce ${targetName}'s speed by ${speedReduction} ft until the end of their next turn.`,
+    }).catch((e) => { console.error("[giantAncestry] Error:", e); });
+
     return {
         type: 'popup',
         payload: {
@@ -908,33 +982,77 @@ export async function handleHillsTumble(action, playerStats, campaignName, optio
             payload: {
                 type: 'automation_info',
                 name: optName,
-                description: `${optName} has no uses remaining. Recharges on a Long Rest.`,
+                description: `${optName} has no uses remaining. Uses will reset on the next Long Rest.`,
                 automation: action.automation,
             },
         };
     }
 
-    // Check if there's a recent hit to apply prone to
-    const cs = await getCombatContext(campaignName);
-    const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
-    const targetName = target?.name || null;
+    const lastAttack = await findLastAttack(campaignName);
+    if (!lastAttack?.attackEvent) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} requires a recent attack. Use it after hitting a creature.`,
+                automation: action.automation,
+            },
+        };
+    }
 
+    if (lastAttack.attackerName !== playerStats.name) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} can only be used after you make an attack. Wait for your turn.`,
+                automation: action.automation,
+            },
+        };
+    }
+
+    if (lastAttack.attackEvent.rollType !== 'attack') {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} can only be used after an attack roll.`,
+                automation: action.automation,
+            },
+        };
+    }
+
+    const targetName = lastAttack.targetName;
     if (!targetName) {
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: optName,
-                description: `${optName}: No target found. Use this after hitting a creature with a melee attack.`,
+                description: `${optName} requires a target. No target found from the last attack.`,
                 automation: action.automation,
             },
         };
     }
 
-    // Consume the use and apply prone
+    const storedConds = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    if (storedConds.includes('prone')) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${targetName} is already prone.`,
+                automation: action.automation,
+            },
+        };
+    }
+
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
-    const storedConds = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
     const newConds = Array.isArray(storedConds) ? [...storedConds, 'prone'] : ['prone'];
     await setRuntimeValue(targetName, 'activeConditions', newConds, campaignName);
 
@@ -943,7 +1061,16 @@ export async function handleHillsTumble(action, playerStats, campaignName, optio
         characterName: playerStats.name,
         abilityName: optName,
         description: `${playerStats.name} used ${optName} to knock ${targetName} prone.`,
-    }).catch(() => {});
+    }).catch((e) => { console.error("[giantAncestry] Error:", e); });
+
+    await addEntry(campaignName, {
+        type: 'condition',
+        characterName: playerStats.name,
+        targetName,
+        condition: 'prone',
+        source: optName,
+        description: `${playerStats.name} used ${optName} to apply the prone condition to ${targetName}.`,
+    }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
     return {
         type: 'popup',

@@ -63,7 +63,6 @@ vi.mock('../../common/damageRollback.js', () => ({
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { resolveTarget } from '../../common/targetResolver.js';
-import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 
 function makeAction(overrides = {}) {
@@ -348,6 +347,12 @@ describe('giantAncestryHandler', () => {
                 targetName: 'Goblin',
                 damageType: 'Cold',
             }));
+            expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'condition',
+                targetName: 'Goblin',
+                condition: 'speed_reduction',
+                source: "Frost's Chill",
+            }));
         });
 
         it('returns popup when no lastAttack', async () => {
@@ -422,27 +427,86 @@ describe('giantAncestryHandler', () => {
                 if (campaign && key === 'activeConditions') return [];
                 return null;
             });
-            getCombatContext.mockResolvedValue({});
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
             const result = await handleHillsTumble(makeAction(), makePlayerStats(), 'campaign', option);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Goblin');
             expect(result.payload.description).toContain('prone');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'hillsTumbleUses', 2, 'campaign');
+            expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', ['prone'], 'campaign');
             expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
                 type: 'ability_use',
                 abilityName: "Hill's Tumble",
             }));
+            expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'condition',
+                targetName: 'Goblin',
+                condition: 'prone',
+                source: "Hill's Tumble",
+            }));
         });
 
-        it('returns popup when no target found', async () => {
+        it('returns popup when no lastAttack', async () => {
             makeUsesMock('hillsTumbleUses', 3);
-            getCombatContext.mockResolvedValue({});
-            getTargetFromAttacker.mockReturnValue(null);
+            findLastAttack.mockResolvedValue(null);
             const result = await handleHillsTumble(makeAction(), makePlayerStats(), 'campaign', option);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No target found');
+            expect(result.payload.description).toContain('requires a recent attack');
+        });
+
+        it('returns popup when attacker is not the player', async () => {
+            makeUsesMock('hillsTumbleUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack' },
+                attackerName: 'Orc',
+                targetName: 'Goblin',
+            });
+
+            const result = await handleHillsTumble(makeAction(), makePlayerStats(), 'campaign', option);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('after you make an attack');
+        });
+
+        it('returns popup when rollType is not attack', async () => {
+            makeUsesMock('hillsTumbleUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'check' },
+                attackerName: 'TestHero',
+                targetName: 'Goblin',
+            });
+
+            const result = await handleHillsTumble(makeAction(), makePlayerStats(), 'campaign', option);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('after an attack roll');
+        });
+
+        it('returns popup when no targetName in lastAttack', async () => {
+            makeUsesMock('hillsTumbleUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack' },
+                attackerName: 'TestHero',
+                targetName: null,
+            });
+
+            const result = await handleHillsTumble(makeAction(), makePlayerStats(), 'campaign', option);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('requires a target');
+        });
+
+        it('returns popup when target is already prone', async () => {
+            getRuntimeValue.mockImplementation((_name, key, campaign) => {
+                if (key === 'hillsTumbleUses') return 3;
+                if (campaign && key === 'activeConditions') return ['prone'];
+                return null;
+            });
+            const result = await handleHillsTumble(makeAction(), makePlayerStats(), 'campaign', option);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('already prone');
         });
 
         it('returns info popup when no uses remaining', async () => {
@@ -451,6 +515,7 @@ describe('giantAncestryHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('no uses remaining');
+            expect(result.payload.description).toContain('Long Rest');
         });
     });
 
@@ -691,6 +756,12 @@ describe('giantAncestryHandler', () => {
                 targetName: 'Goblin',
                 damageType: 'Cold',
             }));
+            expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'condition',
+                targetName: 'Goblin',
+                condition: 'speed_reduction',
+                source: "Frost's Chill",
+            }));
         });
 
         it('returns popup when no lastAttack', async () => {
@@ -775,27 +846,86 @@ describe('giantAncestryHandler', () => {
                 if (campaign && key === 'activeConditions') return [];
                 return null;
             });
-            getCombatContext.mockResolvedValue({});
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
             const result = await handleHillsTumbleDirect(directAction, makePlayerStats(), 'campaign');
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Goblin');
             expect(result.payload.description).toContain('prone');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'hillsTumbleUses', 2, 'campaign');
+            expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', ['prone'], 'campaign');
             expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
                 type: 'ability_use',
                 abilityName: "Hill's Tumble",
             }));
+            expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'condition',
+                targetName: 'Goblin',
+                condition: 'prone',
+                source: "Hill's Tumble",
+            }));
         });
 
-        it('returns popup when no target found', async () => {
+        it('returns popup when no lastAttack', async () => {
             makeUsesMock('hillsTumbleUses', 3);
-            getCombatContext.mockResolvedValue({});
-            getTargetFromAttacker.mockReturnValue(null);
+            findLastAttack.mockResolvedValue(null);
             const result = await handleHillsTumbleDirect(directAction, makePlayerStats(), 'campaign');
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No target found');
+            expect(result.payload.description).toContain('requires a recent attack');
+        });
+
+        it('returns popup when attacker is not the player', async () => {
+            makeUsesMock('hillsTumbleUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack' },
+                attackerName: 'Orc',
+                targetName: 'Goblin',
+            });
+
+            const result = await handleHillsTumbleDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('after you make an attack');
+        });
+
+        it('returns popup when rollType is not attack', async () => {
+            makeUsesMock('hillsTumbleUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'check' },
+                attackerName: 'TestHero',
+                targetName: 'Goblin',
+            });
+
+            const result = await handleHillsTumbleDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('after an attack roll');
+        });
+
+        it('returns popup when no targetName in lastAttack', async () => {
+            makeUsesMock('hillsTumbleUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack' },
+                attackerName: 'TestHero',
+                targetName: null,
+            });
+
+            const result = await handleHillsTumbleDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('requires a target');
+        });
+
+        it('returns popup when target is already prone', async () => {
+            getRuntimeValue.mockImplementation((_name, key, campaign) => {
+                if (key === 'hillsTumbleUses') return 3;
+                if (campaign && key === 'activeConditions') return ['prone'];
+                return null;
+            });
+            const result = await handleHillsTumbleDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('already prone');
         });
 
         it('returns info popup when no uses remaining', async () => {
@@ -804,6 +934,7 @@ describe('giantAncestryHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('no uses remaining');
+            expect(result.payload.description).toContain('Long Rest');
         });
     });
 

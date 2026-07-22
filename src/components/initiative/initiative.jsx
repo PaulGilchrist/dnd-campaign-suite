@@ -716,6 +716,14 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
     const handleAutoBreakCondition = (creatureName, condition) => {
         if (!isLocalhost || !combatSummary) return
+        const conditionKey = String(condition.key || condition).toLowerCase()
+        const creature = combatSummary.creatures.find(c => c.name === creatureName)
+        if (creature?.conditions) {
+            creature.conditions = creature.conditions.filter(c => {
+                if (!c || typeof c !== 'object') return true
+                return String(c.key || c).toLowerCase() !== conditionKey
+            })
+        }
         removeCondition(combatSummary, creatureName, condition, getRuntimeValue, setRuntimeValue, campaignName)
         storage.set('combatSummary', combatSummary, campaignName)
         setCombatSummary(cloneDeep(combatSummary))
