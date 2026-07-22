@@ -501,7 +501,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const handleStrokeOfLuck = React.useCallback(() => {
         if (playerStats) {
             setRuntimeValue(playerStats.name, 'strokeOfLuckUsed', true, campaignName);
-            setRuntimeValue(playerStats.name, 'boonOfCombatProwessUsed', true, campaignName);
+            setRuntimeValue(playerStats.name, 'boonOfCombatProwessUsed', Date.now(), campaignName);
         }
     }, [playerStats, campaignName]);
 
@@ -836,6 +836,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                         onBardicInspirationOffense={popupHtml?.bardicInspirationOffense ? handleBardicInspirationOffense : undefined}
                         onEmpoweredSpell={popupHtml?.empoweredSpell ? handleEmpoweredSpell : undefined}
                         onAfterBiDefense={handleBiDefenseCombatSummary}
+                        onStrokeOfLuck={handleStrokeOfLuck}
                     />;
                 })()}
                 {popupHtml?.type === 'shield_of_faith_target_selection' && (

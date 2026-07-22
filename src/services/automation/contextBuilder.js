@@ -477,7 +477,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
         const hasBoonOfCombatProwess = allAutomation.some(
             p => p.type === 'auto_reroll' && (p.effect === 'convert_miss_to_hit' || p.automation?.effect === 'convert_miss_to_hit')
         );
-        const boonOfCombatProwessUsed = hasBoonOfCombatProwess ? getRuntimeValue(playerName, 'boonOfCombatProwessUsed', campaignName) : false;
+        const boonOfCombatProwessUsed = hasBoonOfCombatProwess ? getRuntimeValue(playerName, 'boonOfCombatProwessUsed') : false;
         const boonOfCombatProwessAvailable = hasBoonOfCombatProwess && !boonOfCombatProwessUsed;
 
         // Graze: check if the player has Graze weapon mastery for this weapon

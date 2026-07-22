@@ -31,7 +31,7 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
                 updates.relentlessUsedRound = null;
             }
 
-            // Reset Boon of Combat Prowess and Stroke of Luck on initiative (new combat)
+            // Reset Boon of Combat Prowess and Stroke of Luck on initiative (new turn)
             updates.boonOfCombatProwessUsed = null;
             updates.strokeOfLuckUsed = null;
 
@@ -42,6 +42,14 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
 
             // Clear War God's Blessing active state on new combat
             setRuntimeValue(playerStats.name, '_War_Gods_Blessing_active', null, campaignName);
+
+            // Clear Living Legend active state on initiative roll (new combat)
+            setRuntimeValue(playerStats.name, 'livingLegendActive', null, campaignName);
+            setRuntimeValue(playerStats.name, 'unerringStrikeUsed', null, campaignName);
+
+            // Reset Boon of Combat Prowess and Stroke of Luck for the rolling character
+            setRuntimeValue(playerStats.name, 'boonOfCombatProwessUsed', null, campaignName);
+            setRuntimeValue(playerStats.name, 'strokeOfLuckUsed', null, campaignName);
 
             // Clear Living Legend active state on initiative roll (new combat)
             setRuntimeValue(playerStats.name, 'livingLegendActive', null, campaignName);

@@ -82,8 +82,9 @@ export const SHORT_REST_RESOURCES = [
   'adrenalineRushUses',
   '_celestialRevelationUses',
   '_War_Gods_Blessing_active',
-  'spellthiefUses',
-  'strokeOfLuckUsed'
+   'spellthiefUses',
+   'strokeOfLuckUsed',
+   'boonOfCombatProwessUsed'
 ]
 
 export function getShortRestResources() {

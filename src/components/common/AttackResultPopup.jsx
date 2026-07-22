@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useRef } from 'react';
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../services/ui/logService.js';
@@ -7,6 +7,12 @@ import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
 
 function AttackResultPopup({ popupHtml, onClose, campaignName, attackerName, setPopupHtml, onBeforeBiDefense, onAfterBiDefense, onStrokeOfLuck, ...callbacks }) {
   const [missToHitApplied, setMissToHitApplied] = useState(false);
+  const hasBoonBeenUsedRef = useRef(false);
+
+  if (popupHtml?.autoRerollForAttack && attackerName) {
+    const used = getRuntimeValue(attackerName, 'boonOfCombatProwessUsed');
+    hasBoonBeenUsedRef.current = !!used;
+  }
 
   const handleDone = useCallback(() => {
     const hit = missToHitApplied || popupHtml?.hit;
@@ -19,10 +25,10 @@ function AttackResultPopup({ popupHtml, onClose, campaignName, attackerName, set
   }, [popupHtml, onClose, missToHitApplied]);
 
   const handleMissToHit = useCallback(() => {
-    if (!popupHtml) return;
+    if (!popupHtml || missToHitApplied || hasBoonBeenUsedRef.current) return;
     setMissToHitApplied(true);
     if (onStrokeOfLuck) onStrokeOfLuck();
-  }, [popupHtml, onStrokeOfLuck]);
+  }, [popupHtml, missToHitApplied, onStrokeOfLuck]);
 
   const handleBardicInspirationDefense = useCallback(async (dieValue, dieSize, newAc, willMiss) => {
     if (!popupHtml) return;
@@ -76,7 +82,7 @@ function AttackResultPopup({ popupHtml, onClose, campaignName, attackerName, set
           autoDamage={popupHtml?.autoDamage && (missToHitApplied || popupHtml?.hit) ? popupHtml.autoDamage : undefined}
           onBardicInspirationDefense={popupHtml?.bardicInspirationDefense ? handleBardicInspirationDefense : undefined}
           onDone={popupHtml?.autoDamage && (popupHtml?.hit || missToHitApplied) ? handleDone : undefined}
-          onStrokeOfLuck={popupHtml?.strokeOfLuck || popupHtml?.autoRerollForAttack ? handleMissToHit : undefined}
+          onStrokeOfLuck={popupHtml?.strokeOfLuck || (popupHtml?.autoRerollForAttack && !missToHitApplied && !hasBoonBeenUsedRef.current) ? handleMissToHit : undefined}
           {...callbacks}
         />
       )}
