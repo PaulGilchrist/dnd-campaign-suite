@@ -3,9 +3,9 @@ import { rollExpression } from '../../../dice/diceRoller.js';
 import { addEntry } from '../../../ui/logService.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { findLastAttack } from '../../common/damageRollback.js';
-import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
+import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 
 const GIANT_ANCESTRY_KEY = 'giantAncestrySelection';
 
@@ -517,7 +517,8 @@ export async function handleHillsTumbleDirect(action, playerStats, campaignName)
 }
 
 export async function handleStonesEnduranceDirect(action, playerStats, campaignName) {
-    const usesKey = getRuntimeUsesKey("Stone's Endurance");
+    const optName = "Stone's Endurance";
+    const usesKey = getRuntimeUsesKey(optName);
     const usesMax = playerStats.proficiency || 0;
     const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
 
@@ -526,32 +527,85 @@ export async function handleStonesEnduranceDirect(action, playerStats, campaignN
             type: 'popup',
             payload: {
                 type: 'automation_info',
-                name: "Stone's Endurance",
-                description: "Stone's Endurance has no uses remaining. Recharges on a Long Rest.",
+                name: optName,
+                description: `${optName} has no uses remaining. Uses will reset on the next Long Rest.`,
                 automation: action.automation,
             },
         };
     }
 
-    const reduction = evaluateAutoExpression(action.automation.reductionExpression || '1d12 + CON modifier', playerStats);
-    const reductionDisplay = typeof reduction === 'number' ? String(reduction) : (reduction || action.automation.reductionExpression || '1d12 + CON modifier');
+    const lastAttack = await findLastAttack(campaignName);
+    if (!lastAttack?.attackEvent) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} requires a recent attack where you were the target and took damage.`,
+                automation: action.automation,
+            },
+        };
+    }
+
+    if (lastAttack.targetName !== playerStats.name) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} can only be used when you were the target of the attack and took damage.`,
+                automation: action.automation,
+            },
+        };
+    }
+
+    const totalDamage = lastAttack.totalDamage || 0;
+    if (totalDamage <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} requires that you took damage from the attack. No damage was dealt.`,
+                automation: action.automation,
+            },
+        };
+    }
+
+    const enduranceRoll = rollExpression('1d12');
+    const conMod = playerStats.abilities?.find(a => a.name === 'Constitution')?.bonus || 0;
+    const totalHeal = enduranceRoll.total + conMod;
+    const actualHeal = Math.min(totalHeal, totalDamage);
 
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+
+    const cs = await getCombatContext(campaignName);
+    const healResult = applyHealingToTarget(cs, playerStats.name, actualHeal, campaignName);
+    const finalHeal = healResult?.actualHeal ?? actualHeal;
 
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,
-        abilityName: "Stone's Endurance",
-        description: `${playerStats.name} used Stone's Endurance to reduce damage by ${reductionDisplay}.`,
-    });
+        abilityName: optName,
+        description: `${playerStats.name} used ${optName} to heal ${finalHeal} HP (rolled ${enduranceRoll.total} + ${conMod} CON modifier, capped at ${totalDamage} damage).`,
+    }).catch((e) => { console.error("[giantAncestry] Error:", e); });
+
+    await addEntry(campaignName, {
+        type: 'healing',
+        characterName: playerStats.name,
+        targetName: playerStats.name,
+        amount: finalHeal,
+        source: optName,
+        description: `${playerStats.name} used ${optName} to heal ${finalHeal} HP.`,
+    }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
-            name: "Stone's Endurance",
+            name: optName,
             automationType: 'stones_endurance',
-            description: `Stone's Endurance: Reduce damage by <strong>${reductionDisplay}</strong>.`,
+            description: `${optName}: Rolled <strong>${enduranceRoll.total}</strong> + ${conMod} CON = <strong>${totalHeal}</strong> (capped at ${totalDamage} damage). Healed <strong>${finalHeal}</strong> HP.`,
             automation: action.automation,
         },
     };
@@ -1097,24 +1151,76 @@ export async function handleStonesEndurance(action, playerStats, campaignName, o
             payload: {
                 type: 'automation_info',
                 name: optName,
-                description: `${optName} has no uses remaining. Recharges on a Long Rest.`,
+                description: `${optName} has no uses remaining. Uses will reset on the next Long Rest.`,
                 automation: action.automation,
             },
         };
     }
 
-    const reduction = evaluateAutoExpression(opt.reductionExpression, playerStats);
-    const reductionDisplay = typeof reduction === 'number' ? String(reduction) : (reduction || opt.reductionExpression);
+    const lastAttack = await findLastAttack(campaignName);
+    if (!lastAttack?.attackEvent) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} requires a recent attack where you were the target and took damage.`,
+                automation: action.automation,
+            },
+        };
+    }
 
-    // Consume the use
+    if (lastAttack.targetName !== playerStats.name) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} can only be used when you were the target of the attack and took damage.`,
+                automation: action.automation,
+            },
+        };
+    }
+
+    const totalDamage = lastAttack.totalDamage || 0;
+    if (totalDamage <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} requires that you took damage from the attack. No damage was dealt.`,
+                automation: action.automation,
+            },
+        };
+    }
+
+    const enduranceRoll = rollExpression('1d12');
+    const conMod = playerStats.abilities?.find(a => a.name === 'Constitution')?.bonus || 0;
+    const totalHeal = enduranceRoll.total + conMod;
+    const actualHeal = Math.min(totalHeal, totalDamage);
+
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+
+    const cs = await getCombatContext(campaignName);
+    const healResult = applyHealingToTarget(cs, playerStats.name, actualHeal, campaignName);
+    const finalHeal = healResult?.actualHeal ?? actualHeal;
 
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: optName,
-        description: `${playerStats.name} used ${optName} to reduce damage by ${reductionDisplay}.`,
-    });
+        description: `${playerStats.name} used ${optName} to heal ${finalHeal} HP (rolled ${enduranceRoll.total} + ${conMod} CON modifier, capped at ${totalDamage} damage).`,
+    }).catch((e) => { console.error("[giantAncestry] Error:", e); });
+
+    await addEntry(campaignName, {
+        type: 'healing',
+        characterName: playerStats.name,
+        targetName: playerStats.name,
+        amount: finalHeal,
+        source: optName,
+        description: `${playerStats.name} used ${optName} to heal ${finalHeal} HP.`,
+    }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
     return {
         type: 'popup',
@@ -1122,7 +1228,7 @@ export async function handleStonesEndurance(action, playerStats, campaignName, o
             type: 'automation_info',
             name: optName,
             automationType: opt.type,
-            description: `${optName}: Reduce damage by <strong>${reductionDisplay}</strong>.`,
+            description: `${optName}: Rolled <strong>${enduranceRoll.total}</strong> + ${conMod} CON = <strong>${totalHeal}</strong> (capped at ${totalDamage} damage). Healed <strong>${finalHeal}</strong> HP.`,
             automation: action.automation,
         },
     };

@@ -106,6 +106,15 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         });
     }
 
+    // Update Stone's Endurance description based on remaining uses
+    const stonesEnduranceUses = Number(getRuntimeValue(playerStats.name, 'stonesEnduranceUses', campaignName) ?? playerStats._trackedResources?.stonesEnduranceUses?.current ?? 0);
+    const stonesEnduranceReaction = reactions.find(r => r.name === "Stone's Endurance");
+    if (stonesEnduranceReaction) {
+        stonesEnduranceReaction.description = stonesEnduranceUses > 0
+            ? `When you take damage, you can take a Reaction to roll 1d12 + CON modifier and heal up to that amount (capped at damage taken). ${stonesEnduranceUses} uses remaining. Recharges on a Long Rest.`
+            : 'No uses remaining. Uses will reset on the next Long Rest.';
+    }
+
     const reactionSpellNames = getReactionSpellNames(playerStats);
     let reactionSpells = [];
     if (playerStats.spellAbilities && playerStats.spellAbilities.spells.length > 0) {

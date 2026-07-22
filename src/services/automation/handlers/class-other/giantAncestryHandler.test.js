@@ -48,15 +48,19 @@ vi.mock('../../../rules/combat/applyDamage.js', () => ({
     applyDamageToTarget: vi.fn(() => ({ finalDamage: 5, newHp: 15, oldHp: 20, damageReduced: false })),
 }));
 
+vi.mock('../../../rules/combat/applyHealing.js', () => ({
+    applyHealingToTarget: vi.fn(() => ({ actualHeal: 12, oldHp: 10, newHp: 22 })),
+}));
+
 vi.mock('../../common/damageRollback.js', () => ({
     findLastAttack: vi.fn(async () => ({
         attackEvent: { rollType: 'attack', attackerName: 'TestHero' },
         attackerName: 'TestHero',
         targetName: 'Goblin',
-        primaryDamage: 0,
+        primaryDamage: 10,
         secondaryDamage: 0,
-        totalDamage: 0,
-        damageTypes: [],
+        totalDamage: 10,
+        damageTypes: ['slashing'],
     })),
 }));
 
@@ -522,18 +526,58 @@ describe('giantAncestryHandler', () => {
     describe('handleStonesEndurance', () => {
         const option = { name: "Stone's Endurance", type: 'damage_reduction', reductionExpression: '1d10 + CON modifier' };
 
-        it('reduces damage and returns popup', async () => {
+        it('heals when giant was target and took damage', async () => {
             makeUsesMock('stonesEnduranceUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack', attackerName: 'Orc' },
+                attackerName: 'Orc',
+                targetName: 'TestHero',
+                totalDamage: 15,
+            });
             const result = await handleStonesEndurance(makeAction(), makePlayerStats(), 'campaign', option);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain("Stone's Endurance");
-            expect(result.payload.description).toContain('Reduce damage by');
+            expect(result.payload.description).toContain('Healed');
             expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'stonesEnduranceUses', 2, 'campaign');
             expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
                 type: 'ability_use',
                 abilityName: "Stone's Endurance",
             }));
+            expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'healing',
+                characterName: 'TestHero',
+            }));
+        });
+
+        it('returns popup when player was not the target', async () => {
+            makeUsesMock('stonesEnduranceUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack' },
+                attackerName: 'Orc',
+                targetName: 'Goblin',
+                totalDamage: 10,
+            });
+
+            const result = await handleStonesEndurance(makeAction(), makePlayerStats(), 'campaign', option);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('you were the target');
+        });
+
+        it('returns popup when no damage was dealt', async () => {
+            makeUsesMock('stonesEnduranceUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack' },
+                attackerName: 'Orc',
+                targetName: 'TestHero',
+                totalDamage: 0,
+            });
+
+            const result = await handleStonesEndurance(makeAction(), makePlayerStats(), 'campaign', option);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('took damage');
         });
 
         it('returns info popup when no uses remaining', async () => {
@@ -542,6 +586,16 @@ describe('giantAncestryHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('no uses remaining');
+        });
+
+        it('returns popup when no lastAttack', async () => {
+            makeUsesMock('stonesEnduranceUses', 3);
+            findLastAttack.mockResolvedValue({ attackEvent: null });
+
+            const result = await handleStonesEndurance(makeAction(), makePlayerStats(), 'campaign', option);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('recent attack');
         });
     });
 
@@ -951,18 +1005,58 @@ describe('giantAncestryHandler', () => {
             },
         };
 
-        it('reduces damage and returns popup', async () => {
+        it('heals when giant was target and took damage', async () => {
             makeUsesMock('stonesEnduranceUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack', attackerName: 'Orc' },
+                attackerName: 'Orc',
+                targetName: 'TestHero',
+                totalDamage: 15,
+            });
             const result = await handleStonesEnduranceDirect(directAction, makePlayerStats(), 'campaign');
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain("Stone's Endurance");
-            expect(result.payload.description).toContain('Reduce damage by');
+            expect(result.payload.description).toContain('Healed');
             expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'stonesEnduranceUses', 2, 'campaign');
             expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
                 type: 'ability_use',
                 abilityName: "Stone's Endurance",
             }));
+            expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'healing',
+                characterName: 'TestHero',
+            }));
+        });
+
+        it('returns popup when player was not the target', async () => {
+            makeUsesMock('stonesEnduranceUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack' },
+                attackerName: 'Orc',
+                targetName: 'Goblin',
+                totalDamage: 10,
+            });
+
+            const result = await handleStonesEnduranceDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('you were the target');
+        });
+
+        it('returns popup when no damage was dealt', async () => {
+            makeUsesMock('stonesEnduranceUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack' },
+                attackerName: 'Orc',
+                targetName: 'TestHero',
+                totalDamage: 0,
+            });
+
+            const result = await handleStonesEnduranceDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('took damage');
         });
 
         it('returns info popup when no uses remaining', async () => {
@@ -971,6 +1065,16 @@ describe('giantAncestryHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('no uses remaining');
+        });
+
+        it('returns popup when no lastAttack', async () => {
+            makeUsesMock('stonesEnduranceUses', 3);
+            findLastAttack.mockResolvedValue({ attackEvent: null });
+
+            const result = await handleStonesEnduranceDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('recent attack');
         });
     });
 
