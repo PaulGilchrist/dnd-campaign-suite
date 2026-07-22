@@ -44,10 +44,27 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getTargetFromAttacker: vi.fn(() => null),
 }));
 
+vi.mock('../../../rules/combat/applyDamage.js', () => ({
+    applyDamageToTarget: vi.fn(() => ({ finalDamage: 5, newHp: 15, oldHp: 20, damageReduced: false })),
+}));
+
+vi.mock('../../common/damageRollback.js', () => ({
+    findLastAttack: vi.fn(async () => ({
+        attackEvent: { rollType: 'attack', attackerName: 'TestHero' },
+        attackerName: 'TestHero',
+        targetName: 'Goblin',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+    })),
+}));
+
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
+import { findLastAttack } from '../../common/damageRollback.js';
 
 function makeAction(overrides = {}) {
     return {
@@ -167,7 +184,8 @@ describe('giantAncestryHandler', () => {
             );
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain("Fire's Burn");
+            expect(result.payload.type).toBe('damage');
+            expect(result.payload.name).toBe("Fire's Burn");
         });
 
         it('returns info popup when direct type does not match selection', async () => {
@@ -231,8 +249,11 @@ describe('giantAncestryHandler', () => {
             const result = await handleFiresBurn(makeAction(), makePlayerStats(), 'campaign', option);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain("Fire's Burn");
-            expect(result.payload.description).toContain('Fire');
+            expect(result.payload.type).toBe('damage');
+            expect(result.payload.name).toBe("Fire's Burn");
+            expect(result.payload.damageType).toBe('Fire');
+            expect(result.payload.finalDamage).toBe(5);
+            expect(result.payload.targetName).toBe('Goblin');
             expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'firesBurnUses', 2, 'campaign');
             expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
                 type: 'roll',
@@ -243,9 +264,52 @@ describe('giantAncestryHandler', () => {
             }));
         });
 
-        it('returns popup when no target', async () => {
+        it('returns popup when no lastAttack', async () => {
             makeUsesMock('firesBurnUses', 3);
-            resolveTarget.mockResolvedValue(null);
+            findLastAttack.mockResolvedValue({ attackEvent: null });
+
+            const result = await handleFiresBurn(makeAction(), makePlayerStats(), 'campaign', option);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.description).toContain('requires a recent attack');
+        });
+
+        it('returns popup when attacker is not the player', async () => {
+            makeUsesMock('firesBurnUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack' },
+                attackerName: 'Orc',
+                targetName: 'Goblin',
+            });
+
+            const result = await handleFiresBurn(makeAction(), makePlayerStats(), 'campaign', option);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('after you make an attack');
+        });
+
+        it('returns popup when rollType is not attack', async () => {
+            makeUsesMock('firesBurnUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'check' },
+                attackerName: 'TestHero',
+                targetName: 'Goblin',
+            });
+
+            const result = await handleFiresBurn(makeAction(), makePlayerStats(), 'campaign', option);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('after an attack roll');
+        });
+
+        it('returns popup when no targetName in lastAttack', async () => {
+            makeUsesMock('firesBurnUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack' },
+                attackerName: 'TestHero',
+                targetName: null,
+            });
 
             const result = await handleFiresBurn(makeAction(), makePlayerStats(), 'campaign', option);
 
@@ -259,6 +323,7 @@ describe('giantAncestryHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('no uses remaining');
+            expect(result.payload.description).toContain('Long Rest');
         });
     });
 
@@ -266,17 +331,16 @@ describe('giantAncestryHandler', () => {
         const option = { name: "Frost's Chill", type: 'damage_with_condition', damage: '1d6', damageType: 'Cold', value: '10_ft' };
 
         it('deals damage and applies speed reduction', async () => {
-            getRuntimeValue.mockImplementation((_name, key, campaign) => {
-                if (key === 'frostsChillUses') return 3;
-                if (key === 'targetEffects' && campaign === 'campaign') return [];
-                return null;
-            });
-            resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+            makeUsesMock('frostsChillUses', 3);
             const result = await handleFrostsChill(makeAction(), makePlayerStats(), 'campaign', option);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain("Frost's Chill");
-            expect(result.payload.description).toContain('Cold');
+            expect(result.payload.type).toBe('damage');
+            expect(result.payload.name).toBe("Frost's Chill");
+            expect(result.payload.damageType).toBe('Cold');
+            expect(result.payload.finalDamage).toBe(5);
+            expect(result.payload.targetName).toBe('Goblin');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'frostsChillUses', 2, 'campaign');
             expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', expect.any(Array), 'campaign');
             expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
                 type: 'roll',
@@ -286,9 +350,52 @@ describe('giantAncestryHandler', () => {
             }));
         });
 
-        it('returns popup when no target', async () => {
+        it('returns popup when no lastAttack', async () => {
             makeUsesMock('frostsChillUses', 3);
-            resolveTarget.mockResolvedValue(null);
+            findLastAttack.mockResolvedValue({ attackEvent: null });
+
+            const result = await handleFrostsChill(makeAction(), makePlayerStats(), 'campaign', option);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.description).toContain('requires a recent attack');
+        });
+
+        it('returns popup when attacker is not the player', async () => {
+            makeUsesMock('frostsChillUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack' },
+                attackerName: 'Orc',
+                targetName: 'Goblin',
+            });
+
+            const result = await handleFrostsChill(makeAction(), makePlayerStats(), 'campaign', option);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('after you make an attack');
+        });
+
+        it('returns popup when rollType is not attack', async () => {
+            makeUsesMock('frostsChillUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'check' },
+                attackerName: 'TestHero',
+                targetName: 'Goblin',
+            });
+
+            const result = await handleFrostsChill(makeAction(), makePlayerStats(), 'campaign', option);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('after an attack roll');
+        });
+
+        it('returns popup when no targetName in lastAttack', async () => {
+            makeUsesMock('frostsChillUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack' },
+                attackerName: 'TestHero',
+                targetName: null,
+            });
 
             const result = await handleFrostsChill(makeAction(), makePlayerStats(), 'campaign', option);
 
@@ -302,6 +409,7 @@ describe('giantAncestryHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('no uses remaining');
+            expect(result.payload.description).toContain('Long Rest');
         });
     });
 
@@ -467,15 +575,15 @@ describe('giantAncestryHandler', () => {
         };
 
         it('deals damage and consumes use', async () => {
-            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-                if (key === 'firesBurnUses') return 3;
-                return null;
-            });
+            makeUsesMock('firesBurnUses', 3);
             const result = await handleFiresBurnDirect(directAction, makePlayerStats(), 'campaign');
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain("Fire's Burn");
-            expect(result.payload.description).toContain('Fire');
+            expect(result.payload.type).toBe('damage');
+            expect(result.payload.name).toBe("Fire's Burn");
+            expect(result.payload.damageType).toBe('Fire');
+            expect(result.payload.finalDamage).toBe(5);
+            expect(result.payload.targetName).toBe('Goblin');
             expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'firesBurnUses', 2, 'campaign');
             expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
                 type: 'roll',
@@ -486,9 +594,52 @@ describe('giantAncestryHandler', () => {
             }));
         });
 
-        it('returns popup when no target', async () => {
+        it('returns popup when no lastAttack', async () => {
             makeUsesMock('firesBurnUses', 3);
-            resolveTarget.mockResolvedValue(null);
+            findLastAttack.mockResolvedValue({ attackEvent: null });
+
+            const result = await handleFiresBurnDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.description).toContain('requires a recent attack');
+        });
+
+        it('returns popup when attacker is not the player', async () => {
+            makeUsesMock('firesBurnUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack' },
+                attackerName: 'Orc',
+                targetName: 'Goblin',
+            });
+
+            const result = await handleFiresBurnDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('after you make an attack');
+        });
+
+        it('returns popup when rollType is not attack', async () => {
+            makeUsesMock('firesBurnUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'check' },
+                attackerName: 'TestHero',
+                targetName: 'Goblin',
+            });
+
+            const result = await handleFiresBurnDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('after an attack roll');
+        });
+
+        it('returns popup when no targetName in lastAttack', async () => {
+            makeUsesMock('firesBurnUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack' },
+                attackerName: 'TestHero',
+                targetName: null,
+            });
 
             const result = await handleFiresBurnDirect(directAction, makePlayerStats(), 'campaign');
 
@@ -502,6 +653,7 @@ describe('giantAncestryHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('no uses remaining');
+            expect(result.payload.description).toContain('Long Rest');
         });
     });
 
@@ -522,17 +674,16 @@ describe('giantAncestryHandler', () => {
         };
 
         it('deals damage and applies speed reduction', async () => {
-            getRuntimeValue.mockImplementation((_name, key, campaign) => {
-                if (key === 'frostsChillUses') return 3;
-                if (key === 'targetEffects' && campaign === 'campaign') return [];
-                return null;
-            });
-            resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+            makeUsesMock('frostsChillUses', 3);
             const result = await handleFrostsChillDirect(directAction, makePlayerStats(), 'campaign');
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain("Frost's Chill");
-            expect(result.payload.description).toContain('cold');
+            expect(result.payload.type).toBe('damage');
+            expect(result.payload.name).toBe("Frost's Chill");
+            expect(result.payload.damageType).toBe('Cold');
+            expect(result.payload.finalDamage).toBe(5);
+            expect(result.payload.targetName).toBe('Goblin');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'frostsChillUses', 2, 'campaign');
             expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', expect.any(Array), 'campaign');
             expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
                 type: 'roll',
@@ -542,9 +693,52 @@ describe('giantAncestryHandler', () => {
             }));
         });
 
-        it('returns popup when no target', async () => {
+        it('returns popup when no lastAttack', async () => {
             makeUsesMock('frostsChillUses', 3);
-            resolveTarget.mockResolvedValue(null);
+            findLastAttack.mockResolvedValue({ attackEvent: null });
+
+            const result = await handleFrostsChillDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.description).toContain('requires a recent attack');
+        });
+
+        it('returns popup when attacker is not the player', async () => {
+            makeUsesMock('frostsChillUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack' },
+                attackerName: 'Orc',
+                targetName: 'Goblin',
+            });
+
+            const result = await handleFrostsChillDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('after you make an attack');
+        });
+
+        it('returns popup when rollType is not attack', async () => {
+            makeUsesMock('frostsChillUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'check' },
+                attackerName: 'TestHero',
+                targetName: 'Goblin',
+            });
+
+            const result = await handleFrostsChillDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('after an attack roll');
+        });
+
+        it('returns popup when no targetName in lastAttack', async () => {
+            makeUsesMock('frostsChillUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack' },
+                attackerName: 'TestHero',
+                targetName: null,
+            });
 
             const result = await handleFrostsChillDirect(directAction, makePlayerStats(), 'campaign');
 
@@ -558,6 +752,7 @@ describe('giantAncestryHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('no uses remaining');
+            expect(result.payload.description).toContain('Long Rest');
         });
     });
 

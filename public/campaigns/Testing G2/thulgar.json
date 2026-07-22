@@ -62,7 +62,7 @@
   "race": {
     "name": "Goliath",
     "subrace": {
-      "name": "Cloud Giant",
+      "name": "Frost Giant",
       "description": ""
     }
   },
@@ -106,5 +106,9 @@
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
-  "imagePath": "images/Thulgar.png"
+  "imagePath": "images/Thulgar.png",
+  "featAbilityChoices": {
+    "0": "Strength",
+    "1": "Strength"
+  }
 }

@@ -2,8 +2,10 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { addEntry } from '../../../ui/logService.js';
 import { resolveTarget } from '../../common/targetResolver.js';
+import { findLastAttack } from '../../common/damageRollback.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
+import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 
 const GIANT_ANCESTRY_KEY = 'giantAncestrySelection';
 
@@ -174,31 +176,72 @@ export async function handleFiresBurnDirect(action, playerStats, campaignName) {
             payload: {
                 type: 'automation_info',
                 name: "Fire's Burn",
-                description: "Fire's Burn has no uses remaining. Recharges on a Long Rest.",
+                description: "Fire's Burn has no uses remaining. Uses will reset on the next Long Rest.",
                 automation: action.automation,
             },
         };
     }
 
-    const targetInfo = await resolveTarget(campaignName, playerStats.name);
-    if (!targetInfo?.target) {
+    const lastAttack = await findLastAttack(campaignName);
+    if (!lastAttack?.attackEvent) {
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: "Fire's Burn",
-                description: "Fire's Burn requires a target. Select a creature in combat.",
+                description: "Fire's Burn requires a recent attack. Use it after hitting a creature.",
                 automation: action.automation,
             },
         };
     }
 
-    const targetName = targetInfo.target.name;
+    if (lastAttack.attackerName !== playerStats.name) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: "Fire's Burn",
+                description: "Fire's Burn can only be used after you make an attack. Wait for your turn.",
+                automation: action.automation,
+            },
+        };
+    }
+
+    if (lastAttack.attackEvent.rollType !== 'attack') {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: "Fire's Burn",
+                description: "Fire's Burn can only be used after an attack roll.",
+                automation: action.automation,
+            },
+        };
+    }
+
+    const targetName = lastAttack.targetName;
+    if (!targetName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: "Fire's Burn",
+                description: "Fire's Burn requires a target. No target found from the last attack.",
+                automation: action.automation,
+            },
+        };
+    }
+
     const damageResult = rollExpression(action.automation.damage || '1d10');
-    const damageDisplay = damageResult ? damageResult.total : (action.automation.damage || '1d10');
     const damageType = action.automation.damageType || 'Fire';
 
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+
+    const cs = await getCombatContext(campaignName);
+    const characters = cs?.creatures?.filter(c => c.type === 'player') || [];
+    const applyResult = applyDamageToTarget(cs, targetName, damageResult?.total ?? 0, [damageType], campaignName, characters, false, playerStats.name);
+    const actualDamage = applyResult?.finalDamage ?? damageResult?.total ?? 0;
+    const newHp = applyResult?.newHp;
 
     await addEntry(campaignName, {
         type: 'roll',
@@ -207,20 +250,25 @@ export async function handleFiresBurnDirect(action, playerStats, campaignName) {
         name: "Fire's Burn" + ' Damage',
         targetName,
         damageType,
-        total: damageResult?.total ?? 0,
+        total: actualDamage,
         formula: action.automation.damage || '1d10',
         rolls: damageResult?.rolls,
-        description: `${playerStats.name} used Fire's Burn to deal ${damageDisplay} fire damage to ${targetName}.`,
+        description: `${playerStats.name} used Fire's Burn to deal ${actualDamage} fire damage to ${targetName}.`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
     return {
         type: 'popup',
         payload: {
-            type: 'automation_info',
+            type: 'damage',
             name: "Fire's Burn",
-            automationType: 'fire_burn',
-            description: `Fire's Burn: Dealt <strong>${damageDisplay}</strong> fire damage to ${targetName}.`,
-            automation: action.automation,
+            formula: action.automation.damage || '1d10',
+            rolls: damageResult?.rolls,
+            total: actualDamage,
+            finalDamage: actualDamage,
+            damageApplied: true,
+            targetName,
+            targetCurrentHp: newHp,
+            damageType,
         },
     };
 }
@@ -236,34 +284,76 @@ export async function handleFrostsChillDirect(action, playerStats, campaignName)
             payload: {
                 type: 'automation_info',
                 name: "Frost's Chill",
-                description: "Frost's Chill has no uses remaining. Recharges on a Long Rest.",
+                description: "Frost's Chill has no uses remaining. Uses will reset on the next Long Rest.",
                 automation: action.automation,
             },
         };
     }
 
-    const targetInfo = await resolveTarget(campaignName, playerStats.name);
-    if (!targetInfo?.target) {
+    const lastAttack = await findLastAttack(campaignName);
+    if (!lastAttack?.attackEvent) {
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: "Frost's Chill",
-                description: "Frost's Chill requires a target. Select a creature in combat.",
+                description: "Frost's Chill requires a recent attack. Use it after hitting a creature.",
                 automation: action.automation,
             },
         };
     }
 
-    const targetName = targetInfo.target.name;
+    if (lastAttack.attackerName !== playerStats.name) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: "Frost's Chill",
+                description: "Frost's Chill can only be used after you make an attack. Wait for your turn.",
+                automation: action.automation,
+            },
+        };
+    }
+
+    if (lastAttack.attackEvent.rollType !== 'attack') {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: "Frost's Chill",
+                description: "Frost's Chill can only be used after an attack roll.",
+                automation: action.automation,
+            },
+        };
+    }
+
+    const targetName = lastAttack.targetName;
+    if (!targetName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: "Frost's Chill",
+                description: "Frost's Chill requires a target. No target found from the last attack.",
+                automation: action.automation,
+            },
+        };
+    }
+
     const damageResult = rollExpression(action.automation.damage || '1d6');
-    const damageDisplay = damageResult ? damageResult.total : (action.automation.damage || '1d6');
     const damageType = action.automation.damageType || 'Cold';
     const speedReduction = parseInt(action.automation.value?.replace('_ft', ''), 10) || 10;
 
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
+    const cs = await getCombatContext(campaignName);
+    const characters = cs?.creatures?.filter(c => c.type === 'player') || [];
+    const applyResult = applyDamageToTarget(cs, targetName, damageResult?.total ?? 0, [damageType], campaignName, characters, false, playerStats.name);
+    const actualDamage = applyResult?.finalDamage ?? damageResult?.total ?? 0;
+    const newHp = applyResult?.newHp;
+
     const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+    const filteredEffects = storedEffects.filter(te => !(te.target === targetName && te.effect === 'speed_reduction'));
     const speedEffect = {
         target: targetName,
         source: "Frost's Chill",
@@ -271,7 +361,7 @@ export async function handleFrostsChillDirect(action, playerStats, campaignName)
         value: speedReduction,
         duration: 'until_end_of_next_turn',
     };
-    await setRuntimeValue(campaignName, 'targetEffects', [...storedEffects, speedEffect], campaignName);
+    await setRuntimeValue(campaignName, 'targetEffects', [...filteredEffects, speedEffect], campaignName);
 
     await addEntry(campaignName, {
         type: 'roll',
@@ -280,20 +370,25 @@ export async function handleFrostsChillDirect(action, playerStats, campaignName)
         name: "Frost's Chill" + ' Damage',
         targetName,
         damageType,
-        total: damageResult?.total ?? 0,
+        total: actualDamage,
         formula: action.automation.damage || '1d6',
         rolls: damageResult?.rolls,
-        description: `${playerStats.name} used Frost's Chill to deal ${damageDisplay} cold damage and reduce ${targetName}'s speed by ${speedReduction} feet.`,
+        description: `${playerStats.name} used Frost's Chill to deal ${actualDamage} cold damage to ${targetName}.`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
     return {
         type: 'popup',
         payload: {
-            type: 'automation_info',
+            type: 'damage',
             name: "Frost's Chill",
-            automationType: 'frosts_chill',
-            description: `Frost's Chill: Dealt <strong>${damageDisplay}</strong> cold damage to ${targetName}. Speed reduced by ${speedReduction} ft for 1 round.`,
-            automation: action.automation,
+            formula: action.automation.damage || '1d6',
+            rolls: damageResult?.rolls,
+            total: actualDamage,
+            finalDamage: actualDamage,
+            damageApplied: true,
+            targetName,
+            targetCurrentHp: newHp,
+            damageType,
         },
     };
 }
@@ -583,31 +678,72 @@ export async function handleFiresBurn(action, playerStats, campaignName, option)
             payload: {
                 type: 'automation_info',
                 name: optName,
-                description: `${optName} has no uses remaining. Recharges on a Long Rest.`,
+                description: `${optName} has no uses remaining. Uses will reset on the next Long Rest.`,
                 automation: action.automation,
             },
         };
     }
 
-    const targetInfo = await resolveTarget(campaignName, playerStats.name);
-    if (!targetInfo?.target) {
+    const lastAttack = await findLastAttack(campaignName);
+    if (!lastAttack?.attackEvent) {
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: optName,
-                description: `${optName} requires a target. Select a creature in combat.`,
+                description: `${optName} requires a recent attack. Use it after hitting a creature.`,
                 automation: action.automation,
             },
         };
     }
 
-    const targetName = targetInfo.target.name;
-    const damageResult = rollExpression(opt.damage);
-    const damageDisplay = damageResult ? damageResult.total : opt.damage;
+    if (lastAttack.attackerName !== playerStats.name) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} can only be used after you make an attack. Wait for your turn.`,
+                automation: action.automation,
+            },
+        };
+    }
 
-    // Consume the use
+    if (lastAttack.attackEvent.rollType !== 'attack') {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} can only be used after an attack roll.`,
+                automation: action.automation,
+            },
+        };
+    }
+
+    const targetName = lastAttack.targetName;
+    if (!targetName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} requires a target. No target found from the last attack.`,
+                automation: action.automation,
+            },
+        };
+    }
+
+    const damageResult = rollExpression(opt.damage);
+    const damageType = opt.damageType || 'Fire';
+
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+
+    const cs = await getCombatContext(campaignName);
+    const characters = cs?.creatures?.filter(c => c.type === 'player') || [];
+    const applyResult = applyDamageToTarget(cs, targetName, damageResult?.total ?? 0, [damageType], campaignName, characters, false, playerStats.name);
+    const actualDamage = applyResult?.finalDamage ?? damageResult?.total ?? 0;
+    const newHp = applyResult?.newHp;
 
     await addEntry(campaignName, {
         type: 'roll',
@@ -615,21 +751,26 @@ export async function handleFiresBurn(action, playerStats, campaignName, option)
         rollType: 'damage',
         name: optName + ' Damage',
         targetName,
-        damageType: opt.damageType,
-        total: damageResult?.total ?? 0,
+        damageType,
+        total: actualDamage,
         formula: opt.damage,
         rolls: damageResult?.rolls,
-        description: `${playerStats.name} used ${optName} to deal ${damageDisplay} ${opt.damageType} damage to ${targetName}.`,
+        description: `${playerStats.name} used ${optName} to deal ${actualDamage} ${damageType} damage to ${targetName}.`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
     return {
         type: 'popup',
         payload: {
-            type: 'automation_info',
+            type: 'damage',
             name: optName,
-            automationType: opt.type,
-            description: `${optName}: Dealt <strong>${damageDisplay}</strong> ${opt.damageType} damage to ${targetName}.`,
-            automation: action.automation,
+            formula: opt.damage,
+            rolls: damageResult?.rolls,
+            total: actualDamage,
+            finalDamage: actualDamage,
+            damageApplied: true,
+            targetName,
+            targetCurrentHp: newHp,
+            damageType,
         },
     };
 }
@@ -646,43 +787,84 @@ export async function handleFrostsChill(action, playerStats, campaignName, optio
             payload: {
                 type: 'automation_info',
                 name: optName,
-                description: `${optName} has no uses remaining. Recharges on a Long Rest.`,
+                description: `${optName} has no uses remaining. Uses will reset on the next Long Rest.`,
                 automation: action.automation,
             },
         };
     }
 
-    const targetInfo = await resolveTarget(campaignName, playerStats.name);
-    if (!targetInfo?.target) {
+    const lastAttack = await findLastAttack(campaignName);
+    if (!lastAttack?.attackEvent) {
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: optName,
-                description: `${optName} requires a target. Select a creature in combat.`,
+                description: `${optName} requires a recent attack. Use it after hitting a creature.`,
                 automation: action.automation,
             },
         };
     }
 
-    const targetName = targetInfo.target.name;
-    const damageResult = rollExpression(opt.damage);
-    const damageDisplay = damageResult ? damageResult.total : opt.damage;
+    if (lastAttack.attackerName !== playerStats.name) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} can only be used after you make an attack. Wait for your turn.`,
+                automation: action.automation,
+            },
+        };
+    }
 
-    // Consume the use
+    if (lastAttack.attackEvent.rollType !== 'attack') {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} can only be used after an attack roll.`,
+                automation: action.automation,
+            },
+        };
+    }
+
+    const targetName = lastAttack.targetName;
+    if (!targetName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: `${optName} requires a target. No target found from the last attack.`,
+                automation: action.automation,
+            },
+        };
+    }
+
+    const damageResult = rollExpression(opt.damage);
+    const damageType = opt.damageType || 'Cold';
+    const speedReduction = parseInt(opt.value?.replace('_ft', ''), 10) || 10;
+
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
-    // Apply speed reduction to target
+    const cs = await getCombatContext(campaignName);
+    const characters = cs?.creatures?.filter(c => c.type === 'player') || [];
+    const applyResult = applyDamageToTarget(cs, targetName, damageResult?.total ?? 0, [damageType], campaignName, characters, false, playerStats.name);
+    const actualDamage = applyResult?.finalDamage ?? damageResult?.total ?? 0;
+    const newHp = applyResult?.newHp;
 
     const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+    const filteredEffects = storedEffects.filter(te => !(te.target === targetName && te.effect === 'speed_reduction'));
     const speedEffect = {
         target: targetName,
         source: optName,
         effect: 'speed_reduction',
-        value: parseInt(opt.value.replace('_ft', ''), 10) || 10,
+        value: speedReduction,
         duration: 'until_end_of_next_turn',
     };
-    await setRuntimeValue(campaignName, 'targetEffects', [...storedEffects, speedEffect], campaignName);
+    await setRuntimeValue(campaignName, 'targetEffects', [...filteredEffects, speedEffect], campaignName);
 
     await addEntry(campaignName, {
         type: 'roll',
@@ -690,21 +872,26 @@ export async function handleFrostsChill(action, playerStats, campaignName, optio
         rollType: 'damage',
         name: optName + ' Damage',
         targetName,
-        damageType: opt.damageType,
-        total: damageResult?.total ?? 0,
+        damageType,
+        total: actualDamage,
         formula: opt.damage,
         rolls: damageResult?.rolls,
-        description: `${playerStats.name} used ${optName} to deal ${damageDisplay} ${opt.damageType} damage and reduce ${targetName}'s speed by 10 feet.`,
+        description: `${playerStats.name} used ${optName} to deal ${actualDamage} ${damageType} damage to ${targetName}.`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
     return {
         type: 'popup',
         payload: {
-            type: 'automation_info',
+            type: 'damage',
             name: optName,
-            automationType: opt.type,
-            description: `${optName}: Dealt <strong>${damageDisplay}</strong> ${opt.damageType} damage to ${targetName}. Speed reduced by ${(parseInt(opt.value.replace('_ft', ''), 10) || 10)} ft for 1 round.`,
-            automation: action.automation,
+            formula: opt.damage,
+            rolls: damageResult?.rolls,
+            total: actualDamage,
+            finalDamage: actualDamage,
+            damageApplied: true,
+            targetName,
+            targetCurrentHp: newHp,
+            damageType,
         },
     };
 }
