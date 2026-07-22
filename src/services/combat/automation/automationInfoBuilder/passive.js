@@ -1,6 +1,31 @@
 export const passiveHandlers = {
     'passive_buff': (feature, _playerStats) => {
         const auto = feature.automation
+        // fortified_health keeps its distinct effect name for special routing
+        if (auto.effect === 'fortified_health') {
+            return {
+                type: 'passive_rule',
+                effect: 'fortified_health',
+                name: feature.name,
+                target: auto.target || 'allies_in_range',
+                range_expression: auto.range_expression || '10_ft',
+                bonusExpression: auto.bonusExpression || auto.bonus || '',
+                bonus: auto.bonus ?? undefined,
+                condition: auto.condition || '',
+                conditionImmunity: auto.conditionImmunity || '',
+                resistances: auto.resistances || [],
+                options: auto.options || [],
+                extraMastery: auto.extraMastery || [],
+                replaceMastery: auto.replaceMastery || [],
+                grantsFlySpeed: !!auto.grantsFlySpeed,
+                grantsSwimSpeed: !!auto.grantsSwimSpeed,
+                resistanceType: auto.resistanceType || [],
+                validTypes: auto.validTypes || [],
+                amount: auto.amount || 0,
+                alsoSelfHealing: auto.alsoSelfHealing || null,
+                hasAutomation: true
+            }
+        }
         return {
             type: auto.effect === 'max_hp_increase' ? 'passive_rule' : 'passive_buff',
             name: feature.name,

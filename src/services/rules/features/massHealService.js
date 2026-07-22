@@ -4,7 +4,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
 import { addEntry } from '../../ui/logService.js';
 import { getDistanceFeet, rangeToFeet } from '../combat/rangeValidation.js';
 import { isDistanceInRange } from '../combat/rangeCheck.js';
-import { resolveHealingBonusesWithDetails } from '../../combat/automation/automationService.js';
+import { resolveHealingBonusesWithDetails, markFortifiedHealthUsed } from '../../combat/automation/automationService.js';
 
 const MASS_HEAL_NAME = 'Mass Heal';
 const CONDITIONS_TO_REMOVE = ['blinded', 'deafened', 'poisoned'];
@@ -114,7 +114,7 @@ export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName,
         }
     }
     let remainingPool = totalPool;
-    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel);
+    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName);
     if (bonusHeal > 0) {
         remainingPool += bonusHeal * targets.length;
     }
@@ -150,12 +150,17 @@ export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName,
             sourceName: casterName,
             note: 'Mass Heal',
             formula: formulaParts.join(' + '),
+            bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
             timestamp: Date.now(),
         }).catch((e) => { console.error("[massHeal] Error:", e); });
 
         await removeConditionsOnTarget(targetName, campaignName, spell, 'Mass Heal');
 
         results.push({ targetName, healAmount: actualHeal });
+    }
+
+    if (results.some(r => r.healAmount > 0) && bonusDetails?.some(d => d.name === 'Fortified Health')) {
+        await markFortifiedHealthUsed(playerStats, campaignName);
     }
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));

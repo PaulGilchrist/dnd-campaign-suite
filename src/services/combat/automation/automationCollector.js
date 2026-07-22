@@ -495,7 +495,9 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 }
                 break
             case 'passive_rule':
-                if (info.effect === 'superior_defense') {
+                if (info.effect === 'fortified_health') {
+                    result.specialActions.push(info)
+                } else if (info.effect === 'superior_defense') {
                     result.specialActions.push(info)
                 } else if (info.effect === 'grapple_damage') {
                     result.specialActions.push(info)

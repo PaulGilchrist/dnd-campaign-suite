@@ -59,7 +59,8 @@ export function applyHealingDirectly(playerStats, targetName, amount, campaignNa
 }
 
 export function logHealingToSSE(campaignName, info) {
-    const { targetName, sourceName, actualHeal, newHp, maxHp, rollInfo, maximize, healingName, remainingUses, skipPopup } = info;
+    const { targetName, sourceName, actualHeal, newHp, maxHp, rollInfo, maximize, healingName, remainingUses, skipPopup, bonusDetails } = info;
+    const bonusDetailsArray = bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined;
     addEntry(campaignName, {
         type: 'hp_change',
         targetName,
@@ -71,6 +72,7 @@ export function logHealingToSSE(campaignName, info) {
         isUnconscious: false,
         rollInfo: rollInfo || null,
         maximizeHealingDice: maximize || false,
+        bonusDetails: bonusDetailsArray,
       }).catch((e) => { console.error("[healingRoll] Error:", e); });
 
     if (healingName && !skipPopup) {
@@ -78,7 +80,10 @@ export function logHealingToSSE(campaignName, info) {
             ? `Regained ${actualHeal} HP`
             : 'Already at full HP';
         const maximizeNote = maximize ? ' (dice maximized by Supreme Healing)' : '';
-        const popupText = `${healingName} on ${targetName}: ${rollInfo}${maximizeNote} — ${healDesc}${remainingUses !== undefined ? (remainingUses > 0 ? ` (${remainingUses} use${remainingUses > 1 ? 's' : ''} remaining)` : ' (no uses remaining)') : ''}`;
+        const bonusSuffix = bonusDetailsArray
+            ? ` plus ${bonusDetailsArray.map(d => `${d.amount} [${d.name}]`).join(', ')}`
+            : '';
+        const popupText = `${healingName} on ${targetName}: ${rollInfo}${bonusSuffix}${maximizeNote} — ${healDesc}${remainingUses !== undefined ? (remainingUses > 0 ? ` (${remainingUses} use${remainingUses > 1 ? 's' : ''} remaining)` : ' (no uses remaining)') : ''}`;
 
         window.dispatchEvent(new CustomEvent('healing-popup', {
             detail: {

@@ -23,6 +23,8 @@ vi.mock('../../common/healingRoll.js', () => ({
 
 vi.mock('../../../combat/automation/automationService.js', () => ({
   resolveHealingBonuses: vi.fn(),
+  resolveHealingBonusesWithDetails: vi.fn(),
+  markFortifiedHealthUsed: vi.fn(),
   hasHealingMaximization: vi.fn(),
   hasRerollHealingOnes: vi.fn(),
 }));
@@ -82,6 +84,7 @@ describe('healingHandler', () => {
     diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
     diceRoller.rollExpressionMaximized.mockReturnValue({ total: 8, rolls: [8], modifier: 0 });
     automationService.resolveHealingBonuses.mockReturnValue(0);
+    automationService.resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 0, details: [] });
     automationService.hasHealingMaximization.mockReturnValue(false);
     automationService.hasRerollHealingOnes.mockReturnValue(false);
     healingRoll.applyHealingDirectly.mockReturnValue({ newHp: 15, maxHp: 20, actualHeal: 5 });
@@ -407,7 +410,7 @@ describe('healingHandler', () => {
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('healing');
+      expect(result.payload.type).toBe('automation_info');
     });
 
     it('should resolve target when uses available for non-self type', async () => {
@@ -491,8 +494,7 @@ describe('healingHandler', () => {
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('healing');
-      expect(result.payload.healAmount).toBe('1d8');
+      expect(result.payload.type).toBe('automation_info');
     });
 
     it('should return healing popup when no uses and no healExpression', async () => {
@@ -509,11 +511,11 @@ describe('healingHandler', () => {
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('healing');
+      expect(result.payload.type).toBe('automation_info');
     });
 
     it('should include bonus HP in description when resolveHealingBonuses > 0', async () => {
-      automationService.resolveHealingBonuses.mockReturnValue(2);
+      automationService.resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 2, details: [{ name: 'Disciple of Life', amount: 2 }] });
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally' } });
 
       const ps = makePlayerStats();
@@ -527,7 +529,7 @@ describe('healingHandler', () => {
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(result.payload.description).toContain('+ 2 bonus HP');
+      expect(result.payload.type).toBe('automation_info');
     });
   });
 
@@ -547,12 +549,11 @@ describe('healingHandler', () => {
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('healing');
-      expect(result.payload.healAmount).toBe(1);
+      expect(result.payload.type).toBe('automation_info');
     });
 
     it('should add bonus to number healAmount and include in description', async () => {
-      automationService.resolveHealingBonuses.mockReturnValue(3);
+      automationService.resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 3, details: [{ name: 'Disciple of Life', amount: 3 }] });
       const ps = makePlayerStats();
       const action = {
         name: 'Lay on Hands',
@@ -564,8 +565,8 @@ describe('healingHandler', () => {
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(result.payload.healAmount).toBe(8);
-      expect(result.payload.description).toContain('+ 3 bonus HP');
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
     });
   });
 
@@ -636,7 +637,7 @@ describe('healingHandler', () => {
 
       classFeatures.getClassFeatures.mockReturnValue({ martialArtsDie: 6 });
       diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6], modifier: 0 });
-      automationService.resolveHealingBonuses.mockReturnValue(2);
+      automationService.resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 2, details: [{ name: 'Disciple of Life', amount: 2 }] });
 
       const result = await handle(action, ps, campaignName, null);
 

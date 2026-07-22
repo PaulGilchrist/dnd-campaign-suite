@@ -5,7 +5,7 @@ import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
 import { getDistanceFeet } from '../combat/rangeValidation.js';
 import { isDistanceInRange } from '../combat/rangeCheck.js';
-import { resolveHealingBonusesWithDetails, hasHealingMaximization } from '../../combat/automation/automationService.js';
+import { resolveHealingBonusesWithDetails, hasHealingMaximization, markFortifiedHealthUsed } from '../../combat/automation/automationService.js';
 
 const MASS_CURE_WOUNDS_NAME = 'Mass Cure Wounds';
 
@@ -72,7 +72,7 @@ export async function triggerMassCureWounds(spell, metaCtx, playerStats, campaig
         return null;
     }
 
-    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel);
+    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName);
     const healAmount = result.total + bonusHeal;
     const combatSummary = await getCombatContext(campaignName);
     if (!combatSummary) {
@@ -151,10 +151,15 @@ export async function triggerMassCureWounds(spell, metaCtx, playerStats, campaig
             sourceName: casterName,
             note: 'Mass Cure Wounds',
             formula: formulaParts.join(' + '),
+            bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
             timestamp: Date.now(),
         }).catch((e) => { console.error("[massCureWounds] Error:", e); });
 
         results.push({ targetName, healAmount: actualHeal });
+    }
+
+    if (results.some(r => r.healAmount > 0) && bonusDetails?.some(d => d.name === 'Fortified Health')) {
+        await markFortifiedHealthUsed(playerStats, campaignName);
     }
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));

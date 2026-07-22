@@ -394,13 +394,13 @@
                 "type": "passive",
                 "automation": {
                     "type": "passive_buff",
-                    "effect": "max_hp_increase",
+                    "effect": "fortified_health",
                     "amount": 40,
                     "alsoSelfHealing": {
                         "extraHealingExpression": "CON modifier",
                         "oncePerTurn": true
                     },
-                    "casting_time": "1 action"
+                    "casting_time": "passive"
                 }
             }
         ],

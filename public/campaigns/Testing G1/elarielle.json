@@ -62,7 +62,7 @@
     "Ability Score Improvement",
     "Tough",
     "Ability Score Improvement",
-    "Boon Of Fate"
+    "Boon Of Fortitude"
   ],
   "fightingStyles": [],
   "race": {
@@ -169,6 +169,12 @@
       "assignment": "Strength"
     },
     "Boon Of Fate-3": {
+      "assignment": "Strength"
+    },
+    "Boon Of Fortitude-4": {
+      "assignment": "Strength"
+    },
+    "Boon Of Fortitude-3": {
       "assignment": "Strength"
     }
   }

@@ -479,7 +479,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                     }
                 }
                 if (expression) {
-                    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel);
+                    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName);
                     if (expression === 'max') {
                         const combatSummary = await getCombatContext(campaignName);
                         if (combatSummary) {
@@ -534,6 +534,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                                     sourceName: playerStats.name,
                                     note: spell.name,
                                     formula: formulaParts.join(' + '),
+                                    bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
                                     timestamp: Date.now(),
                                 }).catch((e) => { console.error("[spellCast] Error:", e); });
                             }
@@ -1196,7 +1197,7 @@ async function triggerHeal(spell, metaCtx, playerStats, campaignName, _mapName) 
             healAmount = parsed;
         }
     }
-    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel);
+    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName);
     healAmount += bonusHeal;
     const maxHp = creature.maxHp || playerStats.hitPoints || 0;
     const currentHp = creature.currentHp ?? getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? maxHp;
@@ -1219,6 +1220,7 @@ async function triggerHeal(spell, metaCtx, playerStats, campaignName, _mapName) 
             sourceName: playerStats.name,
             note: spell.name,
             formula: formulaParts.join(' + '),
+            bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
             timestamp: Date.now(),
         }).catch((e) => { console.error("[spellCast] Error:", e); });
     }
@@ -1330,7 +1332,7 @@ async function applyRegenerateSpell(spell, target, caster, campaignName) {
         }
     }
 
-    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(caster, caster.proficiency || 0, caster.level || 1, slotLevel);
+    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(caster, caster.proficiency || 0, caster.level || 1, slotLevel, campaignName);
     let initialHeal = 0;
     let result = null;
     // Apply initial healing
@@ -1367,6 +1369,7 @@ async function applyRegenerateSpell(spell, target, caster, campaignName) {
                     sourceName: casterName,
                     note: spell.name,
                     formula: formulaParts.join(' + '),
+                    bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
                     timestamp: Date.now(),
                 }).catch((e) => { console.error("[spellCast] Error:", e); });
             }

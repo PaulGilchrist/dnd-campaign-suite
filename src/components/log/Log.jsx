@@ -395,6 +395,14 @@ function HpChangeEntry({ entry }) {
             <span className="log-hp-current"> {entry.currentHp}/{entry.maxHp} remaining</span>
             {entry.rollInfo && !isDamage && <span className="log-roll-info"> ({entry.rollInfo})</span>}
             {entry.formula && !isDamage && <span className="log-dice-formula">{entry.formula}</span>}
+            {entry.bonusDetails && entry.bonusDetails.length > 0 && !isDamage && (
+                <span className="log-bonus-healing">
+                    {' plus '}
+                    {entry.bonusDetails.map((d, i) => (
+                        <span key={i}>{i > 0 && ', '}{d.amount} [{d.name}]</span>
+                    ))}
+                </span>
+            )}
           </>
         )}
       </div>

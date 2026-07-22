@@ -3,7 +3,7 @@ import { getCombatContext, getTargetFromAttacker } from '../combat/damageUtils.j
 import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
-import { resolveHealingBonusesWithDetails, hasHealingMaximization } from '../../combat/automation/automationService.js';
+import { resolveHealingBonusesWithDetails, hasHealingMaximization, markFortifiedHealthUsed } from '../../combat/automation/automationService.js';
 
 const HEALING_WORD_NAME = 'Healing Word';
 
@@ -49,7 +49,7 @@ export async function triggerHealingWord(spell, metaCtx, playerStats, campaignNa
     const result = maximize ? rollExpressionMaximized(healExpression) : rollExpression(healExpression);
     if (!result) return null;
 
-    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel);
+    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName);
     const healAmount = result.total + bonusHeal;
     const maxHp = combatSummary.creatures.find(c => c.name === targetName)?.maxHp || playerStats.hitPoints || 0;
     const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
@@ -61,6 +61,10 @@ export async function triggerHealingWord(spell, metaCtx, playerStats, campaignNa
     }
 
     const newHp = Math.min(maxHp, currentHp + actualHeal);
+
+    if (actualHeal > 0 && bonusDetails?.some(d => d.name === 'Fortified Health')) {
+        await markFortifiedHealthUsed(playerStats, campaignName);
+    }
 
     const formulaParts = [healExpression];
     if (bonusDetails.length > 0) {
@@ -78,6 +82,7 @@ export async function triggerHealingWord(spell, metaCtx, playerStats, campaignNa
         sourceName: playerStats.name,
         note: 'Healing Word',
         formula: formulaParts.join(' + '),
+        bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[healingWord] Error:", e); });
 

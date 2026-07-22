@@ -5,7 +5,7 @@ import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
-import { resolveHealingBonusesWithDetails, hasHealingMaximization } from '../../../combat/automation/automationService.js';
+import { resolveHealingBonusesWithDetails, hasHealingMaximization, markFortifiedHealthUsed } from '../../../combat/automation/automationService.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 
 const MASS_HEALING_WORD_NAME = 'Mass Healing Word';
@@ -66,7 +66,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return null;
     }
 
-    const { totalBonus: bonusHeal } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel);
+    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName);
     const healAmount = result.total + bonusHeal;
 
     const combatSummary = await getCombatContext(campaignName);
@@ -92,7 +92,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     if (eligible.length <= maxTargets) {
-        return confirmMassHealingWord(action, playerStats, campaignName, eligible.map(c => c.name), healAmount, healExpression, result.rolls, bonusHeal);
+        return confirmMassHealingWord(action, playerStats, campaignName, eligible.map(c => c.name), healAmount, healExpression, result.rolls, bonusHeal, bonusDetails);
     }
 
     const creatureTargets = eligible.map(c => ({ name: c.name, type: c.type, currentHp: c.currentHp, maxHp: c.maxHp }));
@@ -114,7 +114,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
-export async function confirmMassHealingWord(action, playerStats, campaignName, selectedTargetNames, healAmount, healExpression, _rolls, _bonusHeal) {
+export async function confirmMassHealingWord(action, playerStats, campaignName, selectedTargetNames, healAmount, healExpression, _rolls, _bonusHeal, bonusDetails) {
     const playerName = playerStats.name;
     const maxTargets = action.automation?.maxTargets || 6;
     const finalTargets = selectedTargetNames.slice(0, maxTargets);
@@ -143,10 +143,15 @@ export async function confirmMassHealingWord(action, playerStats, campaignName, 
             sourceName: playerName,
             note: MASS_HEALING_WORD_NAME,
             formula: healExpression,
+            bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
             timestamp: Date.now(),
         }).catch((e) => { console.error('[massHealingWord] Error:', e); });
 
         results.push({ targetName, healAmount: actualHeal });
+    }
+
+    if (results.some(r => r.healAmount > 0) && bonusDetails?.some(d => d.name === 'Fortified Health')) {
+        await markFortifiedHealthUsed(playerStats, campaignName);
     }
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));

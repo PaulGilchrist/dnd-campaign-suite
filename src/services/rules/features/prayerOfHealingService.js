@@ -5,7 +5,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
 import { addEntry } from '../../ui/logService.js';
 import { getDistanceFeet, rangeToFeet } from '../combat/rangeValidation.js';
 import { isDistanceInRange } from '../combat/rangeCheck.js';
-import { resolveHealingBonusesWithDetails, hasHealingMaximization } from '../../combat/automation/automationService.js';
+import { resolveHealingBonusesWithDetails, hasHealingMaximization, markFortifiedHealthUsed } from '../../combat/automation/automationService.js';
 
 const PRAYER_OF_HEALING_NAME = 'Prayer of Healing';
 
@@ -104,7 +104,7 @@ export async function triggerPrayerOfHealing(spell, metaCtx, playerStats, campai
         return null;
     }
 
-    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, 1);
+    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, 1, campaignName);
     const healAmount = result.total + bonusHeal;
     const results = [];
 
@@ -143,6 +143,7 @@ export async function triggerPrayerOfHealing(spell, metaCtx, playerStats, campai
             sourceName: casterName,
             note: 'Prayer of Healing',
             formula: formulaParts.join(' + '),
+            bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
             timestamp: Date.now(),
         }).catch((e) => { console.error("[prayerOfHealing] Error:", e); });
 
@@ -155,6 +156,10 @@ export async function triggerPrayerOfHealing(spell, metaCtx, playerStats, campai
         }).catch((e) => { console.error("[prayerOfHealing] Error:", e); });
 
         results.push({ targetName, healAmount: actualHeal });
+    }
+
+    if (results.some(r => r.healAmount > 0) && bonusDetails?.some(d => d.name === 'Fortified Health')) {
+        await markFortifiedHealthUsed(playerStats, campaignName);
     }
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));

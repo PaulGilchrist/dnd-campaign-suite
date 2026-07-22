@@ -5,7 +5,7 @@ export { evaluateAutoExpression, resolveDiceExpression } from './automationExpre
 export { collectAutomationFromFeatures, processFeatureAutomation, collectTurnStartEffects } from './automationCollector.js'
 export { collectSaveModifiers } from './automationModifiers.js'
 export { getConditionImmunities, getConditionalImmunities, playerIsImmuneToCondition, hasSelfRestoration } from './automationImmunities.js'
-export { getPassiveBuffs, collectWeaponMastery, resolveHealingBonuses, resolveHealingBonusesWithDetails, hasHealingMaximization, hasRerollHealingOnes, hasTacticalShift, hasSpeedyOpportunityDisadvantage, hasSpeedyDifficultTerrainIgnore, hasIgnoreResistance, hasMinDamage, hasTruesight, hasFastWrestler, hasGreatWeaponFighting, hasTwoWeaponFighting, hasSomaticComponentWaiver, hasNaturallyStealthy, hasInterception, hasProtection, hasThrownWeaponFighting, hasBlessedWarrior, applyGreatWeaponFightingToDamage } from './automationPassives.js'
+export { getPassiveBuffs, collectWeaponMastery, resolveHealingBonuses, resolveHealingBonusesWithDetails, markFortifiedHealthUsed, hasHealingMaximization, hasRerollHealingOnes, hasTacticalShift, hasSpeedyOpportunityDisadvantage, hasSpeedyDifficultTerrainIgnore, hasIgnoreResistance, hasMinDamage, hasTruesight, hasFastWrestler, hasGreatWeaponFighting, hasTwoWeaponFighting, hasSomaticComponentWaiver, hasNaturallyStealthy, hasInterception, hasProtection, hasThrownWeaponFighting, hasBlessedWarrior, applyGreatWeaponFightingToDamage } from './automationPassives.js'
 
 export function hasAutomation(feature) {
     return !!(feature?.automation)

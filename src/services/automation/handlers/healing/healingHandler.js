@@ -2,7 +2,7 @@ import { rollExpression, rollExpressionMaximized } from '../../../dice/diceRolle
 import { getClassFeatures } from '../../../character/classFeatures.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { applyHealingDirectly, logHealingToSSE } from '../../common/healingRoll.js';
-import { resolveHealingBonuses, hasHealingMaximization, hasRerollHealingOnes } from '../../../combat/automation/automationService.js';
+import { resolveHealingBonusesWithDetails, hasHealingMaximization, hasRerollHealingOnes, markFortifiedHealthUsed } from '../../../combat/automation/automationService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getHitDieSize, computeHitDieRecovery } from '../../../rules/effects/restRules.js';
 import { resolveDiceExpression, evaluateAutoExpression } from '../../../combat/automation/automationExpressions.js';
@@ -30,7 +30,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         }
 
         const baseHeal = rollResult.total + wisModifier;
-        const bonusHeal = resolveHealingBonuses(playerStats, playerStats.proficiencyBonus || 0, playerStats.level || 1, slotLevel);
+        const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiencyBonus || 0, playerStats.level || 1, slotLevel, campaignName);
         const healAmount = baseHeal + bonusHeal;
 
         let targetName;
@@ -42,6 +42,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
           }
 
         const { newHp, maxHp, actualHeal } = applyHealingDirectly(playerStats, isSelf ? playerStats.name : targetName, healAmount, campaignName);
+
+        if (actualHeal > 0) {
+            const hasFortifiedHealth = bonusDetails.some(d => d.name === 'Fortified Health');
+            if (hasFortifiedHealth) {
+                await markFortifiedHealthUsed(playerStats, campaignName);
+            }
+        }
 
         const rollDisplay = maximize ? 'maximized' : (rerollOnes ? 'rerolled ones' : rollResult.rolls.join(', '));
         const rollInfo = `1d${martialArtsDie}=${rollResult.total} (${rollDisplay})`;
@@ -56,6 +63,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             maximize,
             healingName: action.name,
             skipPopup: true,
+            bonusDetails,
           });
 
         const hasPhysiciansTouch = playerStats.specialActions?.some(f => f.name === "Physician's Touch");
@@ -154,15 +162,22 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         }
 
         let healAmount;
+        let bonusDetails;
         if (isHitDieRoll) {
             const conBonus = playerStats.abilities?.find(a => a.name === 'Constitution')?.bonus || 0;
             healAmount = computeHitDieRecovery(rollResult.total, conBonus);
         } else {
-            const bonusHeal = resolveHealingBonuses(playerStats, playerStats.proficiencyBonus || 0, playerStats.level || 1, slotLevel);
-            healAmount = rollResult.total + bonusHeal;
+            ({ totalBonus: healAmount, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiencyBonus || 0, playerStats.level || 1, slotLevel, campaignName));
         }
 
         const { newHp, maxHp, actualHeal } = applyHealingDirectly(playerStats, playerStats.name, healAmount, campaignName);
+
+        if (actualHeal > 0) {
+            const hasFortifiedHealth = bonusDetails?.some(d => d.name === 'Fortified Health');
+            if (hasFortifiedHealth) {
+                await markFortifiedHealthUsed(playerStats, campaignName);
+            }
+        }
 
         if (isHitDieRoll && hitDiceCost > 0) {
             const currentHitDice = Number(getRuntimeValue(playerStats.name, 'shortRestHitDice', campaignName) ?? playerStats.level);
@@ -187,6 +202,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             healingName: action.name,
             remainingUses,
             maxUses,
+            bonusDetails,
         });
 
         const healDesc = actualHeal > 0
@@ -241,10 +257,17 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                     return null;
                 }
 
-                const bonusHeal = resolveHealingBonuses(playerStats, playerStats.proficiencyBonus || 0, playerStats.level || 1, slotLevel);
+                const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiencyBonus || 0, playerStats.level || 1, slotLevel, campaignName);
                 const healAmount = rollResult.total + bonusHeal;
 
                 const { newHp, maxHp, actualHeal } = applyHealingDirectly(playerStats, targetName, healAmount, campaignName);
+
+                if (actualHeal > 0) {
+                    const hasFortifiedHealth = bonusDetails.some(d => d.name === 'Fortified Health');
+                    if (hasFortifiedHealth) {
+                        await markFortifiedHealthUsed(playerStats, campaignName);
+                    }
+                }
 
                 await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
@@ -263,6 +286,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                     healingName: action.name,
                     remainingUses,
                     maxUses,
+                    bonusDetails,
                 });
 
                 const healDesc = actualHeal > 0
@@ -285,36 +309,93 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
             await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
-          const baseHeal = typeof auto.healAmount === 'number' ? auto.healAmount : null;
-          const bonusHeal = resolveHealingBonuses(playerStats, playerStats.proficiencyBonus || 0, playerStats.level || 1, slotLevel);
-          const totalHealAmount = baseHeal !== null ? baseHeal + bonusHeal : auto.healExpression;
+            const baseHeal = typeof auto.healAmount === 'number' ? auto.healAmount : null;
+            const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiencyBonus || 0, playerStats.level || 1, slotLevel, campaignName);
+            const totalHealAmount = baseHeal !== null ? baseHeal + bonusHeal : auto.healExpression;
 
-          return {
-              type: 'popup',
-              payload: {
-                  type: 'healing',
-                  name: action.name,
-                  healAmount: typeof totalHealAmount === 'number' ? totalHealAmount : auto.healExpression,
-                  description: bonusHeal > 0
-                      ? `${action.name}: Restores ${auto.healExpression} + ${bonusHeal} bonus HP`
-                      : `${action.name}: Restores ${auto.healExpression} HP`,
-                  },
-              };
+            // Determine target for this flat-heal path
+            const flatTargetInfo = await resolveTarget(campaignName, playerStats.name);
+            const flatTargetName = flatTargetInfo?.target?.name || playerStats.name;
+            const { newHp: finalNewHp, maxHp: finalMaxHp, actualHeal: finalActualHeal } = applyHealingDirectly(playerStats, flatTargetName, totalHealAmount, campaignName);
+
+            if (finalActualHeal > 0) {
+                const hasFortifiedHealth = bonusDetails.some(d => d.name === 'Fortified Health');
+                if (hasFortifiedHealth) {
+                    await markFortifiedHealthUsed(playerStats, campaignName);
+                }
+            }
+
+            const rollInfo = auto.healExpression || `${auto.healAmount}`;
+
+            logHealingToSSE(campaignName, {
+                targetName: flatTargetName,
+                sourceName: action.name,
+                actualHeal: finalActualHeal,
+                newHp: finalNewHp,
+                maxHp: finalMaxHp,
+                rollInfo,
+                maximize: false,
+                healingName: action.name,
+                bonusDetails,
+            });
+
+            const healDesc = finalActualHeal > 0
+                ? `Regained ${finalActualHeal} HP`
+                : 'Already at full HP';
+            const description = `${action.name}: ${rollInfo} — ${healDesc}`;
+
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    automationType: auto.type,
+                    description,
+                },
+            };
         } else {
          const baseHeal = typeof auto.healAmount === 'number' ? auto.healAmount : null;
-         const bonusHeal = resolveHealingBonuses(playerStats, playerStats.proficiencyBonus || 0, playerStats.level || 1, slotLevel);
+         const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiencyBonus || 0, playerStats.level || 1, slotLevel, campaignName);
          const totalHealAmount = baseHeal !== null ? baseHeal + bonusHeal : auto.healExpression;
+
+         const defaultTargetInfo = await resolveTarget(campaignName, playerStats.name);
+         const defaultTargetName = defaultTargetInfo?.target?.name || playerStats.name;
+         const { newHp: finalNewHp, maxHp: finalMaxHp, actualHeal: finalActualHeal } = applyHealingDirectly(playerStats, defaultTargetName, totalHealAmount, campaignName);
+
+         if (finalActualHeal > 0) {
+             const hasFortifiedHealth = bonusDetails.some(d => d.name === 'Fortified Health');
+             if (hasFortifiedHealth) {
+                 await markFortifiedHealthUsed(playerStats, campaignName);
+             }
+         }
+
+         const rollInfo = auto.healExpression || `${auto.healAmount}`;
+
+         logHealingToSSE(campaignName, {
+             targetName: defaultTargetName,
+             sourceName: action.name,
+             actualHeal: finalActualHeal,
+             newHp: finalNewHp,
+             maxHp: finalMaxHp,
+             rollInfo,
+             maximize: false,
+             healingName: action.name,
+             bonusDetails,
+         });
+
+         const healDesc = finalActualHeal > 0
+             ? `Regained ${finalActualHeal} HP`
+             : 'Already at full HP';
+         const description = `${action.name}: ${rollInfo} — ${healDesc}`;
 
          return {
              type: 'popup',
              payload: {
-                 type: 'healing',
+                 type: 'automation_info',
                  name: action.name,
-                 healAmount: typeof totalHealAmount === 'number' ? totalHealAmount : auto.healExpression,
-                 description: bonusHeal > 0
-                     ? `${action.name}: Restores ${auto.healExpression} + ${bonusHeal} bonus HP`
-                     : `${action.name}: Restores ${auto.healExpression} HP`,
-                 },
+                 automationType: auto.type,
+                 description,
+             },
              };
         }
    }
