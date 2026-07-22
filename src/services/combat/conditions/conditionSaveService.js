@@ -34,13 +34,20 @@ async function rollConditionSave(creature, condition, characters, campaignNpcs, 
     if (creature.type === 'player') {
         const playerCharacter = characters.find(c => getName(c.name) === creature.name)
         const playerStats = playerCharacter?.computedStats || playerCharacter
-        if (playerStats?.saveModifiers) {
-            const matchingModifier = playerStats.saveModifiers.find(mod =>
+        const saveModifiers = playerStats?.saveModifiers || playerCharacter?.saveModifiers
+        if (saveModifiers) {
+            const matchingModifier = saveModifiers.find(mod =>
                 mod.saveType && mod.condition && mod.target === 'saving_throw' && mod.effect === 'advantage' && (!mod.abilities || mod.abilities.length === 0) && mod.condition === conditionKey
             )
             if (matchingModifier) {
                 hasPassiveImmunityAdvantage = true
             }
+        }
+        const powerfulBuildAdvantage = saveModifiers?.some(mod =>
+            mod.target === 'ability_check' && mod.effect === 'advantage' && mod.abilities?.includes('STR') && mod.condition === 'powerful_build_grapple_escape'
+        )
+        if (powerfulBuildAdvantage && conditionKey === 'grappled') {
+            hasPassiveImmunityAdvantage = true
         }
     }
     const hasAdvantage = hasAuraOfPurityAdvantage || hasPassiveImmunityAdvantage

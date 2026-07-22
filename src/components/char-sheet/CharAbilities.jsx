@@ -123,6 +123,13 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                           forcedMode = 'advantage'
                       }
                   }
+              // Powerful Build: advantage on STR checks to escape grapple
+              if (!forcedMode && conditionEffects?.strCheckAdvantage) {
+                const abbr = checkName.substring(0, 3).toUpperCase();
+                if (abbr === 'STR' || checkName === 'Strength' || checkName === 'Athletics') {
+                  forcedMode = 'advantage'
+                }
+              }
               // Ray of Enfeeblement: STR-based d20 tests have disadvantage
               if (!forcedMode && conditionEffects?.strCheckDisadvantage) {
                 const abbr = checkName.substring(0, 3).toUpperCase();

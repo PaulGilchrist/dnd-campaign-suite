@@ -192,6 +192,7 @@ function applySpeedIncreasePassives(playerStats) {
  * Detect Powerful Build trait and set sizeMultiplier on playerStats.
  * Powerful Build: "count as one size larger when determining your carrying capacity."
  * One size larger = 2x carrying capacity.
+ * Also grants advantage on ability checks to end the grappled condition.
  */
 function applyPowerfulBuild(playerStats) {
     const traits = playerStats.race?.traits;
@@ -202,6 +203,7 @@ function applyPowerfulBuild(playerStats) {
     const hasPowerfulBuild = traits.some(t => t.name === 'Powerful Build');
     if (hasPowerfulBuild) {
         playerStats.sizeMultiplier = 2;
+        playerStats.hasPowerfulBuild = true;
     }
     return playerStats;
 }
@@ -1140,9 +1142,19 @@ const rules = {
               }
           }
 
-           playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
-         playerStats.saveModifiers = collectSaveModifiers(allFeatures);
-        playerStats.evasionEffects = getEvasionEffects(allFeatures);
+            playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+          playerStats.saveModifiers = collectSaveModifiers(allFeatures);
+          // Add Powerful Build grapple escape advantage after saveModifiers is collected
+          if (playerStats.hasPowerfulBuild && Array.isArray(playerStats.saveModifiers)) {
+              playerStats.saveModifiers.push({
+                  source: 'Powerful Build',
+                  target: 'ability_check',
+                  condition: 'powerful_build_grapple_escape',
+                  effect: 'advantage',
+                  abilities: ['STR'],
+              });
+          }
+          playerStats.evasionEffects = getEvasionEffects(allFeatures);
         playerStats.automationConditionImmunities = getConditionImmunities(allFeatures);
         playerStats.automationConditionalImmunities = getConditionalImmunities(allFeatures);
         playerStats.turnStartEffects = collectTurnStartEffects(allFeatures);
