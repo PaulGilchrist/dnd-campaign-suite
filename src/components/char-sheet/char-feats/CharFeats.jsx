@@ -62,12 +62,12 @@ function CharFeats({ playerStats, showPopup }) {
                      const count = grouped[featName];
                      const displayName = count > 1 ? `${featName} * ${count}` : featName;
                      return (
-                         <div key={featName}>
-                             {index > 0 && <span>, </span>}
-                             <span className="feat-name clickable" onClick={() => handleFeatClick(featName)}>
-                                 {displayName}
-                             </span>
-                         </div>
+                          <span key={featName}>
+                              {index > 0 && <span>, </span>}
+                              <span className="feat-name clickable" onClick={() => handleFeatClick(featName)}>
+                                  {displayName}
+                              </span>
+                          </span>
                     );
                  })}
              </div>

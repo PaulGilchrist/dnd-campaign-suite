@@ -62,7 +62,7 @@
     "Ability Score Improvement",
     "Tough",
     "Ability Score Improvement",
-    "Boon Of Combat Prowess"
+    "Boon Of Dimensional Travel"
   ],
   "fightingStyles": [],
   "race": {
@@ -158,6 +158,9 @@
     },
     "Boon Of Combat Prowess-3": {
       "assignment": "Intelligence"
+    },
+    "Boon Of Dimensional Travel-3": {
+      "assignment": "Strength"
     }
   }
 }
