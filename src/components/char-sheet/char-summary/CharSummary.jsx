@@ -268,6 +268,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     let glisteningFlightHover = false;
     let dragonWingsHover = false;
     let tremorsenseActive = false;
+    const largeFormActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'large_form');
     const huntersMarkActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === "Hunter's Mark");
     const aspectBuff = Array.isArray(activeBuffs) ? (activeBuffs.find(b => b.name === 'Aspect of the Wilds') || null) : null;
     const aspectOption = aspectBuff?.optionName || null;
@@ -497,6 +498,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                         <i className="fa-solid fa-users"></i> Allies ({currentAllies.length})
                     </span>
                     {flyBuffActive && <span className="automation-badge">{flyBuffName} Active</span>}
+                    {largeFormActive && <span className="automation-badge">Large Form</span>}
                     {huntersMarkActive && <span className="automation-badge">Hunter's Mark Active</span>}
                     {tremorsenseActive && <span className="automation-badge">Tremorsense 60 ft.</span>}
                 </div>

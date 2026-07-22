@@ -165,5 +165,21 @@ describe('largeFormHandler', () => {
             });
             expect(result.payload.automation).toEqual(makeAction().automation);
         });
+
+        it('sets largeFormActive_restUsed flag on activation', async () => {
+            getRuntimeValue.mockImplementation((_name, key) => {
+                if (key === 'largeFormActive') return false;
+                if (key === 'activeBuffs') return [];
+                return null;
+            });
+
+            await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+            const restUsedCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
+                call => call[1] === 'largeFormActive_restUsed',
+            );
+            expect(restUsedCalls).toHaveLength(1);
+            expect(restUsedCalls[0][2]).toBe(true);
+        });
     });
 });

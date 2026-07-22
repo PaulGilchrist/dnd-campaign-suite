@@ -59,6 +59,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     // Activate
     await setRuntimeValue(playerName, LARGE_FORM_KEY, true, campaignName);
+    await setRuntimeValue(playerName, LARGE_FORM_KEY + '_restUsed', true, campaignName);
 
     // Add buff to activeBuffs
     const storedBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName);
@@ -78,7 +79,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         type: 'ability_use',
         characterName: playerName,
         abilityName: action.name,
-        description: `${playerName} activated Large Form for 10 minutes.`,
+        description: `${playerName} activated Large Form! Size changes to Large, Speed increases by 10 feet, Advantage on Strength checks for 10 minutes.`,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[largeForm] Error:", e); });
 

@@ -433,6 +433,9 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
     // Clear Trance of Order active state on short rest
     updates.tranceOfOrderActive = null;
 
+    // Clear Large Form active state on short rest (rest-used flag persists)
+    updates.largeFormActive = null;
+
     // Clear Wild Magic Surge badge on short rest
     updates.wildMagicSurgeEffects = null;
 
@@ -540,7 +543,11 @@ export async function applyLongRest(playerStats, campaignName) {
        charData.fanaticalFocusUsed = null;
 
        // Clear Wild Magic Surge badge on long rest
-      charData.wildMagicSurgeEffects = null;
+       charData.wildMagicSurgeEffects = null;
+
+       // Clear Large Form active state and rest-used flag on long rest
+       charData.largeFormActive = null;
+       charData.largeFormActive_restUsed = null;
 
       // Clear Vow of Enmity active state on long rest
     charData.vowOfEnmityTarget = null;

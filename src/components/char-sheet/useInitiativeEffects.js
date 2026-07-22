@@ -89,6 +89,9 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
             // Clear Trance of Order on initiative roll (new combat)
             setRuntimeValue(playerStats.name, 'tranceOfOrderActive', null, campaignName);
 
+            // Clear Large Form active state on initiative roll (rest-used flag persists)
+            setRuntimeValue(playerStats.name, 'largeFormActive', null, campaignName);
+
             // Clear Superior Defense buff on initiative roll (new combat)
             const superiorDefenseBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || [];
             const filteredSuperiorDefense = superiorDefenseBuffs.filter(b => b.name !== 'Superior Defense');
