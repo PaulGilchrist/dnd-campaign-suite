@@ -62,7 +62,7 @@
     "Ability Score Improvement",
     "Tough",
     "Ability Score Improvement",
-    "Boon Of Fortitude"
+    "Boon Of Irresistible Offense"
   ],
   "fightingStyles": [],
   "race": {
@@ -175,6 +175,12 @@
       "assignment": "Strength"
     },
     "Boon Of Fortitude-3": {
+      "assignment": "Strength"
+    },
+    "Boon Of Irresistible Offense-4": {
+      "assignment": "Strength"
+    },
+    "Boon Of Irresistible Offense-3": {
       "assignment": "Strength"
     }
   }

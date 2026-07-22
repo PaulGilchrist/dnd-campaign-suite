@@ -136,7 +136,7 @@ export function resolveHealingBonuses(playerStats, prof, level, slotLevel, campa
     return totalBonus;
 }
 
-export function resolveHealingBonusesWithDetails(playerStats, prof, level, slotLevel, campaignName) {
+export function resolveHealingBonusesWithDetails(playerStats, prof, level, slotLevel, campaignName, targetStats) {
     const passives = playerStats.automation?.passives || [];
     let totalBonus = 0;
     const details = [];
@@ -150,13 +150,40 @@ export function resolveHealingBonusesWithDetails(playerStats, prof, level, slotL
         }
         if (passive.type === 'passive_rule' && (passive.effect === 'max_hp_increase' || passive.effect === 'fortified_health') && passive.alsoSelfHealing?.extraHealingExpression) {
             if (passive.alsoSelfHealing.oncePerTurn && campaignName) {
-                const stored = getRuntimeValue(null, '_fortifiedHealth_usedRound', campaignName);
-                if (stored) continue;
+                const stored = getRuntimeValue(playerStats.name, '_fortifiedHealth_usedRound');
+                if (stored) {
+                    continue;
+                }
             }
             const bonus = evaluateAutoExpression(passive.alsoSelfHealing.extraHealingExpression, playerStats, prof, level, slotLevel);
             if (typeof bonus === 'number' && !isNaN(bonus) && bonus > 0) {
                 totalBonus += bonus;
                 details.push({ name: passive.name, amount: bonus });
+            }
+        }
+    }
+    if (targetStats && targetStats !== playerStats) {
+        const targetPassives = targetStats.automation?.passives || [];
+        for (const passive of targetPassives) {
+            if (passive.type === 'passive_rule' && passive.effect === 'bonus_healing' && passive.bonusExpression) {
+                const bonus = evaluateAutoExpression(passive.bonusExpression, targetStats, prof, level, slotLevel);
+                if (typeof bonus === 'number' && !isNaN(bonus) && bonus > 0) {
+                    totalBonus += bonus;
+                    details.push({ name: passive.name, amount: bonus });
+                }
+            }
+            if (passive.type === 'passive_rule' && (passive.effect === 'max_hp_increase' || passive.effect === 'fortified_health') && passive.alsoSelfHealing?.extraHealingExpression) {
+                if (passive.alsoSelfHealing.oncePerTurn && campaignName) {
+                    const stored = getRuntimeValue(targetStats.name, '_fortifiedHealth_usedRound');
+                    if (stored) {
+                        continue;
+                    }
+                }
+                const bonus = evaluateAutoExpression(passive.alsoSelfHealing.extraHealingExpression, targetStats, prof, level, slotLevel);
+                if (typeof bonus === 'number' && !isNaN(bonus) && bonus > 0) {
+                    totalBonus += bonus;
+                    details.push({ name: passive.name, amount: bonus });
+                }
             }
         }
     }

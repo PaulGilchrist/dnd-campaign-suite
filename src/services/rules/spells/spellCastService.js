@@ -230,7 +230,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
           castingTime: spell.casting_time,
           damageType: damageType || null,
           damageFormula: formula || null,
-          saveDC: spellSaveDc || null,
+          saveDC: spell.dc ? spellSaveDc : null,
           concentration: !!spell.concentration,
           timestamp: Date.now(),
         }).catch(() => {});
@@ -479,23 +479,30 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                     }
                 }
                 if (expression) {
-                    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName);
+                    const targetChar = (characters || []).find(c => c.name === target.name);
+                    const targetStats = targetChar?.computedStats || targetChar;
+                    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName, targetStats);
                     if (expression === 'max') {
                         const combatSummary = await getCombatContext(campaignName);
                         if (combatSummary) {
                             const creature = combatSummary.creatures.find(c => c.name === target.name);
-                            const maxHp = creature?.maxHp || playerStats.hitPoints || 0;
-                            const currentHp = creature?.currentHp ?? getRuntimeValue(target.name, 'currentHitPoints', campaignName) ?? maxHp;
+                            const isSelf = target.name === playerStats.name;
+                            const maxHp = (creature != null && creature.maxHp != null)
+                                ? creature.maxHp
+                                : (isSelf ? (playerStats.hitPoints || 0) : (getRuntimeValue(target.name, 'hitPoints') || 0));
+                            const currentHp = (creature != null && creature.currentHp != null)
+                                ? creature.currentHp
+                                : (isSelf ? (playerStats.hitPoints || 0) : (getRuntimeValue(target.name, 'currentHitPoints') ?? maxHp));
                             const actualHeal = maxHp - currentHp;
+                            genericHealResult = { targetName: target.name, healAmount: Math.max(0, actualHeal), formula: 'max', rolls: [], rawTotal: Math.max(0, actualHeal), bonusHeal, bonusDetails };
                             if (actualHeal > 0) {
                                 applyHealingToTarget(combatSummary, target.name, actualHeal, campaignName);
                             }
-                            genericHealResult = { targetName: target.name, healAmount: actualHeal, formula: 'max', rolls: [], rawTotal: actualHeal, bonusHeal, bonusDetails };
                             addEntry(campaignName, {
                                 type: 'hp_change',
                                 targetName: target.name,
                                 delta: actualHeal,
-                                currentHp: maxHp,
+                                currentHp: Math.min(maxHp, currentHp + Math.max(0, actualHeal)),
                                 maxHp,
                                 isHealing: true,
                                 sourceName: playerStats.name,
@@ -511,10 +518,15 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                             const combatSummary = await getCombatContext(campaignName);
                             if (combatSummary) {
                                 const creature = combatSummary.creatures.find(c => c.name === target.name);
-                                const maxHp = creature?.maxHp || playerStats.hitPoints || 0;
-                                const currentHp = creature?.currentHp ?? getRuntimeValue(target.name, 'currentHitPoints', campaignName) ?? maxHp;
+                                const isSelf = target.name === playerStats.name;
+                                const maxHp = (creature != null && creature.maxHp != null)
+                                    ? creature.maxHp
+                                    : (isSelf ? (playerStats.hitPoints || 0) : (getRuntimeValue(target.name, 'hitPoints') || 0));
+                                const currentHp = (creature != null && creature.currentHp != null)
+                                    ? creature.currentHp
+                                    : (isSelf ? (playerStats.hitPoints || 0) : (getRuntimeValue(target.name, 'currentHitPoints') ?? maxHp));
                                 const healAmount = result.total + bonusHeal;
-                                const actualHeal = Math.min(healAmount, maxHp - currentHp);
+                                const actualHeal = Math.min(Math.max(0, healAmount), Math.max(0, maxHp - currentHp));
                                 if (actualHeal > 0) {
                                     applyHealingToTarget(combatSummary, target.name, actualHeal, campaignName);
                                 }

@@ -494,10 +494,13 @@ export function collectAutomationFromFeatures(features, playerStats) {
                     result.primalKnowledge.push(...info.primalKnowledge)
                 }
                 break
+            // IMPORTANT: passive_rule effects that are read by automation services
+            // (resolveHealingBonusesWithDetails, hasPassiveEffect, etc.) MUST go to
+            // result.passives, NOT result.specialActions.  The switch's default branch
+            // (the else clause above) handles this correctly — only add to specialActions
+            // when the effect is exclusively UI-only and never queried by automation.
             case 'passive_rule':
-                if (info.effect === 'fortified_health') {
-                    result.specialActions.push(info)
-                } else if (info.effect === 'superior_defense') {
+                if (info.effect === 'superior_defense') {
                     result.specialActions.push(info)
                 } else if (info.effect === 'grapple_damage') {
                     result.specialActions.push(info)

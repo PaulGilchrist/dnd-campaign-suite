@@ -47,7 +47,6 @@ const DISPATCH = {
 function buildAttackInfo(feature, playerStats) {
     const auto = feature.automation
     if (!auto) return null
-
     const handler = DISPATCH[auto.type]
     if (handler) return handler(feature, playerStats)
     return null

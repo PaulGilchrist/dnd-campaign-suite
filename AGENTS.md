@@ -105,6 +105,7 @@ await setRuntimeValue(characterKey, 'myKey', newValue, campaignName);
 - **No fallbacks:** Use `console.error` for error logging instead of silent fallbacks. Only use defaults for known values defined in the rules.
 
 ## Core Rules
+- NEVER REMOVE DEBUG LOGGING WITHOUT THE USERS PERMISSION FIRST
 - Never leave dead code.  It just confuses people later.
 - Look for and re-use existing code and avoid duplicating code.
 - If a map is active, use position on map, but if no map is active, assume all creatures are within range.

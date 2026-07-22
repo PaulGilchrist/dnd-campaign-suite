@@ -160,6 +160,14 @@ describe('collectAutomationFromFeatures: passive categorization', () => {
     expect(result.passives.map(p => p.type)).toEqual(['passive_rule', 'evasion', 'resistance'])
   })
 
+  it('categorizes fortified_health as a passive (not specialAction)', () => {
+    const features = [makeFeature({ type: 'passive_rule', effect: 'fortified_health', alsoSelfHealing: { extraHealingExpression: 'CON modifier', oncePerTurn: true } }, 'Fortified Health')]
+    const result = collectAutomationFromFeatures(features, playerStats)
+    expect(result.passives).toHaveLength(1)
+    expect(result.passives[0].effect).toBe('fortified_health')
+    expect(result.specialActions).toHaveLength(0)
+  })
+
   it('categorizes font_of_inspiration as a passive', () => {
     const features = [makeFeature({ type: 'font_of_inspiration' }, 'Font of Inspiration')]
     const result = collectAutomationFromFeatures(features, playerStats)

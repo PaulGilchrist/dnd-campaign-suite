@@ -184,7 +184,7 @@ describe('executeSpellCast - Magic Missile', () => {
   })
 
   describe('early exit behavior', () => {
-    it('returns without logging or applying damage for empty distribution', async () => {
+    it('logs spell cast but returns without applying damage for empty distribution', async () => {
       vi.mocked(combatData.getCombatSummary).mockReturnValue({ creatures: [] })
 
       const services = makeServices({
@@ -206,7 +206,7 @@ describe('executeSpellCast - Magic Missile', () => {
         castingTime: '1 action',
         damageType: 'Force',
         damageFormula: '1d4 + 1',
-        saveDC: 17,
+        saveDC: null,
         concentration: false,
         timestamp: expect.any(Number),
       })

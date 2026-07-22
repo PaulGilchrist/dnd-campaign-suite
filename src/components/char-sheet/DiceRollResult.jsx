@@ -354,7 +354,9 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
 
             {isHealType && (
               <div className="dice-roll-heal-applied">
-                {healReduced ? (
+                {finalHeal <= 0 ? (
+                  <span><strong>{targetName}</strong> is already at full HP</span>
+                ) : healReduced ? (
                   <span><strong>{finalHeal}</strong> healing applied to <strong>{targetName}</strong> (reduced from {originalTotal}){targetCurrentHp !== undefined ? ` — HP: ${targetCurrentHp + finalHeal} → ${targetCurrentHp}` : ''}</span>
                 ) : (
                   <span><strong>{finalHeal}</strong> healing applied to <strong>{targetName}</strong>{targetCurrentHp !== undefined ? ` — HP: ${targetCurrentHp + finalHeal} → ${targetCurrentHp}` : ''}</span>

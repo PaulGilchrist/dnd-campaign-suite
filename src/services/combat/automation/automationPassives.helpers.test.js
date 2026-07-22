@@ -97,4 +97,27 @@ describe('wrapper helpers (hasInterception, hasProtection, hasThrownWeaponFighti
     expect(hasThrownWeaponFighting(empty)).toBe(false)
     expect(hasBlessedWarrior(empty)).toBe(false)
   })
+
+  it('resolves fortified_health healing bonus from passives array', () => {
+    evaluateAutoExpression.mockReturnValue(3)
+    const playerStats = {
+      automation: { passives: [
+        { type: 'passive_rule', effect: 'fortified_health', name: 'Fortified Health', alsoSelfHealing: { extraHealingExpression: 'CON modifier', oncePerTurn: true } },
+      ] },
+    }
+    const result = resolveHealingBonusesWithDetails(playerStats, 4, 3, 1)
+    expect(result).toEqual({ totalBonus: 3, details: [{ name: 'Fortified Health', amount: 3 }] })
+  })
+
+  it('resolves fortified_health healing bonus from target passives when casting on another creature', () => {
+    evaluateAutoExpression.mockReturnValue(5)
+    const casterStats = { automation: { passives: [] } }
+    const targetStats = {
+      automation: { passives: [
+        { type: 'passive_rule', effect: 'fortified_health', name: 'Fortified Health', alsoSelfHealing: { extraHealingExpression: 'CON modifier', oncePerTurn: true } },
+      ] },
+    }
+    const result = resolveHealingBonusesWithDetails(casterStats, 4, 3, 1, 'test-campaign', targetStats)
+    expect(result).toEqual({ totalBonus: 5, details: [{ name: 'Fortified Health', amount: 5 }] })
+  })
 })

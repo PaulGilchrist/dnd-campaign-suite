@@ -34,7 +34,7 @@ export function useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTar
                 } else {
                     setPopupHtml(result.payload);
                 }
-            } else if (result && result.healAmount > 0) {
+            } else if (result && result.targetName != null) {
                 const bonusHealDetail = result.bonusDetails?.length > 0
                     ? result.bonusDetails.map(d => `${d.amount} ${d.name}`).join(', ')
                     : '';
