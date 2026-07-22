@@ -7,6 +7,8 @@ import { findLastAttack } from '../../common/damageRollback.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { MELEE_REACH_FEET } from '../../../combat/baseCombatActions.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { applyDamageToTarget, computeDamageAfterSave } from '../../../rules/combat/applyDamage.js';
+import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 
 const POLEARM_WEAPONS = ['Quarterstaff', 'Spear'];
 
@@ -92,18 +94,7 @@ export async function handle(action, playerStats, campaignName, mapName, allEqui
     }
 
     if (auto?.trigger === 'damage_taken_of_chosen_resistance_type') {
-        const chosenTypes = getChosenResistanceTypes(playerStats.name, campaignName);
-        if (!chosenTypes || chosenTypes.length === 0) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: `${action.name} requires you to have chosen damage types for Energy Resistances.`,
-                    automation: auto,
-                },
-            };
-        }
+        return await handleEnergyRedirection(action, playerStats, campaignName);
     }
 
     if (!auto.saveType) {
@@ -383,6 +374,159 @@ async function handleThoughtShield(action, playerStats, campaignName) {
             type: 'automation_info',
             name: action.name,
             description: `${warlockName} reflects ${reflectedDamage} psychic damage back to ${attackerCreatureName}!`,
+        },
+    };
+}
+
+async function handleEnergyRedirection(action, playerStats, campaignName) {
+    const playerName = playerStats.name;
+    const auto = action.automation;
+
+    const chosenTypes = getChosenResistanceTypes(playerName, campaignName);
+    if (!chosenTypes || chosenTypes.length === 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${action.name} requires you to have chosen damage types for Energy Resistances.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const cs = await getCombatContext(campaignName);
+    if (!cs) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: 'No combat context available.',
+            },
+        };
+    }
+
+    const lastAttack = cs?.lastAttack;
+    if (!lastAttack) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `No recent attack found. Energy Redirection requires you to have taken damage of a type you've chosen resistance against.`,
+            },
+        };
+    }
+
+    if (lastAttack.targetName !== playerName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `You were not the target of the last attack (${lastAttack.targetName} was). Energy Redirection only works when you take damage.`,
+            },
+        };
+    }
+
+    const damageTypes = lastAttack.damageTypes || [];
+    const matchingTypes = damageTypes.filter(dt =>
+        chosenTypes.some(ct => ct.toLowerCase() === dt.toLowerCase())
+    );
+    if (matchingTypes.length === 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `The last attack dealt ${damageTypes.join(', ') || 'unknown'} damage, not one of your chosen resistance types (${chosenTypes.join(', ')}).`,
+            },
+        };
+    }
+
+    const targets = cs.creatures
+        .filter(c => c.name !== playerName)
+        .map(c => {
+            const hp = c.type === 'player'
+                ? { currentHp: getRuntimeValue(c.name, 'currentHitPoints') ?? getRuntimeValue(c.name, 'hitPoints') ?? 0, maxHp: getRuntimeValue(c.name, 'hitPoints') ?? 0 }
+                : { currentHp: c.currentHp ?? c.maxHp, maxHp: c.maxHp };
+            return { ...c, ...hp };
+        });
+
+    if (targets.length === 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${action.name}: No other creatures available to redirect to.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const conBonus = getAbilityModifier(playerStats.abilities, 'CON');
+    const prof = playerStats.proficiency || 0;
+    const saveDc = 8 + conBonus + prof;
+
+    return {
+        type: 'modal',
+        modalName: 'energyRedirection',
+        payload: {
+            title: `${action.name} — Redirect Energy`,
+            targets,
+            confirmLabel: 'Redirect',
+            confirmIcon: 'fa-bolt',
+            featureDescription: `Target must make a DEX saving throw (DC ${saveDc}) or take 2d12 + ${conBonus >= 0 ? '+' : ''}${conBonus} ${matchingTypes[0]} damage.`,
+            description: `You redirect damage of the ${matchingTypes[0]} type toward another creature you can see within 60 feet.`,
+            onTargetSelected: async (targetName) => {
+                if (!targetName) return null;
+
+                const evaluated = evaluateAutoExpression(auto.damageExpression, playerStats);
+                const roll = rollExpression(evaluated);
+                const redirectDamage = roll?.total ?? 0;
+
+                const { promise } = createSaveListener(campaignName, {
+                    targetName,
+                    saveType: auto.saveType || 'DEX',
+                    saveDc,
+                });
+                const saveResult = await promise;
+
+                const damageOnSave = computeDamageAfterSave(redirectDamage, saveResult.success, null);
+                if (damageOnSave > 0) {
+                    const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
+                    await applyDamageToTarget(cs, targetName, damageOnSave, [matchingTypes[0]], campaignName, characters, false, playerName);
+                }
+
+                await addEntry(campaignName, {
+                    type: 'ability_use',
+                    characterName: playerName,
+                    abilityName: action.name,
+                    description: `${playerName} redirects ${matchingTypes[0]} energy to ${targetName}. ${targetName} ${saveResult.success ? 'succeeded' : 'failed'} their DEX save (DC ${saveDc}) and took ${damageOnSave} ${matchingTypes[0]} damage.`,
+                    targetName,
+                    timestamp: Date.now(),
+                }).catch((e) => { console.error("[energyRedirection] Error:", e); });
+
+                return {
+                    type: 'popup',
+                    payload: {
+                        type: 'automation_info',
+                        name: action.name,
+                        targetName,
+                        description: `${targetName} ${saveResult.success ? 'succeeded' : 'failed'} their DEX save (DC ${saveDc}) and took ${damageOnSave} ${matchingTypes[0]} damage.`,
+                    },
+                };
+            },
+            onSkip: async () => {
+                await addEntry(campaignName, {
+                    type: 'ability_use',
+                    characterName: playerName,
+                    abilityName: action.name,
+                    description: `${playerName} chose not to redirect energy.`,
+                }).catch((e) => { console.error("[energyRedirection] Skip:", e); });
+            },
         },
     };
 }

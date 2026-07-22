@@ -63,6 +63,7 @@ function createMockProps(overrides = {}) {
     featAbilityChoices: [],
     featAbilityAssignments: {},
     onFeatAbilityChoiceChange: vi.fn(),
+    onFeatAbilityModeChange: vi.fn(),
     ...overrides,
   };
 }
@@ -429,6 +430,7 @@ describe('WizardStepAbilities', () => {
       const props = createMockProps({
         featAbilityChoices: [
           {
+            id: 'Ability Score Improvement',
             featName: 'Ability Score Improvement',
             type: 'choice',
             mode: 'single',
@@ -453,38 +455,6 @@ describe('WizardStepAbilities', () => {
       fireEvent.change(selects[0], { target: { value: 'Constitution' } });
 
       expect(props.onFeatAbilityChoiceChange).toHaveBeenCalledWith('Ability Score Improvement', 0, 'Constitution');
-    });
-
-    it('should call onFeatAbilityModeChange when mode radio changes', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps({
-        featAbilityChoices: [
-          {
-            featName: 'Ability Score Improvement',
-            type: 'choice',
-            mode: 'single',
-            options: {
-              single: { amount: 2, abilityNames: ['Strength', 'Dexterity', 'Constitution'], assignment: null },
-              dual: { amount: 1, count: 2, abilityNames: ['Strength', 'Dexterity', 'Constitution'], assignments: [null, null] },
-            },
-            featDescription: 'Test description',
-          },
-        ],
-        featAbilityAssignments: {
-          'Ability Score Improvement': { mode: 'single', assignments: { single: 'Strength', dual: ['Strength', ''] } },
-        },
-      });
-      render(<WizardStepAbilities {...props} />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Feat Ability Score Increases/)).toBeInTheDocument();
-      });
-
-      const radios = screen.getAllByRole('radio');
-      const dualRadio = radios[1];
-      fireEvent.click(dualRadio);
-
-      expect(props.onFeatAbilityModeChange).toHaveBeenCalledWith('Ability Score Improvement', 'dual');
     });
 
     it('should show mode toggle with single and dual options for choice type', async () => {

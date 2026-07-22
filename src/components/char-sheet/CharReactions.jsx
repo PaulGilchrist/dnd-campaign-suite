@@ -237,6 +237,8 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                 setModalState({ stepsOfTheFeyTauntModal: result.payload });
             } else if (result.modalName === 'searingVengeance') {
                 setModalState({ searingVengeanceModal: { ...result.payload, reaction, campaignName, characters } });
+            } else if (result.modalName === 'energyRedirection') {
+                setModalState({ energyRedirectionModal: result.payload });
             } else {
                 const html = buildFeatureDetailHtml(reaction);
                 if (html) setPopupHtml(html);
@@ -260,6 +262,22 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         setModalState({ deflectRedirectModal: null });
         await modalState.deflectRedirectModal.onSkip?.();
     }, [modalState.deflectRedirectModal, setModalState]);
+
+    const handleEnergyRedirectionConfirm = React.useCallback(async (targetName) => {
+        if (!modalState.energyRedirectionModal) return;
+        setModalState({ energyRedirectionModal: null });
+        if (!targetName) return;
+        const result = await modalState.energyRedirectionModal.onTargetSelected(targetName);
+        if (result && result.type === 'popup') {
+            setPopupHtml(result.payload);
+        }
+    }, [modalState.energyRedirectionModal, setModalState, setPopupHtml]);
+
+    const handleEnergyRedirectionSkip = React.useCallback(async () => {
+        if (!modalState.energyRedirectionModal) return;
+        setModalState({ energyRedirectionModal: null });
+        await modalState.energyRedirectionModal.onSkip?.();
+    }, [modalState.energyRedirectionModal, setModalState]);
 
     const handleSearingVengeanceConfirm = React.useCallback(async (selectedTargets) => {
         if (!modalState.searingVengeanceModal) return;
@@ -558,6 +576,18 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                     description={modalState.deflectRedirectModal.description}
                     onTargetSelected={handleRedirectConfirm}
                     onSkip={handleRedirectSkip}
+                />
+            )}
+            {modalState.energyRedirectionModal && (
+                <SecondaryTargetModal
+                    title={modalState.energyRedirectionModal.title}
+                    targets={modalState.energyRedirectionModal.targets}
+                    confirmLabel={modalState.energyRedirectionModal.confirmLabel || 'Redirect'}
+                    confirmIcon={modalState.energyRedirectionModal.confirmIcon || 'fa-bolt'}
+                    featureDescription={modalState.energyRedirectionModal.featureDescription}
+                    description={modalState.energyRedirectionModal.description}
+                    onTargetSelected={handleEnergyRedirectionConfirm}
+                    onSkip={handleEnergyRedirectionSkip}
                 />
             )}
             {modalState.stepsOfTheFeyTauntModal && (

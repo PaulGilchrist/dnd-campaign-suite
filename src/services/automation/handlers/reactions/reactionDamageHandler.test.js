@@ -32,6 +32,15 @@ vi.mock('../../../combat/automation/automationService.js', () => ({
     evaluateAutoExpression: vi.fn(() => 1),
 }));
 
+vi.mock('../../../rules/combat/applyDamage.js', () => ({
+    applyDamageToTarget: vi.fn(async () => ({})),
+    computeDamageAfterSave: vi.fn((_raw, saveSuccess, _dcSuccess) => saveSuccess ? 0 : _raw),
+}));
+
+vi.mock('../../../shared/abilityLookup.js', () => ({
+    getAbilityModifier: vi.fn((_abilities, ability) => ability === 'CON' ? 2 : 0),
+}));
+
 vi.mock('../../../combat/baseCombatActions.js', () => ({
     MELEE_REACH_FEET: 5,
 }));
@@ -155,18 +164,95 @@ describe('reactionDamageHandler', () => {
             expect(result.type).toBe('popup');
         });
 
-        it('proceeds to save popup when chosen types exist', async () => {
+        it('returns popup when no combat context', async () => {
             getRuntimeValue.mockReturnValue(['Fire']);
+            const action = makeAction({ automation: { trigger: 'damage_taken_of_chosen_resistance_type' } });
+            getCombatContext.mockResolvedValue(null);
+
+            const result = await handle(action, makePlayerStats(), 'test-campaign');
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toBe('No combat context available.');
+        });
+
+        it('returns popup when no recent attack', async () => {
+            getRuntimeValue.mockReturnValue(['Fire']);
+            const action = makeAction({ automation: { trigger: 'damage_taken_of_chosen_resistance_type' } });
+            getCombatContext.mockResolvedValue({ creatures: [] });
+
+            const result = await handle(action, makePlayerStats(), 'test-campaign');
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('No recent attack found');
+        });
+
+        it('returns popup when player was not the target', async () => {
+            getRuntimeValue.mockReturnValue(['Fire']);
+            const action = makeAction({ automation: { trigger: 'damage_taken_of_chosen_resistance_type' } });
+            getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'TestHero', type: 'player', currentHp: 20 }],
+                lastAttack: { targetName: 'OtherPC', damageTypes: ['Fire'] },
+            });
+
+            const result = await handle(action, makePlayerStats(), 'test-campaign');
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('You were not the target');
+        });
+
+        it('returns popup when damage type does not match chosen types', async () => {
+            getRuntimeValue.mockReturnValue(['Fire']);
+            const action = makeAction({ automation: { trigger: 'damage_taken_of_chosen_resistance_type' } });
+            getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'TestHero', type: 'player', currentHp: 20 }],
+                lastAttack: { targetName: 'TestHero', damageTypes: ['Psychic'] },
+            });
+
+            const result = await handle(action, makePlayerStats(), 'test-campaign');
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('not one of your chosen resistance types');
+        });
+
+        it('returns popup when no other creatures to redirect to', async () => {
+            getRuntimeValue.mockReturnValue(['Fire']);
+            const action = makeAction({ automation: { trigger: 'damage_taken_of_chosen_resistance_type' } });
+            getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'TestHero', type: 'player', currentHp: 20 }],
+                lastAttack: { targetName: 'TestHero', damageTypes: ['Fire'] },
+            });
+
+            const result = await handle(action, makePlayerStats(), 'test-campaign');
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('No other creatures available');
+        });
+
+        it('returns modal with targets when all checks pass', async () => {
+            getRuntimeValue
+                .mockImplementation((_characterKey, propertyName, campaignName) => {
+                    if (campaignName === 'test-campaign' && propertyName === '_Energy_Resistances_chosenTypes') return ['Fire'];
+                    if (campaignName === 'test-campaign' && propertyName === 'characters') return [];
+                    return undefined;
+                });
             const action = makeAction({
                 automation: {
                     trigger: 'damage_taken_of_chosen_resistance_type',
-                    saveType: 'CON',
+                    damageExpression: '2d12 + CON modifier',
                 },
             });
-            resolveTarget.mockResolvedValue({ target: { name: 'Enemy' } });
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'TestHero', type: 'player', currentHp: 20 },
+                    { name: 'Goblin', type: 'monster', currentHp: 10, maxHp: 10 },
+                ],
+                lastAttack: { targetName: 'TestHero', damageTypes: ['Fire'] },
+            });
 
             const result = await handle(action, makePlayerStats(), 'test-campaign');
-            expect(result.payload.description).toContain('saving throw');
+
+            expect(result.type).toBe('modal');
+            expect(result.modalName).toBe('energyRedirection');
+            expect(result.payload.title).toContain('Redirect Energy');
+            expect(result.payload.targets).toHaveLength(1);
+            expect(result.payload.targets[0].name).toBe('Goblin');
+            expect(result.payload.onTargetSelected).toBeInstanceOf(Function);
+            expect(result.payload.onSkip).toBeInstanceOf(Function);
         });
     });
 
