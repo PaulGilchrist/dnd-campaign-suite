@@ -86,8 +86,19 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
     const saveLabel = getAbilityLabel(saveAbility)
     const conditionLabel = conditionKey.charAt(0).toUpperCase() + conditionKey.slice(1)
     const saveBonus = getAbilitySaveBonus(playerStats, saveAbility)
-    const hasAdvantage = hasSaveAdvantage(conditionEffects, conditionKey, conditionEffects?.restoreBalance)
-      || (conditionKey === 'grappled' && conditionEffects?.strCheckAdvantage)
+    let hasAdvantage = hasSaveAdvantage(conditionEffects, conditionKey, conditionEffects?.restoreBalance)
+      || (conditionKey === 'grappled' && (conditionEffects?.strCheckAdvantage || (conditionEffects?.abilityCheckAdvantageAbilities && conditionEffects.abilityCheckAdvantageAbilities.includes('STR'))))
+
+    // Check saveModifiers directly for Powerful Build (same logic as conditionSaveService)
+    if (conditionKey === 'grappled') {
+      const saveModifiers = playerStats?.saveModifiers || playerStats?.computedStats?.saveModifiers
+      const powerfulBuildAdvantage = saveModifiers?.some(mod =>
+        mod.target === 'ability_check' && mod.effect === 'advantage' && mod.abilities?.includes('STR') && mod.condition === 'powerful_build_grapple_escape'
+      )
+      if (powerfulBuildAdvantage) {
+        hasAdvantage = true
+      }
+    }
 
     let roll1, roll2, finalRoll, mode
     if (hasAdvantage) {
