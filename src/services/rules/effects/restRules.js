@@ -394,9 +394,12 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
     // Clear Awakened Mind target on short rest
     updates.awakenedMindTarget = null;
 
-    // Clear Clairvoyant Combatant target on short rest
-    updates.clairvoyantCombatantTarget = null;
-    updates.clairvoyantCombatantUses = null;
+  // Clear Clairvoyant Combatant target on short rest
+  updates.clairvoyantCombatantTarget = null;
+  updates.clairvoyantCombatantUses = null;
+
+  // Clear Portent once-per-turn flag on short rest
+  updates.portentUsedThisTurn = null;
 
    // Reset Psionic Strike once-per-turn flag on short rest
   updates.psionicStrikeUsedThisTurn = null;
@@ -770,6 +773,7 @@ export async function applyLongRest(playerStats, campaignName) {
         dice.push(rollD20())
       }
       setRuntimeValue(name, 'portentDice', JSON.stringify(dice), campaignName, true)
+      setRuntimeValue(name, 'portentUsedThisTurn', null, campaignName, true)
     }
 
     // Reset Phantasmal Creatures free cast on long rest

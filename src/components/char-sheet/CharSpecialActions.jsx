@@ -39,6 +39,7 @@ import ClairvoyantCombatantModal from './modals/ClairvoyantCombatantModal.jsx';
 import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
 import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
 import { onSavantSelected } from '../../services/automation/handlers/class-wizard/SavantHandler.js';
+import { applyPortentChoice } from '../../services/automation/handlers/class-wizard/portentHandler.js';
 import { addEntry } from '../../services/ui/logService.js';
 import CreatureSelectionModal from './modals/shared/CreatureSelectionModal.jsx';
 import './CharSpecialActions.css';
@@ -70,6 +71,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
     const [stepsOfTheFeyTauntModal, setStepsOfTheFeyTauntModal] = useState(null);
     const [hurlThroughHellModal, setHurlThroughHellModal] = useState(null);
     const [clairvoyantCombatantModal, setClairvoyantCombatantModal] = useState(null);
+    const [portentModal, setPortentModal] = useState(null);
     const [fightingStylesMap, setFightingStylesMap] = useState(null);
     const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats?.name, campaignName, {
@@ -271,6 +273,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
                 setHurlThroughHellModal(result.payload);
             } else if (result.modalName === 'clairvoyantCombatant') {
                 setClairvoyantCombatantModal(result.payload);
+            } else if (result.modalName === 'portentDiceChoice') {
+                setPortentModal(result.payload);
             } else if (result.modalName === 'celestialResilienceModal') {
                 setCelestialResilienceModal({ ...result.payload, playerStats, campaignName });
             } else if (result.modalName === 'fiendishResilience') {
@@ -442,6 +446,37 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
             setPopupHtml(html);
         }
     }, [savantModal, playerStats, campaignName, setPopupHtml]);
+
+    function getEventDisplayLabel(eventType, eventData) {
+        if (eventType === 'attack') {
+            return `Attack vs AC ${eventData.targetName || 'unknown'}`;
+        }
+        if (eventType === 'ability') {
+            return eventData.checkName || 'Ability check';
+        }
+        return eventData.saveType ? eventData.saveType.toUpperCase() : 'Save';
+    }
+
+    const handlePortentDieChoice = useCallback(async (chosenDie) => {
+        if (!portentModal) return;
+        const { action, playerStats: ps, campaignName: cn, targetName, eventType, eventData, context } = portentModal;
+        try {
+            const result = await applyPortentChoice(action, ps, cn, targetName, eventType, eventData, context, chosenDie);
+            setPortentModal(null);
+            if (result?.type === 'popup') {
+                const payload = result.payload;
+                const html = `<b>${payload.name || 'Portent'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+                setPopupHtml(html);
+            }
+        } catch (e) {
+            console.error('[Portent] Failed to apply die choice:', e);
+            setPortentModal(null);
+        }
+    }, [portentModal, setPopupHtml]);
+
+    const handlePortentModalClose = useCallback(() => {
+        setPortentModal(null);
+    }, []);
 
 
 
@@ -661,6 +696,34 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
                     {...clairvoyantCombatantModal}
                     onClose={() => setClairvoyantCombatantModal(null)}
                 />
+            )}
+            {portentModal && (
+                <div className="portent-modal-overlay" onClick={handlePortentModalClose}>
+                    <div className="portent-modal" onClick={e => e.stopPropagation()}>
+                        <h3>Portent</h3>
+                        <div className="portent-modal-section">
+                            <div className="portent-modal-label">Creature: <span className="portent-modal-target">{portentModal.targetName}</span></div>
+                            <div className="portent-modal-label">{getEventDisplayLabel(portentModal.eventType, portentModal.eventData)}</div>
+                            <div className="portent-modal-original">
+                                d20({portentModal.eventData.d20}) + {portentModal.eventData.bonus} = {portentModal.eventData.d20 + portentModal.eventData.bonus}
+                                {portentModal.eventType === 'attack' && ` (${portentModal.eventData.hit ? 'Hit' : 'Miss'})`}
+                            </div>
+                        </div>
+                        <div className="portent-modal-section">
+                            <div className="portent-modal-label">Choose a foretelling roll:</div>
+                            <div className="portent-dice-options">
+                                {portentModal.diceOptions.map(die => (
+                                    <button key={die} className="portent-die-btn" onClick={() => handlePortentDieChoice(die)}>
+                                        {die}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="portent-modal-actions">
+                            <button className="portent-cancel-btn" onClick={handlePortentModalClose}>Cancel</button>
+                        </div>
+                    </div>
+                </div>
             )}
             {celestialResilienceModal && (
                 <CreatureSelectionModal

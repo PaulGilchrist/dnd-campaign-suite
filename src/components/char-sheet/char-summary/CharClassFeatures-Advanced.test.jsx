@@ -241,7 +241,11 @@ describe('CharClassFeatures', () => {
             expect(screen.getByText(/within 30 ft\./)).toBeInTheDocument();
         });
 
-        it('renders portent section and button when portent action exists', () => {
+        it('renders portent section when portent action exists', () => {
+            vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
+                if (key === 'portentDice') return [];
+                return null;
+            });
             const stats = makeStats({
                 level: 5,
                 class: { name: 'Wizard', class_levels: [{ level: 5 }] },
@@ -250,12 +254,11 @@ describe('CharClassFeatures', () => {
             });
             renderComponent(stats);
             expect(screen.getByText(/Portent Dice:/)).toBeInTheDocument();
-            expect(screen.getByTitle(/Use Portent/)).toBeInTheDocument();
         });
 
         it('renders portent dice display when dice are stored', () => {
-            vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-                if (key === 'portentDice') return [1, 20];
+            vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
+                if (key === 'portentDice') return [7, 13];
                 return null;
             });
             const stats = makeStats({
@@ -270,7 +273,7 @@ describe('CharClassFeatures', () => {
         });
 
         it('shows no dice remaining badge when portent dice array is empty', () => {
-            vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
+            vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
                 if (key === 'portentDice') return [];
                 return null;
             });

@@ -3,10 +3,7 @@ import React from 'react'
 import TrackedResourceInput from './TrackedResourceInput.jsx';
 import { getClassFeatures } from '../../../services/character/classFeatures.js';
 import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { executeHandler } from '../../../services/automation/index.js';
 import { hasGloriousDefenseActive } from '../../../services/automation/handlers/class-cleric-paladin/gloriousDefenseHandler.js';
-import { applyPortentChoice } from '../../../services/automation/handlers/class-wizard/portentHandler.js';
-import Popup from '../../common/popup.jsx';
 import WeaponKindMasteryModal from '../modals/WeaponKindMasteryModal.jsx';
 import { loadFightingStyles } from '../../../services/ui/dataLoader.js';
 import { isUnbreakableMajestyActive, getUnbreakableMajestySaveDc, clearUnbreakableMajesty } from '../../../services/combat/auras/unbreakableMajesty.js';
@@ -582,10 +579,9 @@ const WarlockFeatures = function WarlockFeatures({ playerStats, campaignName }) 
 /* ─── Wizard ─── */
 const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
     const wizardFeatures = getClassFeatures(playerStats);
-    const portentAction = (playerStats.specialActions ?? []).find(
+    const hasPortent = (playerStats.specialActions ?? []).some(
         a => a.automation?.type === 'portent'
     );
-    const hasPortent = !!portentAction;
     const hasProjectedWard = (playerStats.automation?.reactions ?? []).some(
         a => a.type === 'projected_ward' || a.name === 'Projected Ward'
     );
@@ -593,9 +589,7 @@ const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
         a => a.type === 'projected_ward' || a.name === 'Projected Ward'
     );
     const projectedWardRange = projectedWardReaction?.range || 30;
-    const [portentDice, setPortentDiceState] = React.useState([]);
-    const [portentPopup, setPortentPopup] = React.useState(null);
-    const [portentModal, setPortentModal] = React.useState(null);
+    const portentDice = useRuntimeValue(playerStats.name, 'portentDice', campaignName);
     const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
     const thirdEyeBuff = Array.isArray(activeBuffs) ? (activeBuffs.find(b => b.name === 'The Third Eye') || null) : null;
     const THIRD_EYE_EFFECTS = {
@@ -604,130 +598,41 @@ const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
         'see_invisibility': 'See Invisibility',
     };
 
-    React.useEffect(() => {
-        try {
-            const stored = getRuntimeValue(playerStats.name, 'portentDice', campaignName);
-            if (stored) {
-                const parsed = typeof stored === 'string' ? JSON.parse(stored) : stored;
-                if (Array.isArray(parsed)) setPortentDiceState(parsed);
-            }
-        } catch { /* ignore */ }
-    }, [playerStats.name, campaignName]);
-
-    const refreshDiceDisplay = React.useCallback(() => {
-        const stored = getRuntimeValue(playerStats.name, 'portentDice', campaignName);
-        if (stored) {
-            const parsed = typeof stored === 'string' ? JSON.parse(stored) : stored;
-            if (Array.isArray(parsed)) setPortentDiceState(parsed);
+    let parsedDice = [];
+    try {
+        if (portentDice) {
+            const parsed = typeof portentDice === 'string' ? JSON.parse(portentDice) : portentDice;
+            if (Array.isArray(parsed)) parsedDice = parsed;
         }
-    }, [playerStats.name, campaignName]);
-
-    const handlePortentClick = React.useCallback(async () => {
-        if (!portentAction) return;
-        const result = await executeHandler(portentAction, playerStats, campaignName, null);
-        if (!result) return;
-        if (result.type === 'modal') {
-            setPortentModal(result.payload);
-        } else if (result.type === 'popup') {
-            const payload = result.payload;
-            const html = typeof payload === 'string'
-                ? payload
-                : `<b>${payload.name || 'Portent'}</b><br/>${payload.description || ''}`;
-            setPortentPopup(html);
-            refreshDiceDisplay();
-        }
-    }, [portentAction, playerStats, campaignName, refreshDiceDisplay]);
-
-    const handlePortentDieChoice = React.useCallback(async (chosenDie) => {
-        const { action, playerStats: ps, campaignName: cn, targetName, eventType, eventData, context } = portentModal;
-        try {
-            const result = await applyPortentChoice(action, ps, cn, targetName, eventType, eventData, context, chosenDie);
-            setPortentModal(null);
-            if (result?.type === 'popup') {
-                const payload = result.payload;
-                const html = typeof payload === 'string'
-                    ? payload
-                    : `<b>${payload.name || 'Portent'}</b><br/>${payload.description || ''}`;
-                setPortentPopup(html);
-                refreshDiceDisplay();
-            }
-        } catch (e) {
-            console.error('[Portent] Failed to apply die choice:', e);
-            setPortentModal(null);
-        }
-    }, [portentModal, refreshDiceDisplay]);
-
-    function getEventDisplayLabel(eventType, eventData) {
-        if (eventType === 'attack') {
-            return `Attack vs AC ${eventData.targetName || 'unknown'}`;
-        }
-        if (eventType === 'ability') {
-            return eventData.checkName || 'Ability check';
-        }
-        return eventData.saveType ? eventData.saveType.toUpperCase() : 'Save';
-    }
+    } catch { /* ignore */ }
 
     if ((wizardFeatures?.showWizardFeatures ?? true) === false) return null;
     const wardMax = playerStats.class?.name === 'Wizard' ? (2 * playerStats.level) + (playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus || 0) : 0;
     return (
-         <div data-testid="char-class-wizard">
-              <TrackedResourceInput label="Arcane Recovery Levels" resourceKey="arcaneRecoveryLevels" playerName={playerStats.name} getMax={() => wizardFeatures?.arcaneRecoveryLevels || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-             {wardMax > 0 && <TrackedResourceInput label="Arcane Ward HP" resourceKey="arcaneWardHp" playerName={playerStats.name} getMax={() => wardMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />}
-             {portentPopup && <Popup html={portentPopup} onClickOrKeyDown={() => setPortentPopup(null)} />}
-             {portentModal && (
-                 <div className="portent-modal-overlay" onClick={() => setPortentModal(null)}>
-                     <div className="portent-modal" onClick={e => e.stopPropagation()}>
-                         <h3>Portent</h3>
-                         <div className="portent-modal-section">
-                             <div className="portent-modal-label">Creature: <span className="portent-modal-target">{portentModal.targetName}</span></div>
-                             <div className="portent-modal-label">{getEventDisplayLabel(portentModal.eventType, portentModal.eventData)}</div>
-                             <div className="portent-modal-original">
-                                 d20({portentModal.eventData.d20}) + {portentModal.eventData.bonus} = {portentModal.eventData.d20 + portentModal.eventData.bonus}
-                                 {portentModal.eventType === 'attack' && ` (${portentModal.eventData.hit ? 'Hit' : 'Miss'})`}
-                             </div>
-                         </div>
-                         <div className="portent-modal-section">
-                             <div className="portent-modal-label">Choose a foretelling roll:</div>
-                             <div className="portent-dice-options">
-                                 {portentModal.diceOptions.map(die => (
-                                     <button key={die} className="portent-die-btn" onClick={() => handlePortentDieChoice(die)}>
-                                         {die}
-                                     </button>
-                                 ))}
-                             </div>
-                         </div>
-                         <div className="portent-modal-actions">
-                             <button className="portent-cancel-btn" onClick={() => setPortentModal(null)}>Cancel</button>
-                         </div>
-                     </div>
-                 </div>
-             )}
-             {hasPortent && (
-                  <div>
-                      <b>Portent Dice:</b>
-                      <span className="portent-dice-display">
-                          {portentDice.length > 0
-                              ? portentDice.map((die, i) => (
-                                  <span key={i} className="portent-die">{die}{i < portentDice.length - 1 ? ', ' : ''}</span>
-                              ))
-                              : <span className="automation-badge">No dice remaining</span>
-                          }
-                      </span>
-                      <div className="automation-actions">
-                          <button className="automation-btn" onClick={handlePortentClick} title="Use Portent to replace a d20 test with a foretelling roll">
-                              <i className="fas fa-dice-d20"></i> Use Portent
-                          </button>
-                      </div>
-                      <span className="automation-badge">{portentDice.length} remaining (refreshes on Long Rest)</span>
-                  </div>
-              )}
-              {hasProjectedWard && (
-                 <div className="automation-badge">Projected Ward: Allies within {projectedWardRange} ft. (Reaction)</div>
-              )}
-              {thirdEyeBuff && (
-                  <span className="automation-badge">The Third Eye: {THIRD_EYE_EFFECTS[thirdEyeBuff.effect] || 'Active'}</span>
-              )}
-          </div>
+          <div data-testid="char-class-wizard">
+               <TrackedResourceInput label="Arcane Recovery Levels" resourceKey="arcaneRecoveryLevels" playerName={playerStats.name} getMax={() => wizardFeatures?.arcaneRecoveryLevels || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+              {wardMax > 0 && <TrackedResourceInput label="Arcane Ward HP" resourceKey="arcaneWardHp" playerName={playerStats.name} getMax={() => wardMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />}
+              {hasPortent && (
+                   <div>
+                       <b>Portent Dice:</b>
+                       <span className="portent-dice-display">
+                           {parsedDice.length > 0
+                               ? parsedDice.map((die, i) => (
+                                   <span key={i} className="portent-die">{die}{i < parsedDice.length - 1 ? ', ' : ''}</span>
+                               ))
+                               : <span className="automation-badge">No dice remaining</span>
+                           }
+                       </span>
+                       <span className="automation-badge">{parsedDice.length} remaining (refreshes on Long Rest)</span>
+                   </div>
+               )}
+               {hasProjectedWard && (
+                  <div className="automation-badge">Projected Ward: Allies within {projectedWardRange} ft. (Reaction)</div>
+               )}
+               {thirdEyeBuff && (
+                   <span className="automation-badge">The Third Eye: {THIRD_EYE_EFFECTS[thirdEyeBuff.effect] || 'Active'}</span>
+               )}
+           </div>
     );
 };
 

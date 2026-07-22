@@ -42,6 +42,7 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     'hurl_through_hell',
     'clairvoyant_combatant',
     'boon_of_energy_resistance',
+    'portent',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([
