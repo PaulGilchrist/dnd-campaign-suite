@@ -46,6 +46,9 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
         const { baseName: offHandRangedBase } = parseMagicItemName(offHandRangedName);
         const offHandRangedWeapon = allEquipment.find(item => item.name === offHandRangedBase);
         if (offHandRangedWeapon) {
+            const hasCrossbowExpert = (playerStats.feats || []).some(f => f && f.toLowerCase && f.toLowerCase().includes('crossbow expert'));
+            const isHandCrossbow = offHandRangedBase === 'Hand Crossbow';
+            const includeAbilityBonus = hasCrossbowExpert && isHandCrossbow;
             attacks.push(buildWeaponAttack({
                 weapon: offHandRangedWeapon,
                 weaponName: offHandRangedName,
@@ -54,7 +57,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
                 proficiency,
                 actionType: 'Bonus Action',
                 weaponType: 'ranged',
-                includeAbilityBonusInDamage: false,
+                includeAbilityBonusInDamage: includeAbilityBonus,
             }));
         }
     }

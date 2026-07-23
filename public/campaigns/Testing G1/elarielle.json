@@ -13,7 +13,7 @@
     {
       "name": "Dexterity",
       "baseScore": 12,
-      "featIncrease": 2,
+      "featIncrease": 6,
       "backgroundIncrease": 0,
       "miscIncrease": 0
     },
@@ -62,9 +62,8 @@
     "Ability Score Improvement",
     "Tough",
     "Ability Score Improvement",
-    "Crusher",
     "Crossbow Expert",
-    "Magic Initiate",
+    "Defensive Duelist",
     "Magic Initiate"
   ],
   "fightingStyles": [],
