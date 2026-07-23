@@ -47,6 +47,21 @@ function is2024(playerStats, playerSummary) {
 }
 
 /**
+ * Merge automation specialActions back into playerStats.specialActions
+ * so features like bonus_healing (Replenishing Meal) appear in CharSpecialActions.
+ */
+function mergeAutomationSpecialActions(playerStats) {
+    const automationSpecialActions = playerStats.automation?.specialActions || [];
+    const existingNames = new Set((playerStats.specialActions || []).map(s => s.name));
+    for (const sa of automationSpecialActions) {
+        if (!existingNames.has(sa.name)) {
+            if (!playerStats.specialActions) playerStats.specialActions = [];
+            playerStats.specialActions.push({ name: sa.name, description: sa.description || '', automation: sa, hasAutomation: true });
+        }
+    }
+}
+
+/**
  * Apply The Third Eye darkvision enhancement from active buffs.
  * Sets Darkvision to 120 ft if the Third Eye buff with darkvision_120 effect is active.
  */
@@ -1143,6 +1158,7 @@ const rules = {
           }
 
             playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+            mergeAutomationSpecialActions(playerStats);
           playerStats.saveModifiers = collectSaveModifiers(allFeatures);
           // Add Powerful Build grapple escape advantage after saveModifiers is collected
           if (playerStats.hasPowerfulBuild && Array.isArray(playerStats.saveModifiers)) {
@@ -1298,6 +1314,7 @@ const rules = {
             });
             // Re-process automation with feat features included
           playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+          mergeAutomationSpecialActions(playerStats);
 
           // Now create feat entries with processed automation (options instead of effects)
           for (const featFeature of featFeatures) {
@@ -1393,10 +1410,11 @@ const rules = {
                            allFeatures.push(feature);
                            playerStats.bonusActions.push(feature);
                        });
-                       playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
-                   }
+                        playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+                        mergeAutomationSpecialActions(playerStats);
+                    }
 
-                   const reactionManeuvers = maneuvers.filter(m => knownNames.includes(m.name) && m.actionType === 'reaction');
+                    const reactionManeuvers = maneuvers.filter(m => knownNames.includes(m.name) && m.actionType === 'reaction');
                    if (reactionManeuvers.length > 0) {
                        reactionManeuvers.forEach(m => {
                            const feature = {
@@ -1418,10 +1436,11 @@ const rules = {
                            allFeatures.push(feature);
                            playerStats.reactions.push(feature);
                        });
-                       playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
-                   }
+                        playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+                        mergeAutomationSpecialActions(playerStats);
+                    }
 
-                  const grantAttackManeuvers = maneuvers.filter(m => knownNames.includes(m.name) && m.actionType === 'grant_attack');
+                   const grantAttackManeuvers = maneuvers.filter(m => knownNames.includes(m.name) && m.actionType === 'grant_attack');
                   if (grantAttackManeuvers.length > 0) {
                       grantAttackManeuvers.forEach(m => {
                           allFeatures.push({
@@ -1442,10 +1461,11 @@ const rules = {
                               hasAutomation: true,
                           });
                       });
-                      playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
-                  }
+                       playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+                       mergeAutomationSpecialActions(playerStats);
+                   }
 
-                   const movementManeuvers = maneuvers.filter(m => knownNames.includes(m.name) && m.actionType === 'movement');
+                    const movementManeuvers = maneuvers.filter(m => knownNames.includes(m.name) && m.actionType === 'movement');
                    if (movementManeuvers.length > 0) {
                        movementManeuvers.forEach(m => {
                            allFeatures.push({
@@ -1465,10 +1485,11 @@ const rules = {
                                hasAutomation: true,
                            });
                        });
-                       playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
-                   }
+                        playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+                        mergeAutomationSpecialActions(playerStats);
+                    }
 
-                    const skillCheckManeuvers = maneuvers.filter(m => knownNames.includes(m.name) && m.actionType === 'skill_check');
+                     const skillCheckManeuvers = maneuvers.filter(m => knownNames.includes(m.name) && m.actionType === 'skill_check');
                     if (skillCheckManeuvers.length > 0) {
                         skillCheckManeuvers.forEach(m => {
                             allFeatures.push({
@@ -1507,8 +1528,9 @@ const rules = {
                             }
                         });
                         playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+                        mergeAutomationSpecialActions(playerStats);
                     }
-               }
+                }
            } catch (_e) {
               // Maneuver data not available, skip
           }

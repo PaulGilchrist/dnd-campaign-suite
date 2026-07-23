@@ -52,6 +52,7 @@ const INTERACTIVE_PASSIVE_EFFECTS = new Set([
     'illusion_savant',
     'persistent_rage',
     'superior_defense',
+    'bonus_healing',
 ]);
 
 export function isInteractiveAutomation(feature) {

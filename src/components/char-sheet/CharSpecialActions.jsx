@@ -9,7 +9,7 @@ import { renderMarkdownInline, sanitizeHtml } from '../../services/ui/sanitize.j
 import { loadFightingStyles } from '../../services/ui/dataLoader.js';
 import { executeHandler } from '../../services/automation/index.js';
 import { isInteractiveAutomation } from '../../services/combat/automation/automationService.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { applyChoice } from '../../services/automation/handlers/class-ranger/defensiveTacticsHandler.js';
 import { applyChoice as applyHunterPreyChoice } from '../../services/automation/handlers/class-ranger/hunterPreyHandler.js';
 import TeleportModal from './modals/TeleportModal.jsx';
@@ -41,6 +41,7 @@ import { onSpellMasterySelected } from '../../services/automation/handlers/class
 import { onSavantSelected } from '../../services/automation/handlers/class-wizard/SavantHandler.js';
 import { applyPortentChoice } from '../../services/automation/handlers/class-wizard/portentHandler.js';
 import { addEntry } from '../../services/ui/logService.js';
+import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import CreatureSelectionModal from './modals/shared/CreatureSelectionModal.jsx';
 import './CharSpecialActions.css';
 
@@ -72,6 +73,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
     const [hurlThroughHellModal, setHurlThroughHellModal] = useState(null);
     const [clairvoyantCombatantModal, setClairvoyantCombatantModal] = useState(null);
     const [portentModal, setPortentModal] = useState(null);
+    const [replenishingMealModal, setReplenishingMealModal] = useState(null);
     const [fightingStylesMap, setFightingStylesMap] = useState(null);
     const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats?.name, campaignName, {
@@ -96,6 +98,52 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
         handleCombatSuperiorityConfirm,
         handleCombatSuperiorityReopenSelection,
     } = useCombatSuperiorityModal(playerStats, campaignName, rollAttack, rollDamage, setPopupHtml);
+
+    const hasReplenishingMeal = (playerStats.automation?.passives ?? []).some(
+        p => p.type === 'passive_rule' && p.effect === 'bonus_healing' && p.name === 'Replenishing Meal'
+    );
+    const replenishingMeals = useRuntimeValue(playerStats.name, 'replenishingMeals', campaignName);
+    const replenishingMealMax = hasReplenishingMeal ? 4 + (playerStats.proficiency || 0) : 0;
+
+    const handleReplenishingMealClick = useCallback(async () => {
+        if (cannotAct) return;
+        if (!hasReplenishingMeal) return;
+        const current = Number(replenishingMeals ?? replenishingMealMax);
+        if (current <= 0) {
+            setPopupHtml('<b>Replenishing Meal</b><br/>No meals remaining.<br/><span class="dice-roll-hint">click to dismiss</span>');
+            return;
+        }
+        const combatSummary = await getCombatContext(campaignName);
+        const chefName = playerStats.name;
+        const allCreatures = [
+            ...(characters || []).filter(c => c.name !== chefName).map(c => ({ name: c.name, type: 'player' })),
+            ...(combatSummary?.creatures || []).filter(c => c.type !== 'player' && c.name !== chefName).map(c => ({ name: c.name, type: 'monster' }))
+        ];
+        const seen = new Set();
+        const targets = allCreatures.filter(c => { if (seen.has(c.name)) return false; seen.add(c.name); return true; });
+        setReplenishingMealModal({ targets, maxTargets: current });
+    }, [cannotAct, hasReplenishingMeal, replenishingMeals, replenishingMealMax, campaignName, characters, playerStats.name, setPopupHtml]);
+
+    const handleReplenishingMealConfirm = useCallback(async (selectedNames) => {
+        if (!replenishingMealModal) return;
+        const { maxTargets } = replenishingMealModal;
+        const count = Math.min(selectedNames.length, maxTargets);
+        for (const name of selectedNames.slice(0, count)) {
+            setRuntimeValue(name, 'replenishingMeals', 1, campaignName);
+        }
+        const current = Number(replenishingMeals ?? replenishingMealMax);
+        setRuntimeValue(playerStats.name, 'replenishingMeals', Math.max(0, current - count), campaignName);
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: 'Replenishing Meal',
+            description: `${playerStats.name} distributed ${count} replenishing meal${count > 1 ? 's' : ''} to ${selectedNames.slice(0, count).join(', ')}.`,
+            timestamp: Date.now(),
+        }).catch(() => {});
+        const html = `<b>Replenishing Meal</b><br/>Granted ${count} meal${count > 1 ? 's' : ''} to: ${selectedNames.slice(0, count).join(', ')}.<br/><span class="dice-roll-hint">click to dismiss</span>`;
+        setPopupHtml(html);
+        setReplenishingMealModal(null);
+    }, [replenishingMealModal, replenishingMeals, replenishingMealMax, campaignName, setPopupHtml, playerStats.name]);
 
     useEffect(() => {
         let cancelled = false;
@@ -228,6 +276,10 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
             setAspectOfTheWildsModal(true);
             return;
         }
+        if (auto?.type === 'passive_rule' && auto?.effect === 'bonus_healing') {
+            handleReplenishingMealClick();
+            return;
+        }
         const result = await executeHandler(action, playerStats, campaignName, mapName);
         if (!result) return;
         if (result.type === 'modal') {
@@ -289,7 +341,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
             const html = `<b>${name}</b><br/>${description}<br/><span class="dice-roll-hint">click to dismiss</span>`;
             setPopupHtml(html);
         }
-    }, [playerStats, campaignName, cannotAct, mapName, setCombatSuperiorityModal, setPopupHtml]);
+    }, [playerStats, campaignName, cannotAct, mapName, setCombatSuperiorityModal, setPopupHtml, handleReplenishingMealClick]);
     const handleStrideConfirm = useCallback(async (optionName, buffEntry) => {
         if (!strideModal) return;
         const { action, playerStats: modalPlayerStats, campaignName: modalCampaign } = strideModal;
@@ -826,6 +878,20 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
                         </div>
                     </div>
                 </div>
+            )}
+            {replenishingMealModal && (
+                <CreatureSelectionModal
+                    title="Replenishing Meal"
+                    icon="fa-utensils"
+                    targets={replenishingMealModal.targets}
+                    maxTargets={replenishingMealModal.maxTargets}
+                    description="Choose creatures to receive a replenishing meal."
+                    note="Each creature can hold at most 1 meal. During a Short Rest, a creature that eats the meal and rolls a Hit Die gains extra 1d8 HP."
+                    confirmLabel="Distribute Meals"
+                    confirmIcon="fa-utensils"
+                    onConfirm={handleReplenishingMealConfirm}
+                    onSkip={() => setReplenishingMealModal(null)}
+                />
             )}
             {uniqueActions.map((specialAction, index) => {
                 const isInteractive = isInteractiveAutomation(specialAction);

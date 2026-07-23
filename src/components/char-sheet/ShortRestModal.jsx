@@ -1,6 +1,6 @@
 
 import React from 'react'
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { rollDice } from '../../services/dice/diceRoller.js'
 import { getHitDieSize, computeHitDieRecovery, SHORT_REST_RESOURCES, getShortRestResourceLabels, applyShortRest } from '../../services/rules/effects/restRules.js'
 import { getClassFeatures } from '../../services/character/classFeatures.js'
@@ -21,6 +21,10 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const [songOfRestApplied, setSongOfRestApplied] = React.useState(false);
     const [restorationRequested, setRestorationRequested] = React.useState(false);
     const [celestialResilienceModal, setCelestialResilienceModal] = React.useState(null);
+
+    const replenishingMeals = useRuntimeValue(playerStats.name, 'replenishingMeals', campaignName);
+    const hasMeal = Number(replenishingMeals ?? 0) > 0;
+    const [mealConsumed, setMealConsumed] = React.useState(false);
 
 
     const isSorcerer = playerStats?.class?.name === 'Sorcerer';
@@ -133,7 +137,14 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const handleRollOne = () => {
         if (remainingHitDice <= 0) return;
         const { total, rolls } = rollDice(1, hitDie);
-        const hp = computeHitDieRecovery(total, conBonus);
+        let hp = computeHitDieRecovery(total, conBonus);
+        if (hasMeal && !mealConsumed) {
+            const { total: mealTotal } = rollDice(1, 8);
+            const mealBonus = Math.max(1, mealTotal);
+            hp += mealBonus;
+            setMealConsumed(true);
+            setRuntimeValue(playerStats.name, 'replenishingMeals', Number(replenishingMeals ?? 0) - 1, campaignName);
+        }
         setRemainingHitDice(prev => prev - 1);
         setRecoveredHp(prev => prev + hp);
         setRollLog(prev => [...prev, { roll: rolls[0], hp }]);
@@ -143,9 +154,18 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         if (remainingHitDice <= 0) return;
         let totalHp = 0;
         let newRolls = [];
+        let mealApplied = false;
         for (let i = 0; i < remainingHitDice; i++) {
             const { total, rolls } = rollDice(1, hitDie);
-            const hp = computeHitDieRecovery(total, conBonus);
+            let hp = computeHitDieRecovery(total, conBonus);
+            if (hasMeal && !mealApplied) {
+                const { total: mealTotal } = rollDice(1, 8);
+                const mealBonus = Math.max(1, mealTotal);
+                hp += mealBonus;
+                mealApplied = true;
+                setMealConsumed(true);
+                setRuntimeValue(playerStats.name, 'replenishingMeals', Number(replenishingMeals ?? 0) - 1, campaignName);
+            }
             totalHp += hp;
             newRolls.push({ roll: rolls[0], hp });
          }
@@ -223,6 +243,11 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
 
         // Apply base short rest logic (resource clearing, feature clearing, expiration)
         const restResult = await applyShortRest(playerStats, campaignName, { skipAutoRecovery: true });
+
+        // Replenishing Meal was consumed during this rest — subtract 1 from the reset value
+        if (mealConsumed) {
+            setRuntimeValue(playerStats.name, 'replenishingMeals', Number(getRuntimeValue(playerStats.name, 'replenishingMeals', campaignName) ?? 0) - 1, campaignName);
+        }
 
         // Check if Celestial Resilience needs ally selection
         if (restResult?.celestialResilienceAllies) {
@@ -336,6 +361,9 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
             logEntries.push(`Natural Recovery: ${slotDetails}`);
             restoredResources.push(`Natural Recovery (${slotDetails})`);
         }
+        if (mealConsumed) {
+            logEntries.push('Replenishing Meal consumed: +1d8 HP');
+        }
         if (restoredResources.length > 0) {
             logEntries.push(`Resources restored: ${restoredResources.join(', ')}`);
         }
@@ -428,23 +456,35 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
                           </div>
                       )}
 
-                     {hasBolsteringTreats && (
-                         <div className="short-rest-section">
-                             <h4>Bolstering Treats</h4>
-                             <p>Craft {playerStats.proficiency || 0} bolstering treats (last 8 hours).</p>
-                             <div className="short-rest-dice-row">
-                                 {bolsteringTreatsCrafted ? (
-                                     <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Treats crafted</span>
-                                   ) : (
-                                     <button className="char-btn" onClick={handleCraftBolsteringTreats}>
-                                         <i className="fas fa-cookie-bite"></i> Craft Bolstering Treats
-                                     </button>
-                                   )}
-                             </div>
-                         </div>
-                     )}
+                      {hasBolsteringTreats && (
+                          <div className="short-rest-section">
+                              <h4>Bolstering Treats</h4>
+                              <p>Craft {playerStats.proficiency || 0} bolstering treats (last 8 hours).</p>
+                              <div className="short-rest-dice-row">
+                                  {bolsteringTreatsCrafted ? (
+                                      <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Treats crafted</span>
+                                    ) : (
+                                      <button className="char-btn" onClick={handleCraftBolsteringTreats}>
+                                          <i className="fas fa-cookie-bite"></i> Craft Bolstering Treats
+                                      </button>
+                                    )}
+                              </div>
+                          </div>
+                      )}
 
-                      {resourceLabels.length > 0 && (
+                      {hasMeal && !mealConsumed && (
+                          <div className="short-rest-section">
+                              <h4>Replenishing Meal</h4>
+                              <p>Your next Hit Die roll gains +1d8 HP. The meal will be consumed.</p>
+                          </div>
+                      )}
+                      {mealConsumed && (
+                          <div className="short-rest-section">
+                              <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Replenishing Meal consumed (+1d8 HP)</span>
+                          </div>
+                      )}
+
+                       {resourceLabels.length > 0 && (
                        <div className="short-rest-section">
                            <h4>Resources Restored</h4>
                            <ul>

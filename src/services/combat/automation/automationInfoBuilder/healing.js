@@ -202,6 +202,7 @@ export const healingHandlers = {
             type: 'passive_rule',
             effect: 'bonus_healing',
             name: feature.name,
+            description: feature.description || '',
             bonusExpression: auto.extraHealing || '0',
             trigger: auto.trigger || '',
             hasAutomation: true

@@ -806,7 +806,7 @@
                     "effect": "extra_healing_hit_dice",
                     "extraHealing": "1d8",
                     "targets": "4 + proficiency_bonus",
-                    "casting_time": "1 action"
+                    "casting_time": "passive"
                 }
             },
             {

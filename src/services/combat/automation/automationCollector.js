@@ -506,6 +506,9 @@ export function collectAutomationFromFeatures(features, playerStats) {
                     result.specialActions.push(info)
                 } else if (info.effect === 'ritual_spells') {
                     result.ritualSpells.push(info)
+                } else if (info.effect === 'bonus_healing') {
+                    result.passives.push(info)
+                    result.specialActions.push(info)
                 } else if (info.effect === 'tavern_brawler_push' || info.effect === 'tavern_brawler_reroll_ones' || info.effect === 'ignore_loading_crossbows' || info.effect === 'no_melee_disadvantage_crossbows') {
                     result.passives.push(info)
                 } else {

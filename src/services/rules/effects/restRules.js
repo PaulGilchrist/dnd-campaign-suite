@@ -259,6 +259,15 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
     updates.wardingflareUses = null
   }
 
+  // Chef: Replenishing Meals reset on Short Rest
+  const hasReplenishingMeal = (playerStats.automation?.passives ?? []).some(
+    p => p.type === 'passive_rule' && p.effect === 'bonus_healing' && p.name === 'Replenishing Meal'
+  )
+  if (hasReplenishingMeal) {
+    const mealMax = 4 + (playerStats.proficiency || 0)
+    setRuntimeValue(name, 'replenishingMeals', mealMax, campaignName, true)
+  }
+
   if (!skipAutoRecovery) {
     const hasFontOfInspiration = (playerStats.automation?.passives ?? []).some(p => p.type === 'font_of_inspiration')
     if (hasFontOfInspiration) {
@@ -879,6 +888,15 @@ export async function applyLongRest(playerStats, campaignName) {
         setRuntimeValue(name, 'chefBolsteringTreats', craftCount, campaignName, true)
     }
 
+    // Chef: Replenishing Meals reset on Long Rest
+    const hasReplenishingMeal = (playerStats.automation?.passives ?? []).some(
+        p => p.type === 'passive_rule' && p.effect === 'bonus_healing' && p.name === 'Replenishing Meal'
+    )
+    if (hasReplenishingMeal) {
+        const mealMax = 4 + (playerStats.proficiency || 0)
+        setRuntimeValue(name, 'replenishingMeals', mealMax, campaignName, true)
+    }
+
     // Log long rest to campaign log
     const logEntries = [];
     logEntries.push(`${name} takes a long rest.`);
@@ -888,6 +906,7 @@ export async function applyLongRest(playerStats, campaignName) {
     if (playerStats.class?.name === 'Warlock') resources.push('Pact Magic (Warlock spell slots)');
     if (hasPortent) resources.push('Portent dice');
     if (hasBolsteringTreats) resources.push('Bolstering Treats');
+    if (hasReplenishingMeal) resources.push('Replenishing Meals');
     const hasCelestialResilience = playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron';
     if (hasCelestialResilience && playerStats.specialActions?.some(f => f.name === 'Celestial Resilience')) resources.push('Celestial Resilience (temp HP)');
     if (hasNaturalRecovery) resources.push('Natural Recovery (spell slots)');
