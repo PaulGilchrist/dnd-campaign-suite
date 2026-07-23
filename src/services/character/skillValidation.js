@@ -4,7 +4,102 @@
  * Supports both 5e and 2024 rulesets
  */
 
-import { fetchClassData, fetchRaceData, fetchBackgroundData } from '../ui/dataLoader.js';
+const ALL_SKILL_NAMES = [
+  'Acrobatics', 'Animal Handling', 'Arcana', 'Athletics', 'Deception', 'History',
+  'Insight', 'Intimidation', 'Investigation', 'Medicine', 'Nature', 'Perception',
+  'Performance', 'Persuasion', 'Religion', 'Sleight of Hand', 'Stealth', 'Survival',
+];
+
+/**
+ * Checks if a feat grants proficiency in all skills (e.g., Boon of Skill)
+ * @param {object} feat - The feat data object
+ * @returns {boolean}
+ */
+function featGrantsAllSkillProficiencies(feat) {
+  if (!feat || !feat.benefits) return false;
+  return feat.benefits.some(benefit =>
+    benefit.type === 'proficiency' &&
+    benefit.description &&
+    /proficiency in (all|every).?skill/i.test(benefit.description)
+  );
+}
+
+/**
+ * Checks if a feat grants expertise slots (e.g., Boon of Skill)
+ * @param {object} feat - The feat data object
+ * @returns {number} Number of expertise slots granted (0 or 1)
+ */
+function featGrantsExpertise(feat) {
+  if (!feat || !feat.benefits) return 0;
+  return feat.benefits.reduce((count, benefit) => {
+    if (
+      benefit.type === 'proficiency' &&
+      benefit.description &&
+      /choose\s+(\d+|one)/i.test(benefit.description)
+    ) {
+      const match = benefit.description.match(/choose\s+(\d+)/i);
+      if (match) {
+        return count + parseInt(match[1], 10);
+      }
+      if (benefit.description.match(/choose\s+one/i)) {
+        return count + 1;
+      }
+    }
+    if (
+      benefit.type === 'proficiency' &&
+      benefit.automation &&
+      benefit.automation.effect === 'expertise'
+    ) {
+      return count + (benefit.automation.count || 1);
+    }
+    return count;
+  }, 0);
+}
+
+/**
+ * Finds feats in formData that grant all skill proficiencies
+ * @param {object} formData - The character form data
+ * @param {Array} allFeats - Array of all feat data objects (may be empty during initial load)
+ * @returns {Array} Matching feat objects
+ */
+async function findAllSkillProfFeats(formData, allFeats) {
+  if (!formData.feats || formData.feats.length === 0) {
+    return [];
+  }
+
+  const featData = (allFeats && allFeats.length > 0) ? allFeats : await loadFeatData(formData.rules || '5e');
+  if (!featData || featData.length === 0) {
+    return [];
+  }
+
+  return formData.feats
+    .map(featName => featData.find(f => f.name === featName || f.index === featName.toLowerCase()))
+    .filter(feat => feat && featGrantsAllSkillProficiencies(feat));
+}
+
+/**
+ * Counts expertise slots granted by feats in formData
+ * @param {object} formData - The character form data
+ * @param {Array} allFeats - Array of all feat data objects (may be empty during initial load)
+ * @returns {number} Total expertise slots from feats
+ */
+async function countFeatExpertiseSlots(formData, allFeats) {
+  if (!formData.feats || formData.feats.length === 0) {
+    return 0;
+  }
+
+  const featData = (allFeats && allFeats.length > 0) ? allFeats : await loadFeatData(formData.rules || '5e');
+  if (!featData || featData.length === 0) {
+    return 0;
+  }
+
+  return formData.feats.reduce((total, featName) => {
+    const feat = featData.find(f => f.name === featName || f.index === featName.toLowerCase());
+    return total + featGrantsExpertise(feat);
+  }, 0);
+}
+
+import { fetchClassData, fetchRaceData, fetchBackgroundData, loadFeatData } from '../ui/dataLoader.js';
 
 /**
  * Parses skill proficiencies from a class/race/background data object
@@ -92,7 +187,7 @@ function parseSkillProficiencies(data, ruleset = '5e') {
  * @param {object} formData - The character form data
  * @returns {Promise<object>} - { allowed: number, fromClass: object, fromRace: object, fromBackground: object, details: string }
  */
-export async function getSkillLimits(formData) {
+export async function getSkillLimits(formData, allFeats) {
   const ruleset = formData.rules || '5e';
   const className = formData.class?.name || '';
   const raceName = formData.race?.name || '';
@@ -101,6 +196,18 @@ export async function getSkillLimits(formData) {
   let fromClass = { count: 0, skills: [], isChoice: true };
   let fromRace = { count: 0, skills: [], isChoice: false };
   let fromBackground = { count: 0, skills: [], isChoice: false };
+
+  const allSkillProfFeats = await findAllSkillProfFeats(formData, allFeats);
+  if (allSkillProfFeats.length > 0) {
+    return {
+      allowed: ALL_SKILL_NAMES.length,
+      fromClass: { count: 0, skills: [], isChoice: true },
+      fromRace: { count: 0, skills: [], isChoice: false },
+      fromBackground: { count: 0, skills: [], isChoice: false },
+      details: 'Boon of Skill grants proficiency in all skills',
+      allSkillsGranted: true,
+    };
+  }
 
   if (ruleset === '2024') {
     // 2024 rules: Class gives choice, Race gives automatic, Background gives 2 skills
@@ -162,9 +269,14 @@ export async function getSkillLimits(formData) {
  * @param {object} formData - The character form data
  * @returns {Promise<string[]>} - Array of skill names that are automatically granted
  */
-export async function getPreSelectedSkills(formData) {
+export async function getPreSelectedSkills(formData, allFeats) {
   const ruleset = formData.rules || '5e';
   const preSelected = new Set();
+
+  const allSkillProfFeats = await findAllSkillProfFeats(formData, allFeats);
+  if (allSkillProfFeats.length > 0) {
+    return ALL_SKILL_NAMES;
+  }
 
   // Race skills (automatic, not choices)
   if (formData.race?.name) {
@@ -205,12 +317,20 @@ export async function getPreSelectedSkills(formData) {
  * @param {object} formData - The character form data
  * @returns {Promise<object>} - { allowed: boolean, count: number, details: string }
  */
-export async function getExpertiseLimits(formData) {
+export async function getExpertiseLimits(formData, allFeats) {
   const ruleset = formData.rules || '5e';
   const className = formData.class?.name || '';
   const level = formData.level || 1;
 
   if (!className) {
+    const featSlots = await countFeatExpertiseSlots(formData, allFeats);
+    if (featSlots > 0) {
+      return {
+        allowed: true,
+        count: featSlots,
+        details: `Feats grant ${featSlots} expertise slot(s)`,
+      };
+    }
     return {
       allowed: false,
       count: 0,
@@ -219,14 +339,22 @@ export async function getExpertiseLimits(formData) {
    }
 
    // Load class data from JSON
-  const classData = await fetchClassData(className, ruleset);
-  if (!classData || !classData.class_levels) {
-    return {
-      allowed: false,
-      count: 0,
-      details: `Expertise is not available for ${className}`
-     };
-   }
+   const classData = await fetchClassData(className, ruleset);
+   if (!classData || !classData.class_levels) {
+     const featSlots = await countFeatExpertiseSlots(formData, allFeats);
+     if (featSlots > 0) {
+       return {
+         allowed: true,
+         count: featSlots,
+         details: `Feats grant ${featSlots} expertise slot(s)`,
+       };
+     }
+     return {
+       allowed: false,
+       count: 0,
+       details: `Expertise is not available for ${className}`
+      };
+    }
 
     // Search through class levels for expertise features
    let totalCount = 0;
@@ -347,13 +475,15 @@ export async function getExpertiseLimits(formData) {
           }
        }
      }
-   }
+    }
 
-  return {
-    allowed: totalCount > 0,
-    count: totalCount,
-    details: `${className} can have expertise in ${totalCount} skill(s) at level ${level}`
-   };
+    const featSlots = await countFeatExpertiseSlots(formData, allFeats);
+
+   return {
+     allowed: totalCount > 0 || featSlots > 0,
+     count: totalCount + featSlots,
+     details: `${className} can have expertise in ${totalCount} skill(s) at level ${level} ${featSlots > 0 ? `+ ${featSlots} from feats` : ''}`
+    };
 }
 
 /**
@@ -361,7 +491,7 @@ export async function getExpertiseLimits(formData) {
  * @param {object} formData - The character form data
  * @returns {Promise<object>} - Array of warning objects { message: string, type: 'warning'|'info' }
  */
-export async function validateSkills(formData) {
+export async function validateSkills(formData, allFeats) {
   const warnings = [];
   const selectedSkills = formData.skillProficiencies || [];
   const expertSkills = formData.expertSkills || [];
@@ -369,8 +499,8 @@ export async function validateSkills(formData) {
   void _ruleset;
 
   // Get skill limits
-  const limits = await getSkillLimits(formData);
-  const expertiseLimits = await getExpertiseLimits(formData);
+  const limits = await getSkillLimits(formData, allFeats);
+  const expertiseLimits = await getExpertiseLimits(formData, allFeats);
 
   // Check if too many skills selected
   if (selectedSkills.length > limits.allowed) {

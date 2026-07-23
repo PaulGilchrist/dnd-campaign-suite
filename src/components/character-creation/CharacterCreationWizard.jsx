@@ -203,7 +203,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
     expertiseLimits,
     skillWarnings,
     preSelectedSkills,
-   } = useWizardSkills(formData, setFormData);
+   } = useWizardSkills(formData, setFormData, feats);
 
   // Languages & Fighting Styles
   const {

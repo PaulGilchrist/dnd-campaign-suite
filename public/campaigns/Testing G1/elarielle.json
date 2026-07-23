@@ -56,13 +56,15 @@
     "divineOrder": "",
     "primalOrder": ""
   },
-  "expertSkills": [],
+  "expertSkills": [
+    "Perception"
+  ],
   "feats": [
     "War Caster",
     "Ability Score Improvement",
     "Tough",
     "Ability Score Improvement",
-    "Boon Of Recovery"
+    "Boon Of Skill"
   ],
   "fightingStyles": [],
   "race": {
@@ -108,7 +110,20 @@
     "History",
     "Investigation",
     "Medicine",
-    "Perception"
+    "Perception",
+    "Acrobatics",
+    "Animal Handling",
+    "Athletics",
+    "Deception",
+    "Insight",
+    "Intimidation",
+    "Nature",
+    "Performance",
+    "Persuasion",
+    "Religion",
+    "Sleight of Hand",
+    "Stealth",
+    "Survival"
   ],
   "specialActions": [],
   "spells": [
@@ -187,6 +202,12 @@
       "assignment": "Strength"
     },
     "Boon Of Recovery-3": {
+      "assignment": "Strength"
+    },
+    "Boon Of Skill-4": {
+      "assignment": "Strength"
+    },
+    "Boon Of Skill-3": {
       "assignment": "Strength"
     }
   }
