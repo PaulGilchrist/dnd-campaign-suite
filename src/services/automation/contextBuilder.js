@@ -92,6 +92,15 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
                 adv++;
             }
         }
+        if (forcedMode === undefined && targetName) {
+            const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+            const crusherEffect = storedEffects.find(
+                te => te.effect === 'crusher_enhanced_critical' && te.target === targetName
+            );
+            if (crusherEffect) {
+                adv++;
+            }
+        }
         if (hasSaveAdvantage && forcedMode === undefined) {
             adv++;
         }

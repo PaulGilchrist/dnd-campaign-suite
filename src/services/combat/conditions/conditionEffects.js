@@ -614,6 +614,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     }
     if (te.effect === 'crusher_enhanced_critical') {
       effects.targetAdvantageCount = (effects.targetAdvantageCount || 0) + 1;
+      effects.targetAdvantageReasons.push(te.source || 'Crusher');
     }
     if (te.effect === 'disadvantage_next_attack') {
       effects.attackDisadvantageCount = (effects.attackDisadvantageCount || 0) + 1;

@@ -1075,8 +1075,8 @@
     "weight": 1.5
   },
   {
-    "index": "crossbow-hand",
-    "name": "Crossbow, hand",
+    "index": "hand-crossbow-hand",
+    "name": "Hand Crossbow",
     "equipment_category": "Weapon",
     "weapon_category": "Martial",
     "weapon_range": "Ranged",
@@ -1102,8 +1102,8 @@
     "mastery": "Vex"
   },
   {
-    "index": "crossbow-heavy",
-    "name": "Crossbow, heavy",
+    "index": "heavy-crossbow",
+    "name": "Heavy Crossbow",
     "equipment_category": "Weapon",
     "weapon_category": "Martial",
     "weapon_range": "Ranged",
@@ -1130,8 +1130,8 @@
     "mastery": "Push"
   },
   {
-    "index": "crossbow-light",
-    "name": "Crossbow, light",
+    "index": "light-crossbow",
+    "name": "Light Crossbow",
     "equipment_category": "Weapon",
     "weapon_category": "Simple",
     "weapon_range": "Ranged",

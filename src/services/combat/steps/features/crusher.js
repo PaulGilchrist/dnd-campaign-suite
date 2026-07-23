@@ -1,6 +1,8 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { getCurrentCombatRound } from '../../../encounters/combatData.js';
+import { addEntry } from '../../../../services/ui/logService.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
 
 export const crusher = {
   name: 'crusher',
@@ -35,6 +37,15 @@ export const crusher = {
         if (t?.name) {
           const effs = getRuntimeValue(ctx.campaignName, 'targetEffects') || [];
           setRuntimeValue(ctx.campaignName, 'targetEffects', [...effs, { target: t.name, source: cc.name, effect: 'crusher_enhanced_critical', duration: 'until_start_of_next_turn' }], ctx.campaignName);
+          addExpiration(ps.name, t.name, [
+            { type: 'remove_target_effect', effectKey: 'crusher_enhanced_critical', source: cc.name }
+          ], ctx.campaignName, undefined, ps.name);
+          await addEntry(ctx.campaignName, {
+            type: 'ability_use',
+            characterName: ps.name,
+            abilityName: cc.name,
+            description: `${ps.name} scored a critical hit with bludgeoning damage on ${t.name}. Attack rolls against ${t.name} have Advantage until the start of ${ps.name}'s next turn.`,
+          }).catch((e) => { console.error('[crusher] Error logging:', e); });
         }
       }
     }

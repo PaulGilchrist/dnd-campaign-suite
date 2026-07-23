@@ -13,7 +13,7 @@
     {
       "name": "Dexterity",
       "baseScore": 12,
-      "featIncrease": 1,
+      "featIncrease": 2,
       "backgroundIncrease": 0,
       "miscIncrease": 0
     },
@@ -62,8 +62,9 @@
     "Ability Score Improvement",
     "Tough",
     "Ability Score Improvement",
-    "Magic Initiate",
-    "Crafter"
+    "Crusher",
+    "Crossbow Expert",
+    "Magic Initiate"
   ],
   "fightingStyles": [],
   "race": {
@@ -90,7 +91,8 @@
     ],
     "equipped": [
       "Quarterstaff",
-      "Dagger"
+      "Hand Crossbow",
+      "Hand Crossbow"
     ],
     "gold": 10,
     "magicItems": []
@@ -230,6 +232,9 @@
     },
     "Chef-3": {
       "assignment": "Constitution"
+    },
+    "Crusher-3": {
+      "assignment": "Strength"
     }
   },
   "proficiencies": [

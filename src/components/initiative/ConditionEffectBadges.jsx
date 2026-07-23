@@ -77,10 +77,11 @@ function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, c
         const disAdvCondition = conditions.find(c => disAdvConditionKeys.includes(c.key))
         badges.push({ label: 'Disadv vs', cls: 'effect-target-disadv', icon: 'fa-arrow-down', removable: true, removeAction: 'condition', removeKey: disAdvCondition?.key || 'blinded' })
     }
-    if (effects.attackAdvantageCount > 0) {
-        const reasons = (effects.attackAdvantageReasons || []).length > 0 ? effects.attackAdvantageReasons.join(', ') : 'Advantage on attack rolls'
-        const advSource = effects.attackAdvantageReasons?.find(r => r === 'Vow of Enmity') || activeBuffs.find(b => b.effect === 'vow_of_enmity') || activeBuffs.find(b => b.effect === 'advantage_attacks_and_saves')
-        badges.push({ label: 'Adv', cls: 'effect-target-adv', icon: 'fa-arrow-up', removable: true, removeAction: advSource ? (advSource.effect === 'vow_of_enmity' ? 'vow_of_enmity' : 'remove_buff') : 'target_effect', tooltip: `Advantage on attack rolls${reasons !== 'Advantage on attack rolls' ? ' (' + reasons + ')' : ''}` })
+    if (effects.attackAdvantageCount > 0 || effects.targetAdvantageCount > 0) {
+        const reasons = [(effects.attackAdvantageReasons || []), (effects.targetAdvantageReasons || [])].flat()
+        const reasonText = reasons.length > 0 ? reasons.join(', ') : 'Advantage on attack rolls'
+        const advSource = reasons.find(r => r === 'Vow of Enmity') || effects.attackAdvantageReasons?.find(r => r === 'Vow of Enmity') || activeBuffs.find(b => b.effect === 'vow_of_enmity') || activeBuffs.find(b => b.effect === 'advantage_attacks_and_saves')
+        badges.push({ label: 'Adv', cls: 'effect-target-adv', icon: 'fa-arrow-up', removable: true, removeAction: advSource ? (advSource.effect === 'vow_of_enmity' ? 'vow_of_enmity' : 'remove_buff') : 'target_effect', tooltip: `Advantage on attack rolls${reasonText !== 'Advantage on attack rolls' ? ' (' + reasonText + ')' : ''}` })
     }
     if (effects.saveAdvantageCount > 0) {
         const reasons = (effects.saveAdvantageReasons || []).length > 0 ? effects.saveAdvantageReasons.join(', ') : 'Advantage on saving throws'
