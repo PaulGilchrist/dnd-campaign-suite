@@ -41,6 +41,7 @@ export const tempHandlers = {
         return {
             type: 'temp_hp_buff',
             name: feature.name,
+            description: feature.description || '',
             buffExpression: auto.buffExpression || '',
             range: auto.range || '60_ft',
             targets: auto.targets || 1,
@@ -55,6 +56,8 @@ export const tempHandlers = {
             casting_time: auto.casting_time || '1 bonus action',
             includesSelf: !!auto.includesSelf,
             multiTargetAlly: !!auto.multiTargetAlly,
+            craftCount: auto.craftCount || null,
+            craftTime: auto.craftTime || '',
             hasAutomation: true
         }
     },

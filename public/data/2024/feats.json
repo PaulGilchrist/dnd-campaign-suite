@@ -820,7 +820,7 @@
                     "craftCount": "proficiency_bonus",
                     "craftTime": "1_hour_or_long_rest",
                     "duration": "8_hours",
-                    "casting_time": "1 bonus action"
+                    "casting_time": "passive"
                 }
             }
         ],

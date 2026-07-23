@@ -43,6 +43,7 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     'clairvoyant_combatant',
     'boon_of_energy_resistance',
     'portent',
+    'temp_hp_buff',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([

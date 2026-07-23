@@ -880,13 +880,16 @@ export async function applyLongRest(playerStats, campaignName) {
     setRuntimeValue(name, "_Hunter's_Prey_choice", null, campaignName, true)
 
     // Chef: Bolstering Treats crafted on Long Rest
-    const hasBolsteringTreats = (playerStats.automation?.passives ?? []).some(
+    const hasBolsteringTreats = (playerStats.automation?.specialActions ?? []).some(
         p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats'
     )
     if (hasBolsteringTreats) {
         const craftCount = playerStats.proficiency || 0
         setRuntimeValue(name, 'chefBolsteringTreats', craftCount, campaignName, true)
     }
+
+    // Clear recipient's bolstering treats on long rest
+    setRuntimeValue(name, 'bolsteringTreat', null, campaignName, true)
 
     // Chef: Replenishing Meals reset on Long Rest
     const hasReplenishingMeal = (playerStats.automation?.passives ?? []).some(

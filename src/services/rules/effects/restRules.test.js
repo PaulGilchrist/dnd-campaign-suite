@@ -397,7 +397,7 @@ describe('restRules', () => {
       vi.clearAllMocks()
       const chefStats = makeStats({
         proficiency: 4,
-        automation: { passives: [{ type: 'temp_hp_buff', name: 'Bolstering Treats' }] },
+        automation: { specialActions: [{ type: 'temp_hp_buff', name: 'Bolstering Treats' }] },
       })
       await applyLongRest(chefStats, CAMPAIGN)
       expect(setRuntimeValue).toHaveBeenCalledWith(

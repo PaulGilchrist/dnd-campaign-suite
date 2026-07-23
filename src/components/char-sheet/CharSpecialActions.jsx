@@ -74,6 +74,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
     const [clairvoyantCombatantModal, setClairvoyantCombatantModal] = useState(null);
     const [portentModal, setPortentModal] = useState(null);
     const [replenishingMealModal, setReplenishingMealModal] = useState(null);
+    const [bolsteringTreatsModal, setBolsteringTreatsModal] = useState(null);
     const [fightingStylesMap, setFightingStylesMap] = useState(null);
     const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats?.name, campaignName, {
@@ -144,6 +145,52 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
         setPopupHtml(html);
         setReplenishingMealModal(null);
     }, [replenishingMealModal, replenishingMeals, replenishingMealMax, campaignName, setPopupHtml, playerStats.name]);
+
+    const hasBolsteringTreats = (playerStats.automation?.specialActions ?? []).some(
+        p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats'
+    );
+    const chefBolsteringTreats = useRuntimeValue(playerStats.name, 'chefBolsteringTreats', campaignName);
+    const bolsteringTreatsMax = hasBolsteringTreats ? (playerStats.proficiency || 0) : 0;
+
+    const handleBolsteringTreatsClick = useCallback(async () => {
+        if (cannotAct) return;
+        if (!hasBolsteringTreats) return;
+        const current = Number(chefBolsteringTreats ?? bolsteringTreatsMax);
+        if (current <= 0) {
+            setPopupHtml('<b>Bolstering Treats</b><br/>No treats remaining.<br/><span class="dice-roll-hint">click to dismiss</span>');
+            return;
+        }
+        const combatSummary = await getCombatContext(campaignName);
+        const chefName = playerStats.name;
+        const allCreatures = [
+            ...(characters || []).filter(c => c.name !== chefName).map(c => ({ name: c.name, type: 'player' })),
+            ...(combatSummary?.creatures || []).filter(c => c.type !== 'player' && c.name !== chefName).map(c => ({ name: c.name, type: 'monster' }))
+        ];
+        const seen = new Set();
+        const targets = allCreatures.filter(c => { if (seen.has(c.name)) return false; seen.add(c.name); return true; });
+        setBolsteringTreatsModal({ targets, maxTargets: current });
+    }, [cannotAct, hasBolsteringTreats, chefBolsteringTreats, bolsteringTreatsMax, campaignName, characters, playerStats.name, setPopupHtml]);
+
+    const handleBolsteringTreatsConfirm = useCallback(async (selectedNames) => {
+        if (!bolsteringTreatsModal) return;
+        const { maxTargets } = bolsteringTreatsModal;
+        const count = Math.min(selectedNames.length, maxTargets);
+        for (const name of selectedNames.slice(0, count)) {
+            setRuntimeValue(name, 'bolsteringTreat', 1, campaignName);
+        }
+        const current = Number(chefBolsteringTreats ?? bolsteringTreatsMax);
+        setRuntimeValue(playerStats.name, 'chefBolsteringTreats', Math.max(0, current - count), campaignName);
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: 'Bolstering Treats',
+            description: `${playerStats.name} distributed ${count} bolstering treat${count > 1 ? 's' : ''} to ${selectedNames.slice(0, count).join(', ')}.`,
+            timestamp: Date.now(),
+        }).catch(() => {});
+        const html = `<b>Bolstering Treats</b><br/>Granted ${count} treat${count > 1 ? 's' : ''} to: ${selectedNames.slice(0, count).join(', ')}.<br/><span class="dice-roll-hint">click to dismiss</span>`;
+        setPopupHtml(html);
+        setBolsteringTreatsModal(null);
+    }, [bolsteringTreatsModal, chefBolsteringTreats, bolsteringTreatsMax, campaignName, setPopupHtml, playerStats.name]);
 
     useEffect(() => {
         let cancelled = false;
@@ -280,6 +327,10 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
             handleReplenishingMealClick();
             return;
         }
+        if (auto?.type === 'temp_hp_buff' && auto?.craftCount) {
+            handleBolsteringTreatsClick();
+            return;
+        }
         const result = await executeHandler(action, playerStats, campaignName, mapName);
         if (!result) return;
         if (result.type === 'modal') {
@@ -341,7 +392,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
             const html = `<b>${name}</b><br/>${description}<br/><span class="dice-roll-hint">click to dismiss</span>`;
             setPopupHtml(html);
         }
-    }, [playerStats, campaignName, cannotAct, mapName, setCombatSuperiorityModal, setPopupHtml, handleReplenishingMealClick]);
+    }, [playerStats, campaignName, cannotAct, mapName, setCombatSuperiorityModal, setPopupHtml, handleReplenishingMealClick, handleBolsteringTreatsClick]);
     const handleStrideConfirm = useCallback(async (optionName, buffEntry) => {
         if (!strideModal) return;
         const { action, playerStats: modalPlayerStats, campaignName: modalCampaign } = strideModal;
@@ -891,6 +942,20 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
                     confirmIcon="fa-utensils"
                     onConfirm={handleReplenishingMealConfirm}
                     onSkip={() => setReplenishingMealModal(null)}
+                />
+            )}
+            {bolsteringTreatsModal && (
+                <CreatureSelectionModal
+                    title="Bolstering Treats"
+                    icon="fa-cookie-bite"
+                    targets={bolsteringTreatsModal.targets}
+                    maxTargets={bolsteringTreatsModal.maxTargets}
+                    description="Choose creatures to receive a bolstering treat."
+                    note="Each creature can hold at most 1 treat. A creature with a treat can use a Bonus Action to gain Temporary Hit Points equal to your Proficiency Bonus."
+                    confirmLabel="Distribute Treats"
+                    confirmIcon="fa-cookie-bite"
+                    onConfirm={handleBolsteringTreatsConfirm}
+                    onSkip={() => setBolsteringTreatsModal(null)}
                 />
             )}
             {uniqueActions.map((specialAction, index) => {

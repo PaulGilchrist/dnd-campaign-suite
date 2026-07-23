@@ -9,8 +9,9 @@ import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { getBonusActionSpellNames } from '../../services/ui/spellSectionUtils.js'
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
 import { hasAutomation } from '../../services/combat/automation/automationService.js'
+import { addEntry } from '../../services/ui/logService.js'
 
-import { getRuntimeValue, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js'
 import { useSpellUpcastFlow } from '../../hooks/combat/useSpellUpcastFlow.js'
 import { getCurrentCombatRound } from '../../services/encounters/combatData.js'
@@ -36,6 +37,33 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
     const _activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName); (void _activeBuffs);
 
     const is2024Rules = playerStats.rules === '2024';
+
+    const bolsteringTreat = useRuntimeValue(playerStats.name, 'bolsteringTreat', campaignName);
+    const chefBolsteringTreats = useRuntimeValue(playerStats.name, 'chefBolsteringTreats', campaignName);
+    const hasBolsteringTreat = Number(bolsteringTreat ?? 0) > 0;
+    const hasChefBolsteringTreats = Number(chefBolsteringTreats ?? 0) > 0;
+    const showEatTreat = hasBolsteringTreat || hasChefBolsteringTreats;
+
+    const handleEatBolsteringTreat = React.useCallback(async () => {
+        if (cannotAct) return;
+        const isChef = hasChefBolsteringTreats;
+        const usesKey = isChef ? 'chefBolsteringTreats' : 'bolsteringTreat';
+        const current = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 0);
+        if (current <= 0) return;
+        const tempHpAmount = playerStats.proficiency || 0;
+        const existingTempHp = Number(getRuntimeValue(playerStats.name, 'tempHp') || 0);
+        setRuntimeValue(playerStats.name, 'tempHp', Math.max(existingTempHp, tempHpAmount), campaignName);
+        setRuntimeValue(playerStats.name, usesKey, current - 1, campaignName);
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: 'Bolstering Treat',
+            description: `${playerStats.name} ate a bolstering treat, gaining ${tempHpAmount} temporary hit points.`,
+            timestamp: Date.now(),
+        }).catch(() => {});
+        const html = `<b>Bolstering Treat</b><br/>Gained ${tempHpAmount} temporary hit points. (${current - 1} treat${current - 1 !== 1 ? 's' : ''} remaining)<br/><span class="dice-roll-hint">click to dismiss</span>`;
+        setPopupHtml(html);
+    }, [cannotAct, hasChefBolsteringTreats, playerStats, campaignName, setPopupHtml]);
 
     const getBonusSpellDamageDisplay = React.useCallback((spell) => {
         if (spell.heal_at_slot_level) return '';
@@ -251,6 +279,12 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                         </div>
                     );
                 })()}
+
+                {showEatTreat && (
+                    <div>
+                        <b className="clickable" onClick={handleEatBolsteringTreat}>Eat Bolstering Treat:</b> <span>Eat treat to gain a number of Temporary Hit Points equal to your Proficiency Bonus.</span>
+                    </div>
+                )}
 
                 {pendingHexSpell && (
                     <HexAbilityModal
