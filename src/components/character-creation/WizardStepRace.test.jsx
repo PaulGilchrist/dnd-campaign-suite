@@ -183,8 +183,8 @@ describe('WizardStepRace', () => {
     });
   });
 
-  describe('Trait expand/collapse', () => {
-    it('should show trait header when traits exist', () => {
+  describe('Trait display', () => {
+    it('should show trait header when traits exist and card expanded', () => {
       render(
         <WizardStepRace
           {...createMockProps({
@@ -198,7 +198,7 @@ describe('WizardStepRace', () => {
       expect(screen.getByText('Extra Language')).toBeInTheDocument();
     });
 
-    it('should expand trait description when clicked', () => {
+    it('should show trait description when card expanded', () => {
       render(
         <WizardStepRace
           {...createMockProps({
@@ -208,9 +208,7 @@ describe('WizardStepRace', () => {
       );
       const header = document.querySelector('.detail-card-header');
       fireEvent.click(header);
-      const traitHeader = screen.getByText('Extra Language');
-      fireEvent.click(traitHeader);
-      expect(screen.getByText('You can speak one extra language.')).toBeInTheDocument();
+      expect(screen.getByText(/You can speak one extra language/)).toBeInTheDocument();
     });
   });
 

@@ -144,7 +144,7 @@ describe('WizardStepSubclass', () => {
       expect(screen.getByText('Level 3')).toBeInTheDocument();
     });
 
-    it('should expand feature description when clicked', () => {
+    it('should show feature description when card expanded', () => {
       render(
         <WizardStepSubclass
           {...createMockProps({
@@ -154,9 +154,7 @@ describe('WizardStepSubclass', () => {
       );
       const header = document.querySelector('.detail-card-header');
       fireEvent.click(header);
-      const featureHeader = screen.getByText('Combat Superiority');
-      fireEvent.click(featureHeader);
-      expect(screen.getByText('You learn maneuvers that exploit openings in your foes\' defenses.')).toBeInTheDocument();
+      expect(screen.getByText(/You learn maneuvers that exploit openings in your foes/)).toBeInTheDocument();
     });
   });
 

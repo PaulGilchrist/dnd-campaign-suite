@@ -46,7 +46,6 @@
       "miscIncrease": 0
     }
   ],
-  "background": "Sage",
   "class": {
     "name": "Wizard",
     "subclass": {
@@ -64,8 +63,9 @@
     "Ability Score Improvement",
     "Tough",
     "Ability Score Improvement",
-    "Charger",
-    "Magic Initiate"
+    "Magic Initiate",
+    "Magic Initiate",
+    "Chef"
   ],
   "fightingStyles": [],
   "race": {
@@ -144,6 +144,7 @@
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
+  "background": "Sage",
   "imagePath": "images/Elarielle.png",
   "featAbilityChoices": {
     "War Caster-0": {
@@ -225,6 +226,12 @@
     },
     "Charger-3": {
       "assignment": "Strength"
+    },
+    "Chef-4": {
+      "assignment": "Constitution"
+    },
+    "Chef-3": {
+      "assignment": "Constitution"
     }
   }
 }

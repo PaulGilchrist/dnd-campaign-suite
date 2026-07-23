@@ -4,7 +4,6 @@ import './WizardStepSubclass.css';
 
 function WizardStepSubclass({ formData, errors, classSubtypes, ruleset, onInputChange, allClassesData }) {
   const [expanded, setExpanded] = useState(false);
-  const [expandedFeatures, setExpandedFeatures] = useState({});
 
   const selectedClassName = formData.class?.name || '';
   const selectedClass = classSubtypes.find(c => c.className === selectedClassName);
@@ -70,13 +69,6 @@ function WizardStepSubclass({ formData, errors, classSubtypes, ruleset, onInputC
   };
 
   const features = getSubclassFeatures();
-
-  const toggleFeature = (featureIndex) => {
-    setExpandedFeatures(prev => ({
-      ...prev,
-      [featureIndex]: !prev[featureIndex]
-    }));
-  };
 
   return (
     <div className="wizard-step wizard-step-subclass">
@@ -145,25 +137,17 @@ function WizardStepSubclass({ formData, errors, classSubtypes, ruleset, onInputC
                       <h4>Features</h4>
                       {features.map((feature, index) => (
                         <div key={index} className="feature-item">
-                          <div
-                            className="feature-header"
-                            onClick={() => toggleFeature(index)}
-                          >
+                          <div className="feature-header">
                             <span className="feature-name">{feature.name}</span>
                             <span className="feature-level-badge">Level {feature.level}</span>
-                            <span className="feature-toggle-icon">
-                              <i className={`fa-solid ${expandedFeatures[index] ? 'fa-chevron-up' : 'fa-chevron-down'}`} />
-                            </span>
                           </div>
-                          {expandedFeatures[index] && feature.description && (
-                            <div className="feature-description">
-                              {feature.description.includes('<') ? (
-                                <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(feature.description) }} />
-                              ) : (
-                                feature.description
-                              )}
-                            </div>
-                          )}
+                          <div className="feature-description">
+                            {feature.description.includes('<') ? (
+                              <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(feature.description) }} />
+                            ) : (
+                              feature.description
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>

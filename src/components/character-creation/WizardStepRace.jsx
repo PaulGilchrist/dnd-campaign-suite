@@ -4,7 +4,6 @@ import './WizardStepRace.css';
 
 function WizardStepRace({ formData, errors, allRacesData, racesData, ruleset, onInputChange }) {
   const [expanded, setExpanded] = useState(false);
-  const [expandedTraits, setExpandedTraits] = useState({});
 
   const selectedRaceName = formData.race?.name || '';
   const selectedRace = racesData.find(r => r.name === selectedRaceName);
@@ -13,13 +12,6 @@ function WizardStepRace({ formData, errors, allRacesData, racesData, ruleset, on
   const traits = ruleset === '2024'
     ? (selectedRace?.traits || [])
     : (selectedRace?.traits || []);
-
-  const toggleTrait = (traitIndex) => {
-    setExpandedTraits(prev => ({
-      ...prev,
-      [traitIndex]: !prev[traitIndex]
-    }));
-  };
 
   return (
     <div className="wizard-step wizard-step-race">
@@ -103,24 +95,16 @@ function WizardStepRace({ formData, errors, allRacesData, racesData, ruleset, on
                   <h4>Racial Traits</h4>
                   {traits.map((trait, index) => (
                     <div key={index} className="trait-item">
-                      <div
-                        className="trait-header"
-                        onClick={() => toggleTrait(index)}
-                      >
+                      <div className="trait-header">
                         <span className="trait-name">{trait.name}</span>
-                        <span className="trait-toggle-icon">
-                          <i className={`fa-solid ${expandedTraits[index] ? 'fa-chevron-up' : 'fa-chevron-down'}`} />
-                        </span>
                       </div>
-                      {expandedTraits[index] && trait.description && (
-                        <div className="trait-description">
-                          {trait.description.includes('<') ? (
-                            <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(trait.description) }} />
-                          ) : (
-                            trait.description
-                          )}
-                        </div>
-                      )}
+                      <div className="trait-description">
+                        {trait.description.includes('<') ? (
+                          <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(trait.description) }} />
+                        ) : (
+                          trait.description
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

@@ -22,6 +22,49 @@
   overflow: hidden;
 }
 
+.wizard-step-background .detail-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background-color: var(--background-color-header);
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.wizard-step-background .detail-card-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.wizard-step-background .detail-card-header h3 i {
+  color: var(--color-primary);
+}
+
+.wizard-step-background .detail-card-body {
+  padding: 1rem;
+}
+
+.wizard-step-background .detail-section {
+  margin-bottom: 1.5rem;
+}
+
+.wizard-step-background .detail-section:last-child {
+  margin-bottom: 0;
+}
+
+.wizard-step-background .detail-section h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
+  color: var(--color-text);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.25rem;
+}
+
 .wizard-step-background .detail-content {
   font-size: 0.9rem;
   color: var(--color-text-secondary);
@@ -38,6 +81,10 @@
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+}
+
+.wizard-step-background .info-item.full-width {
+  grid-column: 1 / -1;
 }
 
 .wizard-step-background .info-label {

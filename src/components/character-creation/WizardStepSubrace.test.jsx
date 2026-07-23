@@ -131,8 +131,8 @@ describe('WizardStepSubrace', () => {
     });
   });
 
-  describe('Trait expansion', () => {
-    it('should show damage resistance trait', () => {
+  describe('Trait display', () => {
+    it('should show damage resistance trait when card expanded', () => {
       render(
         <WizardStepSubrace
           {...createMockProps({
