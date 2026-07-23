@@ -429,6 +429,7 @@ export function createLogAndShow(deps) {
             source: autoDamageSourceRef?.current || characterName,
             isAutoCrit: isCrit,
             sneakAttackDice: context?.sneakAttackDice || 0,
+            d20Roll: effectiveD20Roll,
         } : undefined;
 
         // Apply Death Strike attack_rider (Rogue Assassin level 17) — forces CON save, doubles damage on fail

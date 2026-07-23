@@ -409,7 +409,7 @@ describe('applyDamageToTarget — Boon of Recovery (Last Stand)', () => {
         level,
         hitPoints: { max: maxHp },
         class: { name: 'Paladin', class_levels: [{ level }] },
-        allFeatures: [{ name: 'Boon Of Recovery' }, { name: 'Other Feature' }],
+        allFeatures: [{ name: 'Last Stand' }, { name: 'Other Feature' }],
         equipment: [],
       },
     });
@@ -429,7 +429,7 @@ describe('applyDamageToTarget — Boon of Recovery (Last Stand)', () => {
         cs, 'BoonChar', 10, ['Slashing'], campaignName,
         [makeCharacter('BoonChar', {
           level: 20, maxHp: 180,
-          features: [{ name: 'Boon Of Recovery' }],
+          features: [{ name: 'Last Stand' }],
           className: 'Paladin', classLevel: 20,
         })],
       );
@@ -453,7 +453,7 @@ describe('applyDamageToTarget — Boon of Recovery (Last Stand)', () => {
         cs, 'BoonChar', 10, ['Slashing'], campaignName,
         [makeCharacter('BoonChar', {
           level: 20, maxHp: 180,
-          features: [{ name: 'Boon Of Recovery' }],
+          features: [{ name: 'Last Stand' }],
           className: 'Paladin', classLevel: 20,
         })],
       );
@@ -510,7 +510,7 @@ describe('applyDamageToTarget — Boon of Recovery (Last Stand)', () => {
         cs, 'BoonChar', 10, ['Slashing'], campaignName,
         [makeCharacter('BoonChar', {
           level: 20, maxHp: 180,
-          features: [{ name: 'Boon Of Recovery' }],
+          features: [{ name: 'Last Stand' }],
           className: 'Paladin', classLevel: 20,
         })],
       );
@@ -539,7 +539,7 @@ describe('applyDamageToTarget — Boon of Recovery (Last Stand)', () => {
         cs, 'BoonChar', 10, ['Slashing'], campaignName,
         [makeCharacter('BoonChar', {
           level: 20, maxHp: 180,
-          features: [{ name: 'Boon Of Recovery' }],
+          features: [{ name: 'Last Stand' }],
           className: 'Paladin', classLevel: 20,
         })],
       );
@@ -564,7 +564,7 @@ describe('applyDamageToTarget — Boon of Recovery (Last Stand)', () => {
         cs, 'BoonChar', 10, ['Slashing'], campaignName,
         [makeCharacter('BoonChar', {
           level: 20, maxHp: 180,
-          features: [{ name: 'Boon Of Recovery' }],
+          features: [{ name: 'Last Stand' }],
           className: 'Paladin', classLevel: 20,
         })],
       )).toThrow('Last Stand: hitPoints not found for BoonChar');

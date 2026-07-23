@@ -346,12 +346,12 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
       await autoDamageRoll(mockAutoDamage, isCrit);
 
       const expectedRollFn = isCrit ? rollExpressionDoubled : rollExpression;
-      expect(expectedRollFn).toHaveBeenCalledWith(formula);
+      expect(expectedRollFn).toHaveBeenCalledWith(expect.stringContaining(formula));
 
       const calls = getRollDamageCalls();
       expect(calls).toHaveLength(1);
       expect(calls[0][0]).toBe('Riposte');
-      expect(calls[0][1]).toBe(formula);
+      expect(calls[0][1]).toEqual(expect.stringContaining(formula));
       expect(calls[0][2]).toBe(expectedTotal);
       expect(calls[0][3]).toEqual(expectedRolls);
       expect(calls[0][4]).toBe(0);
@@ -393,11 +393,11 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
       await autoDamageRoll(mockAutoDamage, isCrit);
 
       const expectedRollFn = isCrit ? rollExpressionDoubled : rollExpression;
-      expect(expectedRollFn).toHaveBeenCalledWith(formula);
+      expect(expectedRollFn).toHaveBeenCalledWith(expect.stringContaining(formula));
       const calls = getRollDamageCalls();
       expect(calls).toHaveLength(1);
       expect(calls[0][0]).toBe('Longsword Attack');
-      expect(calls[0][1]).toBe(formula);
+      expect(calls[0][1]).toEqual(expect.stringContaining(formula));
       expect(calls[0][2]).toBe(expectedTotal);
       expect(calls[0][3]).toEqual(expectedRolls);
       expect(calls[0][4]).toBe(0);

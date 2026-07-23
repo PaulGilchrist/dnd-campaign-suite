@@ -125,6 +125,7 @@ export function normalizeAutoDamage(autoDamage, isCrit, playerStats) {
     metamagicHeighten: autoDamage.metamagicHeighten || false,
     metamagicTwinTarget: autoDamage.metamagicTwinTarget || null,
     autoDamageSchool: autoDamage.autoDamageSchool || '',
+    d20Roll: autoDamage.d20Roll,
   };
 
   return { attack, ctx };

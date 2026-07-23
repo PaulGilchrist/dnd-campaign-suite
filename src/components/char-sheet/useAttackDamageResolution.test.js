@@ -123,11 +123,11 @@ describe('useAttackDamageResolution', () => {
             await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
-            expect(rollExpression).toHaveBeenCalledWith('1d8+3');
+            expect(rollExpression).toHaveBeenCalledWith(expect.stringContaining('1d8+3'));
             expect(deps.buildCtxSync).toHaveBeenCalledWith(attack);
             expect(deps.rollDamage).toHaveBeenCalledWith(
                 'Longsword',
-                '1d8+3',
+                expect.stringContaining('1d8+3'),
                 5,
                 [5],
                 3,
@@ -143,7 +143,7 @@ describe('useAttackDamageResolution', () => {
             await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
-            expect(rollExpressionDoubled).toHaveBeenCalledWith('1d8+3');
+            expect(rollExpressionDoubled).toHaveBeenCalledWith(expect.stringContaining('1d8+3'));
             expect(rollExpression).not.toHaveBeenCalled();
         });
 
@@ -244,7 +244,7 @@ describe('useAttackDamageResolution', () => {
 
             expect(deps.rollDamage).toHaveBeenCalledWith(
                 'Warhammer',
-                '1d8',
+                expect.stringContaining('1d8'),
                 expect.any(Number),
                 expect.any(Array),
                 expect.any(Number),
@@ -271,7 +271,7 @@ describe('useAttackDamageResolution', () => {
 
             expect(testDeps.rollDamage).toHaveBeenCalledWith(
                 'Handaxe',
-                '1d6',
+                expect.stringContaining('1d6'),
                 expect.any(Number),
                 expect.any(Array),
                 expect.any(Number),
@@ -295,7 +295,7 @@ describe('useAttackDamageResolution', () => {
 
             expect(deps.rollDamage).toHaveBeenCalledWith(
                 'Handaxe',
-                '1d6',
+                expect.stringContaining('1d6'),
                 expect.any(Number),
                 expect.any(Array),
                 expect.any(Number),
@@ -360,7 +360,7 @@ describe('useAttackDamageResolution', () => {
 
             expect(deps.rollDamage).toHaveBeenCalledWith(
                 'Longsword',
-                '1d8',
+                expect.stringContaining('1d8'),
                 expect.any(Number),
                 expect.any(Array),
                 expect.any(Number),
@@ -769,7 +769,7 @@ describe('useAttackDamageResolution', () => {
 
             expect(testDeps.rollDamage).toHaveBeenCalledWith(
                 'Longsword',
-                '1d8+3',
+                expect.stringContaining('1d8+3'),
                 expect.any(Number),
                 expect.any(Array),
                 expect.any(Number),
@@ -856,7 +856,7 @@ describe('useAttackDamageResolution', () => {
 
             expect(testDeps.rollDamage).toHaveBeenCalledWith(
                 'Longsword',
-                expect.stringContaining('1d8'),
+                expect.stringContaining('1d8+3'),
                 expect.any(Number),
                 expect.any(Array),
                 expect.any(Number),
@@ -864,8 +864,6 @@ describe('useAttackDamageResolution', () => {
             );
         });
     });
-
-    // ── Natural 20 bonuses ──────────────────────────────────────────────
 
     describe('natural_20_attack_roll bonuses', () => {
         it('applies natural_20 damage bonus when isNatural20 is true', async () => {
@@ -1025,7 +1023,7 @@ describe('useAttackDamageResolution', () => {
 
             expect(testDeps.rollDamage).toHaveBeenCalledWith(
                 'Longsword',
-                '1d8',
+                expect.stringContaining('1d8'),
                 expect.any(Number),
                 expect.any(Array),
                 expect.any(Number),
@@ -1079,7 +1077,7 @@ describe('useAttackDamageResolution', () => {
 
             expect(deps.rollDamage).toHaveBeenCalledWith(
                 'Longsword',
-                '1d8+3',
+                expect.stringContaining('1d8+3'),
                 expect.any(Number),
                 expect.any(Array),
                 expect.any(Number),
@@ -1087,5 +1085,4 @@ describe('useAttackDamageResolution', () => {
             );
         });
     });
-
 });

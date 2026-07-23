@@ -10,7 +10,7 @@ export function checkBoonOfRecoveryLastStand(creature, playerComputed, campaignN
     let hasBoonOfRecovery = false;
 
     for (const feature of allFeatures) {
-        if (feature?.name === 'Boon Of Recovery') {
+        if (feature?.name === 'Last Stand') {
             hasBoonOfRecovery = true;
             break;
         }

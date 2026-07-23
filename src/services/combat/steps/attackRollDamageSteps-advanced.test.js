@@ -191,6 +191,42 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation, fe
         });
         expect(steps[12].condition(ctx)).toBe(false);
       });
+
+      it('returns true when ctx.d20Roll >= test roll (10)', () => {
+        const ctx = makeCtx({
+          isNatural20: false,
+          d20Roll: 10,
+          playerStats: { automation: { actions: [] } },
+        });
+        expect(steps[12].condition(ctx)).toBe(true);
+      });
+
+      it('returns true when ctx.d20Roll is 19 (above test threshold)', () => {
+        const ctx = makeCtx({
+          isNatural20: false,
+          d20Roll: 19,
+          playerStats: { automation: { actions: [] } },
+        });
+        expect(steps[12].condition(ctx)).toBe(true);
+      });
+
+      it('returns false when ctx.d20Roll is 9 (below test threshold)', () => {
+        const ctx = makeCtx({
+          isNatural20: false,
+          d20Roll: 9,
+          playerStats: { automation: { actions: [] } },
+        });
+        expect(steps[12].condition(ctx)).toBe(false);
+      });
+
+      it('returns false when ctx.d20Roll is undefined (auto-damage path without d20)', () => {
+        const ctx = makeCtx({
+          isNatural20: false,
+          d20Roll: undefined,
+          playerStats: { automation: { actions: [] } },
+        });
+        expect(steps[12].condition(ctx)).toBe(false);
+      });
     });
 
     describe('handler', () => {
@@ -229,68 +265,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation, fe
         });
         const result = await steps[12].handler(ctx);
 
-        expect(result.data.formula).toContain('+ 1d6 [force]');
-      });
-
-      it('marks used for current round', async () => {
-        const ctx = makeCtx({
-          isNatural20: true,
-          playerStats: {
-            name: 'TestChar',
-            automation: {
-              actions: [
-                {
-                  type: 'damage_bonus',
-                  trigger: 'natural_20_attack_roll',
-                  extraDamageExpression: '1d6',
-                  extraDamageType: 'force',
-                  name: 'Overwhelming Strike',
-                },
-              ],
-            },
-          },
-          formula: '1d8+3',
-          total: 11,
-          rolls: [8, 3],
-        });
-        await steps[12].handler(ctx);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-          'TestChar',
-          '_Overwhelming_Strike_usedRound',
-          1,
-          'test-campaign',
-        );
-      });
-
-      it('skips when already used this round', async () => {
-        getRuntimeValue.mockImplementation((_key, prop, _campaign) => {
-          if (prop === '_Overwhelming_Strike_usedRound') return 1;
-          return null;
-        });
-
-        const ctx = makeCtx({
-          isNatural20: true,
-          playerStats: {
-            automation: {
-              actions: [
-                {
-                  type: 'damage_bonus',
-                  trigger: 'natural_20_attack_roll',
-                  extraDamageExpression: '1d6',
-                  extraDamageType: 'force',
-                  name: 'Overwhelming Strike',
-                },
-              ],
-            },
-          },
-          formula: '1d8+3',
-          total: 11,
-          rolls: [8, 3],
-        });
-        const result = await steps[12].handler(ctx);
-
-        expect(result.data.formula).toBe('1d8+3');
+        expect(result.data.formula).toContain('+ 1d6 [Overwhelming Strike]');
       });
 
       it('handles increased_ability_score expression', async () => {
@@ -316,7 +291,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation, fe
         });
         const result = await steps[12].handler(ctx);
 
-        expect(result.data.formula).toContain('+ 5 [same_as_attack]');
+        expect(result.data.formula).toContain('+ 5 [Overwhelming Strike]');
       });
 
       it('handles increased_ability_score when ability not found', async () => {
@@ -339,7 +314,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation, fe
         });
         const result = await steps[12].handler(ctx);
 
-        expect(result.data.formula).toBe(undefined);
+        expect(result.data.formula).toContain('+ 0 [Overwhelming Strike]');
       });
 
       it('defaults to attack damageType when extraDamageType is same_as_attack', async () => {
@@ -365,7 +340,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation, fe
         });
         const result = await steps[12].handler(ctx);
 
-        expect(result.data.formula).toContain('+ 1d6 [slashing]');
+        expect(result.data.formula).toContain('+ 1d6 [Overwhelming Strike]');
       });
 
       it('uses extraDamageType when not same_as_attack', async () => {
@@ -390,7 +365,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation, fe
         });
         const result = await steps[12].handler(ctx);
 
-        expect(result.data.formula).toContain('+ 1d6 [force]');
+        expect(result.data.formula).toContain('+ 1d6 [Overwhelming Strike]');
       });
 
       it('handles missing extraDamageType by using same_as_attack fallback', async () => {
@@ -414,7 +389,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation, fe
         });
         const result = await steps[12].handler(ctx);
 
-        expect(result.data.formula).toContain('+ 1d6 [same_as_attack]');
+        expect(result.data.formula).toContain('+ 1d6 [Overwhelming Strike]');
       });
     });
   });

@@ -13,7 +13,7 @@
     {
       "name": "Dexterity",
       "baseScore": 12,
-      "featIncrease": 0,
+      "featIncrease": 1,
       "backgroundIncrease": 0,
       "miscIncrease": 0
     },
@@ -27,7 +27,7 @@
     {
       "name": "Intelligence",
       "baseScore": 15,
-      "featIncrease": 4,
+      "featIncrease": 3,
       "backgroundIncrease": 1,
       "miscIncrease": 0
     },
@@ -62,7 +62,7 @@
     "Ability Score Improvement",
     "Tough",
     "Ability Score Improvement",
-    "Boon Of Irresistible Offense"
+    "Boon Of Recovery"
   ],
   "fightingStyles": [],
   "race": {
@@ -181,6 +181,12 @@
       "assignment": "Strength"
     },
     "Boon Of Irresistible Offense-3": {
+      "assignment": "Dexterity"
+    },
+    "Boon Of Recovery-4": {
+      "assignment": "Strength"
+    },
+    "Boon Of Recovery-3": {
       "assignment": "Strength"
     }
   }

@@ -18,6 +18,9 @@ import { isWithinRange } from '../../rules/combat/rangeCheck.js';
 import { createSaveListener } from '../../automation/common/savePrompt.js';
 import { resolveDiceExpression } from '../automation/automationExpressions.js';
 
+// DEBUG: temporarily trigger Overwhelming Strike on 10 instead of 20
+const OVERWHELMING_STRIKE_TEST_ROLL = 10;
+
 /**
  * Build the damage pipeline steps for a weapon-type action.
  * Each step: { name, subscribe, emit, condition(ctx), handler(ctx) → result|null }
@@ -225,6 +228,10 @@ export function buildAttackRollDamageSteps() {
         if (wasCrit && ctx.setPopupHtml) ctx.setPopupHtml(null);
 
         let formula = ctx.autoFormulaOverride || ctx.attack.damage;
+        const baseDamageType = ctx.attack?.damageType || '';
+        if (baseDamageType) {
+          formula = `${formula} [${baseDamageType}]`;
+        }
 
         // Empowered Evocation: add int mod to evocation cantrip damage
         const empEvocMod = ctx.empoweredEvocationModifier || 0;
@@ -694,32 +701,44 @@ export function buildAttackRollDamageSteps() {
       name: 'natural20Bonuses',
       subscribe: 'weapon_hit:applied',
       emit: 'n20:applied',
-      condition: (ctx) => ctx.isNatural20 && !!ctx.playerStats.automation?.actions,
+      condition: (ctx) => {
+        const d20Val = ctx.d20Roll;
+        const matches = ctx.isNatural20 || (d20Val >= OVERWHELMING_STRIKE_TEST_ROLL);
+        const hasActions = !!ctx.playerStats.automation?.actions;
+        return matches && hasActions;
+      },
       handler: async (ctx) => {
         let formula = ctx.formula;
         let total = ctx.total;
         let rolls = [...(ctx.rolls || [])];
-        const round = getCurrentCombatRound();
 
-        for (const a of ctx.playerStats.automation.actions.filter(x => x.type === 'damage_bonus' && x.trigger === 'natural_20_attack_roll')) {
-          const usedKey = `_${a.name.replace(/\s+/g, '_')}_usedRound`;
-          if (getRuntimeValue(ctx.playerStats.name, usedKey, ctx.campaignName) === round) continue;
-
+        const matchingActions = ctx.playerStats.automation.actions.filter(x => x.type === 'damage_bonus' && x.trigger === 'natural_20_attack_roll');
+        for (const a of matchingActions) {
           let expr = a.extraDamageExpression || '';
           if (expr === 'increased_ability_score') {
-            const abil = ctx.playerStats.abilities?.find(x => x.name === (a.abilityIncreased || 'Strength'));
-            expr = abil?.bonus || 0;
-          }
-          if (expr) {
-            const dt = a.extraDamageType === 'same_as_attack' ? (ctx.attack?.damageType || '') : (a.extraDamageType || a.damageType || '');
-            const r = rollExpression(String(expr));
-            if (r) {
-              formula += ` + ${expr} [${dt || 'same_as_attack'}]`;
-              total += r.total;
-              rolls = [...rolls, ...r.rolls];
+            const abilityName = a.abilityIncreased || null;
+            if (abilityName) {
+              const abil = ctx.playerStats.abilities?.find(x => x.name === abilityName);
+              expr = abil?.bonus || 0;
+            } else {
+              const strAbil = ctx.playerStats.abilities?.find(x => x.name === 'Strength');
+              const dexAbil = ctx.playerStats.abilities?.find(x => x.name === 'Dexterity');
+              const strBonus = strAbil?.bonus || 0;
+              const dexBonus = dexAbil?.bonus || 0;
+              expr = Math.max(strBonus, dexBonus);
             }
           }
-          setRuntimeValue(ctx.playerStats.name, usedKey, round, ctx.campaignName);
+          if (expr || expr === 0) {
+            const r = rollExpression(String(expr));
+            if (r) {
+              formula += ` + ${expr} [${a.name}]`;
+              total += r.total;
+              rolls = [...rolls, ...r.rolls];
+            } else if (typeof expr === 'number') {
+              formula += ` + ${expr} [${a.name}]`;
+              total += expr;
+            }
+          }
         }
 
         return { data: { formula, total, rolls } };
