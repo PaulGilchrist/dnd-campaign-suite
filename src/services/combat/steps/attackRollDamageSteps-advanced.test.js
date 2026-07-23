@@ -192,22 +192,22 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation, fe
         expect(steps[12].condition(ctx)).toBe(false);
       });
 
-      it('returns true when ctx.d20Roll >= test roll (10)', () => {
+      it('returns true when ctx.d20Roll is 20 (matches test threshold)', () => {
         const ctx = makeCtx({
           isNatural20: false,
-          d20Roll: 10,
+          d20Roll: 20,
           playerStats: { automation: { actions: [] } },
         });
         expect(steps[12].condition(ctx)).toBe(true);
       });
 
-      it('returns true when ctx.d20Roll is 19 (above test threshold)', () => {
+      it('returns false when ctx.d20Roll is 19 (below test threshold)', () => {
         const ctx = makeCtx({
           isNatural20: false,
           d20Roll: 19,
           playerStats: { automation: { actions: [] } },
         });
-        expect(steps[12].condition(ctx)).toBe(true);
+        expect(steps[12].condition(ctx)).toBe(false);
       });
 
       it('returns false when ctx.d20Roll is 9 (below test threshold)', () => {

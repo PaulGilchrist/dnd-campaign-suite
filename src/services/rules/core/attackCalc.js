@@ -223,7 +223,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
     const attacks = [];
     const fightingStyles = playerStats.class?.fightingStyles != null ? playerStats.class.fightingStyles : [];
 
-     // Ranged weapon
+      // Ranged weapons
     const rangedWeapons = findEquippedWeapons(allEquipment, playerStats.inventory.equipped, 'Ranged');
     const hasThrownWeaponFighting = fightingStyles.includes('Thrown Weapon Fighting');
     if (rangedWeapons.length > 0) {
@@ -248,6 +248,25 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
          }));
          }
      }
+
+    // Second ranged weapon as bonus action (off-hand ranged)
+    if (rangedWeapons.length > 1) {
+        const offHandRangedName = rangedWeapons[1];
+        const { baseName: offHandRangedBase } = parseMagicItemName(offHandRangedName);
+        const offHandRangedWeapon = allEquipment.find(item => item.name === offHandRangedBase);
+        if (offHandRangedWeapon) {
+            attacks.push(buildWeaponAttack({
+                weapon: offHandRangedWeapon,
+                weaponName: offHandRangedName,
+                abilityBonus: dexterity.bonus,
+                abilityName: 'Dexterity',
+                proficiency,
+                actionType: 'Bonus Action',
+                weaponType: 'ranged',
+                includeAbilityBonusInDamage: false,
+            }));
+        }
+    }
 
     // Thrown Weapon Fighting: treat short swords as thrown weapons for ranged attacks
     if (hasThrownWeaponFighting) {

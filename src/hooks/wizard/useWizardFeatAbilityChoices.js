@@ -96,7 +96,7 @@ function useWizardFeatAbilityChoices(formData, allFeats, setFormData) {
       return;
     }
 
-    const key = `${formData.rules}|${formData.feats.map(f => f.name).join(',')}`;
+    const key = `${formData.rules}|${formData.feats.map(f => typeof f === 'string' ? f : f.name).join(',')}`;
     if (key === lastProcessedKey.current) return;
     lastProcessedKey.current = key;
 
@@ -111,7 +111,17 @@ function useWizardFeatAbilityChoices(formData, allFeats, setFormData) {
     const grouped = buildGroupedChoices(choices);
     setFeatAbilityChoices(grouped);
 
+    const selectedFeatNames = new Set(formData.feats.map(f => typeof f === 'string' ? f : f.name).filter(Boolean));
+
     const savedChoices = formData.featAbilityChoices || {};
+
+    const filteredChoices = {};
+    Object.keys(savedChoices).forEach(key => {
+      const featName = key.split('-').slice(0, -1).join('-');
+      if (selectedFeatNames.has(featName)) {
+        filteredChoices[key] = savedChoices[key];
+      }
+    });
 
     const migratedChoices = {};
     Object.keys(savedChoices).forEach(oldKey => {
@@ -123,7 +133,7 @@ function useWizardFeatAbilityChoices(formData, allFeats, setFormData) {
         migratedChoices[matchingGroup.id] = existing;
       }
     });
-    const mergedChoices = { ...savedChoices, ...migratedChoices };
+    const mergedChoices = { ...filteredChoices, ...migratedChoices };
 
     const needsInit = grouped.some(group => {
       const saved = mergedChoices[group.id];

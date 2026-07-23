@@ -209,14 +209,13 @@ describe('CharClassFeatures', () => {
     });
 
     describe('Wizard features', () => {
-        const wizardStats = () => makeStats({
-            level: 5,
-            class: { name: 'Wizard', class_levels: [{ level: 5 }] },
-            automation: { passives: [] },
-        });
-
         it('renders wizard tracked resources', () => {
-            renderComponent(wizardStats());
+            const stats = makeStats({
+                level: 5,
+                class: { name: 'Wizard', class_levels: [{ level: 5 }] },
+                automation: { passives: [{ type: 'arcane_ward' }], actions: [] },
+            });
+            renderComponent(stats);
             expect(screen.getByTestId('tracked-resource-Arcane Recovery Levels')).toBeInTheDocument();
             expect(screen.getByTestId('tracked-resource-Arcane Ward HP')).toBeInTheDocument();
         });

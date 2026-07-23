@@ -19,7 +19,7 @@ import { createSaveListener } from '../../automation/common/savePrompt.js';
 import { resolveDiceExpression } from '../automation/automationExpressions.js';
 
 // DEBUG: temporarily trigger Overwhelming Strike on 10 instead of 20
-const OVERWHELMING_STRIKE_TEST_ROLL = 10;
+const OVERWHELMING_STRIKE_TEST_ROLL = 20;
 
 /**
  * Build the damage pipeline steps for a weapon-type action.

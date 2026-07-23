@@ -49,45 +49,33 @@ export function useEquipmentSearch(tempInventory, onTempInventoryChange, onInven
 
   const handleEquipmentSelect = (item) => {
     if (searchField === 'backpack') {
-      const currentItems = tempInventory.backpack;
-      if (!currentItems.includes(item.name)) {
-        const newItems = [...currentItems, item.name];
-        onTempInventoryChange('backpack', newItems);
-        onInventoryChange('backpack', newItems);
+      const newItems = [...tempInventory.backpack, item.name];
+      onTempInventoryChange('backpack', newItems);
+      onInventoryChange('backpack', newItems);
 
-        setSearchField(null);
-        setSearchQuery('');
-        setFilteredEquipment([]);
-      }
+      setSearchField(null);
+      setSearchQuery('');
+      setFilteredEquipment([]);
     } else if (searchField === 'equipped') {
-      const currentItems = tempInventory.equipped;
-      if (!currentItems.includes(item.name)) {
-        const newItems = [...currentItems, item.name];
-        onTempInventoryChange('equipped', newItems);
-        onInventoryChange('equipped', newItems);
+      const newItems = [...tempInventory.equipped, item.name];
+      onTempInventoryChange('equipped', newItems);
+      onInventoryChange('equipped', newItems);
 
-        setSearchField(null);
-        setSearchQuery('');
-        setFilteredEquipment([]);
-      }
+      setSearchField(null);
+      setSearchQuery('');
+      setFilteredEquipment([]);
     }
   };
 
   const handleAddCustomItem = (customItem) => {
     if (searchField === 'backpack') {
-      const currentItems = tempInventory.backpack;
-      if (!currentItems.includes(customItem)) {
-        const newItems = [...currentItems, customItem];
-        onTempInventoryChange('backpack', newItems);
-        onInventoryChange('backpack', newItems);
-      }
+      const newItems = [...tempInventory.backpack, customItem];
+      onTempInventoryChange('backpack', newItems);
+      onInventoryChange('backpack', newItems);
     } else if (searchField === 'equipped') {
-      const currentItems = tempInventory.equipped;
-      if (!currentItems.includes(customItem)) {
-        const newItems = [...currentItems, customItem];
-        onTempInventoryChange('equipped', newItems);
-        onInventoryChange('equipped', newItems);
-      }
+      const newItems = [...tempInventory.equipped, customItem];
+      onTempInventoryChange('equipped', newItems);
+      onInventoryChange('equipped', newItems);
     }
     setSearchQuery('');
 

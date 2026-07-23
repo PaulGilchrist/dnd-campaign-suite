@@ -18,7 +18,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
     const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
     const attacks = [];
 
-    // Ranged weapon
+    // Ranged weapons
     const rangedWeapons = findEquippedWeapons(allEquipment, playerStats.inventory.equipped, 'Ranged');
     const fightingStyles2024 = playerStats.class?.fightingStyles != null ? playerStats.class.fightingStyles : [];
     if (rangedWeapons.length > 0) {
@@ -36,6 +36,25 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
                 actionType: 'Action',
                 extraHitBonus: archeryBonus,
                 extraHitBonusLabel: archeryBonus ? 'Archery Fighting Style (2)' : '',
+            }));
+        }
+    }
+
+    // Second ranged weapon as bonus action (off-hand ranged)
+    if (rangedWeapons.length > 1) {
+        const offHandRangedName = rangedWeapons[1];
+        const { baseName: offHandRangedBase } = parseMagicItemName(offHandRangedName);
+        const offHandRangedWeapon = allEquipment.find(item => item.name === offHandRangedBase);
+        if (offHandRangedWeapon) {
+            attacks.push(buildWeaponAttack({
+                weapon: offHandRangedWeapon,
+                weaponName: offHandRangedName,
+                abilityBonus: dexterity.bonus,
+                abilityName: 'Dexterity',
+                proficiency,
+                actionType: 'Bonus Action',
+                weaponType: 'ranged',
+                includeAbilityBonusInDamage: false,
             }));
         }
     }
