@@ -151,8 +151,8 @@ describe('featValidation', () => {
             const result = await getFeatLimits({ rules: '2024', level: 1, race: { name: 'Human' } });
 
             expect(result.allowed).toBe(2);
-            expect(result.details).toContain('2 Origin feat(s)');
-            expect(result.details).toContain('Versatile trait');
+            expect(result.details).toContain('1 Origin feat from their background');
+            expect(result.details).toContain('levels 4, 8, 12, 16, 19');
         });
 
         it('should return 0 for level 1 with 5e rules', async () => {

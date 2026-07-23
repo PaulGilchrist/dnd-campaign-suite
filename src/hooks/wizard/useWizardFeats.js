@@ -10,10 +10,15 @@ function useWizardFeats(formData, setFormData) {
     getDeps: (f) => [f.background, f.rules],
     preSelect: {
       getFn: getPreSelectedFeats,
-      merge: (prev, items) => ({
-        ...prev,
-        feats: [...(prev.feats || []), ...items.filter(feat => !(prev.feats || []).includes(feat))]
-      }),
+      merge: (prev, items, prevItems) => {
+        const existingFeats = prev.feats || [];
+        const toRemove = prevItems || [];
+        const keptFeats = existingFeats.filter(feat => !toRemove.includes(feat));
+        return {
+          ...prev,
+          feats: [...keptFeats, ...items]
+        };
+      },
       deps: (f) => [f.background, f.rules],
       stateKey: 'preSelectedFeats'
     }

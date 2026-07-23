@@ -28,7 +28,7 @@ function useWizardResistances(formData, setFormData) {
     ],
     preSelect: {
       getFn: getPreSelectedResistances,
-      merge: (prev, items) => ({
+      merge: (prev, items, _prevItems) => ({
         ...prev,
         resistances: [
           ...(prev.resistances || []),

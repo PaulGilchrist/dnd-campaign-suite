@@ -92,6 +92,52 @@ describe('useWizardFeats', () => {
       const updatedData = setFormDataCall(formDataWithFeats);
       expect(updatedData.feats).toEqual(['Tough', 'Resilient']);
     });
+
+    it('replaces old pre-selected feats when background changes', async () => {
+      const formDataWithOldFeat = {
+        ...mockFormData,
+        background: 'Hermit',
+        rules: '2024',
+        feats: ['Healer', 'Tough']
+      };
+      const formDataWithNewFeat = {
+        ...formDataWithOldFeat,
+        background: 'Sage'
+      };
+
+      getPreSelectedFeats.mockResolvedValueOnce(['Healer']);
+
+      const { rerender } = renderHook(
+        ({ formData }) => useWizardFeats(formData, mockSetFormData),
+        { initialProps: { formData: formDataWithOldFeat, setFormData: mockSetFormData } }
+      );
+
+      await waitFor(() => {
+        expect(mockSetFormData).toHaveBeenCalled();
+      });
+
+      mockSetFormData.mockClear();
+      getPreSelectedFeats.mockResolvedValueOnce(['Magic Initiate']);
+
+      rerender({ formData: formDataWithNewFeat, setFormData: mockSetFormData });
+
+      await waitFor(() => {
+        expect(getPreSelectedFeats).toHaveBeenCalledTimes(2);
+      });
+
+      await waitFor(() => {
+        expect(mockSetFormData).toHaveBeenCalled();
+      });
+
+      const setFormDataCall = mockSetFormData.mock.calls[0][0];
+      const updatedData = setFormDataCall(formDataWithOldFeat);
+      expect(updatedData.feats).toContain('Magic Initiate');
+      expect(updatedData.feats).toContain('Tough');
+      expect(updatedData.feats).not.toContain('Healer');
+      expect(updatedData.feats).toContain('Magic Initiate');
+      expect(updatedData.feats).toContain('Tough');
+      expect(updatedData.feats).not.toContain('Healer');
+    });
   });
 
   describe('error handling', () => {

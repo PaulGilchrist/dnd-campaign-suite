@@ -38,13 +38,8 @@ export async function getFeatLimits(formData) {
       
     let details;
     if (ruleset === '2024') {
-        const fullRace = formData.race?.name ? await fetchRaceData(formData.race.name, ruleset) : null;
-        const hasVersatile = fullRace?.traits?.some(t => t.name === 'Versatile' && t.proficiency_choices?.from?.length > 0);
-        const originCount = originRequired ? 1 : 0;
-        const versatileCount = hasVersatile ? 1 : 0;
-        const totalOrigin = originCount + versatileCount;
         details = originRequired
-            ? `Level 1 2024 characters get ${totalOrigin} Origin feat(s)${versatileCount ? ' (including Versatile trait)' : ''}, plus additional feats at levels ${availableLevels.join(', ')}`
+            ? `Level 1 2024 characters get 1 Origin feat from their background, plus additional feats at levels ${availableLevels.filter(l => l !== 1).join(', ')}`
             : `In 2024 rules, feats are available at levels ${availableLevels.join(', ')}`;
          } else {
         details = `In 5e, feats are optional and can be taken instead of ability score increases at levels ${availableLevels.join(', ')}`;
@@ -225,7 +220,7 @@ export async function getPreSelectedFeats(formData) {
 
      // Background feats (automatic, not choices) - 2024 only
     if (formData.background && ruleset === '2024') {
-        const backgroundData = await fetchBackgroundData(formData.background);
+        const backgroundData = await fetchBackgroundData(formData.background, ruleset);
         if (backgroundData && backgroundData.feat) {
              // Strip parenthetical qualifiers (e.g. "Magic Initiate (Druid)" → "Magic Initiate")
             const normalized = normalizeBackgroundFeatName(backgroundData.feat);

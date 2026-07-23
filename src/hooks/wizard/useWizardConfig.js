@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
 
+// Tracks previous pre-selected items per stateKey across effect re-runs
+// Using a Map to persist across Strict Mode remounts
+const prevPreSelectedMap = new Map();
+
 function useWizardConfig(config) {
   const { formData, validateFn, slots, getDeps, preSelect, setFormData } = config;
 
@@ -60,14 +64,14 @@ function useWizardConfig(config) {
      };
    }, getDeps(formData)); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Pre-select auto-merge effect
+     // Pre-select auto-merge effect
   useEffect(() => {
     if (!preSelect || !preSelect.getFn || !setFormData) return;
 
     let cancelled = false;
 
-      (async () => {
-      try {
+       (async () => {
+       try {
         const items = await preSelect.getFn(formData);
         if (!cancelled) {
           if (preSelect.stateKey) {
@@ -75,7 +79,9 @@ function useWizardConfig(config) {
           }
           const hasItemsFn = preSelect.hasItems ?? ((x) => Array.isArray(x) ? x.length > 0 : false);
           if (preSelect.merge && hasItemsFn(items)) {
-            setFormData((prev) => preSelect.merge(prev, items));
+            const prevItems = prevPreSelectedMap.get(preSelect.stateKey) || [];
+            setFormData((prev) => preSelect.merge(prev, items, prevItems));
+            prevPreSelectedMap.set(preSelect.stateKey, items);
           }
         }
       } catch (error) {

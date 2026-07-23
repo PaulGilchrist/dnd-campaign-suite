@@ -13,7 +13,7 @@ function useWizardSkills(formData, setFormData, allFeats) {
     getDeps: (f) => [f.skillProficiencies, f.expertSkills, f.class?.name, f.race?.name, f.background, f.rules, f.level, f.feats],
     preSelect: {
       getFn: (f) => getPreSelectedSkills(f, allFeats),
-      merge: (prev, items) => ({ ...prev, skillProficiencies: [...(prev.skillProficiencies || []), ...items.filter(s => !(prev.skillProficiencies || []).includes(s))] }),
+      merge: (prev, items, _prevItems) => ({ ...prev, skillProficiencies: [...(prev.skillProficiencies || []), ...items.filter(s => !(prev.skillProficiencies || []).includes(s))] }),
       deps: (f) => [f.background, f.race?.name, f.class?.name, f.rules, f.feats],
       stateKey: 'preSelectedSkills',
      },
