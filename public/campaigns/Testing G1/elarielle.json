@@ -64,7 +64,7 @@
     "Ability Score Improvement",
     "Tough",
     "Ability Score Improvement",
-    "Boon Of Skill"
+    "Charger"
   ],
   "fightingStyles": [],
   "race": {
@@ -208,6 +208,21 @@
       "assignment": "Strength"
     },
     "Boon Of Skill-3": {
+      "assignment": "Strength"
+    },
+    "Boon Of Speed-4": {
+      "assignment": "Strength"
+    },
+    "Boon Of Speed-3": {
+      "assignment": "Strength"
+    },
+    "Boon Of Truesight-4": {
+      "assignment": "Strength"
+    },
+    "Boon Of Truesight-3": {
+      "assignment": "Strength"
+    },
+    "Charger-3": {
       "assignment": "Strength"
     }
   }

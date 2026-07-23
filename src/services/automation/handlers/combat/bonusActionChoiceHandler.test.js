@@ -143,9 +143,8 @@ describe('bonusActionChoiceHandler.handle — once-per-turn', () => {
         expect(result.type).toBe('popup');
         expect(result.payload.description).toContain('once per turn');
         expect(useRuntimeState.getRuntimeValue).toHaveBeenCalledWith(
-            null,
+            'TestRogue',
             '_FastHands_usedRound',
-            campaignName,
         );
     });
 

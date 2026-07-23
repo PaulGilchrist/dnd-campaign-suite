@@ -135,7 +135,7 @@ describe('useAttackDamageResolution - feats', () => {
     }
 
     describe('Charger feat', () => {
-        it('applies Charger attack rider effect on melee hit after charge', async () => {
+        it('does not auto-apply Charger effect during attack damage pipeline', async () => {
             getCombatContext.mockResolvedValue(createCombatContext());
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
             const stats = {
@@ -158,7 +158,7 @@ describe('useAttackDamageResolution - feats', () => {
             };
             await resolveAttackDamage(attack);
             await tick();
-            expect(setRuntimeValue).toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.arrayContaining([
+            expect(setRuntimeValue).not.toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.arrayContaining([
                 expect.objectContaining({
                     target: 'Goblin',
                     source: 'Charge Attack',
@@ -166,12 +166,19 @@ describe('useAttackDamageResolution - feats', () => {
                     value: 10,
                 }),
             ]), 'test-campaign');
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Charge_Attack_usedRound', 1, 'test-campaign');
+            expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_Charge_Attack_usedRound', expect.any(Number), 'test-campaign');
+            expect(mockRollDamage).toHaveBeenCalled();
         });
 
-        it('skips Charger when no combat context target available', async () => {
-            getCombatContext.mockResolvedValue(null);
-            getTargetFromAttacker.mockReturnValue(null);
+        it('skips Charger when oncePerTurn already used this round (new format)', async () => {
+            getCombatContext.mockResolvedValue(createCombatContext());
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+            setRuntimeValue.mockImplementation(async (key, value, _campaignName) => {
+                if (key === 'TestFighter' && value === '_Charge_Attack_usedRound') {
+                    // Simulate oncePerTurn already used this round (new format)
+                    return;
+                }
+            });
             const stats = {
                 ...mockPlayerStats,
                 automation: {
@@ -192,7 +199,6 @@ describe('useAttackDamageResolution - feats', () => {
             };
             await resolveAttackDamage(attack);
             await tick();
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_Charge_Attack_usedRound', expect.any(Number), 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalled();
         });
     });

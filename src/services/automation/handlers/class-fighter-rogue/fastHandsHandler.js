@@ -19,7 +19,7 @@ export async function handle(action, playerStats, campaignName) {
 
     // Check once-per-turn usage
     if (auto.oncePerTurn) {
-        const skip = await checkOncePerTurn(action.name, '_FastHands_usedRound', campaignName);
+        const skip = await checkOncePerTurn(action.name, '_FastHands_usedRound', playerStats.name, campaignName);
         if (skip) return skip;
     }
 

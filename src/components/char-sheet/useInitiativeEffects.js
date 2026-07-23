@@ -5,6 +5,10 @@ import { rollExpression } from '../../services/dice/diceRoller.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
 import * as storageService from '../../services/ui/storage.js';
 
+// INITIATIVE RESET: When adding a new once-per-turn tracker, reset it with
+// setRuntimeValue(playerStats.name, '_TrackerName_usedRound', null, campaignName)
+// inside the initiative-rolled handler below. Use the _<Name>_usedRound key pattern.
+
 export default function useInitiativeEffects(playerStats, campaignName, rollDamage) {
     // Passive: recover Focus Points and Wild Shape uses when anyone rolls initiative
     useEffect(() => {
@@ -103,6 +107,17 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
 
             // Clear Trance of Order on initiative roll (new combat)
             setRuntimeValue(playerStats.name, 'tranceOfOrderActive', null, campaignName);
+
+            // Reset once-per-turn trackers on initiative roll (new combat)
+            setRuntimeValue(playerStats.name, '_Charge_Attack_usedRound', null, campaignName);
+            setRuntimeValue(playerStats.name, '_FastHands_usedRound', null, campaignName);
+            setRuntimeValue(playerStats.name, '_CunningAction_usedRound', null, campaignName);
+            setRuntimeValue(playerStats.name, '_Cleave_UsedRound', null, campaignName);
+            setRuntimeValue(playerStats.name, '_Nick_UsedRound', null, campaignName);
+            setRuntimeValue(playerStats.name, 'surgeUsedRound', null, campaignName);
+            setRuntimeValue(playerStats.name, 'illusoryRealityUsedRound', null, campaignName);
+            setRuntimeValue(playerStats.name, '_BrutalStrike_usedRound', null, campaignName);
+            setRuntimeValue(playerStats.name, '_fortifiedHealth_usedRound', null, campaignName);
 
             // Clear Large Form active state on initiative roll (rest-used flag persists)
             setRuntimeValue(playerStats.name, 'largeFormActive', null, campaignName);

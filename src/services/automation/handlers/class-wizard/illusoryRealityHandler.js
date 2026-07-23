@@ -10,7 +10,7 @@ export async function handle(action, playerStats, campaignName) {
     const playerName = playerStats.name;
     const featureName = action.name || 'Illusory Reality';
 
-    const skip = await checkOncePerTurn(featureName, 'illusoryRealityUsedRound', campaignName);
+    const skip = await checkOncePerTurn(featureName, 'illusoryRealityUsedRound', playerName, campaignName);
     if (skip) return skip;
 
     // Check if there's already a real object from this feature active

@@ -8,6 +8,11 @@ import storage from '../../services/ui/storage.js'
 import { clearDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js'
 import { getMonsterImageUrl, getMonsterData } from '../../services/npcs/monsterUtils.js'
 import { getAbilityLabel, CONDITIONS } from '../../services/combat/conditions/conditionUtils.js'
+
+// INITIATIVE RESET (initiative component): When advancing to a new round or rolling
+// initiative from the initiative panel, reset once-per-turn trackers for player creatures
+// using setRuntimeValue(creature.name, '_TrackerName_usedRound', null, campaignName)
+// inside the initiative-rolled handler and handleNextCreature round-increment block.
 import { loadNPCs } from '../../services/npcs/npcsService.js'
 import { npcToMonsterFormat, npcHasStatBlock } from '../../services/encounters/npcStatBlockUtils.js'
 import { expireStaleEffects, applyTurnStartEffects } from '../../services/rules/effects/expirations.js'
@@ -314,13 +319,24 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 setCombatSummary(cloneDeep(cs))
                 storage.set('activeCreatureName', newActiveName, campaignName)
                  setActiveCreatureName(newActiveName)
-                 for (const creature of cs.creatures) {
-                     clearPerRoundMajestyTrackers(creature.name, campaignName)
-                     if (creature.type === 'player') {
-                         setRuntimeValue(creature.name, '_cunningStrikeCostUsed', 0, campaignName);
-                         setRuntimeValue(creature.name, '_CunningStrike_usedRound', null, campaignName);
-                     }
-                 }
+                  for (const creature of cs.creatures) {
+                      clearPerRoundMajestyTrackers(creature.name, campaignName)
+                      if (creature.type === 'player') {
+                           setRuntimeValue(creature.name, '_cunningStrikeCostUsed', 0, campaignName);
+                           setRuntimeValue(creature.name, '_CunningStrike_usedRound', null, campaignName);
+                           setRuntimeValue(creature.name, '_Charge_Attack_usedRound', null, campaignName);
+                           setRuntimeValue(creature.name, '_FastHands_usedRound', null, campaignName);
+                           setRuntimeValue(creature.name, '_CunningAction_usedRound', null, campaignName);
+                           setRuntimeValue(creature.name, '_Cleave_UsedRound', null, campaignName);
+                           setRuntimeValue(creature.name, '_Nick_UsedRound', null, campaignName);
+                           setRuntimeValue(creature.name, 'surgeUsedRound', null, campaignName);
+                           setRuntimeValue(creature.name, 'illusoryRealityUsedRound', null, campaignName);
+                           setRuntimeValue(creature.name, 'portentUsedThisTurn', null, campaignName);
+                           setRuntimeValue(creature.name, 'psionicStrikeUsedThisTurn', null, campaignName);
+                           setRuntimeValue(creature.name, '_BrutalStrike_usedRound', null, campaignName);
+                           setRuntimeValue(creature.name, '_fortifiedHealth_usedRound', null, campaignName);
+                      }
+                  }
               }
               expireStaleEffects(campaignName, newActiveName)
               const newActiveChar = characters.find(ch => utils.getName(ch.name) === utils.getName(newActiveName))
@@ -465,6 +481,18 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                     setRuntimeValue(creature.name, 'peerlessAthleteActive', null, campaignName)
                     setRuntimeValue(creature.name, 'elementalAttunementActive', null, campaignName)
                     setRuntimeValue(creature.name, 'elementalAttunementElement', null, campaignName)
+                    setRuntimeValue(creature.name, '_CunningStrike_usedRound', null, campaignName)
+                    setRuntimeValue(creature.name, '_Charge_Attack_usedRound', null, campaignName)
+                    setRuntimeValue(creature.name, '_FastHands_usedRound', null, campaignName)
+                    setRuntimeValue(creature.name, '_CunningAction_usedRound', null, campaignName)
+                    setRuntimeValue(creature.name, '_Cleave_UsedRound', null, campaignName)
+                    setRuntimeValue(creature.name, '_Nick_UsedRound', null, campaignName)
+                    setRuntimeValue(creature.name, 'surgeUsedRound', null, campaignName)
+                    setRuntimeValue(creature.name, 'illusoryRealityUsedRound', null, campaignName)
+                    setRuntimeValue(creature.name, 'portentUsedThisTurn', null, campaignName)
+                    setRuntimeValue(creature.name, 'psionicStrikeUsedThisTurn', null, campaignName)
+                    setRuntimeValue(creature.name, '_BrutalStrike_usedRound', null, campaignName)
+                    setRuntimeValue(creature.name, '_fortifiedHealth_usedRound', null, campaignName)
                 }
                 if (creature.concentration?.spell === "Hunter's Mark") {
                     creature.concentration = null

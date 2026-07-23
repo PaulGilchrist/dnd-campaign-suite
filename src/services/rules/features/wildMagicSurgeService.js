@@ -99,7 +99,7 @@ export async function triggerWildMagicSurge(spell, metaCtx, playerStats, campaig
     }
 
     const surgeFeature = surgeFeatures[0];
-    const skip = await checkOncePerTurn('Wild Magic Surge', 'surgeUsedRound', campaignName);
+    const skip = await checkOncePerTurn('Wild Magic Surge', 'surgeUsedRound', playerStats.name, campaignName);
     if (skip) return null;
 
     const surgeTable = playerStats.wildMagicSurgeTable;

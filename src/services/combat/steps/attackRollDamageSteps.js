@@ -404,12 +404,17 @@ export function buildAttackRollDamageSteps() {
         for (const te of riders) {
           const r = rollExpression(te.damageExpression);
           if (r) {
-            const dt = te.damageType || ctx.attack?.damageType || 'same_as_weapon';
+            const dt = te.label || te.damageType || ctx.attack?.damageType || 'same_as_weapon';
             formula += ` + ${te.damageExpression} [${dt}]`;
             total += r.total;
             rolls = [...rolls, ...r.rolls];
           }
         }
+
+        // Consume ALL damage_bonus entries so they only apply once
+        const remaining = stored.filter(te => te.effect !== 'damage_bonus');
+        setRuntimeValue(ctx.campaignName, 'targetEffects', remaining, ctx.campaignName);
+
         return { data: { formula, total, rolls } };
       },
     },

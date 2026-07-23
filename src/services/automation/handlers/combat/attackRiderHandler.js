@@ -24,6 +24,13 @@ export async function handle(action, playerStats, campaignName, mapName) {
         description: `${action.name} used${targetName ? ` against ${targetName}` : ''}`,
     }).catch(() => {});
 
+    if (auto.oncePerTurn) {
+        const isCsFeature = ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].includes(action.name);
+        const usedKey = isCsFeature ? '_CunningStrike_usedRound' : `_${action.name.replace(/\s+/g, '_')}_usedRound`;
+        const skip = await checkOncePerTurn(action.name, usedKey, playerStats.name, campaignName);
+        if (skip) return skip;
+    }
+
     if (options.length > 0 && (auto.chooseOne || (auto.maxEffects || 1) > 1)) {
         return {
             type: 'modal',
@@ -68,7 +75,7 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     if (auto.oncePerTurn) {
         const isCsFeature = ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].includes(action.name);
         const usedKey = isCsFeature ? '_CunningStrike_usedRound' : `_${action.name.replace(/\s+/g, '_')}_usedRound`;
-        const skip = await checkOncePerTurn(action.name, usedKey, campaignName);
+        const skip = await checkOncePerTurn(action.name, usedKey, playerStats.name, campaignName);
         if (skip) return skip;
     }
 
@@ -287,6 +294,9 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
         ignoreResistance: !!option.ignoreResistance,
         restoreCost: option.restoreCost || null,
         damageDoubled: option.damageDoubled || auto.damageDoubled || false,
+        damageExpression: option.damageExpression || null,
+        damageType: option.damageType || null,
+        label: auto.name || action.name,
     };
     const updatedEffects = [...storedEffects, newEffect];
     setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);

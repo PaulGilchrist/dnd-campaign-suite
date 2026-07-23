@@ -20,7 +20,7 @@ export async function handle(action, playerStats, campaignName) {
     // Check once-per-turn usage
     if (auto.oncePerTurn) {
         const trackingKey = action.name === 'Fast Hands' ? '_FastHands_usedRound' : '_CunningAction_usedRound';
-        const skip = await checkOncePerTurn(action.name, trackingKey, campaignName);
+        const skip = await checkOncePerTurn(action.name, trackingKey, playerStats.name, campaignName);
         if (skip) return skip;
     }
 

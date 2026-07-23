@@ -24,7 +24,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const playerName = playerStats.name;
 
     if (!auto?.autoSurge) {
-        const skip = await checkOncePerTurn(action.name, 'surgeUsedRound', campaignName);
+        const skip = await checkOncePerTurn(action.name, 'surgeUsedRound', playerName, campaignName);
         if (skip) return skip;
     }
 

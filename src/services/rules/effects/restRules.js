@@ -68,6 +68,18 @@ export function computeShortRestHpNewCurrent(currentHp, maxHp, recoveredAmount) 
   return Math.min(maxHp, base + (recoveredAmount || 0))
 }
 
+// SHORT REST RESET: For once-per-turn trackers that reset on short rest, add the key
+// to SHORT_REST_RESOURCES array below. The applyShortRest function sets all keys in
+// this array to null via setRuntimeBatch. Use the _<Name>_usedRound key pattern.
+//
+// LONG REST RESET: For once-per-turn trackers that reset on long rest, add the key
+// to LONG_REST_RESOURCES array below. The applyLongRest function sets all keys in
+// this array to null via setRuntimeBatch. Use the _<Name>_usedRound key pattern.
+//
+// INITIATIVE RESET: For once-per-turn trackers that reset when the character rolls
+// initiative, add setRuntimeValue(playerStats.name, '_TrackerName_usedRound', null, campaignName)
+// inside useInitiativeEffects.js handleInitiativeRolled handler.
+
 export const SHORT_REST_RESOURCES = [
   'channelDivinityCharges',
   'wildShapeUses',
@@ -97,6 +109,38 @@ export const LONG_REST_RESOURCES = [
   'bardicInspirationUses',
   'channelDivinityCharges',
   'wildShapeUses',
+  'secondWindUses',
+  'psionicEnergy',
+  'focusPoints',
+  'uncannymetabolismUses',
+  'sorceryPoints',
+  'arcaneRecoveryLevels',
+  'superiorityDice',
+  'kiPoints',
+  'actionSurgeUses',
+  'actionSurgeUsedThisRound',
+  'layOnHandsPool',
+  'preserveLifePool',
+  'gloriousDefenseUses',
+  'warlockPactMagic',
+  'luckyPoints',
+  'adrenalineRushUses',
+  '_celestialRevelationUses',
+  '_War_Gods_Blessing_active',
+  'spellthiefUses',
+  'strokeOfLuckUsed',
+  'boonOfCombatProwessUsed',
+  '_Charge_Attack_usedRound',
+  '_FastHands_usedRound',
+  '_CunningAction_usedRound',
+  '_Cleave_UsedRound',
+  '_Nick_UsedRound',
+  'surgeUsedRound',
+  'illusoryRealityUsedRound',
+  'portentUsedThisTurn',
+  'psionicStrikeUsedThisTurn',
+  '_BrutalStrike_usedRound',
+  '_fortifiedHealth_usedRound',
   'secondWindUses',
   'psionicEnergy',
   'focusPoints',
@@ -404,6 +448,9 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
   // Clear Portent once-per-turn flag on short rest
   updates.portentUsedThisTurn = null;
 
+  // Reset Charger once-per-turn flag on short rest
+  updates["_Charge_Attack_usedRound"] = null;
+
    // Reset Psionic Strike once-per-turn flag on short rest
   updates.psionicStrikeUsedThisTurn = null;
 
@@ -499,7 +546,7 @@ export async function applyLongRest(playerStats, campaignName) {
     charData.shortRestHitDice = playerStats.level
 
       getLongRestResources().forEach((key) => {
-       charData[key] = null
+        charData[key] = null
         })
 
     // Clear post-cast rider uses on long rest (e.g. Beguiling Magic)

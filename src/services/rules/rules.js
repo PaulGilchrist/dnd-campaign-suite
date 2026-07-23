@@ -1283,58 +1283,6 @@ const rules = {
             console.error('rules: expected features to be an array for', playerStats.name);
             throw new Error('Missing array: features for ' + playerStats.name);
         }
-        if (featFeatures.length > 0) {
-            for (const featFeature of featFeatures) {
-                if (!featFeature.name) continue;
-
-                const featEntry = {
-                    name: featFeature.name,
-                    description: featFeature.description || '',
-                    type: featFeature.type || 'passive',
-                    source: 'feat',
-                    automation: featFeature.automation,
-                };
-
-                const featureCategories = getCategories(playerStats.rules || '5e');
-
-                // Categorize by automation.casting_time
-                let castingTime = featFeature.automation?.casting_time;
-                if (castingTime) {
-                    const ct = castingTime;
-                    if (ct === '1 action' && !playerStats.actions.some(f => f.name === featFeature.name)) {
-                        playerStats.actions = [...playerStats.actions, featEntry];
-                    } else if (ct === '1 bonus action' && !playerStats.bonusActions.some(f => f.name === featFeature.name)) {
-                        playerStats.bonusActions = [...playerStats.bonusActions, featEntry];
-                    } else if (ct === '1 reaction' && !playerStats.reactions.some(f => f.name === featFeature.name)) {
-                        playerStats.reactions = [...playerStats.reactions, featEntry];
-                    } else if (ct === 'passive' && featureCategories.characterAdvancement.includes(featFeature.name) && !playerStats.characterAdvancement.some(f => f.name === featFeature.name)) {
-                        playerStats.characterAdvancement = [...playerStats.characterAdvancement, featEntry];
-                    } else {
-                        playerStats.specialActions = [...playerStats.specialActions, featEntry];
-                    }
-                } else {
-                    // No automation.casting_time — go to specialActions unless name matches a category
-                    if (featureCategories.characterAdvancement.includes(featFeature.name) && !playerStats.characterAdvancement.some(f => f.name === featFeature.name)) {
-                        playerStats.characterAdvancement = [...playerStats.characterAdvancement, featEntry];
-                    } else if (featureCategories.actions.includes(featFeature.name) && !playerStats.actions.some(f => f.name === featFeature.name)) {
-                        playerStats.actions = [...playerStats.actions, featEntry];
-                    } else if (featureCategories.bonusActions.includes(featFeature.name) && !playerStats.bonusActions.some(f => f.name === featFeature.name)) {
-                        playerStats.bonusActions = [...playerStats.bonusActions, featEntry];
-                    } else if (featureCategories.reactions.includes(featFeature.name) && !playerStats.reactions.some(f => f.name === featFeature.name)) {
-                        playerStats.reactions = [...playerStats.reactions, featEntry];
-                    } else if (!playerStats.specialActions.some(f => f.name === featFeature.name)) {
-                        playerStats.specialActions = [...playerStats.specialActions, featEntry];
-                    }
-                }
-            }
-
-            // Re-sort all action arrays after feat features are merged
-            playerStats.actions = uniqBy(playerStats.actions, 'name').sort((a, b) => a.name.localeCompare(b.name));
-            playerStats.bonusActions = uniqBy(playerStats.bonusActions, 'name').sort((a, b) => a.name.localeCompare(b.name));
-            playerStats.reactions = uniqBy(playerStats.reactions, 'name').sort((a, b) => a.name.localeCompare(b.name));
-            playerStats.specialActions = uniqBy(playerStats.specialActions, 'name').sort((a, b) => a.name.localeCompare(b.name));
-            playerStats.characterAdvancement = uniqBy(playerStats.characterAdvancement, 'name').sort((a, b) => a.name.localeCompare(b.name));
-        }
 
         // Add feat features to allFeatures for automation processing
         if (featFeatures.length > 0) {
@@ -1351,7 +1299,71 @@ const rules = {
             // Re-process automation with feat features included
           playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
 
-         try {
+          // Now create feat entries with processed automation (options instead of effects)
+          for (const featFeature of featFeatures) {
+              if (!featFeature.name) continue;
+
+              // Look up the processed automation info from playerStats.automation
+              // This ensures feat actions have 'options' (processed) instead of 'effects' (raw)
+              const processedAutomation = (playerStats.automation?.passives || []).find(
+                  p => p.name === featFeature.name && p.type === 'attack_rider'
+              ) || (playerStats.automation?.actions || []).find(
+                  p => p.name === featFeature.name && p.type === 'attack_rider'
+              ) || (playerStats.automation?.bonusActions || []).find(
+                  p => p.name === featFeature.name && p.type === 'attack_rider'
+              ) || (playerStats.automation?.reactions || []).find(
+                  p => p.name === featFeature.name && p.type === 'attack_rider'
+              );
+
+              const featEntry = {
+                  name: featFeature.name,
+                  description: featFeature.description || '',
+                  type: featFeature.type || 'passive',
+                  source: 'feat',
+                  automation: processedAutomation || featFeature.automation,
+              };
+
+              const featureCategories = getCategories(playerStats.rules || '5e');
+
+              // Categorize by automation.casting_time
+              let castingTime = featFeature.automation?.casting_time;
+              if (castingTime) {
+                  const ct = castingTime;
+                  if (ct === '1 action' && !playerStats.actions.some(f => f.name === featFeature.name)) {
+                      playerStats.actions = [...playerStats.actions, featEntry];
+                  } else if (ct === '1 bonus action' && !playerStats.bonusActions.some(f => f.name === featFeature.name)) {
+                      playerStats.bonusActions = [...playerStats.bonusActions, featEntry];
+                  } else if (ct === '1 reaction' && !playerStats.reactions.some(f => f.name === featFeature.name)) {
+                      playerStats.reactions = [...playerStats.reactions, featEntry];
+                  } else if (ct === 'passive' && featureCategories.characterAdvancement.includes(featFeature.name) && !playerStats.characterAdvancement.some(f => f.name === featFeature.name)) {
+                      playerStats.characterAdvancement = [...playerStats.characterAdvancement, featEntry];
+                  } else {
+                      playerStats.specialActions = [...playerStats.specialActions, featEntry];
+                  }
+              } else {
+                  // No automation.casting_time — go to specialActions unless name matches a category
+                  if (featureCategories.characterAdvancement.includes(featFeature.name) && !playerStats.characterAdvancement.some(f => f.name === featFeature.name)) {
+                      playerStats.characterAdvancement = [...playerStats.characterAdvancement, featEntry];
+                  } else if (featureCategories.actions.includes(featFeature.name) && !playerStats.actions.some(f => f.name === featFeature.name)) {
+                      playerStats.actions = [...playerStats.actions, featEntry];
+                  } else if (featureCategories.bonusActions.includes(featFeature.name) && !playerStats.bonusActions.some(f => f.name === featFeature.name)) {
+                      playerStats.bonusActions = [...playerStats.bonusActions, featEntry];
+                  } else if (featureCategories.reactions.includes(featFeature.name) && !playerStats.reactions.some(f => f.name === featFeature.name)) {
+                      playerStats.reactions = [...playerStats.reactions, featEntry];
+                  } else if (!playerStats.specialActions.some(f => f.name === featFeature.name)) {
+                      playerStats.specialActions = [...playerStats.specialActions, featEntry];
+                  }
+              }
+          }
+
+          // Re-sort all action arrays after feat features are merged
+          playerStats.actions = uniqBy(playerStats.actions, 'name').sort((a, b) => a.name.localeCompare(b.name));
+          playerStats.bonusActions = uniqBy(playerStats.bonusActions, 'name').sort((a, b) => a.name.localeCompare(b.name));
+          playerStats.reactions = uniqBy(playerStats.reactions, 'name').sort((a, b) => a.name.localeCompare(b.name));
+          playerStats.specialActions = uniqBy(playerStats.specialActions, 'name').sort((a, b) => a.name.localeCompare(b.name));
+          playerStats.characterAdvancement = uniqBy(playerStats.characterAdvancement, 'name').sort((a, b) => a.name.localeCompare(b.name));
+
+          try {
              const maneuverSelection = getRuntimeValue(playerStats.name, 'BattleMasterManeuvers_selection', playerSummary.campaignName);
              const knownNames = Array.isArray(maneuverSelection) ? maneuverSelection : [];
              if (knownNames.length > 0) {

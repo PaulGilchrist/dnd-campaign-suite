@@ -151,13 +151,13 @@ export async function applyMasteryEffect(masteryName, playerStats, campaignName,
 
     // Check once-per-turn for Cleave
     if (mastery.oncePerTurn && masteryName === 'Cleave') {
-        const skip = await checkOncePerTurn(masteryName, '_Cleave_UsedRound', campaignName);
+        const skip = await checkOncePerTurn(masteryName, '_Cleave_UsedRound', playerStats.name, campaignName);
         if (skip) return skip;
     }
 
     // Check once-per-turn for Nick
     if (mastery.oncePerTurn && masteryName === 'Nick') {
-        const skip = await checkOncePerTurn(masteryName, '_Nick_UsedRound', campaignName);
+        const skip = await checkOncePerTurn(masteryName, '_Nick_UsedRound', playerStats.name, campaignName);
         if (skip) return skip;
     }
 

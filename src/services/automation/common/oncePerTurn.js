@@ -12,16 +12,20 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
  * activeCreature === storedActiveCreature — i.e., one full round has
  * passed and this character's turn has come around again.
  *
+ * IMPORTANT: Always pass characterName (not null) as the 3rd argument so
+ * checkOncePerTurn reads from the same store that markOncePerTurn writes to.
+ *
  * @param {string} featureName — for display in popup messages
  * @param {string} usedKey — runtime key (e.g. '_CunningStrike_usedRound')
+ * @param {string} characterName — the character whose store to read from
  * @param {string} campaignName
  * @returns {Promise<object|null>} null if usable, popup response if already used
  */
-export async function checkOncePerTurn(featureName, usedKey, campaignName) {
+export async function checkOncePerTurn(featureName, usedKey, characterName, campaignName) {
     const cs = await getCombatContext(campaignName);
     const currentRound = cs?.round || 1;
     const currentCreature = cs?.activeCreatureName || null;
-    const stored = getRuntimeValue(null, usedKey, campaignName);
+    const stored = getRuntimeValue(characterName, usedKey);
 
     if (!stored) return null;
 
