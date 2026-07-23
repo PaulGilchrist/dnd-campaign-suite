@@ -172,7 +172,7 @@ const classRules = {
             getWizardFeatures: (playerStats) => {
                  const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
                  const arcaneRecoveryLevels = classLevel?.class_specific?.arcane_recovery_levels || 0;
-                 const hasArcaneWard = (playerStats.automation?.passives ?? []).some(p => p.type === 'arcane_ward');
+                  const hasArcaneWard = (playerStats.automation?.passives ?? []).some(p => p.type === 'arcane_ward' || (p.type === 'passive_rule' && p.effect === 'arcane_ward'));
                  let wardMax = 0;
                  if (hasArcaneWard) {
                      const intMod = playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus || 0;

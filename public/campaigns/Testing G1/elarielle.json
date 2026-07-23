@@ -49,8 +49,7 @@
   "class": {
     "name": "Wizard",
     "subclass": {
-      "name": "Diviner",
-      "type": ""
+      "name": "Diviner"
     },
     "divineOrder": "",
     "primalOrder": ""
@@ -63,9 +62,8 @@
     "Ability Score Improvement",
     "Tough",
     "Ability Score Improvement",
-    "Magic Initiate",
-    "Magic Initiate",
-    "Chef"
+    "Chef",
+    "Magic Initiate"
   ],
   "fightingStyles": [],
   "race": {

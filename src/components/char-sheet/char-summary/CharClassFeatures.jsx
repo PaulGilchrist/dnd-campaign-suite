@@ -607,7 +607,8 @@ const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
     } catch { /* ignore */ }
 
     if ((wizardFeatures?.showWizardFeatures ?? true) === false) return null;
-    const wardMax = playerStats.class?.name === 'Wizard' ? (2 * playerStats.level) + (playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus || 0) : 0;
+    const hasArcaneWard = (playerStats.automation?.passives ?? []).some(p => p.type === 'arcane_ward' || (p.type === 'passive_rule' && p.effect === 'arcane_ward'));
+    const wardMax = hasArcaneWard ? (2 * playerStats.level) + (playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus || 0) : 0;
     return (
           <div data-testid="char-class-wizard">
                <TrackedResourceInput label="Arcane Recovery Levels" resourceKey="arcaneRecoveryLevels" playerName={playerStats.name} getMax={() => wizardFeatures?.arcaneRecoveryLevels || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />

@@ -13481,14 +13481,15 @@
                 "name": "Arcane Ward",
                 "level": 2,
                 "prerequisites": [],
-                "description": "You can weave magic around yourself for protection. When you cast an abjuration spell of 1st level or higher, you can simultaneously use a strand of the spell's magic to create a magical ward on yourself that lasts until you finish a long rest. The ward has a hit point maximum equal to twice your wizard level + your I ntelligence modifier. Whenever you take damage, the ward takes the damage instead. If this damage reduces the ward to 0 hit points, you take any remaining damage. While the ward has 0 hit points, it can't absorb damage, but its magic remains. Whenever you cast an abjuration spell of 1st level or higher, the ward regains a number of hit points equal to twice the level of the spell. Once you create the ward, you can't create it again until you finish a long rest.",
+                "description": "You can weave magic around yourself for protection. When you cast an abjuration spell of 1st level or higher, you can simultaneously use a strand of the spell's magic to create a magical ward on yourself that lasts until you finish a long rest. The ward has a hit point maximum equal to twice your wizard level + your I ntelligence modifier. Whenever you take damage, the ward takes damage instead. If this damage reduces the ward to 0 hit points, you take any remaining damage. While the ward has 0 hit points, it can't absorb damage, but its magic remains. Whenever you cast an abjuration spell of 1st level or higher, the ward regains a number of hit points equal to twice the level of the spell. Once you create the ward, you can't create it again until you finish a long rest.",
                 "automation": {
-                  "type": "damage_reduction",
-                  "reductionExpression": "arcane_ward_pool",
-                  "trigger": "damage_taken",
-                  "reaction": false,
-                  "redirect": false,
-                  "casting_time": "1 action"
+                  "type": "passive_rule",
+                  "effect": "arcane_ward",
+                  "wardHpExpression": "(2 * wizard_level) + int_mod",
+                  "wardRestoreExpression": "2 * spell_slot_level",
+                  "wardTrigger": "abjuration_spell_cast",
+                  "wardDuration": "long_rest",
+                  "bonusActionRestore": true
                 }
               }
             ]
