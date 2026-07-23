@@ -815,13 +815,10 @@ export async function applyLongRest(playerStats, campaignName) {
      }
 
       // Restore Arcane Ward on long rest (only for Abjurers)
-     const allPassives = playerStats.automation?.passives ?? [];
-     const hasArcaneWard = allPassives.some(p => p.type === 'arcane_ward' || (p.type === 'passive_rule' && p.effect === 'arcane_ward'))
-     console.log('[applyLongRest] Arcane Ward check:', { name, hasArcaneWard, passives: allPassives.map(p => ({ type: p.type, effect: p.effect, name: p.name })) })
+     const hasArcaneWard = (playerStats.automation?.passives ?? []).some(p => p.type === 'arcane_ward' || (p.type === 'passive_rule' && p.effect === 'arcane_ward'))
      if (hasArcaneWard) {
        const intMod = playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus || 0
        const wardMax = (2 * playerStats.level) + intMod
-       console.log('[applyLongRest] Setting arcaneWardHp to:', wardMax, 'for', name)
        setRuntimeValue(name, 'arcaneWardActive', false, campaignName, true)
        setRuntimeValue(name, 'arcaneWardHp', wardMax, campaignName, true)
        setRuntimeValue(name, 'arcaneWardMax', wardMax, campaignName, true)

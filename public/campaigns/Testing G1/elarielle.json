@@ -62,8 +62,8 @@
     "Ability Score Improvement",
     "Tough",
     "Ability Score Improvement",
-    "Chef",
-    "Magic Initiate"
+    "Magic Initiate",
+    "Crafter"
   ],
   "fightingStyles": [],
   "race": {
@@ -231,5 +231,8 @@
     "Chef-3": {
       "assignment": "Constitution"
     }
-  }
+  },
+  "proficiencies": [
+    "3 from: Artisan's Tools"
+  ]
 }

@@ -4,7 +4,6 @@ import { getRuntimeValue, setRuntimeValue, addStorageChangeListener, hasRuntimeV
 function resolveCurrent(storageKey, playerName, playerStats, maxGetter) {
   const hasKey = hasRuntimeValue(playerName, storageKey);
   const storedValue = getRuntimeValue(playerName, storageKey);
-  if (storageKey === 'arcaneWardHp') console.log('[resolveCurrent] arcaneWardHp:', { hasKey, storedValue, trackedCurrent: playerStats?._trackedResources?.arcaneWardHp?.current, maxGetter: maxGetter() });
   if (hasKey && storedValue != null) return storedValue;
   if (hasKey && storedValue === null) return maxGetter();
   if (playerStats?._trackedResources?.[storageKey]) {
