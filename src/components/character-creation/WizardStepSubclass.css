@@ -1,0 +1,151 @@
+.wizard-step-subclass .no-subclass-message {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background-color: var(--background-color-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+
+.wizard-step-subclass .no-subclass-message i {
+  color: var(--color-primary);
+  font-size: 1.2rem;
+}
+
+.wizard-step-subclass .subclass-detail-card {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--background-color-card);
+  overflow: hidden;
+}
+
+.wizard-step-subclass .detail-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background-color: var(--background-color-header);
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.wizard-step-subclass .detail-card-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.wizard-step-subclass .detail-card-header h3 i {
+  color: var(--color-primary);
+}
+
+.wizard-step-subclass .detail-card-body {
+  padding: 1rem;
+}
+
+.wizard-step-subclass .detail-section {
+  margin-bottom: 1.5rem;
+}
+
+.wizard-step-subclass .detail-section:last-child {
+  margin-bottom: 0;
+}
+
+.wizard-step-subclass .detail-section h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
+  color: var(--color-text);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.25rem;
+}
+
+.wizard-step-subclass .detail-content {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.wizard-step-subclass .feature-item {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+
+.wizard-step-subclass .feature-item:last-child {
+  margin-bottom: 0;
+}
+
+.wizard-step-subclass .feature-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--background-color-card);
+  cursor: pointer;
+  transition: background-color 0.2s;
+  gap: 0.5rem;
+}
+
+.wizard-step-subclass .feature-header:hover {
+  background-color: var(--background-color-card-hover);
+}
+
+.wizard-step-subclass .feature-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--color-text);
+  flex: 1;
+}
+
+.wizard-step-subclass .feature-level-badge {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  background-color: var(--background-color-badge);
+  color: var(--color-text);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.wizard-step-subclass .feature-toggle-icon {
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+}
+
+.wizard-step-subclass .feature-description {
+  padding: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+  border-top: 1px dashed var(--border-color);
+}
+
+.wizard-step-subclass .feature-description p {
+  margin: 0.5em 0;
+}
+
+.wizard-step-subclass .feature-description table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+  font-size: 0.8rem;
+}
+
+.wizard-step-subclass .feature-description th,
+.wizard-step-subclass .feature-description td {
+  border: 1px solid var(--border-color);
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+}
+
+.wizard-step-subclass .feature-description th {
+  background-color: var(--background-color-header);
+  font-weight: 600;
+}

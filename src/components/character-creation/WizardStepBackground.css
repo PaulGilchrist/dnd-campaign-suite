@@ -1,0 +1,54 @@
+.wizard-step-background .background-not-available {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background-color: var(--background-color-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+
+.wizard-step-background .background-not-available i {
+  color: var(--color-primary);
+  font-size: 1.2rem;
+}
+
+.wizard-step-background .background-detail-card {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--background-color-card);
+  overflow: hidden;
+}
+
+.wizard-step-background .detail-content {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.wizard-step-background .info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.wizard-step-background .info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.wizard-step-background .info-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.wizard-step-background .info-value {
+  font-size: 0.95rem;
+  color: var(--color-text);
+}

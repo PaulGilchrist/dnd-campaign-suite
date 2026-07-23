@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-function WizardStepBasic({ formData, errors, backgrounds, ruleset, campaignName, onInputChange }) {
+function WizardStepBasic({ formData, errors, campaignName, onInputChange }) {
   const [alignments, setAlignments] = useState([]);
 
   useEffect(() => {
@@ -95,24 +95,7 @@ function WizardStepBasic({ formData, errors, backgrounds, ruleset, campaignName,
             </button>
           )}
         </div>
-       
-      {ruleset === '2024' && (
-        <div className="form-group">
-          <label>Background (2024 Rules)</label>
-          <select
-            value={formData.background}
-            onChange={(e) => onInputChange('background', e.target.value)}
-            className={errors.background ? 'error' : ''}
-          >
-            <option value="">Select a background</option>
-            {backgrounds.map(background => (
-              <option key={background.index} value={background.name}>{background.name}</option>
-            ))}
-          </select>
-          {errors.background && <span className="error-message">{errors.background}</span>}
-        </div>
-      )}
-    </div>
+      </div>
   );
 }
 

@@ -24,7 +24,8 @@ describe('WizardSidebar', () => {
     it('renders step tabs with correct titles', () => {
       renderSidebar();
       expect(screen.getByText('Basic Information')).toBeInTheDocument();
-      expect(screen.getByText('Race & Class')).toBeInTheDocument();
+      expect(screen.getByText('Race')).toBeInTheDocument();
+      expect(screen.getByText('Subclass / Major')).toBeInTheDocument();
       expect(screen.getByText('Special Actions')).toBeInTheDocument();
     });
 
@@ -33,12 +34,22 @@ describe('WizardSidebar', () => {
       expect(screen.queryByText('Ruleset')).not.toBeInTheDocument();
       expect(screen.getByText('Basic Information')).toBeInTheDocument();
     });
+
+    it('hides step 5 (Background) for 5e', () => {
+      renderSidebar({ ruleset: '5e' });
+      expect(screen.queryByText('Background')).not.toBeInTheDocument();
+    });
+
+    it('shows step 5 (Background) for 2024', () => {
+      renderSidebar({ ruleset: '2024' });
+      expect(screen.getByText('Background')).toBeInTheDocument();
+    });
   });
 
   describe('active state', () => {
     it('highlights the current step as active and others as inactive', () => {
       renderSidebar({ currentStep: 3 });
-      const activeTab = screen.getByText('Race & Class').closest('.sidebar-tab');
+      const activeTab = screen.getByText('Race').closest('.sidebar-tab');
       expect(activeTab).toHaveClass('active');
       const inactiveTab = screen.getByText('Basic Information').closest('.sidebar-tab');
       expect(inactiveTab).not.toHaveClass('active');
@@ -48,7 +59,7 @@ describe('WizardSidebar', () => {
   describe('disabled state', () => {
     it('disables tabs based on getStepEnabled', () => {
       renderSidebar({ getStepEnabled: (step) => step !== 3 });
-      const disabledTab = screen.getByText('Race & Class').closest('.sidebar-tab');
+      const disabledTab = screen.getByText('Race').closest('.sidebar-tab');
       expect(disabledTab).toHaveClass('disabled');
       expect(disabledTab).toHaveAttribute('disabled');
       const enabledTab = screen.getByText('Basic Information').closest('.sidebar-tab');
@@ -67,7 +78,7 @@ describe('WizardSidebar', () => {
     it('calls goToStep with the correct step number when a tab is clicked', () => {
       const props = createProps();
       render(<WizardSidebar {...props} />);
-      fireEvent.click(screen.getByText('Race & Class').closest('.sidebar-tab'));
+      fireEvent.click(screen.getByText('Race').closest('.sidebar-tab'));
       expect(props.goToStep).toHaveBeenCalledWith(3);
     });
   });

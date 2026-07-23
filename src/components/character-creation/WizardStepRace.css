@@ -1,0 +1,147 @@
+.wizard-step-race .race-detail-card {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--background-color-card);
+  overflow: hidden;
+}
+
+.wizard-step-race .detail-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background-color: var(--background-color-header);
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.wizard-step-race .detail-card-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.wizard-step-race .detail-card-header h3 i {
+  color: var(--color-primary);
+}
+
+.wizard-step-race .detail-card-body {
+  padding: 1rem;
+}
+
+.wizard-step-race .detail-section {
+  margin-bottom: 1.5rem;
+}
+
+.wizard-step-race .detail-section:last-child {
+  margin-bottom: 0;
+}
+
+.wizard-step-race .detail-section h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
+  color: var(--color-text);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.25rem;
+}
+
+.wizard-step-race .detail-content {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.wizard-step-race .info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.wizard-step-race .info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.wizard-step-race .info-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.wizard-step-race .info-value {
+  font-size: 0.95rem;
+  color: var(--color-text);
+}
+
+.wizard-step-race .trait-item {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+
+.wizard-step-race .trait-item:last-child {
+  margin-bottom: 0;
+}
+
+.wizard-step-race .trait-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--background-color-card);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.wizard-step-race .trait-header:hover {
+  background-color: var(--background-color-card-hover);
+}
+
+.wizard-step-race .trait-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.wizard-step-race .trait-toggle-icon {
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+}
+
+.wizard-step-race .trait-description {
+  padding: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+  border-top: 1px dashed var(--border-color);
+}
+
+.wizard-step-race .trait-description p {
+  margin: 0.5em 0;
+}
+
+.wizard-step-race .trait-description table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+  font-size: 0.8rem;
+}
+
+.wizard-step-race .trait-description th,
+.wizard-step-race .trait-description td {
+  border: 1px solid var(--border-color);
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+}
+
+.wizard-step-race .trait-description th {
+  background-color: var(--background-color-header);
+  font-weight: 600;
+}

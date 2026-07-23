@@ -29,7 +29,9 @@ const WizardStepRenderer = React.memo(({
   campaignName,
   backgrounds,
   racesData,
+  allRacesData,
   classSubtypes,
+  allClassesData,
   allClasses,
   feats,
   magicItems,
@@ -90,7 +92,9 @@ const WizardStepRenderer = React.memo(({
     campaignName,
     backgrounds,
     racesData,
+    allRacesData,
     classSubtypes: classSubtypes,
+    allClassesData,
     allClasses,
     feats,
     magicItems,
@@ -181,7 +185,9 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
   const {
     backgrounds,
     racesData,
+    allRacesData,
     classSubtypes,
+    allClassesData,
     feats,
     magicItems,
    } = useWizardData(ruleset);
@@ -355,7 +361,9 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
         campaignName={campaignName}
         backgrounds={backgrounds}
         racesData={racesData}
+        allRacesData={allRacesData}
         classSubtypes={classSubtypes}
+        allClassesData={allClassesData}
         allClasses={allClasses}
         feats={feats}
         magicItems={magicItems}
@@ -410,7 +418,9 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
     campaignName,
     backgrounds,
     racesData,
+    allRacesData,
     classSubtypes,
+    allClassesData,
     allClasses,
     feats,
     magicItems,
@@ -471,6 +481,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
             <WizardSidebar
               currentStep={currentStep}
               isEditing={isEditing}
+              ruleset={ruleset}
               getStepEnabled={getStepEnabled}
               goToStep={goToStep}
               isSaveEnabled={isSaveEnabled}

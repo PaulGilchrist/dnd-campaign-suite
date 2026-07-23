@@ -1,6 +1,10 @@
 import WizardStepRules from '../components/character-creation/WizardStepRules.jsx';
 import WizardStepBasic from '../components/character-creation/WizardStepBasic.jsx';
-import WizardStepRaceClass from '../components/character-creation/WizardStepRaceClass.jsx';
+import WizardStepRace from '../components/character-creation/WizardStepRace.jsx';
+import WizardStepSubrace from '../components/character-creation/WizardStepSubrace.jsx';
+import WizardStepBackground from '../components/character-creation/WizardStepBackground.jsx';
+import WizardStepClass from '../components/character-creation/WizardStepClass.jsx';
+import WizardStepSubclass from '../components/character-creation/WizardStepSubclass.jsx';
 import WizardStepFeats from '../components/character-creation/WizardStepFeats.jsx';
 import WizardStepAbilities from '../components/character-creation/WizardStepAbilities.jsx';
 import WizardStepSkills from '../components/character-creation/WizardStepSkills.jsx';
@@ -45,20 +49,70 @@ export const WIZARD_STEPS = [
   },
   {
     step: 3,
-    title: 'Race & Class',
-    component: WizardStepRaceClass,
-    getProps: ({ formData, errors, racesData, classSubtypes, ruleset, onInputChange, allClasses }) => ({
+    title: 'Race',
+    component: WizardStepRace,
+    getProps: ({ formData, errors, allRacesData, racesData, ruleset, onInputChange }) => ({
       formData,
       errors,
+      allRacesData,
       racesData,
-      classSubtypes,
       ruleset,
       onInputChange,
-      allClasses,
     }),
   },
   {
     step: 4,
+    title: 'Subrace',
+    component: WizardStepSubrace,
+    getProps: ({ formData, errors, allRacesData, racesData, ruleset, onInputChange }) => ({
+      formData,
+      errors,
+      allRacesData,
+      racesData,
+      ruleset,
+      onInputChange,
+    }),
+  },
+  {
+    step: 5,
+    title: 'Background',
+    component: WizardStepBackground,
+    getProps: ({ formData, errors, backgrounds, ruleset, onInputChange }) => ({
+      formData,
+      errors,
+      backgrounds,
+      ruleset,
+      onInputChange,
+    }),
+  },
+  {
+    step: 6,
+    title: 'Class',
+    component: WizardStepClass,
+    getProps: ({ formData, errors, allClassesData, classSubtypes, ruleset, onInputChange }) => ({
+      formData,
+      errors,
+      allClassesData,
+      classSubtypes,
+      ruleset,
+      onInputChange,
+    }),
+  },
+  {
+    step: 7,
+    title: 'Subclass / Major',
+    component: WizardStepSubclass,
+    getProps: ({ formData, errors, classSubtypes, ruleset, onInputChange, allClassesData }) => ({
+      formData,
+      errors,
+      classSubtypes,
+      ruleset,
+      onInputChange,
+      allClassesData,
+    }),
+  },
+  {
+    step: 8,
     title: 'Feats',
     component: WizardStepFeats,
     getProps: ({ formData, allFeats, onArrayFieldChange, preSelectedFeats, computedBuffs }) => ({
@@ -70,7 +124,7 @@ export const WIZARD_STEPS = [
     }),
   },
   {
-    step: 5,
+    step: 9,
     title: 'Ability Scores',
     component: WizardStepAbilities,
     getProps: ({ formData, errors, onAbilityBaseScoreChange, onAbilityMiscIncreaseChange, updateBackgroundIncrease, backgroundAbilityNames, backgroundAbilityAssignments, backgroundValidationWarnings, allFeats, featAbilityChoices, featAbilityAssignments, handleFeatAbilityChoice, onFeatAbilityModeChange, racesData }) => ({
@@ -91,7 +145,7 @@ export const WIZARD_STEPS = [
     }),
   },
   {
-    step: 6,
+    step: 10,
     title: 'Skill Proficiencies',
     component: WizardStepSkills,
     getProps: ({ formData, errors, onSkillToggle, onSkillExpertiseToggle, skillLimits, expertiseLimits, warnings, preSelectedSkills }) => ({
@@ -106,7 +160,7 @@ export const WIZARD_STEPS = [
     }),
   },
   {
-    step: 7,
+    step: 11,
     title: 'Languages & Fighting Styles',
     component: WizardStepLanguages,
     getProps: ({ formData, errors, onLanguageToggle, onFightingStyleToggle, languageLimits, fightingStyleLimits, languageWarnings, preSelectedLanguages, preSelectedFightingStyles }) => ({
@@ -122,7 +176,7 @@ export const WIZARD_STEPS = [
     }),
   },
   {
-    step: 8,
+    step: 12,
     title: 'Resistances & Immunities',
     component: WizardStepResistances,
     getProps: ({ formData, onResistanceToggle, onImmunityToggle, resistanceWarnings, preSelectedResistances, preSelectedImmunities }) => ({
@@ -135,7 +189,7 @@ export const WIZARD_STEPS = [
     }),
   },
   {
-    step: 9,
+    step: 13,
     title: 'Spells',
     component: WizardStepSpells,
     getProps: ({ formData, allSpells, onArrayFieldChange, preSelectedSpells }) => ({
@@ -146,7 +200,7 @@ export const WIZARD_STEPS = [
     }),
   },
   {
-    step: 10,
+    step: 14,
     title: 'Magic Items',
     component: WizardStepMagicItems,
     getProps: ({ formData, allMagicItems, ruleset, classSubtypes, onArrayFieldChange }) => ({
@@ -158,7 +212,7 @@ export const WIZARD_STEPS = [
     }),
   },
   {
-    step: 11,
+    step: 15,
     title: 'Inventory',
     component: WizardStepInventory,
     getProps: ({ formData, tempInventory, onInventoryChange, onTempInventoryChange }) => ({
@@ -169,7 +223,7 @@ export const WIZARD_STEPS = [
     }),
   },
   {
-    step: 12,
+    step: 16,
     title: 'Special Actions',
     component: WizardStepSpecial,
     getProps: ({ formData, onArrayFieldChange }) => ({

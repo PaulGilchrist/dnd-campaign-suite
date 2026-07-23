@@ -7,24 +7,36 @@ function useWizardNavigation(initialStep, formData, racesData, classSubtypes, ru
   const [step2Valid, setStep2Valid] = useState(false);
   const step1Valid = !!ruleset;
 
-  // Synchronous step 3 validity: checks race/class selection and subrace/subclass requirements
-  // directly against formData and reference data. If reference data hasn't loaded yet for the
-  // selected class/race, returns false — no async timing window to worry about.
   const step3Valid = useMemo(() => {
+    return !!(formData.race && formData.race.name);
+  }, [formData.race]);
+
+  const step4Valid = useMemo(() => {
     if (!formData.race?.name) return false;
-    if (!formData.class?.name) return false;
-
-    const cls = classSubtypes.find(cs => cs.className === formData.class.name);
-    if (!cls) return false;
-
     const race = racesData.find(r => r.name === formData.race.name);
     if (!race) return false;
+    const subraces = race.subraces || [];
+    if (subraces.length === 0) return true;
+    return !!(formData.race.subrace && formData.race.subrace.name);
+  }, [formData.race, racesData]);
 
-    if (cls.subtypes?.length > 0 && !formData.class.subclass?.name) return false;
-    if (race.subraces?.length > 0 && !formData.race.subrace?.name) return false;
+  const step5Valid = useMemo(() => {
+    if (ruleset !== '2024') return true;
+    return !!formData.background;
+  }, [formData.background, ruleset]);
 
-    return true;
-  }, [formData.race, formData.class, classSubtypes, racesData]);
+  const step6Valid = useMemo(() => {
+    return !!(formData.class && formData.class.name);
+  }, [formData.class]);
+
+  const step7Valid = useMemo(() => {
+    if (!formData.class?.name) return false;
+    const cls = classSubtypes.find(cs => cs.className === formData.class.name);
+    if (!cls) return false;
+    const subclasses = cls.subtypes || [];
+    if (subclasses.length === 0) return true;
+    return !!(formData.class.subclass && formData.class.subclass.name);
+  }, [formData.class, classSubtypes]);
 
   const navigateNext = useCallback(async () => {
     const stepErrors = await validateStep(currentStep, formData, {}, racesData, classSubtypes, ruleset);
@@ -43,7 +55,6 @@ function useWizardNavigation(initialStep, formData, racesData, classSubtypes, ru
     setCurrentStep(step);
   }, []);
 
-  // Async validation of the current step — gates the "Next" button
   useEffect(() => {
     const checkValidation = async () => {
       const stepErrors = await validateStep(currentStep, formData, {}, racesData, classSubtypes, ruleset);
@@ -52,7 +63,6 @@ function useWizardNavigation(initialStep, formData, racesData, classSubtypes, ru
     checkValidation();
   }, [currentStep, formData, racesData, classSubtypes, ruleset]);
 
-  // Async validation of step 2 — gates sidebar access to step 3+
   useEffect(() => {
     const checkStep2 = async () => {
       const step2Errors = await validateStep(2, formData, {}, racesData, classSubtypes, ruleset);
@@ -66,11 +76,15 @@ function useWizardNavigation(initialStep, formData, racesData, classSubtypes, ru
       if (targetStep === 1) return true;
       if (targetStep === 2) return step1Valid;
       if (targetStep === 3) return step1Valid && step2Valid;
-      return step1Valid && step2Valid && step3Valid;
+      if (targetStep === 4) return step1Valid && step2Valid && step3Valid;
+      if (targetStep === 5) return step1Valid && step2Valid && step3Valid && step4Valid;
+      if (targetStep === 6) return step1Valid && step2Valid && step3Valid && step4Valid && step5Valid;
+      if (targetStep === 7) return step1Valid && step2Valid && step3Valid && step4Valid && step5Valid && step6Valid;
+      return step1Valid && step2Valid && step3Valid && step4Valid && step5Valid && step6Valid && step7Valid;
     };
-  }, [step1Valid, step2Valid, step3Valid]);
+  }, [step1Valid, step2Valid, step3Valid, step4Valid, step5Valid, step6Valid, step7Valid]);
 
-  const isSaveEnabled = useMemo(() => step1Valid && step2Valid && step3Valid, [step1Valid, step2Valid, step3Valid]);
+  const isSaveEnabled = useMemo(() => step1Valid && step2Valid && step3Valid && step4Valid && step5Valid && step6Valid && step7Valid, [step1Valid, step2Valid, step3Valid, step4Valid, step5Valid, step6Valid, step7Valid]);
 
   return {
     currentStep,

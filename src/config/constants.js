@@ -24,7 +24,6 @@ export const DEFAULT_FORM_DATA = {
         backgroundIncrease: 0,
         miscIncrease: 0,
       })),
-    background: '',
     class: {
         name: 'Fighter',
         subclass: { name: '' },

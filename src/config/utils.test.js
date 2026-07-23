@@ -148,67 +148,71 @@ describe('character-creation/utils', () => {
         expect(errors).toEqual({});
       });
 
-      it('requires background for 2024 ruleset but not for 5e', async () => {
+      it('requires background for 2024 ruleset (step 5) but not for 5e', async () => {
         const formData = { name: 'Test', level: 1, alignment: 'Good' };
-        let errors = await utils.validateStep(2, formData, {}, [], [], '2024');
+        let errors = await utils.validateStep(5, formData, {}, [], [], '2024');
         expect(errors).toHaveProperty('background', 'Background is required');
-        errors = await utils.validateStep(2, formData, {}, [], [], '5e');
+        errors = await utils.validateStep(5, formData, {}, [], [], '5e');
         expect(errors).not.toHaveProperty('background');
       });
     });
 
-    describe('Step 3: Race & Class', () => {
+    describe('Step 3: Race', () => {
       it('returns an error when race is missing or race.name is absent', async () => {
-        let errors = await utils.validateStep(3, { class: { name: 'Fighter' } }, {}, [], [], '5e');
+        let errors = await utils.validateStep(3, {}, {}, [], [], '5e');
         expect(errors).toHaveProperty('race', 'Race is required');
-        errors = await utils.validateStep(3, { race: {}, class: { name: 'Fighter' } }, {}, [], [], '5e');
+        errors = await utils.validateStep(3, { race: {} }, {}, [], [], '5e');
         expect(errors).toHaveProperty('race', 'Race is required');
       });
+    });
 
-      it('returns an error when class is missing or class.name is absent', async () => {
-        let errors = await utils.validateStep(3, { race: { name: 'Human' } }, {}, [], [], '5e');
-        expect(errors).toHaveProperty('class', 'Class is required');
-        errors = await utils.validateStep(3, { race: { name: 'Human' }, class: {} }, {}, [], [], '5e');
-        expect(errors).toHaveProperty('class', 'Class is required');
-      });
-
+    describe('Step 4: Subrace', () => {
       it('requires subrace when the selected race has subraces and none is chosen', async () => {
         const racesData = [{ name: 'Elf', subraces: [{ name: 'High Elf' }, { name: 'Wood Elf' }] }];
-        const formData = { race: { name: 'Elf' }, class: { name: 'Fighter' } };
-        const errors = await utils.validateStep(3, formData, {}, racesData, [], '5e');
+        const formData = { race: { name: 'Elf' } };
+        const errors = await utils.validateStep(4, formData, {}, racesData, [], '5e');
         expect(errors).toHaveProperty('subrace', 'Subrace is required');
       });
 
       it('does not require subrace when the selected race has no subraces', async () => {
         const racesData = [{ name: 'Human', subraces: [] }];
-        const formData = { race: { name: 'Human' }, class: { name: 'Fighter' } };
-        const errors = await utils.validateStep(3, formData, {}, racesData, [], '5e');
+        const formData = { race: { name: 'Human' } };
+        const errors = await utils.validateStep(4, formData, {}, racesData, [], '5e');
         expect(errors).not.toHaveProperty('subrace');
       });
 
       it('does not require subrace when the race is not found in racesData', async () => {
-        const formData = { race: { name: 'Gnome' }, class: { name: 'Fighter' } };
-        const errors = await utils.validateStep(3, formData, {}, [], [], '5e');
+        const formData = { race: { name: 'Gnome' } };
+        const errors = await utils.validateStep(4, formData, {}, [], [], '5e');
         expect(errors).not.toHaveProperty('subrace');
+      });
+    });
+
+    describe('Step 6: Class', () => {
+      it('returns an error when class is missing or class.name is absent', async () => {
+        let errors = await utils.validateStep(6, {}, {}, [], [], '5e');
+        expect(errors).toHaveProperty('class', 'Class is required');
+        errors = await utils.validateStep(6, { class: {} }, {}, [], [], '5e');
+        expect(errors).toHaveProperty('class', 'Class is required');
       });
 
       it('requires subclass when the selected class has subclasses and none is chosen', async () => {
         const classSubtypes = [{ className: 'Fighter', subtypes: [{ name: 'Champion' }] }];
-        const formData = { race: { name: 'Human' }, class: { name: 'Fighter' } };
-        const errors = await utils.validateStep(3, formData, {}, [], classSubtypes, '5e');
+        const formData = { class: { name: 'Fighter' } };
+        const errors = await utils.validateStep(6, formData, {}, [], classSubtypes, '5e');
         expect(errors).toHaveProperty('subclass', 'Subclass is required');
       });
 
       it('does not require subclass when the class has no subclasses', async () => {
         const classSubtypes = [{ className: 'Fighter', subtypes: [] }];
-        const formData = { race: { name: 'Human' }, class: { name: 'Fighter' } };
-        const errors = await utils.validateStep(3, formData, {}, [], classSubtypes, '5e');
+        const formData = { class: { name: 'Fighter' } };
+        const errors = await utils.validateStep(6, formData, {}, [], classSubtypes, '5e');
         expect(errors).not.toHaveProperty('subclass');
       });
 
       it('does not require subclass when the class is not found in classSubtypes', async () => {
-        const formData = { race: { name: 'Human' }, class: { name: 'Rogue' } };
-        const errors = await utils.validateStep(3, formData, {}, [], [], '5e');
+        const formData = { class: { name: 'Rogue' } };
+        const errors = await utils.validateStep(6, formData, {}, [], [], '5e');
         expect(errors).not.toHaveProperty('subclass');
       });
     });

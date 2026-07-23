@@ -16,11 +16,6 @@ const mockAlignments = [
   'Chaotic Evil',
 ];
 
-const mockBackgrounds2024 = [
-  { index: 'acrobat', name: 'Acrobat' },
-  { index: 'soldier', name: 'Soldier' },
-];
-
 function createMockProps(overrides = {}) {
   return {
     formData: {
@@ -95,24 +90,6 @@ describe('WizardStepBasic', () => {
 
       expect(screen.getByText('Remove Image')).toBeInTheDocument();
     });
-
-    it('should render 2024 background select with populated choices', () => {
-      render(
-        <WizardStepBasic
-          {...createMockProps()}
-          ruleset="2024"
-          backgrounds={mockBackgrounds2024}
-        />
-      );
-
-      expect(screen.getByText('Background (2024 Rules)')).toBeInTheDocument();
-      const bgSelect = document.querySelectorAll('select')[1];
-      const options = bgSelect.querySelectorAll('option');
-      expect(options[0]).toHaveValue('');
-      expect(options[0]).toHaveTextContent('Select a background');
-      expect(options[1]).toHaveValue('Acrobat');
-      expect(options[2]).toHaveValue('Soldier');
-    });
   });
 
   describe('Input changes', () => {
@@ -150,22 +127,6 @@ describe('WizardStepBasic', () => {
 
       expect(mockOnChange).toHaveBeenCalledWith('alignment', 'Chaotic Neutral');
     });
-
-    it('should call onInputChange with background when the background select changes', () => {
-      const mockOnChange = vi.fn();
-      render(
-        <WizardStepBasic
-          {...createMockProps({ onInputChange: mockOnChange })}
-          ruleset="2024"
-          backgrounds={mockBackgrounds2024}
-        />
-      );
-
-      const backgroundSelect = document.querySelectorAll('select')[1];
-      fireEvent.change(backgroundSelect, { target: { value: 'Acrobat' } });
-
-      expect(mockOnChange).toHaveBeenCalledWith('background', 'Acrobat');
-    });
   });
 
   describe('Validation errors', () => {
@@ -185,22 +146,6 @@ describe('WizardStepBasic', () => {
       expect(screen.getByText(error)).toBeInTheDocument();
       const input = getInput();
       expect(input).toHaveClass('error');
-    });
-
-    it('should render error message and error class for the background field in 2024', () => {
-      render(
-        <WizardStepBasic
-          {...createMockProps({
-            ruleset: '2024',
-            backgrounds: mockBackgrounds2024,
-            errors: { background: 'Background is required for 2024 rules' },
-          })}
-        />
-      );
-
-      expect(screen.getByText('Background is required for 2024 rules')).toBeInTheDocument();
-      const bgSelect = document.querySelectorAll('select')[1];
-      expect(bgSelect).toHaveClass('error');
     });
   });
 

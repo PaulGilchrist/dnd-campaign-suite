@@ -111,34 +111,26 @@ export async function validateLevel(level, ruleset = '5e') {
 export async function validateStep(step, formData, errors, racesData = [], classSubtypes = [], ruleset) {
   const newErrors = {};
   
-  // Step 2: Basic Information - validate name, level, alignment, and background (2024)
   if (step === 2) {
     if (!formData.name?.trim()) {
       newErrors.name = 'Character name is required';
     }
     
-    // Validate level using rules from JSON
     const levelErrors = await validateLevel(formData.level, ruleset);
     Object.assign(newErrors, levelErrors);
     
     if (!formData.alignment) {
       newErrors.alignment = 'Alignment is required';
-      }
-    if (ruleset === '2024' && !formData.background) {
-      newErrors.background = 'Background is required';
     }
   }
   
-  // Step 3: Race & Class - validate race, class, subrace and subclass
   if (step === 3) {
     if (!formData.race || !formData.race.name) {
       newErrors.race = 'Race is required';
     }
-    if (!formData.class || !formData.class.name) {
-      newErrors.class = 'Class is required';
-    }
-    
-    // Check if subrace is required (when race has subraces)
+  }
+  
+  if (step === 4) {
     if (formData.race?.name) {
       const selectedRace = racesData.find(race => race.name === formData.race.name);
       const availableSubraces = selectedRace?.subraces || [];
@@ -148,8 +140,19 @@ export async function validateStep(step, formData, errors, racesData = [], class
         }
       }
     }
+  }
+  
+  if (step === 5) {
+    if (ruleset === '2024' && !formData.background) {
+      newErrors.background = 'Background is required';
+    }
+  }
+  
+  if (step === 6) {
+    if (!formData.class || !formData.class.name) {
+      newErrors.class = 'Class is required';
+    }
     
-    // Check if subclass is required (when class has subclasses)
     if (formData.class?.name) {
       const selectedClass = classSubtypes.find(cs => cs.className === formData.class.name);
       const availableSubclasses = selectedClass?.subtypes || [];
@@ -161,9 +164,17 @@ export async function validateStep(step, formData, errors, racesData = [], class
     }
   }
   
-    // Steps 4+ (Feats, Abilities, Skills, etc.) should NOT block progression
-  // Validation warnings for these steps are informational only, not blocking
-  // The Next button should only be disabled for steps 1-3 which have required fields
+  if (step === 7) {
+    if (formData.class?.name) {
+      const selectedClass = classSubtypes.find(cs => cs.className === formData.class.name);
+      const availableSubclasses = selectedClass?.subtypes || [];
+      if (availableSubclasses.length > 0) {
+        if (!formData.class.subclass || !formData.class.subclass.name) {
+          newErrors.subclass = 'Subclass is required';
+        }
+      }
+    }
+  }
   
   return newErrors;
 }
