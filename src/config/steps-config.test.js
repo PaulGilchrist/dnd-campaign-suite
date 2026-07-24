@@ -11,6 +11,7 @@ import WizardStepSubclass from '../components/character-creation/WizardStepSubcl
 import WizardStepFeats from '../components/character-creation/WizardStepFeats.jsx';
 import WizardStepAbilities from '../components/character-creation/WizardStepAbilities.jsx';
 import WizardStepSkills from '../components/character-creation/WizardStepSkills.jsx';
+import WizardStepTools from '../components/character-creation/WizardStepTools.jsx';
 import WizardStepLanguages from '../components/character-creation/WizardStepLanguages.jsx';
 import WizardStepResistances from '../components/character-creation/WizardStepResistances.jsx';
 import WizardStepSpells from '../components/character-creation/WizardStepSpells.jsx';
@@ -20,13 +21,13 @@ import WizardStepSpecial from '../components/character-creation/WizardStepSpecia
 
 describe('steps-config', () => {
   describe('WIZARD_STEPS', () => {
-    it('should have exactly 16 steps', () => {
-      expect(WIZARD_STEPS.length).toBe(16);
+    it('should have exactly 17 steps', () => {
+      expect(WIZARD_STEPS.length).toBe(17);
     });
 
-    it('should have steps numbered 1 through 16 with no gaps', () => {
+    it('should have steps numbered 1 through 17 with no gaps', () => {
       const stepNumbers = WIZARD_STEPS.map((step) => step.step);
-      for (let i = 1; i <= 16; i++) {
+      for (let i = 1; i <= 17; i++) {
         expect(stepNumbers).toContain(i);
       }
     });
@@ -66,6 +67,7 @@ describe('steps-config', () => {
         WizardStepFeats,
         WizardStepAbilities,
         WizardStepSkills,
+        WizardStepTools,
         WizardStepLanguages,
         WizardStepResistances,
         WizardStepSpells,
@@ -98,12 +100,13 @@ describe('steps-config', () => {
         { step: 8, title: 'Feats' },
         { step: 9, title: 'Ability Scores' },
         { step: 10, title: 'Skill Proficiencies' },
-        { step: 11, title: 'Languages & Fighting Styles' },
-        { step: 12, title: 'Resistances & Immunities' },
-        { step: 13, title: 'Spells' },
-        { step: 14, title: 'Magic Items' },
-        { step: 15, title: 'Inventory' },
-        { step: 16, title: 'Special Actions' },
+        { step: 11, title: 'Tool Proficiencies' },
+        { step: 12, title: 'Languages & Fighting Styles' },
+        { step: 13, title: 'Resistances & Immunities' },
+        { step: 14, title: 'Spells' },
+        { step: 15, title: 'Magic Items' },
+        { step: 16, title: 'Inventory' },
+        { step: 17, title: 'Special Actions' },
       ];
       for (const expected of expectedTitles) {
         const step = getStepConfig(expected.step);
@@ -117,14 +120,14 @@ describe('steps-config', () => {
       expect(getTotalSteps()).toBe(WIZARD_STEPS.length);
     });
 
-    it('should return 16', () => {
-      expect(getTotalSteps()).toBe(16);
+    it('should return 17', () => {
+      expect(getTotalSteps()).toBe(17);
     });
   });
 
   describe('getStepConfig', () => {
-    it('should return config for all valid step numbers 1-16', () => {
-      for (let i = 1; i <= 16; i++) {
+    it('should return config for all valid step numbers 1-17', () => {
+      for (let i = 1; i <= 17; i++) {
         const step = getStepConfig(i);
         expect(step).toBeDefined();
         expect(step.step).toBe(i);
@@ -134,7 +137,7 @@ describe('steps-config', () => {
     it('should return undefined for invalid step numbers', () => {
       expect(getStepConfig(0)).toBeUndefined();
       expect(getStepConfig(-1)).toBeUndefined();
-      expect(getStepConfig(17)).toBeUndefined();
+      expect(getStepConfig(18)).toBeUndefined();
       expect(getStepConfig(100)).toBeUndefined();
     });
 
@@ -220,44 +223,51 @@ describe('steps-config', () => {
       expect(step.component).toBe(WizardStepSkills);
     });
 
-    it('should return correct step config for step 11 (Languages & Fighting Styles)', () => {
+    it('should return correct step config for step 11 (Tool Proficiencies)', () => {
       const step = getStepConfig(11);
       expect(step.step).toBe(11);
+      expect(step.title).toBe('Tool Proficiencies');
+      expect(step.component).toBe(WizardStepTools);
+    });
+
+    it('should return correct step config for step 12 (Languages & Fighting Styles)', () => {
+      const step = getStepConfig(12);
+      expect(step.step).toBe(12);
       expect(step.title).toBe('Languages & Fighting Styles');
       expect(step.component).toBe(WizardStepLanguages);
     });
 
-    it('should return correct step config for step 12 (Resistances & Immunities)', () => {
-      const step = getStepConfig(12);
-      expect(step.step).toBe(12);
+    it('should return correct step config for step 13 (Resistances & Immunities)', () => {
+      const step = getStepConfig(13);
+      expect(step.step).toBe(13);
       expect(step.title).toBe('Resistances & Immunities');
       expect(step.component).toBe(WizardStepResistances);
     });
 
-    it('should return correct step config for step 13 (Spells)', () => {
-      const step = getStepConfig(13);
-      expect(step.step).toBe(13);
+    it('should return correct step config for step 14 (Spells)', () => {
+      const step = getStepConfig(14);
+      expect(step.step).toBe(14);
       expect(step.title).toBe('Spells');
       expect(step.component).toBe(WizardStepSpells);
     });
 
-    it('should return correct step config for step 14 (Magic Items)', () => {
-      const step = getStepConfig(14);
-      expect(step.step).toBe(14);
+    it('should return correct step config for step 15 (Magic Items)', () => {
+      const step = getStepConfig(15);
+      expect(step.step).toBe(15);
       expect(step.title).toBe('Magic Items');
       expect(step.component).toBe(WizardStepMagicItems);
     });
 
-    it('should return correct step config for step 15 (Inventory)', () => {
-      const step = getStepConfig(15);
-      expect(step.step).toBe(15);
+    it('should return correct step config for step 16 (Inventory)', () => {
+      const step = getStepConfig(16);
+      expect(step.step).toBe(16);
       expect(step.title).toBe('Inventory');
       expect(step.component).toBe(WizardStepInventory);
     });
 
-    it('should return correct step config for step 16 (Special Actions)', () => {
-      const step = getStepConfig(16);
-      expect(step.step).toBe(16);
+    it('should return correct step config for step 17 (Special Actions)', () => {
+      const step = getStepConfig(17);
+      expect(step.step).toBe(17);
       expect(step.title).toBe('Special Actions');
       expect(step.component).toBe(WizardStepSpecial);
     });
@@ -513,9 +523,31 @@ describe('steps-config', () => {
       });
     });
 
-    describe('Step 11 - Languages & Fighting Styles getProps', () => {
-      it('should return correct props object with warnings alias', () => {
+    describe('Step 11 - Tool Proficiencies getProps', () => {
+      it('should return correct props object', () => {
         const step = getStepConfig(11);
+        const props = step.getProps({
+          formData: {},
+          errors: {},
+          onToolToggle: vi.fn(),
+          toolLimits: {},
+          toolWarnings: [],
+          preSelectedTools: [],
+        });
+        expect(props).toEqual({
+          formData: {},
+          errors: {},
+          onToolToggle: expect.any(Function),
+          toolLimits: {},
+          toolWarnings: [],
+          preSelectedTools: [],
+        });
+      });
+    });
+
+    describe('Step 12 - Languages & Fighting Styles getProps', () => {
+      it('should return correct props object with warnings alias', () => {
+        const step = getStepConfig(12);
         const mockWarnings = ['Too many languages'];
         const props = step.getProps({
           formData: {},
@@ -534,9 +566,9 @@ describe('steps-config', () => {
       });
     });
 
-    describe('Step 12 - Resistances & Immunities getProps', () => {
+    describe('Step 13 - Resistances & Immunities getProps', () => {
       it('should return correct props object with warnings alias', () => {
-        const step = getStepConfig(12);
+        const step = getStepConfig(13);
         const mockWarnings = ['Too many resistances'];
         const props = step.getProps({
           formData: {},
@@ -552,29 +584,29 @@ describe('steps-config', () => {
       });
     });
 
-    describe('Step 13 - Spells getProps', () => {
-      it('should return correct props object', () => {
-        const step = getStepConfig(13);
-        const props = step.getProps({
-          formData: {},
-          allSpells: [{ name: 'Fireball' }],
-          onArrayFieldChange: vi.fn(),
-          preSelectedSpells: [],
-        });
-        expect(props).toEqual({
-          formData: {},
-          allSpells: [{ name: 'Fireball' }],
-          onArrayFieldChange: expect.any(Function),
-          preSelectedSpells: [],
-        });
-      });
-    });
-
-    describe('Step 14 - Magic Items getProps', () => {
+    describe('Step 14 - Spells getProps', () => {
       it('should return correct props object', () => {
         const step = getStepConfig(14);
         const props = step.getProps({
           formData: {},
+          allSpells: [{ name: 'Fireball' }],
+          onArrayFieldChange: vi.fn(),
+          preSelectedSpells: [],
+        });
+        expect(props).toEqual({
+          formData: {},
+          allSpells: [{ name: 'Fireball' }],
+          onArrayFieldChange: expect.any(Function),
+          preSelectedSpells: [],
+        });
+      });
+    });
+
+    describe('Step 15 - Magic Items getProps', () => {
+      it('should return correct props object', () => {
+        const step = getStepConfig(15);
+        const props = step.getProps({
+          formData: {},
           allMagicItems: [{ name: 'Ring of Protection' }],
           ruleset: '5e',
           classSubtypes: [],
@@ -590,9 +622,9 @@ describe('steps-config', () => {
       });
     });
 
-    describe('Step 15 - Inventory getProps', () => {
+    describe('Step 16 - Inventory getProps', () => {
       it('should return correct props object', () => {
-        const step = getStepConfig(15);
+        const step = getStepConfig(16);
         const props = step.getProps({
           formData: {},
           tempInventory: [],
@@ -608,9 +640,9 @@ describe('steps-config', () => {
       });
     });
 
-    describe('Step 16 - Special Actions getProps', () => {
+    describe('Step 17 - Special Actions getProps', () => {
       it('should return correct props object', () => {
-        const step = getStepConfig(16);
+        const step = getStepConfig(17);
         const props = step.getProps({
           formData: {},
           onArrayFieldChange: vi.fn(),

@@ -8,6 +8,7 @@ import WizardStepSubclass from '../components/character-creation/WizardStepSubcl
 import WizardStepFeats from '../components/character-creation/WizardStepFeats.jsx';
 import WizardStepAbilities from '../components/character-creation/WizardStepAbilities.jsx';
 import WizardStepSkills from '../components/character-creation/WizardStepSkills.jsx';
+import WizardStepTools from '../components/character-creation/WizardStepTools.jsx';
 import WizardStepLanguages from '../components/character-creation/WizardStepLanguages.jsx';
 import WizardStepResistances from '../components/character-creation/WizardStepResistances.jsx';
 import WizardStepSpells from '../components/character-creation/WizardStepSpells.jsx';
@@ -161,6 +162,19 @@ export const WIZARD_STEPS = [
   },
   {
     step: 11,
+    title: 'Tool Proficiencies',
+    component: WizardStepTools,
+    getProps: ({ formData, errors, onToolToggle, toolLimits, toolWarnings, preSelectedTools }) => ({
+      formData,
+      errors,
+      onToolToggle,
+      toolLimits,
+      toolWarnings,
+      preSelectedTools,
+    }),
+  },
+  {
+    step: 12,
     title: 'Languages & Fighting Styles',
     component: WizardStepLanguages,
     getProps: ({ formData, errors, onLanguageToggle, onFightingStyleToggle, languageLimits, fightingStyleLimits, languageWarnings, preSelectedLanguages, preSelectedFightingStyles }) => ({
@@ -176,7 +190,7 @@ export const WIZARD_STEPS = [
     }),
   },
   {
-    step: 12,
+    step: 13,
     title: 'Resistances & Immunities',
     component: WizardStepResistances,
     getProps: ({ formData, onResistanceToggle, onImmunityToggle, resistanceWarnings, preSelectedResistances, preSelectedImmunities }) => ({
@@ -189,7 +203,7 @@ export const WIZARD_STEPS = [
     }),
   },
   {
-    step: 13,
+    step: 14,
     title: 'Spells',
     component: WizardStepSpells,
     getProps: ({ formData, allSpells, onArrayFieldChange, preSelectedSpells }) => ({
@@ -200,7 +214,7 @@ export const WIZARD_STEPS = [
     }),
   },
   {
-    step: 14,
+    step: 15,
     title: 'Magic Items',
     component: WizardStepMagicItems,
     getProps: ({ formData, allMagicItems, ruleset, classSubtypes, onArrayFieldChange }) => ({
@@ -212,7 +226,7 @@ export const WIZARD_STEPS = [
     }),
   },
   {
-    step: 15,
+    step: 16,
     title: 'Inventory',
     component: WizardStepInventory,
     getProps: ({ formData, tempInventory, onInventoryChange, onTempInventoryChange }) => ({
@@ -223,7 +237,7 @@ export const WIZARD_STEPS = [
     }),
   },
   {
-    step: 16,
+    step: 17,
     title: 'Special Actions',
     component: WizardStepSpecial,
     getProps: ({ formData, onArrayFieldChange }) => ({

@@ -1634,8 +1634,8 @@
   {
     "index": "forgery-kit",
     "name": "Forgery Kit",
-    "equipment_category": "Adventuring Gear",
-    "gear_category": "Kits",
+    "equipment_category": "Tools",
+    "tool_category": "Other Tools",
     "cost": {
       "quantity": 15,
       "unit": "gp"
@@ -1643,7 +1643,11 @@
     "weight": 5,
     "description": [
       "This small box contains a variety of papers and parchments, pens and inks, seals and sealing wax, gold and silver leaf, and other supplies necessary to create convincing forgeries of physical documents. Proficiency with this kit lets you add your proficiency bonus to any ability checks you make to create a physical forgery of a document."
-    ]
+    ],
+    "ability": "Dexterity",
+    "utilize": "Create a forgery of a document (DC 20)",
+    "craft": "",
+    "rules": "2024"
   },
   {
     "index": "galley",
@@ -1961,8 +1965,8 @@
   {
     "index": "herbalism-kit",
     "name": "Herbalism Kit",
-    "equipment_category": "Adventuring Gear",
-    "gear_category": "Kits",
+    "equipment_category": "Tools",
+    "tool_category": "Other Tools",
     "cost": {
       "quantity": 5,
       "unit": "gp"
@@ -1970,7 +1974,11 @@
     "weight": 3,
     "description": [
       "This kit contains a variety of instruments such as clippers, mortar and pestle, and pouches and vials used by herbalists to create remedies and potions. Proficiency with this kit lets you add your proficiency bonus to any ability checks you make to identify or apply herbs. Also, proficiency with this kit is required to create antitoxin and potions of healing."
-    ]
+    ],
+    "ability": "Wisdom",
+    "utilize": "Identify or apply herbs (DC 15)",
+    "craft": "Antitoxin, Potion of Healing",
+    "rules": "2024"
   },
   {
     "index": "hide",

@@ -1,0 +1,75 @@
+/* ============================================
+   WIZARD STEP TOOLS - COMPONENT STYLES
+   ============================================ */
+
+.wizard-step-tools .tool-category-section {
+    margin-bottom: 1.25rem;
+}
+
+.wizard-step-tools .tool-category-header {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin: 0 0 0.5rem 0;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.wizard-step-tools .tool-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.wizard-step-tools .tool-card:hover {
+    background-color: var(--background-color-card-hover);
+}
+
+.wizard-step-tools .tool-card.selected {
+    background-color: var(--background-color-selected);
+}
+
+.wizard-step-tools .tool-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.wizard-step-tools .tool-name {
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--color-text);
+    flex: 1;
+}
+
+.wizard-step-tools .tool-ability-badge {
+    font-size: 0.7rem;
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    background-color: var(--background-color-badge);
+    color: var(--color-text);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.wizard-step-tools .tool-card-details {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    padding-top: 0.25rem;
+    border-top: 1px solid var(--border-color);
+    margin-top: 0.25rem;
+}
+
+.wizard-step-tools .tool-utilize,
+.wizard-step-tools .tool-craft {
+    margin: 0.15rem 0;
+    line-height: 1.3;
+}
+
+.wizard-step-tools .form-group:last-child {
+    margin-bottom: 0;
+}

@@ -122,6 +122,9 @@
     "Acrobatics",
     "Persuasion"
   ],
+  "toolProficiencies": [
+    "Thieves' Tools"
+  ],
   "specialActions": [],
   "spells": [],
   "magicInitiateInstances": [],

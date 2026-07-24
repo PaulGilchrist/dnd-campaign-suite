@@ -44,6 +44,7 @@ export const DEFAULT_FORM_DATA = {
     languages: [],
     resistances: [],
     skillProficiencies: [],
+    toolProficiencies: [],
     specialActions: [],
     spells: [],
     magicInitiateInstances: [],

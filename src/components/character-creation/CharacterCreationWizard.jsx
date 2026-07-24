@@ -10,6 +10,7 @@ import useWizardForm from '../../hooks/wizard/useWizardForm.js';
 import useWizardData from '../../hooks/wizard/useWizardData.js';
 import useWizardNavigation from '../../hooks/wizard/useWizardNavigation.js';
 import useWizardSkills from '../../hooks/wizard/useWizardSkills.js';
+import useWizardTools from '../../hooks/wizard/useWizardTools.js';
 import useWizardLanguages from '../../hooks/wizard/useWizardLanguages.js';
 import useWizardResistances from '../../hooks/wizard/useWizardResistances.js';
 import useWizardFeats from '../../hooks/wizard/useWizardFeats.js';
@@ -51,6 +52,9 @@ const WizardStepRenderer = React.memo(({
   skillLimits,
   expertiseLimits,
   skillWarnings,
+  toolLimits,
+  toolWarnings,
+  preSelectedTools,
   languageLimits,
   fightingStyleLimits,
   languageWarnings: _languageWarnings,
@@ -65,6 +69,7 @@ const WizardStepRenderer = React.memo(({
   onAbilityMiscIncreaseChange,
   onSkillToggle,
   onSkillExpertiseToggle,
+  onToolToggle,
   onLanguageToggle,
   onFightingStyleToggle,
   onResistanceToggle,
@@ -114,6 +119,9 @@ const WizardStepRenderer = React.memo(({
     skillLimits,
     expertiseLimits,
     skillWarnings,
+    toolLimits,
+    toolWarnings,
+    preSelectedTools,
     languageLimits,
     fightingStyleLimits,
     resistanceWarnings,
@@ -127,6 +135,7 @@ const WizardStepRenderer = React.memo(({
     onAbilityMiscIncreaseChange,
     onSkillToggle,
     onSkillExpertiseToggle,
+    onToolToggle,
     onLanguageToggle,
     onFightingStyleToggle,
     onResistanceToggle,
@@ -211,7 +220,14 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
     preSelectedSkills,
    } = useWizardSkills(formData, setFormData, feats);
 
-  // Languages & Fighting Styles
+   // Tool Proficiencies
+   const {
+     toolLimits,
+     toolWarnings,
+     preSelectedTools,
+    } = useWizardTools(formData, setFormData);
+
+   // Languages & Fighting Styles
   const {
     languageLimits,
     fightingStyleLimits,
@@ -301,16 +317,21 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
      setFormData, setErrors, 'skillProficiencies', preSelectedSkills
    );
 
-   // Expert Skills - Pattern B: force add/remove via setItem/removeItem
-   const { setItem: addExpertSkill, removeItem: removeExpertSkill } = useWizardArrayToggle(
-     setFormData, setErrors, 'expertSkills'
-   );
-   const handleSkillExpertiseToggle = useCallback(
-      (skill, isExpert) => isExpert ? addExpertSkill(skill) : removeExpertSkill(skill),
-      [addExpertSkill, removeExpertSkill]
-   );
+    // Expert Skills - Pattern B: force add/remove via setItem/removeItem
+    const { setItem: addExpertSkill, removeItem: removeExpertSkill } = useWizardArrayToggle(
+      setFormData, setErrors, 'expertSkills'
+    );
+    const handleSkillExpertiseToggle = useCallback(
+       (skill, isExpert) => isExpert ? addExpertSkill(skill) : removeExpertSkill(skill),
+       [addExpertSkill, removeExpertSkill]
+    );
 
-   // Languages - Pattern A: preSelectedItems from closure
+    // Tool Proficiencies - Pattern A: preSelectedItems from closure
+    const { toggleItem: handleToolToggle } = useWizardArrayToggle(
+      setFormData, setErrors, 'toolProficiencies', preSelectedTools
+    );
+
+    // Languages - Pattern A: preSelectedItems from closure
    const { toggleItem: handleLanguageToggle } = useWizardArrayToggle(
      setFormData, setErrors, 'languages', preSelectedLanguages
    );
@@ -382,6 +403,9 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
         skillLimits={skillLimits}
         expertiseLimits={expertiseLimits}
         skillWarnings={skillWarnings}
+        toolLimits={toolLimits}
+        toolWarnings={toolWarnings}
+        preSelectedTools={preSelectedTools}
         languageLimits={languageLimits}
         fightingStyleLimits={fightingStyleLimits}
         languageWarnings={languageWarnings}
@@ -396,6 +420,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
         onAbilityMiscIncreaseChange={onAbilityMiscIncreaseChange}
         onSkillToggle={handleSkillToggle}
         onSkillExpertiseToggle={handleSkillExpertiseToggle}
+        onToolToggle={handleToolToggle}
         onLanguageToggle={handleLanguageToggle}
         onFightingStyleToggle={handleFightingStyleToggle}
         onResistanceToggle={handleResistanceToggle}
@@ -438,6 +463,9 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
     skillLimits,
     expertiseLimits,
     skillWarnings,
+    toolLimits,
+    toolWarnings,
+    preSelectedTools,
     languageLimits,
     fightingStyleLimits,
     languageWarnings,
@@ -452,6 +480,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
     onAbilityMiscIncreaseChange,
     handleSkillToggle,
     handleSkillExpertiseToggle,
+    handleToolToggle,
     handleLanguageToggle,
     handleFightingStyleToggle,
     handleResistanceToggle,
