@@ -458,9 +458,10 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
 
         // Compute Defensive Duelist AC bonus (2024 rules)
         let defensiveDuelistBonus = 0;
-        const defensiveDuelistActive = getRuntimeValue(playerName, 'defensiveDuelistActive', campaignName);
-        if (defensiveDuelistActive) {
-            defensiveDuelistBonus = Number(getRuntimeValue(playerName, 'defensiveDuelistBonus', campaignName) || 0);
+        const ddActiveBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName) || [];
+        const ddBuff = ddActiveBuffs.find(b => b.effect === 'defensive_duelist');
+        if (ddBuff) {
+            defensiveDuelistBonus = playerStats.proficiency || 0;
         }
 
         // Compute Bait and Switch AC bonus (2024 rules)
@@ -808,12 +809,11 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                 }
 
                 // Check Defensive Duelist AC bonus (2024 rules)
-                const defensiveDuelistActive = getRuntimeValue(base.targetName, 'defensiveDuelistActive', campaignName);
-                if (defensiveDuelistActive) {
-                    const defensiveDuelistBonus = Number(getRuntimeValue(base.targetName, 'defensiveDuelistBonus', campaignName) || 0);
-                    if (defensiveDuelistBonus > coverResult.acBonus) {
-                        coverResult.acBonus = defensiveDuelistBonus;
-                    }
+                const ddActiveBuffs = getRuntimeValue(base.targetName, 'activeBuffs', campaignName) || [];
+                const ddBuff2 = ddActiveBuffs.find(b => b.effect === 'defensive_duelist');
+                const coverProf = playerStats.proficiency || 0;
+                if (ddBuff2 && coverProf > coverResult.acBonus) {
+                    coverResult.acBonus = coverProf;
                 }
 
                 // Check Bait and Switch AC bonus (2024 rules)

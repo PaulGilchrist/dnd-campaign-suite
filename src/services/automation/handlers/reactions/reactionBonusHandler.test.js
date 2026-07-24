@@ -49,7 +49,14 @@ vi.mock('../../../../services/character/classFeatures.js', () => ({
     getClassFeatures: vi.fn(),
 }));
 
-vi.mock('../../common/damageRollback.js', () => ({}));
+vi.mock('../../common/damageRollback.js', () => ({
+    findAttackRollAgainstTarget: vi.fn(),
+    rollbackDamage: vi.fn(),
+}));
+
+vi.mock('../../common/buffToggle.js', () => ({
+    toggleBuff: vi.fn(),
+}));
 
 vi.mock('../../../ui/storage.js', () => ({
     __esModule: true,
@@ -77,6 +84,10 @@ import { rollExpression } from '../../../dice/diceRoller.js';
 import { getCurrentSorceryPoints } from '../../../../hooks/combat/useMetamagic.js';
 import { spendSorceryPoints } from '../../../../hooks/combat/useMetamagic.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { findAttackRollAgainstTarget, rollbackDamage } from '../../common/damageRollback.js';
+import { toggleBuff } from '../../common/buffToggle.js';
+import { addEntry } from '../../../ui/logService.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getClassFeatures } from '../../../../services/character/classFeatures.js';
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -106,6 +117,10 @@ function makePlayerStats(overrides = {}) {
         ],
         conditions: [],
         speed: 30,
+        inventory: {
+            equipped: overrides.equipped || [],
+        },
+        equipment: overrides.equipment || [],
         ...overrides,
     };
 }
@@ -143,11 +158,12 @@ describe('reactionBonusHandler', () => {
         });
 
         it('should route ac_bonus to handleAcBonus', async () => {
+            findAttackRollAgainstTarget.mockResolvedValue({ attackEvent: null, attackerName: null });
             const action = makeAction({ automation: { effect: 'ac_bonus' } });
-            const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
+            const result = await handle(action, makePlayerStats({ equipped: ['Shortsword'], equipment: [{ name: 'Shortsword', equipment_category: 'Weapon', properties: ['Finesse', 'Light'] }] }), CAMPAIGN, MAP);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('activated');
+            expect(result.payload.description).toContain('No recent attack');
         });
 
         it('should default to handleInspiringMovement for unknown effects', async () => {
@@ -446,17 +462,153 @@ describe('reactionBonusHandler', () => {
         });
     });
 
-    // ── handleAcBonus ────────────────────────────────────────
-    // NOTE: Toggle and duration coverage lives in reactionBonusHandler.unbreakableMajesty.test.js
+    // ── handleAcBonus (Defensive Duelist / Parry) ──────────────
 
     describe('handleAcBonus', () => {
-        it('should route to handleAcBonus for ac_bonus effect', async () => {
+        const finesseWeapon = { name: 'Shortsword', equipment_category: 'Weapon', properties: ['Finesse', 'Light'] };
+        const nonFinesseWeapon = { name: 'Longsword', equipment_category: 'Weapon', properties: [] };
+        const mockAttackEvent = { d20: 14, bonus: 5, targetAc: 15, rawDamage: 8, attackerName: 'Goblin' };
+        const mockMissAttackEvent = { d20: 14, bonus: 5, targetAc: 17, rawDamage: 8, attackerName: 'Goblin' };
+
+        beforeEach(() => {
+            toggleBuff.mockReturnValue({ wasActive: false });
+            findAttackRollAgainstTarget.mockResolvedValue({ attackEvent: null, attackerName: null });
+            rollbackDamage.mockResolvedValue(0);
+            addEntry.mockResolvedValue(undefined);
+            getCombatContext.mockReturnValue(null);
+            applyHealingToTarget.mockReturnValue(null);
+        });
+
+        it('should reject when no equipped items', async () => {
             const action = makeAction({ automation: { effect: 'ac_bonus' } });
             const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
 
             expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('must be wielding a Finesse weapon');
+            expect(toggleBuff).not.toHaveBeenCalled();
+            expect(addExpiration).not.toHaveBeenCalled();
+        });
+
+        it('should reject when equipped items but no Finesse weapon', async () => {
+            const result = await handle(
+                makeAction({ automation: { effect: 'ac_bonus' } }),
+                makePlayerStats({ equipped: ['Longsword'], equipment: [nonFinesseWeapon] }),
+                CAMPAIGN, MAP
+            );
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('must be wielding a Finesse weapon');
+            expect(toggleBuff).not.toHaveBeenCalled();
+        });
+
+        it('should reject when no recent attack targeting player', async () => {
+            const result = await handle(
+                makeAction({ automation: { effect: 'ac_bonus' } }),
+                makePlayerStats({ equipped: ['Shortsword'], equipment: [finesseWeapon] }),
+                CAMPAIGN, MAP
+            );
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('No recent attack targeting');
+            expect(toggleBuff).not.toHaveBeenCalled();
+        });
+
+        it('should activate when Finesse weapon and attack targeting player', async () => {
+            findAttackRollAgainstTarget.mockResolvedValue({ attackEvent: mockAttackEvent, attackerName: 'Goblin' });
+            const action = makeAction({ automation: { effect: 'ac_bonus' } });
+            const result = await handle(action, makePlayerStats({ equipped: ['Shortsword'], equipment: [finesseWeapon] }), CAMPAIGN, MAP);
+
+            expect(toggleBuff).toHaveBeenCalledWith(HERO_NAME, 'Test Reaction', expect.objectContaining({ effect: 'defensive_duelist' }), CAMPAIGN);
+            expect(addExpiration).toHaveBeenCalledWith(HERO_NAME, HERO_NAME, expect.arrayContaining([
+                expect.objectContaining({ type: 'remove_active_buff', buffName: 'Test Reaction' })
+            ]), CAMPAIGN, undefined, HERO_NAME);
+            expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('activated');
-            expect(result.payload.description).toContain('Proficiency Bonus');
+        });
+
+        it('should show "already active" when buff is already toggled on', async () => {
+            toggleBuff.mockReturnValue({ wasActive: true });
+            findAttackRollAgainstTarget.mockResolvedValue({ attackEvent: mockAttackEvent, attackerName: 'Goblin' });
+            const action = makeAction({ automation: { effect: 'ac_bonus' } });
+            const result = await handle(action, makePlayerStats({ equipped: ['Shortsword'], equipment: [finesseWeapon] }), CAMPAIGN, MAP);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('already active');
+            expect(addExpiration).not.toHaveBeenCalled();
+            expect(rollbackDamage).not.toHaveBeenCalled();
+        });
+
+        it('should show "still hits" when roll >= new AC', async () => {
+            findAttackRollAgainstTarget.mockResolvedValue({ attackEvent: mockAttackEvent, attackerName: 'Goblin' });
+            const action = makeAction({ automation: { effect: 'ac_bonus' } });
+            const result = await handle(action, makePlayerStats({ proficiency: 3, equipped: ['Shortsword'], equipment: [finesseWeapon] }), CAMPAIGN, MAP);
+
+            expect(result.payload.description).toContain('still hits');
+            expect(result.payload.description).toContain('Roll 19');
+            expect(rollbackDamage).not.toHaveBeenCalled();
+            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+                type: 'ability_use',
+                characterName: HERO_NAME,
+                abilityName: 'Test Reaction',
+            }));
+        });
+
+        it('should show "misses" and rollback when roll < new AC and damage > 0', async () => {
+            const attackWithDamage = { ...mockMissAttackEvent, rawDamage: 8 };
+            findAttackRollAgainstTarget.mockResolvedValue({ attackEvent: attackWithDamage, attackerName: 'Goblin' });
+            getCombatContext.mockReturnValue({ creatures: [] });
+            applyHealingToTarget.mockReturnValue({ actualHeal: 5, oldHp: 10, newHp: 15 });
+            const action = makeAction({ automation: { effect: 'ac_bonus' } });
+            const result = await handle(action, makePlayerStats({ proficiency: 3, equipped: ['Shortsword'], equipment: [finesseWeapon] }), CAMPAIGN, MAP);
+
+            expect(result.payload.description).toContain('misses');
+            expect(result.payload.description).toContain('Roll 19 < AC 20');
+            expect(result.payload.description).toContain('5 HP healed');
+        });
+
+        it('should show "misses" without healing when no damage dealt', async () => {
+            const attackNoDamage = { ...mockMissAttackEvent, rawDamage: 0 };
+            findAttackRollAgainstTarget.mockResolvedValue({ attackEvent: attackNoDamage, attackerName: 'Goblin' });
+            const action = makeAction({ automation: { effect: 'ac_bonus' } });
+            const result = await handle(action, makePlayerStats({ proficiency: 3, equipped: ['Shortsword'], equipment: [finesseWeapon] }), CAMPAIGN, MAP);
+
+            expect(result.payload.description).toContain('misses');
+            expect(result.payload.description).not.toContain('healed');
+            expect(rollbackDamage).not.toHaveBeenCalled();
+        });
+
+        it('should show "misses" without healing when rollback returns 0', async () => {
+            const attackWithDamage = { ...mockMissAttackEvent, rawDamage: 8 };
+            findAttackRollAgainstTarget.mockResolvedValue({ attackEvent: attackWithDamage, attackerName: 'Goblin' });
+            applyHealingToTarget.mockReturnValue(null);
+            const action = makeAction({ automation: { effect: 'ac_bonus' } });
+            const result = await handle(action, makePlayerStats({ proficiency: 3, equipped: ['Shortsword'], equipment: [finesseWeapon] }), CAMPAIGN, MAP);
+
+            expect(result.payload.description).toContain('misses');
+            expect(result.payload.description).not.toContain('healed');
+        });
+
+        it('should strip magic prefix from equipped item names when checking Finesse', async () => {
+            const magicShortsword = { name: 'Shortsword', equipment_category: 'Weapon', properties: ['Finesse', 'Light'] };
+            const result = await handle(
+                makeAction({ automation: { effect: 'ac_bonus' } }),
+                makePlayerStats({ equipped: ['+3 Shortsword'], equipment: [magicShortsword] }),
+                CAMPAIGN, MAP
+            );
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('No recent attack');
+            expect(toggleBuff).not.toHaveBeenCalled();
+        });
+
+        it('should log same description as popup', async () => {
+            findAttackRollAgainstTarget.mockResolvedValue({ attackEvent: mockAttackEvent, attackerName: 'Goblin' });
+            const action = makeAction({ automation: { effect: 'ac_bonus' } });
+            const result = await handle(action, makePlayerStats({ proficiency: 3, equipped: ['Shortsword'], equipment: [finesseWeapon] }), CAMPAIGN, MAP);
+
+            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+                description: result.payload.description,
+            }));
         });
     });
 

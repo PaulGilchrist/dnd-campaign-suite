@@ -11,6 +11,8 @@ import { infoPopup } from '../../common/infoPopup.js';
 import storage from '../../../ui/storage.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
+import { toggleBuff } from '../../common/buffToggle.js';
+import { findAttackRollAgainstTarget } from '../../common/damageRollback.js';
 
 export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
@@ -295,53 +297,94 @@ export async function applyBendFateChoice(action, playerStats, campaignName, d4R
 async function handleAcBonus(action, playerStats, campaignName) {
     const auto = action.automation;
     const playerName = playerStats.name;
+    const buffName = action.name;
     const prof = playerStats.proficiency || 0;
 
-    const activeKey = 'defensiveDuelistActive';
-    const wasActive = getRuntimeValue(playerName, activeKey, campaignName) === true;
-
-    if (wasActive) {
-        setRuntimeValue(playerName, activeKey, null, campaignName);
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerName,
-            abilityName: action.name,
-            description: `${playerName} ended ${action.name}.`,
-        }).catch(() => {});
+    // Check for Finesse weapon in equipped items
+    const equipped = playerStats.inventory?.equipped || [];
+    let hasFinesse = false;
+    for (const itemName of equipped) {
+        if (!itemName || typeof itemName !== 'string') continue;
+        const baseName = itemName.charAt(0) === '+' ? itemName.substring(3) : itemName;
+        const item = playerStats.equipment?.find(e => e.name === baseName);
+        if (item) {
+            const properties = item.properties || [];
+            if (properties.some(p => p.toLowerCase() === 'finesse')) {
+                hasFinesse = true;
+                break;
+            }
+        }
+    }
+    if (!hasFinesse) {
         return {
             type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${action.name} ended.`,
-                automation: auto,
-            },
+            payload: { type: 'automation_info', name: buffName, description: `You must be wielding a Finesse weapon to use ${buffName}.`, automation: auto },
         };
     }
 
-    setRuntimeValue(playerName, activeKey, true, campaignName);
-    setRuntimeValue(playerName, 'defensiveDuelistBonus', prof, campaignName);
+    // Check lastAttack — was the player the target?
+    const attackResult = await findAttackRollAgainstTarget(playerName, campaignName);
 
-    const durationRounds = parseDurationRounds(auto.duration) || 1;
+    if (!attackResult.attackEvent) {
+        return {
+            type: 'popup',
+            payload: { type: 'automation_info', name: buffName, description: `No recent attack targeting ${playerName} to react to.`, automation: auto },
+        };
+    }
+
+    // Toggle buff
+    const { wasActive } = toggleBuff(playerName, buffName, { ...auto, effect: 'defensive_duelist', acBonus: prof }, campaignName);
+
+    if (wasActive) {
+        return {
+            type: 'popup',
+            payload: { type: 'automation_info', name: buffName, description: `${buffName} is already active.`, automation: auto },
+        };
+    }
+
+    // Set expiration — auto-removes at start of next turn
     addExpiration(playerName, playerName, [
-        { type: 'defensive_duelist' }
-    ], campaignName, durationRounds);
+        { type: 'remove_active_buff', buffName }
+    ], campaignName, undefined, playerName);
+
+    // Check if hit would become miss
+    const { d20, bonus, targetAc, rawDamage, attackerName } = attackResult.attackEvent;
+    const rollTotal = d20 + bonus;
+    const newAc = targetAc != null ? targetAc + prof : null;
+    const wouldMiss = targetAc != null && (rollTotal < newAc);
+
+    let description = `${buffName} activated — +${prof} AC until start of your next turn.`;
+    let healAmount = 0;
+
+    if (wouldMiss && attackerName && rawDamage > 0) {
+        const cs = await getCombatContext(campaignName);
+        if (cs) {
+            const healResult = applyHealingToTarget(cs, playerName, rawDamage, campaignName);
+            if (healResult?.actualHeal != null) {
+                healAmount = healResult.actualHeal;
+            }
+        }
+        if (healAmount > 0) {
+            description += ` The attack misses! (Roll ${rollTotal} < AC ${newAc}) — ${healAmount} HP healed.`;
+        } else {
+            description += ` The attack misses! (Roll ${rollTotal} < AC ${newAc})`;
+        }
+    } else if (wouldMiss) {
+        description += ` The attack misses! (Roll ${rollTotal} < AC ${newAc})`;
+    } else {
+        description += ` The attack still hits. (Roll ${rollTotal} >= AC ${newAc})`;
+    }
 
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
-        abilityName: action.name,
-        description: `${playerName} activated ${action.name}. Proficiency bonus (+${prof}) added to AC as a Reaction.`,
-    }).catch(() => {});
+        abilityName: buffName,
+        description,
+    }).catch((e) => { console.error(`[${buffName}] Error:`, e); });
 
     return {
         type: 'popup',
-        payload: {
-            type: 'automation_info',
-            name: action.name,
-            description: `${action.name} activated! Add ${prof} (Proficiency Bonus) to AC until the start of your next turn or until used.`,
-            automation: auto,
-        },
+        payload: { type: 'automation_info', name: buffName, description, automation: auto },
     };
 }
 

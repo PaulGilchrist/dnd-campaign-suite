@@ -1,8 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 export function getActiveBuffs(playerName, campaignName) {
-  void campaignName;
-  const buffs = getRuntimeValue(playerName, 'activeBuffs');
+  const buffs = getRuntimeValue(playerName, 'activeBuffs', campaignName);
   return Array.isArray(buffs) ? buffs : [];
 }
 

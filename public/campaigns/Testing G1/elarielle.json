@@ -64,6 +64,7 @@
     "Ability Score Improvement",
     "Crossbow Expert",
     "Defensive Duelist",
+    "Magic Initiate",
     "Magic Initiate"
   ],
   "fightingStyles": [],
@@ -92,7 +93,8 @@
     "equipped": [
       "Quarterstaff",
       "Hand Crossbow",
-      "Hand Crossbow"
+      "Hand Crossbow",
+      "Dagger"
     ],
     "gold": 10,
     "magicItems": []

@@ -989,13 +989,12 @@ describe('contextBuilder: buildAttackContextSync', () => {
   describe('defensive duelist and bait and switch', () => {
     it('includes AC bonuses when active', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'defensiveDuelistActive') return true;
-        if (key === 'defensiveDuelistBonus') return 1;
+        if (key === 'activeBuffs' && name === 'Fighter1') return [{ effect: 'defensive_duelist' }];
         return undefined;
       });
 
       const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
-      expect(result.defensiveDuelistBonus).toBe(1);
+      expect(result.defensiveDuelistBonus).toBe(2);
 
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'baitAndSwitchActive') return true;
