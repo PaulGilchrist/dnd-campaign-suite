@@ -4,7 +4,6 @@ import WarningList from '../common/WarningList.jsx';
 import { getSpellLimits, validateSpellSelection } from '../../services/rules/spells/spellLimits.js';
 import { getSpellValidationInfo } from '../../services/rules/spells/spellValidation.js';
 import { renderMarkdown } from '../../services/ui/sanitize.js';
-import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import MagicInitiateModal from './MagicInitiateModal.jsx';
 import './WizardStepSpells.css';
 
@@ -28,8 +27,16 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
   const charLevel = parseInt(formData?.level) || 1;
   const [expandedArcanumSpell, setExpandedArcanumSpell] = useState(null);
   const [showMagicInitiateModal, setShowMagicInitiateModal] = useState(false);
-  const characterKey = formData.name || 'Character';
-  const campaignName = formData.campaignName || formData.campaign || '';
+  const miSpells = useMemo(() => {
+    const spells = new Set();
+    (formData.magicInitiateInstances || []).forEach(inst => {
+      if (inst.cantrips?.[0]) spells.add(inst.cantrips[0]);
+      if (inst.cantrips?.[1]) spells.add(inst.cantrips[1]);
+      if (inst.level1Spell) spells.add(inst.level1Spell);
+    });
+    return spells;
+  }, [formData.magicInitiateInstances]);
+
   const qualifyingArcanumLevels = useMemo(() => {
     if (!isWarlock) return [];
     return getQualifyingArcanumLevels(charLevel);
@@ -93,30 +100,31 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
     if (magicInitiateCount === 0) {
       return;
     }
-    const existingInstances = getRuntimeValue(characterKey, '_magicInitiateInstances', campaignName);
+    const existingInstances = formData.magicInitiateInstances;
     if (!existingInstances || !Array.isArray(existingInstances) || existingInstances.length !== magicInitiateCount) {
       setShowMagicInitiateModal(true);
     }
-  }, [formData.feats, characterKey, campaignName]);
+  }, [formData.feats, formData.magicInitiateInstances]);
 
-    // Calculate spell counts by level (excluding pre-selected spells)
+    // Calculate spell counts by level (excluding pre-selected spells and Magic Initiate spells)
     useEffect(() => {   
       const counts = { cantrip: 0, level1: 0, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0 };
       
       if (formData.spells && formData.spells.length > 0) {
         formData.spells.forEach(spellName => {
           if (preSelected.includes(spellName)) return;
+          if (miSpells.has(spellName)) return;
           const spell = allSpells.find(s => s.name === spellName || s.index === spellName);
           if (spell) {
             const level = spell.level !== undefined ? spell.level : 0;
             const levelKey = level === 0 ? 'cantrip' : `level${level}`;
             counts[levelKey] = (counts[levelKey] || 0) + 1;
            }
-         });
+          });
        }
       
       setSpellCounts(counts);
-     }, [formData.spells, allSpells, preSelected]);
+      }, [formData.spells, allSpells, preSelected, miSpells]);
 
      // Filter spells to only those of levels for which the character has at least one spell slot.
     // Cantrips are always available since they don't require spell slots.
@@ -499,7 +507,6 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
           allSpells={allSpells}
           onArrayFieldChange={onArrayFieldChange}
           onClose={() => setShowMagicInitiateModal(false)}
-          campaignName={campaignName}
         />
       )}
       {renderArcanumSelection()}

@@ -1,5 +1,4 @@
 import { useState, useCallback, useMemo } from 'react';
-import { setRuntimeValue, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { renderMarkdown } from '../../services/ui/sanitize.js';
 import './MagicInitiateModal.css';
 
@@ -14,9 +13,8 @@ function getSpellClassList(spell) {
   return (spell.classes || []).map(c => c.charAt(0).toUpperCase() + c.slice(1));
 }
 
-function MagicInitiateModal({ formData, allSpells, onArrayFieldChange, onClose, campaignName }) {
-  const characterKey = formData.name || 'Character';
-  const existingInstances = useRuntimeValue(characterKey, '_magicInitiateInstances', campaignName);
+function MagicInitiateModal({ formData, allSpells, onArrayFieldChange, onClose }) {
+  const existingInstances = formData.magicInitiateInstances;
   const [instances, setInstances] = useState(() => {
     if (existingInstances && Array.isArray(existingInstances)) {
       return existingInstances.map(inst => ({ ...inst }));

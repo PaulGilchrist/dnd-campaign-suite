@@ -358,6 +358,13 @@ export async function validateSpells(formData, selectedSpells, allSpells, versio
   // Add any explicitly granted spells (auto-assigned from subclass/race/subrace/feats)
   grantedSpells.forEach(spell => allowedSpells.add(spell));
   
+  // Add Magic Initiate spells — they are granted by the feat and should not trigger the "outside class list" warning
+  (formData.magicInitiateInstances || []).forEach(inst => {
+    if (inst.cantrips?.[0]) allowedSpells.add(inst.cantrips[0]);
+    if (inst.cantrips?.[1]) allowedSpells.add(inst.cantrips[1]);
+    if (inst.level1Spell) allowedSpells.add(inst.level1Spell);
+  });
+  
   // Check if Bard has Magical Secrets (2024) — load class data once
   const className = sources.class.name;
   const isMagicalSecretsBard = className === 'Bard' && version === '2024';

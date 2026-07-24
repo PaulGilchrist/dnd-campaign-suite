@@ -67,7 +67,7 @@ function mergeAutomationSpecialActions(playerStats) {
  */
 function renameMagicInitiateFeatures(playerStats, playerSummary) {
     const campaignName = playerSummary?.campaignName;
-    const instances = getRuntimeValue(playerStats.name, '_magicInitiateInstances', campaignName);
+    const instances = getRuntimeValue(playerStats.name, '_magicInitiateInstances', campaignName) || playerStats.magicInitiateInstances;
     if (!instances || !Array.isArray(instances) || instances.length === 0) return;
 
     const automation = playerStats.automation;

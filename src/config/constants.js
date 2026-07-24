@@ -46,6 +46,7 @@ export const DEFAULT_FORM_DATA = {
     skillProficiencies: [],
     specialActions: [],
     spells: [],
+    magicInitiateInstances: [],
     rules: '5e',
     xp: 0,
     xpMode: 'milestone',

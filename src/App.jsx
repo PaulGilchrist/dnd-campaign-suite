@@ -158,6 +158,11 @@ function App() {
               }
             }
           }
+          // Seed Magic Initiate instances from character data into runtime store
+          if (char.magicInitiateInstances && Array.isArray(char.magicInitiateInstances)) {
+            const miStore = getStore(stats.name);
+            miStore.set('_magicInitiateInstances', char.magicInitiateInstances);
+          }
         }
       })();
     }, [computedCharacters, campaignName]);

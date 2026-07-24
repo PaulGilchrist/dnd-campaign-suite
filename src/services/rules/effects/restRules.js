@@ -743,7 +743,7 @@ export async function applyLongRest(playerStats, campaignName) {
     setRuntimeValue(name, '_Energy_Resistances_chosenTypes', null, campaignName, true)
 
     // Reset Magic Initiate free cast counters on long rest
-    const miInstances = getRuntimeValue(name, '_magicInitiateInstances', campaignName)
+    const miInstances = getRuntimeValue(name, '_magicInitiateInstances', campaignName) || playerStats.magicInitiateInstances
     if (miInstances && Array.isArray(miInstances)) {
       miInstances.forEach((inst) => {
         setRuntimeValue(name, `_magicInitiateInstance_${inst.id}_freeCastCount`, null, campaignName, true)

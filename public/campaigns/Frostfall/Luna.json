@@ -109,13 +109,26 @@
   ],
   "specialActions": [],
   "spells": [
-    "Sacred Flame",
     "Spare the Dying",
     "Word of Radiance",
     "Bane",
     "Cure Wounds",
     "Guiding Bolt",
-    "Healing Word"
+    "Healing Word",
+    "Shield",
+    "Poison Spray",
+    "Ray of Frost",
+    "Guidance"
+  ],
+  "magicInitiateInstances": [
+    {
+      "class": "Wizard",
+      "cantrips": [
+        "Poison Spray",
+        "Ray of Frost"
+      ],
+      "level1Spell": "Shield"
+    }
   ],
   "rules": "2024",
   "xp": 0,
