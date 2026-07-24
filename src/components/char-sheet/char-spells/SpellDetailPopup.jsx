@@ -207,6 +207,18 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
     if (stored && Array.isArray(stored) && stored.includes(spellName)) return true;
   }
 
+  // Check specialActions for Magic Initiate level 1 spell free casts
+  const miSpecialActions = playerStats?.automation?.specialActions || [];
+  for (const entry of miSpecialActions) {
+    if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'misty_wanderer' && entry.type !== 'dragon_companion') continue;
+    const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
+    if (spells.includes(spellName) && entry.uses != null && entry.recharge && !entry.uses_expression) {
+      const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
+      const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.uses);
+      if (count > 0) return true;
+    }
+  }
+
   return false;
 }
 

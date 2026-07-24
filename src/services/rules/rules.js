@@ -1409,6 +1409,41 @@ const rules = {
               }
           }
 
+          // Add Magic Initiate level 1 spell free_spell features
+          const miInstances = playerStats.magicInitiateInstances || [];
+          miInstances.forEach((inst, idx) => {
+            if (inst.level1Spell) {
+              const featureName = `Level 1 Spell [Instance ${idx + 1}]`;
+              // Check if this specific spell is already in automation.specialActions
+              const miAutomation = playerStats.automation?.specialActions || [];
+              const alreadyAdded = miAutomation.some(a => 
+                a.type === 'free_spell' && 
+                (a.spell === inst.level1Spell || (Array.isArray(a.spell) && a.spell.includes(inst.level1Spell)))
+              );
+              if (alreadyAdded) return;
+              const newFeature = {
+                name: featureName,
+                description: `Magic Initiate (${inst.class}): Cast ${inst.level1Spell} once for free. Recharges on long rest.`,
+                type: 'free_spell',
+                automation: {
+                  type: 'free_spell',
+                  spell: inst.level1Spell,
+                  name: featureName,
+                  uses: 1,
+                  recharge: 'long_rest',
+                },
+              };
+              playerStats.specialActions.push(newFeature);
+              playerStats.automation.specialActions.push({
+                type: 'free_spell',
+                spell: inst.level1Spell,
+                name: featureName,
+                uses: 1,
+                recharge: 'long_rest',
+              });
+            }
+          });
+
           // Re-sort all action arrays after feat features are merged
           playerStats.actions = uniqBy(playerStats.actions, 'name').sort((a, b) => a.name.localeCompare(b.name));
           playerStats.bonusActions = uniqBy(playerStats.bonusActions, 'name').sort((a, b) => a.name.localeCompare(b.name));

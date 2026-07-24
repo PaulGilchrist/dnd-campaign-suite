@@ -745,8 +745,10 @@ export async function applyLongRest(playerStats, campaignName) {
     // Reset Magic Initiate free cast counters on long rest
     const miInstances = getRuntimeValue(name, '_magicInitiateInstances', campaignName) || playerStats.magicInitiateInstances
     if (miInstances && Array.isArray(miInstances)) {
-      miInstances.forEach((inst) => {
-        setRuntimeValue(name, `_magicInitiateInstance_${inst.id}_freeCastCount`, null, campaignName, true)
+      miInstances.forEach((inst, idx) => {
+        const featureName = `Level 1 Spell [Instance ${idx + 1}]`;
+        const freeCastKey = `_${featureName.replace(/\s+/g, '_')}_freeCastCount`;
+        setRuntimeValue(name, freeCastKey, null, campaignName, true)
       })
     }
 
