@@ -174,6 +174,10 @@ function WizardStepAbilities({
     return sum + (pointBuyCosts[baseScore] || 0);
   }, 0);
 
+  const totalMiscPoints = (formData.abilities || []).reduce((sum, ability) => {
+    return sum + (parseInt(ability.miscIncrease) || 0);
+  }, 0);
+
   const pointsRemaining = pointsAllowed - totalPointsSpent;
 
   const isBackgroundAbility = (abilityName) => {
@@ -401,6 +405,13 @@ function WizardStepAbilities({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {totalMiscPoints > 0 && (
+        <div className="step-description misc-warning">
+          <i className="fa-solid fa-triangle-exclamation"></i>
+          <span>Misc increases total {totalMiscPoints} point{totalMiscPoints > 1 ? 's' : ''}. These points are not counted against the point buy system and must be approved by your GM.</span>
         </div>
       )}
 

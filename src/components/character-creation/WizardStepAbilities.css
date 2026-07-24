@@ -96,6 +96,24 @@
   }
 }
 
+/* Misc increase warning */
+.wizard-step-abilities .misc-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  background-color: var(--background-color-warning);
+  border: 1px solid var(--border-color-warning);
+  border-radius: 4px;
+  color: var(--color-warning);
+  font-size: 0.9rem;
+}
+
+.wizard-step-abilities .misc-warning i {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
 /* Background ability score choice */
 .wizard-step-abilities .bg-ability-choice {
   background-color: var(--background-color-card);
