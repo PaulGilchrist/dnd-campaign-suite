@@ -804,8 +804,8 @@
    "rules": "2024"
   },
   {
-    "index": "case-crossbow-bolt",
-    "name": "Case, crossbow bolt",
+    "index": "crossbow-bolt-case",
+    "name": "Crossbow Bolt Case",
     "equipment_category": "Adventuring Gear",
     "gear_category": "Standard Gear",
     "cost": {
@@ -818,8 +818,8 @@
     ]
   },
   {
-    "index": "case-map-or-scroll",
-    "name": "Case, map or scroll",
+    "index": "map-or-scroll-case",
+    "name": "Map or Scroll Case",
     "equipment_category": "Adventuring Gear",
     "gear_category": "Standard Gear",
     "cost": {
@@ -943,8 +943,8 @@
     ]
   },
   {
-    "index": "clothes-common",
-    "name": "Clothes, common",
+    "index": "common-clothes",
+    "name": "Common Clothes",
     "equipment_category": "Adventuring Gear",
     "gear_category": "Standard Gear",
     "cost": {
@@ -954,8 +954,8 @@
     "weight": 3
   },
   {
-    "index": "clothes-costume",
-    "name": "Clothes, costume",
+    "index": "costume-clothes",
+    "name": "Costume Clothes",
     "equipment_category": "Adventuring Gear",
     "gear_category": "Standard Gear",
     "cost": {
@@ -965,8 +965,8 @@
     "weight": 4
   },
   {
-    "index": "clothes-fine",
-    "name": "Clothes, fine",
+    "index": "fine-clothes",
+    "name": "Fine Clothes",
     "equipment_category": "Adventuring Gear",
     "gear_category": "Standard Gear",
     "cost": {
@@ -976,8 +976,8 @@
     "weight": 6
   },
   {
-    "index": "clothes-travelers",
-    "name": "Clothes, traveler's",
+    "index": "travelers-clothes",
+    "name": "Traveler's Clothes",
     "equipment_category": "Adventuring Gear",
     "gear_category": "Standard Gear",
     "cost": {
@@ -1831,8 +1831,8 @@
     "mastery": "Graze"
   },
   {
-    "index": "guildhall-town",
-    "name": "Guildhall, town or city",
+    "index": "guildhall",
+    "name": "Guildhall",
     "equipment_category": "Property",
     "cost": {
       "quantity": 5000,
@@ -1907,8 +1907,8 @@
     "weight": 3
   },
   {
-    "index": "hammer-sledge",
-    "name": "Hammer, sledge",
+    "index": "sledge-hammer",
+    "name": "Sledge Hammer",
     "equipment_category": "Adventuring Gear",
     "gear_category": "Standard Gear",
     "cost": {
@@ -2033,8 +2033,8 @@
     "rules": "2024"
   },
   {
-    "index": "horse-draft",
-    "name": "Horse, draft",
+    "index": "draft-horse",
+    "name": "Draft Horse",
     "equipment_category": "Mounts and Vehicles",
     "vehicle_category": "Mounts and Other Animals",
     "cost": {
@@ -2048,8 +2048,8 @@
     "capacity": "540 lb."
   },
   {
-    "index": "horse-riding",
-    "name": "Horse, riding",
+    "index": "riding-horse",
+    "name": "Riding Horse",
     "equipment_category": "Mounts and Vehicles",
     "vehicle_category": "Mounts and Other Animals",
     "cost": {
@@ -2112,8 +2112,8 @@
     "weight": 0
   },
   {
-    "index": "inn-rural",
-    "name": "Inn, rural roadside",
+    "index": "rural-roadside-inn",
+    "name": "Rural Roadside Inn",
     "cost": {
       "quantity": 5000,
       "unit": "gp"
@@ -2132,8 +2132,8 @@
     "untrained_hirelings": 10
   },
   {
-    "index": "inn-town",
-    "name": "Inn, town or city",
+    "index": "town-inn",
+    "name": "Town or City Inn",
     "cost": {
       "quantity": 5000,
       "unit": "gp"
@@ -2332,8 +2332,8 @@
     "mastery": "Topple"
   },
   {
-    "index": "lantern-bullseye",
-    "name": "Lantern, bullseye",
+    "index": "bullseye-lantern",
+    "name": "Bullseye Lantern",
     "equipment_category": "Adventuring Gear",
     "gear_category": "Standard Gear",
     "cost": {
@@ -2346,8 +2346,8 @@
     ]
   },
   {
-    "index": "lantern-hooded",
-    "name": "Lantern, hooded",
+    "index": "hooded-lantern",
+    "name": "Hooded Lantern",
     "equipment_category": "Adventuring Gear",
     "gear_category": "Standard Gear",
     "cost": {
@@ -2455,8 +2455,8 @@
     ]
   },
   {
-    "index": "lodge-hunting",
-    "name": "Lodge, hunting",
+    "index": "hunting-lodge",
+    "name": "Hunting Lodge",
     "cost": {
       "quantity": 7500,
       "unit": "gp"
@@ -2733,8 +2733,8 @@
     ]
   },
   {
-    "index": "mirror-steel",
-    "name": "Mirror, steel",
+    "index": "steel mirror",
+    "name": "Steel Mirror",
     "equipment_category": "Adventuring Gear",
     "gear_category": "Standard Gear",
     "cost": {
@@ -3006,8 +3006,8 @@
     "weight": 0
   },
   {
-    "index": "pick-miners",
-    "name": "Pick, miner's",
+    "index": "miners-pick",
+    "name": "Miner's Pick",
     "equipment_category": "Adventuring Gear",
     "gear_category": "Standard Gear",
     "cost": {
@@ -3090,8 +3090,8 @@
     "rules": "2024"
   },
   {
-    "index": "poison-basic-vial",
-    "name": "Poison, basic (vial)",
+    "index": "poison-vial",
+    "name": "Poison (vial)",
     "equipment_category": "Adventuring Gear",
     "gear_category": "Standard Gear",
     "cost": {
@@ -3144,8 +3144,8 @@
     "capacity": "225 lb."
   },
   {
-    "index": "pot-iron",
-    "name": "Pot, iron",
+    "index": "iron-pot",
+    "name": "Iron Pot",
     "equipment_category": "Adventuring Gear",
     "gear_category": "Standard Gear",
     "cost": {
@@ -3313,8 +3313,8 @@
     ]
   },
   {
-    "index": "ram-portable",
-    "name": "Ram, portable",
+    "index": "portable-ram",
+    "name": "Portable Ram",
     "equipment_category": "Adventuring Gear",
     "gear_category": "Standard Gear",
     "cost": {
@@ -3424,8 +3424,8 @@
     ]
   },
   {
-    "index": "rope-hempen",
-    "name": "Rope, Hempen",
+    "index": "hempen-rope",
+    "name": "Hempen Rope",
     "equipment_category": "Adventuring Gear",
     "gear_category": "Standard Gear",
     "cost": {
@@ -3438,8 +3438,8 @@
     ]
   },
   {
-    "index": "rope-silk",
-    "name": "Rope, Silk",
+    "index": "silk-rope",
+    "name": "Silk Rope",
     "equipment_category": "Adventuring Gear",
     "gear_category": "Standard Gear",
     "cost": {
@@ -3506,8 +3506,8 @@
     "weight": 0.5
   },
   {
-    "index": "saddle-exotic",
-    "name": "Saddle, Exotic",
+    "index": "exotic-saddle",
+    "name": "Exotic Saddle",
     "equipment_category": "Mounts and Vehicles",
     "vehicle_category": "Tack, Harness, and Drawn Vehicles",
     "cost": {
@@ -3520,8 +3520,8 @@
     ]
   },
   {
-    "index": "saddle-military",
-    "name": "Saddle, Military",
+    "index": "military-saddle",
+    "name": "Military Saddle",
     "equipment_category": "Mounts and Vehicles",
     "vehicle_category": "Tack, Harness, and Drawn Vehicles",
     "cost": {
@@ -3535,7 +3535,7 @@
   },
   {
     "index": "saddle-pack",
-    "name": "Saddle, Pack",
+    "name": "Saddle Pack",
     "equipment_category": "Mounts and Vehicles",
     "vehicle_category": "Tack, Harness, and Drawn Vehicles",
     "cost": {
@@ -3545,8 +3545,8 @@
     "weight": 15
   },
   {
-    "index": "saddle-riding",
-    "name": "Saddle, Riding",
+    "index": "riding-saddle",
+    "name": "Riding Saddle",
     "equipment_category": "Mounts and Vehicles",
     "vehicle_category": "Tack, Harness, and Drawn Vehicles",
     "cost": {
@@ -3633,8 +3633,8 @@
     }
   },
   {
-    "index": "scale-merchants",
-    "name": "Scale, merchant's",
+    "index": "merchants-scale",
+    "name": "Merchant's Scale",
     "equipment_category": "Adventuring Gear",
     "gear_category": "Standard Gear",
     "cost": {
@@ -4031,8 +4031,8 @@
     ]
   },
   {
-    "index": "spike-iron",
-    "name": "Spike, iron",
+    "index": "iron-spike",
+    "name": "Iron Spike",
     "equipment_category": "Adventuring Gear",
     "gear_category": "Standard Gear",
     "cost": {
@@ -4145,8 +4145,8 @@
     }
   },
   {
-    "index": "temple-large",
-    "name": "Temple, large",
+    "index": "large-temple",
+    "name": "Large Temple",
     "equipment_category": "Property",
     "cost": {
       "quantity": 50000,
@@ -4165,8 +4165,8 @@
     "untrained_hirelings": 10
   },
   {
-    "index": "temple-small",
-    "name": "Temple, small",
+    "index": "small-temple",
+    "name": "Small Temple",
     "equipment_category": "Property",
     "cost": {
       "quantity": 5000,
@@ -4185,8 +4185,8 @@
     "untrained_hirelings": 0
   },
   {
-    "index": "tent-two-person",
-    "name": "Tent, two-person",
+    "index": "two-person-tent",
+    "name": "Two Person Tent",
     "equipment_category": "Adventuring Gear",
     "gear_category": "Standard Gear",
     "cost": {
@@ -4278,7 +4278,7 @@
   },
   {
     "index": "tower",
-    "name": "Tower, fortified",
+    "name": "Tower",
     "equipment_category": "Property",
     "cost": {
       "quantity": 15000,
