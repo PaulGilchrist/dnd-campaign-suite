@@ -192,6 +192,21 @@
 .death-saves-roll:active {
     background-color: #e69500;
 }
+.death-saves-roll-area {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.death-saves-advantage {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 700;
+    text-transform: uppercase;
+    background: rgba(76, 175, 80, 0.2);
+    color: #4CAF50;
+    letter-spacing: 0.05em;
+}
 .death-saves-result {
     display: flex;
     align-items: center;

@@ -223,5 +223,29 @@ describe('deathSaveRules', () => {
       const result = rollDeathSaveWithAdvantage([], []);
       expect(result.restoredToHp).toBeNull();
     });
+
+    it('returns rolls array on nat20', () => {
+      mockD20Sequence(20, 3);
+      const result = rollDeathSaveWithAdvantage([], []);
+      expect(result.result).toBe('nat20');
+      expect(result.roll).toBe(20);
+      expect(result.rolls).toEqual([20, 3]);
+    });
+
+    it('returns rolls array on success', () => {
+      mockD20Sequence(7, 15);
+      const result = rollDeathSaveWithAdvantage([], []);
+      expect(result.result).toBe('success');
+      expect(result.roll).toBe(15);
+      expect(result.rolls).toEqual([7, 15]);
+    });
+
+    it('returns rolls array on failure', () => {
+      mockD20Sequence(4, 6);
+      const result = rollDeathSaveWithAdvantage([], []);
+      expect(result.result).toBe('failure');
+      expect(result.roll).toBe(6);
+      expect(result.rolls).toEqual([4, 6]);
+    });
   });
 });

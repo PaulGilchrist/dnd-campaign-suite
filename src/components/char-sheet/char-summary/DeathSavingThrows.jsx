@@ -48,6 +48,7 @@ function DeathSavingThrows({ playerStats, campaignName, isLocalhost }) {
 
     const isStable = deathSaveRules.isStable(saves)
     const isDeadState = deathSaveRules.isDead(failures)
+    const hasAdvantage = hasSaveModifier(playerStats?.saveModifiers, 'death_saving_throws')
 
     const logEntry = (entry) => {
         addEntry(campaignName, entry).catch((e) => { console.error("[DeathSavingThrows] Error:", e); })
@@ -72,7 +73,6 @@ function DeathSavingThrows({ playerStats, campaignName, isLocalhost }) {
     const rollDeathSave = () => {
         if (isStable || isDeadState || isDead) return;
 
-        const hasAdvantage = hasSaveModifier(playerStats?.saveModifiers, 'death_saving_throws');
         const treat18AsNat20 = (playerStats?.automation?.passives || []).some(
             p => p.type === 'passive_rule' && p.effect === 'death_save_nat18_as_20'
         );
@@ -90,6 +90,8 @@ function DeathSavingThrows({ playerStats, campaignName, isLocalhost }) {
             type: 'death_save',
             characterName: playerStats.name,
             roll: result.roll,
+            rolls: result.rolls,
+            hasAdvantage: result.rolls?.length === 2,
             isNatural20: result.isNat20,
             isNatural1: result.isNat1,
             success: result.result === 'success' || result.result === 'nat20' || result.result === 'stable',
@@ -158,8 +160,11 @@ function DeathSavingThrows({ playerStats, campaignName, isLocalhost }) {
             {isStable && <div className="death-saves-stable">Stable</div>}
             {isDeadState && <div className="death-saves-dead">Dead</div>}
             {!isStable && !isDeadState && (
-                <div className="death-saves-roll" onClick={rollDeathSave} role="button" tabIndex={0}>
-                    <i className="fas fa-dice-d20"></i> Roll
+                <div className="death-saves-roll-area">
+                    {hasAdvantage && <span className="death-saves-advantage">ADVANTAGE</span>}
+                    <div className="death-saves-roll" onClick={rollDeathSave} role="button" tabIndex={0}>
+                        <i className="fas fa-dice-d20"></i> Roll
+                    </div>
                 </div>
             )}
             {lastRoll && (

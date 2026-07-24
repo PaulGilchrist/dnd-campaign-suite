@@ -1,11 +1,11 @@
 {
   "name": "Luna",
-  "level": 3,
+  "level": 1,
   "alignment": "Neutral Good",
   "abilities": [
     {
       "name": "Strength",
-      "baseScore": 15,
+      "baseScore": 14,
       "featIncrease": 0,
       "backgroundIncrease": 0,
       "miscIncrease": 0
@@ -35,29 +35,30 @@
       "name": "Wisdom",
       "baseScore": 15,
       "featIncrease": 0,
-      "backgroundIncrease": 0,
+      "backgroundIncrease": 2,
       "miscIncrease": 0
     },
     {
       "name": "Charisma",
-      "baseScore": 8,
+      "baseScore": 9,
       "featIncrease": 0,
-      "backgroundIncrease": 0,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     }
   ],
-  "background": "",
   "class": {
     "name": "Cleric",
     "subclass": {
-      "name": "Life",
-      "type": ""
+      "name": "Life Domain"
     },
-    "divineOrder": "",
+    "divineOrder": "Protector",
     "primalOrder": ""
   },
   "expertSkills": [],
-  "feats": [],
+  "feats": [
+    "Magic Initiate",
+    "Magic Initiate"
+  ],
   "fightingStyles": [],
   "race": {
     "name": "Elf",
@@ -100,30 +101,25 @@
   },
   "languages": [
     "Common",
-    "Elvish",
-    "Celestial",
-    "Dwarvish"
+    "Elvish"
   ],
   "resistances": [],
   "skillProficiencies": [
-    "Medicine",
-    "Nature"
+    "Insight"
   ],
   "specialActions": [],
   "spells": [
-    "Guidance",
     "Sacred Flame",
     "Spare the Dying",
+    "Word of Radiance",
     "Bane",
-    "Bless",
     "Cure Wounds",
     "Guiding Bolt",
-    "Healing Word",
-    "Aid",
-    "Prayer of Healing"
+    "Healing Word"
   ],
-  "rules": "5e",
+  "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
+  "background": "Acolyte",
   "imagePath": "images/Luna.png"
 }

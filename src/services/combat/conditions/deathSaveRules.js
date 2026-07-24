@@ -83,6 +83,7 @@ function rollDeathSaveWithAdvantage(currentSaves, currentFailures, treat18AsNat2
       newFailures: [false, false, false],
       result: 'nat20',
       roll: bestRoll,
+      rolls: [roll1, roll2],
       isNat20: isNat20 || isTreatedAsNat20,
       isNat1,
       restoredToHp: 1,

@@ -20,7 +20,7 @@
     {
       "name": "Constitution",
       "baseScore": 15,
-      "featIncrease": 2,
+      "featIncrease": 3,
       "backgroundIncrease": 1,
       "miscIncrease": 0
     },
@@ -62,10 +62,8 @@
     "Ability Score Improvement",
     "Tough",
     "Ability Score Improvement",
-    "Crossbow Expert",
-    "Defensive Duelist",
     "Magic Initiate",
-    "Magic Initiate"
+    "Durable"
   ],
   "fightingStyles": [],
   "race": {

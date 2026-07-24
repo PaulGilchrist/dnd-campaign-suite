@@ -33,7 +33,7 @@ describe('getActiveBuffs', () => {
     const result = getActiveBuffs(PLAYER, CAMPAIGN)
 
     expect(result).toBe(buffs)
-    expect(getRuntimeValue).toHaveBeenCalledWith(PLAYER, 'activeBuffs')
+    expect(getRuntimeValue).toHaveBeenCalledWith(PLAYER, 'activeBuffs', CAMPAIGN)
   })
 
   it('returns empty array when runtime state has no buffs or a non-array value', () => {
@@ -218,7 +218,7 @@ describe('setInnateSorceryActive', () => {
       getRuntimeValue.mockReturnValue([])
       setInnateSorceryActive(PLAYER, true, CAMPAIGN)
 
-      expect(getRuntimeValue).toHaveBeenCalledWith(PLAYER, 'activeBuffs')
+      expect(getRuntimeValue).toHaveBeenCalledWith(PLAYER, 'activeBuffs', CAMPAIGN)
 
       const [arg0, arg1, arg2, arg3] = setRuntimeValue.mock.calls[0]
       expect(arg0).toBe(PLAYER)

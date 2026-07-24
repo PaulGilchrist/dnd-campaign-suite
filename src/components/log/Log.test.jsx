@@ -479,6 +479,15 @@ describe('Log', () => {
       expect(screen.getByText(/\(12\)/)).toBeInTheDocument();
       expect(q('.log-death-save i.fa-skull-crossbones')).toBeInTheDocument();
     });
+
+    it('shows both dice with selected/discarded and ADVANTAGE badge when rolls array present', () => {
+      setup([ds({ roll: 17, rolls: [17, 9], hasAdvantage: true })]);
+      expect(screen.getByText(/ADVANTAGE/i)).toBeInTheDocument();
+      expect(screen.getByText(/selected/i)).toBeInTheDocument();
+      expect(screen.getByText(/discarded/i)).toBeInTheDocument();
+      expect(screen.getByText(/\(17/)).toBeInTheDocument();
+      expect(screen.getByText(/\(9/)).toBeInTheDocument();
+    });
   });
 
   // ── SPELL ENTRY component ───────────────
