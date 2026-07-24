@@ -618,7 +618,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
           !bonusActionNames.has(action.name) && 
           !reactionNames.has(action.name) &&
           !characterAdvancementNames.has(action.name) &&
-          !categories.featuresToIgnore.includes(action.name)
+          !categories.featuresToIgnore.includes(action.name) &&
+          !(action.name && action.name.startsWith('Level 1 Spell [Instance'))
       );
     
     const uniqueActions = Array.from(new Map(filteredActions.map(action => [action.name, action])).values());
