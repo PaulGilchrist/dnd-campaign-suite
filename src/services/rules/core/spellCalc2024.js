@@ -410,6 +410,25 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
                 return cloneDeep(spell);
             });
 
+            spellAbilities.spells = spellAbilities.spells.filter(spell => {
+                const spellLevel = spell.level !== undefined ? spell.level : 0;
+                if (spellLevel === 0) return true;
+                let hasAnySlot = false;
+                for (let i = 1; i <= 9; i++) {
+                    if ((spellAbilities[`spell_slots_level_${i}`] || 0) > 0) {
+                        hasAnySlot = true;
+                        break;
+                    }
+                }
+                if (!hasAnySlot) return true;
+                for (let i = 9; i >= 1; i--) {
+                    if ((spellAbilities[`spell_slots_level_${i}`] || 0) > 0 && spellLevel <= i) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+
             spellAbilities.spells.sort((a, b) => {
                 if (a.level !== b.level) {
                     return a.level - b.level;

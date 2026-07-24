@@ -60,6 +60,7 @@ function extractRaceSpells(raceData, version = '5e') {
   if (version === '2024') {
     if (raceData.traits) {
       raceData.traits.forEach(trait => {
+        if (/lineage/i.test(trait.name || '')) return;
         const desc = trait.description || '';
         extractSpellsFromDescription(desc, result);
          });
@@ -74,6 +75,7 @@ function extractRaceSpells(raceData, version = '5e') {
     } else {
     if (raceData.traits) {
       raceData.traits.forEach(trait => {
+        if (/lineage/i.test(trait.name || '')) return;
         const desc = Array.isArray(trait.description) ? trait.description.join(' ') : (trait.description || '');
         extractSpellsFromDescription(desc, result);
           });
@@ -101,11 +103,13 @@ function extractSubraceSpells(subraceData, version = '5e') {
 
   if (version === '2024') {
     traits.forEach(trait => {
+      if (/lineage/i.test(trait.name || '')) return;
       const desc = trait.description || '';
       extractSpellsFromDescription(desc, result);
         });
       } else {
     traits.forEach(trait => {
+      if (/lineage/i.test(trait.name || '')) return;
       const desc = Array.isArray(trait.description) ? trait.description.join(' ') : (trait.description || '');
       extractSpellsFromDescription(desc, result);
         });

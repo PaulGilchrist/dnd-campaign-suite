@@ -21,7 +21,7 @@ function makePlayerStats(overrides = {}) {
     proficiency: 2,
     class: {
       name: 'Wizard',
-      class_levels: [{ level: 1, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } }],
+      class_levels: [{ level: 1, spellcasting: { cantrips_known: 3, spell_slots_level_1: 2, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_slots_level_5: 0, spell_slots_level_6: 0, spell_slots_level_7: 0, spell_slots_level_8: 0, spell_slots_level_9: 0, spell_type: 'prepared' } }],
       spell_casting_ability: 'Intelligence',
       ...overrides.class,
     },
@@ -95,7 +95,7 @@ describe('spellCalc2024', () => {
 
       expect(result).not.toBeNull();
       expect(result.cantrips_known).toBe(3);
-      expect(result.spell_slots).toEqual({ '1': 2 });
+      expect(result.spell_slots_level_1).toBe(2);
       expect(result.spellCastingAbility).toBe('Intelligence');
       expect(result.modifier).toBe(3);
       expect(result.toHit).toBe(5);
@@ -279,6 +279,7 @@ describe('spellCalc2024', () => {
           cantrips_known: 0,
           spells_known: 0,
           spell_slots_level_1: 2,
+          spell_slots_level_2: 2,
           spell_type: 'known',
         },
       });
@@ -322,6 +323,7 @@ describe('spellCalc2024', () => {
           spell_slots_level_2: 3,
           spell_slots_level_3: 2,
           spell_slots_level_4: 0,
+          spell_slots_level_5: 1,
           spell_type: 'known',
         },
       });
@@ -427,7 +429,7 @@ describe('spellCalc2024', () => {
             { level: 17, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 0, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_type: 'known' } },
             { level: 18, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 0, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_type: 'known' } },
             { level: 19, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 0, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_type: 'known' } },
-            { level: 20, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 4, spell_slots_level_2: 3, spell_slots_level_3: 3, spell_slots_level_4: 1, spell_type: 'known' } },
+            { level: 20, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 4, spell_slots_level_2: 3, spell_slots_level_3: 3, spell_slots_level_4: 1, spell_slots_level_5: 1, spell_type: 'known' } },
           ],
           major: {
             name: 'Path of the Wild Heart',
