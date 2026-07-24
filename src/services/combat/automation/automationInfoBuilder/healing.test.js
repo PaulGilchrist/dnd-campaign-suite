@@ -180,6 +180,8 @@ describe('healingHandlers.self_healing', () => {
 
         expect(result.healAmount).toBe(8)
         expect(result.healExpression).toBe('hit_die_roll')
+        expect(result.uses).toBeNull()
+        expect(result.usesMax).toBeNull()
     })
 
     it('returns the expression string for a dice formula healExpression', () => {

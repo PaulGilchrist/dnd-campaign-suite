@@ -122,21 +122,26 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             }
         }
 
-        const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
-        const maxFromTracked = playerStats?._trackedResources?.[usesKey]?.max;
-        const maxUses = maxFromTracked ?? auto.usesMax ?? auto.uses ?? 1;
-        const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? maxUses);
+        let usesKey;
+        let maxUses = 1;
+        let currentUses = 1;
+        if (!(isHitDieRoll && isSelf)) {
+            usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
+            const maxFromTracked = playerStats?._trackedResources?.[usesKey]?.max;
+            maxUses = maxFromTracked ?? auto.usesMax ?? auto.uses ?? 1;
+            currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? maxUses);
 
-        if (currentUses <= 0) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    automationType: auto.type,
-                    description: `${action.name} has no uses remaining. Recharges on a ${auto.recharge === 'long_rest' ? 'Long Rest' : 'Short Rest'}.`,
-                },
-            };
+            if (currentUses <= 0) {
+                return {
+                    type: 'popup',
+                    payload: {
+                        type: 'automation_info',
+                        name: action.name,
+                        automationType: auto.type,
+                        description: `${action.name} has no uses remaining. Recharges on a ${auto.recharge === 'long_rest' ? 'Long Rest' : 'Short Rest'}.`,
+                    },
+                };
+            }
         }
 
         let resolvedExpression = resolveDiceExpression(auto.healExpression, playerStats, slotLevel)
@@ -179,15 +184,17 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             }
         }
 
+        let remainingHitDice;
         if (isHitDieRoll && hitDiceCost > 0) {
             const currentHitDice = Number(getRuntimeValue(playerStats.name, 'shortRestHitDice', campaignName) ?? playerStats.level);
-            const newHitDice = Math.max(0, currentHitDice - hitDiceCost);
-            await setRuntimeValue(playerStats.name, 'shortRestHitDice', newHitDice, campaignName, true);
+            remainingHitDice = Math.max(0, currentHitDice - hitDiceCost);
+            await setRuntimeValue(playerStats.name, 'shortRestHitDice', remainingHitDice, campaignName, true);
         }
 
-        await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName, true);
+        if (!(isHitDieRoll && isSelf)) {
+            await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName, true);
+        }
 
-        const remainingUses = currentUses - 1;
         const rollDisplay = maximize ? 'maximized' : (rerollOnes ? 'rerolled ones' : rollResult.rolls.join(', '));
         const rollInfo = `${resolvedExpression}=${rollResult.total} (${rollDisplay})`;
 
@@ -200,7 +207,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             rollInfo,
             maximize,
             healingName: action.name,
-            remainingUses,
+            remainingHitDice: (isHitDieRoll && isSelf) ? remainingHitDice : undefined,
+            remainingUses: (isHitDieRoll && isSelf) ? undefined : currentUses - 1,
             maxUses,
             bonusDetails,
         });
@@ -208,9 +216,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         const healDesc = actualHeal > 0
             ? `Regained ${actualHeal} HP`
             : 'Already at full HP';
-        const description = remainingUses > 0
-            ? `${action.name}: ${rollInfo} — ${healDesc} (${remainingUses} use${remainingUses > 1 ? 's' : ''} remaining).`
-            : `${action.name}: ${rollInfo} — ${healDesc} (no uses remaining).`;
+        const description = (isHitDieRoll && isSelf)
+            ? `${action.name}: ${rollInfo} — ${healDesc} (${remainingHitDice} hit dice remaining).`
+            : `${action.name}: ${rollInfo} — ${healDesc} (${currentUses - 1} use${currentUses - 1 > 1 ? 's' : ''} remaining).`;
 
         return {
             type: 'popup',

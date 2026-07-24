@@ -20,8 +20,8 @@
     {
       "name": "Constitution",
       "baseScore": 15,
-      "featIncrease": 3,
-      "backgroundIncrease": 1,
+      "featIncrease": 4,
+      "backgroundIncrease": 2,
       "miscIncrease": 0
     },
     {
@@ -35,7 +35,7 @@
       "name": "Wisdom",
       "baseScore": 9,
       "featIncrease": 0,
-      "backgroundIncrease": 1,
+      "backgroundIncrease": 0,
       "miscIncrease": 0
     },
     {
@@ -58,12 +58,9 @@
     "Perception"
   ],
   "feats": [
-    "War Caster",
-    "Ability Score Improvement",
-    "Tough",
-    "Ability Score Improvement",
     "Magic Initiate",
-    "Durable"
+    "Durable",
+    "Lucky"
   ],
   "fightingStyles": [],
   "race": {
@@ -126,6 +123,9 @@
     "Stealth",
     "Survival"
   ],
+  "toolProficiencies": [
+    "Calligrapher's Supplies"
+  ],
   "specialActions": [],
   "spells": [
     "Find Familiar",
@@ -141,15 +141,13 @@
     "Feather Fall",
     "Haste"
   ],
+  "magicInitiateInstances": [],
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
   "background": "Sage",
   "imagePath": "images/Elarielle.png",
   "featAbilityChoices": {
-    "War Caster-0": {
-      "assignment": "Intelligence"
-    },
     "Ability Score Improvement-1": {
       "mode": "single",
       "assignments": {
@@ -170,71 +168,15 @@
         ]
       }
     },
-    "Athlete-3": {
-      "assignment": "Strength"
-    },
-    "Boon Of Combat Prowess-3": {
-      "assignment": "Intelligence"
-    },
-    "Boon Of Dimensional Travel-3": {
-      "assignment": "Strength"
-    },
-    "Boon Of Energy Resistance-3": {
-      "assignment": "Strength"
-    },
-    "Boon Of Fate-4": {
-      "assignment": "Strength"
-    },
-    "Boon Of Fate-3": {
-      "assignment": "Strength"
-    },
-    "Boon Of Fortitude-4": {
-      "assignment": "Strength"
-    },
-    "Boon Of Fortitude-3": {
-      "assignment": "Strength"
-    },
-    "Boon Of Irresistible Offense-4": {
-      "assignment": "Strength"
-    },
-    "Boon Of Irresistible Offense-3": {
-      "assignment": "Dexterity"
-    },
-    "Boon Of Recovery-4": {
-      "assignment": "Strength"
-    },
-    "Boon Of Recovery-3": {
-      "assignment": "Strength"
-    },
-    "Boon Of Skill-4": {
-      "assignment": "Strength"
-    },
-    "Boon Of Skill-3": {
-      "assignment": "Strength"
-    },
-    "Boon Of Speed-4": {
-      "assignment": "Strength"
-    },
-    "Boon Of Speed-3": {
-      "assignment": "Strength"
-    },
-    "Boon Of Truesight-4": {
-      "assignment": "Strength"
-    },
-    "Boon Of Truesight-3": {
-      "assignment": "Strength"
-    },
-    "Charger-3": {
-      "assignment": "Strength"
-    },
-    "Chef-4": {
-      "assignment": "Constitution"
-    },
-    "Chef-3": {
-      "assignment": "Constitution"
-    },
-    "Crusher-3": {
-      "assignment": "Strength"
+    "Ability Score Improvement-0": {
+      "mode": "single",
+      "assignments": {
+        "single": "Strength",
+        "dual": [
+          "Strength",
+          ""
+        ]
+      }
     }
   },
   "proficiencies": [

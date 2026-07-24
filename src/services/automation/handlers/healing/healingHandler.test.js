@@ -252,6 +252,7 @@ describe('healingHandler', () => {
 
       expect(result.type).toBe('popup');
       expect(restRules.computeHitDieRecovery).toHaveBeenCalledWith(6, 2);
+      expect(result.payload.description).toContain('2 hit dice');
     });
 
     it('should decrement hit dice after healing', async () => {
@@ -277,6 +278,25 @@ describe('healingHandler', () => {
       );
     });
 
+    it('should not decrement a generic uses key for hit_die_roll', async () => {
+      runtimeState.getRuntimeValue.mockReturnValue(2);
+      restRules.getHitDieSize.mockReturnValue(8);
+      restRules.computeHitDieRecovery.mockReturnValue(5);
+      diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4], modifier: 0 });
+
+      const ps = makePlayerStats();
+      const action = makeAction({
+        healExpression: 'hit_die_roll',
+        hitDiceCost: 1,
+      });
+
+      await handle(action, ps, campaignName, null);
+
+      const setRuntimeCalls = runtimeState.setRuntimeValue.mock.calls;
+      const usesKeyCalls = setRuntimeCalls.filter(call => call[1] !== 'shortRestHitDice');
+      expect(usesKeyCalls).toHaveLength(0);
+    });
+
     it('should use Constitution bonus for hit die recovery', async () => {
       runtimeState.getRuntimeValue.mockReturnValue(2);
       restRules.getHitDieSize.mockReturnValue(10);
@@ -294,6 +314,36 @@ describe('healingHandler', () => {
       await handle(action, ps, campaignName, null);
 
       expect(restRules.computeHitDieRecovery).toHaveBeenCalledWith(6, 3);
+    });
+
+    it('should allow multiple uses as long as hit dice remain', async () => {
+      restRules.getHitDieSize.mockReturnValue(8);
+      restRules.computeHitDieRecovery.mockReturnValue(5);
+      diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4], modifier: 0 });
+
+      const ps = makePlayerStats();
+      const action = makeAction({
+        healExpression: 'hit_die_roll',
+        hitDiceCost: 1,
+      });
+
+      runtimeState.getRuntimeValue.mockImplementation((playerName, key) => {
+        if (key === 'shortRestHitDice') return 2;
+        return undefined;
+      });
+
+      const result1 = await handle(action, ps, campaignName, null);
+      expect(result1.type).toBe('popup');
+      expect(result1.payload.description).toContain('1 hit dice');
+
+      runtimeState.getRuntimeValue.mockImplementation((playerName, key) => {
+        if (key === 'shortRestHitDice') return 1;
+        return undefined;
+      });
+
+      const result2 = await handle(action, ps, campaignName, null);
+      expect(result2.type).toBe('popup');
+      expect(result2.payload.description).toContain('0 hit dice');
     });
 
   });
