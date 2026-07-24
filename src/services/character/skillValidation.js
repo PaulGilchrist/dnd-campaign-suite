@@ -222,7 +222,7 @@ export async function getSkillLimits(formData, allFeats) {
     }
 
     if (backgroundName) {
-      const backgroundData = await fetchBackgroundData(backgroundName);
+      const backgroundData = await fetchBackgroundData(backgroundName, '2024');
       fromBackground = parseSkillProficiencies(backgroundData, '2024');
     }
 
@@ -290,7 +290,7 @@ export async function getPreSelectedSkills(formData, allFeats) {
   // Background skills (automatic, not choices)
   if (formData.background) {
     if (ruleset === '2024') {
-      const backgroundData = await fetchBackgroundData(formData.background);
+      const backgroundData = await fetchBackgroundData(formData.background, '2024');
       const bgSkills = parseSkillProficiencies(backgroundData, '2024');
       if (!bgSkills.isChoice) {
         bgSkills.skills.forEach(skill => preSelected.add(skill));
@@ -595,7 +595,7 @@ export async function getSkillInfo(skillName, formData) {
 
    // Check if skill comes from background (2024 only)
   if (formData.background && ruleset === '2024') {
-    const backgroundData = await fetchBackgroundData(formData.background);
+    const backgroundData = await fetchBackgroundData(formData.background, '2024');
     const bgSkills = parseSkillProficiencies(backgroundData, '2024');
     if (bgSkills.skills.includes(skillName)) {
       sources.push('Background');
