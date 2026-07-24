@@ -1,10 +1,11 @@
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js'
 import { buildAbilityDetailHtml } from '../../hooks/combat/useActionPopup.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { hasSaveAdvantage } from '../../services/combat/conditions/conditionEffects.js';
+import { loadEquipment } from '../../services/ui/dataLoader.js';
 import './CharAbilities.css'
 
 const INTERNAL_SKILL_CHECK_EVENT = 'internal-skill-check';
@@ -245,12 +246,71 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
            if (conditionEffects?.darkOnesLuck) {
              return { forcedMode, autoFail: autoFail || undefined, darkOnesLuck: true }
            }
-           return { forcedMode, autoFail: autoFail || undefined }
-      }
+            return { forcedMode, autoFail: autoFail || undefined }
+       }
+
+         const [toolEntries, setToolEntries] = useState([]);
+         const [equipmentLoaded, setEquipmentLoaded] = useState(false);
+
+         useEffect(() => {
+             const loadTools = async () => {
+                 const equipment = await loadEquipment();
+                 const toolMap = {};
+                 for (const item of equipment) {
+                     if (item.equipment_category === 'Tools' && item.ability) {
+                         toolMap[item.name] = item;
+                     }
+                 }
+                 const proficiencySet = new Set(playerStats.toolProficiencies || []);
+                 const allInventoryItems = [
+                     ...(playerStats.inventory?.equipped || []),
+                     ...(playerStats.inventory?.backpack || []),
+                 ];
+                 const abilitiesByName = {};
+                 for (const ab of playerStats.abilities || []) {
+                     abilitiesByName[ab.name] = ab;
+                 }
+                 const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
+                 const toolsByAbility = {};
+                 for (const itemName of allInventoryItems) {
+                     const tool = toolMap[itemName];
+                     if (!tool) continue;
+                     const abilityName = tool.ability;
+                     const ability = abilitiesByName[abilityName];
+                     if (!ability) continue;
+                     const isProficient = proficiencySet.has(itemName);
+                     const bonus = isProficient
+                         ? ability.bonus + proficiency
+                         : ability.bonus;
+                     if (!toolsByAbility[abilityName]) {
+                         toolsByAbility[abilityName] = [];
+                     }
+                     toolsByAbility[abilityName].push({
+                         name: itemName,
+                         ability: abilityName,
+                         bonus,
+                         isProficient,
+                         utilize: tool.utilize,
+                     });
+                 }
+                 const entries = [];
+                 for (const ability of playerStats.abilities || []) {
+                     if (toolsByAbility[ability.name]) {
+                         entries.push({
+                             ability: ability.name,
+                             tools: toolsByAbility[ability.name],
+                         });
+                     }
+                 }
+                 setToolEntries(entries);
+                 setEquipmentLoaded(true);
+             };
+             loadTools();
+         }, [playerStats]);
 
 
 
-        const getSaveAdvantageSource = () => {
+         const getSaveAdvantageSource = () => {
           if (conditionEffects?.saveAdvantage?.includes('against_spell')) {
             const saveModifiers = playerStats?.saveModifiers || playerStats?.computedStats?.saveModifiers || [];
             const spellResistMod = saveModifiers.find(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');
@@ -323,22 +383,47 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                               rollSavingThrow(ability.name, ability.save + saveBonus - exhaustionPenalty, saveCtx);
                             }
                           }} title={getSaveAdvantageSource()}>{autoFailSave ? 'AUTO FAIL' : signFormatter.format(ability.save + getSaveBonus(ability.name) - exhaustionPenalty)}{hasSaveAdvantage(conditionEffects, ability.name, conditionEffects?.restoreBalance) ? ' (Adv)' : ''}</div>
-                      <div className='left'>{ability.skills.map((skill) => {
-                           const skillBonus = getSkillBonus(skill);
-                           const isExpert = playerStats.expertise?.includes(skill.name);
-                           return <span key={skill.name}>
-                                  <span className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage || (conditionEffects?.abilityCheckDisadvantageAbilities?.includes(ability.name)) ? ' stat--penalized' : '')} onClick={() => {
-                                    const checkCtx = { ...makeCheckContext(skill.name) };
-                                    const biDie = getRuntimeValue(playerStats.name, 'bardicInspirationDie', campaignName);
-                                    if (biDie) {
-                                      checkCtx.bardicInspiration = true;
-                                      checkCtx.bardicInspirationDie = biDie;
-                                    }
-                                     rollSkillCheck(skill.name, skillBonus, checkCtx);
-                                   }}>{skill.name}{isExpert ? ' (Expert)' : ''} ({signFormatter.format(skillBonus)})</span>
-                               {ability.skills.indexOf(skill) < ability.skills.length - 1 ? ', ' : ''}
-                           </span>;
-                       })}</div>
+                      <div className='left'>{(() => {
+                            const allSkills = ability.skills;
+                            const toolList = equipmentLoaded
+                                ? (toolEntries.find(e => e.ability === ability.name)?.tools || [])
+                                : [];
+                            const allItems = [...allSkills, ...toolList];
+                            return allItems.map((item, idx) => {
+                                if (allSkills.includes(item)) {
+                                    const skill = item;
+                                    const skillBonus = getSkillBonus(skill);
+                                    const isExpert = playerStats.expertise?.includes(skill.name);
+                                    return <span key={skill.name}>
+                                        <span className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage || (conditionEffects?.abilityCheckDisadvantageAbilities?.includes(ability.name)) ? ' stat--penalized' : '')} onClick={() => {
+                                            const checkCtx = { ...makeCheckContext(skill.name) };
+                                            const biDie = getRuntimeValue(playerStats.name, 'bardicInspirationDie', campaignName);
+                                            if (biDie) {
+                                                checkCtx.bardicInspiration = true;
+                                                checkCtx.bardicInspirationDie = biDie;
+                                            }
+                                            rollSkillCheck(skill.name, skillBonus, checkCtx);
+                                        }}>{skill.name}{isExpert ? ' (Expert)' : ''} ({signFormatter.format(skillBonus)})</span>
+                                        {idx < allItems.length - 1 ? ', ' : ''}
+                                    </span>;
+                                } else {
+                                    const tool = item;
+                                    const toolBonus = tool.bonus - exhaustionPenalty;
+                                    return <span key={tool.name}>
+                                        <span className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage || (conditionEffects?.abilityCheckDisadvantageAbilities?.includes(ability.name)) ? ' stat--penalized' : '')} onClick={() => {
+                                            const checkCtx = { ...makeCheckContext(tool.name) };
+                                            const biDie = getRuntimeValue(playerStats.name, 'bardicInspirationDie', campaignName);
+                                            if (biDie) {
+                                                checkCtx.bardicInspiration = true;
+                                                checkCtx.bardicInspirationDie = biDie;
+                                            }
+                                            rollAbilityCheck(tool.name, toolBonus, checkCtx);
+                                        }}>{tool.name} ({signFormatter.format(toolBonus)})</span>
+                                        {idx < allItems.length - 1 ? ', ' : ''}
+                                    </span>;
+                                }
+                            });
+                        })()}</div>
                 </div>;
             })}
         </div>
