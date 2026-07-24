@@ -209,12 +209,6 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         if (dataKey === 'combatSummary') {
             if (!event.data?.creatures) return
             const merged = { ...event.data, activeCreatureName: event.data.activeCreatureName || activeCreatureName }
-            if (merged.creatures) {
-                const attacker = merged.creatures.find(c => c.name === 'Test Character')
-                if (attacker) {
-                    console.log(`[initiative] ★ combatSummary SSE - Test Character.targetName: ${attacker.targetName || 'NONE'}, all creature names:`, merged.creatures.map(c => c.name).join(', '))
-                }
-            }
             combatSummaryRef.current = merged
             setCombatSummaryCache(merged, campaignName)
             setCombatSummaryG(merged)

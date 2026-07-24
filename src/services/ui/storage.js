@@ -52,9 +52,6 @@ const storage = {
             });
             return queue.pending;
         }
-        if (key === 'combatsumm' && value && value.lastAttack) {
-            console.log(`[storage] ★ storage.set combatsumm - value keys:`, Object.keys(value).join(', '));
-        }
         const fullUrl = `/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(key)}`;
         return fetch(fullUrl, {
             method: 'POST',

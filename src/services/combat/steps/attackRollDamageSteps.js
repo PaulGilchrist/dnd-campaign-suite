@@ -858,7 +858,6 @@ export function buildAttackRollDamageSteps() {
                 }).catch(() => {});
 
                 ctx.attack.damageType = chosenType;
-                console.log('[DEBUG3] returning popup, chosenType:', chosenType);
                 return {
                   data: { formula, total, rolls },
                   popup: `<b>${mod.name}</b><br/>${target.name} ${reason} ${normalOption.damageType} — using <b>${chosenType}</b>`,

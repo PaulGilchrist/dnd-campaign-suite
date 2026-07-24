@@ -60,7 +60,8 @@
     "Perception"
   ],
   "feats": [
-    "Lucky"
+    "Lucky",
+    "Tough"
   ],
   "fightingStyles": [],
   "race": {
@@ -123,6 +124,7 @@
   ],
   "specialActions": [],
   "spells": [],
+  "magicInitiateInstances": [],
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",

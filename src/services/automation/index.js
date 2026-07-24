@@ -528,7 +528,6 @@ export { confirmSearingVengeance, skipSearingVengeance } from './handlers/class-
 export { confirmCelestialResilience, skipCelestialResilience } from './handlers/class-warlock/celestialResilienceHandler.js';
 export async function executeHandler(action, playerStats, campaignName, mapName, characters) {
     if (!action?.automation) {
-        console.log('[EXEC] no automation, returning null');
         return null;
     }
 

@@ -105,7 +105,9 @@ function SelectableList({
     }
 
     const newItems = isRepeatable
-       ? [...currentItems, itemName]
+       ? currentItems.includes(itemName)
+         ? currentItems.filter(i => i !== itemName)
+         : [...currentItems, itemName]
        : currentItems.includes(itemName)
          ? currentItems.filter(i => i !== itemName)
          : [...currentItems, itemName];

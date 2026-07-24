@@ -115,7 +115,7 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
                                     >
                                         <i className="fa-solid fa-plus" /> Add Another
                                     </button>
-                                    {itemCount > 1 && (
+                                    {itemCount >= 1 && !isPreSelected && (
                                         <button
                                             type="button"
                                             className="remove-feat-btn"
