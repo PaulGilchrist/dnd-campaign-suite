@@ -96,10 +96,8 @@
       "Studded Leather",
       "Scimitar",
       "Scimitar",
-      "Crossbow",
-      "hand",
-      "Crossbow",
-      "hand"
+      "Hand Crossbow",
+      "Hand Crossbow"
     ],
     "gold": 10,
     "magicItems": []
@@ -116,7 +114,12 @@
   "resistances": [],
   "skillProficiencies": [
     "Sleight of Hand",
-    "Perception"
+    "Perception",
+    "Insight",
+    "Stealth",
+    "Investigation",
+    "Acrobatics",
+    "Persuasion"
   ],
   "specialActions": [],
   "spells": [],

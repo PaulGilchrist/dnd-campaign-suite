@@ -1,6 +1,6 @@
 {
   "name": "Zane",
-  "level": 3,
+  "level": 1,
   "alignment": "True Neutral",
   "abilities": [
     {
@@ -21,14 +21,14 @@
       "name": "Constitution",
       "baseScore": 14,
       "featIncrease": 0,
-      "backgroundIncrease": 0,
+      "backgroundIncrease": 2,
       "miscIncrease": 0
     },
     {
       "name": "Intelligence",
       "baseScore": 15,
       "featIncrease": 0,
-      "backgroundIncrease": 0,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
@@ -46,18 +46,18 @@
       "miscIncrease": 0
     }
   ],
-  "background": "",
   "class": {
     "name": "Wizard",
     "subclass": {
-      "name": "Divination",
-      "type": ""
+      "name": "Evoker"
     },
     "divineOrder": "",
     "primalOrder": ""
   },
   "expertSkills": [],
-  "feats": [],
+  "feats": [
+    "Magic Initiate"
+  ],
   "fightingStyles": [],
   "race": {
     "name": "Elf",
@@ -69,37 +69,37 @@
   "immunities": [],
   "inventory": {
     "backpack": [
-      "bedroll",
-      "mess kit",
-      "rations",
-      "rope",
-      "tinderbox",
-      "torch",
-      "waterski"
+      "Bedroll",
+      "Mess Kit",
+      "Ration",
+      "Rope",
+      "Hempen",
+      "Tinderbox",
+      "Torch",
+      "Waterskin"
     ],
     "equipped": [
-      "dagger",
-      "spellbook"
+      "Dagger",
+      "Spellbook"
     ],
     "gold": 0,
     "magicItems": []
   },
   "languages": [
     "Common",
-    "Elvish",
-    "Goblin"
+    "Elvish"
   ],
   "resistances": [],
   "skillProficiencies": [
     "Arcana",
-    "Religion"
+    "Religion",
+    "History"
   ],
   "specialActions": [],
   "spells": [
     "Invisibility",
     "Misty Step",
     "Alarm",
-    "False Life",
     "Magic Missile",
     "Prestidigitation",
     "Minor Illusion",
@@ -110,5 +110,6 @@
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
+  "background": "Sage",
   "imagePath": "images/Zane.png"
 }

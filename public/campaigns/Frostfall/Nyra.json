@@ -1,13 +1,13 @@
 {
   "name": "Nyra",
-  "level": 3,
+  "level": 1,
   "alignment": "Lawful Good",
   "abilities": [
     {
       "name": "Strength",
       "baseScore": 15,
       "featIncrease": 0,
-      "backgroundIncrease": 0,
+      "backgroundIncrease": 2,
       "miscIncrease": 0
     },
     {
@@ -21,7 +21,7 @@
       "name": "Constitution",
       "baseScore": 15,
       "featIncrease": 0,
-      "backgroundIncrease": 0,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
@@ -35,23 +35,21 @@
       "name": "Wisdom",
       "baseScore": 8,
       "featIncrease": 0,
-      "backgroundIncrease": 0,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
       "name": "Charisma",
       "baseScore": 15,
       "featIncrease": 0,
-      "backgroundIncrease": 0,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     }
   ],
-  "background": "",
   "class": {
     "name": "Paladin",
     "subclass": {
-      "name": "Vengeance",
-      "type": ""
+      "name": "Oath of Vengeance"
     },
     "divineOrder": "",
     "primalOrder": "",
@@ -60,7 +58,9 @@
     ]
   },
   "expertSkills": [],
-  "feats": [],
+  "feats": [
+    "Savage Attacker"
+  ],
   "fightingStyles": [],
   "race": {
     "name": "Human",
@@ -95,7 +95,7 @@
       "Half Plate",
       "Shield",
       "Longsword",
-      "Crossbow, heavy"
+      "Heavy Crossbow"
     ],
     "gold": 10,
     "magicItems": []
@@ -109,18 +109,22 @@
   "resistances": [],
   "skillProficiencies": [
     "Athletics",
-    "Acrobatics"
+    "Intimidation",
+    "Insight",
+    "Investigation",
+    "Stealth"
   ],
   "specialActions": [],
   "spells": [
     "Searing Smite",
-    "Thunderous Smite",
-    "Wrathful Smite"
+    "Thunderous Smite"
   ],
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
+  "background": "Soldier",
   "imagePath": "images/Nyra.png",
-  "_fileName": "Paladin.json",
-  "originalFileName": "Armenta.json"
+  "proficiencies": [
+    "3 from: skills or tools"
+  ]
 }
