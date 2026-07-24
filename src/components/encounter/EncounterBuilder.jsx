@@ -21,11 +21,6 @@ import './EncounterBuilder.css';
 
 const difficultyLabels = ['Easy', 'Medium', 'Hard', 'Deadly'];
 
-// Local helpers not available in the service
-function calculateMaxXP(playerLevels, difficultyIndex) {
-  return calculateXPThreshold(playerLevels, difficultyIndex) * 1.5;
-}
-
 function calculateDifficultyIndex(effectiveXP, totalThreshold) {
   if (!totalThreshold) return 0;
   const ratio = effectiveXP / totalThreshold;
@@ -45,11 +40,7 @@ function calculateMonsterCount(selectedMonsters) {
 
 function filterMonsters(monsters, searchQuery, playerLevels, difficultyIndex, totalThreshold, environmentFilter) {
   if (!monsters) return [];
-  const maxXP = calculateMaxXP(playerLevels, difficultyIndex);
-  const minXP = totalThreshold * 0.15;
   return monsters.filter(m => {
-    if (m.xp > maxXP) return false;
-    if (m.xp < minXP) return false;
     if (environmentFilter && m.environments && !m.environments.includes(environmentFilter)) return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();

@@ -130,37 +130,9 @@ describe('calculateDifficultyIndex', () => {
 });
 
 describe('filterMonsters', () => {
-  const xpThresholds = [
-    [15, 25, 40, 50], [25, 50, 75, 100], [50, 100, 150, 200],
-    [75, 150, 225, 400], [125, 250, 375, 500], [250, 500, 750, 1100],
-    [300, 600, 900, 1400], [350, 750, 1100, 1700], [450, 900, 1400, 2100],
-    [550, 1100, 1600, 2400], [600, 1200, 1900, 2800], [800, 1600, 2400, 3600],
-    [1000, 2000, 3000, 4500], [1100, 2200, 3400, 5100], [1250, 2500, 3800, 5700],
-    [1400, 2800, 4300, 6400], [1600, 3200, 4800, 7200], [2000, 3900, 5900, 8800],
-    [2100, 4200, 6300, 9500], [2400, 4900, 7300, 10900], [2800, 5700, 8500, 12700],
-  ];
-
-  function calculateXPThreshold(playerLevels, difficultyIndex) {
-    return playerLevels.reduce((sum, level) => {
-      const idx = parseInt(level, 10);
-      if (!isNaN(idx) && idx >= 0 && idx <= 20) {
-        return sum + (xpThresholds[idx]?.[difficultyIndex] ?? 0);
-      }
-      return sum;
-    }, 0);
-  }
-
-  function calculateMaxXP(playerLevels, difficultyIndex) {
-    return calculateXPThreshold(playerLevels, difficultyIndex) * 1.5;
-  }
-
   function filterMonsters(monsters, searchQuery, playerLevels, difficultyIndex, totalThreshold, environmentFilter) {
     if (!monsters) return [];
-    const maxXP = calculateMaxXP(playerLevels, difficultyIndex);
-    const minXP = totalThreshold * 0.15;
     return monsters.filter(m => {
-      if (m.xp > maxXP) return false;
-      if (m.xp < minXP) return false;
       if (environmentFilter && m.environments && !m.environments.includes(environmentFilter)) return false;
       if (!searchQuery) return true;
       const q = searchQuery.toLowerCase();
@@ -184,10 +156,10 @@ describe('filterMonsters', () => {
     expect(filterMonsters(monsters, 'GOBLIN', [1, 1, 1], 1, 150, '').map(m => m.index)).toEqual(['goblin']);
   });
 
-  it('filters by environment and XP thresholds', () => {
+  it('filters by environment only', () => {
     expect(filterMonsters(monsters, '', [15, 15, 15], 1, 8400, 'underdark').map(m => m.index)).toEqual(['slime']);
-    expect(filterMonsters(monsters, '', [1, 1, 1], 1, 150, '').map(m => m.index)).not.toContain('dragon');
-    expect(filterMonsters(monsters, '', [15, 15, 15], 1, 0, '').map(m => m.index)).toContain('slime');
+    expect(filterMonsters(monsters, '', [1, 1, 1], 1, 150, '').map(m => m.index)).toEqual(['goblin', 'orc', 'dragon', 'slime']);
+    expect(filterMonsters(monsters, '', [15, 15, 15], 1, 0, '').map(m => m.index)).toEqual(['goblin', 'orc', 'dragon', 'slime']);
   });
 
   it('returns empty array when monsters is null or no monsters match', () => {
