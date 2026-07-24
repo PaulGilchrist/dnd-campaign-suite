@@ -26,7 +26,8 @@ import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import CharConditions from './CharConditions.jsx'
-import AllySelectionModal from '../../common/AllySelectionModal.jsx';
+import AllySelectionModal from '../../common/AllySelectionModal.jsx'
+import TrackedResourceInput from './TrackedResourceInput.jsx';
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
@@ -513,7 +514,8 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                     {tremorsenseActive && <span className="automation-badge">Tremorsense 60 ft.</span>}
                 </div>
                 <div>
-                      <CharClassFeatures playerStats={playerStats} campaignName={campaignName} />
+                    <TrackedResourceInput label="Short Rest Hit Dice" resourceKey="shortRestHitDice" playerName={playerStats.name} getMax={() => playerStats.level} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+                    <CharClassFeatures playerStats={playerStats} campaignName={campaignName} />
                       <CharFeatFeatures playerStats={playerStats} campaignName={campaignName} />
                       <CharRaceFeatures playerStats={playerStats} campaignName={campaignName} />
                 </div>

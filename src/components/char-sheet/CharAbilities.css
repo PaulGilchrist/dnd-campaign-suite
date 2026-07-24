@@ -8,12 +8,12 @@
 }
 .char-abilities .tableHeader {
     display: grid;
-    grid-template-columns: 80px 45px 50px 45px auto;
+    grid-template-columns: 80px 45px 50px 75px auto;
     text-align: center;
 }
 .char-abilities .abilities {
     display: grid;
-    grid-template-columns: 80px 45px 50px 45px auto;
+    grid-template-columns: 80px 45px 50px 75px auto;
     text-align: center;
 }
 .char-abilities .abilities > div {

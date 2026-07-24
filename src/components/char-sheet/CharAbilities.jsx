@@ -252,61 +252,61 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
          const [toolEntries, setToolEntries] = useState([]);
          const [equipmentLoaded, setEquipmentLoaded] = useState(false);
 
-         useEffect(() => {
-             const loadTools = async () => {
-                 const equipment = await loadEquipment();
-                 const toolMap = {};
-                 for (const item of equipment) {
-                     if (item.equipment_category === 'Tools' && item.ability) {
-                         toolMap[item.name] = item;
-                     }
-                 }
-                 const proficiencySet = new Set(playerStats.toolProficiencies || []);
-                 const allInventoryItems = [
-                     ...(playerStats.inventory?.equipped || []),
-                     ...(playerStats.inventory?.backpack || []),
-                 ];
-                 const abilitiesByName = {};
-                 for (const ab of playerStats.abilities || []) {
-                     abilitiesByName[ab.name] = ab;
-                 }
-                 const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
-                 const toolsByAbility = {};
-                 for (const itemName of allInventoryItems) {
-                     const tool = toolMap[itemName];
-                     if (!tool) continue;
-                     const abilityName = tool.ability;
-                     const ability = abilitiesByName[abilityName];
-                     if (!ability) continue;
-                     const isProficient = proficiencySet.has(itemName);
-                     const bonus = isProficient
-                         ? ability.bonus + proficiency
-                         : ability.bonus;
-                     if (!toolsByAbility[abilityName]) {
-                         toolsByAbility[abilityName] = [];
-                     }
-                     toolsByAbility[abilityName].push({
-                         name: itemName,
-                         ability: abilityName,
-                         bonus,
-                         isProficient,
-                         utilize: tool.utilize,
-                     });
-                 }
-                 const entries = [];
-                 for (const ability of playerStats.abilities || []) {
-                     if (toolsByAbility[ability.name]) {
-                         entries.push({
-                             ability: ability.name,
-                             tools: toolsByAbility[ability.name],
-                         });
-                     }
-                 }
-                 setToolEntries(entries);
-                 setEquipmentLoaded(true);
-             };
-             loadTools();
-         }, [playerStats]);
+          useEffect(() => {
+              const loadTools = async () => {
+                  const equipment = await loadEquipment();
+                  const toolMap = {};
+                  for (const item of equipment) {
+                      if (item.equipment_category === 'Tools' && item.ability) {
+                          toolMap[item.name] = item;
+                      }
+                  }
+                  const proficiencySet = new Set(playerStats.toolProficiencies || []);
+                  const allInventoryItems = [
+                      ...(playerStats.inventory?.equipped || []),
+                      ...(playerStats.inventory?.backpack || []),
+                  ];
+                  const abilitiesByName = {};
+                  for (const ab of playerStats.abilities || []) {
+                      abilitiesByName[ab.name] = ab;
+                  }
+                  const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
+                  const toolsByAbility = {};
+                  for (const itemName of allInventoryItems) {
+                      const tool = toolMap[itemName];
+                      if (!tool) continue;
+                      const abilityName = tool.ability;
+                      const ability = abilitiesByName[abilityName];
+                      if (!ability) continue;
+                      const isProficient = proficiencySet.has(itemName);
+                      const bonus = isProficient
+                          ? ability.bonus + proficiency
+                          : ability.bonus;
+                      if (!toolsByAbility[abilityName]) {
+                          toolsByAbility[abilityName] = [];
+                      }
+                      toolsByAbility[abilityName].push({
+                          name: itemName,
+                          ability: abilityName,
+                          bonus,
+                          isProficient,
+                          utilize: tool.utilize,
+                      });
+                  }
+                  const entries = [];
+                  for (const ability of playerStats.abilities || []) {
+                      if (toolsByAbility[ability.name]) {
+                          entries.push({
+                              ability: ability.name,
+                              tools: toolsByAbility[ability.name],
+                          });
+                      }
+                  }
+                  setToolEntries(entries);
+                  setEquipmentLoaded(true);
+              };
+              loadTools();
+          }, [playerStats]);
 
 
 
