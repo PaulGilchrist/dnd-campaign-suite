@@ -44,6 +44,7 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     'boon_of_energy_resistance',
     'portent',
     'temp_hp_buff',
+    'lucky_point',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([

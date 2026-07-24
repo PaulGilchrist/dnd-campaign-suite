@@ -365,12 +365,10 @@
             "You regain your expended luck points when you finish a long rest."
         ],
         "automation": {
-            "type": "resource_pool",
-            "resource": "lucky_points",
-            "uses_expression": "3",
-            "recharge_short_rest": "3",
-            "recharge_long_rest": "3",
-            "casting_time": "1 action"
+            "type": "lucky_point",
+            "effect": "advantage",
+            "target": "d20",
+            "cost": 1
         }
     },
     {

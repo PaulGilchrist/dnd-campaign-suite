@@ -10,8 +10,6 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
     const [tacticalResult, setTacticalResult] = useState(null);
     const [strokeUsed, setStrokeUsed] = useState(false);
     const [strokeResult, setStrokeResult] = useState(null);
-    const [luckyAdvantageUsed, setLuckyAdvantageUsed] = useState(false);
-    const [luckyDisadvantageUsed, setLuckyDisadvantageUsed] = useState(false);
     const [bardicInspirationUsed, setBardicInspirationUsed] = useState(false);
     const [bardicInspirationResult, setBardicInspirationResult] = useState(null);
     const [bardicInspirationDefenseUsed, setBardicInspirationDefenseUsed] = useState(false);
@@ -413,17 +411,17 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
               </div>
             )}
 
-            {luckyAdvantage && !luckyAdvantageUsed && isD20 && (
+            {luckyAdvantage && isD20 && (
               <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={() => { setMode('advantage'); setLuckyAdvantageUsed(true); if (onLuckyAdvantage) onLuckyAdvantage(); }} type="button">
+                <button className="dice-roll-reroll-btn" onClick={() => { setMode('advantage'); if (onLuckyAdvantage) onLuckyAdvantage(); }} type="button">
                   <i className="fa-solid fa-eye"></i> Lucky: Advantage (1 LP)
                 </button>
               </div>
             )}
 
-            {luckyDisadvantage && !luckyDisadvantageUsed && isD20 && (
+            {luckyDisadvantage && isD20 && (
               <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={() => { setMode('disadvantage'); setLuckyDisadvantageUsed(true); if (onLuckyDisadvantage) onLuckyDisadvantage(); }} type="button">
+                <button className="dice-roll-reroll-btn" onClick={() => { setMode('disadvantage'); if (onLuckyDisadvantage) onLuckyDisadvantage(); }} type="button">
                   <i className="fa-solid fa-eye-slash"></i> Lucky: Disadvantage (1 LP)
                 </button>
               </div>

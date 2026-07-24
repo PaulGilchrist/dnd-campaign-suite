@@ -56,15 +56,8 @@ export function createLogAndShow(deps) {
 
         const effectiveD20 = (context?.d20Floor10 && r1 <= 9) ? 10 : r1;
 
-        const forcedMode = context?.forcedMode || 'normal';
         let effectiveD20Roll;
-        if (forcedMode === 'advantage') {
-            effectiveD20Roll = Math.max(r1, r2);
-        } else if (forcedMode === 'disadvantage') {
-            effectiveD20Roll = Math.min(r1, r2);
-        } else {
-            effectiveD20Roll = effectiveD20;
-        }
+        let forcedMode = context?.forcedMode || 'normal';
 
         // Halfling Lucky: automatic reroll on natural 1
         let luckyRerolled = false;
@@ -150,6 +143,35 @@ export function createLogAndShow(deps) {
             for (const te of targetEffectsForTarget) {
                 if (te.effect === 'next_attack_bonus') {
                     sunderingBlowBonus += parseInt(te.value, 10) || 5;
+                }
+            }
+        }
+        if (forcedMode === 'advantage') {
+            effectiveD20Roll = Math.max(r1, r2);
+        } else if (forcedMode === 'disadvantage') {
+            effectiveD20Roll = Math.min(r1, r2);
+        } else {
+            effectiveD20Roll = effectiveD20;
+        }
+
+        // Check for Lucky feat disadvantage/advantage on attack targets (works for both monsters and player characters)
+        if (rollType === 'attack' && !forcedMode || forcedMode === 'normal') {
+            const targetNameForLucky = target?.name || context?.targetName;
+            if (targetNameForLucky) {
+                const targetLuckyDis = getRuntimeValue(targetNameForLucky, 'luckyDisadvantageActive', campaignName);
+                if (targetLuckyDis) {
+                    forcedMode = 'disadvantage';
+                    context.forcedMode = 'disadvantage';
+                    await setRuntimeValue(targetNameForLucky, 'luckyDisadvantageActive', null, campaignName);
+                    effectiveD20Roll = Math.min(r1, r2);
+                } else {
+                    const targetLuckyAdv = getRuntimeValue(targetNameForLucky, 'luckyAdvantageActive', campaignName);
+                    if (targetLuckyAdv) {
+                        forcedMode = 'advantage';
+                        context.forcedMode = 'advantage';
+                        await setRuntimeValue(targetNameForLucky, 'luckyAdvantageActive', null, campaignName);
+                        effectiveD20Roll = Math.max(r1, r2);
+                    }
                 }
             }
         }
@@ -576,6 +598,11 @@ export function createLogAndShow(deps) {
                 campaignName,
                 availableSuperiorityManeuvers,
             });
+
+            const luckyActive = getRuntimeValue(characterName, 'luckyAdvantageActive');
+            if (luckyActive) {
+                await setRuntimeValue(characterName, 'luckyAdvantageActive', null, campaignName);
+            }
         }
 
         if (rollType === 'attack') {

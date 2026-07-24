@@ -481,6 +481,17 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
 
     const cannotAct = activeConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c))
     const conditionAttackMode = getNetAttackMode(conditionEffects.attackAdvantageCount, conditionEffects.attackDisadvantageCount, conditionEffects.restoreBalance)
+    const luckyAdvantageActive = useRuntimeValue(playerStats?.name, 'luckyAdvantageActive', campaignName)
+    const luckyDisadvantageActive = useRuntimeValue(playerStats?.name, 'luckyDisadvantageActive', campaignName)
+    const effectiveAttackMode = luckyAdvantageActive ? 'advantage' : conditionAttackMode
+
+    if (luckyAdvantageActive && conditionEffects) {
+        conditionEffects.saveAdvantageCount = (conditionEffects.saveAdvantageCount || 0) + 1
+    }
+
+    if (luckyDisadvantageActive && conditionEffects) {
+        conditionEffects.luckyDisadvantage = true
+    }
 
     const handleReroll = React.useCallback(() => {
         if (playerStats) {
@@ -770,23 +781,24 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                     onConditionsChange={handleConditionsChange}
                     auraComboEffects={auraComboEffects}
                 ></CharSummary>
-                 <CharAbilities
-                     allAbilityScores={allAbilityScores}
-                     playerStats={playerStats}
-                     campaignName={campaignName}
-                     exhaustionPenalty={exhaustionPenalty}
-                     conditionEffects={conditionEffects}
-                     isRaging={isRaging}
-                     onReroll={handleReroll}
-                     onStrokeOfLuck={handleStrokeOfLuck}
-                     characters={characters}
-                 ></CharAbilities>
+                  <CharAbilities
+                      allAbilityScores={allAbilityScores}
+                      playerStats={playerStats}
+                      campaignName={campaignName}
+                      exhaustionPenalty={exhaustionPenalty}
+                      conditionEffects={conditionEffects}
+                      isRaging={isRaging}
+                      onReroll={handleReroll}
+                      onStrokeOfLuck={handleStrokeOfLuck}
+                      characters={characters}
+                      luckyDisadvantageActive={luckyDisadvantageActive}
+                  ></CharAbilities>
 
                 <CharActions
                     playerStats={playerStats}
                     campaignName={campaignName}
                     exhaustionPenalty={exhaustionPenalty}
-                    conditionAttackMode={conditionAttackMode}
+                    conditionAttackMode={effectiveAttackMode}
                     conditionEffects={conditionEffects}
                     cannotAct={cannotAct}
                     mapName={activeMapName}
@@ -803,8 +815,8 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                     characters={characters}
                 ></CharReactions>
                 {playerSummary.rules === '2024'
-                    ? <CharSpells playerStats={playerStats} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} cannotAct={cannotAct} mapName={activeMapName} characters={characters} setModalState={setCharActionsModalState}></CharSpells>
-                    : <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} cannotAct={cannotAct} mapName={activeMapName} characters={characters} setModalState={setCharActionsModalState}></CharSpells>
+                    ? <CharSpells playerStats={playerStats} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={effectiveAttackMode} cannotAct={cannotAct} mapName={activeMapName} characters={characters} setModalState={setCharActionsModalState}></CharSpells>
+                    : <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={effectiveAttackMode} cannotAct={cannotAct} mapName={activeMapName} characters={characters} setModalState={setCharActionsModalState}></CharSpells>
 
                 }
                 <CharInventory playerStats={playerStats}></CharInventory>

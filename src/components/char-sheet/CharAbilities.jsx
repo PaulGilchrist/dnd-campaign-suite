@@ -12,7 +12,7 @@ const INTERNAL_SKILL_CHECK_EVENT = 'internal-skill-check';
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
-function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustionPenalty = 0, conditionEffects, isRaging = false, _onReroll, _onStrokeOfLuck, characters }) {
+function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustionPenalty = 0, conditionEffects, isRaging = false, _onReroll, _onStrokeOfLuck, characters, luckyDisadvantageActive }) {
       const abilityDesc = buildAbilityDetailHtml(allAbilityScores);
       const { setPopupHtml } = useDiceRollPopup();
       const { rollAbilityCheck, rollSavingThrow, rollSkillCheck } = useLoggedDiceRoll(playerStats.name, campaignName, { characters });
@@ -187,7 +187,7 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                 if (conditionEffects?.luckyAdvantage) {
                   ctx.luckyAdvantage = true; ctx.luckyAdvantageType = 'advantage'
                 }
-                if (conditionEffects?.luckyDisadvantage) {
+                if (conditionEffects?.luckyDisadvantage || luckyDisadvantageActive) {
                   ctx.luckyDisadvantage = true; ctx.luckyDisadvantageType = 'disadvantage'
                 }
                if (conditionEffects?.d20Floor10) {
@@ -205,8 +205,8 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                   ctx.psiBolsteredKnack = true;
                   ctx.psiBolsteredKnackDieSize = classLevel?.energy?.energy_die_type || 6;
                 }
-                return Object.keys(ctx).length > 0 ? ctx : undefined
-          }, [conditionEffects, playerStats]);
+                 return Object.keys(ctx).length > 0 ? ctx : undefined
+           }, [conditionEffects, playerStats, luckyDisadvantageActive]);
 
         const makeSaveContext = (abilityName) => {
            const abbr = abilityName.substring(0, 3).toLowerCase()
@@ -233,8 +233,8 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
              if (conditionEffects?.luckyAdvantage) {
                return { forcedMode, autoFail: autoFail || undefined, luckyAdvantage: true }
              }
-            if (conditionEffects?.luckyDisadvantage) {
-              return { forcedMode, autoFail: autoFail || undefined, luckyDisadvantage: true }
+             if (conditionEffects?.luckyDisadvantage || luckyDisadvantageActive) {
+               return { forcedMode, autoFail: autoFail || undefined, luckyDisadvantage: true }
             }
            if (conditionEffects?.strSaveReplace) {
              const strAbility = playerStats?.abilities?.find(a => a.name === 'Strength');

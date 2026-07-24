@@ -93,7 +93,13 @@
   "skillProficiencies": [
     "Arcana",
     "Religion",
-    "History"
+    "History",
+    "Perception",
+    "Insight"
+  ],
+  "toolProficiencies": [
+    "Calligrapher's Supplies",
+    "Alchemist's Supplies"
   ],
   "specialActions": [],
   "spells": [
@@ -105,7 +111,20 @@
     "Minor Illusion",
     "Fire Bolt",
     "Mage Hand",
-    "Feather Fall"
+    "Feather Fall",
+    "Toll the Dead",
+    "Mending",
+    "Bane"
+  ],
+  "magicInitiateInstances": [
+    {
+      "class": "Cleric",
+      "cantrips": [
+        "Toll the Dead",
+        "Mending"
+      ],
+      "level1Spell": "Bane"
+    }
   ],
   "rules": "2024",
   "xp": 0,
