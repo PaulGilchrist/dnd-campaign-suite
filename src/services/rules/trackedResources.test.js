@@ -507,23 +507,25 @@ describe('computeTrackedResources', () => {
   // ── luckyPoints (Lucky feat) ──
 
   describe('luckyPoints', () => {
-    it('sets from Lucky feat: 3 + floor(level/2)', () => {
-      const stats = basePlayerStats({ feats: [{ name: 'Lucky' }], level: 6 });
+    it('sets from Lucky feat using proficiency bonus', () => {
+      const stats = basePlayerStats({ feats: ['Lucky'], proficiency: 3 });
       const result = computeTrackedResources(stats);
-      expect(result.luckyPoints).toEqual({ current: 6, max: 6 });
+      expect(result.luckyPoints).toEqual({ current: 3, max: 3 });
     });
 
     it('is case-insensitive for feat name', () => {
-      const stats = basePlayerStats({ feats: [{ name: 'lucky' }], level: 4 });
+      const stats = basePlayerStats({ feats: ['lucky'], proficiency: 4 });
       const result = computeTrackedResources(stats);
-      expect(result.luckyPoints).toEqual({ current: 5, max: 5 });
+      expect(result.luckyPoints).toEqual({ current: 4, max: 4 });
     });
 
     it('defaults to 0 when no Lucky feat', () => {
-      const stats = basePlayerStats({ feats: [{ name: 'Alert' }] });
+      const stats = basePlayerStats({ feats: ['Alert'] });
       const result = computeTrackedResources(stats);
       expect(result.luckyPoints).toEqual({ current: 0, max: 0 });
     });
+
+  });
 
   // ── divineInterventionUses (Cleric) ──
 
@@ -626,7 +628,6 @@ describe('computeTrackedResources', () => {
       expect(result.warPriestUses).toEqual({ current: 1, max: 1 });
     });
   });
-});
 });
 
 // ── applyServerOverride ─────────────────────────────────────────

@@ -1696,17 +1696,17 @@
     {
         "name": "Lucky",
         "type": "Origin Feat",
-        "description": "<p><b>Lucid Points.</b> You have a number of Lucid Points equal to your Proficiency Bonus and can spend the points on the benefits below. You regain your expended Lucid Points when you finish a Long Rest.</p><p><b>Advantage.</b> When you roll a d20 for a D20 Test, you can spend 1 Lucid Point to give yourself Advantage on the roll.</p><p><b>Disadvantage.</b> When a creature rolls a d20 for an attack roll against you, you can spend 1 Lucid Point to impose Disadvantage on that roll.</p>",
+        "description": "<p><b>Luck Points.</b> You have a number of Luck Points equal to your Proficiency Bonus and can spend the points on the benefits below. You regain your expended Luck Points when you finish a Long Rest.</p><p><b>Advantage.</b> When you roll a d20 for a D20 Test, you can spend 1 Luck Point to give yourself Advantage on the roll.</p><p><b>Disadvantage.</b> When a creature rolls a d20 for an attack roll against you, you can spend 1 Luck Point to impose Disadvantage on that roll.</p>",
         "prerequisites": null,
         "benefits": [
             {
-                "name": "Lucid Points",
-                "description": "You have a number of Lucid Points equal to your Proficiency Bonus and can spend the points on the benefits below. You regain your expended Lucid Points when you finish a Long Rest.",
+                "name": "Luck Points",
+                "description": "You have a number of Luck Points equal to your Proficiency Bonus and can spend the points on the benefits below. You regain your expended Luck Points when you finish a Long Rest.",
                 "type": "passive"
             },
             {
                 "name": "Advantage",
-                "description": "When you roll a d20 for a D20 Test, you can spend 1 Lucid Point to give yourself Advantage on the roll.",
+                "description": "When you roll a d20 for a D20 Test, you can spend 1 Luck Point to give yourself Advantage on the roll.",
                 "type": "utility",
                 "automation": {
                     "type": "lucky_point",
@@ -1718,7 +1718,7 @@
             },
             {
                 "name": "Disadvantage",
-                "description": "When a creature rolls a d20 for an attack roll against you, you can spend 1 Lucid Point to impose Disadvantage on that roll.",
+                "description": "When a creature rolls a d20 for an attack roll against you, you can spend 1 Luck Point to impose Disadvantage on that roll.",
                 "type": "utility",
                 "automation": {
                     "type": "lucky_point",

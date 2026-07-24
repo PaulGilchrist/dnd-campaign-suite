@@ -20,7 +20,7 @@ describe('luckyPointHandler.handle', () => {
         return {
             name: 'TestFighter',
             level: 10,
-            feats: [{ name: 'Lucky' }],
+            feats: ['Lucky'],
             _trackedResources: { luckyPoints: { current: 5, max: 5 } },
             ...overrides,
         };
@@ -50,7 +50,7 @@ describe('luckyPointHandler.handle', () => {
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Lucky Break');
             expect(result.payload.description).toContain('0');
-            expect(result.payload.description).toContain('Lucid Point');
+            expect(result.payload.description).toContain('Luck Point');
             expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
             expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
 

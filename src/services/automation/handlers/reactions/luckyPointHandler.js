@@ -20,7 +20,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const maxLP = playerStats._trackedResources?.luckyPoints?.max || 0;
     const currentLP = Number(getRuntimeValue(playerName, 'luckyPoints', campaignName) ?? maxLP);
     if (currentLP <= 0) {
-        return infoPopup(action.name, `${action.name} requires at least 1 Lucid Point. You have ${currentLP} remaining.`, auto);
+        return infoPopup(action.name, `${action.name} requires at least 1 Luck Point. You have ${currentLP} remaining.`, auto);
     }
 
     const cs = await getCombatContext(campaignName);

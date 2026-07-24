@@ -213,9 +213,9 @@ export function computeTrackedResources(playerStats) {
   resources.uncannymetabolismUses = { current: maxUM, max: maxUM }
 
   const isLucky = (playerStats.feats || []).some(f =>
-    f.name?.toLowerCase().includes('lucky')
+    f?.toLowerCase?.().includes('lucky')
   )
-  const maxLP = isLucky ? (3 + Math.floor((playerStats.level || 0) / 2)) : 0
+  const maxLP = isLucky ? (playerStats.proficiency || 0) : 0
   resources.luckyPoints = { current: maxLP, max: maxLP }
 
   const isCleric = playerStats.class?.name === 'Cleric'

@@ -7,6 +7,7 @@ function CharFeatFeatures({ playerStats, campaignName }) {
     const replenishingMeals = useRuntimeValue(playerStats.name, 'replenishingMeals', campaignName);
     const chefBolsteringTreats = useRuntimeValue(playerStats.name, 'chefBolsteringTreats', campaignName);
     const bolsteringTreat = useRuntimeValue(playerStats.name, 'bolsteringTreat', campaignName);
+    const luckyPoints = useRuntimeValue(playerStats.name, 'luckyPoints', campaignName);
 
     const hasChefFeat = (playerStats.automation?.specialActions ?? []).some(
         p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats'
@@ -16,13 +17,30 @@ function CharFeatFeatures({ playerStats, campaignName }) {
         p => p.type === 'passive_rule' && p.effect === 'bonus_healing' && p.name === 'Replenishing Meal'
     );
 
-    const hasAnyResources = (replenishingMeals > 0) || (hasChefFeat && chefBolsteringTreats > 0) || bolsteringTreat > 0;
+    const hasLuckyFeat = (playerStats.feats || []).some(f =>
+        f?.toLowerCase?.().includes('lucky')
+    );
+
+    const lpMax = playerStats.proficiency || 0;
+
+    const hasAnyResources = (replenishingMeals > 0) || (hasChefFeat && chefBolsteringTreats > 0) || bolsteringTreat > 0 || (hasLuckyFeat && lpMax > 0);
     if (!hasAnyResources) {
         return null;
     }
 
     return (
         <div data-testid="char-feat-features">
+            {hasLuckyFeat && lpMax > 0 && (
+                <TrackedResourceInput
+                    label="Luck Points"
+                    resourceKey="luckyPoints"
+                    playerName={playerStats.name}
+                    getMax={() => lpMax}
+                    deps={[playerStats, luckyPoints]}
+                    campaignName={campaignName}
+                    playerStats={playerStats}
+                />
+            )}
             {replenishingMeals > 0 && (
                 <TrackedResourceInput
                     label="Replenishing Meals"
