@@ -302,7 +302,9 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
             {isExpanded && (
               <div className="list-item-full-details">
                 <div className="spell-description">
-                  {spell.description && spell.description[0] && spell.description[0]}
+                  {spell.description && spell.description[0] && (
+                    <div dangerouslySetInnerHTML={{ __html: renderMarkdown(spell.description[0]) }} />
+                  )}
                 </div>
 
 

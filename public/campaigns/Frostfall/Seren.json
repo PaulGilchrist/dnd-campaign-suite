@@ -1,52 +1,51 @@
 {
   "name": "Seren",
-  "level": 3,
+  "level": 1,
   "alignment": "True Neutral",
   "abilities": [
     {
       "name": "Strength",
       "baseScore": 9,
       "featIncrease": 0,
-      "backgroundIncrease": 0,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
       "name": "Dexterity",
       "baseScore": 15,
       "featIncrease": 0,
-      "backgroundIncrease": 0,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
       "name": "Constitution",
       "baseScore": 13,
       "featIncrease": 0,
-      "backgroundIncrease": 0,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
       "name": "Intelligence",
       "baseScore": 13,
       "featIncrease": 0,
-      "backgroundIncrease": 0,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
       "name": "Wisdom",
       "baseScore": 11,
       "featIncrease": 0,
-      "backgroundIncrease": 0,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
       "name": "Charisma",
       "baseScore": 9,
       "featIncrease": 0,
-      "backgroundIncrease": 0,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     }
   ],
-  "background": "",
   "class": {
     "name": "Rogue",
     "subclass": {
@@ -60,7 +59,9 @@
     "Sleight of Hand",
     "Perception"
   ],
-  "feats": [],
+  "feats": [
+    "Tavern Brawler"
+  ],
   "fightingStyles": [],
   "race": {
     "name": "Human",
@@ -133,7 +134,6 @@
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
-  "imagePath": "images/Seren.png",
-  "_fileName": "Seren.json",
-  "originalFileName": "Seren.json"
+  "background": "Sailor",
+  "imagePath": "images/Seren.png"
 }
