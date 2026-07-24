@@ -914,9 +914,6 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'spell_breaker':
                 result.passives.push(info);
                 break;
-            case 'magic_initiate':
-                result.passives.push(info);
-                break;
             case 'telekinetic_shove':
                 if (info.action === 'bonus_action') {
                     result.bonusActions.push(info);

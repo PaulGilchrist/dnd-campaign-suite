@@ -135,13 +135,6 @@ function extractFeatSpells(featData) {
   const featName = featData.name || '';
   const desc = featData.description || '';
 
-  if (featName === 'Magic Initiate') {
-    result.details.push('Magic Initiate grants 2 cantrips and 1 first-level spell from a chosen class spell list');
-    result.spellListAccess.push('Any class (chosen by player)');
-    result.grantedSpellLevels.cantrips = 2;
-    result.grantedSpellLevels.level1 = 1;
-  }
-
   if (featName === 'Fey Touched') {
     result.spells.push('Misty Step');
     result.details.push('Fey Touched grants Misty Step and one level 1 Divination or Enchantment spell');

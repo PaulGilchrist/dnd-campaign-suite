@@ -4,6 +4,8 @@ import WarningList from '../common/WarningList.jsx';
 import { getSpellLimits, validateSpellSelection } from '../../services/rules/spells/spellLimits.js';
 import { getSpellValidationInfo } from '../../services/rules/spells/spellValidation.js';
 import { renderMarkdown } from '../../services/ui/sanitize.js';
+import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import MagicInitiateModal from './MagicInitiateModal.jsx';
 import './WizardStepSpells.css';
 
 // Mystic Arcanum level requirements for Warlock
@@ -25,6 +27,9 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
   const isWarlock = formData?.class?.name === 'Warlock';
   const charLevel = parseInt(formData?.level) || 1;
   const [expandedArcanumSpell, setExpandedArcanumSpell] = useState(null);
+  const [showMagicInitiateModal, setShowMagicInitiateModal] = useState(false);
+  const characterKey = formData.name || 'Character';
+  const campaignName = formData.campaignName || formData.campaign || '';
   const qualifyingArcanumLevels = useMemo(() => {
     if (!isWarlock) return [];
     return getQualifyingArcanumLevels(charLevel);
@@ -80,6 +85,19 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
     
     fetchSpellLimits();
   }, [formData, formData.class, formData.level, formData.rules]);
+
+  // Show Magic Initiate modal when feat is selected and instances not yet configured
+  useEffect(() => {
+    const feats = formData.feats || [];
+    const magicInitiateCount = feats.filter(f => f === 'Magic Initiate' || f.index === 'magic-initiate').length;
+    if (magicInitiateCount === 0) {
+      return;
+    }
+    const existingInstances = getRuntimeValue(characterKey, '_magicInitiateInstances', campaignName);
+    if (!existingInstances || !Array.isArray(existingInstances) || existingInstances.length !== magicInitiateCount) {
+      setShowMagicInitiateModal(true);
+    }
+  }, [formData.feats, characterKey, campaignName]);
 
     // Calculate spell counts by level (excluding pre-selected spells)
     useEffect(() => {   
@@ -470,25 +488,48 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
       );
     };
 
+    const magicInitiateFeats = (formData.feats || []).filter(f => f === 'Magic Initiate' || (typeof f === 'object' && f.name === 'Magic Initiate'));
+    const hasMagicInitiate = magicInitiateFeats.length > 0;
+
     return (
         <div className="wizard-step-spells">
+      {showMagicInitiateModal && (
+        <MagicInitiateModal
+          formData={formData}
+          allSpells={allSpells}
+          onArrayFieldChange={onArrayFieldChange}
+          onClose={() => setShowMagicInitiateModal(false)}
+          campaignName={campaignName}
+        />
+      )}
       {renderArcanumSelection()}
+      {hasMagicInitiate && !showMagicInitiateModal && (
+        <div className="mi-wizard-banner">
+          <button
+            type="button"
+            className="mi-wizard-edit-btn"
+            onClick={() => setShowMagicInitiateModal(true)}
+          >
+            <i className="fa-solid fa-hat-wizard"></i> Edit Magic Initiate
+          </button>
+        </div>
+      )}
         <SelectableList
-       items={availableSpells}
-       fieldName="spells"
-       formData={formData}
-       onArrayFieldChange={onArrayFieldChange}
-       title="Step 9: Spells"
-       searchPlaceholder="Search spells..."
-       filters={filters}
-       renderItem={renderItem}
-       renderSummary={renderSummary}
-       loadingMessage="Spell data not yet loaded. Please try again."
-       preSelectedItems={preSelected}
-       resultLabel="spell"
-      />
-      </div>
-    );
+        items={availableSpells}
+        fieldName="spells"
+        formData={formData}
+        onArrayFieldChange={onArrayFieldChange}
+        title="Step 9: Spells"
+        searchPlaceholder="Search spells..."
+        filters={filters}
+        renderItem={renderItem}
+        renderSummary={renderSummary}
+        loadingMessage="Spell data not yet loaded. Please try again."
+        preSelectedItems={preSelected}
+        resultLabel="spell"
+       />
+       </div>
+     );
 }
 
 export default WizardStepSpells;

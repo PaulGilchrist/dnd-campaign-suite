@@ -1,10 +1,6 @@
 import { cloneDeep } from 'lodash';
 import classRules from '../../character/classRules2024.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import {
-    getMagicInitiateCantrips,
-    getMagicInitiateLevel1Spell,
-} from '../../automation/handlers/feats/magicInitiateHandler.js';
 
 export function getSpellAbilities(allSpells, playerStats, playerSummary) {
     let spellAbilities = null;
@@ -55,7 +51,7 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
     }
 
     // Create spellAbilities for non-spellcasting characters who gain spells from race/feat
-    const lineageTypes = ['elfish_lineage', 'gnomish_lineage', 'fiendish_legacy', 'magic_initiate'];
+    const lineageTypes = ['elfish_lineage', 'gnomish_lineage', 'fiendish_legacy'];
     const hasLineageOrFeatSpells = playerStats.automation?.specialActions?.some(
         f => lineageTypes.includes(f.type)
     );
@@ -197,21 +193,6 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
                             spellAbilities.cantrips_known += cantripCount;
                             spellAbilities.spells_known += levelSpellCount;
                         }
-                    }
-                }
-                if (feature.type === 'magic_initiate') {
-                    const campaignName = playerSummary?.campaignName;
-                    const cantrips = getMagicInitiateCantrips(playerStats, campaignName);
-                    if (Array.isArray(cantrips)) {
-                        cantrips.forEach(cantripName => {
-                            if (cantripName && !spellAbilities.spells.find(s => s.name === cantripName)) {
-                                spellAbilities.spells.push({ name: cantripName, prepared: 'Always' });
-                            }
-                        });
-                    }
-                    const level1Spell = getMagicInitiateLevel1Spell(playerStats, campaignName);
-                    if (level1Spell && !spellAbilities.spells.find(s => s.name === level1Spell)) {
-                        spellAbilities.spells.push({ name: level1Spell, prepared: 'Always' });
                     }
                 }
                 if (feature.type === 'passive_rule' && feature.effect === 'always_prepared_spells' && feature.spells) {

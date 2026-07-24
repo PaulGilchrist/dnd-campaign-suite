@@ -10,10 +10,6 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../feats/magicInitiateHandler.js', () => ({
-  getMagicInitiateLevel1Spell: vi.fn(),
-}));
-
 vi.mock('../../../../services/rules/spells/postCastRiderService.js', () => ({
   getEmpoweredEvocationFeatures: vi.fn(() => []),
   getEmpoweredEvocationIntModifier: vi.fn(),
@@ -44,7 +40,6 @@ vi.mock('../../../ui/storage.js', () => ({
 import { handle } from './spellCastHandler.js';
 import * as diceRoller from '../../../dice/diceRoller.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as magicInitiateHandler from '../feats/magicInitiateHandler.js';
 import * as postCastRiderService from '../../../../services/rules/spells/postCastRiderService.js';
 import * as expirations from '../../../rules/effects/expirations.js';
 import * as logPoster from '../../../ui/logService.js';
@@ -64,7 +59,7 @@ function makePlayerStats(overrides = {}) {
 
 function makeAction(automation = {}) {
   return {
-    name: 'Magic Initiate',
+    name: 'Divine Smite',
     automation: {
       type: 'spell',
       ...automation,
@@ -76,32 +71,6 @@ describe('spellCastHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     runtimeState.getRuntimeValue.mockReturnValue(null);
-  });
-
-  describe('Magic Initiate spell resolution', () => {
-    it('uses action.name when auto.spell is empty or undefined, falls back to Magic Initiate or action.name', async () => {
-      const ps = makePlayerStats();
-
-      // Empty string → Magic Initiate lookup
-      magicInitiateHandler.getMagicInitiateLevel1Spell.mockReturnValue('Magic Missile');
-      let result = await handle(makeAction({ spell: '' }), ps, campaignName, null);
-      expect(result.payload.html).toContain('Magic Missile');
-
-      // Magic Initiate returns null → action.name
-      magicInitiateHandler.getMagicInitiateLevel1Spell.mockReturnValue(null);
-      result = await handle(makeAction({ spell: '' }), ps, campaignName, null);
-      expect(result.payload.html).toContain('Magic Initiate');
-
-      // Undefined spell → action.name
-      const action = makeAction();
-      delete action.automation.spell;
-      result = await handle(action, ps, campaignName, null);
-      expect(result.payload.html).toContain('Magic Initiate');
-
-      // Non-empty spell → uses spell directly
-      result = await handle(makeAction({ spell: 'Fire Bolt' }), ps, campaignName, null);
-      expect(result.payload.html).toContain('Fire Bolt');
-    });
   });
 
   describe('Channel Divinity cost', () => {
@@ -185,7 +154,7 @@ describe('spellCastHandler', () => {
       let result = await handle(action, makePlayerStats(), campaignName, null);
       expect(result.payload.html).toContain('2 remaining');
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestWizard', '_Magic_Initiate_freeCastCount', 2, campaignName,
+        'TestWizard', '_Divine_Smite_freeCastCount', 2, campaignName,
       );
 
       runtimeState.getRuntimeValue.mockReturnValue(2);
@@ -193,7 +162,7 @@ describe('spellCastHandler', () => {
       result = await handle(action, makePlayerStats(), campaignName, null);
       expect(result.payload.html).toContain('1 remaining');
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestWizard', '_Magic_Initiate_freeCastCount', 1, campaignName,
+        'TestWizard', '_Divine_Smite_freeCastCount', 1, campaignName,
       );
     });
 
@@ -308,7 +277,7 @@ describe('spellCastHandler', () => {
       const result = await handle(action, makePlayerStats(), campaignName, null);
       expect(result.payload.html).toContain('2 remaining');
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestWizard', '_Magic_Initiate_freeCastCount', 2, campaignName,
+        'TestWizard', '_Divine_Smite_freeCastCount', 2, campaignName,
       );
     });
   });
@@ -475,7 +444,7 @@ describe('spellCastHandler', () => {
       expect(result.payload.html).toContain('Free cast of');
       expect(result.payload.html).toContain('Light');
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestWizard', '_Magic_Initiate_freeCast', ['Light'], campaignName,
+        'TestWizard', '_Divine_Smite_freeCast', ['Light'], campaignName,
       );
 
       // Already expended — use a fresh action to avoid mock pollution
@@ -526,12 +495,12 @@ describe('spellCastHandler', () => {
       runtimeState.getRuntimeValue.mockReturnValue(null);
 
       const action = {
-        name: 'Magic Initiate',
-        description: 'Learn a cantrip from the wizard spell list',
+        name: 'Divine Smite',
+        description: 'Smite the enemy with divine power',
         automation: { type: 'spell', spell: 'Light' },
       };
       let result = await handle(action, ps, campaignName, null);
-      expect(result.payload.html).toContain('Learn a cantrip from the wizard spell list');
+      expect(result.payload.html).toContain('Smite the enemy with divine power');
 
       // Missing description
       delete action.description;

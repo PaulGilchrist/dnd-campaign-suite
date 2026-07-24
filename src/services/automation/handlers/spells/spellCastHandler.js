@@ -3,7 +3,6 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { getCombatSummary } from '../../../encounters/combatData.js';
 import { addConcentration } from '../../../combat/concentration/concentrationService.js';
 import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../../../services/rules/spells/postCastRiderService.js';
-import { getMagicInitiateLevel1Spell } from '../feats/magicInitiateHandler.js';
 import { addEntry } from '../../../ui/logService.js';
 
 import { addExpiration } from '../../../rules/effects/expirations.js';
@@ -12,14 +11,7 @@ import storage from '../../../ui/storage.js';
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
 
-    // Magic Initiate: read spell name from runtime state if automation spell is explicitly empty string
     let spellName = auto.spell || action.name;
-    if (auto.spell === '') {
-        const miSpell = getMagicInitiateLevel1Spell(playerStats, campaignName);
-        if (miSpell) {
-            spellName = miSpell;
-        }
-    }
 
     // Mantle of Majesty: set activeBuffs for concentration-gated free cast
     if (action.name === 'Mantle of Majesty' && auto.type === 'free_spell' && auto.concentration) {

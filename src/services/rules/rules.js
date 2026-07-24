@@ -62,6 +62,40 @@ function mergeAutomationSpecialActions(playerStats) {
 }
 
 /**
+ * Rename Magic Initiate "Level 1 Spell" features with instance indices
+ * to avoid runtime key collisions for repeatable instances.
+ */
+function renameMagicInitiateFeatures(playerStats, playerSummary) {
+    const campaignName = playerSummary?.campaignName;
+    const instances = getRuntimeValue(playerStats.name, '_magicInitiateInstances', campaignName);
+    if (!instances || !Array.isArray(instances) || instances.length === 0) return;
+
+    const automation = playerStats.automation;
+    if (!automation) return;
+
+    // Collect all "Level 1 Spell" features across all automation arrays
+    const level1Features = [];
+    ['actions', 'bonusActions', 'reactions', 'passives', 'specialActions'].forEach(arrayName => {
+        const arr = automation[arrayName];
+        if (!Array.isArray(arr)) return;
+        arr.forEach(feature => {
+            if (!feature || !feature.name || feature.name !== 'Level 1 Spell') return;
+            const auto = feature.automation;
+            if (!auto || auto.type !== 'free_spell') return;
+            level1Features.push({ feature, auto, arrayName });
+        });
+    });
+
+    // Rename them in order to match instances
+    level1Features.forEach((item, i) => {
+        if (i >= instances.length) return;
+        const newName = `Level 1 Spell [Instance ${i + 1}]`;
+        item.feature.name = newName;
+        if (item.auto.name) item.auto.name = newName;
+    });
+}
+
+/**
  * Apply The Third Eye darkvision enhancement from active buffs.
  * Sets Darkvision to 120 ft if the Third Eye buff with darkvision_120 effect is active.
  */
@@ -1158,6 +1192,7 @@ const rules = {
           }
 
             playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+            renameMagicInitiateFeatures(playerStats, playerSummary);
             mergeAutomationSpecialActions(playerStats);
           playerStats.saveModifiers = collectSaveModifiers(allFeatures);
           // Add Powerful Build grapple escape advantage after saveModifiers is collected
@@ -1314,6 +1349,7 @@ const rules = {
             });
             // Re-process automation with feat features included
           playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+          renameMagicInitiateFeatures(playerStats, playerSummary);
           mergeAutomationSpecialActions(playerStats);
 
           // Now create feat entries with processed automation (options instead of effects)
@@ -1437,6 +1473,7 @@ const rules = {
                            playerStats.reactions.push(feature);
                        });
                         playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+                        renameMagicInitiateFeatures(playerStats, playerSummary);
                         mergeAutomationSpecialActions(playerStats);
                     }
 
@@ -1461,8 +1498,9 @@ const rules = {
                               hasAutomation: true,
                           });
                       });
-                       playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
-                       mergeAutomationSpecialActions(playerStats);
+                        playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+                        renameMagicInitiateFeatures(playerStats, playerSummary);
+                        mergeAutomationSpecialActions(playerStats);
                    }
 
                     const movementManeuvers = maneuvers.filter(m => knownNames.includes(m.name) && m.actionType === 'movement');
@@ -1486,6 +1524,7 @@ const rules = {
                            });
                        });
                         playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+                        renameMagicInitiateFeatures(playerStats, playerSummary);
                         mergeAutomationSpecialActions(playerStats);
                     }
 
@@ -1528,10 +1567,11 @@ const rules = {
                             }
                         });
                         playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+                        renameMagicInitiateFeatures(playerStats, playerSummary);
                         mergeAutomationSpecialActions(playerStats);
                     }
                 }
-           } catch (_e) {
+            } catch (_e) {
               // Maneuver data not available, skip
           }
             playerStats.actions = uniqBy(playerStats.actions, 'name').sort((a, b) => a.name.localeCompare(b.name));

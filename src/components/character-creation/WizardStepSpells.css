@@ -243,8 +243,35 @@
 }
 
 .wizard-step-spells .no-arcanum-spells {
-    font-size: 0.8rem;
-    color: var(--color-text-secondary);
-    font-style: italic;
-    padding: 0.3rem 0;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
+  padding: 0.3rem 0;
+}
+
+.wizard-step-spells .mi-wizard-banner {
+  margin: 1rem 0;
+  padding: 0.75rem;
+  background-color: var(--background-color-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  text-align: center;
+}
+
+.wizard-step-spells .mi-wizard-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--color-primary);
+  border-radius: 6px;
+  background-color: var(--background-color-surface);
+  color: var(--color-primary);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+.wizard-step-spells .mi-wizard-edit-btn:hover {
+  background-color: var(--background-color-card);
 }

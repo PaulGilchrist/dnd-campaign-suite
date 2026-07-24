@@ -1,0 +1,298 @@
+.mi-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.mi-modal {
+  background-color: var(--background-color-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.mi-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: var(--color-text);
+}
+
+.mi-body {
+  padding: 1rem;
+}
+
+.mi-description {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  margin: 0 0 1rem 0;
+  line-height: 1.4;
+}
+
+.mi-instances-list {
+  margin-bottom: 1rem;
+}
+
+.mi-instance-summary {
+  background-color: var(--background-color-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.mi-instance-summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.mi-instance-summary-class {
+  font-weight: bold;
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
+
+.mi-instance-summary-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.mi-instance-summary-spells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.mi-spell-tag {
+  background-color: var(--background-color-card);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.8rem;
+  color: var(--color-text);
+}
+
+.mi-spell-tag.mi-level1-tag {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.mi-edit-btn,
+.mi-remove-btn {
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--background-color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.mi-edit-btn:hover,
+.mi-remove-btn:hover {
+  background-color: var(--background-color-card);
+}
+
+.mi-remove-btn {
+  color: #c0392b;
+  border-color: #c0392b;
+}
+
+.mi-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border: 1px dashed var(--border-color);
+  border-radius: 6px;
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 0.85rem;
+  width: 100%;
+  justify-content: center;
+}
+
+.mi-add-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.mi-save-all-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  background-color: var(--color-primary);
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+.mi-save-all-btn:hover {
+  opacity: 0.9;
+}
+
+.mi-add-instance {
+  margin-bottom: 1rem;
+}
+
+.mi-save-all {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.mi-instance-editor {
+  background-color: var(--background-color-surface);
+  border: 1px solid var(--color-primary);
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.mi-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.mi-editor-header h4 {
+  margin: 0;
+  color: var(--color-text);
+}
+
+.mi-close-btn {
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--background-color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.mi-close-btn:hover {
+  background-color: var(--background-color-card);
+}
+
+.mi-editor-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.mi-editor-actions {
+  margin-top: 0.5rem;
+  text-align: right;
+}
+
+.mi-save-btn {
+  padding: 0.4rem 1rem;
+  border: none;
+  border-radius: 4px;
+  background-color: var(--color-primary);
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.mi-save-btn:hover {
+  opacity: 0.9;
+}
+
+.mi-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.mi-selector-label {
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: var(--color-text);
+}
+
+.mi-selector-select {
+  padding: 0.4rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--background-color-card);
+  color: var(--color-text);
+  font-size: 0.85rem;
+}
+
+.mi-error {
+  font-size: 0.75rem;
+  color: #c0392b;
+}
+
+.mi-spell-details {
+  margin-top: 0.25rem;
+}
+
+.mi-spell-details-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.4rem;
+  border: none;
+  background: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.mi-spell-details-toggle:hover {
+  color: var(--color-primary);
+}
+
+.mi-spell-details-content {
+  margin-top: 0.25rem;
+  padding: 0.5rem;
+  background-color: var(--background-color-card);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+.mi-spell-desc {
+  font-size: 0.8rem;
+  color: var(--color-text);
+  margin-bottom: 0.4rem;
+  line-height: 1.35;
+}
+
+.mi-spell-desc p {
+  margin: 0.2rem 0;
+}
+
+.mi-spell-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  line-height: 1.3;
+}

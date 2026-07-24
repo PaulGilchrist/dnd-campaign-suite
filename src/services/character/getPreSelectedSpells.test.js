@@ -23,7 +23,7 @@ describe('getPreSelectedSpells', () => {
   ];
 
   const mockFeats = [
-    { name: 'Magic Initiate', index: 'magic-initiate', description: 'Learn <em>Guidance</em> cantrip' },
+    { name: 'Magic Initiate', index: 'magic-initiate', description: 'Choose a class and learn spells from its spell list' },
     { name: 'Fey Touched', index: 'fey-touched', description: '' },
     { name: 'Shadow Touched', index: 'shadow-touched', description: '' },
     { name: 'War Caster', index: 'war-caster', description: '<em>Shield</em> cantrip', benefits: [{ type: 'spell', description: '<em>Burning Hands</em>' }] },
@@ -174,14 +174,15 @@ describe('getPreSelectedSpells', () => {
   });
 
   describe('feat spell extraction', () => {
-    it('extracts cantrips from Magic Initiate feat description', async () => {
+    it('does not extract spells from Magic Initiate feat (spells are user-selected)', async () => {
       const formData = {
         rules: '5e',
         level: 1,
         feats: ['Magic Initiate'],
       };
       const result = await getPreSelectedSpells(formData);
-      expect(result).toContain('Guidance');
+      expect(result).not.toContain('Guidance');
+      expect(result).toEqual([]);
     });
 
     it('extracts Misty Step from Fey Touched', async () => {
@@ -221,7 +222,8 @@ describe('getPreSelectedSpells', () => {
         feats: ['Magic Initiate', 'Fey Touched'],
       };
       const result = await getPreSelectedSpells(formData);
-      expect(result).toContain('Guidance');
+      // Magic Initiate no longer contributes auto-extracted spells
+      expect(result).not.toContain('Guidance');
       expect(result).toContain('Misty Step');
     });
 
@@ -290,6 +292,8 @@ describe('getPreSelectedSpells', () => {
         feats: ['Magic Initiate'],
       };
       const result = await getPreSelectedSpells(formData);
+      // Guidance comes from Half-Elf race trait only (Magic Initiate no longer contributes)
+      expect(result).toContain('Guidance');
       const guidanceCount = result.filter(s => s === 'Guidance').length;
       expect(guidanceCount).toBe(1);
     });

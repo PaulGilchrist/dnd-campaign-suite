@@ -12,11 +12,6 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn((_key, _prop) => null),
 }));
 
-vi.mock('../../automation/handlers/feats/magicInitiateHandler.js', () => ({
-  getMagicInitiateCantrips: vi.fn(),
-  getMagicInitiateLevel1Spell: vi.fn(),
-}));
-
 // ── Helpers ──
 
 function makePlayerStats(overrides = {}) {
@@ -47,19 +42,14 @@ describe('spellCalc2024', () => {
   // References to mocked functions (set in beforeEach via dynamic import)
   let mockGetRuntimeValue;
   let mockGetHighestMajorLevel;
-  let mockMagicInitiateCantrips;
-  let mockMagicInitiateLevel1Spell;
 
   beforeEach(async () => {
     vi.resetAllMocks();
     const runtimeState = await import('../../../hooks/runtime/useRuntimeState.js');
     const classRules2024 = await import('../../character/classRules2024.js');
-    const magicInitiate = await import('../../automation/handlers/feats/magicInitiateHandler.js');
 
     mockGetRuntimeValue = runtimeState.getRuntimeValue;
     mockGetHighestMajorLevel = classRules2024.default.getHighestMajorLevel;
-    mockMagicInitiateCantrips = magicInitiate.getMagicInitiateCantrips;
-    mockMagicInitiateLevel1Spell = magicInitiate.getMagicInitiateLevel1Spell;
   });
 
   describe('getSpellAbilities', () => {
@@ -785,28 +775,6 @@ describe('spellCalc2024', () => {
       expect(names).toContain('Dominate Person');
     });
 
-    // ── Automation: magic_initiate ──
-
-    it('adds magic initiate cantrips and level 1 spell', () => {
-      const allSpells = [
-        makeSpell('Minor Illusion', 0),
-        makeSpell('Shield', 1),
-      ];
-      mockMagicInitiateCantrips.mockReturnValue(['Minor Illusion']);
-      mockMagicInitiateLevel1Spell.mockReturnValue('Shield');
-
-      const stats = makePlayerStats();
-      stats.automation = {
-        actions: [{ type: 'magic_initiate' }],
-      };
-
-      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign' });
-
-      const names = result.spells.map(s => s.name);
-      expect(names).toContain('Minor Illusion');
-      expect(names).toContain('Shield');
-    });
-
     it('creates spellAbilities for non-spellcasting character with fiendish legacy', () => {
       const allSpells = [
         makeSpell('Fire Bolt', 0),
@@ -843,26 +811,6 @@ describe('spellCalc2024', () => {
       expect(result.modifier).toBe(3);
       expect(result.toHit).toBe(5);
       expect(result.saveDc).toBe(13);
-    });
-
-    it('handles magic_initiate with multiple cantrips', () => {
-      const allSpells = [
-        makeSpell('Minor Illusion', 0),
-        makeSpell('Thaumaturgy', 0),
-      ];
-      mockMagicInitiateCantrips.mockReturnValue(['Minor Illusion', 'Thaumaturgy']);
-      mockMagicInitiateLevel1Spell.mockReturnValue(null);
-
-      const stats = makePlayerStats();
-      stats.automation = {
-        actions: [{ type: 'magic_initiate' }],
-      };
-
-      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign' });
-
-      const names = result.spells.map(s => s.name);
-      expect(names).toContain('Minor Illusion');
-      expect(names).toContain('Thaumaturgy');
     });
 
     // ── Automation: runtime-state features (Spell Mastery, Savants, Signature Spells) ──

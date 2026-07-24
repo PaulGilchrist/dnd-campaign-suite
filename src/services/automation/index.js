@@ -8,7 +8,6 @@ import { handle as handleMassHealingWord } from './handlers/healing/massHealingW
 import { handle as handleBuff } from './handlers/buffs/buffHandler.js';
 import { handle as handlePowerWordFortify } from './handlers/buffs/powerWordFortifyHandler.js';
 import { handle as handleCondition } from './handlers/buffs/conditionHandler.js';
-import { handle as handleMagicInitiate } from './handlers/feats/magicInitiateHandler.js';
 import { handle as handleTelekineticShove } from './handlers/feats/telekineticShoveHandler.js';
 import { handle as handleSorcery } from './handlers/resources/sorceryHandler.js';
 import { handle as handleSpellCast } from './handlers/spells/spellCastHandler.js';
@@ -507,7 +506,6 @@ const HANDLER_MAP = {
         slow: handleSlow,
         survive_and_heal: handleBoonOfRecovery,
         lucky_point: handleLuckyPoint,
-        magic_initiate: handleMagicInitiate,
         telekinetic_shove: handleTelekineticShove,
         sentinel_guardian: handleSentinelGuardian,
         sentinel: handleSentinelHalt,

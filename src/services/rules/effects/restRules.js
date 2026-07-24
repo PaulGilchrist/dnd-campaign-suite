@@ -742,6 +742,14 @@ export async function applyLongRest(playerStats, campaignName) {
     // Reset Boon Of Energy Resistance chosen types on long rest
     setRuntimeValue(name, '_Energy_Resistances_chosenTypes', null, campaignName, true)
 
+    // Reset Magic Initiate free cast counters on long rest
+    const miInstances = getRuntimeValue(name, '_magicInitiateInstances', campaignName)
+    if (miInstances && Array.isArray(miInstances)) {
+      miInstances.forEach((inst) => {
+        setRuntimeValue(name, `_magicInitiateInstance_${inst.id}_freeCastCount`, null, campaignName, true)
+      })
+    }
+
     // Reset Undying Sentinel (Oath of Glory level 15) on long rest
     setRuntimeValue(name, 'undyingSentinelUsed', false, campaignName, true)
 
