@@ -18,7 +18,7 @@ export async function getFeatLimits(formData) {
     const rules = await loadValidationRules(ruleset);
     const featRules = rules.feats || {};
      
-    const availableLevels = featRules.available_levels || (ruleset === '2024' ? [1, 4, 8, 12, 16, 19] : [4, 8, 12, 16, 19]);
+    const availableLevels = featRules.available_levels || (ruleset === '2024' ? [4, 8, 12, 16, 19] : [4, 8, 12, 16, 19]);
     const originRequired = featRules.origin_feat_required || false;
     const originFeatLevel = featRules.origin_feat_level || 1;
 
@@ -39,12 +39,12 @@ export async function getFeatLimits(formData) {
     let details;
     if (ruleset === '2024') {
         details = originRequired
-            ? `Level 1 2024 characters get 1 Origin feat from their background, plus additional feats at levels ${availableLevels.filter(l => l !== 1).join(', ')}`
+            ? `Level 1 2024 characters get 1 Origin feat from their background, plus additional feats at levels ${availableLevels.join(', ')}`
             : `In 2024 rules, feats are available at levels ${availableLevels.join(', ')}`;
          } else {
         details = `In 5e, feats are optional and can be taken instead of ability score increases at levels ${availableLevels.join(', ')}`;
          }
-     
+      
     return {
         allowed,
         originRequired,

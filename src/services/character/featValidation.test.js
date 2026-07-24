@@ -103,7 +103,7 @@ describe('featValidation', () => {
 
             const result = await getFeatLimits({ rules: '2024', level: 1 });
 
-            expect(result.allowed).toBe(1);
+            expect(result.allowed).toBe(0);
             expect(result.originRequired).toBe(false);
         });
 
@@ -112,13 +112,13 @@ describe('featValidation', () => {
 
             const result = await getFeatLimits({ rules: '2024', level: 4 });
 
-            expect(result.allowed).toBe(2);
+            expect(result.allowed).toBe(1);
         });
 
         it('should return origin feat info from rules when present', async () => {
             vi.mocked(dataLoader.loadValidationRules).mockResolvedValue({
                 feats: {
-                    available_levels: [1, 4, 8, 12, 16, 19],
+                    available_levels: [4, 8, 12, 16, 19],
                     origin_feat_required: true,
                     origin_feat_level: 1
                 }
@@ -126,7 +126,7 @@ describe('featValidation', () => {
 
             const result = await getFeatLimits({ rules: '2024', level: 1 });
 
-            expect(result.allowed).toBe(1);
+            expect(result.allowed).toBe(0);
             expect(result.originRequired).toBe(true);
             expect(result.originFeatLevel).toBe(1);
         });
@@ -134,7 +134,7 @@ describe('featValidation', () => {
         it('should add 1 to allowed count for Versatile Human in 2024', async () => {
             vi.mocked(dataLoader.loadValidationRules).mockResolvedValue({
                 feats: {
-                    available_levels: [1, 4, 8, 12, 16, 19],
+                    available_levels: [4, 8, 12, 16, 19],
                     origin_feat_required: true,
                     origin_feat_level: 1
                 }
@@ -150,7 +150,7 @@ describe('featValidation', () => {
 
             const result = await getFeatLimits({ rules: '2024', level: 1, race: { name: 'Human' } });
 
-            expect(result.allowed).toBe(2);
+            expect(result.allowed).toBe(1);
             expect(result.details).toContain('1 Origin feat from their background');
             expect(result.details).toContain('levels 4, 8, 12, 16, 19');
         });

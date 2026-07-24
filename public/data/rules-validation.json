@@ -1,80 +1,79 @@
 {
-    "2024": {
-        "level_range": {
-            "min": 1,
-            "max": 20
+        "2024": {
+                "level_range": {
+                        "min": 1,
+                        "max": 20
+                },
+                "point_buy": {
+                        "total_points": 27,
+                        "min_base_score": 8,
+                        "max_base_score": 15,
+                        "max_total_score": 20,
+                        "max_total_score_level_20": 24,
+                        "costs": {
+                                "8": 0,
+                                "9": 1,
+                                "10": 2,
+                                "11": 3,
+                                "12": 4,
+                                "13": 5,
+                                "14": 7,
+                                "15": 9
+                        }
+                },
+                "feats": {
+                        "available_levels": [
+                                4,
+                                8,
+                                12,
+                                16,
+                                19
+                        ],
+                        "origin_feat_required": true,
+                        "origin_feat_level": 1
+                },
+                "background_languages": 2,
+                "ability_score_max": {
+                        "standard": 20,
+                        "level_20": 24
+                }
         },
-        "point_buy": {
-            "total_points": 27,
-            "min_base_score": 8,
-            "max_base_score": 15,
-            "max_total_score": 20,
-            "max_total_score_level_20": 24,
-            "costs": {
-                "8": 0,
-                "9": 1,
-                "10": 2,
-                "11": 3,
-                "12": 4,
-                "13": 5,
-                "14": 7,
-                "15": 9
-            }
-        },
-        "feats": {
-            "available_levels": [
-                1,
-                4,
-                8,
-                12,
-                16,
-                19
-            ],
-            "origin_feat_required": true,
-            "origin_feat_level": 1
-        },
-        "background_languages": 2,
-        "ability_score_max": {
-            "standard": 20,
-            "level_20": 24
+        "5e": {
+                "level_range": {
+                        "min": 1,
+                        "max": 20
+                },
+                "point_buy": {
+                        "total_points": 27,
+                        "min_base_score": 8,
+                        "max_base_score": 15,
+                        "max_total_score": 20,
+                        "max_total_score_level_20": 24,
+                        "costs": {
+                                "8": 0,
+                                "9": 1,
+                                "10": 2,
+                                "11": 3,
+                                "12": 4,
+                                "13": 5,
+                                "14": 7,
+                                "15": 9
+                        }
+                },
+                "feats": {
+                        "available_levels": [
+                                4,
+                                8,
+                                12,
+                                16,
+                                19
+                        ],
+                        "origin_feat_required": false
+                },
+                "background_languages": 2,
+                "ability_score_max": {
+                        "standard": 20,
+                        "level_20": 24
+                }
         }
-    },
-    "5e": {
-        "level_range": {
-            "min": 1,
-            "max": 20
-        },
-        "point_buy": {
-            "total_points": 27,
-            "min_base_score": 8,
-            "max_base_score": 15,
-            "max_total_score": 20,
-            "max_total_score_level_20": 24,
-            "costs": {
-                "8": 0,
-                "9": 1,
-                "10": 2,
-                "11": 3,
-                "12": 4,
-                "13": 5,
-                "14": 7,
-                "15": 9
-            }
-        },
-        "feats": {
-            "available_levels": [
-                4,
-                8,
-                12,
-                16,
-                19
-            ],
-            "origin_feat_required": false
-        },
-        "background_languages": 2,
-        "ability_score_max": {
-            "standard": 20,
-            "level_20": 24
-        }
-    }
 }

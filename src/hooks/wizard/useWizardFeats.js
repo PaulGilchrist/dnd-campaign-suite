@@ -14,9 +14,10 @@ function useWizardFeats(formData, setFormData) {
         const existingFeats = prev.feats || [];
         const toRemove = prevItems || [];
         const keptFeats = existingFeats.filter(feat => !toRemove.includes(feat));
+        const newItems = items.filter(item => !keptFeats.includes(item));
         return {
           ...prev,
-          feats: [...keptFeats, ...items]
+          feats: [...keptFeats, ...newItems]
         };
       },
       deps: (f) => [f.background, f.rules],

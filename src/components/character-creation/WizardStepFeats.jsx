@@ -61,7 +61,7 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
         };
 
     // Render item function
-  const renderItem = (feat, index, { isSelected, isPreSelected, isExpanded, onToggle, onToggleExpand, itemCount = 0 }) => {
+  const renderItem = (feat, index, { isSelected, isPreSelected, isExpanded, onToggle, onRemove, onToggleExpand, itemCount = 0 }) => {
     const descData = normalizeFeatDescription(feat);
     const ruleset = formData.rules || '5e';
     const featBuffs = isSelected ? computeFeatBuffs(feat, ruleset) : null;
@@ -104,16 +104,30 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
                                 {isSelected ? '✓' : ''}
                             </div>
                             {isRepeatable && isSelected && (
-                                <button
-                                    type="button"
-                                    className="add-another-btn"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onToggle();
-                                    }}
-                                >
-                                    <i className="fa-solid fa-plus" /> Add Another
-                                </button>
+                                <div className="repeatable-feat-actions">
+                                    <button
+                                        type="button"
+                                        className="add-another-btn"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onToggle();
+                                        }}
+                                    >
+                                        <i className="fa-solid fa-plus" /> Add Another
+                                    </button>
+                                    {itemCount > 1 && (
+                                        <button
+                                            type="button"
+                                            className="remove-feat-btn"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onRemove();
+                                            }}
+                                        >
+                                            <i className="fa-solid fa-minus" /> Remove One
+                                        </button>
+                                    )}
+                                </div>
                             )}
                         </div>
                     </div>

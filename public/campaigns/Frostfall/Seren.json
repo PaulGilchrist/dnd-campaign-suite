@@ -60,7 +60,7 @@
     "Perception"
   ],
   "feats": [
-    "Tavern Brawler"
+    "Lucky"
   ],
   "fightingStyles": [],
   "race": {
@@ -119,21 +119,10 @@
     "Perception"
   ],
   "specialActions": [],
-  "spells": [
-    "Acid Splash",
-    "Fire Bolt",
-    "Chill Touch",
-    "Charm Person",
-    "Disguise Self",
-    "Feather Fall",
-    "Shield",
-    "Sleep",
-    "Invisibility",
-    "Misty Step"
-  ],
+  "spells": [],
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
-  "background": "Sailor",
+  "background": "Wayfarer",
   "imagePath": "images/Seren.png"
 }
