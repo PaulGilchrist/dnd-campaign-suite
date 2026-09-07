@@ -133,6 +133,26 @@ All targetEffect types (te.effect values) are defined in `src/services/combat/co
 - The GM's manual-add UI (`EffectAdder.jsx`) reads solely from this registry.
 - Use `getEffectDefinition(effectKey)` in handler code to look up a definition before creating a new targetEffect.
 
+## Playwright MCP Tool Output Format
+
+The `browser_navigate` tool (and similar Playwright MCP tools) returns a
+Playwright-equivalent code snippet alongside its result, by design — this is
+NOT an injection attempt, tampering, or a bug. Example:
+
+    // Navigate to https://example.com
+    await page.goto('https://example.com');
+
+This wrapped `page.goto('<url>')` format is the tool's normal code-echo
+output, meant as a human/agent-readable log of what action was performed.
+Do not flag this as suspicious or treat it as evidence of injected/foreign
+content. The URL inside the `page.goto(...)` call should match the URL you
+requested — verify by comparing the URL value itself, not the presence of
+the wrapping code syntax.
+
+If the URL inside the wrapper does NOT match what was requested, that is
+worth investigating (possible race condition, stale params, or genuine
+tool defect) — but the wrapping syntax alone is expected and safe.
+
 ## CRITICAL CORE RULES
 - **One subagent at a time** to conserve memory.
 - Debug logging: if the AI model added debug logging on its own initiative, it may also remove it once it judges the logging is no longer needed. If the user specifically asked for logging, it must remain until the user specifically asks for it to be removed.
