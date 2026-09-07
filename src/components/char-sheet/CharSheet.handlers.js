@@ -52,11 +52,25 @@ export function handleReroll(playerStats, campaignName, conditionEffects, reroll
     }
 }
 
-export function handleStrokeOfLuck(playerStats, campaignName) {
-    if (playerStats) {
-        setRuntimeValue(playerStats.name, 'strokeOfLuckUsed', true, campaignName);
+export function handleStrokeOfLuck(playerStats, campaignName, popupHtml, featureKey) {
+    if (!playerStats) return;
+    if (featureKey === 'boonOfCombatProwess') {
         setRuntimeValue(playerStats.name, 'boonOfCombatProwessUsed', Date.now(), campaignName);
+        return;
     }
+    setRuntimeValue(playerStats.name, 'strokeOfLuckUsed', true, campaignName);
+    const d20 = Number(popupHtml?.rolls?.[0]) || 0;
+    const bonus = Number(popupHtml?.bonus) || 0;
+    const modifier = Number(popupHtml?.modifier) || 0;
+    const originalTotal = d20 + bonus + modifier;
+    const newTotal = 20 + bonus + modifier;
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: 'Stroke of Luck',
+        description: `${playerStats.name} used Stroke of Luck on ${popupHtml?.name || 'a D20 Test'}: d20 ${d20} → 20 (total ${originalTotal} → ${newTotal}).${popupHtml?.hit === false ? ' Miss converted to a hit.' : ''}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[CharSheet] Error logging Stroke of Luck:', e); });
 }
 
 export async function handleBardicInspiration(playerStats, campaignName, popupHtml) {

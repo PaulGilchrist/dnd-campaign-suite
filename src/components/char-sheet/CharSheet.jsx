@@ -410,9 +410,9 @@ function CharSheetContent({
         handleReroll(playerStats, campaignName, conditionEffects, rerollInfo);
     }, [playerStats, campaignName, conditionEffects]);
 
-    const handleStrokeOfLuckWrapped = React.useCallback(() => {
-        handleStrokeOfLuck(playerStats, campaignName);
-    }, [playerStats, campaignName]);
+    const handleStrokeOfLuckWrapped = React.useCallback((featureKey) => {
+        handleStrokeOfLuck(playerStats, campaignName, popupHtml, featureKey);
+    }, [playerStats, campaignName, popupHtml]);
 
     const handleBardicInspirationWrapped = React.useCallback(async (_dieValue, _dieSize) => {
         await handleBardicInspiration(playerStats, campaignName, popupHtml);

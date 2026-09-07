@@ -119,7 +119,7 @@ function DiceRollResult(props) {
         safeRolls, finalRoll, originalTotal, displayRoll, displayTotal,
         strReplaceApplied, finalDisplayTotal,
         finalTotal, showFumble,
-        computedHit, homingStrikesApplied, effectiveAc,
+        computedHit, homingStrikesApplied, effectiveAc, d20TestFailed,
     } = state;
 
     const hitMissTotal = homingStrikesApplied ? finalTotal : displayTotal;
@@ -163,12 +163,12 @@ function DiceRollResult(props) {
     const handleStrokeOfLuck = () => {
         setStrokeResult({ roll: 20, total: 20 + bonus + modifier });
         setStrokeUsed(true);
-        if (onStrokeOfLuck) onStrokeOfLuck();
+        if (onStrokeOfLuck) onStrokeOfLuck('strokeOfLuck');
     };
 
     const handleBoonOfCombatProwess = () => {
         setBoonUsed(true);
-        if (onStrokeOfLuck) onStrokeOfLuck();
+        if (onStrokeOfLuck) onStrokeOfLuck('boonOfCombatProwess');
     };
 
     const handleLuckyAdvantage = () => {
@@ -323,7 +323,6 @@ function DiceRollResult(props) {
 
             {(isCritDamage || isCrit || isAutoCrit) && <div className="dice-roll-crit">Critical Hit! — damage dice doubled</div>}
             {(isD20 && !isCrit && !isAutoCrit && displayRoll === 20) && <div className="dice-roll-crit">Natural 20!</div>}
-            {strokeResult !== null && isD20 && !isCrit && !isAutoCrit && <div className="dice-roll-crit">Natural 20!</div>}
             {showFumble && <div className="dice-roll-crit dice-roll-crit-miss">Critical Miss!</div>}
                {targetName && computedHit !== undefined && !isSaveDamageType && rollType === 'attack' && (
                     <div className={`dice-roll-hit-miss ${computedHit ? 'hit' : 'miss'}`}>
@@ -458,7 +457,7 @@ function DiceRollResult(props) {
               </div>
             )}
 
-            {strokeOfLuck && !strokeUsed && isD20 && (
+            {strokeOfLuck && !strokeUsed && isD20 && d20TestFailed && (
               <div className="dice-roll-reroll">
                 <button className="dice-roll-reroll-btn" onClick={handleStrokeOfLuck} type="button">
                   <i className="fa-solid fa-star"></i> Stroke of Luck

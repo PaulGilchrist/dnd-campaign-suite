@@ -27,10 +27,10 @@ function AttackResultPopup({ popupHtml, onClose, campaignName, attackerName, pla
     if (onClose) onClose();
   }, [popupHtml, onClose, missToHitApplied]);
 
-  const handleMissToHit = useCallback(() => {
-    if (!popupHtml || missToHitApplied || hasBoonBeenUsedRef.current) return;
+  const handleMissToHit = useCallback((featureKey) => {
+    if (!popupHtml || missToHitApplied || (featureKey === 'boonOfCombatProwess' && hasBoonBeenUsedRef.current)) return;
     setMissToHitApplied(true);
-    if (onStrokeOfLuck) onStrokeOfLuck();
+    if (onStrokeOfLuck) onStrokeOfLuck(featureKey);
   }, [popupHtml, missToHitApplied, onStrokeOfLuck]);
 
   const handleBardicInspirationDefense = useCallback(async (dieValue, dieSize, newAc, willMiss) => {

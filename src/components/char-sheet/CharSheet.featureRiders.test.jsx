@@ -152,13 +152,29 @@ describe('handleStrokeOfLuck', () => {
     mockStore.clear();
   });
 
-  it('sets strokeOfLuckUsed and boonOfCombatProwessUsed', () => {
+  it('CLA-339: stroke of luck use stamps strokeOfLuckUsed only, no boonOfCombatProwessUsed collateral, and logs ability_use', async () => {
+    const { addEntry } = await import('../../services/ui/logService.js');
     const stats = createPlayerStats();
 
-    handleStrokeOfLuck(stats, campaignName);
+    handleStrokeOfLuck(stats, campaignName, { name: 'Shortsword', rolls: [6], bonus: 8, hit: false }, 'strokeOfLuck');
 
     expect(mockStore.get('Test Character:strokeOfLuckUsed')).toBe(true);
-    expect(typeof mockStore.get('Test Character:boonOfCombatProwessUsed')).toBe('number');
+    expect(mockStore.get('Test Character:boonOfCombatProwessUsed')).toBeUndefined();
+    expect(addEntry).toHaveBeenCalled();
+    const entry = addEntry.mock.calls.at(-1)[1];
+    expect(entry.type).toBe('ability_use');
+    expect(entry.abilityName).toBe('Stroke of Luck');
+    expect(entry.description).toContain('d20 6 → 20');
+    expect(entry.description).toContain('total 14 → 28');
+  });
+
+  it('CLA-339: boon of combat prowess use stamps boonOfCombatProwessUsed only, not strokeOfLuckUsed', () => {
+    const stats = createPlayerStats();
+
+    handleStrokeOfLuck(stats, campaignName, { name: 'Shortsword', rolls: [4], bonus: 8, hit: false }, 'boonOfCombatProwess');
+
+    expect(mockStore.get('Test Character:boonOfCombatProwessUsed')).toEqual(expect.any(Number));
+    expect(mockStore.get('Test Character:strokeOfLuckUsed')).toBeUndefined();
   });
 });
 

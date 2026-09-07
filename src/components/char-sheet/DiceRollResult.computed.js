@@ -94,6 +94,19 @@ export function useDiceRollState(props) {
 
     const isSaveDamageType = type === 'save-damage';
 
+    // CLA-339: Stroke of Luck triggers only on a FAILED D20 Test. Mirrors the
+    // verified failure-only offer gates (Boon of Combat Prowess: !hit &&
+    // !isAutoMiss; Psi-Bolstered Knack: success !== true). When no outcome
+    // flag is known (adjudicated check), the offer stands.
+    const { saveResult, success, waitingForPlayerSave } = props;
+    const d20TestFailed = waitingForPlayerSave
+        ? false
+        : computedHit !== undefined
+            ? (!computedHit && !isAutoMiss)
+            : (saveResult && saveResult.success !== undefined)
+                ? saveResult.success !== true
+                : success !== true;
+
     return {
         mode, setMode,
         rerollUsed, setRerollUsed, rerollResult, setRerollResult,
@@ -113,6 +126,6 @@ export function useDiceRollState(props) {
         safeRolls, finalRoll, originalTotal, displayRoll, displayTotal,
         appliesReplace, strReplaceApplied, finalDisplayTotal, wisBonus, wisDisplayTotal,
         reliableTalentTotal, d20Floor10Total, starryDragonFloorTotal, finalTotal, showFumble,
-        effectiveAc, computedHit, isNatural1, homingStrikesApplied,
+        effectiveAc, computedHit, isNatural1, homingStrikesApplied, d20TestFailed,
     };
 }
