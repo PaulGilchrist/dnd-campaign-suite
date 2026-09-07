@@ -6032,7 +6032,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "needs manual decision — see .opencode/plans/bug-FT-087-spell-sniper-clauses-inert.md",
+      "verified": "verified (partial, owner decision 2026-09-07 Option 2) — ASI + clause (d) Increased Range +60 consumed at Distant-Metamagic seam (attack-roll spells >=10ft, test-locked). Clauses (b) bypass-cover + (c) casting-in-melee = ADVISORY/GM-enforced: engine computes no cover and no melee disadvantage on the spell path, so there is nothing to bypass. Real fix requires a spell-cover/melee subsystem + ignore_cover_ranged source attribution — scoped as a SEPARATE project (see playbook)",
       "triggerConditions": "",
       "expectedBehavior": "Ability Score Increase. Increase your Intelligence, Wisdom, or Charisma score by 1, to a maximum of 20. Bypass Cover. Your attack rolls for spells ignore Half Cover and Three-Quarters Cover. Casting in Melee. Being within 5 feet of an enemy doesn't impose Disadvantage on your attack rolls with spells. Increased Range. When you cast a spell that has a range of at least 10 feet and requires you to make an attack roll, you can increase the spell's range by 60 feet."
     },
@@ -6043,7 +6043,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "needs manual decision — see .opencode/plans/bug-CLA-325-spell-thief-negate-block-castability-inert.md",
+      "verified": "verified (partial, owner decision 2026-09-07 Option 2) — Reaction-row gated + INT save vs rogue DC + negate via Counterspell rollback + stolen-spell castable injection + PC-list block enforced. Clause (e) monster 8h recast-block = ADVISORY/GM-enforced (block key recorded + honest log; no monster-path consumer, none built by design)",
       "class": "Rogue",
       "triggerConditions": "Trigger: spell_cast; Action: 1 reaction",
       "expectedBehavior": "Immediately after a creature casts a spell targeting you or including you in its area, take Reaction to force Intelligence save (your spell save DC). On failed save, negate spell and steal knowledge of spell (level 1+, of a level you can cast). For 8 hours you have the spell prepared. Creature can't cast it until 8 hours pass. Once per Long Rest."
@@ -6139,7 +6139,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "needs manual decision — see .opencode/plans/bug-CLA-333-step-of-the-wind.md",
+      "verified": "verified (partial, owner decision 2026-09-07 Option A) — FP double-spend fixed (handler sole FP writer) + RAW free base Dash now granted at FP=0 (never refused) with Disengage+Dash+doubled-jump auto-upgrade at FP>=1 (no_opportunity_attacks self-te + turn-start expiration). Deferred: numeric Dash/jump distance + after_attack_action trigger gate — no gridless movement/turn-action model exists app-wide",
       "class": "Monk",
       "triggerConditions": "Trigger: after_attack_action; Action: 1 bonus action",
       "expectedBehavior": "Take Dash as Bonus Action, or expend 1 Focus Point for Disengage + Dash with doubled jump distance."

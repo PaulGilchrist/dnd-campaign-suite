@@ -138,6 +138,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     if (!casterCreature) {
         return refuse(`${featureName} — ${casterName} is not in combat.`);
     }
+    const isMonsterCaster = casterCreature.type !== 'player';
 
     const spellName = normalizeStolenSpellName(action.spellName || attackEvent.attackName || attackEvent.damageName || 'unknown spell');
 
@@ -198,11 +199,19 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         await addBlockedSpell(playerName, casterName, spellName, campaignName);
         await addStolenSpell(playerName, casterName, spellName, campaignName);
 
+        // CLA-325 (e) — advisory model (owner decision 2026-09-07): the caster-block key
+        // is recorded and IS enforced on player spell lists (spellCalc2024 filters them),
+        // but there is no monster-path consumer — a blocked MONSTER recasting the stolen
+        // spell is GM-enforced, not engine-enforced. The log states this honestly.
+        const blockNote = isMonsterCaster
+            ? ` ${casterName} is blocked from recasting ${spellName} for 8 hours (recorded; GM-enforced for monsters).`
+            : ` ${casterName} cannot cast ${spellName} for 8 hours.`;
+
         addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerName,
             abilityName: featureName,
-            description: `${casterName} failed INT save (DC ${saveDc}). Spell negated.${negationNote} ${playerName} steals ${spellName} for 8 hours. ${casterName} cannot cast ${spellName} for 8 hours.`,
+            description: `${casterName} failed INT save (DC ${saveDc}). Spell negated.${negationNote} ${playerName} steals ${spellName} for 8 hours.${blockNote}`,
         }).catch((e) => { console.error("[spellThief] Error:", e); });
 
         window.dispatchEvent(new CustomEvent('combat-summary-updated'));
