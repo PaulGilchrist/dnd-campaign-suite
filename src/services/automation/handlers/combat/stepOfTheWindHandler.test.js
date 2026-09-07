@@ -20,12 +20,17 @@ vi.mock('./destructiveStrideHandler.js', () => ({
     handle: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('../../../rules/effects/expirations.js', () => ({
+    addExpiration: vi.fn(),
+}));
+
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './stepOfTheWindHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
 import * as destructiveStride from './destructiveStrideHandler.js';
+import * as expirations from '../../../rules/effects/expirations.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -154,7 +159,7 @@ describe('stepOfTheWindHandler — normal Step of the Wind', () => {
             type: 'ability_use',
             characterName: 'TestMonk',
             abilityName: 'Step of the Wind',
-            description: 'TestMonk used Step of the Wind to Dash or Disengage as a bonus action',
+            description: 'TestMonk used Step of the Wind to Dash or Disengage as a bonus action (no Opportunity Attacks against you until the start of your next turn)',
         });
     });
 
@@ -216,7 +221,7 @@ describe('stepOfTheWindHandler — Heightened Step of the Wind', () => {
             type: 'ability_use',
             characterName: 'TestMonk',
             abilityName: 'Heightened Step of the Wind',
-            description: 'TestMonk used Heightened Step of the Wind to Dash or Disengage as a bonus action, moving a willing creature within 5 feet (Large or smaller) with you',
+            description: 'TestMonk used Heightened Step of the Wind to Dash or Disengage as a bonus action (no Opportunity Attacks against you until the start of your next turn), moving a willing creature within 5 feet (Large or smaller) with you',
         });
     });
 
@@ -680,5 +685,99 @@ describe('stepOfTheWindHandler — class_levels edge cases', () => {
         // No class level with level === 5, so maxFocus = 0
         expect(result.type).toBe('popup');
         expect(result.payload.description).toBe('Not enough Focus Points. 0/1 required.');
+    });
+});
+
+// ── Tests: CLA-333 single FP writer + Disengage te ─────────────
+
+describe('stepOfTheWindHandler — CLA-333 single FP writer + Disengage te', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('one activation spends exactly 1 FP once (no double-spend)', async () => {
+        setupRuntimeMocks({
+            'TestMonk:focusPoints:TestCampaign': 17,
+        });
+
+        const playerStats = makePlayerStats({ level: 17, class: { class_levels: [{ level: 17, focus_points: 17 }] } });
+        const action = makeAction({ name: 'Heightened Step of the Wind' });
+
+        const result = await handle(action, playerStats, campaignName);
+
+        const focusWrites = runtimeState.setRuntimeValue.mock.calls.filter(
+            call => call[1] === 'focusPoints',
+        );
+        expect(focusWrites).toHaveLength(1);
+        expect(focusWrites[0]).toEqual(['TestMonk', 'focusPoints', 16, campaignName]);
+        expect(result.payload.description).toContain('(16 Focus Points remaining)');
+    });
+
+    it('dispatches focus-points-updated after spending FP', async () => {
+        setupRuntimeMocks({
+            'TestMonk:focusPoints:TestCampaign': 5,
+        });
+        const listener = vi.fn();
+        window.addEventListener('focus-points-updated', listener);
+
+        const action = makeAction();
+        await handle(action, makePlayerStats(), campaignName);
+
+        expect(listener).toHaveBeenCalledTimes(1);
+        window.removeEventListener('focus-points-updated', listener);
+    });
+
+    it('writes self-target no_opportunity_attacks te appended to existing effects', async () => {
+        setupRuntimeMocks({
+            'TestMonk:focusPoints:TestCampaign': 2,
+            'campaign:targetEffects:TestCampaign': [
+                { target: 'Goblin', source: 'Someone', effect: 'next_attack_advantage' },
+            ],
+        });
+
+        const action = makeAction();
+        await handle(action, makePlayerStats(), campaignName);
+
+        const teWrites = runtimeState.setRuntimeValue.mock.calls.filter(
+            call => call[1] === 'targetEffects',
+        );
+        expect(teWrites).toHaveLength(1);
+        expect(teWrites[0][0]).toBe('campaign');
+        expect(teWrites[0][3]).toBe(campaignName);
+        expect(teWrites[0][2]).toEqual([
+            { target: 'Goblin', source: 'Someone', effect: 'next_attack_advantage' },
+            { target: 'TestMonk', source: 'Step of the Wind', effect: 'no_opportunity_attacks', value: null, duration: 'until_start_of_next_turn' },
+        ]);
+    });
+
+    it('registers remove_target_effect expiration on the monk at turn start', async () => {
+        setupRuntimeMocks({
+            'TestMonk:focusPoints:TestCampaign': 2,
+        });
+
+        const action = makeAction({ name: 'Heightened Step of the Wind' });
+        await handle(action, makePlayerStats(), campaignName);
+
+        expect(expirations.addExpiration).toHaveBeenCalledWith(
+            'TestMonk',
+            'TestMonk',
+            [{ type: 'remove_target_effect', effectKey: 'no_opportunity_attacks', source: 'Heightened Step of the Wind', target: 'TestMonk' }],
+            campaignName,
+            undefined,
+            'TestMonk',
+        );
+    });
+
+    it('insufficient FP: no te written, no expiration, no FP spend', async () => {
+        setupRuntimeMocks({
+            'TestMonk:focusPoints:TestCampaign': 0,
+        });
+
+        const action = makeAction();
+        const result = await handle(action, makePlayerStats(), campaignName);
+
+        expect(result.payload.description).toBe('Not enough Focus Points. 0/1 required.');
+        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+        expect(expirations.addExpiration).not.toHaveBeenCalled();
     });
 });

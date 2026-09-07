@@ -1,5 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
 import { handle as handleDestructiveStride } from './destructiveStrideHandler.js';
 
 export async function handle(action, playerStats, campaignName) {
@@ -25,6 +26,20 @@ export async function handle(action, playerStats, campaignName) {
     }
 
     await setRuntimeValue(playerName, 'focusPoints', currentFocus - cost, campaignName);
+    window.dispatchEvent(new CustomEvent('focus-points-updated'));
+
+    // Disengage mechanical output: self-target no_opportunity_attacks te until the
+    // start of your next turn (registry entry exists; consumed by computeConditionEffects
+    // via riderCannotOpportunityAttack badges). CLA-333 — mirrors the patientDefense
+    // Dodge expiration and executeManeuver self-target te patterns.
+    const storedEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+    await setRuntimeValue('campaign', 'targetEffects', [
+        ...storedEffects,
+        { target: playerName, source: action.name, effect: 'no_opportunity_attacks', value: null, duration: 'until_start_of_next_turn' },
+    ], campaignName);
+    addExpiration(playerName, playerName, [
+        { type: 'remove_target_effect', effectKey: 'no_opportunity_attacks', source: action.name, target: playerName },
+    ], campaignName, undefined, playerName);
 
     let description = `${playerName} used ${action.name}: Dash or Disengage as a bonus action. Your jump distance is doubled.`;
     if (isHeightened) {
@@ -32,7 +47,7 @@ export async function handle(action, playerStats, campaignName) {
     }
     description += ` (${currentFocus - cost} Focus Points remaining).`;
 
-    let logDesc = `${playerName} used ${action.name} to Dash or Disengage as a bonus action`;
+    let logDesc = `${playerName} used ${action.name} to Dash or Disengage as a bonus action (no Opportunity Attacks against you until the start of your next turn)`;
     if (isHeightened) {
         logDesc += `, moving a willing creature within 5 feet (Large or smaller) with you`;
     }

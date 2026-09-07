@@ -174,7 +174,10 @@ export default function useCharActionsAutomation({
         // Skip pre-spend for 2024 patient_defense: patientDefenseHandler is the sole FP
         // writer (focus mode spends 1 FP, plain Disengage spends none) — pre-spending here
         // double-charged and blocked the plain-Disengage fallback (CLA-247)
-        if (MONK_KI_FEATURES.includes(action.name) && auto?.type !== 'patient_defense') {
+        // Skip pre-spend for step_of_the_wind too: stepOfTheWindHandler is the sole FP
+        // writer for both rulesets (gates FP>=1, spends once, writes the Disengage te) —
+        // pre-spending here double-charged 2 FP per click (CLA-333)
+        if (MONK_KI_FEATURES.includes(action.name) && auto?.type !== 'patient_defense' && auto?.type !== 'step_of_the_wind') {
             const skipFP = (HAS_FLURRY_HEALING_HARM && (action.name === 'Hand of Healing' || action.name === 'Flurry of Blows' || action.name === 'Heightened Flurry of Blows'))
                 || (cloakActive && (action.name === 'Flurry of Blows' || action.name === 'Heightened Flurry of Blows'));
             if (!skipFP) {

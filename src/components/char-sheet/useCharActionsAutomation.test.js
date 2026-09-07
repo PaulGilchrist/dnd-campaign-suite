@@ -361,6 +361,59 @@ describe('useCharActionsAutomation', () => {
                 );
             });
 
+            it('should NOT pre-spend FP for step_of_the_wind actions (handler is sole FP writer, CLA-333)', async () => {
+                const grv = vi.fn((charKey, key, _cn) => {
+                    if (key === 'activeBuffs') return [];
+                    if (key === 'focusPoints') return 17;
+                    if (key === 'lastActionSpellCast') return null;
+                    return undefined;
+                });
+
+                for (const actionName of ['Step of the Wind', 'Heightened Step of the Wind']) {
+                    const action = {
+                        name: actionName,
+                        automation: { type: 'step_of_the_wind', cost: { resource: 'focus_points', amount: 1 } },
+                    };
+                    const deps = createDeps({ getRuntimeValue: grv });
+                    const { handleAutomationAction } = getHandlers(deps);
+
+                    await handleAutomationAction(action);
+
+                    expect(deps.setRuntimeValue).not.toHaveBeenCalledWith(
+                        'TestFighter', 'focusPoints', expect.any(Number), campaignName
+                    );
+                    expect(deps.executeHandler).toHaveBeenCalledWith(
+                        action, basePlayerStats, campaignName, 'test-map', []
+                    );
+                }
+            });
+
+            it('should pass step_of_the_wind FP=0 gate down to the handler (CLA-333)', async () => {
+                const grv = vi.fn((charKey, key, _cn) => {
+                    if (key === 'activeBuffs') return [];
+                    if (key === 'focusPoints') return 0;
+                    if (key === 'lastActionSpellCast') return null;
+                    return undefined;
+                });
+                const playerStats = { ...basePlayerStats, rules: '2024' };
+                const action = {
+                    name: 'Heightened Step of the Wind',
+                    automation: { type: 'step_of_the_wind', cost: { resource: 'focus_points', amount: 1 } },
+                };
+
+                const deps = createDeps({ getRuntimeValue: grv, playerStats });
+                const { handleAutomationAction } = getHandlers(deps);
+
+                await handleAutomationAction(action);
+
+                expect(deps.setRuntimeValue).not.toHaveBeenCalledWith(
+                    'TestFighter', 'focusPoints', expect.any(Number), campaignName
+                );
+                expect(deps.executeHandler).toHaveBeenCalledWith(
+                    action, playerStats, campaignName, 'test-map', []
+                );
+            });
+
             it('should skip FP spending for Flurry of Blows when Flurry of Healing and Harm is active', async () => {
                 const grv = vi.fn((charKey, key, _cn) => {
                     if (key === 'activeBuffs') return [];
