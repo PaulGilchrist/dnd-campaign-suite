@@ -318,7 +318,7 @@ describe('stinkingCloudHandler', () => {
       );
     });
 
-    it('should call addExpiration exactly once', async () => {
+    it('should call addExpiration for zone area and concentration expiry', async () => {
       getCombatContext.mockResolvedValue(singleTargetCombat);
       getRuntimeValue.mockImplementation((key, field) => {
         if (key === 'campaign' && field === 'targetEffects') return [];
@@ -331,8 +331,8 @@ describe('stinkingCloudHandler', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      // Should be called once: for concentration expiration
-      expect(addExpiration).toHaveBeenCalledTimes(1);
+      // Zone area expiration (1 minute = 10 rounds) + poisoned/concentration expiry
+      expect(addExpiration).toHaveBeenCalledTimes(2);
     });
 
     it('should track stinking_cloud in targetEffects', async () => {

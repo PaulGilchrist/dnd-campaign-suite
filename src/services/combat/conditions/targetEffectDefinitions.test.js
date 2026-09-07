@@ -203,7 +203,19 @@ describe('targetEffectDefinitions', () => {
         expect(effectKeys).toContain('prismatic_spray_violet');
         expect(effectKeys).toContain('sanctuary');
         expect(effectKeys).toContain('sleet_storm');
+        expect(effectKeys).toContain('stinking_cloud');
         expect(effectKeys).toContain('warding_bond');
+      });
+
+      it('SP-111: registers stinking_cloud zone and no_action_and_bonus_action block', () => {
+        const cloud = getEffectDefinition('stinking_cloud');
+        expect(cloud).toBeDefined();
+        expect(cloud.group).toBe('Spells');
+        expect(cloud.fields).toContain('dc');
+
+        const block = getEffectDefinition('no_action_and_bonus_action');
+        expect(block).toBeDefined();
+        expect(block.cls).toBe('effect-cannot-act');
       });
 
       it('polymorph effects have beastName field', () => {

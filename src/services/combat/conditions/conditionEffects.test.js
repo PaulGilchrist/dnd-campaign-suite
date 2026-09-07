@@ -376,6 +376,14 @@ describe('conditionEffects', () => {
         expect(computeConditionEffects([], [], [{ effect: 'no_reactions' }]).riderNoReactions).toBe(true);
       });
 
+      it('SP-111: generic Poisoned never blocks actions in computeConditionEffects', () => {
+        // The Poisoned-by-Stinking-Cloud block is a per-source te consumed at
+        // the sheet level (computeCharConditionEffects → cannotActActions) —
+        // generic Poisoned must not set cannotAct here (would block app-wide).
+        expect(computeConditionEffects(['poisoned'], [], []).cannotAct).toBe(false);
+        expect(computeConditionEffects([], [], []).cannotActReason).toBeNull();
+      });
+
       it('handles cleave, nick, and topple effects', () => {
         const cleaveResult = computeConditionEffects([], [], [{ effect: 'cleave', target: 'creature1', source: 'creature2' }]);
         expect(cleaveResult.cleaveAttack).toBe(true);

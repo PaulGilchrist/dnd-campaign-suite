@@ -120,6 +120,15 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source'],
   },
   {
+    effect: 'no_action_and_bonus_action',
+    label: 'No Actions or Bonus Actions',
+    description: 'The creature can\'t take an Action or a Bonus Action (e.g. while Poisoned by Stinking Cloud).',
+    icon: 'fa-ban',
+    cls: 'effect-cannot-act',
+    group: 'Defensive',
+    fields: ['source'],
+  },
+  {
     effect: 'no_opportunity_attacks',
     label: 'No Opportunity Attacks',
     description: 'The creature cannot make Opportunity Attacks.',
@@ -679,6 +688,16 @@ const TARGET_EFFECT_DEFINITIONS = [
     label: 'Sleet Storm',
     description: 'Area is Heavily Obscured with Difficult Terrain. Creatures entering or starting turn in area must make DEX save or become Prone and lose Concentration. Concentration spell, up to 1 minute.',
     icon: 'fa-snowflake',
+    cls: 'effect-debuff',
+    group: 'Spells',
+    fields: ['source', 'dc'],
+  },
+
+  {
+    effect: 'stinking_cloud',
+    label: 'Stinking Cloud',
+    description: 'Inside a Stinking Cloud sphere (20-foot radius): at the start of its turn the creature must make a CON save (DC indicated) or have the Poisoned condition until the end of the current turn. While Poisoned in this way, the creature can\'t take an Action or a Bonus Action. The cloud is Heavily Obscured. Concentration, up to 1 minute.',
+    icon: 'fa-smog',
     cls: 'effect-debuff',
     group: 'Spells',
     fields: ['source', 'dc'],

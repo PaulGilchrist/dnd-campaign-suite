@@ -242,8 +242,20 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const targetSaveModifiers = target?.type === 'player' ? targetComputed?.saveModifiers : (target?.saveModifiers || []);
 
     const attackerEffects = computeConditionEffects(attackerConditions, targetSaveModifiers, monsterTargetEffects, false, false, false, false, null, false, null, false, false, false, false, false, false, false, monsterSensesArray)
-    const attackerCannotAct = attackerConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c))
-    if (attackerCannotAct) return
+    const cloudActionBlock = monsterTargetEffects.some(te => te.effect === 'no_action_and_bonus_action')
+    const attackerCannotAct = attackerConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c)) || cloudActionBlock
+    if (attackerCannotAct) {
+        if (cloudActionBlock) {
+            addEntry(campaignName, {
+                type: 'automation blocked',
+                characterName: monsterName,
+                abilityName: name,
+                description: `${monsterName} is Poisoned by Stinking Cloud and can't take an Action or Bonus Action — ${name} refused.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[MonsterCardModal] Error:', e); });
+        }
+        return
+    }
 
     const targetRiderForTarget = allTargetEffects.filter(te => te.target === target?.name)
     const targetEffectData = computeConditionEffects(targetConditions, targetSaveModifiers, targetRiderForTarget, false, false, false, false, null, false, null, false, false, false, false, false, false, false, null)
@@ -458,6 +470,12 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     return (creature.conditions || []).some(c => CONDITIONS_THAT_CANNOT_ACT.has(c.key));
   }, [getAttackerCreature]);
 
+  // SP-111: Stinking Cloud's "can't take an Action or Bonus Action" rider —
+  // blocks Actions/Traits/Legendary rows but NOT Reactions (those stay
+  // gated solely by the condition-based attackerCannotAct above).
+  const attackerActionBlocked = attackerCannotAct
+    || monsterTargetEffects.some(te => te.effect === 'no_action_and_bonus_action');
+
   const hasShareableEvasionForSave = useCallback((saveType) => {
     if (!saveType || !characters) return false;
     const normalizedSaveType = normalizeSaveType(saveType);
@@ -511,6 +529,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         handleSaveThrow={handleSaveThrow}
         handleSkillCheck={handleSkillCheck}
         attackerCannotAct={attackerCannotAct}
+        attackerActionBlocked={attackerActionBlocked}
         handleAttack={handleAttack}
         handleDamage={handleDamage}
         handleSaveRoll={handleSaveRoll}

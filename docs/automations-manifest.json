@@ -6032,7 +6032,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-FT-087-spell-sniper-clauses-inert.md",
+      "verified": "needs manual decision — see .opencode/plans/bug-FT-087-spell-sniper-clauses-inert.md",
       "triggerConditions": "",
       "expectedBehavior": "Ability Score Increase. Increase your Intelligence, Wisdom, or Charisma score by 1, to a maximum of 20. Bypass Cover. Your attack rolls for spells ignore Half Cover and Three-Quarters Cover. Casting in Melee. Being within 5 feet of an enemy doesn't impose Disadvantage on your attack rolls with spells. Increased Range. When you cast a spell that has a range of at least 10 feet and requires you to make an attack roll, you can increase the spell's range by 60 feet."
     },
@@ -6055,7 +6055,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-SP-111-stinking-cloud-zone-turn-start-save-action-block-inert.md",
+      "verified": "verified — Stinking Cloud now a real zone: recurring turn-start CON save (Phase-4 consumer in expireStaleEffects, centered/radius persisted), Poisoned clears at turn-end, source-scoped Action/Bonus-Action block live on PC+monster cards, stinking_cloud registered; 4355-suite green",
       "class": "Spell",
       "triggerConditions": "",
       "expectedBehavior": "You create a 20-foot-radius Sphere of yellow, nauseating gas centered on a point within range. The cloud is Heavily Obscured. The cloud lingers in the air for the duration or until a strong wind (such as the one created by Gust of Wind) disperses it. Each creature that starts its turn in the Sphere must succeed on a Constitution saving throw or have the Poisoned condition until the end of the current turn. While Poisoned in this way, the creature can't take an action or a Bonus Action."

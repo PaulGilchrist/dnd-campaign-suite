@@ -30,7 +30,21 @@ export default function useCharActionsAttackHandlers({
     const PSY_BLADE_SECOND_ROUND_KEY = '_PsychicBlade_secondBlade_round';
 
     function handleAttackClick(attack) {
-        if (cannotAct) return;
+        if (cannotAct) {
+            const cloudBlock = (getRuntimeValue('campaign', 'targetEffects', campaignName) || [])
+                .some(te => te && te.effect === 'no_action_and_bonus_action' && te.target === playerName);
+            if (cloudBlock) {
+                addEntry(campaignName, {
+                    type: 'automation blocked',
+                    characterName: playerName,
+                    abilityName: attack?.name || 'Attack',
+                    description: `${playerName} is Poisoned by Stinking Cloud and can't take an Action or Bonus Action — attack refused.`,
+                    timestamp: Date.now(),
+                }).catch((e) => { console.error("[useCharActionsAttackHandlers:log-error]", e); });
+                setPopupHtml('<b>Stinking Cloud</b><br/>You are Poisoned by Stinking Cloud and can\'t take an Action or a Bonus Action until the end of your current turn.<br/><span class="dice-roll-hint">click to dismiss</span>');
+            }
+            return;
+        }
         if (attack?.isPsychicBlade) {
             const currentRound = getCurrentCombatRound(campaignName);
             if (attack.type === 'Bonus Action') {

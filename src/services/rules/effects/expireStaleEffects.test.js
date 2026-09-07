@@ -29,7 +29,14 @@ vi.mock('../../encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(),
 }));
 
+vi.mock('../../automation/handlers/spells/stinkingCloudHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue(null),
+  processStinkingCloudAreaSave: vi.fn().mockResolvedValue(null),
+  applyStinkingCloudTurnEnd: vi.fn().mockResolvedValue(null),
+}));
+
 import { expireStaleEffects } from './expirations.js';
+import { processStinkingCloudAreaSave } from '../../automation/handlers/spells/stinkingCloudHandler.js';
 import { getRuntimeValue, setRuntimeValue, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
 import utils from '../../ui/utils.js';
 import {
@@ -325,5 +332,62 @@ describe('expireStaleEffects — error recovery', () => {
       );
       expect(goblinKeyCalls.length).toBe(0);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// expireStaleEffects — SP-111 Stinking Cloud turn-start saves (Phase 4)
+// ---------------------------------------------------------------------------
+describe('expireStaleEffects — SP-111 Stinking Cloud turn-start saves', () => {
+  beforeEach(() => {
+    resetMocks();
+    stubUtilsNameIdentity();
+    getCurrentCombatRound.mockReturnValue(2);
+    getActiveCreatureName.mockReturnValue('Thug 1');
+  });
+
+  it('forces a CON area save when the active creature has a live stinking_cloud te', async () => {
+    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Thug 1' }] });
+    getRuntimeValue.mockImplementation((key, prop) => {
+      if (key === 'campaign' && prop === 'targetEffects') {
+        return [{ target: 'Thug 1', effect: 'stinking_cloud', source: 'TestWizard', duration: 'concentration', dc: 18 }];
+      }
+      if (key === 'TestWizard' && prop === '_stinkingCloud_TestWizard') {
+        return { saveDc: 18, saveType: 'CON', radius: 20, mapName: 'Cave' };
+      }
+      return null;
+    });
+
+    await expireStaleEffects('test-campaign');
+
+    expect(processStinkingCloudAreaSave).toHaveBeenCalledWith('TestWizard', 'Thug 1', 'test-campaign', 'Cave');
+  });
+
+  it('skips the save when the caster zone tracking is gone (cloud ended)', async () => {
+    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Thug 1' }] });
+    getRuntimeValue.mockImplementation((key, prop) => {
+      if (key === 'campaign' && prop === 'targetEffects') {
+        return [{ target: 'Thug 1', effect: 'stinking_cloud', source: 'TestWizard', duration: 'concentration', dc: 18 }];
+      }
+      return null;
+    });
+
+    await expireStaleEffects('test-campaign');
+
+    expect(processStinkingCloudAreaSave).not.toHaveBeenCalled();
+  });
+
+  it('does not force saves for creatures without a stinking_cloud te', async () => {
+    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Thug 1' }] });
+    getRuntimeValue.mockImplementation((key, prop) => {
+      if (key === 'campaign' && prop === 'targetEffects') {
+        return [{ target: 'Rug', effect: 'stinking_cloud', source: 'TestWizard', duration: 'concentration', dc: 18 }];
+      }
+      return null;
+    });
+
+    await expireStaleEffects('test-campaign');
+
+    expect(processStinkingCloudAreaSave).not.toHaveBeenCalled();
   });
 });

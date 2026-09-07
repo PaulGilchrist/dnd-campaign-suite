@@ -28,6 +28,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     autoFailSaves: [],
     saveDisadvantage: [],
     cannotAct: false,
+    cannotActReason: null,
     speedZero: false,
     speedReduction: 0,
     concentrationBroken: false,
@@ -357,6 +358,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     if (te.effect === 'no_reactions') {
       effects.riderNoReactions = true;
     }
+
     if (te.effect === 'speed_reduction') {
       effects.speedReduction = (effects.speedReduction || 0) + (te.value || 10);
     }

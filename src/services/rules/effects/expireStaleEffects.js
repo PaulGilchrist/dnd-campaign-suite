@@ -3,6 +3,7 @@ import utils from '../../ui/utils.js';
 import { getCurrentCombatRound, getActiveCreatureName, getCombatSummary } from '../../encounters/combatData.js';
 import { expireForCreature, expireForTarget } from './expirationQueue.js';
 import { processSleetStormAreaSave } from '../../automation/handlers/spells/sleetStormHandler.js';
+import { processStinkingCloudAreaSave } from '../../automation/handlers/spells/stinkingCloudHandler.js';
 
 /**
  * Expire stale pendingExpirations at the start of each creature's turn.
@@ -69,6 +70,26 @@ export async function expireStaleEffects(campaignName, overrideActiveName) {
                     } catch (_e) { console.error(`[expireStaleEffects] Sleet Storm area save failed for ${teTargetName}:`, _e); }
                 }
             }
+
+            // Phase 4: SP-111 Stinking Cloud recurring turn-start CON saves.
+            // Each creature that starts its turn with a live stinking_cloud te
+            // (written by the cast, swept by the concentration break) re-saves at
+            // CON DC stored on the caster's `_stinkingCloud_<caster>` zone tracking
+            // (SP-108 sleetStorm Phase 3 pattern). Poisoned on a failed save; the
+            // action/bonus-action block and Poisoned are shed at that creature's
+            // turn end by applyStinkingCloudTurnEnd.
+            const allCloudEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+            const cloudEffects = Array.isArray(allCloudEffects)
+                ? allCloudEffects.filter(te => te && te.effect === 'stinking_cloud' && te.target === activeName)
+                : [];
+            for (const te of cloudEffects) {
+                const casterTrackingKey = `_stinkingCloud_${String(te.source || '').replace(/\s+/g, '_')}`;
+                const cloudTracking = getRuntimeValue(te.source, casterTrackingKey, campaignName);
+                if (!cloudTracking || !cloudTracking.saveDc) continue;
+                try {
+                    await processStinkingCloudAreaSave(te.source, activeName, campaignName, cloudTracking.mapName);
+                } catch (_e) { console.error(`[expireStaleEffects] Stinking Cloud turn-start save failed for ${activeName}:`, _e); }
+            }
         }
-    } catch (_e) { console.error('[expireStaleEffects] Sleet Storm expiration processing failed:', _e); }
+    } catch (_e) { console.error('[expireStaleEffects] Zone save expiration processing failed:', _e); }
 }

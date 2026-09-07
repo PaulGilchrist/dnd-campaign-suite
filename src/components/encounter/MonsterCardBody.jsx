@@ -7,7 +7,7 @@ import { EFFECT_DESCRIPTIONS } from '../../services/combat/conditions/effectDesc
 import { MonsterAction } from './MonsterAction.jsx';
 import { hasEntries, hasSenseEntries, saveAbilityAbbr, parseInitiativeBonus, formatSenses } from './MonsterCardHelpers.js';
 
-export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName }) {
+export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked = attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName }) {
   const content = useMemo(() => {
     if (!monster) return null;
 
@@ -45,7 +45,7 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
               <hr />
               <div className="mc-section">
                 {monster.traits.map((t, i) => (
-                  <MonsterAction key={i} action={t} index={i} attackerCannotAct={attackerCannotAct} onAttack={handleAttack} onDamage={handleDamage} onSaveRoll={handleSaveRoll} />
+                  <MonsterAction key={i} action={t} index={i} attackerCannotAct={attackerActionBlocked} onAttack={handleAttack} onDamage={handleDamage} onSaveRoll={handleSaveRoll} />
                 ))}
               </div>
             </>
@@ -56,7 +56,7 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
               <h5 className="mc-section-title">Actions</h5>
               <div className="mc-section">
                 {monster.actions.map((a, i) => (
-                  <MonsterAction key={i} action={a} index={i} attackerCannotAct={attackerCannotAct} onAttack={handleAttack} onDamage={handleDamage} onSaveRoll={handleSaveRoll} />
+                  <MonsterAction key={i} action={a} index={i} attackerCannotAct={attackerActionBlocked} onAttack={handleAttack} onDamage={handleDamage} onSaveRoll={handleSaveRoll} />
                 ))}
               </div>
             </>
@@ -78,7 +78,7 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
               <h5 className="mc-section-title">Legendary Actions</h5>
               <div className="mc-section">
                 {monster.legendary_actions.map((la, i) => (
-                  <MonsterAction key={i} action={la} index={i} attackerCannotAct={attackerCannotAct} onAttack={handleAttack} onDamage={handleDamage} onSaveRoll={handleSaveRoll} />
+                  <MonsterAction key={i} action={la} index={i} attackerCannotAct={attackerActionBlocked} onAttack={handleAttack} onDamage={handleDamage} onSaveRoll={handleSaveRoll} />
                 ))}
               </div>
             </>
@@ -125,7 +125,7 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
         </div>
       </div>
     );
-  }, [monster, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterName]);
+  }, [monster, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked, handleAttack, handleDamage, handleSaveRoll, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterName]);
 
   return content;
 }

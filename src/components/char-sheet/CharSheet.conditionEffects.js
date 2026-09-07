@@ -202,12 +202,20 @@ export function computeCharConditionEffects(playerSummary, playerStats, campaign
     }
 
     const cannotAct = activeConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c));
+    // SP-111: the Poisoned-by-Stinking-Cloud rider blocks Actions + Bonus
+    // Actions but NOT Reactions — cannotActActions feeds CharActions /
+    // CharBonusActions / CharSpells / CharSpecialActions; CharReactions keeps
+    // the condition-only cannotAct.
+    const cloudBlockTe = myTargetEffects.find(te => te && te.effect === 'no_action_and_bonus_action');
+    const cannotActActions = cannotAct || conditionEffects.cannotAct === true || !!cloudBlockTe;
     const conditionAttackMode = getNetAttackMode(conditionEffects.attackAdvantageCount, conditionEffects.attackDisadvantageCount, conditionEffects.restoreBalance);
     const exhausted = 2 * exhaustionLevel;
 
     return {
         conditionEffects,
         cannotAct,
+        cannotActActions,
+        cannotActReason: cloudBlockTe ? (cloudBlockTe.reason || 'Can\'t take an Action or Bonus Action') : null,
         conditionAttackMode,
         isRaging,
         shapeShiftActive,

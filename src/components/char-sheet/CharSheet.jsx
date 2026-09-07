@@ -392,7 +392,7 @@ function CharSheetContent({
     // te consumed by attackPostProcessing after an attack roll recomputes
     // conditionAttackMode immediately (no sheet remount needed for the next attack).
     void useRuntimeValue('campaign', 'targetEffects', campaignName);
-    const { conditionEffects, cannotAct, conditionAttackMode, isRaging, exhaustionPenalty } = computeCharConditionEffects(playerSummary, playerStats, campaignName, activeBuffs);
+    const { conditionEffects, cannotAct, cannotActActions, cannotActReason, conditionAttackMode, isRaging, exhaustionPenalty } = computeCharConditionEffects(playerSummary, playerStats, campaignName, activeBuffs);
 
     const luckyAdvantageActive = useRuntimeValue(playerStats?.name, 'luckyAdvantageActive', campaignName);
     const luckyDisadvantageActive = useRuntimeValue(playerStats?.name, 'luckyDisadvantageActive', campaignName);
@@ -582,7 +582,8 @@ function CharSheetContent({
                     exhaustionPenalty={exhaustionPenalty}
                     conditionAttackMode={effectiveAttackMode}
                     conditionEffects={conditionEffects}
-                    cannotAct={cannotAct}
+                    cannotAct={cannotActActions}
+                    cannotActReason={cannotActReason}
                     mapName={activeMapName}
                     onBuffsChange={handleBuffsChange}
                     characters={characters}
@@ -596,9 +597,9 @@ function CharSheetContent({
                     mapName={activeMapName}
                     characters={characters}
                 ></CharReactions>
-                <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={effectiveAttackMode} cannotAct={cannotAct} mapName={activeMapName} characters={characters} setModalState={setModalState}></CharSpells>
+                <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={effectiveAttackMode} cannotAct={cannotActActions} mapName={activeMapName} characters={characters} setModalState={setModalState}></CharSpells>
                 <CharInventory playerStats={playerStats}></CharInventory>
-                <CharSpecialActions playerStats={playerStats} campaignName={campaignName} cannotAct={cannotAct} characters={characters} mapName={activeMapName}></CharSpecialActions>
+                <CharSpecialActions playerStats={playerStats} campaignName={campaignName} cannotAct={cannotActActions} characters={characters} mapName={activeMapName}></CharSpecialActions>
                 <div className='no-print'><CharCharacterAdvancement playerStats={playerStats} campaignName={campaignName}></CharCharacterAdvancement></div>
             </div>
         </React.Fragment>

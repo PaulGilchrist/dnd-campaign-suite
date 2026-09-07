@@ -46,7 +46,7 @@ import { applyMasteryEffect } from '../../services/automation/handlers/combat/we
 import { normalizeAutoDamage } from './useAttackDamageResolution.js';
 
 import './CharActions.css'
-const CharActions = function CharActions({ playerStats, campaignName, exhaustionPenalty = 0, conditionAttackMode, conditionEffects, cannotAct, mapName, onBuffsChange, characters, onSpellModalStateChange, spellModalState }) {
+const CharActions = function CharActions({ playerStats, campaignName, exhaustionPenalty = 0, conditionAttackMode, conditionEffects, cannotAct, cannotActReason = null, mapName, onBuffsChange, characters, onSpellModalStateChange, spellModalState }) {
     const [actions, setActions] = useState([]);
     const [selectedActionSpell, setSelectedActionSpell] = useState(null);
     const [featRangeEffects, setFeatRangeEffects] = useState(null);
@@ -398,7 +398,7 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
              */}
             <div>
                 <div className='sectionHeader'>Actions</div>
-                {cannotAct && <span className='disabled-attack-label'>(Incapacitated)</span>}
+                {cannotAct && <span className='disabled-attack-label'>({cannotActReason || 'Incapacitated'})</span>}
                 <div className={`attacks ${is2024Rules && hasWeaponMastery ? 'mastery-enabled' : ''}`}>
                     <div className='left'><b>Name</b></div>
                     <div><b>Level</b></div>

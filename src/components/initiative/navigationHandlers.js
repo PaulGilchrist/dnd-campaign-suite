@@ -5,6 +5,7 @@ import { getNextCreatureName, getPreviousCreatureName } from '../../services/enc
 import { clearPerRoundMajestyTrackers } from '../../services/combat/auras/unbreakableMajesty.js'
 import { expireStaleEffects, applyTurnStartEffects, applyTurnEndConditionRemoval } from '../../services/rules/effects/expirations.js'
 import { applySleepTurnEnd } from '../../services/rules/features/sleepService.js'
+import { applyStinkingCloudTurnEnd } from '../../services/automation/handlers/spells/stinkingCloudHandler.js'
 import { getCombatSummary } from '../../services/encounters/combatData.js'
 
 // Turn-start effects must re-apply each round, so the dedupe key is round-scoped.
@@ -81,6 +82,10 @@ export function createNextCreatureHandler({
             // success sheds Incapacitated, failure escalates to Unconscious for the duration.
             applySleepTurnEnd(campaignName, activeCreatureName)
                 .catch((e) => { console.error('[navigationHandlers] SP-107 sleep turn-end save failed:', e) })
+            // SP-111: Stinking Cloud Poisoned + action/bonus-action block last only
+            // until the end of the OUTGOING creature's current turn.
+            applyStinkingCloudTurnEnd(campaignName, activeCreatureName)
+                .catch((e) => { console.error('[navigationHandlers] SP-111 stinking cloud turn-end cleanup failed:', e) })
         }
         expireStaleEffects(campaignName, newActiveName)
         // BUG CLA-198: turn-start effects must run for EVERY newly active creature, not just
