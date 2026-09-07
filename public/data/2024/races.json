@@ -299,6 +299,7 @@
                 "automation": {
                     "type": "stonecunning",
                     "effect": "tremorsense_60ft",
+                    "duration": "10_minutes",
                     "uses": "proficiency_bonus",
                     "recharge": "long_rest",
                     "casting_time": "1 bonus action"

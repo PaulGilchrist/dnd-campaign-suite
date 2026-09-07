@@ -6139,7 +6139,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-333-step-of-the-wind.md",
+      "verified": "needs manual decision — see .opencode/plans/bug-CLA-333-step-of-the-wind.md",
       "class": "Monk",
       "triggerConditions": "Trigger: after_attack_action; Action: 1 bonus action",
       "expectedBehavior": "Take Dash as Bonus Action, or expend 1 Focus Point for Disengage + Dash with doubled jump distance."
@@ -6149,12 +6149,12 @@
       "name": "Stonecunning",
       "type": "racialTrait",
       "handler": "src/services/automation/handlers/class-other/stonecunningHandler.js",
-      "router": "src/services/automation/automation/index.js",
+      "router": "src/services/automation/index.js (dispatch stonecunning:)",
       "infoBuilder": "(real consumers: trackedResources.js uses-counter, restRules-longRest.js LR refill, charSummaryCalc.js/CharSummary.jsx badge)",
       "verified": "verified (PASS-subset)",
       "class": "Dwarf (racial trait, not Ranger — MISATTRIBUTED row fixed in place 2026-09-06)",
       "triggerConditions": "Action: 1 bonus action; Must be on/touching stone; Uses: proficiency_bonus, Recharge: long_rest",
-      "expectedBehavior": "As a Bonus Action, you gain Tremorsense with a range of 60 feet for 10 minutes. You must be on a stone surface or touching a stone surface to use this Tremorsense. The stone can be natural or worked. You can use this Bonus Action a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest. VERIFIED PASS-SUBSET 2026-09-06 (Dwarf, Divine_Cleric lv17 PB+6): bonus-action row + stonecunningUses counter max PB exact + LR refill + tremorsense_60ft buff/badge + ability_use log exact. GAPS (see bug file): no duration expiry registrant (10-min never expires), stone-surface gate unmodellable (app has no sense model §7), first-spend uses lost to same-tick snapshot race, re-click while active silently strips buff."
+      "expectedBehavior": "As a Bonus Action, you gain Tremorsense with a range of 60 feet for 10 minutes. You must be on a stone surface or touching a stone surface to use this Tremorsense. The stone can be natural or worked. You can use this Bonus Action a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest. VERIFIED PASS-SUBSET 2026-09-06 (Dwarf, Divine_Cleric lv17 PB+6): bonus-action row + stonecunningUses counter max PB exact + LR refill + tremorsense_60ft buff/badge + ability_use log exact. FIXED 2026-09-07: dwarven racial trait activation now uses one merged setRuntimeObject write (buff+uses in a single full-store POST, no §6-#18 first-spend race); re-click while active refuses without stripping the buff (popup+state agree, naturesSanctuary precedent); duration '10_minutes' added to races.json automation + addExpiration(remove_active_buff, 100 rounds) registered at activation (engine encodes minutes as rounds, mirrors sacredWeaponHandler). Stone-surface gate + tremorsense sense-model remain display-only (accepted §7)."
     },
     {
       "id": "CLA-335",
