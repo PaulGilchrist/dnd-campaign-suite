@@ -284,6 +284,23 @@ export function getDamageResistances(playerStats) {
                 resistances.push(chosenType);
             }
         }
+        // CLA-336: active-gated type:'resistance' passives (Stormborn Cold/Lightning/
+        // Thunder while Wrath of the Sea is active) must resolve LIVE at hit-resolution.
+        // Gates mirror rulesFactory.getPlayerStats (the compute-time path never sees the
+        // wrathOfTheSeaActive toggle flip). 5e shares this function — 5e data's only
+        // type:'resistance' passive (Avatar of Battle) is always-on and emits ungated.
+        if (passive.type === 'resistance' && Array.isArray(passive.damageTypes)) {
+            if (passive.name === 'Stormborn') {
+                const wrathActive = getRuntimeValue(playerStats.name, 'wrathOfTheSeaActive');
+                if (!wrathActive) continue;
+            }
+            if (passive.name === 'Full of Stars') {
+                const activeBuffs = getRuntimeValue(playerStats.name, 'activeBuffs') || [];
+                const starryFormActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Starry Form');
+                if (!starryFormActive) continue;
+            }
+            resistances.push(...passive.damageTypes);
+        }
         if (passive.type === 'land_resistance' && passive.landMappings && typeof passive.landMappings === 'object') {
             const runtimeLandType = getRuntimeValue(playerStats.name, '_circleOfTheLandType') || '';
             const landType = (runtimeLandType || playerStats.class?.major?.type || playerStats.class?.subclass?.type || '').toLowerCase().trim();

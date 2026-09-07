@@ -6175,7 +6175,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-336-stormborn.md",
+      "verified": "verified — getDamageResistances type:'resistance' branch + applyDamage resolves wrathOfTheSeaActive gate LIVE at hit-resolution; Cold/Lightning/Thunder halved (reuses CLA-324 halving helper); grid-flight stays display-only §7",
       "class": "Druid",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Your Wrath of the Sea confers two more benefits while active, as detailed below. Flight: You gain a Fly Speed equal to your Speed. Resistance: You have Resistance to Cold, Lightning, and Thunder damage."

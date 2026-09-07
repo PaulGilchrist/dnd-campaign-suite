@@ -178,10 +178,14 @@ export async function applyDamageToTarget(combatSummary, targetName, rawDamage, 
   const playerStats = isPlayer ? characters.find(c => c.name === targetName || c.name.startsWith(targetName + ' ')) : null;
   const playerComputed = playerStats?.computedStats || playerStats;
   let resistances = isPlayer ? (playerComputed?.resistances || []) : (creature.resistances || []);
+  // CLA-336: passive resistances are read LIVE at hit-resolution (name included so
+  // runtime-key gates inside getDamageResistances resolve), because computedStats is
+  // only recomputed on character-JSON serial changes — runtime toggles never refresh it.
+  let passiveResistances = [];
   if (isPlayer && playerStats) {
     const statsForPassives = playerComputed?.automation || playerStats?.automation;
     if (statsForPassives?.passives?.length) {
-      const passiveResistances = statsForPassives ? getDamageResistances({ automation: statsForPassives }) : [];
+      passiveResistances = getDamageResistances({ name: creature.name, automation: statsForPassives });
       if (passiveResistances.length > 0) {
         resistances = [...new Set([...resistances, ...passiveResistances])];
       }
@@ -235,6 +239,24 @@ if (!Array.isArray(damageTypes)) { throw new Error('damageTypes must be an array
             description: `${creature.name} has resistance to damage of spells — ${rawDamage} spell damage halved to ${finalDamage}.`,
             timestamp: Date.now(),
         }).catch((e) => { console.error('[applyDamage] Spell Resistance log failed:', e); });
+    }
+
+    // CLA-336: concrete-type resistance from passive passives (e.g. Stormborn
+    // Cold/Lightning/Thunder while Wrath of the Sea is active) halves damage — log it.
+    if (rawDamage > 0 && finalDamage < rawDamage) {
+        const matchedPassiveTypes = resistanceDetails
+            .filter(rd => rd.status === 'resistant' &&
+                passiveResistances.some(pr => String(pr).toLowerCase() === String(rd.damageType).toLowerCase()))
+            .map(rd => rd.damageType);
+        if (matchedPassiveTypes.length > 0) {
+            addEntry(campaignName, {
+                type: 'automation',
+                creatureName: creature.name,
+                name: 'Damage Resistance',
+                description: `${creature.name} has resistance to ${matchedPassiveTypes.join(', ')} damage — ${rawDamage} damage halved to ${finalDamage}.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[applyDamage] Damage Resistance log failed:', e); });
+        }
     }
 
     if (silenceThunderImmunity && rawDamage > 0 && damageTypes.some(dt => String(dt).toLowerCase() === 'thunder')) {
