@@ -5,6 +5,7 @@
 // @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getSpellAbilities } from './spellCalc2024.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 // ── Module-level mocks for all ESM dependencies ──
 vi.mock('../../character/classRules2024.js', () => ({
@@ -393,6 +394,70 @@ describe('spellCalc2024-automation', () => {
       const mageHand = result.spells.find(s => s.name === 'Mage Hand');
       expect(mageHand.casting_time).toBe('Action');
       expect(mageHand._mageHandLegerdemain).toBeUndefined();
+    });
+  });
+
+  describe('spell thief - stolen spell castability (CLA-325)', () => {
+    // @improved-by-ai
+    function stubStolenList(stolenList, casterBlockList) {
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+        if (key === '_spellThiefStolenList') return stolenList;
+        if (key === '_spellThiefCasterBlock') return casterBlockList || null;
+        return null;
+      });
+    }
+
+    it('injects FULL spell data (castable row) for a resolvable stolen spell name', () => {
+      const rayOfFrost = { name: 'Ray of Frost', level: 1, casting_time: '1 action', range: '60 feet', school: 'evocation', damage: { dice: '1d8', type: 'cold' } };
+      const stats = makePlayerStats({ spells: ['Fire Bolt'], automation: {} });
+      stubStolenList(JSON.stringify([{ casterName: 'Gazer 1', spellName: 'Ray of Frost' }]));
+
+      const result = getSpellAbilities([makeSpell('Fire Bolt'), rayOfFrost], stats);
+      const stolen = result.spells.find(s => s.name === 'Ray of Frost');
+
+      expect(stolen).toBeDefined();
+      expect(stolen.prepared).toBe('Always');
+      expect(stolen.level).toBe(1);
+      expect(stolen.school).toBe('evocation');
+      expect(stolen.damage).toEqual({ dice: '1d8', type: 'cold' });
+      expect(stolen.casting_time).toBe('1 action');
+    });
+
+    it('normalizes monster-card action labels ("3. Frost Ray") before resolving spell data', () => {
+      const frostRay = { name: 'Frost Ray', level: 0, casting_time: '1 action', range: '30 feet', school: 'evocation', damage: { dice: '3d6', type: 'cold' } };
+      const stats = makePlayerStats({ spells: ['Fire Bolt'], automation: {} });
+      stubStolenList(JSON.stringify([{ casterName: 'Gazer 1', spellName: '3. Frost Ray' }]));
+
+      const result = getSpellAbilities([makeSpell('Fire Bolt'), frostRay], stats);
+      const stolen = result.spells.find(s => s.name === 'Frost Ray');
+
+      expect(stolen).toBeDefined();
+      expect(stolen.damage).toEqual({ dice: '3d6', type: 'cold' });
+      expect(result.spells.filter(s => s.name === 'Frost Ray')).toHaveLength(1);
+    });
+
+    it('keeps a display-only row and logs when the stolen name has no spell data', () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const stats = makePlayerStats({ spells: ['Fire Bolt'], automation: {} });
+      stubStolenList(JSON.stringify([{ casterName: 'Gazer 1', spellName: '3. Frost Ray' }]));
+
+      const result = getSpellAbilities([makeSpell('Fire Bolt')], stats);
+      const stolen = result.spells.find(s => s.name === 'Frost Ray');
+
+      expect(stolen).toBeDefined();
+      expect(stolen.prepared).toBe('Always');
+      expect(stolen.level).toBeUndefined();
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("no spells.json entry"));
+      consoleSpy.mockRestore();
+    });
+
+    it('filters blocked caster spells using normalized names (legacy numbered labels)', () => {
+      const stats = makePlayerStats({ spells: ['Fire Bolt'], automation: {} });
+      stubStolenList(null, JSON.stringify([{ thiefName: 'AasimarTest', spellName: '3. Fire Bolt' }]));
+
+      const result = getSpellAbilities([makeSpell('Fire Bolt'), makeSpell('Light')], stats);
+
+      expect(result.spells.map(s => s.name)).not.toContain('Fire Bolt');
     });
   });
 });

@@ -476,24 +476,37 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
                 }
             }
 
-            // Spell Thief: remove spells stolen by other characters
+            // Spell Thief: remove spells stolen by other characters. CLA-325: names are
+            // normalized (monster-card labels "3. Frost Ray" → "Frost Ray") so persisted
+            // entries from either era still match the rendered spell names.
             const casterBlockList = getRuntimeValue(playerStats.name, '_spellThiefCasterBlock', campaignName);
             if (casterBlockList) {
                 const entries = JSON.parse(casterBlockList);
                 if (Array.isArray(entries) && entries.length > 0) {
-                    const blockedSpellNames = new Set(entries.map(e => e.spellName).filter(Boolean));
+                    const blockedSpellNames = new Set(entries.map(e => String(e.spellName || '').replace(/^\d+\.\s*/, '').trim()).filter(Boolean));
                     spellAbilities.spells = spellAbilities.spells.filter(spell => !blockedSpellNames.has(spell.name));
                 }
             }
 
-            // Spell Thief: add stolen spells from runtime state
+            // Spell Thief: add stolen spells from runtime state. CLA-325: inject FULL spell
+            // data from allSpells (mirrors the Improved Illusions injection above) so the
+            // stolen row opens a complete SpellDetailPopup and is CASTABLE, not display-only.
+            // Unresolvable names (monster-only labels with no spells.json entry) stay a
+            // display-only row and are flagged — no silent fallback.
             const stolenList = getRuntimeValue(playerStats.name, '_spellThiefStolenList', campaignName);
             if (stolenList) {
                 const entries = JSON.parse(stolenList);
                 if (Array.isArray(entries)) {
                     for (const entry of entries) {
-                        const spellName = entry?.spellName;
-                        if (spellName && !spellAbilities.spells.find(s => s.name === spellName)) {
+                        const rawName = entry?.spellName;
+                        if (!rawName) continue;
+                        const spellName = String(rawName).replace(/^\d+\.\s*/, '').trim();
+                        if (spellAbilities.spells.find(s => s.name === spellName)) continue;
+                        const stolenSpellDetail = allSpells ? allSpells.find(s => s.name === spellName) : null;
+                        if (stolenSpellDetail) {
+                            spellAbilities.spells.push({ ...stolenSpellDetail, prepared: 'Always' });
+                        } else {
+                            console.error(`[spellCalc2024] Spell Thief stolen spell '${spellName}' has no spells.json entry — row is display-only and cannot be cast.`);
                             spellAbilities.spells.push({ name: spellName, prepared: 'Always' });
                         }
                     }

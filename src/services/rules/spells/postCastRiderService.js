@@ -1,6 +1,5 @@
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { executeHandler } from '../../automation/index.js';
-import { isBlockedBySpellThief } from '../../automation/handlers/class-fighter-rogue/spellThiefHandler.js';
 import { usesSpellSlot } from '../features/spellUtils.js';
 
 let soulstitchResolve = null;
@@ -209,57 +208,14 @@ export function getEmpoweredEvocationIntModifier(playerStats) {
     return intAbility?.bonus || 0;
 }
 
-export async function triggerSpellThief(spell, metaCtx, playerStats, campaignName, mapName) {
-    if (!usesSpellSlot(spell, metaCtx)) {
-        return null;
-    }
-
-    if (isBlockedBySpellThief(playerStats.name, playerStats.name, spell.name, campaignName)) {
-        return null;
-    }
-
-    const spellThiefFeatures = getSpellThiefFeatures(playerStats);
-    if (spellThiefFeatures.length === 0) {
-        return null;
-    }
-
-    const results = [];
-    for (const thief of spellThiefFeatures) {
-        const featureName = thief.name;
-        const usesKey = featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
-        const currentUses = Number(getRuntimeValue(playerStats.name, usesKey) ?? 1);
-
-        if (currentUses <= 0) {
-            continue;
-        }
-
-        const action = {
-            name: featureName,
-            automation: {
-                type: 'spell_thief',
-                saveType: thief.saveType || 'INT',
-                saveDc: thief.saveDc || 'ability',
-                saveAbility: thief.saveAbility || 'INT',
-                trigger: thief.trigger || 'spell_cast',
-                oncePerLongRest: !!thief.oncePerLongRest,
-                casting_time: thief.casting_time || '1 reaction',
-            },
-            casterName: playerStats.name,
-            spellName: spell.name,
-        };
-
-        try {
-            const result = await executeHandler(action, playerStats, campaignName, mapName);
-            if (result) {
-                results.push(result);
-            }
-        } catch (e) {
-            console.error(`[spellThief] Failed to execute Spell Thief for ${featureName}:`, e);
-            throw e;
-        }
-    }
-
-    return results.length > 0 ? results : null;
+export async function triggerSpellThief(_spell, _metaCtx, _playerStats, _campaignName, _mapName) {
+    // CLA-325: self-misfire removed. Spell Thief reacts to ANOTHER creature's spell
+    // cast targeting the thief, but this auto-trigger runs inside the CASTER's own
+    // cast-execution context — firing here made the thief save against their own
+    // spell save DC and steal/blocked their own spells. The feature is driven by the
+    // manual Reactions row, which gates against the enemy-cast lastAttack stamp
+    // (see spellThiefHandler.js).
+    return null;
 }
 
 export function confirmSoulstitchSelection(selectedNames) {

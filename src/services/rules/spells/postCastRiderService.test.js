@@ -409,108 +409,23 @@ describe('postCastRiderService', () => {
   describe('triggerSpellThief', () => {
     const spell = { name: 'Fireball' }
 
-    it('returns null when no spell slot used (both metaCtx and spell have level 0)', async () => {
-      const stats = { name: 'Player', automation: { reactions: [{ type: 'spell_thief', name: 'Thief' }] } }
-      const result = await triggerSpellThief(spell, { slotLevel: 0 }, stats, 'camp', 'map')
-      expect(result).toBeNull()
-    })
-
-    it('returns null when blocked by spell thief', async () => {
-      const { isBlockedBySpellThief } = await import('../../automation/handlers/class-fighter-rogue/spellThiefHandler.js')
-      vi.mocked(isBlockedBySpellThief).mockReturnValue(true)
-      const stats = { name: 'Player', automation: { reactions: [{ type: 'spell_thief', name: 'Thief' }] } }
-      const result = await triggerSpellThief(spell, { slotLevel: 1 }, stats, 'camp', 'map')
-      expect(result).toBeNull()
-      vi.mocked(isBlockedBySpellThief).mockRestore()
-    })
-
-    it('returns null when no spell thief features', async () => {
-      const result = await triggerSpellThief(spell, { slotLevel: 1 }, { automation: { reactions: [] } }, 'camp', 'map')
-      expect(result).toBeNull()
-    })
-
-    it('skips riders with exhausted uses', async () => {
+    // CLA-325: the auto-path ran inside the caster's own cast context, forcing the
+    // thief to save against their own DC and steal from themselves (self-misfire).
+    // It is inert by design — the manual Reactions row drives the feature.
+    it('never fires in the casters own cast context (self-misfire removed, CLA-325)', async () => {
       const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js')
-      vi.mocked(getRuntimeValue).mockReturnValue(0)
-      const stats = { name: 'Player', automation: { reactions: [{ type: 'spell_thief', name: 'Thief' }] } }
+      vi.mocked(getRuntimeValue).mockReturnValue(1)
+      const stats = { name: 'Player', automation: { reactions: [{ type: 'spell_thief', name: 'Spell Thief' }] } }
       const result = await triggerSpellThief(spell, { slotLevel: 1 }, stats, 'camp', 'map')
       expect(result).toBeNull()
       expect(executeHandler).not.toHaveBeenCalled()
       vi.mocked(getRuntimeValue).mockRestore()
     })
 
-    it('calls executeHandler for each thief feature with correct action shape', async () => {
-      const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js')
-      executeHandler.mockResolvedValue({ success: true })
-      vi.mocked(getRuntimeValue).mockReturnValue(1)
-      const stats = {
-        name: 'Player',
-        automation: { reactions: [{ type: 'spell_thief', name: 'Thief', saveType: 'INT', saveDc: 15 }] },
-      }
-      const result = await triggerSpellThief(spell, { slotLevel: 1 }, stats, 'camp', 'map')
-      expect(executeHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'Thief',
-          automation: expect.objectContaining({
-            type: 'spell_thief',
-            saveType: 'INT',
-            saveDc: 15,
-            saveAbility: 'INT',
-            trigger: 'spell_cast',
-            oncePerLongRest: false,
-            casting_time: '1 reaction',
-          }),
-          casterName: 'Player',
-          spellName: 'Fireball',
-        }),
-        stats,
-        'camp',
-        'map',
-      )
-      expect(result).toEqual([{ success: true }])
-      vi.mocked(getRuntimeValue).mockRestore()
-    })
-
-    it('uses default save values when not provided on feature', async () => {
-      const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js')
-      executeHandler.mockResolvedValue({ success: true })
-      vi.mocked(getRuntimeValue).mockReturnValue(1)
-      const stats = {
-        name: 'Player',
-        automation: { reactions: [{ type: 'spell_thief', name: 'Thief' }] },
-      }
-      await triggerSpellThief(spell, { slotLevel: 1 }, stats, 'camp', 'map')
-      expect(executeHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          automation: expect.objectContaining({
-            saveType: 'INT',
-            saveDc: 'ability',
-            saveAbility: 'INT',
-          }),
-        }),
-        stats,
-        'camp',
-        'map',
-      )
-      vi.mocked(getRuntimeValue).mockRestore()
-    })
-
-    it('collects results from multiple thief features', async () => {
-      const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js')
-      executeHandler.mockResolvedValueOnce({ success: true }).mockResolvedValueOnce({ success: false })
-      vi.mocked(getRuntimeValue).mockReturnValue(1)
-      const stats = {
-        name: 'Player',
-        automation: {
-          reactions: [
-            { type: 'spell_thief', name: 'Thief A' },
-            { type: 'spell_thief', name: 'Thief B' },
-          ],
-        },
-      }
-      const result = await triggerSpellThief(spell, { slotLevel: 1 }, stats, 'camp', 'map')
-      expect(result).toHaveLength(2)
-      vi.mocked(getRuntimeValue).mockRestore()
+    it('returns null when caster has no spell thief features', async () => {
+      const result = await triggerSpellThief(spell, { slotLevel: 1 }, { automation: { reactions: [] } }, 'camp', 'map')
+      expect(result).toBeNull()
+      expect(executeHandler).not.toHaveBeenCalled()
     })
   })
 

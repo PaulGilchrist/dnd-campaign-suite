@@ -1,6 +1,8 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { createSaveListener, buildSaveDc } from '../../common/savePrompt.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { findLastAttack, rollbackSpellEffects } from '../../common/damageRollback.js';
 const SPELL_THIEF_BLOCK_KEY = 'spellThiefBlocked';
 const SPELL_THIEF_STOLEN_KEY = 'spellThiefStolen';
 const SPELL_THIEF_BLOCKED_LIST_KEY = '_spellThiefBlockedList';
@@ -11,7 +13,12 @@ function getRuntimeUsesKey(featureName) {
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
 }
 
-
+// CLA-325: monster-card cast stamps carry the MONSTER action label ("3. Frost Ray"),
+// not a spells.json name — strip the leading action number so block keys, the stolen
+// list and the spellCalc2024 injection (which resolves against allSpells) all agree.
+export function normalizeStolenSpellName(name) {
+    return String(name || '').replace(/^\d+\.\s*/, '').trim();
+}
 
 function getBlockedSpellKey(casterName, spellName) {
     return `${SPELL_THIEF_BLOCK_KEY}_${casterName}_${spellName}`;
@@ -69,10 +76,70 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
+    // CLA-325: trigger gate (mirrors the Counterspell reaction gate and the
+    // CLA-315 Slow Fall refusal pattern) — the Reaction may only be taken
+    // immediately after a SPELL cast by ANOTHER creature that targeted the thief.
+    // Refusals spend nothing and log to the campaign log.
+    const refuse = (reason) => {
+        addEntry(campaignName, {
+            type: 'automation',
+            characterName: playerName,
+            automationType: 'spell_thief_refused',
+            name: featureName,
+            description: reason,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[spellThief] Error logging refusal:", e); });
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: reason,
+                automation: auto,
+            },
+        };
+    };
 
-    const casterName = action.casterName || (lastAttack?.attackerName) || action.targetName || 'unknown creature';
-    const spellName = action.spellName || (lastAttack?.attackName) || 'unknown spell';
+    const cs = await getCombatContext(campaignName);
+    if (!cs) {
+        return refuse(`${featureName} requires an active combat. Select a creature in combat and try again.`);
+    }
+
+    const lastAttack = await findLastAttack(campaignName);
+    const attackEvent = lastAttack.attackEvent;
+    if (!attackEvent) {
+        return refuse(`${featureName} — no recent spell cast to respond to.`);
+    }
+
+    // Spell-origin: PC spell pipeline stamps rollType 'spell-save'; monster-card
+    // save attacks stamp isSpellDamage (CLA-324) or a saveType/saveDc pair.
+    const spellOrigin = attackEvent.rollType === 'spell-save'
+        || attackEvent.isSpellDamage === true
+        || (attackEvent.saveDc != null && !!attackEvent.saveType);
+    if (!spellOrigin) {
+        return refuse(`${featureName} — the most recent attack was not a spell cast. No spell to steal.`);
+    }
+
+    const casterName = action.casterName || attackEvent.attackerName || null;
+    if (!casterName) {
+        return refuse(`${featureName} — could not identify the spellcaster.`);
+    }
+    if (casterName === playerName) {
+        return refuse(`${featureName} responds to another creature's spell — you cannot steal from yourself.`);
+    }
+
+    const targetsThief = attackEvent.targetName === playerName
+        || (attackEvent.affectedTargets || []).includes(playerName);
+    if (!targetsThief) {
+        return refuse(`${featureName} — the most recent spell did not target you.`);
+    }
+
+    const casterCreature = cs.creatures ? cs.creatures.find(c => c.name === casterName) : null;
+    if (!casterCreature) {
+        return refuse(`${featureName} — ${casterName} is not in combat.`);
+    }
+
+    const spellName = normalizeStolenSpellName(action.spellName || attackEvent.attackName || attackEvent.damageName || 'unknown spell');
 
     const saveDc = buildSaveDc(auto, playerStats);
 
@@ -110,7 +177,24 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         timestamp: Date.now(),
     }).catch((e) => { console.error("[spellThief] Error:", e); });
 
+    let negationNote = '';
     if (!success) {
+        // CLA-325: "negate spell" — retroactively roll back the cast's damage,
+        // conditions and target effects via the verified Counterspell consumer
+        // (rollbackSpellEffects works off the monster-card / spell-save lastAttack
+        // stamps, same retroactive-negation model as Shield / Illusory Self).
+        const rolledBack = await rollbackSpellEffects(attackEvent, campaignName, featureName, cs);
+
+        if (rolledBack.damageHealed > 0 || rolledBack.conditionsRemoved.length > 0 || rolledBack.effectsRemoved > 0) {
+            negationNote = ` ${rolledBack.damageHealed} HP restored, ${rolledBack.conditionsRemoved.length} condition(s) and ${rolledBack.effectsRemoved} effect(s) rolled back.`;
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName: playerName,
+                abilityName: featureName,
+                description: `${featureName} negated '${spellName}' — ${rolledBack.damageHealed} HP restored, ${rolledBack.conditionsRemoved.length} condition(s) removed, ${rolledBack.effectsRemoved} target effect(s) cleared.`,
+            }).catch((e) => { console.error("[spellThief] Error:", e); });
+        }
+
         await addBlockedSpell(playerName, casterName, spellName, campaignName);
         await addStolenSpell(playerName, casterName, spellName, campaignName);
 
@@ -118,7 +202,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             type: 'ability_use',
             characterName: playerName,
             abilityName: featureName,
-            description: `${casterName} failed INT save (DC ${saveDc}). Spell negated. ${playerName} steals ${spellName} for 8 hours. ${casterName} cannot cast ${spellName} for 8 hours.`,
+            description: `${casterName} failed INT save (DC ${saveDc}). Spell negated.${negationNote} ${playerName} steals ${spellName} for 8 hours. ${casterName} cannot cast ${spellName} for 8 hours.`,
         }).catch((e) => { console.error("[spellThief] Error:", e); });
 
         window.dispatchEvent(new CustomEvent('combat-summary-updated'));
@@ -133,7 +217,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const resultDescription = success
         ? `${casterName} succeeded on INT save (DC ${saveDc}). ${featureName} has no effect.`
-        : `${casterName} failed INT save (DC ${saveDc}). Spell negated. ${playerName} steals ${spellName} for 8 hours.`;
+        : `${casterName} failed INT save (DC ${saveDc}). Spell negated.${negationNote} ${playerName} steals ${spellName} for 8 hours.`;
 
     return {
         type: 'popup',

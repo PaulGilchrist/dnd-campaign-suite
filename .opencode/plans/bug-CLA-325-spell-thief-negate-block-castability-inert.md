@@ -38,3 +38,65 @@ Spell Thief (2024 Rogue / Arcane Trickster lv17) is wired end-to-end as a manual
 - Live clauses: reaction click, INT save vs rogue spell DC (exact incl. tie=success), logs, uses accounting, once-per-LR gate + LR re-arm + full key reset.
 - Dead clauses: negate (no rollback, decisive HP 116→116 after "negated"), caster 8h block (4 successful recasts by blocked caster + zero monster-path consumer), stolen-spell castability (display-only injected row), spell_cast trigger gating (row always offered; auto-path is self-targeting misfire).
 - Per verdict policy (unenforced trigger/gates/claims = FAIL), filing FAIL.
+
+## Fix options
+
+Run 2026-09-07. THREE of four dead clauses FIXED cleanly on top of existing verified
+patterns; one clause (e) requires new monster-path infrastructure with zero precedent →
+left as options below. Verdict SKIPPED (partial: core negation/castability/trigger now
+enforced; monster recast-block not enforced).
+
+### FIXED this run (live-proven on test-campaign)
+- (c) NEGATE — clean fix available, DONE. On failed INT save the handler now calls the
+  verified Counterspell consumer `rollbackSpellEffects(attackEvent, …)`
+  (damageRollback.js:250, same retroactive-negation model as Shield
+  shieldHandler.js:36 / Illusory Self / Glorious Defense — engine never intercepts
+  pre-damage, it rolls back). Live: ray damage −4 → popup "4 HP restored" → runtime HP
+  139→143, log `ability_use` "Spell Thief negated 'Frost Ray' — 4 HP restored…".
+- (a) TRIGGER GATE — clean fix available, DONE. Reaction-row click now gated in
+  spellThiefHandler.js against lastAttack (Counterspell gate + CLA-315 Slow Fall refusal
+  pattern): requires combat, spell-origin (`rollType==='spell-save' ||
+  isSpellDamage===true || saveType+saveDc` — monster-card save attacks stamp
+  isSpellDamage per CLA-324), caster ≠ thief, thief targeted (targetName or
+  affectedTargets), caster in cs. Refusals spend nothing and log
+  `automationType:'spell_thief_refused'`. Live: ray cast at DivinationWizard then row
+  click → "the most recent spell did not target you", uses=1 retained, refusal logged.
+  - Auto-path self-misfire in `triggerSpellThief` (postCastRiderService.js) REMOVED —
+    it ran in the caster's own cast context (thief saving vs own DC, stealing from
+    self); now an inert documented stub; manual Reactions row is the sole driver.
+- (d) STOLEN-SPELL CASTABILITY — clean fix available, DONE. spellCalc2024.js injection
+  now mirrors the verified Improved Illusions full-detail pattern
+  (`{...spellDetail, prepared:'Always'}`) after normalizing monster-card labels
+  ("3. Frost Ray" → "Frost Ray"); block-filter normalizes too (legacy numbered keys).
+  Live: resolvable stolen name "Ray of Frost" renders with full popup details and an
+  ENABLED "Cast Spell" button (castable); unresolvable monster-only labels ("Frost Ray"
+  has no spells.json entry) stay a display-only row with explicit console.error (no
+  silent fallback). Caster-side keys now store the normalized name, so the PC-path
+  spellCalc block filter (spellCalc2024.js) actually matches.
+- Regression tests: spellThiefHandler.test.js (gate refusals incl. spend-nothing,
+  rollback call/no-call, label normalization), spellCalc2024-automation.test.js
+  (full-data injection, label normalization, display-only+console.error, block filter),
+  postCastRiderService.test.js (self-misfire inert). `npm run lint` clean; full
+  `npm run test:run` 31396 passed / 0 failed.
+
+### (e) CASTER 8-HOUR BLOCK ON MONSTER PATH — requires new pipeline (NOT done)
+- Facts: enforcement would need a click-time block check inside the EB monster-card
+  pipeline (MonsterCardBody/MonsterAction/saveProcessing) — grep shows ZERO block-key
+  consumers there today; playbook concurs ("blocked-caster keys have NO monster-path
+  consumer … grep before assuming"). Silence/CLA-315 gates are PC-cast-path only;
+  PC-block (spellCalc row filtering) IS enforced and was improved (normalized match).
+- Option 1 (small new seam, mirrors nothing existing): on monster-card save/attack
+  click, read `getRuntimeValue(monsterName,'_spellThiefCasterBlock')`, match the
+  normalized action label, refuse with popup + `automation blocked` log (mirrors the
+  SP-106 Silence V-gate refusal *shape*, but at a new location — first-ever monster-card
+  block consumer; GM bypass via card remains). Trade-off: invents the seam; any other
+  feature would later reuse it, so design it generic (e.g. `blockedActions`), not
+  Spell-Thief-specific.
+- Option 2 (accept model): treat monster recast-block as GM-remembered (row shows
+  "cannot cast for 8h" log as advisory), like other display-only monster facts
+  (resistances/senses precedents, CLA-336). Cheapest; keeps the engine honest about
+  what it enforces.
+- Option 3: prevent row-click steals from monster-only-label spells ("level 1+, of a
+  level you can cast" gate needs level data on lastAttack stamps — monster stamps carry
+  none), tightening RAW exposure of (e) instead of enforcing it. Needs a level stamp on
+  monster save-attacks (small CLA-324-style caller flag).
