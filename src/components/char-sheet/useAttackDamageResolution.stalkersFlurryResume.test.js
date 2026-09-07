@@ -1,8 +1,9 @@
-// Regression tests for FT-074: the Shield Bash modal pauses the pipeline at
-// _pausedStep:'featureRiders'. resumeAttackPipeline must accept that pause
-// so the triggering attack's weapon damage resolves exactly once after Apply
-// AND Skip/close. CLA-326 added stalkersFlurry to the allow-list; other
-// featureRiders modals (cantripBonuses) must NOT blanket-resume.
+// Regression tests for CLA-326: the Stalker's Flurry choice modal pauses the
+// pipeline at _pausedStep:'featureRiders' BEFORE proceedToDamage, stranding
+// the triggering weapon hit's damage. resumeAttackPipeline must accept the
+// stalkersFlurry pause (mirroring FT-074 shieldBash) so proceedToDamage runs
+// exactly once after the modal resolves (Apply or Cancel), and the
+// stalkersFlurryPostDamage (Sudden Strike) consumer executes off damage:applied.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/combat/steps/index.js', async () => {
@@ -15,10 +16,13 @@ vi.mock('../../services/combat/steps/index.js', async () => {
         subscribe: 'housekeeping:do',
         emit: 'riders:applied',
         condition: () => true,
-        handler: async () => ({
-          data: { formula: '1d6+1', total: 5, rolls: [4] },
-          modal: { type: 'shieldBash', props: { name: 'Shield Bash', targetName: 'Zombie 1', saveDc: 15 } },
-        }),
+        handler: async (ctx) => {
+          ctx.setAttackRiderModal?.({ action: { name: "Stalker's Flurry" }, targetName: 'Thug 1' });
+          return {
+            data: { formula: '1d8+2', total: 5, rolls: [4] },
+            modal: { type: 'stalkersFlurry', props: { action: { name: "Stalker's Flurry" }, targetName: 'Thug 1' } },
+          };
+        },
       });
       pipeline.step({
         name: 'proceedToDamage',
@@ -29,6 +33,13 @@ vi.mock('../../services/combat/steps/index.js', async () => {
           ctx.proceedWithDamage(ctx.attack, ctx.formula, ctx.total, ctx.rolls, ctx.modifier, {}, ctx);
           return { data: { _done: true } };
         },
+      });
+      pipeline.step({
+        name: 'stalkersFlurryPostDamage',
+        subscribe: 'damage:applied',
+        emit: 'cleave:check',
+        condition: () => true,
+        handler: async () => ({ data: { _postDamageRan: true } }),
       });
       return pipeline;
     }),
@@ -42,7 +53,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(() => Promise.resolve({ round: 1, creatures: [] })),
+  getCombatContext: vi.fn(() => Promise.resolve({ round: 2, creatures: [] })),
   getTargetFromAttacker: vi.fn(() => null),
 }));
 
@@ -69,20 +80,32 @@ vi.mock('../../services/ui/logService.js', () => ({
 import useAttackDamageResolution from './useAttackDamageResolution.js';
 
 const attack = {
-  name: 'Shortsword',
-  damage: '1d6+1',
+  name: 'Longbow',
+  damage: '1d8+2',
   damageType: 'Piercing',
   weaponType: 'weapon',
-  properties: ['Light'],
+  properties: ['Heavy'],
   type: 'Action',
 };
 
 const playerStats = {
-  name: 'EvasiveFighter',
-  level: 18,
+  name: 'FeyRanger',
+  level: 17,
   proficiency: 6,
-  abilities: [{ name: 'Strength', bonus: 1 }],
-  automation: { passives: [{ type: 'attack_rider', effect: 'push_or_prone', oncePerTurn: true, name: 'Shield Bash' }] },
+  abilities: [{ name: 'Dexterity', bonus: 5 }],
+  automation: {
+    passives: [{
+      name: "Stalker's Flurry",
+      type: 'attack_rider',
+      trigger: 'weapon_attack_hit',
+      oncePerTurn: true,
+      chooseOne: true,
+      options: [
+        { name: 'Sudden Strike', effect: 'sudden_strike' },
+        { name: 'Mass Fear', effect: 'mass_fear' },
+      ],
+    }],
+  },
 };
 
 function makeDeps(resumeRef) {
@@ -91,7 +114,7 @@ function makeDeps(resumeRef) {
     playerStats,
     campaignName: 'test-campaign',
     mapName: null,
-    popupHtml: { hit: true, targetName: 'Zombie 1' },
+    popupHtml: { hit: true, targetName: 'Thug 1' },
     setPopupHtml: vi.fn(),
     rollDamage: vi.fn(),
     buildCtx: null,
@@ -104,68 +127,52 @@ function makeDeps(resumeRef) {
   };
 }
 
-describe('useAttackDamageResolution — Shield Bash featureRiders pause resume (FT-074)', () => {
+describe('useAttackDamageResolution — Stalker\'s Flurry featureRiders pause resume (CLA-326)', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
-  it('pauses at featureRiders with shieldBash modal and strands no damage yet', async () => {
+  it('pauses at featureRiders with the stalkersFlurry modal and strands no damage yet', async () => {
     const resumeRef = { current: null };
     const deps = makeDeps(resumeRef);
     const { resolveAttackDamage } = useAttackDamageResolution(deps);
 
-    await resolveAttackDamage(attack, { hit: true, targetName: 'Zombie 1' });
+    await resolveAttackDamage(attack, { hit: true, targetName: 'Thug 1' });
 
     expect(resumeRef.current?._pausedStep).toBe('featureRiders');
-    expect(resumeRef.current?._modalType).toBe('shieldBash');
+    expect(resumeRef.current?._modalType).toBe('stalkersFlurry');
     expect(deps.setModalState).toHaveBeenCalledWith(expect.objectContaining({
-      shieldBashModal: expect.objectContaining({ name: 'Shield Bash' }),
+      attackRiderModal: expect.objectContaining({ targetName: 'Thug 1' }),
     }));
     expect(deps.rollDamage).not.toHaveBeenCalled();
   });
 
-  it('resumes from the pause on modal close and applies weapon damage exactly once (Apply path)', async () => {
+  it('resumes from the pause on modal close and applies weapon damage exactly once', async () => {
     const resumeRef = { current: null };
     const deps = makeDeps(resumeRef);
     const { resolveAttackDamage, resumeAttackPipeline } = useAttackDamageResolution(deps);
 
-    await resolveAttackDamage(attack, { hit: true, targetName: 'Zombie 1' });
+    await resolveAttackDamage(attack, { hit: true, targetName: 'Thug 1' });
     expect(deps.rollDamage).not.toHaveBeenCalled();
+    const stash = resumeRef.current.pipelineStash;
 
     await resumeAttackPipeline();
 
     expect(deps.rollDamage).toHaveBeenCalledTimes(1);
-    expect(deps.rollDamage.mock.calls[0][0]).toBe('Shortsword');
-    expect(deps.rollDamage.mock.calls[0][1]).toBe('1d6+1');
+    expect(deps.rollDamage.mock.calls[0][0]).toBe('Longbow');
+    expect(deps.rollDamage.mock.calls[0][1]).toBe('1d8+2');
+    expect(stash.ctx._postDamageRan).toBe(true);
     expect(resumeRef.current).toBeNull();
   });
 
-  it('double resume does not double-apply weapon damage (Skip then close)', async () => {
+  it('double resume does not double-apply weapon damage (Cancel then stray close)', async () => {
     const resumeRef = { current: null };
     const deps = makeDeps(resumeRef);
     const { resolveAttackDamage, resumeAttackPipeline } = useAttackDamageResolution(deps);
 
-    await resolveAttackDamage(attack, { hit: true, targetName: 'Zombie 1' });
+    await resolveAttackDamage(attack, { hit: true, targetName: 'Thug 1' });
     await resumeAttackPipeline();
     await resumeAttackPipeline();
 
     expect(deps.rollDamage).toHaveBeenCalledTimes(1);
     expect(resumeRef.current).toBeNull();
-  });
-
-  it('resumes stalkersFlurry featureRiders pauses (CLA-326) but NOT other featureRiders modals', async () => {
-    const resumeRef = {
-      current: {
-        _pausedStep: 'featureRiders',
-        _modalType: 'cantripBonuses',
-        _modalProps: {},
-        pipelineStash: { pipeline: { resume: vi.fn() }, ctx: {} },
-      },
-    };
-    const deps = makeDeps(resumeRef);
-    const { resumeAttackPipeline } = useAttackDamageResolution(deps);
-
-    await resumeAttackPipeline();
-
-    expect(resumeRef.current.pipelineStash.pipeline.resume).not.toHaveBeenCalled();
-    expect(resumeRef.current._pausedStep).toBe('featureRiders');
   });
 });

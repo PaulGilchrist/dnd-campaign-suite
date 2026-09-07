@@ -269,6 +269,12 @@ function CharActionModals({
                 const skipKey = `_${modalAction.name.replace(/\s+/g, '_')}_skippedRound`;
                 await setSkipFlag(skipKey, modalPlayerStats, modalCampaignName);
             }
+            // CLA-326: the featureRiders step paused BEFORE proceedToDamage while
+            // this modal was open. Resume so the triggering hit's weapon damage
+            // lands; stalkersFlurryPostDamage (Sudden Strike) then runs downstream
+            // off damage:applied. oncePerTurn is already stamped by applyRiderOption
+            // (Apply path) or gated by the skip flag (Cancel path).
+            await resumeAttackPipeline?.();
         }
         const isCunningStrikeVariant = ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].includes(modalAction?.name);
         if (isCunningStrikeVariant) {

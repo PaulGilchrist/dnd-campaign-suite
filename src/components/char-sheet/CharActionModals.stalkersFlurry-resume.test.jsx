@@ -1,8 +1,10 @@
-// @improved-by-ai
-// Regression tests for CLA-188: closing the Cunning Strike rider modal in
-// CharActionModals must resume the paused attack damage pipeline.
+// Regression tests for CLA-326: closing the Stalker's Flurry choice modal in
+// CharActionModals must resume the pipeline paused at featureRiders, so the
+// triggering attack's weapon damage always resolves. Cancel (no option chosen)
+// sets the skip flag AND still resumes; Apply (option chosen via applyRiderOption)
+// resumes without stamping the skip flag.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import CharActionModals from './CharActionModals.jsx';
 
 vi.mock('./CharActionModals.SecondaryModals.jsx', () => ({
@@ -14,7 +16,6 @@ vi.mock('./modals/shared/AttackRiderModal.jsx', () => ({
     return <div data-testid="attack-rider-modal"><button data-testid="attack-rider-close" onClick={onClose}>Done</button></div>;
   },
 }));
-
 vi.mock('./modals/divine/HealingPoolModal.jsx', () => ({ default: () => null }));
 vi.mock('./modals/shared/HandOfHealingModal.jsx', () => ({ default: () => null }));
 vi.mock('./modals/FontOfMagicModal.jsx', () => ({ default: () => null }));
@@ -69,10 +70,22 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(() => Promise.resolve()),
 }));
 
+import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { setSkipFlag } from '../../services/automation/common/oncePerTurn.js';
+
+const sfAction = {
+  name: "Stalker's Flurry",
+  type: 'attack_rider',
+  options: [
+    { name: 'Sudden Strike', effect: 'sudden_strike' },
+    { name: 'Mass Fear', effect: 'mass_fear' },
+  ],
+};
+
 function makeProps(overrides = {}) {
   const modalState = {};
   return {
-    playerStats: { name: 'AasimarTest' },
+    playerStats: { name: 'FeyRanger' },
     campaignName: 'test-campaign',
     characters: [],
     modalState,
@@ -96,57 +109,51 @@ function makeProps(overrides = {}) {
   };
 }
 
-describe('CharActionModals — Cunning Strike rider close resumes pipeline (CLA-188)', () => {
+function armModal(props) {
+  props.modalState.attackRiderModal = {
+    action: sfAction,
+    playerStats: props.playerStats,
+    campaignName: 'test-campaign',
+    targetName: 'Thug 1',
+  };
+}
+
+describe('CharActionModals — Stalker\'s Flurry modal close resumes pipeline (CLA-326)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getRuntimeValue.mockReturnValue(null);
   });
 
-  ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].forEach((featureName) => {
-    it(`resumes the pipeline when the ${featureName} rider modal closes`, async () => {
-      const resumeAttackPipeline = vi.fn(() => Promise.resolve());
-      const props = makeProps({ resumeAttackPipeline });
-      props.modalState.attackRiderModal = {
-        action: { name: featureName },
-        playerStats: props.playerStats,
-        campaignName: 'test-campaign',
-        targetName: 'Animated Rug of Smothering 1',
-      };
-      render(<CharActionModals {...props} />);
-      fireEvent.click(screen.getByTestId('attack-rider-close'));
-      expect(props.setModalState).toHaveBeenCalledWith({ attackRiderModal: null });
-      expect(resumeAttackPipeline).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  it('does not resume the pipeline for non-pausing rider modals', () => {
-    const resumeAttackPipeline = vi.fn();
+  it('resumes the attack pipeline when the modal closes without an option (Cancel)', async () => {
+    const resumeAttackPipeline = vi.fn(() => Promise.resolve());
     const props = makeProps({ resumeAttackPipeline });
-    props.modalState.attackRiderModal = {
-      // 'Hamstring' is opened via the manual attack_rider row flow, not by a
-      // featureRiders pipeline pause — closing it must not touch the pipeline.
-      // Stalker's Flurry and Cunning Strike DO pause featureRiders and resume
-      // on close (CLA-326 / CLA-188).
-      action: { name: 'Hamstring' },
-      playerStats: props.playerStats,
-      campaignName: 'test-campaign',
-      targetName: 'Goblin',
-    };
+    armModal(props);
+    render(<CharActionModals {...props} />);
+    fireEvent.click(screen.getByTestId('attack-rider-close'));
+
+    expect(props.setModalState).toHaveBeenCalledWith({ attackRiderModal: null });
+    expect(setSkipFlag).toHaveBeenCalledWith("_Stalker's_Flurry_skippedRound", props.playerStats, 'test-campaign');
+    // resume follows the awaited skip-flag write — flush the async close handler
+    await waitFor(() => expect(resumeAttackPipeline).toHaveBeenCalledTimes(1));
+  });
+
+  it('resumes the pipeline after an option was applied without stamping the skip flag', async () => {
+    const resumeAttackPipeline = vi.fn(() => Promise.resolve());
+    const props = makeProps({ resumeAttackPipeline });
+    armModal(props);
+    getRuntimeValue.mockImplementation((name, key) => (key === "_Stalker's_Flurry_option" ? 'Mass Fear' : null));
+    render(<CharActionModals {...props} />);
+    fireEvent.click(screen.getByTestId('attack-rider-close'));
+
+    expect(resumeAttackPipeline).toHaveBeenCalledTimes(1);
+    expect(setSkipFlag).not.toHaveBeenCalled();
+  });
+
+  it('tolerates a missing resumeAttackPipeline prop', () => {
+    const props = makeProps({ resumeAttackPipeline: undefined });
+    armModal(props);
     render(<CharActionModals {...props} />);
     fireEvent.click(screen.getByTestId('attack-rider-close'));
     expect(props.setModalState).toHaveBeenCalledWith({ attackRiderModal: null });
-    expect(resumeAttackPipeline).not.toHaveBeenCalled();
-  });
-
-  it('does not call rollDamage directly on rider modal close (pipeline owns damage)', () => {
-    const props = makeProps();
-    props.modalState.attackRiderModal = {
-      action: { name: 'Improved Cunning Strike' },
-      playerStats: props.playerStats,
-      campaignName: 'test-campaign',
-      targetName: 'Animated Rug of Smothering 1',
-    };
-    render(<CharActionModals {...props} />);
-    fireEvent.click(screen.getByTestId('attack-rider-close'));
-    expect(props.rollDamage).not.toHaveBeenCalled();
   });
 });

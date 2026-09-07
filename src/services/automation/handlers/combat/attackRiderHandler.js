@@ -403,7 +403,11 @@ export async function applyRiderOption(action, playerStats, campaignName, target
 
     if (stalkersFlurrySecondaryTarget && stalkersFlurrySecondaryTarget.length > 0) {
         const stalkerFlurryOptions = chosenOptions.map(o => o.name);
-        setRuntimeValue(playerStats.name, 'stalkersFlurrySecondaryTargets', stalkersFlurrySecondaryTarget.map(t => t.creature), campaignName);
+        // CLA-326: store the combatant objects directly (like versatileTrickster
+        // secondary targets) — cs creatures have no `.creature` field, so the old
+        // `.map(t => t.creature)` produced undefined rows that crashed the picker
+        // and left the featureRiders pause unresolved (stranded trigger-hit damage).
+        setRuntimeValue(playerStats.name, 'stalkersFlurrySecondaryTargets', stalkersFlurrySecondaryTarget, campaignName);
         setRuntimeValue(playerStats.name, 'stalkersFlurryPrimaryTarget', targetName, campaignName);
         setRuntimeValue(playerStats.name, 'stalkersFlurryOptions', stalkerFlurryOptions, campaignName);
     }

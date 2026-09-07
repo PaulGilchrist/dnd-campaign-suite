@@ -6043,7 +6043,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-325-spell-thief-negate-block-castability-inert.md",
+      "verified": "needs manual decision — see .opencode/plans/bug-CLA-325-spell-thief-negate-block-castability-inert.md",
       "class": "Rogue",
       "triggerConditions": "Trigger: spell_cast; Action: 1 reaction",
       "expectedBehavior": "Immediately after a creature casts a spell targeting you or including you in its area, take Reaction to force Intelligence save (your spell save DC). On failed save, negate spell and steal knowledge of spell (level 1+, of a level you can cast). For 8 hours you have the spell prepared. Creature can't cast it until 8 hours pass. Once per Long Rest."
@@ -6079,7 +6079,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-326-stalkers-flurry-stranded-trigger-damage.md",
+      "verified": "verified — featureRiders stalkersFlurry pause now resumes (resume allow-list + handleAttackRiderClose), triggering-hit damage lands; Sudden Strike picker crash fixed; mirrors FT-074 shieldBash resume",
       "class": "Ranger",
       "triggerConditions": "Trigger: weapon_attack_hit; Once per turn: yes",
       "expectedBehavior": "Dreadful Strike Psychic damage becomes 2d8. When using Dreadful Strike, can cause: Sudden Strike (make another attack against different creature within 5 feet of original target), or Mass Fear (target + creatures within 10 feet make Wisdom save or be Frightened until start of next turn)."
