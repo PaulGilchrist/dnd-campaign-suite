@@ -328,6 +328,9 @@ describe('normalizeAutoDamage', () => {
             properties: [],
             type: undefined,
             isHordeBreaker: false,
+            // SP-112: school carried through to the pipeline attack (mirrors the
+            // ctx.autoDamageSchool pass-through asserted below).
+            school: 'evocation',
         });
 
         expect(ctx.hit).toBe(true);

@@ -27,6 +27,7 @@ import { resolveSpellDamageAtLevel, isAutoHitSpell, resolveHealExpression } from
 import { useSimpleDamageRoll } from '../../hooks/combat/useSimpleDamageRoll.js';
 import { useSpellPositionResolver } from '../../hooks/combat/useSpellPositionResolver.js';
 import { useSpellCastExecutor } from '../../hooks/combat/useSpellCastExecutor.js';
+import { resolveSpiritualWeaponMoveAndAttack } from '../../services/rules/features/spiritualWeaponService.js';
 import ArcaneVigorModal from './ArcaneVigorModal.jsx';
 import './CharActions.css'
 
@@ -451,6 +452,35 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                                     range: '60_ft',
                                 },
                             })}>Starry Form: Luminous Arrow:</b> <span>Ranged spell attack, 60 ft. On a hit: ${damageDice} + ${wisMod} Radiant damage.</span>
+                        </div>
+                    );
+                })()}
+
+                {(() => {
+                    // SP-112: Spiritual Weapon — once the spectral force is active,
+                    // surface a "Move up to 20 ft & repeat the attack" Bonus Action row
+                    // on the caster's LATER turns (activatedRound gate), mirroring the
+                    // Starry Form conditional-row pattern.
+                    const forceBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.effect === 'spiritual_weapon_force') : null;
+                    if (!forceBuff) return null;
+                    const currentRound = getCurrentCombatRound(campaignName);
+                    if (currentRound <= (forceBuff.activatedRound ?? 0)) return null;
+                    const spellAttackMod = playerStats.spellAbilities?.toHit || 0;
+                    return (
+                        <div>
+                            <b className={"clickable" + (cannotAct ? " disabled-attack" : "")} onClick={async () => {
+                                if (cannotAct) return;
+                                const res = await resolveSpiritualWeaponMoveAndAttack(playerStats, campaignName);
+                                if (res.refused) { setPopupHtml({ type: 'automation_info', name: 'Spiritual Weapon', description: res.message }); return; }
+                                rollAttack(res.attack.name, res.attack.hitBonus - (exhaustionPenalty || 0), {
+                                    targetName: res.targetName,
+                                    damageType: res.attack.damageType,
+                                    autoDamageFormula: res.attack.autoDamageFormula,
+                                    autoDamageName: res.attack.autoDamageName,
+                                    autoDamageSchool: res.attack.school,
+                                    spellName: 'Spiritual Weapon',
+                                });
+                            }}>Spiritual Weapon: Move 20 ft &amp; Attack:</b> <span>Move the spectral force up to 20 feet and repeat the melee spell attack (+{spellAttackMod}) against a creature within 5 feet of it. {forceBuff.damageFormula || '1d8 + 3'} Force.</span>
                         </div>
                     );
                 })()}

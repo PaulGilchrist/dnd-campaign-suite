@@ -172,6 +172,20 @@ export function buildWeaponHitBonusesStep() {
       let total = ctx.total;
       let rolls = [...(ctx.rolls || [])];
 
+      // SP-112: 'weapon_attack_hit' / 'weapon_or_beast_form_attack_hit' riders
+      // (Blessed Strikes/Divine Strike, Dreadful Strikes, Lunar Form) are WEAPON-ONLY.
+      // Mirror the combatSuperiorityQueries.js gate (`trigger weapon_attack_hit &&
+      // !isWeaponAttack → skip`) and the FT-071 `!attack.school && weaponType !== 'spell'`
+      // discriminator: a SPELL attack (Spiritual Weapon force, Luminous Arrow — any
+      // autoDamage carrying a spell school or spell attackType) must never collect a
+      // weapon damage_bonus, stamp _Divine_Strike_usedRound, or open the damage-type modal.
+      const isSpellAttack = !!ctx.autoDamageSchool
+        || ctx.attack?.weaponType === 'spell'
+        || ctx.attack?.attackType === 'spell'
+        || !!ctx.attack?.school
+        || ctx.attack?.isWeaponAttack === false;
+      if (isSpellAttack) return { data: { formula, total, rolls } };
+
       const all = [...(ctx.playerStats.automation.actions || []), ...(ctx.playerStats.automation.passives || [])];
       const upgraded = new Set(all.filter(b => b.upgrades).map(b => b.upgrades));
 

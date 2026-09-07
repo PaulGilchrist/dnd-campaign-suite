@@ -2,6 +2,7 @@ import { rollExpression } from '../../../../dice/diceRoller.js';
 import { isInnateSorceryActive } from '../../../../combat/buffs/buffService.js';
 import { isMagicMissile, executeMagicMissile } from './helpers.js';
 import { resolveSpellDamageAtLevel } from '../../../core/spellDamageUtils.js';
+import { activateSpiritualWeaponForce } from '../../../features/spiritualWeaponService.js';
 
 async function handleNoSavePath(spell, metaCtx, playerStats, campaignName, mapName, characters,
     getTargetInfo, rollAttack, spellToHit, damageType) {
@@ -18,6 +19,18 @@ async function handleNoSavePath(spell, metaCtx, playerStats, campaignName, mapNa
         const overchannelActive = metaCtx?.overchannelActive || false;
         const overchannelUseCount = metaCtx?.overchannelUseCount || 0;
         const finalFormula = metaCtx?.finalFormula || overchannelFormula;
+
+        // SP-112: create the Spiritual Weapon force entity (record + duration clock +
+        // log) BEFORE the immediate melee spell attack so the spectral force exists
+        // as a persisting entity with a registered expiration, available for the
+        // later-turn "Move 20 ft & Attack" Bonus Action row.
+        if (spell.index === 'spiritual-weapon' || spell.name === 'Spiritual Weapon') {
+            await activateSpiritualWeaponForce(spell, playerStats, campaignName, {
+                slotLevel: metaCtx?.slotLevel || spell.level,
+                formula: finalFormula,
+            });
+        }
+
         const damageRollResult = rollExpression(overchannelFormula);
         const attackCtx = {
             attackName: spell.name,

@@ -95,6 +95,24 @@ describe('normalizeAutoDamage', () => {
       const result = normalizeAutoDamage(makeAutoDamage(), false, makePlayerStats());
       expect(result.attack.properties).toEqual([]);
     });
+
+    it('SP-112: carries spell school + attackType tokens through for weapon-only rider discrimination', () => {
+      const autoDamage = makeAutoDamage({ name: 'Spiritual Weapon: Move & Attack', attackType: 'spell' });
+      const result = normalizeAutoDamage(autoDamage, false, makePlayerStats());
+      expect(result.attack.school).toBe('evocation');
+      expect(result.attack.attackType).toBe('spell');
+      // weaponType stays registry-authoritative (not flipped by school alone).
+      expect(result.attack.weaponType).toBe('weapon');
+    });
+
+    it('SP-112: registry weaponType wins over spell attackType token', () => {
+      const playerStats = makePlayerStats({
+        attacks: [{ name: 'Spiritual Weapon', weaponType: 'spell', attackType: 'spell', properties: [] }],
+      });
+      const result = normalizeAutoDamage(makeAutoDamage({ name: 'Spiritual Weapon', attackType: 'spell' }), false, playerStats);
+      expect(result.attack.weaponType).toBe('spell');
+      expect(result.attack.attackType).toBe('spell');
+    });
   });
 
   describe('ctx hit and crit flags', () => {
