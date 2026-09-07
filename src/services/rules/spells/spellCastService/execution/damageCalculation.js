@@ -14,6 +14,13 @@ function computeRange(spell, metaCtx, attackerPos, targetPos, featEffects) {
                 effectiveRange += cantripRangeBonus;
             }
         }
+        const spellRangeBonus = (featEffects?.spellRangeBonus) || 0;
+        if (spellRangeBonus > 0 && spell.attack_type && !spell.dc) {
+            const baseRange = rangeToFeet(spell.range);
+            if (baseRange != null && baseRange >= 10) {
+                effectiveRange += spellRangeBonus;
+            }
+        }
         const distanceFt = getDistanceFeet(attackerPos, targetPos);
         const rangeResult = computeRangeEffect(effectiveRange, distanceFt, featEffects ?? {});
         if (rangeResult.mode === 'miss') {
