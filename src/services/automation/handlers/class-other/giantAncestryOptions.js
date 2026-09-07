@@ -47,7 +47,7 @@ export const GIANT_OPTIONS = [
         damage: '1d8',
         damageType: 'Thunder',
         range: '60_ft',
-        description: 'As a reaction, make a ranged spell attack against one creature within 60 feet. On a hit, the target takes 1d8 thunder damage.',
+        description: 'When you take damage from a creature within 60 feet of you, you can take a Reaction to deal 1d8 thunder damage to that creature.',
         icon: 'fa-bolt',
     },
 ];

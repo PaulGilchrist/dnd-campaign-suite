@@ -7,6 +7,8 @@ import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { getRuntimeUsesKey } from './giantAncestryOptions.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 
 export async function handleCloudsJaunt(action, playerStats, campaignName, option) {
     const optName = (option?.name || action.name || "Cloud's Jaunt");
@@ -615,6 +617,32 @@ export async function handleStormsThunder(action, playerStats, campaignName, _ma
         };
     }
 
+    // CLA-337: 60-ft trigger gate — the attacker must be within the trait's
+    // range. Canonical isWithinRange helper (rangeCheck.js): strict token
+    // distances on a mapped rig, lenient true when gridless/unpositioned.
+    const rangeFt = rangeToFeet(opt.range) ?? 60;
+    const inRange = await isWithinRange(attackerName, playerStats.name, rangeFt);
+    if (!inRange) {
+        const refusalText = `${optName} requires the attacker to be within ${rangeFt} feet of you. ${attackerName} is out of range.`;
+        addEntry(campaignName, {
+            type: 'automation',
+            characterName: playerStats.name,
+            automationType: 'storms_thunder_refused',
+            name: optName,
+            description: refusalText,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[giantAncestry] Error:", e); });
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: refusalText,
+                automation: action.automation,
+            },
+        };
+    }
+
     // Consume the use
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
@@ -626,6 +654,13 @@ export async function handleStormsThunder(action, playerStats, campaignName, _ma
     const applyResult = applyDamageToTarget(cs, attackerName, damageResult?.total ?? 0, [damageType], campaignName, characters, false, playerStats.name);
     const actualDamage = applyResult?.finalDamage ?? damageResult?.total ?? 0;
     const newHp = applyResult?.newHp;
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: optName,
+        description: `${playerStats.name} used ${optName} against ${attackerName} (${currentUses - 1} uses remaining), dealing ${actualDamage} ${damageType} damage.`,
+    }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
     await addEntry(campaignName, {
         type: 'roll',
