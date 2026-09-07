@@ -466,22 +466,62 @@ export async function handleStonesEndurance(action, playerStats, campaignName, o
         };
     }
 
+    // CLA-335: Reaction-economy round latch — one triggering hit can only be
+    // reduced once. Mirrors the CLA-315 Slow Fall / CLA-297 Retaliation /
+    // CLA-310 Shadowy Dodge recipe: stamp holder playerStats.name with a round
+    // read from a FRESH getCombatContext (never the stale cs mirror, FT-082);
+    // re-arms when the round advances (also cleared at initiative roll in
+    // initiative.jsx / navigationHandlers.js).
+    const combatContext = await getCombatContext(campaignName);
+    const currentRound = combatContext?.round || 1;
+    const usedRoundKey = '_Stones_Endurance_usedRound';
+    const usedRound = Number(getRuntimeValue(playerStats.name, usedRoundKey, campaignName) ?? 0);
+    if (usedRound === currentRound) {
+        const refusalText = `You have already used ${optName} this round — your Reaction is spent until your next turn.`;
+        addEntry(campaignName, {
+            type: 'automation',
+            characterName: playerStats.name,
+            automationType: 'stones_endurance_refused',
+            name: optName,
+            description: refusalText,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[giantAncestry] Error:", e); });
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: optName,
+                description: refusalText,
+                automation: action.automation,
+            },
+        };
+    }
+
     const enduranceRoll = rollExpression('1d12');
     const conMod = playerStats.abilities?.find(a => a.name === 'Constitution')?.bonus || 0;
     const totalHeal = enduranceRoll.total + conMod;
-    const actualHeal = Math.min(totalHeal, totalDamage);
+    const rawHeal = Math.min(totalHeal, totalDamage);
 
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+    await setRuntimeValue(playerStats.name, usedRoundKey, currentRound, campaignName);
 
     const cs = await getCombatContext(campaignName);
-    const healResult = applyHealingToTarget(cs, playerStats.name, actualHeal, campaignName);
-    const finalHeal = healResult?.actualHeal ?? actualHeal;
+    const healResult = applyHealingToTarget(cs, playerStats.name, rawHeal, campaignName);
+    const finalHeal = healResult?.actualHeal ?? rawHeal;
+
+    let capNote = '';
+    if (totalHeal > rawHeal) {
+        capNote = `capped at ${rawHeal} (damage taken)`;
+    } else if (finalHeal < rawHeal) {
+        capNote = `capped at ${finalHeal} (HP deficit)`;
+    }
+    const capText = capNote ? `, ${capNote}` : '';
 
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: optName,
-        description: `${playerStats.name} used ${optName} to heal ${finalHeal} HP (rolled ${enduranceRoll.total} + ${conMod} CON modifier, capped at ${totalDamage} damage).`,
+        description: `${playerStats.name} used ${optName} to heal ${finalHeal} HP (rolled ${enduranceRoll.total} + ${conMod} CON modifier = ${totalHeal}${capText}).`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
     await addEntry(campaignName, {
@@ -499,7 +539,7 @@ export async function handleStonesEndurance(action, playerStats, campaignName, o
             type: 'automation_info',
             name: optName,
             automationType: opt.type,
-            description: `${optName}: Rolled <strong>${enduranceRoll.total}</strong> + ${conMod} CON = <strong>${totalHeal}</strong> (capped at ${totalDamage} damage). Healed <strong>${finalHeal}</strong> HP.`,
+            description: `${optName}: Rolled <strong>${enduranceRoll.total}</strong> + ${conMod} CON = <strong>${totalHeal}</strong>${capText ? ` (${capNote})` : ''}. Healed <strong>${finalHeal}</strong> HP.`,
             automation: action.automation,
         },
     };
