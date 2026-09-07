@@ -6020,7 +6020,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-324-spell-resistance.md",
       "class": "Wizard",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Advantage on saving throws against spells. Resistance to damage of spells."
@@ -6032,7 +6032,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-FT-087-spell-sniper-clauses-inert.md",
       "triggerConditions": "",
       "expectedBehavior": "Ability Score Increase. Increase your Intelligence, Wisdom, or Charisma score by 1, to a maximum of 20. Bypass Cover. Your attack rolls for spells ignore Half Cover and Three-Quarters Cover. Casting in Melee. Being within 5 feet of an enemy doesn't impose Disadvantage on your attack rolls with spells. Increased Range. When you cast a spell that has a range of at least 10 feet and requires you to make an attack roll, you can increase the spell's range by 60 feet."
     },
@@ -6043,7 +6043,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-325-spell-thief-negate-block-castability-inert.md",
       "class": "Rogue",
       "triggerConditions": "Trigger: spell_cast; Action: 1 reaction",
       "expectedBehavior": "Immediately after a creature casts a spell targeting you or including you in its area, take Reaction to force Intelligence save (your spell save DC). On failed save, negate spell and steal knowledge of spell (level 1+, of a level you can cast). For 8 hours you have the spell prepared. Creature can't cast it until 8 hours pass. Once per Long Rest."
@@ -6055,7 +6055,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-SP-111-stinking-cloud-zone-turn-start-save-action-block-inert.md",
       "class": "Spell",
       "triggerConditions": "",
       "expectedBehavior": "You create a 20-foot-radius Sphere of yellow, nauseating gas centered on a point within range. The cloud is Heavily Obscured. The cloud lingers in the air for the duration or until a strong wind (such as the one created by Gust of Wind) disperses it. Each creature that starts its turn in the Sphere must succeed on a Constitution saving throw or have the Poisoned condition until the end of the current turn. While Poisoned in this way, the creature can't take an action or a Bonus Action."
@@ -6067,7 +6067,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-SP-112-spiritual-weapon.md",
       "class": "Spell",
       "triggerConditions": "",
       "expectedBehavior": "You create a floating, spectral force that resembles a weapon of your choice and lasts for the duration. The force appears within 60 feet in a space of your choice, and you can immediately make one melee spell attack against one creature within 5 feet of the force. On a hit, the target takes Force damage equal to 1d8 plus your spellcasting ability modifier. As a Bonus Action on your later turns, you can move the force up to 20 feet and repeat the attack against a creature within 5 feet of it."
@@ -6079,7 +6079,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-326-stalkers-flurry-stranded-trigger-damage.md",
       "class": "Ranger",
       "triggerConditions": "Trigger: weapon_attack_hit; Once per turn: yes",
       "expectedBehavior": "Dreadful Strike Psychic damage becomes 2d8. When using Dreadful Strike, can cause: Sudden Strike (make another attack against different creature within 5 feet of original target), or Mass Fear (target + creatures within 10 feet make Wisdom save or be Frightened until start of next turn)."
@@ -6091,7 +6091,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Druid",
       "triggerConditions": "Action: 1 action; Spell: Guidance,Guiding Bolt",
       "expectedBehavior": "You've created a star chart as a Spellcasting Focus. While holding it, you have Guidance and Guiding Bolt prepared, and can cast Guiding Bolt without expending a spell slot (Wisdom modifier times, minimum once). STAR MAP: 1d6: 1=scroll, 2=stone tablet, 3=owlbear hide, 4=ebony maps, 5=crystal, 6=glass disk."
@@ -6103,7 +6103,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Druid",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "As a Bonus Action, you can expend a use of your Wild Shape feature to take on a starry form rather than shape-shifting. While in your starry form, you retain your game statistics, but your body becomes luminous, your joints glimmer like stars, and glowing lines connect them as on a star chart. This form sheds Bright Light in a 10-foot radius and Dim Light for an additional 10 feet. The form lasts for 10 minutes. It ends early if you dismiss it (no action required), have the Incapacitated condition, or use this feature again. Whenever you assume your starry form, choose which of the following constellations glimmers on your body; your choice gives you certain benefits while in the form. Archer: A constellation of an archer appears on you. When you activate this form and as a Bonus Action on your subsequent turns while it lasts, you can make a ranged spell attack, hurling a luminous arrow that targets one creature within 60 feet of yourself. On a hit, the attack deals Radiant damage equal to 1d8 plus your Wisdom modifier. Chalice: A constellation of a life-giving goblet appears on you. Whenever you cast a spell using a spell slot that restores Hit Points to a creative, you or another creature within 30 feet of you can regain Hit Points equal to 1d8 plus your Wisdom modifier. Dragon: A constellation of a wise dragon appears on you. When you maize an Intelligence or a Wisdom check or a Constitution saving throw to maintain Concentration, you can treat a roll of 9 or lower on the d20 as a 10."
@@ -6115,7 +6115,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Rogue",
       "triggerConditions": "Action: 1 bonus action; Duration: until_end_of_turn",
       "expectedBehavior": "As a Bonus Action, you give yourself Advantage on your next attack roll on the current turn. You can use this feature only if you haven't moved during this turn, and after you use it, your Speed is 0 until the end of the current turn."
@@ -6127,7 +6127,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Warlock",
       "triggerConditions": "Action: 1 bonus action",
       "expectedBehavior": "Your patron grants you the ability to move between the boundaries of the planes. You can cast Misty Step without expending a spell slot a number of times equal to your Charisma modifier (minimum of once), and you regain all expended uses when you finish a Long Rest. In addition, whenever you cast that spell, you can choose one of the following additional effects. Refreshing Step: Immediately after you teleport, you or one creature you can see within 10 feet of yourself gains 1d10 Temporary Hit Points. Taunting Step: Creatures within 5 feet of the space you left must succeed on a Wisdom saving throw against your spell save DC or have Disadvantage on attack rolls against creatures other than you until the start of your next turn."
@@ -6139,7 +6139,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-333-step-of-the-wind.md",
       "class": "Monk",
       "triggerConditions": "Trigger: after_attack_action; Action: 1 bonus action",
       "expectedBehavior": "Take Dash as Bonus Action, or expend 1 Focus Point for Disengage + Dash with doubled jump distance."
@@ -6147,26 +6147,26 @@
     {
       "id": "CLA-334",
       "name": "Stonecunning",
-      "type": "classFeature",
-      "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
-      "router": "src/services/combat/automation/routers/classFeatureRouter.js",
-      "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
-      "class": "Ranger",
+      "type": "racialTrait",
+      "handler": "src/services/automation/handlers/class-other/stonecunningHandler.js",
+      "router": "src/services/automation/automation/index.js",
+      "infoBuilder": "(real consumers: trackedResources.js uses-counter, restRules-longRest.js LR refill, charSummaryCalc.js/CharSummary.jsx badge)",
+      "verified": "verified (PASS-subset)",
+      "class": "Dwarf (racial trait, not Ranger — MISATTRIBUTED row fixed in place 2026-09-06)",
       "triggerConditions": "Action: 1 bonus action; Must be on/touching stone; Uses: proficiency_bonus, Recharge: long_rest",
-      "expectedBehavior": "As a Bonus Action, you gain Tremorsense with a range of 60 feet for 10 minutes. You must be on a stone surface or touching a stone surface to use this Tremorsense. The stone can be natural or worked. You can use this Bonus Action a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest."
+      "expectedBehavior": "As a Bonus Action, you gain Tremorsense with a range of 60 feet for 10 minutes. You must be on a stone surface or touching a stone surface to use this Tremorsense. The stone can be natural or worked. You can use this Bonus Action a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest. VERIFIED PASS-SUBSET 2026-09-06 (Dwarf, Divine_Cleric lv17 PB+6): bonus-action row + stonecunningUses counter max PB exact + LR refill + tremorsense_60ft buff/badge + ability_use log exact. GAPS (see bug file): no duration expiry registrant (10-min never expires), stone-surface gate unmodellable (app has no sense model §7), first-spend uses lost to same-tick snapshot race, re-click while active silently strips buff."
     },
     {
       "id": "CLA-335",
-      "name": "Stone's Endurance \u2013 Goliath",
-      "type": "classFeature",
-      "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
-      "router": "src/services/combat/automation/routers/classFeatureRouter.js",
-      "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
-      "class": "Stone Giant",
+      "name": "Stone's Endurance – Goliath",
+      "type": "racialTrait",
+      "handler": "src/services/automation/handlers/class-other/giantAncestryTraits.js",
+      "router": "src/services/automation/automation/index.js",
+      "infoBuilder": "(real consumers: trackedResources.js uses-counter, restRules-longRest.js LR refill)",
+      "verified": "verified (PASS-subset) — see .opencode/plans/bug-CLA-335-stones-endurance-misattribution-refire.md for gaps",
+      "class": "Goliath (Stone Giant subrace racial trait, not \"Stone Giant\" class — MISATTRIBUTED row fixed in place 2026-09-06)",
       "triggerConditions": "When you take damage; Reaction; Uses: proficiency_bonus, recharges on long rest",
-      "expectedBehavior": "When you take damage, you can take a Reaction to roll 1d12. Add your Constitution modifier to the number and reduce the damage by that total. (Stone Giant subrace of Goliath)"
+      "expectedBehavior": "When you take damage, you can take a Reaction to roll 1d12. Add your Constitution modifier to the number and reduce the damage by that total. (Stone Giant subrace of Goliath) VERIFIED PASS-SUBSET 2026-09-06 (Goliath, ElderPaladin lv20 CON+5 PB+6): reaction only-on-damage gate exact (missed attack → refusal), reduction 1d12+CON exact, capped at incoming damage (never negative/overheal), uses=PB decrements + LR refill exact; control hit without reaction took full damage. GAPS (see bug file): implemented as POST-damage heal not pre-damage reduction (0-HP/concentration thresholds see unreduced value); refires on same lastAttack (no round latch); popup cap-text prints totalDamage even when clamp is HP deficit."
     },
     {
       "id": "CLA-336",
@@ -6175,20 +6175,20 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-336-stormborn.md",
       "class": "Druid",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Your Wrath of the Sea confers two more benefits while active, as detailed below. Flight: You gain a Fly Speed equal to your Speed. Resistance: You have Resistance to Cold, Lightning, and Thunder damage."
     },
     {
       "id": "CLA-337",
-      "name": "Storm's Thunder \u2013 Goliath",
-      "type": "classFeature",
-      "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
-      "router": "src/services/combat/automation/routers/classFeatureRouter.js",
-      "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
-      "class": "Storm Giant",
+      "name": "Storm's Thunder – Goliath",
+      "type": "racialTrait",
+      "handler": "src/services/automation/handlers/class-other/giantAncestryTraits.js",
+      "router": "src/services/automation/automation/index.js",
+      "infoBuilder": "(real consumers: trackedResources.js uses-counter, restRules-longRest.js LR refill)",
+      "verified": "verified (PASS-subset) — see .opencode/plans/bug-CLA-337-storms-thunder-60ft-gate-inert.md for gaps",
+      "class": "Goliath (Storm Giant subrace racial trait, not \"Storm Giant\" class — MISATTRIBUTED row fixed in place 2026-09-06)",
       "triggerConditions": "When you take damage from creature within 60ft; Reaction; Uses: proficiency_bonus, recharges on long rest",
       "expectedBehavior": "When you take damage from a creature within 60 feet of you, you can take a Reaction to deal 1d8 Thunder damage to that creature. (Storm Giant subrace of Goliath)"
     },
@@ -6199,7 +6199,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-339-stroke-of-luck.md",
       "class": "Rogue",
       "triggerConditions": "Action: passive",
       "expectedBehavior": "If you fail a D20 Test, you can turn the roll into a 20. Once per Short or Long Rest."
