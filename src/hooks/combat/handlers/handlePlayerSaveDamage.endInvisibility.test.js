@@ -165,7 +165,9 @@ describe('handlePlayerSaveDamage - endInvisibilityOnHostileAction', () => {
             'test-campaign',
             expect.any(Array),
             false,
-            'TestWizard'
+            'TestWizard',
+            false,
+            { isSpellDamage: true }
         );
         expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('TestWizard', 'test-campaign');
         expect(deps.logEntry).toHaveBeenCalledWith(
@@ -288,7 +290,9 @@ describe('handlePlayerSaveDamage - endInvisibilityOnHostileAction', () => {
             'test-campaign',
             null,
             false,
-            'TestWizard'
+            'TestWizard',
+            false,
+            { isSpellDamage: true }
         );
         expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('TestWizard', 'test-campaign');
         expect(deps.logEntry).toHaveBeenCalledWith(

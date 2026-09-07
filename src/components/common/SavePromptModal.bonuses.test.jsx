@@ -80,7 +80,7 @@ vi.mock('./Subscriber.jsx', () => {
     return React.createElement(
       'div',
       { 'data-testid': 'subscriber', 'data-campaign': campaignName },
-      React.createElement('button', { 'data-testid': 'subscriber-trigger', onClick: () => handleEvent({ key: `change-${campaignName}-savePrompt-testTarget`, data: { promptId: 'test-prompt-1', targetName: 'testTarget', saveType: 'con', saveDc: 12, disadvantage: false } }) }),
+      React.createElement('button', { 'data-testid': 'subscriber-trigger', onClick: () => handleEvent({ key: `change-${campaignName}-savePrompt-testTarget`, data: { promptId: 'test-prompt-1', targetName: 'testTarget', saveType: 'con', saveDc: 12, disadvantage: false, isSpellDamage: true } }) }),
       React.createElement('button', { 'data-testid': 'subscriber-trigger-second', onClick: () => handleEvent({ key: `change-${campaignName}-savePrompt-testTarget2`, data: { promptId: 'test-prompt-2', targetName: 'testTarget2', saveType: 'dex', saveDc: 15, disadvantage: true, dcSuccess: 'half' } }) }),
       React.createElement('button', { 'data-testid': 'subscriber-trigger-cleared', onClick: () => handleEvent({ key: `change-${campaignName}-savePromptCleared-testTarget`, data: { promptId: 'test-prompt-1' } }) }),
       React.createElement('button', { 'data-testid': 'subscriber-trigger-disadvantage', onClick: () => handleEvent({ key: `change-${campaignName}-savePrompt-testTarget3`, data: { promptId: 'test-prompt-disadv', targetName: 'testTarget3', saveType: 'str', saveDc: 14, disadvantage: true, dcSuccess: 'half', sourceName: 'Fireball' } }) }),
@@ -142,6 +142,41 @@ describe('SavePromptModal — save bonus sources', () => {
 
     expect(rollD20).toHaveBeenCalledTimes(2);
     expect(savePromptService.sendSaveResult).not.toHaveBeenCalled();
+  });
+
+  it('does NOT grant against_spell advantage when the save is not spell-origin (CLA-324)', async () => {
+    rollD20.mockReturnValueOnce(15);
+    const targetChar = {
+      name: 'testTarget',
+      level: 1,
+      class: { class_levels: [] },
+      computedStats: {
+        abilities: [{ name: 'Constitution', bonus: 3 }],
+        evasionEffects: [],
+      },
+      saveModifiers: [{ target: 'saving_throw', effect: 'advantage', condition: 'against_spell' }],
+    };
+
+    render(
+      <SavePromptModal
+        campaignName="test-campaign"
+        characters={[targetChar]}
+        activeMapName={null}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('subscriber-trigger-attacker'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Roll Save' }));
+
+    await waitFor(() => {
+      expect(rollD20).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.queryByText(/Advantage/)).not.toBeInTheDocument();
   });
 
   // ── Dodge buff ──

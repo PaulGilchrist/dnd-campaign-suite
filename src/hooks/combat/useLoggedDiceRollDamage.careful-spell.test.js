@@ -182,7 +182,9 @@ describe('Careful Spell — player save damage with ally protection', () => {
             'test-campaign',
             expect.any(Array),
             false,
-            'Wizard1'
+            'Wizard1',
+            false,
+            { isSpellDamage: true }
         );
         expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('Wizard1', 'test-campaign');
         expect(deps.logEntry).toHaveBeenCalledWith(
@@ -316,7 +318,9 @@ describe('Careful Spell — player save damage with ally protection', () => {
             'test-campaign',
             expect.any(Array),
             true,
-            'Wizard1'
+            'Wizard1',
+            false,
+            { isSpellDamage: true }
         );
     });
 });

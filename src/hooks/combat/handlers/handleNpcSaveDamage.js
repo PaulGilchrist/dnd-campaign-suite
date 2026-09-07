@@ -34,6 +34,15 @@ function applyPostSaveDamageEffects(primaryApplyResult, characterName, campaignN
     }
 }
 
+// CLA-324: against_spell advantage only on saves against spells — spell-origin is
+// identifiable from cast-spell context (school/cantrip/flag) or lastAttack stamps.
+function hasSpellOrigin(saveModifiers, context, campaignName) {
+    if (!saveModifiers.some(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell')) return false;
+    if (context?.isSpellDamage === true || context?.isCantrip === true || !!context?.autoDamageSchool) return true;
+    const lastAttackOrigin = getRuntimeValue('campaign', 'lastAttack', campaignName) || {};
+    return lastAttackOrigin.rollType === 'spell-save' || lastAttackOrigin.isSpellDamage === true;
+}
+
 export function createNpcSaveDamageHandler(deps) {
     const { characterName, campaignName, characters, setPopupHtml, logEntry } = deps;
 
@@ -79,7 +88,7 @@ export function createNpcSaveDamageHandler(deps) {
         const isSoulstitchProtected = hasSoulstitchProtection(target.name, characterName, campaignName);
         const targetCharacter = (characters || []).find(c => utils.getName(c.name) === target.name);
         const targetSaveModifiers = targetCharacter?.saveModifiers || targetCharacter?.computedStats?.saveModifiers || [];
-        const advantage = targetSaveModifiers.some(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell') || isCircleOfPowerActive(target.name, campaignName);
+        const advantage = hasSpellOrigin(targetSaveModifiers, context, campaignName) || isCircleOfPowerActive(target.name, campaignName);
         const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage, advantage);
         const normalizedSaveType = normalizeSaveType(saveType);
         const targetConditions = getRuntimeValue(target.name, 'activeConditions', campaignName) || [];
@@ -466,7 +475,7 @@ export function createNpcSaveDamageHandler(deps) {
                 }
                 const twinCharacter = (characters || []).find(c => utils.getName(c.name) === twinTarget.name);
                 const twinSaveModifiers = twinCharacter?.saveModifiers || twinCharacter?.computedStats?.saveModifiers || [];
-                const twinAdvantage = twinSaveModifiers.some(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');
+                const twinAdvantage = hasSpellOrigin(twinSaveModifiers, context, campaignName);
                 const twinSaveResult = rollSaveForCreature(twinTarget, saveType, saveDc, twinDisadvantage, twinAdvantage);
                 let twinFinalDamage = computeDamageAfterSave(adjustedTotal, twinSaveResult.success, dcSuccess);
                 if (hasPotentFlag && isCantripFlag && twinSaveResult.success && dcSuccess === 'none') {
@@ -526,7 +535,7 @@ export function createNpcSaveDamageHandler(deps) {
                 if (saveType && saveDc) {
                     const multiCharacter = (characters || []).find(c => utils.getName(c.name) === multiTarget.name);
                     const multiSaveModifiers = multiCharacter?.saveModifiers || multiCharacter?.computedStats?.saveModifiers || [];
-                    const multiAdvantage = multiSaveModifiers.some(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');
+                    const multiAdvantage = hasSpellOrigin(multiSaveModifiers, context, campaignName);
                     let multiDisadvantage = false;
                     const multiTargetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
                     const multiIdx = multiTargetEffects.findIndex(te => te.target === multiTarget.name && te.effect === 'disadvantage_on_next_save');

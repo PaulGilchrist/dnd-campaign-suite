@@ -44,7 +44,7 @@ export function computeDamageAfterResistances(rawDamage, damageTypes, resistance
   return rawDamage;
 }
 
-export function computeDamageAfterResistancesWithDetails(rawDamage, damageTypes, resistances, immunities, ignoreResistance = false) {
+export function computeDamageAfterResistancesWithDetails(rawDamage, damageTypes, resistances, immunities, ignoreResistance = false, spellOrigin = false) {
   if (!damageTypes || damageTypes.length === 0) throw new Error('computeDamageAfterResistancesWithDetails: damageTypes is required');
   const typeDetails = [];
   let finalDamage = rawDamage;
@@ -67,6 +67,12 @@ export function computeDamageAfterResistancesWithDetails(rawDamage, damageTypes,
     finalDamage = 0;
   } else if (isResistant) {
     finalDamage = Math.floor(rawDamage / 2);
+  } else if (spellOrigin && !ignoreResistance && resistances?.some(r => String(r).toLowerCase() === 'spell')) {
+    // CLA-324: categorical 'Spell' resistance (e.g. Abjurer Spell Resistance passive_immunity
+    // damage_resistance:['Spell']) halves spell-origin damage. 'Spell' is never a concrete
+    // damage type, so it is matched via the spellOrigin flag, not the damageTypes loop.
+    finalDamage = Math.floor(rawDamage / 2);
+    typeDetails.push({ damageType: 'Spell', status: 'resistant' });
   }
   return { finalDamage, typeDetails };
 }
@@ -214,9 +220,22 @@ if (auraComboEffects.resistances.length > 0) {
 }
 if (!Array.isArray(damageTypes)) { throw new Error('damageTypes must be an array'); }
     let combatSummaryChanged = false;
-    const resResult = computeDamageAfterResistancesWithDetails(rawDamage, damageTypes, resistances, immunities, ignoreResistance);
+    // CLA-324: spell-origin is knowable from the damage payload (options.isSpellDamage) or
+    // the campaign lastAttack (spell-save stamps, monster-card save-attack stamps).
+    const spellOrigin = options?.isSpellDamage === true || existingAttack?.rollType === 'spell-save' || existingAttack?.isSpellDamage === true;
+    const resResult = computeDamageAfterResistancesWithDetails(rawDamage, damageTypes, resistances, immunities, ignoreResistance, spellOrigin);
      let finalDamage = resResult.finalDamage;
     let resistanceDetails = resResult.typeDetails;
+
+    if (spellOrigin && rawDamage > 0 && resistanceDetails.some(rd => rd.damageType === 'Spell' && rd.status === 'resistant')) {
+        addEntry(campaignName, {
+            type: 'automation',
+            creatureName: creature.name,
+            name: 'Spell Resistance',
+            description: `${creature.name} has resistance to damage of spells — ${rawDamage} spell damage halved to ${finalDamage}.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[applyDamage] Spell Resistance log failed:', e); });
+    }
 
     if (silenceThunderImmunity && rawDamage > 0 && damageTypes.some(dt => String(dt).toLowerCase() === 'thunder')) {
         addEntry(campaignName, {

@@ -167,6 +167,7 @@ describe('createSaveListener', () => {
             secondaryFormula: null,
             secondaryDamageType: null,
             secondaryRawDamage: 0,
+            isSpellDamage: false,
         });
     });
 
@@ -199,6 +200,7 @@ describe('createSaveListener', () => {
             secondaryFormula: null,
             secondaryDamageType: null,
             secondaryRawDamage: 0,
+            isSpellDamage: false,
         });
     });
 

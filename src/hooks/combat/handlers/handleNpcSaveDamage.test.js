@@ -104,6 +104,7 @@ describe('handleNpcSaveDamage - basic save damage flow', () => {
         saveType: 'dex',
         dcSuccess: 'none',
         damageType: 'fire',
+        isSpellDamage: true,
     };
     const defaultCombatSummary = {
         creatures: [{ name: 'Goblin', type: 'npc', currentHp: 13, maxHp: 13 }],

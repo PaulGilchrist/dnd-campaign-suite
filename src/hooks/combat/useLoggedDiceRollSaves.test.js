@@ -206,6 +206,7 @@ describe('createSaves (useLoggedDiceRollSaves) - Core', () => {
                 name: 'Mind Sliver',
                 formula: '1d6',
                 rolls: [4],
+                isSpellDamage: true,
             };
             deps.charactersRef.current = [{
                 name: 'Wiz',

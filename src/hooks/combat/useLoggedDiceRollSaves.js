@@ -190,7 +190,13 @@ export function createSaves(deps) {
 
         const targetChar = (charactersRef.current || []).find(c => c.name === pending.targetName);
         const targetSaveModifiers = targetChar?.saveModifiers || targetChar?.computedStats?.saveModifiers || [];
-        const advantage = targetSaveModifiers.some(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');
+        // CLA-324: against_spell advantage only on saves against spells — spell-origin is
+        // identifiable from the pending prompt flag or a spell-save-owned lastAttack stamp.
+        const hasAgainstSpellAdvantage = targetSaveModifiers.some(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');
+        const lastAttackOrigin = hasAgainstSpellAdvantage ? (getRuntimeValue('campaign', 'lastAttack', campaignName) || {}) : {};
+        const spellOrigin = pending.isSpellDamage === true ||
+          (lastAttackOrigin.rollType === 'spell-save' && (!pending.attackerName || lastAttackOrigin.attackerName === pending.attackerName));
+        const advantage = hasAgainstSpellAdvantage && spellOrigin;
         const targetActiveBuffs = getRuntimeValue(pending.targetName, 'activeBuffs', campaignName) || [];
         const isDodging = Array.isArray(targetActiveBuffs) && targetActiveBuffs.some(b => b.effect === 'dodge');
         const isDexSave = saveType.toUpperCase() === 'DEX';
@@ -309,7 +315,7 @@ export function createSaves(deps) {
             name: pending.name,
             formula: pending.formula,
             rolls: pending.rolls,
-            total: applyResult?.finalDamage,
+            total: finalDamage,
             bonus: 0,
             modifier: pending.modifier,
             damageType: pending.damageType,

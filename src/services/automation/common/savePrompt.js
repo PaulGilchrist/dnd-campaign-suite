@@ -52,6 +52,7 @@ export function createSaveListener(campaignName, config) {
         secondaryFormula: config.secondaryFormula || null,
         secondaryDamageType: config.secondaryDamageType || null,
         secondaryRawDamage: config.secondaryRawDamage || 0,
+        isSpellDamage: config.isSpellDamage === true,
     };
     setRuntimeValue('campaign', 'pendingSavePrompts', pendingSaves, campaignName);
 
@@ -76,6 +77,7 @@ export function createSaveListener(campaignName, config) {
         secondaryFormula: config.secondaryFormula || null,
         secondaryDamageType: config.secondaryDamageType || null,
         secondaryRawDamage: config.secondaryRawDamage || 0,
+        isSpellDamage: config.isSpellDamage === true,
      });
 
     const promise = new Promise((resolve) => {

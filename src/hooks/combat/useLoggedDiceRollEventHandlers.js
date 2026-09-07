@@ -129,10 +129,12 @@ export function setupEventListeners(deps) {
                 }
             }
 
-            // Apply primary damage with combined concentration total (if secondary exists)
+            // Apply primary damage with combined concentration total (if secondary exists).
+            // CLA-324: carry spell-origin from the pending prompt flag.
+            const isSpellDamage = pending.isSpellDamage === true;
             const applyResult = secondaryData
-                ? await applyDamageToTarget(combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, charactersRef.current, ignoreResistance, attacker, true, { concentrationTotalDamage: finalDamage + secondaryData.total })
-                : await applyDamageToTarget(combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, charactersRef.current, ignoreResistance, attacker, true);
+                ? await applyDamageToTarget(combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, charactersRef.current, ignoreResistance, attacker, true, { concentrationTotalDamage: finalDamage + secondaryData.total, isSpellDamage })
+                : await applyDamageToTarget(combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, charactersRef.current, ignoreResistance, attacker, true, { isSpellDamage });
 
             const isIntercepted = applyResult?.intercepted;
             const appliedDamage = isIntercepted ? (applyResult.damageDealt ?? 0) : (applyResult?.finalDamage ?? 0);

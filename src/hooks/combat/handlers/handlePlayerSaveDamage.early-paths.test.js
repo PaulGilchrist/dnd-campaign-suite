@@ -290,7 +290,9 @@ describe('handlePlayerSaveDamage - careful ally path', () => {
             'test-campaign',
             expect.any(Array),
             false,
-            'TestWizard'
+            'TestWizard',
+            false,
+            { isSpellDamage: true }
         );
         expect(logEntry).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -352,7 +354,9 @@ describe('handlePlayerSaveDamage - careful ally path', () => {
             'test-campaign',
             expect.any(Array),
             true,
-            'TestWizard'
+            'TestWizard',
+            false,
+            { isSpellDamage: true }
         );
     });
 });

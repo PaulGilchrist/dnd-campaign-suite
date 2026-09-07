@@ -234,7 +234,9 @@ describe('Contact Other Plane auto-save', () => {
             'test-campaign',
             null,
             false,
-            'Warlock1'
+            'Warlock1',
+            false,
+            { isSpellDamage: true }
         );
 
         expect(deps.setPopupHtml).toHaveBeenCalledWith(

@@ -386,6 +386,8 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       saveType: action?.save_type ? toAbbr(action.save_type) : null,
       dcSuccess: action?.save_dc != null ? 'half' : null,
       saveConditions: extractConditionsFromSaveEffect(action?.save_effect),
+      // CLA-324: spell-origin marker for monster spell attacks (against_spell gates).
+      isSpellDamage: action?.spell_attack_bonus != null || action?.spell_save_dc != null || /spell attack/i.test(action?.description || ''),
     });
   };
 

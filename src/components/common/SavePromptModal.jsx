@@ -174,8 +174,16 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
       for (const mod of saveModifiers) {
         if (mod.target === 'saving_throw' && mod.effect === 'advantage') {
           if (mod.condition === 'against_spell') {
-            hasAdvantage = true;
-            break;
+            // CLA-324: against_spell advantage only on saves against spells — spell-origin is
+            // identifiable from the prompt flag (monster-card save attacks, spell save-damage
+            // prompts) or a spell-save-owned campaign lastAttack from the spell pipeline.
+            const lastAttackOrigin = getRuntimeValue('campaign', 'lastAttack', campaignName) || {};
+            const spellOrigin = current.isSpellDamage === true ||
+              (lastAttackOrigin.rollType === 'spell-save' && (!current.attackerName || lastAttackOrigin.attackerName === current.attackerName));
+            if (spellOrigin) {
+              hasAdvantage = true;
+              break;
+            }
           }
           if (mod.condition && conditionSet.has(mod.condition)) {
             hasAdvantage = true;

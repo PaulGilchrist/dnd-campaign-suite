@@ -236,6 +236,7 @@ describe('handlePlayerSaveDamage - complete save prompt flow', () => {
             rawDamage: 10,
             disadvantage: false,
             advantage: false,
+            isSpellDamage: true,
         });
     });
 

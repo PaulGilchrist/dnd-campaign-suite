@@ -104,6 +104,7 @@ describe('handleNpcSaveDamage - metamagic twin and multi-target', () => {
         saveType: 'dex',
         dcSuccess: 'none',
         damageType: 'fire',
+        isSpellDamage: true,
     };
     const defaultCombatSummary = {
         creatures: [

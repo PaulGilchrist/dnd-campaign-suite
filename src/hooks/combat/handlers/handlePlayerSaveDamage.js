@@ -91,7 +91,7 @@ export function createPlayerSaveDamageHandler(deps) {
                 gwfDisplayRolls: gwfDisplayRolls,
             });
 
-            const applyResult = await applyDamageToTarget(combatSummary, target.name, carefulDamage, [damageType], campaignName, characters, ignoreResistance, characterName);
+            const applyResult = await applyDamageToTarget(combatSummary, target.name, carefulDamage, [damageType], campaignName, characters, ignoreResistance, characterName, false, { isSpellDamage: true });
 
             if (applyResult && applyResult.finalDamage > 0) {
                 endInvisibilityOnHostileAction(characterName, campaignName);
@@ -152,7 +152,7 @@ export function createPlayerSaveDamageHandler(deps) {
                 gwfDisplayRolls: gwfDisplayRolls,
             });
 
-            const applyResult = await applyDamageToTarget(combatSummary, target.name, successfulSave, [damageType], campaignName, null, ignoreResistance, characterName);
+            const applyResult = await applyDamageToTarget(combatSummary, target.name, successfulSave, [damageType], campaignName, null, ignoreResistance, characterName, false, { isSpellDamage: true });
 
             if (applyResult && applyResult.finalDamage > 0) {
                 endInvisibilityOnHostileAction(characterName, campaignName);
@@ -221,6 +221,8 @@ export function createPlayerSaveDamageHandler(deps) {
             autoDamageSecondaryFormula: context?.autoDamageSecondaryFormula || null,
             autoDamageSecondaryName: context?.autoDamageSecondaryName || null,
             autoDamageSecondaryDamageType: context?.autoDamageSecondaryDamageType || null,
+            // CLA-324: this seam is player-cast save-spell damage — spell-origin.
+            isSpellDamage: true,
         };
         pendingSaves[promptId] = pendingData;
         registerPendingSavePrompt(promptId, pendingData);
@@ -239,6 +241,8 @@ export function createPlayerSaveDamageHandler(deps) {
             rawDamage: adjustedTotal,
             disadvantage: saveDisadvantage,
             advantage: saveAdvantage,
+            // CLA-324: player-cast save spell — spell-origin marker.
+            isSpellDamage: true,
         });
 
         logEntry({

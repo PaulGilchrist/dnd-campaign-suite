@@ -38,6 +38,9 @@ async function processPlayerSave(target, characterName, campaignName, context, b
         saveDc,
         dcSuccess: context?.dcSuccess || 'half',
         attackerName: attackerName,
+        // CLA-324: monster-card save-based attacks are spell-like save attacks (eye rays,
+        // magical rays) — flag spell-origin so against_spell gates can discriminate.
+        isSpellDamage: true,
     });
 
     const saveResult = await promise;
@@ -81,6 +84,8 @@ async function processPlayerSave(target, characterName, campaignName, context, b
             attackName: context?.actionName || context?.autoDamageName || context.name,
             actionName,
             rollType: 'save',
+            // CLA-324: spell-origin stamp for save-based attacks rolled from the monster card.
+            isSpellDamage: true,
             saveConditions: context?.saveConditions || [],
             timestamp: Date.now(),
         }, campaignName);
@@ -223,6 +228,8 @@ async function processNpcSave(rollType, target, characterName, campaignName, con
             attackName: context?.actionName || context?.autoDamageName || context.name,
             actionName,
             rollType: 'save',
+            // CLA-324: spell-origin stamp for save-based attacks rolled from the monster card.
+            isSpellDamage: true,
             saveConditions: context?.saveConditions || [],
             timestamp: Date.now(),
         }, campaignName);
@@ -304,7 +311,9 @@ async function applySaveDamage(context, characterName, campaignName, attackerNam
     const attackerChar = (characters || []).find(c => c.name === attackerName);
     const ignoreResistance = (attackerChar?.computedStats && hasIgnoreResistance(attackerChar.computedStats, damageType)) || false;
     const combatSummaryForSave = await loadCombatSummary(campaignName);
-    const applyResult = await applyDamageToTarget(combatSummaryForSave, applyTarget, finalDamage, [damageType], campaignName, characters, ignoreResistance, attackerName);
+    // CLA-324: save-based spell-like attack damage — flag spell-origin for categorical
+    // 'Spell' resistance (Abjurer Spell Resistance).
+    const applyResult = await applyDamageToTarget(combatSummaryForSave, applyTarget, finalDamage, [damageType], campaignName, characters, ignoreResistance, attackerName, false, { isSpellDamage: true });
 
     logEntry({
         type: 'roll',
@@ -328,7 +337,7 @@ async function applySaveDamage(context, characterName, campaignName, attackerNam
         name: context?.actionName || context.name,
         formula: damageFormula,
         rolls: damageResult.rolls,
-        total: applyResult?.finalDamage,
+        total: finalDamage,
         bonus: 0,
         modifier: damageResult.modifier,
         damageType: damageType,
