@@ -6223,7 +6223,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-341-studied-attacks.md",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Trigger: miss; Action: passive; Duration: until_start_of_next_turn",
       "expectedBehavior": "You study your opponents and learn from each attack you make. If you make an attack roll against a creature and miss, you have Advantage on your next attack roll against that creature before the end of your next turn."
