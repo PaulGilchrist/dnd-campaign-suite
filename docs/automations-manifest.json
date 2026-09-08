@@ -6640,7 +6640,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-361-thought-shield-reflect-log-only.md",
+      "verified": "verified",
       "class": "Warlock",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Your thoughts can't be read by telepathy or other means unless you allow it. Resistance to Psychic damage. Whenever a creature deals Psychic damage to you, that creature takes the same amount of damage that you take."

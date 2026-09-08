@@ -878,4 +878,121 @@ describe('reactionDamageHandler', () => {
             expect(lastCall[2]).toEqual(['poisoned']);
         });
     });
+
+    // CLA-361: Thought Shield reflect must PERSIST (applyDamageToTarget, not a
+    // mutation of the fetched combatSummary copy) and latch once per round.
+    describe('CLA-361 Thought Shield persistence + once-per-hit latch', () => {
+        const tsAction = makeAction({
+            name: 'Thought Shield',
+            automation: {
+                type: 'reaction_damage',
+                trigger: 'psychic_damage_received',
+                damageExpression: 'RAW damage',
+                damageType: 'Psychic',
+                range: '5_ft',
+            },
+        });
+
+        const tsStats = () => makePlayerStats({
+            characterAdvancement: [{ name: 'Thought Shield' }],
+        });
+
+        const psychicLastAttack = {
+            targetName: 'TestHero',
+            damageTypes: ['Psychic'],
+            actualDamage: 14,
+            rawDamage: 28,
+            attackerName: 'Githzerai Psion 1',
+        };
+
+        function tsRig() {
+            const cs = {
+                round: 3,
+                creatures: [
+                    { name: 'Githzerai Psion 1', type: 'monster', currentHp: 169, maxHp: 169 },
+                    { name: 'TestHero', type: 'player', currentHp: 59 },
+                ],
+            };
+            getCombatContext.mockResolvedValue(cs);
+            getRuntimeValue.mockImplementation((key, prop) => {
+                if (key === 'campaign' && prop === 'lastAttack') return psychicLastAttack;
+                return undefined;
+            });
+            return cs;
+        }
+
+        it('persists the reflect through applyDamageToTarget (ignoreResistance, warlock attributed)', async () => {
+            tsRig();
+
+            const result = await handle(tsAction, tsStats(), 'test-campaign', null, []);
+
+            expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+            expect(applyDamageToTarget).toHaveBeenCalledWith(
+                expect.objectContaining({ round: 3 }),
+                'Githzerai Psion 1',
+                14,
+                ['Psychic'],
+                'test-campaign',
+                expect.any(Array),
+                true,
+                'TestHero'
+            );
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('reflects 14 psychic damage back to Githzerai Psion 1');
+        });
+
+        it('never hand-rolls an hp_change row or cs mutation — persistence is applyDamageToTarget\'s', async () => {
+            const cs = tsRig();
+
+            await handle(tsAction, tsStats(), 'test-campaign', null, []);
+
+            expect(cs.creatures.find(c => c.name === 'Githzerai Psion 1').currentHp).toBe(169);
+            expect(addEntry.mock.calls.some(([, e]) => e.type === 'hp_change')).toBe(false);
+        });
+
+        it('stamps _Thought_Shield_usedRound and refuses a same-round refire spending nothing', async () => {
+            tsRig();
+
+            await handle(tsAction, tsStats(), 'test-campaign', null, []);
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', '_Thought_Shield_usedRound', 3, 'test-campaign');
+
+            applyDamageToTarget.mockClear();
+            getRuntimeValue.mockImplementation((key, prop) => {
+                if (key === 'campaign' && prop === 'lastAttack') return psychicLastAttack;
+                if (key === 'TestHero' && prop === '_Thought_Shield_usedRound') return 3;
+                return undefined;
+            });
+
+            const result = await handle(tsAction, tsStats(), 'test-campaign', null, []);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('already used Thought Shield this round');
+            expect(applyDamageToTarget).not.toHaveBeenCalled();
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'automation',
+                automationType: 'thought_shield_refused',
+                characterName: 'TestHero',
+            }));
+        });
+
+        it('logs thought_shield_refused on the non-psychic (bludgeoning) refusal leg', async () => {
+            tsRig();
+            getRuntimeValue.mockImplementation((key, prop) => {
+                if (key === 'campaign' && prop === 'lastAttack') {
+                    return { targetName: 'TestHero', damageTypes: ['Bludgeoning'], actualDamage: 5, attackerName: 'Thug 1' };
+                }
+                return undefined;
+            });
+
+            const result = await handle(tsAction, tsStats(), 'test-campaign', null, []);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('not psychic damage');
+            expect(applyDamageToTarget).not.toHaveBeenCalled();
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'automation',
+                automationType: 'thought_shield_refused',
+            }));
+        });
+    });
 });

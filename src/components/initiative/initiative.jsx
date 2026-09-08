@@ -405,6 +405,8 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                     setRuntimeValue(creature.name, '_ShadowyDodge_appliedAttack', null, campaignName)
                     setRuntimeValue(creature.name, '_Slow_Fall_usedRound', null, campaignName)
                     setRuntimeValue(creature.name, '_Stones_Endurance_usedRound', null, campaignName)
+                    // CLA-361: Thought Shield reflect round latch re-arms at round wrap.
+                    setRuntimeValue(creature.name, '_Thought_Shield_usedRound', null, campaignName)
                     setRuntimeValue(creature.name, '_Superior_Hunters_Defense_usedRound', null, campaignName)
                     setRuntimeValue(creature.name, '_Riposte_usedRound', null, campaignName)
                     setRuntimeValue(creature.name, '_Riposte_appliedAttack', null, campaignName)

@@ -11,6 +11,14 @@ import { applyDamageToTarget, computeDamageAfterSave } from '../../../rules/comb
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 import { isPolearmWeapon } from '../../common/polearmUtils.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+
+// CLA-361: Thought Shield ("Whenever a creature deals Psychic damage to you, that
+// creature takes the same amount of damage that you take") — once-per-round reaction
+// latch keyed on the holder's playerStats.name, round from a FRESH getCombatContext
+// (CLA-335/CLA-315/CLA-297 family). Cleared at round wrap in initiative.jsx /
+// navigationHandlers.js.
+const THOUGHT_SHIELD_ROUND_KEY = '_Thought_Shield_usedRound';
 
 // CLA-297: Retaliation ("when you take damage from a creature within 5 feet of you")
 // once-per-round reaction latch, round-keyed like the CLA-274 Psychic Blade precedent
@@ -300,6 +308,28 @@ export async function handle(action, playerStats, campaignName, _mapName, charac
 
 async function handleThoughtShield(action, playerStats, campaignName) {
     const warlockName = playerStats.name;
+
+    // CLA-361: every gate refusal now writes a thought_shield_refused log line
+    // (CLA-337 storms_thunder_refused shape) — popup-only refusals were the §7 gap.
+    const tsRefuse = (description) => {
+        addEntry(campaignName, {
+            type: 'automation',
+            characterName: warlockName,
+            automationType: 'thought_shield_refused',
+            name: action.name,
+            description,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[thoughtShield] Error logging refusal:', e); });
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description,
+            },
+        };
+    };
+
     const allFeatures = [
         ...(playerStats.characterAdvancement || []),
         ...(playerStats.reactions || []),
@@ -330,108 +360,79 @@ async function handleThoughtShield(action, playerStats, campaignName) {
 
     const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
     if (!lastAttack) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `No recent attack found. Thought Shield requires a creature to have dealt psychic damage to you.`,
-            },
-        };
+        return tsRefuse('No recent attack found. Thought Shield requires a creature to have dealt psychic damage to you.');
+    }
+
+    // CLA-361: once-per-round reaction latch (CLA-335 recipe — round read from the
+    // FRESH cs above, never a stale mirror). Checked BEFORE the lastAttack identity
+    // gates because the persisted reflect below re-stamps lastAttack with the warlock
+    // as attacker (CLA-337 caveat), so the latch is the authoritative guard that a
+    // spent Reaction cannot refire — refuses spend nothing.
+    const currentRound = cs.round || 1;
+    const usedRound = Number(getRuntimeValue(warlockName, THOUGHT_SHIELD_ROUND_KEY, campaignName) ?? 0);
+    if (usedRound === currentRound) {
+        return tsRefuse(`You have already used ${action.name} this round — your Reaction is spent until your next turn.`);
     }
 
     if (lastAttack.targetName !== warlockName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `You were not the target of the last attack (${lastAttack.targetName} was). Thought Shield only works when you take psychic damage.`,
-            },
-        };
+        return tsRefuse(`You were not the target of the last attack (${lastAttack.targetName} was). Thought Shield only works when you take psychic damage.`);
     }
 
     if (!lastAttack.damageTypes?.some(d => d.toLowerCase() === 'psychic')) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `The last attack dealt ${lastAttack.damageTypes?.join(', ') || 'unknown'} damage, not psychic damage. Thought Shield only reflects psychic damage.`,
-            },
-        };
+        return tsRefuse(`The last attack dealt ${lastAttack.damageTypes?.join(', ') || 'unknown'} damage, not psychic damage. Thought Shield only reflects psychic damage.`);
     }
 
     const actualWarlockDamage = lastAttack.actualDamage || lastAttack.rawDamage || 0;
     if (actualWarlockDamage <= 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `The attacker dealt no damage to you (immune/resistant). Thought Shield reflects the damage you took, which was 0.`,
-            },
-        };
+        return tsRefuse('The attacker dealt no damage to you (immune/resistant). Thought Shield reflects the damage you took, which was 0.');
     }
 
     const attackerCreatureName = lastAttack.attackerName;
     if (!attackerCreatureName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: 'No attacker found to reflect damage to.',
-            },
-        };
+        return tsRefuse('No attacker found to reflect damage to.');
     }
 
     const attackerCreature = cs.creatures.find(c => c.name === attackerCreatureName);
     if (!attackerCreature) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `Attacker "${attackerCreatureName}" not found in combat.`,
-            },
-        };
+        return tsRefuse(`Attacker "${attackerCreatureName}" not found in combat.`);
     }
 
     if (attackerCreature.currentHp <= 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${attackerCreatureName} is already defeated. Cannot reflect damage to a creature that's already down.`,
-            },
-        };
+        return tsRefuse(`${attackerCreatureName} is already defeated. Cannot reflect damage to a creature that's already down.`);
     }
 
+    // CLA-361: range gate — the feature's data declares range 5_ft. Canonical
+    // isWithinRange (CLA-337 recipe): strict token distances on a mapped rig,
+    // lenient true when gridless/unpositioned.
+    const rangeFt = rangeToFeet(action.automation?.range) ?? 5;
+    const inRange = await isWithinRange(attackerCreatureName, warlockName, rangeFt);
+    if (!inRange) {
+        return tsRefuse(`${attackerCreatureName} is not within ${rangeFt} feet of you. Thought Shield requires the attacker to be within ${rangeFt} feet.`);
+    }
+
+    // Stamp the latch before applying so a thrown apply cannot leave the
+    // Reaction refirable within the same round.
+    await setRuntimeValue(warlockName, THOUGHT_SHIELD_ROUND_KEY, currentRound, campaignName);
+
+    // CLA-361 FIX: persist through the verified applyDamageToTarget consumer
+    // (CLA-337 Storm's Thunder pattern) — it writes combatSummary via storage.set
+    // (monster currentHp), emits the hp_change log row, and handles the attacker's
+    // concentration DC/save. The reflect amount is the post-resistance damage the
+    // warlock actually took, so ignoreResistance=true ("same amount" — RAW).
     const reflectedDamage = actualWarlockDamage;
-    attackerCreature.currentHp = Math.max(0, attackerCreature.currentHp - reflectedDamage);
+    const characters = cs.creatures.filter(c => c.type === 'player');
+    const applyResult = await applyDamageToTarget(cs, attackerCreatureName, reflectedDamage, ['Psychic'], campaignName, characters, true, warlockName);
 
-    await addEntry(campaignName, {
-        type: 'hp_change',
-        targetName: attackerCreatureName,
-        delta: -reflectedDamage,
-        currentHp: attackerCreature.currentHp,
-        maxHp: attackerCreature.maxHp,
-        isHealing: false,
-        isUnconscious: attackerCreature.currentHp <= 0,
-        abilityName: action.name,
-    }).catch((e) => { console.error("[thoughtShield] Error logging:", e); });
-
-    if (attackerCreature.concentration && reflectedDamage > 0) {
-        attackerCreature.concentration.dc = Math.max(10, Math.floor(reflectedDamage / 2));
+    if (!applyResult) {
+        console.error('[thoughtShield] applyDamageToTarget failed — reflected damage not applied:', { warlockName, attackerCreatureName, reflectedDamage });
+        return tsRefuse(`Reflected damage could not be applied to ${attackerCreatureName}.`);
     }
 
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: warlockName,
         abilityName: action.name,
-        description: `${warlockName} reflects ${reflectedDamage} psychic damage back to ${attackerCreatureName} using Thought Shield.`,
+        description: `${warlockName} reflects ${reflectedDamage} psychic damage back to ${attackerCreatureName} using Thought Shield (${attackerCreatureName} at ${applyResult.newHp} HP).`,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[thoughtShield] Error logging:", e); });
 
