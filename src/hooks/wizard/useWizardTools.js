@@ -16,6 +16,8 @@ function useWizardTools(formData, setFormData) {
     getDeps: (f) => [
       f.toolProficiencies,
       f.class?.name,
+      f.class?.major?.name,
+      f.class?.subclass?.name,
       f.race?.name,
       f.background,
       f.rules,

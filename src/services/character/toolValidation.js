@@ -4,6 +4,7 @@
  */
 
 import { loadEquipment, fetchBackgroundData, fetchClassData, loadFeatData } from '../ui/dataLoader.js';
+import { getMajorFeatureProficiencyChoices } from './majorFeatureChoices.js';
 
 const CATEGORY_NORMALIZATION = {
     "Gaming Set": "Gaming Sets",
@@ -237,6 +238,27 @@ export async function getToolLimitsByCategory(formData) {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // Major feature grants with feature-level proficiency_choices
+    // (e.g., Battle Master's Student of War: +1 Artisan's Tools)
+    const majorChoices = await getMajorFeatureProficiencyChoices(formData);
+    if (majorChoices.length > 0) {
+        const equipment = await loadEquipment();
+        const categoryByToolName = new Map(
+            equipment.filter(e => e.equipment_category === 'Tools').map(e => [e.name, normalizeCategory(e.tool_category)])
+        );
+        for (const mc of majorChoices) {
+            const toolNames = mc.from.filter(e => e.startsWith('Tool: ')).map(e => e.substring(6).trim());
+            if (toolNames.length === 0) continue;
+            const categories = [...new Set(toolNames.map(n => categoryByToolName.get(n)).filter(Boolean))];
+            if (categories.length === 1) {
+                const cat = categories[0];
+                categoryLimits.set(cat, (categoryLimits.get(cat) || 0) + mc.choose);
+            } else {
+                console.error(`Major feature "${mc.featureName}" grants tools across multiple categories (${categories.join(', ')}); category-limit model cannot express a mixed pool.`);
             }
         }
     }

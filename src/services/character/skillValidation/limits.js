@@ -7,6 +7,7 @@ import {
   countSkillExpertProficiencyChoices,
 } from './feat-helpers.js';
 import { getRaceProficiencyChoiceSources, getRaceFeatProficiencyChoiceSources, getFeatProficiencyChoiceData } from './race-sources.js';
+import { getMajorFeatureProficiencyChoices } from '../majorFeatureChoices.js';
 import { computeTotalSkilledUsage, computeSkilledToolUsageOnly } from './skilled-pool.js';
 import { parseSkillProficiencies } from './parse-skills.js';
 
@@ -212,6 +213,25 @@ async function getSkillLimits2024(formData, allFeats, ctx) {
     });
   }
 
+  // Major feature grants with feature-level proficiency_choices
+  // (e.g., Battle Master's Student of War: +1 skill from Fighter skills)
+  let majorProfs = 0;
+  const majorSkillLists = [];
+  const majorChoices = await getMajorFeatureProficiencyChoices(formData);
+  majorChoices.forEach(mc => {
+    const skills = mc.from.filter(e => e.startsWith('Skill: ')).map(e => e.substring(7).trim());
+    if (skills.length > 0) {
+      majorProfs += mc.choose;
+      majorSkillLists.push({ featName: mc.featureName, skills });
+      skillChoiceSources.push({
+        source: 'major',
+        count: mc.choose,
+        skills,
+        featName: mc.featureName,
+      });
+    }
+  });
+
   // Count Skilled uses
   const skilledUsesAvailable = await countSkilledUses(formData, allFeats);
 
@@ -227,12 +247,15 @@ async function getSkillLimits2024(formData, allFeats, ctx) {
       details += `. + ${featProfs} from feats/traits: ${featDetails}`;
     }
   }
+  majorSkillLists.forEach(ml => {
+    details += `. + ${ml.featName}: choose 1 from ${ml.skills.join(', ')}`;
+  });
 
   // Compute total Skilled usage (skills + tools not covered by restrictive sources)
   const skilledUsesUsed = await computeTotalSkilledUsage(formData, skillChoiceSources);
 
   return {
-    allowed: finalTotal + skilledUsesAvailable,
+    allowed: finalTotal + majorProfs + skilledUsesAvailable,
     fromClass,
     fromRace,
     fromBackground,

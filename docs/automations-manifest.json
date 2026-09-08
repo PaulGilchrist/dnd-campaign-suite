@@ -6211,7 +6211,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-340-student-of-war.md",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "",
       "expectedBehavior": "Gain proficiency with one type of Artisan's Tools and one skill of your choice from Fighter skills."

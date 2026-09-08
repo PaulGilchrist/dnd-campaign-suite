@@ -10,7 +10,7 @@ function useWizardSkills(formData, setFormData, allFeats) {
        { get: (f) => getSkillLimits(f, allFeats), state: { initial: null, key: 'skillLimits' }, isLimit: true },
        { get: (f) => getExpertiseLimits(f, allFeats), state: { initial: null, key: 'expertiseLimits' }, isLimit: true },
      ],
-     getDeps: (f) => [f.skillProficiencies, f.expertSkills, f.class?.name, f.race?.name, f.background, f.rules, f.level, f.feats, f.toolProficiencies],
+     getDeps: (f) => [f.skillProficiencies, f.expertSkills, f.class?.name, f.class?.major?.name, f.class?.subclass?.name, f.race?.name, f.background, f.rules, f.level, f.feats, f.toolProficiencies],
     preSelect: {
       getFn: (f) => getPreSelectedSkills(f, allFeats),
       merge: (prev, items, _prevItems) => ({ ...prev, skillProficiencies: [...(prev.skillProficiencies || []), ...items.filter(s => !(prev.skillProficiencies || []).includes(s))] }),
