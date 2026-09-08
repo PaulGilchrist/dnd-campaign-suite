@@ -28,9 +28,14 @@ vi.mock('../../../rules/combat/applyHealing.js', () => ({
     applyHealingToTarget: vi.fn(() => Promise.resolve({ actualHeal: 0, oldHp: 0, newHp: 0 })),
 }));
 
+vi.mock('../../../rules/effects/expirations.js', () => ({
+    addExpiration: vi.fn(),
+}));
+
 const { getRuntimeValue, setRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js');
 const { addEntry } = await import('../../../ui/logService.js');
 const { applyHealingToTarget } = await import('../../../rules/combat/applyHealing.js');
+const { addExpiration } = await import('../../../rules/effects/expirations.js');
 
 function makePlayerStats(overrides = {}) {
     return {
@@ -535,6 +540,111 @@ describe('superiorHunterDefenseHandler', () => {
 
             expect(result.payload.description).toContain('Resistance to fire damage');
             expect(result.payload.description).toContain('0 fire');
+        });
+    });
+
+    describe('CLA-345 reaction latch + buff expiration', () => {
+        const bludgeoningHit = () => ({
+            attackEvent: { damageType: 'Bludgeoning', primaryDamageType: 'Bludgeoning', targetName: 'Test Ranger' },
+            attackerName: 'Thug 1',
+            targetName: 'Test Ranger',
+            primaryDamage: 6,
+            secondaryDamage: 0,
+            totalDamage: 6,
+            damageTypes: ['Bludgeoning'],
+            primaryDamageType: 'Bludgeoning',
+            secondaryDamageType: null,
+        });
+
+        it('stamps _Superior_Hunters_Defense_usedRound with the round from a fresh combat context', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'activeBuffs') return [];
+                return undefined;
+            });
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({ round: 3, creatures: [{ name: 'Thug 1' }, { name: 'Test Ranger' }], activeCreatureName: 'Thug 1' });
+            damageRollback.findLastAttack.mockResolvedValue(bludgeoningHit());
+
+            await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'Test Ranger',
+                '_Superior_Hunters_Defense_usedRound',
+                3,
+                'test-campaign'
+            );
+        });
+
+        it('refuses a same-round re-click, logs superior_hunters_defense_refused, and spends nothing', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === '_Superior_Hunters_Defense_usedRound') return 3;
+                if (key === 'activeBuffs') return [];
+                return undefined;
+            });
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({ round: 3, creatures: [{ name: 'Thug 1' }, { name: 'Test Ranger' }], activeCreatureName: 'Thug 1' });
+            damageRollback.findLastAttack.mockResolvedValue(bludgeoningHit());
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('already used');
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'automation',
+                automationType: 'superior_hunters_defense_refused',
+                characterName: 'Test Ranger',
+            }));
+            expect(applyHealingToTarget).not.toHaveBeenCalled();
+            expect(addExpiration).not.toHaveBeenCalled();
+            const buffWrites = setRuntimeValue.mock.calls.filter(c => c[1] === 'activeBuffs');
+            expect(buffWrites).toHaveLength(0);
+            const latchWrites = setRuntimeValue.mock.calls.filter(c => c[1] === '_Superior_Hunters_Defense_usedRound');
+            expect(latchWrites).toHaveLength(0);
+        });
+
+        it('re-arms on the next round (latch round < current round succeeds)', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === '_Superior_Hunters_Defense_usedRound') return 2;
+                if (key === 'activeBuffs') return [];
+                return undefined;
+            });
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({ round: 3, creatures: [{ name: 'Thug 1' }, { name: 'Test Ranger' }], activeCreatureName: 'Thug 1' });
+            damageRollback.findLastAttack.mockResolvedValue(bludgeoningHit());
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            expect(result.payload.description).toContain('Resistance to Bludgeoning damage');
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'Test Ranger',
+                '_Superior_Hunters_Defense_usedRound',
+                3,
+                'test-campaign'
+            );
+        });
+
+        it('registers a 1-round-clock remove_active_buff expiration so the resistance drains at the next round', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'activeBuffs') return [];
+                return undefined;
+            });
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({
+                round: 2,
+                activeCreatureName: 'Thug 1',
+                creatures: [{ name: 'Thug 1' }, { name: 'Thug 2' }, { name: 'Test Ranger' }],
+            });
+            damageRollback.findLastAttack.mockResolvedValue(bludgeoningHit());
+
+            await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            expect(addExpiration).toHaveBeenCalledWith(
+                'Test Ranger',
+                'Test Ranger',
+                [{ type: 'remove_active_buff', buffName: "Superior Hunter's Defense" }],
+                'test-campaign',
+                1
+            );
         });
     });
 });

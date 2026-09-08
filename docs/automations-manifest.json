@@ -6379,7 +6379,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-345-superior-hunters-defense.md",
+      "verified": "verified",
       "class": "Ranger",
       "triggerConditions": "Action: 1 reaction",
       "expectedBehavior": "When you take damage, take Reaction to give yourself Resistance to that damage and any other damage of the same type until end of current turn."

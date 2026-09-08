@@ -3,6 +3,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
 
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation;
@@ -34,6 +35,37 @@ export async function handle(action, playerStats, campaignName) {
         };
     }
 
+    // CLA-345: Reaction-economy round latch — one triggering turn can only be
+    // defended once. Mirrors the CLA-335 Stone's Endurance / CLA-315 Slow Fall
+    // recipe: stamp holder playerStats.name with a round read from a FRESH
+    // getCombatContext (never a stale cs mirror, FT-082); re-arms when the
+    // round advances (also cleared at initiative roll in initiative.jsx /
+    // navigationHandlers.js round-wrap lists).
+    const cs = await getCombatContext(campaignName);
+    const currentRound = cs?.round || 1;
+    const usedRoundKey = '_Superior_Hunters_Defense_usedRound';
+    const usedRound = Number(getRuntimeValue(playerName, usedRoundKey, campaignName) ?? 0);
+    if (usedRound === currentRound) {
+        const refusalText = `You have already used ${featureName} this round — your Reaction is spent until your next turn.`;
+        addEntry(campaignName, {
+            type: 'automation',
+            characterName: playerName,
+            automationType: 'superior_hunters_defense_refused',
+            name: featureName,
+            description: refusalText,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[superiorHunterDefense] Error logging refusal:", e); });
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: refusalText,
+                automation: auto,
+            },
+        };
+    }
+
     const primaryDamage = lastAttack.primaryDamage || 0;
     const secondaryDamage = lastAttack.secondaryDamage || 0;
     const primaryDamageType = lastAttack.primaryDamageType || lastAttack.attackEvent?.damageType || 'untyped';
@@ -55,7 +87,6 @@ export async function handle(action, playerStats, campaignName) {
 
     const healAmount = Math.floor(resistedAmount / 2);
 
-    const cs = await getCombatContext(campaignName);
     let actualHeal = 0;
     if (cs) {
         const healResult = await applyHealingToTarget(cs, playerName, healAmount, campaignName);
@@ -78,6 +109,17 @@ export async function handle(action, playerStats, campaignName) {
 
     const newBuffs = [...existingBuffs, buff];
     setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
+
+    // CLA-345: Enforce "until end of current turn" — register a
+    // remove_active_buff expiration with a 1-round clock so the resistance
+    // drains via expireStaleEffects at the FIRST turn-start of the next
+    // round (same round-boundary drain family as weapon masteries /
+    // CLA-334 rounds recipe), never persisting indefinitely.
+    addExpiration(playerName, playerName, [
+        { type: 'remove_active_buff', buffName: featureName },
+    ], campaignName, 1);
+
+    await setRuntimeValue(playerName, usedRoundKey, currentRound, campaignName);
 
     const healText = actualHeal > 0 ? ` Retroactively healed for ${actualHeal} HP (${Math.floor(resistedAmount / 2)} from ${resistedAmount} ${damageType} damage halved by resistance).` : '';
 
