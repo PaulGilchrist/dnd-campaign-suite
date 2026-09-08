@@ -32,6 +32,7 @@ vi.mock('../../../combat/automation/automationService.js', () => ({
   hasHealingMaximization: vi.fn(),
   hasHealingMaximizationForTarget: vi.fn(),
   hasRerollHealingOnes: vi.fn(),
+  hasTacticalShift: vi.fn(() => false),
 }));
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({

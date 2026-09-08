@@ -16,7 +16,7 @@ import { buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js'
 import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js'
-import { hasAutomation, hasTacticalShift, hasSpeedyOpportunityDisadvantage } from '../../services/combat/automation/automationService.js'
+import { hasAutomation, hasSpeedyOpportunityDisadvantage } from '../../services/combat/automation/automationService.js'
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
 import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { executeHandler, confirmSearingVengeance, skipSearingVengeance } from '../../services/automation/index.js'
@@ -217,11 +217,24 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                 const target = getTargetFromAttacker(cs, playerStats.name);
                 if (target) {
                     const targetNoOA = getRuntimeValue(target.name, 'inspiringMovementNoOA');
-                    const targetHasTacticalShift = hasTacticalShift(target);
+                    // CLA-353: cs combatants carry no automation/passives (initiativeService.js:15-23),
+                    // so gate Tactical Shift (and any other no-OA source, e.g. Step of the Wind) on the
+                    // live campaign-level no_opportunity_attacks te instead of a dead passive lookup.
+                    const campaignTargetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+                    const targetNoOATe = campaignTargetEffects.find(te => te.effect === 'no_opportunity_attacks'
+                        && (Array.isArray(te.target) ? te.target.includes(target.name) : te.target === target.name));
                     const targetHasSpeedy = hasSpeedyOpportunityDisadvantage(target);
-                    if (targetNoOA || targetHasTacticalShift) {
-                        const html = `<b>Opportunity Attack</b><br/>${target.name} is protected by Inspiring Movement and cannot be targeted by Opportunity Attacks right now.`;
+                    if (targetNoOA || targetNoOATe) {
+                        const protector = targetNoOATe ? (targetNoOATe.source || 'Tactical Shift') : 'Inspiring Movement';
+                        const html = `<b>Opportunity Attack</b><br/>${target.name} is protected by ${protector} and cannot be targeted by Opportunity Attacks right now.`;
                         setPopupHtml(html);
+                        addEntry(campaignName, {
+                            type: 'automation',
+                            creatureName: playerStats.name,
+                            name: 'Opportunity Attack',
+                            description: `Opportunity Attack refused — ${target.name} is protected by ${protector} and cannot be targeted by Opportunity Attacks.`,
+                            timestamp: Date.now(),
+                        }).catch((e) => { console.error('[CharReactions:OA-refusal-log-error]', e); });
                         return;
                     }
                     const targetManeuveringNoOA = getRuntimeValue(target.name, 'maneuveringStepNoOA');

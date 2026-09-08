@@ -2,8 +2,10 @@ import { rollExpression, rollExpressionMaximized } from '../../../dice/diceRolle
 import { getClassFeatures } from '../../../character/classFeatures.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { applyHealingDirectly, logHealingToSSE } from '../../common/healingRoll.js';
-import { resolveHealingBonusesWithDetails, hasHealingMaximizationForTarget, hasRerollHealingOnes, markFortifiedHealthUsed } from '../../../combat/automation/automationService.js';
+import { resolveHealingBonusesWithDetails, hasHealingMaximizationForTarget, hasRerollHealingOnes, markFortifiedHealthUsed, hasTacticalShift } from '../../../combat/automation/automationService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getHitDieSize, computeHitDieRecovery } from '../../../rules/effects/restRules.js';
 import { resolveDiceExpression, evaluateAutoExpression } from '../../../combat/automation/automationExpressions.js';
 
@@ -343,8 +345,32 @@ export async function handle(action, playerStats, campaignName, _mapName, _chara
             await setRuntimeValue(playerStats.name, 'shortRestHitDice', remainingHitDice, campaignName, true);
         }
 
+        let tacticalShiftTriggered = false;
         if (!(isHitDieRoll && isSelf) && actualHeal > 0) {
             await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName, true);
+
+            // CLA-353 Tactical Shift (2024 Fighter lv5, passive_rule tactical_shift_no_oa):
+            // whenever Second Wind is activated, the holder moves up to half their Speed
+            // without provoking Opportunity Attacks until the start of their next turn.
+            // Mirrors the verified CLA-333 stepOfTheWindHandler self-te + expiration shape.
+            if (usesKey === 'secondWindUses' && hasTacticalShift(playerStats)) {
+                tacticalShiftTriggered = true;
+                const storedEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+                await setRuntimeValue('campaign', 'targetEffects', [
+                    ...storedEffects,
+                    { target: playerStats.name, source: 'Tactical Shift', effect: 'no_opportunity_attacks', value: null, duration: 'until_start_of_next_turn' },
+                ], campaignName);
+                addExpiration(playerStats.name, playerStats.name, [
+                    { type: 'remove_target_effect', effectKey: 'no_opportunity_attacks', source: 'Tactical Shift', target: playerStats.name },
+                ], campaignName, undefined, playerStats.name);
+                addEntry(campaignName, {
+                    type: 'ability_use',
+                    characterName: playerStats.name,
+                    abilityName: 'Tactical Shift',
+                    description: `${playerStats.name} triggered Tactical Shift (Second Wind): moved up to half Speed without provoking Opportunity Attacks until the start of your next turn.`,
+                    timestamp: Date.now(),
+                }).catch((e) => { console.error('[healingHandler:Tactical Shift] Error logging:', e); });
+            }
         }
 
         const rollDisplay = maximize ? 'maximized' : (rerollOnes ? 'rerolled ones' : rollResult.rolls.join(', '));
@@ -369,9 +395,10 @@ export async function handle(action, playerStats, campaignName, _mapName, _chara
             ? `Regained ${actualHeal} HP`
             : 'Already at full HP';
         const remainingUses = actualHeal > 0 ? currentUses - 1 : currentUses;
+        const shiftNote = tacticalShiftTriggered ? ' Tactical Shift: you can move up to half your Speed without provoking Opportunity Attacks until the start of your next turn' : '';
         const description = (isHitDieRoll && isSelf)
             ? `${action.name}: ${rollInfo} — ${healDesc} (${remainingHitDice} hit dice remaining).`
-            : `${action.name}: ${rollInfo} — ${healDesc} (${remainingUses} use${remainingUses === 1 ? '' : 's'} remaining)${actualHeal > 0 ? '' : '. No use spent'}.`;
+            : `${action.name}: ${rollInfo} — ${healDesc} (${remainingUses} use${remainingUses === 1 ? '' : 's'} remaining)${actualHeal > 0 ? '' : '. No use spent'}${shiftNote}.`;
 
         return {
             type: 'popup',

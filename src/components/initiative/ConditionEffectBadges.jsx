@@ -86,9 +86,17 @@ function pushPerceptionDisadvBadge(badges, targetEffects, creatureName) {
     badges.push({ label: def.label, cls: 'effect-debuff', icon: def.icon, removable: true, removeAction: 'target_effect', effectType: 'disadvantage_perception_checks', tooltip: `Disadvantage on Wisdom (Perception) checks (from ${effect.source || 'unknown'})` })
 }
 
-function pushNoOAMoveBadges(badges, creatureName, campaignName, hasTacticalShift) {
+function pushNoOATeBadge(badges, targetEffects) {
+    const noOASources = [...new Set(targetEffects.filter(te => te.effect === 'no_opportunity_attacks' && te.source).map(te => te.source))]
+    badges.push({ label: 'No OA', cls: 'effect-debuff', icon: 'fa-ban', removable: true, removeAction: 'target_effect', effectType: 'no_opportunity_attacks', tooltip: noOASources.length > 0 ? `No Opportunity Attacks (from ${noOASources.join(', ')})` : undefined })
+}
+
+function pushNoOAMoveBadges(badges, creatureName, campaignName) {
     if (!creatureName || !campaignName) return
-    const noOA = getRuntimeValue(creatureName, 'inspiringMovementNoOA', campaignName) || hasTacticalShift
+    // CLA-353: the tactical_shift_no_oa passive is always-on for lv5+ 2024 Fighters —
+    // it must NOT light this badge. Tactical Shift protection renders via the
+    // no_opportunity_attacks te badge written at Second Wind activation.
+    const noOA = getRuntimeValue(creatureName, 'inspiringMovementNoOA', campaignName)
     if (noOA) {
         badges.push({ label: 'Insp. Move', cls: 'effect-buff', icon: 'fa-person-walking', removable: true, removeAction: 'inspiring_move' })
     }
@@ -102,7 +110,7 @@ function pushManeuveringMoveBadge(badges, creatureName, campaignName) {
     badges.push({ label: 'Mnv. Move', cls: 'effect-buff', icon: 'fa-person-walking', removable: true, removeAction: 'maneuvering_move', tooltip: `Can move up to half their Speed as a Reaction without provoking Opportunity Attacks from ${maneuveringSource}` })
 }
 
-function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, campaignName, allCreatures, hasTacticalShift, hasSpeedyOpportunityDisadvantage, hasSpeedyDifficultTerrainIgnore, isLocalhost, coronaDisadvantage, playerStats: _playerStats, characters: _characters, activeMapName: _activeMapName, onRollConditionSave }) {
+function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, campaignName, allCreatures, hasSpeedyOpportunityDisadvantage, hasSpeedyDifficultTerrainIgnore, isLocalhost, coronaDisadvantage, playerStats: _playerStats, characters: _characters, activeMapName: _activeMapName, onRollConditionSave }) {
     const condKeys = (conditions || []).map(c => c.key)
     const effects = computeConditionEffects(condKeys, [], targetEffects, false, false, false, false, null, false, false, false, false, false, false, false, false, false, false, false, false)
     const activeBuffs = creatureName && campaignName ? (getRuntimeValue(creatureName, 'activeBuffs', campaignName) || []) : []
@@ -211,8 +219,8 @@ function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, c
       badges.push({ label: 'Adv Check', cls: 'effect-buff', icon: 'fa-hand', removable: true, removeAction: 'target_effect', effectType: 'advantage_abilities', tooltip: `Advantage on all ability checks${reasonText ? ' (' + reasonText + ')' : ''}` })
     }
     if (effects.riderAttackBonus > 0) badges.push({ label: `+${effects.riderAttackBonus} to hit`, cls: 'effect-debuff', icon: 'fa-bullseye', removable: true, removeAction: 'target_effect', effectType: 'next_attack_bonus' })
-    if (effects.riderCannotOpportunityAttack) badges.push({ label: 'No OA', cls: 'effect-debuff', icon: 'fa-ban', removable: true, removeAction: 'target_effect', effectType: 'no_opportunity_attacks' })
-    pushNoOAMoveBadges(badges, creatureName, campaignName, hasTacticalShift)
+    if (effects.riderCannotOpportunityAttack) pushNoOATeBadge(badges, targetEffects)
+    pushNoOAMoveBadges(badges, creatureName, campaignName)
     const remarkableNoOA = getRuntimeValue(creatureName, 'remarkableAthleteNoOA', campaignName)
     if (creatureName && campaignName && remarkableNoOA) {
         badges.push({ label: 'No OA (Crit)', cls: 'effect-buff', icon: 'fa-ban', removable: true, removeAction: 'remarkable_no_oa' })

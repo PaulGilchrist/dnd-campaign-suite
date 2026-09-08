@@ -6511,7 +6511,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-353-tactical-shift-ungated-always-on-no-secondwind-trigger.md",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "Whenever you activate your Second Wind with a Bonus Action, you can move up to half your Speed without provoking Opportunity Attacks."

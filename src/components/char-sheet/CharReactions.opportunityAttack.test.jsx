@@ -145,6 +145,7 @@ import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import { buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js';
 import { getCategories } from '../../services/character/featureCategories.js';
 import { getReactionSpellNames } from '../../services/ui/spellSectionUtils.js';
+import { addEntry } from '../../services/ui/logService.js';
 import { resolveSpellDamageAtLevel } from '../../services/rules/core/spellDamageUtils.js';
 import { _getMockSetPopupHtml } from '../../hooks/combat/DiceRollContext.js';
 
@@ -296,24 +297,46 @@ describe('CharReactions - handleOpportunityAttack', () => {
     });
 
     // ─── Protected target popups ────────────────────────────────────────────────
-    // Consolidated: merged two Inspiring Movement popup tests (inspiringMovementNoOA
-    // and hasTacticalShift) into a single parameterized test — both show the same
-    // popup message, differing only in the trigger condition checked.
+    // CLA-353: protection is gated on inspiringMovementNoOA (per-character runtime key)
+    // or a live campaign-level no_opportunity_attacks te (Tactical Shift / Step of the
+    // Wind) — never on a permanent passive, since cs combatants carry no passives.
 
     it.each([
-        { name: 'inspiringMovementNoOA', setup: (gtrv, ht) => { gtrv.mockImplementation((ck, k) => k === 'inspiringMovementNoOA' ? true : null); ht.mockReturnValue(false); } },
-        { name: 'hasTacticalShift', setup: (gtrv, ht) => { gtrv.mockImplementation((ck, k) => k === 'inspiringMovementNoOA' ? false : null); ht.mockReturnValue(true); } },
-    ])('shows Inspiring Movement popup when target is protected (_name)', async ({ _name, setup }) => {
+        { name: 'inspiringMovementNoOA', te: null, protector: 'Inspiring Movement', setup: (gtrv) => { gtrv.mockImplementation((ck, k) => k === 'inspiringMovementNoOA' ? true : null); } },
+        { name: 'no_opportunity_attacks te (Tactical Shift)', te: [{ target: 'Enemy1', source: 'Tactical Shift', effect: 'no_opportunity_attacks', duration: 'until_start_of_next_turn' }], protector: 'Tactical Shift', setup: (gtrv) => { gtrv.mockImplementation((ck, k) => (ck === 'campaign' && k === 'targetEffects') ? [{ target: 'Enemy1', source: 'Tactical Shift', effect: 'no_opportunity_attacks', duration: 'until_start_of_next_turn' }] : null); } },
+    ])('shows protected popup naming $protector when target is protected via $name', async ({ te, protector, setup }) => {
         getCombatContext.mockResolvedValue({});
         getTargetFromAttacker.mockReturnValue({ name: 'Enemy1' });
         const setupFn = setup;
-        setupFn(getRuntimeValue, hasTacticalShift);
+        setupFn(getRuntimeValue);
         render(<CharReactions {...createProps()} />);
         const reaction = screen.getByText('Opportunity Attack:');
         fireEvent.click(reaction);
         await new Promise(r => setTimeout(r, 100));
         expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Enemy1'));
-        expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Inspiring Movement'));
+        expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining(protector));
+        expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            name: 'Opportunity Attack',
+            description: expect.stringContaining(protector),
+        }));
+        void te;
+    });
+
+    // CLA-353: a lv5+ Fighter's permanent tactical_shift_no_oa passive alone must NOT
+    // refuse the OA — no te means the attack rolls normally.
+    it('does not refuse OA from a permanent tactical_shift_no_oa passive alone (CLA-353)', async () => {
+        getCombatContext.mockResolvedValue({});
+        getTargetFromAttacker.mockReturnValue({ name: 'Enemy1' });
+        getRuntimeValue.mockReturnValue(null);
+        hasTacticalShift.mockReturnValue(true);
+        const rollAttack = vi.fn();
+        useLoggedDiceRoll.mockImplementation(() => ({ rollAttack, rollDamage: vi.fn() }));
+        render(<CharReactions {...createProps()} />);
+        const reaction = screen.getByText('Opportunity Attack:');
+        fireEvent.click(reaction);
+        await new Promise(r => setTimeout(r, 100));
+        expect(setPopupHtml).not.toHaveBeenCalledWith(expect.stringContaining('cannot be targeted'));
+        expect(rollAttack).toHaveBeenCalled();
     });
 
     it('shows Agile Movement popup when target has speedy disadvantage', async () => {

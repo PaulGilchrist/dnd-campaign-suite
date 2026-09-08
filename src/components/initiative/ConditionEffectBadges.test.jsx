@@ -130,11 +130,8 @@ describe('ConditionEffectBadges', () => {
     });
 
     describe('badges from props', () => {
-        it.each([
-            ['Insp. Move', { getRuntimeValue: true, hasTacticalShift: false }],
-            ['Insp. Move', { getRuntimeValue: null, hasTacticalShift: true }],
-        ])('should render %s badge when inspiringMovementNoOA is %s or hasTacticalShift is true', (_, { getRuntimeValue: rv, hasTacticalShift: ts }) => {
-            getRuntimeValue.mockReturnValue(rv);
+        it('should render Insp. Move badge when inspiringMovementNoOA is set', () => {
+            getRuntimeValue.mockReturnValue(true);
             computeConditionEffects.mockReturnValue(makeEffects({}));
             render(
                 <ConditionEffectBadges
@@ -142,10 +139,43 @@ describe('ConditionEffectBadges', () => {
                     targetEffects={[]}
                     creatureName={CREATURE_NAME}
                     campaignName={CAMPAIGN_NAME}
-                    hasTacticalShift={ts}
                 />
             );
             expect(screen.getByText('Insp. Move')).toBeInTheDocument();
+        });
+
+        // CLA-353: the tactical_shift_no_oa passive is permanent for lv5+ Fighters —
+        // it must never render an always-on badge. Protection shows only via the
+        // no_opportunity_attacks te written at Second Wind activation.
+        it('does not render any no-OA move badge without inspiringMovementNoOA or the te (CLA-353)', () => {
+            getRuntimeValue.mockReturnValue(null);
+            computeConditionEffects.mockReturnValue(makeEffects({}));
+            render(
+                <ConditionEffectBadges
+                    conditions={[]}
+                    targetEffects={[]}
+                    creatureName={CREATURE_NAME}
+                    campaignName={CAMPAIGN_NAME}
+                />
+            );
+            expect(screen.queryByText('Insp. Move')).not.toBeInTheDocument();
+            expect(screen.queryByText('No OA')).not.toBeInTheDocument();
+        });
+
+        it('renders No OA badge with Tactical Shift source from the te (CLA-353)', () => {
+            getRuntimeValue.mockReturnValue(null);
+            computeConditionEffects.mockReturnValue(makeEffects({ riderCannotOpportunityAttack: true }));
+            render(
+                <ConditionEffectBadges
+                    conditions={[]}
+                    targetEffects={[{ target: CREATURE_NAME, source: 'Tactical Shift', effect: 'no_opportunity_attacks', duration: 'until_start_of_next_turn' }]}
+                    creatureName={CREATURE_NAME}
+                    campaignName={CAMPAIGN_NAME}
+                />
+            );
+            const badge = screen.getByText('No OA');
+            expect(badge).toBeInTheDocument();
+            expect(badge.closest('[title]')).toHaveAttribute('title', expect.stringContaining('Tactical Shift'));
         });
     });
 });

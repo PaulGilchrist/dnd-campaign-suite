@@ -51,7 +51,6 @@ function CreatureCard({
     onBreakConcentration,
     allCreatures,
     campaignName,
-    hasTacticalShift,
     hasSpeedyOpportunityDisadvantage,
     hasSpeedyDifficultTerrainIgnore,
     coronaDisadvantage,
@@ -224,7 +223,7 @@ function CreatureCard({
                         />
                     )
                 })}
-                <ConditionEffectBadges conditions={creature.conditions?.filter(c => c && typeof c === 'object' && c.key) || []} targetEffects={myTargetEffects} creatureName={creature.name} campaignName={campaignName} allCreatures={allCreatures} hasTacticalShift={hasTacticalShift} hasSpeedyOpportunityDisadvantage={hasSpeedyOpportunityDisadvantage} hasSpeedyDifficultTerrainIgnore={hasSpeedyDifficultTerrainIgnore} isLocalhost={isLocalhost} coronaDisadvantage={coronaDisadvantage} characters={characters} activeMapName={mapName} onRollConditionSave={(creature.type === 'player' || isLocalhost) ? onRollConditionSave : undefined} />
+                <ConditionEffectBadges conditions={creature.conditions?.filter(c => c && typeof c === 'object' && c.key) || []} targetEffects={myTargetEffects} creatureName={creature.name} campaignName={campaignName} allCreatures={allCreatures} hasSpeedyOpportunityDisadvantage={hasSpeedyOpportunityDisadvantage} hasSpeedyDifficultTerrainIgnore={hasSpeedyDifficultTerrainIgnore} isLocalhost={isLocalhost} coronaDisadvantage={coronaDisadvantage} characters={characters} activeMapName={mapName} onRollConditionSave={(creature.type === 'player' || isLocalhost) ? onRollConditionSave : undefined} />
                 {isLocalhost && (
                     <button
                         className='effect-add-btn'
