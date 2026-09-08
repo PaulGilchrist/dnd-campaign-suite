@@ -6569,7 +6569,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-355-telekinetic-thrust-rest-gate-inert.md",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Psi-Powered Leap - Bonus Action Fly Speed (2x Speed) until end of turn. Telekinetic Thrust - When you deal damage to a target with your Psionic Strike, you can force the target to make a Strength saving throw (DC 8 plus your intelligence modifier and Proficiency Bonus). On a failed save, you can give the target the Prone condition or transport it up to 10 feet horizontally. Once you utalize this Bonus Action, you can't do so again until you finish a Short or Long Rest unless you expend a Psionic Energy Die (no action required) to restore your use of it."

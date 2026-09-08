@@ -22,6 +22,7 @@ export const ALL_TRACKED_RESOURCES = [
   'gloriousDefenseUses',
   'superiorityDice',
   'psionicEnergy',
+  'telekineticThrustUses',
   'arcaneRecoveryLevels',
   'naturalRecoverySlots',
   'arcaneWardHp',
@@ -162,6 +163,13 @@ export function computeTrackedResources(playerStats) {
     === (playerStats.class.major?.name || playerStats.class.subclass?.name)
   const maxPE = hasEnergy ? (classLevel?.energy?.energy_die_num || 0) : 0
   resources.psionicEnergy = { current: maxPE, max: maxPE }
+
+  // CLA-355: Telekinetic Adept (Psi Warrior lv7) Telekinetic Thrust — once per
+  // Short or Long Rest (re-arm = null). One use until a rest re-arms it.
+  const hasTelekineticThrust = (playerStats.automation?.reactions ?? [])
+    .some(a => a.type === 'telekinetic_thrust')
+  const maxTT = hasTelekineticThrust ? 1 : 0
+  resources.telekineticThrustUses = { current: maxTT, max: maxTT }
 
   const maxAR = features?.arcaneRecoveryLevels || 0
   resources.arcaneRecoveryLevels = { current: maxAR, max: maxAR }

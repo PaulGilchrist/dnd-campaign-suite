@@ -19,6 +19,7 @@ const SHORT_REST_RESOURCE_LABELS = [
     { key: 'focusPoints', label: 'Focus Points', classes: ['Monk'] },
     { key: 'psionicEnergy', label: 'Psionic Energy', classes: ['Fighter'], subclasses: ['Psi Warrior'] },
     { key: 'psionicEnergy', label: 'Psionic Energy', classes: ['Rogue'], subclasses: ['Soulknife'] },
+    { key: 'telekineticThrustUses', label: 'Telekinetic Thrust', classes: ['Fighter'], subclasses: ['Psi Warrior'] },
     { key: 'superiorityDice', label: 'Superiority Dice', classes: ['Fighter'], subclasses: ['Battle Master'] },
     { key: 'naturalRecoverySlots', label: 'Natural Recovery (Spell Slots)', classes: ['Druid'], subclasses: ['Circle of the Land'] },
     { key: 'arcaneRecoveryLevels', label: 'Arcane Recovery (Spell Slots)', classes: ['Wizard'] }
@@ -60,6 +61,8 @@ export const SHORT_REST_RESOURCES = [
   'channelDivinityCharges',
   'wildShapeUses',
   'psionicEnergy',
+  // CLA-355: Telekinetic Thrust re-arms on a Short or Long Rest (app-data truth)
+  'telekineticThrustUses',
   'focusPoints',
   'superiorityDice',
   'kiPoints',
@@ -209,7 +212,9 @@ export const LONG_REST_RESOURCES = [
    '_Energy_Resistances_chosenTypes',
    '_guardedMind_usedRest',
    'poisonedWeaponsActive',
-   '_RendMind_Used'
+   '_RendMind_Used',
+   // CLA-355: Telekinetic Thrust re-arms on a Long Rest (null = re-armed)
+   'telekineticThrustUses'
 ]
 
 export function getLongRestResources() {

@@ -607,6 +607,7 @@ export async function applyLongRest(playerStats, campaignName) {
     if (hasCelestialResilience && playerStats.specialActions?.some(f => f.name === 'Celestial Resilience')) resources.push('Celestial Resilience (temp HP)');
     if (hasNaturalRecovery) resources.push('Natural Recovery (spell slots)');
     if (playerStats.class?.name === 'Warlock') resources.push('Magical Cunning (feature reset)');
+    if ((playerStats.automation?.reactions ?? []).some(r => r.type === 'telekinetic_thrust')) resources.push('Telekinetic Thrust (use restored)');
     if (resources.length > 0) {
         logEntries.push(`Resources restored: ${resources.join(', ')}`);
     }

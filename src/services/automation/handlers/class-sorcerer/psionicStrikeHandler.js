@@ -71,6 +71,22 @@ async function resolveThrustChain(action, playerStats, campaignName, targetName)
         setRuntimeValue(playerStats.name, 'telekineticThrustUsedRound', currentRound, campaignName);
     }
 
+    // CLA-355: once per Short or Long Rest uses gate (null = re-armed by rest).
+    const thrustMax = playerStats._trackedResources?.telekineticThrustUses?.max ?? 1;
+    const thrustUses = Number(getRuntimeValue(playerStats.name, 'telekineticThrustUses', campaignName) ?? thrustMax);
+    if (thrustUses <= 0) {
+        await addEntry(campaignName, {
+            type: 'automation',
+            characterName: playerStats.name,
+            automationType: 'telekinetic_thrust_refused',
+            name: 'Telekinetic Thrust',
+            description: 'Telekinetic Thrust has no uses remaining. Recharges when you finish a Short or Long Rest.',
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[psionicStrikeHandler:log-error]", e); });
+        return null;
+    }
+    await setRuntimeValue(playerStats.name, 'telekineticThrustUses', thrustUses - 1, campaignName);
+
     const saveType = thrustAutomation.saveType || 'STR';
     const saveDc = buildSaveDc(thrustAutomation, playerStats);
     const { promise } = createSaveListener(campaignName, {
