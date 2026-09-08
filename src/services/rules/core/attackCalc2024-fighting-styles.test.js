@@ -205,4 +205,162 @@ describe('attackCalc2024 - fighting styles', () => {
       );
     });
   });
+
+  describe('Thrown Weapon Fighting fighting style (FS-011)', () => {
+    const dart = {
+      name: 'Dart',
+      equipment_category: 'Weapon',
+      weapon_range: 'Ranged',
+      properties: ['Finesse', 'Thrown'],
+      damage: { damage_dice: '1d4', damage_type: 'Piercing' },
+      range: { normal: 20, long: 60 },
+    };
+    const shortbow = {
+      name: 'Shortbow',
+      equipment_category: 'Weapon',
+      weapon_range: 'Ranged',
+      properties: ['Ammunition', 'Two-Handed'],
+      damage: { damage_dice: '1d6', damage_type: 'Piercing' },
+      range: { normal: 80, long: 320 },
+    };
+
+    it('applies +2 damage to thrown-property ranged weapon rows (2024 feats.json canonical)', () => {
+      findEquippedWeaponsStub
+        .mockReturnValueOnce(['Dart'])
+        .mockReturnValueOnce([]);
+      const playerStats = defaultPlayerStats({
+        abilities: [
+          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+          { name: 'Dexterity', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
+        ],
+        class: { name: 'Fighter', fightingStyles: ['Thrown Weapon Fighting'] },
+      });
+
+      getAttacks([dart], [], playerStats);
+
+      expect(buildWeaponAttackStub).toHaveBeenCalledWith(
+        expect.objectContaining({
+          weaponName: 'Dart',
+          extraDamage: '+2',
+          extraDamageLabel: 'Thrown Weapon Fighting (2)',
+        })
+      );
+    });
+
+    it('does NOT double-stack proficiency on thrown ranged attack rolls (no 5e quirk port)', () => {
+      findEquippedWeaponsStub
+        .mockReturnValueOnce(['Dart'])
+        .mockReturnValueOnce([]);
+      const playerStats = defaultPlayerStats({
+        level: 18,
+        abilities: [
+          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+          { name: 'Dexterity', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
+        ],
+        class: { name: 'Fighter', fightingStyles: ['Thrown Weapon Fighting'] },
+      });
+
+      getAttacks([dart], [], playerStats);
+
+      const thrownCall = buildWeaponAttackStub.mock.calls.find(c => c[0].weaponName === 'Dart');
+      expect(thrownCall).toBeTruthy();
+      expect(thrownCall[0].extraHitBonus || 0).toBe(0);
+    });
+
+    it('does not apply to ammunition ranged weapons (Shortbow)', () => {
+      findEquippedWeaponsStub
+        .mockReturnValueOnce(['Shortbow'])
+        .mockReturnValueOnce([]);
+      const playerStats = defaultPlayerStats({
+        class: { name: 'Fighter', fightingStyles: ['Thrown Weapon Fighting'] },
+      });
+
+      getAttacks([shortbow], [], playerStats);
+
+      const bowCall = buildWeaponAttackStub.mock.calls.find(c => c[0].weaponName === 'Shortbow');
+      expect(bowCall).toBeTruthy();
+      expect(bowCall[0].extraDamage || '').toBe('');
+    });
+
+    it('does not apply without the fighting style', () => {
+      findEquippedWeaponsStub
+        .mockReturnValueOnce(['Dart'])
+        .mockReturnValueOnce([]);
+      const playerStats = defaultPlayerStats({
+        class: { name: 'Fighter', fightingStyles: ['Defense'] },
+      });
+
+      getAttacks([dart], [], playerStats);
+
+      expect(buildWeaponAttackStub).toHaveBeenCalledWith(
+        expect.objectContaining({
+          weaponName: 'Dart',
+          extraDamage: '',
+        })
+      );
+    });
+
+    it('does not apply to thrown melee-range weapons (Handaxe melee row)', () => {
+      const handaxe = {
+        name: 'Handaxe',
+        equipment_category: 'Weapon',
+        weapon_range: 'Melee',
+        properties: ['Light', 'Thrown'],
+        damage: { damage_dice: '1d6', damage_type: 'Slashing' },
+        range: { normal: 5 },
+      };
+      findEquippedWeaponsStub
+        .mockReturnValueOnce([])
+        .mockReturnValueOnce(['Handaxe']);
+      const playerStats = defaultPlayerStats({
+        abilities: [
+          { name: 'Strength', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
+          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+        ],
+        class: { name: 'Fighter', fightingStyles: ['Thrown Weapon Fighting'] },
+      });
+
+      getAttacks([handaxe], [], playerStats);
+
+      expect(buildWeaponAttackStub).toHaveBeenCalledWith(
+        expect.objectContaining({
+          weaponName: 'Handaxe',
+          extraDamage: '',
+          extraDamageLabel: '',
+        })
+      );
+    });
+
+    it('stacks cleanly with Archery (+2 hit, +2 damage — separate buckets)', () => {
+      findEquippedWeaponsStub
+        .mockReturnValueOnce(['Dart'])
+        .mockReturnValueOnce([]);
+      const playerStats = defaultPlayerStats({
+        class: { name: 'Fighter', fightingStyles: ['Archery', 'Thrown Weapon Fighting'] },
+      });
+
+      getAttacks([dart], [], playerStats);
+
+      const thrownCall = buildWeaponAttackStub.mock.calls.find(c => c[0].weaponName === 'Dart');
+      expect(thrownCall[0].extraHitBonus).toBe(2);
+      expect(thrownCall[0].extraDamage).toBe('+2');
+      expect(thrownCall[0].extraDamageLabel).toBe('Thrown Weapon Fighting (2)');
+    });
+
+    it('applies +2 damage to every thrown ranged weapon row when multiple are equipped', () => {
+      findEquippedWeaponsStub
+        .mockReturnValueOnce(['Dart', 'Dart 2'])
+        .mockReturnValueOnce([]);
+      const equipment = [dart, { ...dart, name: 'Dart 2' }];
+      const playerStats = defaultPlayerStats({
+        class: { name: 'Fighter', fightingStyles: ['Thrown Weapon Fighting'] },
+      });
+
+      getAttacks(equipment, [], playerStats);
+
+      const calls = buildWeaponAttackStub.mock.calls;
+      const allThrown = calls.filter(c => c[0].extraDamage === '+2');
+      expect(allThrown.length).toBe(2);
+    });
+  });
 });

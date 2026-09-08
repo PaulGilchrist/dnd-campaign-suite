@@ -6652,7 +6652,7 @@
       "handler": "src/services/combat/automation/handlers/fightingStyleHandler.js",
       "router": "src/services/combat/automation/routers/fightingStyleRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/fightingStyleInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-FS-011-thrown-weapon-fighting-2024-inert.md",
+      "verified": "verified",
       "class": "Fighting Style",
       "triggerConditions": "",
       "expectedBehavior": "You can treat any short sword that you hold with one hand as if it had the thrown property, and you can make ranged attacks with a short sword as if you had the light property with it. When you make a ranged attack roll with a thrown weapon, you add your proficiency bonus to the attack roll."

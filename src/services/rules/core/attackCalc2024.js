@@ -23,6 +23,11 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
     const fightingStyles2024 = playerStats.class?.fightingStyles != null ? playerStats.class.fightingStyles : [];
     const hasBlessedWarrior = fightingStyles2024.includes('Blessed Warrior');
     const hasDruidicWarrior = fightingStyles2024.includes('Druidic Warrior');
+    // 2024 feats.json canonical: "When you hit with a ranged attack roll using a
+    // weapon that has the Thrown property, you gain a +2 bonus to the damage roll."
+    const hasThrownWeaponFighting = fightingStyles2024.includes('Thrown Weapon Fighting');
+    const thrownDamageFor = (weapon) => (hasThrownWeaponFighting && weapon.properties && weapon.properties.some(p => p.toLowerCase() === 'thrown') ? '+2' : '');
+    const thrownLabelFor = (thrownDamage) => (thrownDamage ? 'Thrown Weapon Fighting (2)' : '');
     if (rangedWeapons.length > 0) {
         const nonLightRanged = rangedWeapons.filter(name => {
             const { baseName } = parseMagicItemName(name);
@@ -41,6 +46,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
             const rangedWeapon = allEquipment.find(item => item.name === baseName);
             if (rangedWeapon) {
                 const archeryBonus = fightingStyles2024.includes('Archery') ? 2 : 0;
+                const thrownDamage = thrownDamageFor(rangedWeapon);
                 attacks.push(buildWeaponAttack({
                     weapon: rangedWeapon,
                     weaponName: rangedWeaponName,
@@ -50,6 +56,8 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
                     actionType: 'Action',
                     extraHitBonus: archeryBonus,
                     extraHitBonusLabel: archeryBonus ? 'Archery Fighting Style (2)' : '',
+                    extraDamage: thrownDamage,
+                    extraDamageLabel: thrownLabelFor(thrownDamage),
                 }));
             }
         }
@@ -63,6 +71,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
                     const rangedWeapon = allEquipment.find(item => item.name === baseName);
                     if (rangedWeapon) {
                         const archeryBonus = fightingStyles2024.includes('Archery') ? 2 : 0;
+                        const thrownDamage = thrownDamageFor(rangedWeapon);
                         attacks.push(buildWeaponAttack({
                             weapon: rangedWeapon,
                             weaponName: rangedWeaponName,
@@ -72,6 +81,8 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
                             actionType: 'Action',
                             extraHitBonus: archeryBonus,
                             extraHitBonusLabel: archeryBonus ? 'Archery Fighting Style (2)' : '',
+                            extraDamage: thrownDamage,
+                            extraDamageLabel: thrownLabelFor(thrownDamage),
                         }));
                     }
                 }
@@ -94,6 +105,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
                 if (bestWeapon) {
                     const { name: bestName, weapon: bestWpn } = bestWeapon;
                     const archeryBonus = fightingStyles2024.includes('Archery') ? 2 : 0;
+                    const thrownDamage = thrownDamageFor(bestWpn);
                     attacks.push(buildWeaponAttack({
                         weapon: bestWpn,
                         weaponName: bestName,
@@ -103,6 +115,8 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
                         actionType: 'Action',
                         extraHitBonus: archeryBonus,
                         extraHitBonusLabel: archeryBonus ? 'Archery Fighting Style (2)' : '',
+                        extraDamage: thrownDamage,
+                        extraDamageLabel: thrownLabelFor(thrownDamage),
                     }));
                 }
                 // Rest → Bonus Action
@@ -117,6 +131,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
                     if (rangedWeapon) {
                         const isHandCrossbow = baseName === 'Hand Crossbow';
                         const includeAbilityBonus = hasCrossbowExpert && isHandCrossbow;
+                        const thrownDamage = thrownDamageFor(rangedWeapon);
                         attacks.push(buildWeaponAttack({
                             weapon: rangedWeapon,
                             weaponName: rangedWeaponName,
@@ -126,6 +141,8 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
                             actionType: 'Bonus Action',
                             weaponType: 'ranged',
                             includeAbilityBonusInDamage: includeAbilityBonus,
+                            extraDamage: thrownDamage,
+                            extraDamageLabel: thrownLabelFor(thrownDamage),
                         }));
                     }
                 }
