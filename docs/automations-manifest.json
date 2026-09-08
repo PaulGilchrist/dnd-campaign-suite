@@ -6211,7 +6211,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-340-student-of-war.md",
       "class": "Fighter",
       "triggerConditions": "",
       "expectedBehavior": "Gain proficiency with one type of Artisan's Tools and one skill of your choice from Fighter skills."
@@ -6223,7 +6223,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-341-studied-attacks.md",
       "class": "Fighter",
       "triggerConditions": "Trigger: miss; Action: passive; Duration: until_start_of_next_turn",
       "expectedBehavior": "You study your opponents and learn from each attack you make. If you make an attack roll against a creature and miss, you have Advantage on your next attack roll against that creature before the end of your next turn."
@@ -6235,7 +6235,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-342-stunning-strike.md",
       "class": "Monk",
       "triggerConditions": "Trigger: monk_weapon_or_unarmed_hit; Action: 1 action; Duration: until_start_of_next_turn",
       "expectedBehavior": "Once per turn when you hit a creature with a Monk weapon or Unarmed Strike, you can expend 1 Focus Point. Target makes Constitution save. Failed save: Stunned until start of next turn. Success: Speed halved until start of next turn, and next attack roll against target has Advantage."
@@ -6247,7 +6247,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-09-07) — lv2 WIS save vs real spell_save_dc (DC18), slot ledger spent/rest-refilled, FAIL→charmed+logs, SUCCESS no-charm (13 charms/14 saves), concentration badge+cs entry. Gaps: 8h clock unenforced (expiryRounds Infinity, ends via applyDamage charmed-drop), activeConditionMeta.source unstamped, FT-087 caster-hydration throw on first cast",
       "class": "Spell",
       "triggerConditions": "Range: 30 feet; Duration: Concentration, up to 8 hours",
       "expectedBehavior": "You suggest a course of activity described in no more than 25 words to one creature you can see within range that can hear and understand you. The suggestion must sound achievable and not involve anything that would obviously deal damage to the target or its allies. The target must succeed on a Wisdom saving throw or have the Charmed condition for the duration or until you or your allies deal damage to the target. The Charmed target pursues the suggestion to the best of its ability. The suggested activity can continue for the entire duration, but if the suggested activity can be completed in a shorter time, the spell ends for the target upon completing it."
@@ -6259,7 +6259,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-SP-114-summon-aberration.md",
       "class": "Spell",
       "triggerConditions": "Automation type: summon_spirit",
       "expectedBehavior": "You call forth an aberrant spirit. It manifests in an unoccupied space that you can see within range and uses the Aberrant Spirit stat block. When you cast the spell, choose Beholderkin, Mind Flayer, or Slaad. The creature resembles an Aberration of that kind, which determines certain details in its stat block. The creature disappears when it drops to 0 Hit Points or when the spell ends. The creature is an ally to you and your allies. In combat, it shares your Initiative count, but it takes its turn immediately after yours. It obeys your verbal commands (no action required from you). If you don't issue any, it takes the Dodge action and uses its movement to avoid danger."
@@ -6271,7 +6271,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-09-07) — env chooser Air/Land/Water live; summoned combatant 'Bestial Spirit (Land)' AC13 HP30 canonical; initiative immediately-after-caster; concentration NOT stripped (isSummonAberration gate SP-114 does not apply); lv2 slot paid; spell-end removal via concentration break. Gaps: HP-0 auto-disappear zero consumers; Dodge-on-no-command display/data only",
       "class": "Spell",
       "triggerConditions": "Automation type: summon_spirit",
       "expectedBehavior": "You call forth a bestial spirit. It manifests in an unoccupied space that you can see within range and uses the Bestial Spirit stat block. When you cast the spell, choose an environment: Air, Land, or Water. The creature resembles a Beast of that kind, which determines certain details in its stat block. The creature disappears when it drops to 0 Hit Points or when the spell ends. The creature is an ally to you and your allies. In combat, it shares your Initiative count, but it takes its turn immediately after yours. It obeys your verbal commands (no action required from you). If you don't issue any, it takes the Dodge action and uses its movement to avoid danger."
@@ -6283,7 +6283,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS 2026-09-07) — Avenger/Defender chooser live; summoned 'Celestial Spirit (Avenger)' AC16 HP40 canonical (not fabricated); initiative immediately-after-caster; concentration NOT stripped (badge+cs entry, break removes spirit+te); lv5 slot paid; isSummonAberration hardcode correctly not applied",
       "class": "Spell",
       "triggerConditions": "Automation type: summon_spirit",
       "expectedBehavior": "You call forth a Celestial spirit. It manifests in an angelic form in an unoccupied space that you can see within range and uses the Celestial Spirit stat block. When you cast the spell, choose Avenger or Defender. Your choice determines certain details in its stat block. The creature disappears when it drops to 0 Hit Points or when the spell ends. The creature is an ally to you and your allies. In combat, the creature shares your Initiative count, but it takes its turn immediately after yours. It obeys your verbal commands (no action required by you). If you don't issue any, it takes the Dodge action and uses its movement to avoid danger."
@@ -6295,7 +6295,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-09-07) — material chooser Clay/Metal/Stone live; summoned 'Construct Spirit (Clay)' cs combatant AC18/HP45 = canonical lv5-block scaling with paid slot lv5 (app data base lv4; upcast auto-quirk pitfall 43); concentration tracked (hardcode SP-114 name-scoped, not applied); initiative immediately-after-caster; scaling live. Gaps (SP-115 precedent cited): 0-HP auto-removal zero-consumer; Dodge-on-no-command prose-only; no UI concentration-break seam on sheet badge",
       "class": "Spell",
       "triggerConditions": "Automation type: summon_spirit",
       "expectedBehavior": "You call forth the spirit of a Construct. It manifests in an unoccupied space that you can see within range and uses the Construct Spirit stat block. When you cast the spell, choose a material: Clay, Metal, or Stone. The creature resembles an animate statue (you determine the appearance) made of the chosen material, which determines certain details in its stat block. The creature disappears when it drops to 0 Hit Points or when the spell ends. The creature is an ally to you and your allies. In combat, the creature shares your Initiative count, but it takes its turn immediately after yours. It obeys your verbal commands (no action required by you). If you don't issue any, it takes the Dodge action and uses its movement to avoid danger. Using a Higher-Level Spell Slot. Use the spell slot's level for the spell's level in the stat block."
@@ -6307,7 +6307,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS 2026-09-07) — 4-element chooser Air/Earth/Fire/Water; lv4 slot paid real (ledger spell_slots_level_4 3→2, no upcast quirk); summoned 'Elemental Spirit (Air)' AC15/HP50 canonical, fly40; init 14.9=caster-0.1 immediately-after; concentration tracked DC17 (hardcode SP-114 name-scoped); badge-break removes spirit+te+conc. Gaps per SP-115 precedent: 0-HP/Dodge display-only",
       "class": "Spell",
       "triggerConditions": "Automation type: summon_spirit",
       "expectedBehavior": "You call forth an Elemental spirit. It manifests in an unoccupied space that you can see within range and uses the Elemental Spirit stat block. When you cast the spell, choose an element: Air, Earth, Fire, or Water. The creature resembles a bipedal form wreathed in the chosen element, which determines certain details in its stat block. The creature disappears when it drops to 0 Hit Points or when the spell ends. The creature is an ally to you and your allies. In combat, the creature shares your Initiative count, but it takes its turn immediately after yours. It obeys your verbal commands (no action required by you). If you don't issue any, it takes the Dodge action and uses its movement to avoid danger."
@@ -6319,7 +6319,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-09-07) — 3-form chooser Ghostly/Putrid/Skeletal; lv4 slot paid real (lv3-base popup radios pre-check lv4 upcast quirk pitfall 43); summoned 'Undead Spirit (Skeletal)' AC15/HP30 canonical scaling (base11+slot, hp20+10×(slot−base)); init caster−0.1 immediately-after; concentration tracked DC18 (hardcode SP-114 name-scoped, not stripped). Gaps (SP-115 precedent): no-command Dodge / 0-HP disappearance display-only",
       "class": "Spell",
       "triggerConditions": "Automation type: summon_spirit",
       "expectedBehavior": "You call forth an Undead spirit. It manifests in a11 unoccupied space that you can see within range and uses the Undead Spirit stat block. When you cast the spell, choose the creature's form: Ghostly, Putrid, or Skeletal. The spirit resembles an Undead creature with the chosen form, which determines certain details in its stat block. The creature disappears when it drops to 0 Hit Points or when the spell ends. The creature is an ally to you and your allies. In combat, the creature shares your Initiative count, but it takes its turn immediately after yours. It obeys your verbal commands (no action required by you). If you don't issue any, it takes the Dodge action and uses its movement to avoid danger. Using a Higher-Level Spell Slot. Use the spell slot's level for the spell's level in the stat block."
@@ -6331,7 +6331,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-SP-120-summon-fey.md",
       "class": "Spell",
       "triggerConditions": "Automation type: summon_spirit",
       "expectedBehavior": "You call forth a fey spirit. It manifests in an unoccupied space that you can see within range and uses the Fey Spirit stat block. When you cast the spell, choose Trickster, Warrior, or Guide."
@@ -6343,7 +6343,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-09-07) — app data lv6 classes[Warlock,Wizard] variants×3 → SummonSpiritModal Demon/Devil/Yugoloth rendered; lv6 slot paid real (no upcast leak); concentration DC18 tracked name-scoped; summoned 'Fiendish Spirit (Demon)' HP50 fiend type, init caster−0.1; ×-break removes spirit+te+conc. Gap (SP-117 family precedent): AC=base+slot model (12+6=18) vs canonical fixed AC",
       "class": "Spell",
       "triggerConditions": "Automation type: summon_spirit",
       "expectedBehavior": "You call forth a fiendish spirit. It manifests in an unoccupied space that you can see within range and uses the Fiendish Spirit stat block. When you cast the spell, choose Demon, Devil, or Yugoloth."
@@ -6355,7 +6355,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS 2026-09-07) — Champion-only lv15 passive_rule critical_range 18-20 (classes.json majors[Champion]); nat19 adv→CRIT popup+log isCrit:true,isNatural20:false, dice doubled; nat≤17 controls isCrit:false (natural-die threshold, not modified total); scoping proven: Battle Master nat19 isCrit:false — per-attacker passives via contextBuilder-sync.js:609→hitResolution.js:220-230, no global leak",
       "class": "Fighter",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "Critical Hit on 18-20."
@@ -6367,7 +6367,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-09-07) — BASE Monk lv18 passive_rule (any subclass). Core live-exact on lv18 Disciplined_Monk: FP 18→15 (spend exactly 3, gate FP<3 refuses popup), bludgeoning halved (applyDamage.js:196-204 activeBuffs.resistanceTypes, hp_change resisted:true), Force NOT halved (Archmage Arcane Burst full), drained 12→9→6→3 never negative. Consumer: superiorDefenseHandler.js:10 (click-activated INTERACTIVE row, NOT turn-start auto-spend — GAP: trigger spec says 'start of your turn'). Gaps: no addExpiration (pendingExpirations:[] — '1_minute' text-only per CLA-334), no Incapacitated-end consumer, halving event unlogged. Leftover lv18 Monk",
       "class": "Monk",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "At start of your turn, expend 3 Focus Points for Resistance to all damage except Force for 1 minute or until Incapacitated."
@@ -6379,7 +6379,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-345-superior-hunters-defense.md",
       "class": "Ranger",
       "triggerConditions": "Action: 1 reaction",
       "expectedBehavior": "When you take damage, take Reaction to give yourself Resistance to that damage and any other damage of the same type until end of current turn."
@@ -6391,7 +6391,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-09-07) — Hunter major lv11 passive. Live-exact on FeyRanger lv17 Hunter: Hunter's Mark on Thug1 (concentration) + hit → 'Choose Second Target' modal post-Done → splash Force 1d6 to Thug2 (hp_change match spells.json HM die/school); once-per-turn latch _Superior_Hunters_Prey_UsedRound (2nd hit same turn no splash); unmarked control no splash. Real consumer src/services/combat/steps/features/superiorHuntersPrey.js (registered attackRollPostDamage.js:22). Gap (accepted §7): gridless picker lenient — 30ft isWithinRange only when caster has mapName, listed all combatants; lv20 foeSlayer 1d10 branch present",
       "class": "Ranger",
       "triggerConditions": "Action: passive",
       "expectedBehavior": "Once per turn when you deal damage to a creature marked by Hunter's Mark, also deal that spell's extra damage to a different creature within 30 feet of the first creature."
@@ -6403,7 +6403,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS 2026-09-07) — BASE Bard lv18 initiative_action. Live on HeroesFeastBard lv18: BI 0→2 exactly on initiative-rolled (capped at 2 not max 5); control BI 3→3 unchanged; non-initiative writes no-op. Consumer useInitiativeEffects.js:431-441 (+initiativeHandler.js:118), Bard class-gated :432 no leak. Gap: regain is silent setRuntimeValue, no automation log line (popup-only family)",
       "class": "Bard",
       "triggerConditions": "Trigger: roll_initiative; Action: passive",
       "expectedBehavior": "When you roll Initiative, you regain expended uses of Bardic Inspiration until you have two if you have fewer than that."
@@ -6415,7 +6415,7 @@
       "handler": "src/services/combat/automation/handlers/fightingStyleHandler.js",
       "router": "src/services/combat/automation/routers/fightingStyleRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/fightingStyleInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-FS-010-superior-technique.md",
       "class": "Fighting Style",
       "triggerConditions": "",
       "expectedBehavior": "You learn one maneuver of your choice from the Battle Master. You can use your superiority dice to fuel that maneuver. Whenever you finish a short or long rest, you can choose a different maneuver from the Battle Master to replace the maneuver."
@@ -6427,7 +6427,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-09-07) — Life Domain lv17 passive maximize_healing_dice. Live on Divine_Cleric lv17: Cure Wounds dice '8,8' twice (identical=max, no rolling); Channel Divine Spark heal 1d8→8 maximized (cd 3→2). Control Wild_Sage_Druid rolled 8,6 then 7,5 (varies, no leak). Consumer automationPassives.js:201 caster-scoped :17-21 → spell helpers.js:373 + DivineSparkModal.jsx:18 + diceRoller maximized:true. Flat Disciple-of-Life bonus NOT maximized, own attacks/saves unaffected (correct scope). Cosmetic gaps: channel modal 'Current HP: NaN' + missing '(Maximized)' suffix, DoL bonus rendered twice",
       "class": "Cleric",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "When you would normally roll one or more dice to restore Hit Points to a creature with a spell or Channel Divinity, don't roll those dice; instead use the highest number possible for each die."
@@ -6439,7 +6439,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-09-07) — Thief lv9+ stealth_attack+supreme_sneak (canonical classes.json:10247-10272; manifest 'type undefined' wrong). Live on AasimarTest lv20 Thief: Hide→Invisible, StealthAttackModal Activate pays cost 1→0 + ability_use log, attack mode:advantage 50dmg; Invisible RETAINED post-attack. Gaps (§7, GM-enforced): ¾/Total-cover gate ZERO consumers (applyDamage.js:485-496 retains unconditionally, comment-only); control no-Invisible normal. Consumers automationRouter.js:507/:513, steps/features/stealthAttackCost.js, stealthAttackHandler.js:37-73",
       "class": "Rogue",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Stealth Attack (Cost: 1d6). If you have Hide action's Invisible condition, this attack doesn't end that condition on you if you end turn behind Three-Quarters Cover or Total Cover."
@@ -6451,7 +6451,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Defy Death - Advantage on Death Saving Throws, rolling 18-20 counts as 20. Heroic Rally - regain Hit Points equal to 5 + Constitution modifier if Bloodied and have at least 1 Hit Point."
@@ -6463,7 +6463,7 @@
       "handler": "src/services/combat/automation/handlers/maneuverHandler.js",
       "router": "src/services/combat/automation/routers/maneuverRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/maneuverInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-MN-018-sweeping-attack-inert-secondary-target.md",
       "class": "Fighter",
       "triggerConditions": "Action type: attack_rider; Trigger: melee_weapon_attack_hit; Uses: superiority_die",
       "expectedBehavior": "When you hit a creature with a melee attack roll using a weapon or an Unarmed Strike, you can expend one Superiority Die to attempt to damage another creature. Choose another creature within 5 feet of the original target and within your reach. If the original attack roll would hit the second creature, it takes damage equal to the number rolled on your Superiority Die. The damage type is the same as the original attack."
@@ -6475,7 +6475,7 @@
       "handler": "src/services/combat/automation/handlers/maneuverHandler.js",
       "router": "src/services/combat/automation/routers/maneuverRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/maneuverInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Action type: skill_check; Skills: History, Investigation, Insight; Uses: superiority_die",
       "expectedBehavior": "When you make an Intelligence (History or Investigation) check or a Wisdom (Insight) check, you can expend one Superiority Die and add the die to the ability check."
@@ -6487,7 +6487,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "When you attack with a weapon whose mastery property you can use, you can replace that property with the Push, Sap, or Slow property for that attack."
@@ -6499,7 +6499,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-352-tactical-mind-ungated-always-spend-nan.md",
       "class": "Fighter",
       "triggerConditions": "Trigger: failed_ability_check; Action: passive",
       "expectedBehavior": "You have a mind for tactics on and off the battlefield. When you fail an ability check, you can expend a use of your Second Wind to push yourself toward success. Rather than regaining Hit Points, you roll 1d10 and add the number rolled to the ability check, potentially turning it into a success. If the check still fails, this use of Second Wind isn't expended."
@@ -6511,7 +6511,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-353-tactical-shift-ungated-always-on-no-secondwind-trigger.md",
       "class": "Fighter",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "Whenever you activate your Second Wind with a Bonus Action, you can move up to half your Speed without provoking Opportunity Attacks."
@@ -6523,7 +6523,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Sorcerer",
       "triggerConditions": "Trigger: after_sorcerer_spell_slot",
       "expectedBehavior": "Immediately after casting Sorcerer spell with spell slot, create effect of your choice from Wild Magic Surge table instead of rolling. Can choose any effect except final row. Once per Long Rest."
@@ -6535,7 +6535,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Spell",
       "triggerConditions": "",
       "expectedBehavior": "One creature of your choice that you can see within range makes a Wisdom saving throw. On a failed save, it has the Prone and Incapacitated conditions for the duration. During that time, it laughs uncontrollably if it's capable of laughter, and it can't end the Prone condition on itself. At the end of each of its turns and each time it takes damage, it makes another Wisdom saving throw. The target has Advantage on the save if the save is triggered by damage. On a successful save, the spell ends. Using a Higher-Level Spell Slot. You can target one additional creature for each spell slot level above 1."
@@ -6547,7 +6547,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "triggerConditions": "",
       "expectedBehavior": "Enhanced Unarmed Strike. When you hit with your Unarmed Strike and deal damage, you can deal Bludgeoning damage equal to 1d4 plus your Strength modifier instead of the normal damage of an Unarmed Strike. Damage Rerolls. Whenever you roll a damage die for your Unarmed Strike, you can reroll the die if it rolls a 1, and you must use the new roll. Improvised Weaponry. You have proficiency with improvised weapons"
     },
@@ -6558,7 +6558,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-FT-094-telekinetic-shove-ungated-bonus-action.md",
       "triggerConditions": "Action: 1 bonus action; Action: bonus_action; Range: 30",
       "expectedBehavior": "As a Bonus Action, you can telekinetically shove one creature you can see within 30 feet of yourself. When you do so, the target must succeed on a Strength saving throw (DC 8 plus the ability modifier of the score increased by this feat and your Proficiency Bonus) or be moved 5 feet toward or away from you."
     },
@@ -6569,7 +6569,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-355-telekinetic-thrust-rest-gate-inert.md",
       "class": "Fighter",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Psi-Powered Leap - Bonus Action Fly Speed (2x Speed) until end of turn. Telekinetic Thrust - When you deal damage to a target with your Psionic Strike, you can force the target to make a Strength saving throw (DC 8 plus your intelligence modifier and Proficiency Bonus). On a failed save, you can give the target the Prone condition or transport it up to 10 feet horizontally. Once you utalize this Bonus Action, you can't do so again until you finish a Short or Long Rest unless you expend a Psionic Energy Die (no action required) to restore your use of it."
@@ -6581,7 +6581,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-356-telekinetic-master-inert-attack-and-spell-injection.md",
       "class": "Fighter",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Always have Telekinesis spell prepared. Cast without spell slot. On each turn while maintaining Concentration, make one weapon attack as Bonus Action."
@@ -6593,7 +6593,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-357-telekinetic-movement-no-chooser-no-range-gate.md",
       "class": "Fighter",
       "triggerConditions": "Action: 1 action; Range: 30_ft",
       "expectedBehavior": "Action to move an object or willing creature up to 30 feet."
@@ -6605,7 +6605,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "triggerConditions": "Action: passive; Spell: Detect Thoughts",
       "expectedBehavior": "You always have the Detect Thoughts spell prepared. You can cast it without a spell slot or spell components, and you must finish a Long Rest before you can cast it in this way again. You can also cast it using spell slots you have of the appropriate level. Your spellcasting ability for the spell is the ability increased by this feat."
     },
@@ -6616,7 +6616,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-359-third-eye-no-log.md",
       "class": "Wizard",
       "triggerConditions": "Action: 1 bonus action; Duration: short_or_long_rest",
       "expectedBehavior": "Bonus Action, choose one benefit until start of Short or Long Rest: Darkvision (120 feet), Greater Comprehension (read any language), See Invisibility (cast without spell slot)."
@@ -6628,7 +6628,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-360-thiefs-reflexes-inert-no-second-turn.md",
       "class": "Rogue",
       "triggerConditions": "Action: passive",
       "expectedBehavior": "Take two turns during first round of any combat. First turn at normal initiative, second turn at initiative minus 10."
@@ -6640,7 +6640,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-361-thought-shield-reflect-log-only.md",
       "class": "Warlock",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Your thoughts can't be read by telepathy or other means unless you allow it. Resistance to Psychic damage. Whenever a creature deals Psychic damage to you, that creature takes the same amount of damage that you take."
@@ -6652,7 +6652,7 @@
       "handler": "src/services/combat/automation/handlers/fightingStyleHandler.js",
       "router": "src/services/combat/automation/routers/fightingStyleRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/fightingStyleInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-FS-011-thrown-weapon-fighting-2024-inert.md",
       "class": "Fighting Style",
       "triggerConditions": "",
       "expectedBehavior": "You can treat any short sword that you hold with one hand as if it had the thrown property, and you can make ranged attacks with a short sword as if you had the light property with it. When you make a ranged attack roll with a thrown weapon, you add your proficiency bonus to the attack roll."
@@ -6664,7 +6664,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Ranger",
       "triggerConditions": "Action: 1 action; Action: action",
       "expectedBehavior": "Temporary Hit Points. As a Action, you can give yourself Temporary Hit Points equal to 1d8 + Wisdom modifier (minimum 1). Uses = Wisdom modifier (minimum once). Regain all on Long Rest. Decrease Exhaustion. Whenever you finish a Short Rest, your Exhaustion level decreases by 1."
@@ -6676,7 +6676,7 @@
       "handler": "src/services/combat/automation/handlers/weaponMasteryHandler.js",
       "router": "src/services/combat/automation/routers/weaponMasteryRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/weaponMasteryInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Barbarian",
       "triggerConditions": "",
       "expectedBehavior": "If you hit a creature with this weapon, you can force the creature to make a Constitution saving throw (DC 8 + the ability modifier used to make the attack roll + your Proficiency Bonus). On a failed save, the creature has the Prone condition."
@@ -6688,7 +6688,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Feat",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "Your Hit Point maximum increases by an amount equal to twice your character level when you gain this feat. Whenever you gain a character level thereafter, your Hit Point maximum increases by an additional 2 Hit Points."
@@ -6696,11 +6696,11 @@
     {
       "id": "CLA-363",
       "name": "Trance",
-      "type": "classFeature",
+      "type": "racialTrait",
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "race": "Elf",
       "triggerConditions": "",
       "expectedBehavior": "You don't need to sleep, and magic can't put you to sleep. You can finish a Long Rest in 4 hours if you spend those hours in a trance-like meditation, during which you retain consciousness."
@@ -6712,7 +6712,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Sorcerer",
       "triggerConditions": "Action: bonus action; Action: bonus_action; Duration: 1_minute",
       "expectedBehavior": "You gain the ability to align your consciousness with the endless calculations of Mechanus. As a Bonus Action, you can enter this state for 1 minute. For the duration, attack rolls against you can't benefit from Advantage, and whenever you make a D20 Test, you can treat a roll of 9 or lower on the d20 as a 10. Once you use this feature, you can't use it again until you finish a Long Rest unless you spend 5 Sorcery Points (no action required) to restore your use of it."
