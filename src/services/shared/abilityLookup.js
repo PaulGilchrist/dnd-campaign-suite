@@ -28,3 +28,15 @@ export function getAbilitySaveModifier(abilities, abilityName) {
   const ability = abilities?.find(a => a.name === canonical)
   return ability?.save ?? ability?.bonus ?? 0
 }
+
+// FT-094: canonical ASI-choice lookup — featAbilityChoices keys are
+// "<Feat>-<featListIndex>" with value { assignment: '<Ability>' } or a plain string.
+export function resolveFeatChosenAbility(featName, featAbilityChoices) {
+  if (!featName || !featAbilityChoices || typeof featAbilityChoices !== 'object') return null
+  for (const [key, value] of Object.entries(featAbilityChoices)) {
+    if (!key.startsWith(featName)) continue
+    if (value && typeof value === 'object' && value.assignment) return value.assignment
+    if (typeof value === 'string') return value
+  }
+  return null
+}

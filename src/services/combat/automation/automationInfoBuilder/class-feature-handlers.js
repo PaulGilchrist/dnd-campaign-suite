@@ -1,4 +1,4 @@
-import { getAbilityModifier } from '../../../shared/abilityLookup.js'
+import { getAbilityModifier, resolveFeatChosenAbility } from '../../../shared/abilityLookup.js'
 import { normalizeCastingTime } from '../../../shared/castingTimeUtils.js'
 
 // ── Class Feature Handlers ───────────────────────────────────────────
@@ -7,8 +7,13 @@ export const classFeatureHandlers = {
     'telekinetic_shove': (feature, playerStats) => {
         const auto = feature.automation
         const prof = playerStats.proficiency || 0
+        // FT-094: DC ability is the ASI actually chosen for the Telekinesis feat,
+        // not the static feats.json saveAbility (fallback = known data value).
+        const saveAbility = resolveFeatChosenAbility('Telekinesis', playerStats.featAbilityChoices)
+            || auto.saveAbility
+            || 'INT'
         const saveDc = auto.saveDc === 'ability'
-            ? 8 + getAbilityModifier(playerStats.abilities, auto.saveAbility || 'INT') + prof
+            ? 8 + getAbilityModifier(playerStats.abilities, saveAbility) + prof
             : auto.saveDc || 10
         let action = auto.action
         if (!action && auto.casting_time) {
@@ -24,7 +29,7 @@ export const classFeatureHandlers = {
             name: feature.name,
             saveType: auto.saveType || 'STR',
             saveDc,
-            saveAbility: auto.saveAbility || 'INT',
+            saveAbility,
             range: auto.range || '30',
             pushDistance: auto.pushDistance || 5,
             action: action || 'bonus_action',

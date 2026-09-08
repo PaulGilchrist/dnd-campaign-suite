@@ -5,6 +5,7 @@ import { addExpiration } from '../../../rules/effects/expirations.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getCurrentCombatRound } from '../../../encounters/combatData.js';
+import { resolveFeatChosenAbility } from '../../../shared/abilityLookup.js';
 
 function getBardicDieSize(playerStats) {
     const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
@@ -91,21 +92,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 }
 
 function resolveInspiringLeaderTempHp(action, playerStats) {
-    const featAbilityChoices = playerStats.featAbilityChoices || {};
     const featName = action.name || 'Inspiring Leader';
-    let chosenAbility = null;
-
-    for (const [key, value] of Object.entries(featAbilityChoices)) {
-        if (!key.startsWith(featName)) continue;
-        if (value && typeof value === 'object' && value.assignment) {
-            chosenAbility = value.assignment;
-            break;
-        }
-        if (typeof value === 'string') {
-            chosenAbility = value;
-            break;
-        }
-    }
+    const chosenAbility = resolveFeatChosenAbility(featName, playerStats.featAbilityChoices);
 
     const level = playerStats.level || 1;
     if (chosenAbility) {

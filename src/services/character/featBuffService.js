@@ -1,5 +1,6 @@
 import { findFeat } from '../shared/featFinder.js';
 import { mergeDeduplicated } from '../shared/buffApplier.js';
+import { resolveFeatChosenAbility } from '../shared/abilityLookup.js';
 
 /**
  * Feat Buff Service
@@ -568,17 +569,7 @@ export function computeFeatBuffs(feat, ruleset = '2024') {
 }
 
 function resolveSaveTypeFromChoices(featName, choices) {
-  if (!choices || typeof choices !== 'object') return null;
-  for (const [key, value] of Object.entries(choices)) {
-    if (!key.startsWith(featName)) continue;
-    if (value && typeof value === 'object' && value.assignment) {
-      return value.assignment;
-    }
-    if (typeof value === 'string') {
-      return value;
-    }
-  }
-  return null;
+  return resolveFeatChosenAbility(featName, choices);
 }
 
 export function computeAllFeatBuffs(formData, allFeats) {
