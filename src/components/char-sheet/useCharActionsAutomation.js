@@ -148,6 +148,44 @@ export default function useCharActionsAutomation({
 
         const auto = action.automation;
 
+        // CLA-342: Stunning Strike fires only when your own melee weapon/unarmed
+        // attack HIT, once per turn — refuse before any Focus Point/ki is spent
+        // (mirrors the verified quiveringPalmHandler lastAttack hit gates).
+        let stunningStrikeArmed = false;
+        let stunningStrikeRound = 1;
+        if (action.name === 'Stunning Strike' && auto?.trigger === 'monk_weapon_or_unarmed_hit') {
+            const lastAttack = getRuntimeValue('campaign', 'lastAttack', campaignName);
+            const combat = await getCombatContext(campaignName);
+            stunningStrikeRound = combat?.round || 1;
+            const denyStunningStrike = (reason) => {
+                addEntry(campaignName, {
+                    type: 'ability_use',
+                    characterName: playerName,
+                    abilityName: action.name,
+                    description: `${action.name} blocked — ${reason}`,
+                }).catch((e) => { console.error("[useCharActionsAutomation:log-error]", e); });
+                setPopupHtml(`<b>${action.name}</b><br/>${reason}`);
+            };
+            const used = getRuntimeValue(playerName, '_StunningStrike_usedRound', campaignName);
+            if (used && stunningStrikeRound <= (used.round ?? stunningStrikeRound)) {
+                denyStunningStrike('Once per turn — already used this turn.');
+                return;
+            }
+            if (!lastAttack || lastAttack.attackerName !== playerName) {
+                denyStunningStrike('Last attack was not made by you.');
+                return;
+            }
+            if (lastAttack.weaponType !== 'melee' || lastAttack.isAutoMiss === true) {
+                denyStunningStrike('Requires a melee weapon attack.');
+                return;
+            }
+            if (lastAttack.hit !== true) {
+                denyStunningStrike('Last melee attack did not hit.');
+                return;
+            }
+            stunningStrikeArmed = true;
+        }
+
         // If feature has options that need choosing (e.g. Blessed Strikes), present choice
         if (auto?.type === 'damage_bonus' && auto?.options?.length > 0) {
             const optionKey = `_${action.name.replace(/\s+/g, '_')}_option`;
@@ -191,6 +229,15 @@ export default function useCharActionsAutomation({
                 }
                 await setRuntimeValue(playerStats.name, 'focusPoints', currentFP - 1, campaignName);
                 window.dispatchEvent(new CustomEvent('focus-points-updated'));
+                if (stunningStrikeArmed) {
+                    await setRuntimeValue(playerStats.name, '_StunningStrike_usedRound', { round: stunningStrikeRound, activeCreature: playerName }, campaignName);
+                    addEntry(campaignName, {
+                        type: 'ability_use',
+                        characterName: playerName,
+                        abilityName: action.name,
+                        description: `${action.name} — expended 1 ${playerStats.rules === '2024' ? 'Focus Point' : 'ki point'} to attempt to stun ${getRuntimeValue('campaign', 'lastAttack', campaignName)?.targetName || 'target'}.`,
+                    }).catch((e) => { console.error("[useCharActionsAutomation:log-error]", e); });
+                }
             }
         }
 

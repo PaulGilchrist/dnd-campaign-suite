@@ -5938,6 +5938,7 @@
               },
               "saveType": "CON",
               "saveDc": "ability",
+              "saveAbility": "WIS",
               "conditionInflicted": "stunned",
               "duration": "until_start_of_next_turn",
               "successEffect": "speed_halved_until_start_of_next_turn",

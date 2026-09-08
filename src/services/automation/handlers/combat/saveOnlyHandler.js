@@ -67,7 +67,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             addExpiration(playerStats.name, targetName, [
                 { type: 'stunned', condition: 'speed_halved' },
                 { type: 'advantage_on_target' }
-            ], campaignName);
+            ], campaignName, undefined, targetName);
         } else {
             const conditionKey = effects.fail?.[0]?.condition || 'stunned';
             const filtered = conditions.filter(c => String(c).toLowerCase() !== conditionKey.toLowerCase());
@@ -88,7 +88,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
             addExpiration(playerStats.name, targetName, [
                 { type: 'stunned', condition: 'stunned' }
-            ], campaignName);
+            ], campaignName, undefined, targetName);
         }
 
         window.removeEventListener('save-result', handleSaveResult);
@@ -112,9 +112,13 @@ function applySuccessEffects(effects, targetName, attackerName, campaignName) {
     if (!effects || !Array.isArray(effects)) return;
     for (const effect of effects) {
         switch (effect.type) {
-            case 'speed_halved':
-                setRuntimeValue(targetName, `${effect.condition}_${Date.now()}`, true, campaignName);
+            case 'speed_halved': {
+                // CLA-342: canonical key consumed by CharSheet.conditionEffects and
+                // cleared by clearExpirationEffects — the old timestamped key was dead.
+                const key = effect.condition === 'speed_halved' ? 'stunned_speedHalved' : `stunned_${effect.condition}`;
+                setRuntimeValue(targetName, key, true, campaignName);
                 break;
+            }
             case 'advantage_on_target': {
                 const advKey = `_advantageOn_${targetName}`;
                 const storedAdv = getRuntimeValue(attackerName, advKey) || [];

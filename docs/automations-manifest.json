@@ -6235,7 +6235,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-342-stunning-strike.md",
+      "verified": "verified",
       "class": "Monk",
       "triggerConditions": "Trigger: monk_weapon_or_unarmed_hit; Action: 1 action; Duration: until_start_of_next_turn",
       "expectedBehavior": "Once per turn when you hit a creature with a Monk weapon or Unarmed Strike, you can expend 1 Focus Point. Target makes Constitution save. Failed save: Stunned until start of next turn. Success: Speed halved until start of next turn, and next attack roll against target has Advantage."

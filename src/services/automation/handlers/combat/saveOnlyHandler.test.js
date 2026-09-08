@@ -219,6 +219,8 @@ describe('saveOnlyHandler.handle - save result success', () => {
         { type: 'advantage_on_target' },
       ],
       campaignName,
+      undefined,
+      'Goblin',
     );
   });
 
@@ -250,8 +252,9 @@ describe('saveOnlyHandler.handle - save result success', () => {
       detail: { promptId: 'prompt-123', success: true },
     }));
 
+    // CLA-342: canonical consumer key is 'stunned_speedHalved'
     const speedHalvedCall = runtimeState.setRuntimeValue.mock.calls.find(
-      (call) => call[1]?.includes('speed_halved'),
+      (call) => call[1] === 'stunned_speedHalved',
     );
     expect(speedHalvedCall).toBeDefined();
     expect(speedHalvedCall[2]).toBe(true);
@@ -336,7 +339,41 @@ describe('saveOnlyHandler.handle - save result fail', () => {
       'Goblin',
       [{ type: 'stunned', condition: 'stunned' }],
       campaignName,
+      undefined,
+      'Goblin',
     );
+  });
+});
+
+// CLA-342: canonical speed-halved key regression — the success branch must
+// write the key consumed by CharSheet.conditionEffects ('stunned_speedHalved'),
+// not a timestamped dead key.
+describe('saveOnlyHandler.handle - CLA-342 speed-halved key', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    setupMocks();
+  });
+
+  it('writes canonical stunned_speedHalved key on canonical success effect', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction({ saveType: 'CON', saveAbility: 'WIS' });
+
+    await handle(action, ps, campaignName, mapName);
+
+    window.dispatchEvent(new CustomEvent('save-result', {
+      detail: { promptId: 'prompt-123', success: true },
+    }));
+
+    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+      'Goblin',
+      'stunned_speedHalved',
+      true,
+      campaignName,
+    );
+    const deadKeys = runtimeState.setRuntimeValue.mock.calls.filter(
+      (call) => /_\d{13}$/.test(String(call[1])),
+    );
+    expect(deadKeys).toHaveLength(0);
   });
 });
 

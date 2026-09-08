@@ -118,7 +118,7 @@ export const saveHandlers = {
             type: 'save_only',
             name: feature.name,
             saveType: auto.saveType || 'DEX',
-            saveDc: (auto.saveDc === 'ability') ? getSaveDc(playerStats, 'CON', playerStats.proficiency) : auto.saveDc || 10,
+            saveDc: (auto.saveDc === 'ability') ? getSaveDc(playerStats, auto.saveAbility || 'CON', playerStats.proficiency) : auto.saveDc || 10,
             conditionInflicted: auto.conditionInflicted || null,
             duration: auto.duration || '',
             successEffect: auto.successEffect || null,
