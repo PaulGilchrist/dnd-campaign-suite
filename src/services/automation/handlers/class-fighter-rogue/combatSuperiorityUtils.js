@@ -9,6 +9,7 @@ import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addCondition } from '../../../../services/combat/conditions/conditionSaveService.js';
 import { loadManeuvers } from '../../../ui/dataLoader.js';
+import { computeSuperiorityDiceMax } from '../../../rules/trackedResources.js';
 
 export function applyConditionToTarget(targetName, conditionKey, campaignName, combatSummary, saveDc, saveType, playerStats) {
     if (!combatSummary) {
@@ -37,10 +38,21 @@ export function getKnownManeuvers(playerStats, campaignName) {
     return Array.isArray(stored) ? stored : [];
 }
 
+// FS-010: when the runtime key is null (fresh mount or post-rest re-arm),
+// derive the character's ACTUAL max — Battle Master level table or 1 for a
+// pure Superior Technique fighter — never a flat 4 (a style-only fighter could
+// otherwise fuel 4 maneuvers per short rest).
+export function getMaxSuperiorityDice(playerStats) {
+    const trackedMax = playerStats?._trackedResources?.superiorityDice?.max;
+    if (trackedMax != null) return Number(trackedMax);
+    return computeSuperiorityDiceMax(playerStats);
+}
+
 export function getSuperiorityDice(playerStats, campaignName) {
     const usesKey = 'superiorityDice';
-    const defaultMax = 4;
-    return Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? defaultMax);
+    const stored = getRuntimeValue(playerStats.name, usesKey, campaignName);
+    if (stored != null) return Number(stored);
+    return getMaxSuperiorityDice(playerStats);
 }
 
 export function computeMaxOptions(playerStats, auto) {
@@ -60,7 +72,7 @@ export function computeMaxOptions(playerStats, auto) {
     return total;
 }
 
-export function rollManeuverDie(maneuver, playerStats, campaignName) {
+export function rollManeuverDie(maneuver, playerStats, campaignName, featureDieExpression) {
     const relentless = hasRelentless(playerStats);
     const storedRound = getRelentlessUsedRound(playerStats, campaignName);
     const currentRound = getCurrentCombatRound(campaignName);
@@ -72,7 +84,13 @@ export function rollManeuverDie(maneuver, playerStats, campaignName) {
     let dieDescription;
     let expendedDie = true;
 
-    const superiorityDieSize = evaluateAutoExpression(maneuver.dieExpression || 'superiority_die', playerStats);
+    // FS-010: honor a concrete numeric die face supplied by the feature that
+    // armed the roll (Superior Technique style grants '6'); the Battle Master
+    // 'superiority_die' token stays level-table-driven.
+    const explicitFace = Number(featureDieExpression);
+    const superiorityDieSize = (Number.isFinite(explicitFace) && explicitFace > 0)
+        ? explicitFace
+        : evaluateAutoExpression(maneuver.dieExpression || 'superiority_die', playerStats);
 
     if (relentless && !relentlessUsed) {
         // CLA-286: canonical Relentless rolls a fixed d8, not the superiority die size.

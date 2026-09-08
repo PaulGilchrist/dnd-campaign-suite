@@ -82,7 +82,7 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
         }
     }
 
-    const { dieValue, dieDescription, expendedDie } = rollManeuverDie(maneuver, playerStats, campaignName);
+    const { dieValue, dieDescription, expendedDie } = rollManeuverDie(maneuver, playerStats, campaignName, auto.dieExpression);
     await expendSuperiorityDie(playerStats, campaignName, expendedDie, superiorityDice);
 
     let description = dieDescription;

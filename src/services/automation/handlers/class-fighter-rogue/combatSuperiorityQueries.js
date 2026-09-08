@@ -108,6 +108,15 @@ export function getSkillCheckManeuversForSkill(playerStats, campaignName, skillN
     }));
 }
 
+// FS-010: prompt payloads must carry the character's OWN superiority die
+// expression — the Superior Technique style grants a concrete 'd6'
+// (rules-fightingStyles.js), while the Battle Master row keeps the
+// level-table-driven 'superiority_die' token.
+function characterSuperiorityDieExpression(playerStats) {
+    const specialAction = (playerStats?.specialActions || []).find(a => a.type === 'combat_superiority');
+    return specialAction?.automation?.dieExpression || 'superiority_die';
+}
+
 export async function handleAttackRiderPrompt(action, playerStats, campaignName, _mapName) {
     const pending = getRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt', campaignName);
     if (!pending || !pending.attackContext) { return null; }
@@ -140,7 +149,7 @@ export async function handleAttackRiderPrompt(action, playerStats, campaignName,
             action: {
                 automation: {
                     type: 'combat_superiority',
-                    dieExpression: 'superiority_die',
+                    dieExpression: characterSuperiorityDieExpression(playerStats),
                 },
             },
             playerStats,
@@ -179,7 +188,7 @@ export async function handleSkillCheckPrompt(action, playerStats, campaignName, 
             action: {
                 automation: {
                     type: 'combat_superiority',
-                    dieExpression: 'superiority_die',
+                    dieExpression: characterSuperiorityDieExpression(playerStats),
                 },
             },
             playerStats,

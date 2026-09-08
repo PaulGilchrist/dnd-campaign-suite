@@ -58,20 +58,39 @@ describe('getSuperiorityDice', () => {
         expect(getRuntimeValue).toHaveBeenCalledWith('TestFighter', 'superiorityDice', 'test-campaign');
     });
 
-    it('returns default of 4 when no value stored', () => {
+    // FS-010: no stored value derives the character's ACTUAL max — never the
+    // old flat 4 (a pure Superior Technique fighter could fuel 4 maneuvers).
+    it('derives max 1 for a Superior Technique non-Battle Master when no value stored', () => {
         getRuntimeValue.mockReturnValue(null);
 
-        const result = getSuperiorityDice(makePlayerStats(), 'test-campaign');
+        const result = getSuperiorityDice(
+            makePlayerStats({ class: { name: 'Fighter', fightingStyles: ['Superior Technique'] } }),
+            'test-campaign'
+        );
 
-        expect(result).toBe(4);
+        expect(result).toBe(1);
     });
 
-    it('returns default of 4 when value is undefined', () => {
+    it('derives Battle Master level-table max when value is undefined', () => {
         getRuntimeValue.mockReturnValue(undefined);
 
-        const result = getSuperiorityDice(makePlayerStats(), 'test-campaign');
+        const result = getSuperiorityDice(
+            makePlayerStats({
+                level: 18,
+                class: { name: 'Fighter', subclass: { name: 'Battle Master' }, class_levels: [{ level: 18, superiority_dice: 8 }] },
+            }),
+            'test-campaign'
+        );
 
-        expect(result).toBe(4);
+        expect(result).toBe(8);
+    });
+
+    it('derives 0 for non-fighters when no value stored', () => {
+        getRuntimeValue.mockReturnValue(null);
+
+        const result = getSuperiorityDice(makePlayerStats({ class: { name: 'Wizard' } }), 'test-campaign');
+
+        expect(result).toBe(0);
     });
 });
 
@@ -222,5 +241,66 @@ describe('getSkillCheckManeuversForSkill', () => {
         );
 
         expect(result).toEqual([]);
+    });
+});
+
+// ── FS-010: die face honors style (d6) vs Battle Master level table ──
+
+describe('FS-010 rollManeuverDie die face', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    const styleStats = () => makePlayerStats({
+        level: 18,
+        class: { name: 'Fighter', subclass: { name: 'Champion' }, fightingStyles: ['Superior Technique'] },
+    });
+
+    const battleMasterStats = () => makePlayerStats({
+        level: 18,
+        class: { name: 'Fighter', subclass: { name: 'Battle Master' } },
+    });
+
+    it('uses the numeric die face supplied by the feature (Superior Technique d6)', () => {
+        getRuntimeValue.mockReturnValue(undefined);
+
+        const result = rollManeuverDie(
+            { dieExpression: 'superiority_die' },
+            styleStats(),
+            'test-campaign',
+            '6'
+        );
+
+        expect(result.superiorityDieSize).toBe(6);
+        expect(result.dieDescription).toContain('Rolled d6');
+        expect(result.dieValue).toBeGreaterThanOrEqual(1);
+        expect(result.dieValue).toBeLessThanOrEqual(6);
+    });
+
+    it('falls back to d6 for a style-only fighter even via the superiority_die token', () => {
+        getRuntimeValue.mockReturnValue(undefined);
+
+        const result = rollManeuverDie(
+            { dieExpression: 'superiority_die' },
+            styleStats(),
+            'test-campaign'
+        );
+
+        expect(result.superiorityDieSize).toBe(6);
+        expect(result.dieDescription).toContain('d6');
+    });
+
+    it('keeps Battle Master lv18 on the d12 level table', () => {
+        getRuntimeValue.mockReturnValue(undefined);
+
+        const result = rollManeuverDie(
+            { dieExpression: 'superiority_die' },
+            battleMasterStats(),
+            'test-campaign',
+            'superiority_die'
+        );
+
+        expect(result.superiorityDieSize).toBe(12);
+        expect(result.dieDescription).toContain('d12');
     });
 });

@@ -69,6 +69,21 @@ export const ALL_TRACKED_RESOURCES = [
 
 const SPELL_SLOT_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
+// FS-010: single source of truth for a Fighter's superiority die COUNT.
+// Battle Master → level-table dice; non-Battle-Master with the Superior
+// Technique fighting style → exactly 1.
+export function computeSuperiorityDiceMax(playerStats) {
+  if (playerStats?.class?.name !== 'Fighter') return 0
+  const is2024 = playerStats.rules === '2024'
+  const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level)
+  const majorName = playerStats.class.major?.name || playerStats.class.subclass?.name
+  if (majorName === 'Battle Master') {
+    return is2024 ? (classLevel?.superiority_dice || 0) : (playerStats.level >= 15 ? 6 : (playerStats.level >= 7 ? 5 : 4))
+  }
+  if (playerStats.class.fightingStyles?.includes('Superior Technique')) return 1
+  return 0
+}
+
 export function computeTrackedResources(playerStats) {
   if (!playerStats) return {}
   const features = getClassFeatures(playerStats)
@@ -147,16 +162,7 @@ export function computeTrackedResources(playerStats) {
   const maxGD = isPaladin ? Math.max(charisma?.bonus || 0, 1) : 0
   resources.gloriousDefenseUses = { current: maxGD, max: maxGD }
 
-  let maxSD = 0
-  if (isFighter) {
-    const majorName = playerStats.class.major?.name || playerStats.class.subclass?.name
-    const isBattleMaster = majorName === 'Battle Master'
-    if (isBattleMaster) {
-      maxSD = is2024 ? (classLevel?.superiority_dice || 0) : (playerStats.level >= 15 ? 6 : (playerStats.level >= 7 ? 5 : 4))
-    } else if (playerStats.class.fightingStyles?.includes('Superior Technique')) {
-      maxSD = 1
-    }
-  }
+  const maxSD = computeSuperiorityDiceMax(playerStats)
   resources.superiorityDice = { current: maxSD, max: maxSD }
 
   const hasEnergy = classLevel?.energy && classLevel.energy.required_major

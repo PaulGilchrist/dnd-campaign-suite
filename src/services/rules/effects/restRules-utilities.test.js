@@ -115,6 +115,17 @@ describe('restRules utilities', () => {
 
       const battleLabels = getShortRestResourceLabels({ class: { name: 'Fighter', subclass: { name: 'Battle Master' } } })
       expect(battleLabels).toContain('Superiority Dice')
+
+      // FS-010: Superior Technique style (non-Battle Master) also restores Superiority Dice
+      const styleLabels = getShortRestResourceLabels({
+        class: { name: 'Fighter', subclass: { name: 'Champion' }, fightingStyles: ['Superior Technique'] },
+      })
+      expect(styleLabels).toContain('Superiority Dice')
+
+      const noStyleLabels = getShortRestResourceLabels({
+        class: { name: 'Fighter', subclass: { name: 'Champion' }, fightingStyles: ['Defense'] },
+      })
+      expect(noStyleLabels).not.toContain('Superiority Dice')
     })
 
     it('uses major.name as fallback for subclass matching', () => {

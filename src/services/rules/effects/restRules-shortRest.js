@@ -10,6 +10,7 @@ import { setTempHp } from '../../../services/automation/handlers/buffs/tempHpSer
 import { endInvisibility, endGreaterInvisibility } from '../features/invisibilityService.js'
 import { clearHuntersMarkConcentration } from './restRules.js'
 import { getShortRestResources, computeShortRestHpNewCurrent } from './restRules-constants.js'
+import { computeSuperiorityDiceMax } from '../trackedResources.js'
 
 export async function applyShortRest(playerStats, campaignName, options = {}) {
   const { skipAutoRecovery = false } = options;
@@ -23,6 +24,13 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
    }
 
   if (playerStats.class?.name === 'Fighter') {
+    // FS-010: restore superiority dice to the character's ACTUAL max
+    // (Battle Master level table, or 1 for a pure Superior Technique
+    // fighter) — restoring null here armed the ??4 phantom pool.
+    const maxSD = computeSuperiorityDiceMax(playerStats);
+    if (maxSD > 0) {
+      updates.superiorityDice = maxSD;
+    }
     const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
     const maxSW = classLevel?.second_wind || 0;
     const currentSW = Number(getRuntimeValue(name, 'secondWindUses', campaignName) ?? 0);

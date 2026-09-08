@@ -6415,7 +6415,7 @@
       "handler": "src/services/combat/automation/handlers/fightingStyleHandler.js",
       "router": "src/services/combat/automation/routers/fightingStyleRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/fightingStyleInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-FS-010-superior-technique.md",
+      "verified": "verified",
       "class": "Fighting Style",
       "triggerConditions": "",
       "expectedBehavior": "You learn one maneuver of your choice from the Battle Master. You can use your superiority dice to fuel that maneuver. Whenever you finish a short or long rest, you can choose a different maneuver from the Battle Master to replace the maneuver."

@@ -452,3 +452,83 @@ describe('getAttackRiderOptionsByContext', () => {
         expect(result[0].name).toBe('Maneuvering Attack');
     });
 });
+
+// ── FS-010: prompt payload dieExpression honors the character's style ──
+
+describe('FS-010 prompt payload dieExpression', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        dataLoader.loadManeuvers.mockResolvedValue(allManeuvers);
+    });
+
+    const styleStats = () => makePlayerStats({
+        level: 18,
+        class: { name: 'Fighter', subclass: { name: 'Champion' }, fightingStyles: ['Superior Technique'] },
+        specialActions: [{
+            name: 'Combat Superiority',
+            type: 'combat_superiority',
+            automation: { type: 'combat_superiority', dieExpression: '6', uses_max: 1, maxOptions: 1 },
+        }],
+    });
+
+    const battleMasterStats = () => makePlayerStats({
+        level: 18,
+        class: { name: 'Fighter', subclass: { name: 'Battle Master' } },
+        specialActions: [{
+            name: 'Combat Superiority',
+            type: 'combat_superiority',
+            automation: { type: 'combat_superiority', dieExpression: 'superiority_die', uses_max: 8 },
+        }],
+    });
+
+    const makePromptRuntime = (maneuverNames, extra = {}) =>
+        vi.fn().mockImplementation((_playerName, key, _campaignName) => {
+            if (key === 'superiorityDice') return 1;
+            if (key === SELECTION_KEY) return maneuverNames;
+            if (key === 'pendingCombatSuperiorityPrompt') return extra;
+            return undefined;
+        });
+
+    it('attack-rider prompt carries the Superior Technique style d6, not the level-table token', async () => {
+        getRuntimeValue.mockImplementation(makePromptRuntime(['Trip Attack'], { attackContext: { hit: true, weaponType: 'melee', targetName: 'Thug 1' } }));
+        await populateManeuverCache();
+
+        const result = await handleAttackRiderPrompt(
+            { name: 'Combat Superiority', automation: { trigger: 'attack_rider' } },
+            styleStats(),
+            'test-campaign',
+            null
+        );
+
+        expect(result.type).toBe('modal');
+        expect(result.payload.action.automation.dieExpression).toBe('6');
+    });
+
+    it('attack-rider prompt keeps Battle Master level-table superiority_die token', async () => {
+        getRuntimeValue.mockImplementation(makePromptRuntime(['Trip Attack'], { attackContext: { hit: true, weaponType: 'melee', targetName: 'Thug 1' } }));
+        await populateManeuverCache();
+
+        const result = await handleAttackRiderPrompt(
+            { name: 'Combat Superiority', automation: { trigger: 'attack_rider' } },
+            battleMasterStats(),
+            'test-campaign',
+            null
+        );
+
+        expect(result.payload.action.automation.dieExpression).toBe('superiority_die');
+    });
+
+    it('skill-check prompt carries the style d6 for Superior Technique fighters', async () => {
+        getRuntimeValue.mockImplementation(makePromptRuntime(['Ambush'], { skillContext: { skillName: 'Stealth' } }));
+        await populateManeuverCache();
+
+        const result = await handleSkillCheckPrompt(
+            { name: 'Combat Superiority', automation: { trigger: 'skill_check' } },
+            styleStats(),
+            'test-campaign',
+            null
+        );
+
+        expect(result.payload.action.automation.dieExpression).toBe('6');
+    });
+});

@@ -20,7 +20,7 @@ const SHORT_REST_RESOURCE_LABELS = [
     { key: 'psionicEnergy', label: 'Psionic Energy', classes: ['Fighter'], subclasses: ['Psi Warrior'] },
     { key: 'psionicEnergy', label: 'Psionic Energy', classes: ['Rogue'], subclasses: ['Soulknife'] },
     { key: 'telekineticThrustUses', label: 'Telekinetic Thrust', classes: ['Fighter'], subclasses: ['Psi Warrior'] },
-    { key: 'superiorityDice', label: 'Superiority Dice', classes: ['Fighter'], subclasses: ['Battle Master'] },
+    { key: 'superiorityDice', label: 'Superiority Dice', classes: ['Fighter'], subclasses: ['Battle Master'], styles: ['Superior Technique'] },
     { key: 'naturalRecoverySlots', label: 'Natural Recovery (Spell Slots)', classes: ['Druid'], subclasses: ['Circle of the Land'] },
     { key: 'arcaneRecoveryLevels', label: 'Arcane Recovery (Spell Slots)', classes: ['Wizard'] }
 ];
@@ -28,10 +28,15 @@ const SHORT_REST_RESOURCE_LABELS = [
 export function getShortRestResourceLabels(playerStats) {
     const className = playerStats?.class?.name;
     const subclassName = playerStats?.class?.subclass?.name || playerStats?.class?.major?.name;
+    const fightingStyles = playerStats?.class?.fightingStyles || [];
 
     return SHORT_REST_RESOURCE_LABELS.filter(entry => {
         if (!entry.classes.includes(className)) return false;
-        if (entry.subclasses && !entry.subclasses.includes(subclassName)) return false;
+        // FS-010: a subclass-gated label also passes for holders of a
+        // matching fighting style (Superior Technique grants Superiority Dice).
+        if (entry.subclasses && !entry.subclasses.includes(subclassName)) {
+            if (!entry.styles || !entry.styles.some(s => fightingStyles.includes(s))) return false;
+        }
         return true;
        }).map(entry => entry.label);
 }
