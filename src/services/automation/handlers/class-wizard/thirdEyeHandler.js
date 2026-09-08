@@ -15,14 +15,22 @@ export async function handle(action, playerStats, campaignName) {
 
     if (isActive) {
         const buff = activeBuffs.find(b => b.name === action.name);
+        const activeBenefit = EFFECT_NAMES[buff?.effect] || buff?.effect || 'Unknown';
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: `${action.name} is currently active: ${EFFECT_NAMES[buff?.effect] || buff?.effect || 'Unknown'}. Duration: until start of Short or Long Rest.`,
+                description: `${action.name} is currently active: ${activeBenefit}. Duration: until start of Short or Long Rest.`,
                 automation: auto,
             },
+            logEntries: [{
+                type: 'automation',
+                creatureName: playerName,
+                name: action.name,
+                description: `${playerName}'s ${action.name} is already active (${activeBenefit}) — no new benefit gained.`,
+                timestamp: Date.now(),
+            }],
         };
     }
 
@@ -94,8 +102,10 @@ export async function applyThirdEye(action, playerStats, campaignName, chosenOpt
         },
         logEntries: [{
             characterName: playerName,
-            type: 'action',
-            text: `${action.name}: ${chosenOption}`,
+            type: 'ability_use',
+            abilityName: action.name,
+            description: `${playerName} uses ${action.name}, choosing ${chosenOption}. ${descriptions[effectKey]} (Duration: until start of Short or Long Rest)`,
+            timestamp: Date.now(),
         }],
     };
 }

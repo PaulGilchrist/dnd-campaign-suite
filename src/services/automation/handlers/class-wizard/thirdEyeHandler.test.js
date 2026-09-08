@@ -66,6 +66,26 @@ describe('thirdEyeHandler', () => {
             expect(result.payload.automation).toBe(action.automation);
         });
 
+        it('logs a refusal entry when Third Eye is already active', async () => {
+            setupMocks([
+                { name: 'The Third Eye', effect: 'see_invisibility' },
+            ]);
+
+            const action = makeAction();
+            const playerStats = makePlayerStats();
+
+            const result = await handle(action, playerStats, campaignName);
+
+            expect(result.type).toBe('popup');
+            expect(result.logEntries).toHaveLength(1);
+            expect(result.logEntries[0].type).toBe('automation');
+            expect(result.logEntries[0].creatureName).toBe('TestWizard');
+            expect(result.logEntries[0].name).toBe('The Third Eye');
+            expect(result.logEntries[0].description).toContain('already active');
+            expect(result.logEntries[0].description).toContain('See Invisibility');
+            expect(result.logEntries[0].description).toContain('no new benefit gained');
+        });
+
         it('returns popup with unknown effect key when buff has unrecognized effect', async () => {
             setupMocks([
                 { name: 'The Third Eye', effect: 'some_unknown_effect' },
@@ -171,11 +191,12 @@ describe('thirdEyeHandler', () => {
             expect(result.payload.description).toContain('120 feet');
             expect(result.payload.description).toContain('Duration: until start of Short or Long Rest');
             expect(result.payload.automation).toBe(action.automation);
-            expect(result.logEntries).toEqual([{
-                characterName: 'TestWizard',
-                type: 'action',
-                text: 'The Third Eye: Darkvision (120 feet)',
-            }]);
+            expect(result.logEntries).toHaveLength(1);
+            expect(result.logEntries[0].characterName).toBe('TestWizard');
+            expect(result.logEntries[0].type).toBe('ability_use');
+            expect(result.logEntries[0].abilityName).toBe('The Third Eye');
+            expect(result.logEntries[0].description).toContain('Darkvision (120 feet)');
+            expect(result.logEntries[0].description).toContain('Darkvision out to a range of 120 feet');
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestWizard',
                 'activeBuffs',
@@ -207,7 +228,8 @@ describe('thirdEyeHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('read any language');
             expect(result.payload.description).toContain('Greater Comprehension');
-            expect(result.logEntries[0].text).toBe('The Third Eye: Greater Comprehension');
+            expect(result.logEntries[0].abilityName).toBe('The Third Eye');
+            expect(result.logEntries[0].description).toContain('Greater Comprehension');
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestWizard',
                 'activeBuffs',
@@ -236,7 +258,8 @@ describe('thirdEyeHandler', () => {
             expect(result.payload.description).toContain('invisible');
             expect(result.payload.description).toContain('10 feet');
             expect(result.payload.description).toContain('See Invisibility');
-            expect(result.logEntries[0].text).toBe('The Third Eye: See Invisibility');
+            expect(result.logEntries[0].abilityName).toBe('The Third Eye');
+            expect(result.logEntries[0].description).toContain('See Invisibility');
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestWizard',
                 'activeBuffs',

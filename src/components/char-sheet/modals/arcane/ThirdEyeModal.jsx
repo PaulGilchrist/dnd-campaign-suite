@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { applyThirdEye } from '../../../../services/automation/handlers/class-wizard/thirdEyeHandler.js';
+import { addEntry } from '../../../../services/ui/logService.js';
 import '../../CharSheet.css';
 
 const THIRD_EYE_OPTIONS = [
@@ -13,12 +14,16 @@ function ThirdEyeModal({ action, playerStats, campaignName, onClose }) {
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
 
-    const handleApply = () => {
+    const handleApply = async () => {
         if (!selected) return;
-        applyThirdEye(action, playerStats, campaignName, selected).then((res) => {
-            setResult(res);
-            setApplied(true);
-        });
+        const res = await applyThirdEye(action, playerStats, campaignName, selected);
+        if (res?.logEntries) {
+            for (const entry of res.logEntries) {
+                await addEntry(campaignName, entry).catch((e) => { console.error("[thirdEyeModal:log-error]", e); });
+            }
+        }
+        setResult(res);
+        setApplied(true);
     };
 
     if (applied && result) {

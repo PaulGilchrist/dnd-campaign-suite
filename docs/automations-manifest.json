@@ -6616,7 +6616,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-359-third-eye-no-log.md",
+      "verified": "verified",
       "class": "Wizard",
       "triggerConditions": "Action: 1 bonus action; Duration: short_or_long_rest",
       "expectedBehavior": "Bonus Action, choose one benefit until start of Short or Long Rest: Darkvision (120 feet), Greater Comprehension (read any language), See Invisibility (cast without spell slot)."

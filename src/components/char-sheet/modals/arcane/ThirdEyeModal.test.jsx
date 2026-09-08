@@ -10,8 +10,13 @@ vi.mock('../../../../services/automation/handlers/class-wizard/thirdEyeHandler.j
   applyThirdEye: vi.fn(),
 }));
 
+vi.mock('../../../../services/ui/logService.js', () => ({
+  addEntry: vi.fn().mockResolvedValue({}),
+}));
+
 // Re-import mocked modules after mocking
 import * as thirdEyeHandler from '../../../../services/automation/handlers/class-wizard/thirdEyeHandler.js';
+import { addEntry } from '../../../../services/ui/logService.js';
 
 // ── Test fixtures ──
 
@@ -149,6 +154,41 @@ describe('ThirdEyeModal', () => {
       await waitFor(() => {
         expect(screen.getByText('Custom description text')).toBeInTheDocument();
       });
+    });
+
+    it('flushes handler logEntries to the campaign log via addEntry', async () => {
+      thirdEyeHandler.applyThirdEye.mockResolvedValue({
+        ...defaultResult,
+        logEntries: [{
+          characterName: 'Wizard1',
+          type: 'ability_use',
+          abilityName: 'The Third Eye',
+          description: 'Wizard1 uses The Third Eye, choosing Darkvision (120 feet).',
+          timestamp: 123,
+        }],
+      });
+      render(<ThirdEyeModal {...makeProps()} />);
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Use Bonus Action/ }));
+      });
+      await waitFor(() => {
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+          type: 'ability_use',
+          abilityName: 'The Third Eye',
+          characterName: 'Wizard1',
+        }));
+      });
+    });
+
+    it('does not call addEntry when handler returns no logEntries', async () => {
+      render(<ThirdEyeModal {...makeProps()} />);
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Use Bonus Action/ }));
+      });
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+      });
+      expect(addEntry).not.toHaveBeenCalled();
     });
   });
 });
