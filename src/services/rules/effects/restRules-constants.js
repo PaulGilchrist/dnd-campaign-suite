@@ -106,6 +106,8 @@ export const LONG_REST_RESOURCES = [
   'kiPoints',
   'actionSurgeUses',
   'actionSurgeUsedThisRound',
+  // CLA-360: Thief's Reflexes extra_action recharges on a long rest (null = re-armed).
+  "thief'sreflexesUses",
   'layOnHandsPool',
   'preserveLifePool',
   'gloriousDefenseUses',

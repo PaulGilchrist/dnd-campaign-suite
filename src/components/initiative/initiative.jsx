@@ -35,6 +35,7 @@ import { createRollConditionSaveHandler } from './createRollConditionSaveHandler
 import { createConcentrationHandlers } from './createConcentrationHandlers.js'
 import { createEffectAdderHandlers } from './createEffectAdderHandlers.js'
 import { createAutoBreakConditionHandler } from './createAutoBreakConditionHandler.js'
+import { isSecondTurnEntry } from '../../services/combat/thiefsReflexesService.js'
 
 function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapName, onViewCharacter }) {
     const [combatSummary, setCombatSummary] = React.useState(null)
@@ -82,8 +83,10 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     const displayCreatures = React.useMemo(() => {
         if (!combatSummary || !combatSummary.creatures) return []
         const creatures = combatSummary.creatures.map(c => {
-            const runtimeConditions = getRuntimeValue(c.name, 'activeConditions') || []
-            const conditionMeta = getRuntimeValue(c.name, 'activeConditionMeta') || {}
+            // CLA-360: structural second-turn entries resolve live state via the holder's real name.
+            const lookupName = c.holderName || c.name
+            const runtimeConditions = getRuntimeValue(lookupName, 'activeConditions') || []
+            const conditionMeta = getRuntimeValue(lookupName, 'activeConditionMeta') || {}
             const csConditions = c.conditions || []
             const conditions = runtimeConditions.map((key, i) => {
                 const condKey = String(key).toLowerCase()
@@ -103,11 +106,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                     conditions,
                 }
             }
-            const character = characters.find(ch => utils.getName(ch.name) === c.name)
+            const character = characters.find(ch => utils.getName(ch.name) === lookupName)
             const stats = character?.computedStats || character
-            const maxHp = getRuntimeValue(c.name, 'hitPoints') ?? stats?.hitPoints ?? 0
-            const currentHp = getRuntimeValue(c.name, 'currentHitPoints') ?? maxHp
-            const activeBuffs = getRuntimeValue(c.name, 'activeBuffs') || []
+            const maxHp = getRuntimeValue(lookupName, 'hitPoints') ?? stats?.hitPoints ?? 0
+            const currentHp = getRuntimeValue(lookupName, 'currentHitPoints') ?? maxHp
+            const activeBuffs = getRuntimeValue(lookupName, 'activeBuffs') || []
             const shieldOfFaithBonus = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shield_of_faith') ? 2 : 0
             const barkskinActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'barkskin')
             const circleFormsAC = c.wildShapeSource ? (getRuntimeValue(c.name, 'circleFormsAC') ?? null) : null
@@ -376,6 +379,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             if (!summary) return
             let clearedHuntersMark = false
             for (const creature of (summary?.creatures || [])) {
+                if (isSecondTurnEntry(creature)) continue
                 if (creature.type === 'player') {
                     setRuntimeValue(creature.name, 'activeBuffs', [], campaignName)
                     setRuntimeValue(creature.name, 'invokeDuplicityAdvantageTargets', [], campaignName)
@@ -549,7 +553,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
              <div className='carousel-container' ref={carouselRef}>
                   {displayCreatures?.map((creature) => {
                     const isActive = creature.name === activeCreatureName
-                    const character = characters.find(ch => utils.getName(ch.name) === creature.name)
+                    const character = characters.find(ch => utils.getName(ch.name) === (creature.holderName || creature.name))
                     const stats = character?.computedStats || character
                     const hasSpeedyOpportunityDisadvantage = stats?.automation?.passives?.some(p => p.type === 'passive_rule' && p.effect === 'opportunity_attacks_disadvantage')
                     const hasSpeedyDifficultTerrainIgnore = stats?.automation?.passives?.some(p => p.type === 'passive_rule' && p.effect === 'ignore_difficult_terrain_on_dash')

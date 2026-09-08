@@ -3,6 +3,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntime
 import storage from '../../services/ui/storage.js'
 import { clearDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js'
 import { clearCombat, setInitiative, renameNpc, setTarget, removeNpc, addNpc } from '../../services/encounters/initiativeService.js'
+import { maybeGrantThiefsReflexesSecondTurn } from '../../services/combat/thiefsReflexesService.js'
 
 /**
  * Creates creature operation handlers for the initiative component.
@@ -59,6 +60,9 @@ export function createCreatureHandlers({
     const handleInitiativeChange = function handleInitiativeChange(creatureName, value) {
         if (!combatSummary) return
         setInitiative(combatSummary, creatureName, value)
+        // CLA-360: Thief's Reflexes — GM-set initiative in round 1 grants the
+        // holder's structural second turn at initiative − 10 (spends the use once).
+        maybeGrantThiefsReflexesSecondTurn(combatSummary, creatureName, campaignName, characters)
         storage.set('combatSummary', combatSummary, campaignName)
         setCombatSummary(cloneDeep(combatSummary))
     }

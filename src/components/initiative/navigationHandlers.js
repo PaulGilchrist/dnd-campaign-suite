@@ -7,6 +7,7 @@ import { expireStaleEffects, applyTurnStartEffects, applyTurnEndConditionRemoval
 import { applySleepTurnEnd } from '../../services/rules/features/sleepService.js'
 import { applyStinkingCloudTurnEnd } from '../../services/automation/handlers/spells/stinkingCloudHandler.js'
 import { getCombatSummary } from '../../services/encounters/combatData.js'
+import { isSecondTurnEntry } from '../../services/combat/thiefsReflexesService.js'
 
 // Turn-start effects must re-apply each round, so the dedupe key is round-scoped.
 function turnStartGateKey(round, creatureName) {
@@ -31,13 +32,20 @@ export function createNextCreatureHandler({
         const cs = combatSummaryRef.current
         if (!cs) return
         const { newActiveName, roundIncrement } = getNextCreatureName(cs, activeCreatureName)
+        // CLA-360: structural second-turn entries (Thief's Reflexes) are stripped at
+        // the round-1 wrap so they never re-fire in round 2+, and never receive
+        // round-latch clears or turn-start/end effect passes (double-tick guard).
+        const activeEntry = cs.creatures.find(c => c.name === activeCreatureName)
+        const newActiveEntry = cs.creatures.find(c => c.name === newActiveName)
         // Round-wrap-only work: bump the round counter and clear per-round trackers.
         const roundToSet = (roundRef.current ?? 1) + (roundIncrement ? 1 : 0)
         const updatedSummary = cloneDeep(cs)
         if (roundIncrement) {
             updatedSummary.round = roundToSet
+            updatedSummary.creatures = updatedSummary.creatures.filter(c => !isSecondTurnEntry(c))
             setCombatSummary(updatedSummary)
             for (const creature of cs.creatures) {
+                if (isSecondTurnEntry(creature)) continue
                 clearPerRoundMajestyTrackers(creature.name, campaignName)
                 if (creature.type === 'player') {
                     setRuntimeValue(creature.name, '_cunningStrikeCostUsed', 0, campaignName)
@@ -77,7 +85,7 @@ export function createNextCreatureHandler({
         // condition_removal) BEFORE the new active creature's turn-start effects, so the
         // owner's Charmed/Frightened/Poisoned vanish at the end of their own turn, not at
         // their next turn start. Sync POST here (GM client is the writer of truth).
-        if (activeCreatureName) {
+        if (activeCreatureName && !isSecondTurnEntry(activeEntry)) {
             const outgoingChar = characters.find(ch => ch.name === activeCreatureName || ch.name.startsWith(activeCreatureName + ' '))
             applyTurnEndConditionRemoval(activeCreatureName, outgoingChar?.computedStats || outgoingChar, campaignName)
                 .catch((e) => { console.error('[navigationHandlers] CLA-307 turn-end removal failed:', e) })
@@ -96,7 +104,7 @@ export function createNextCreatureHandler({
         // owner's own turn boundary. The round-scoped gate key keeps this to one application
         // per creature per round (mirrors the SSE echo path in sseHandlers.js).
         const gateKey = turnStartGateKey(roundToSet, newActiveName)
-        const shouldApply = lastAppliedTurnStartCreatureRef.current !== gateKey
+        const shouldApply = lastAppliedTurnStartCreatureRef.current !== gateKey && !isSecondTurnEntry(newActiveEntry)
         let finalSummary = updatedSummary
         if (shouldApply) {
             lastAppliedTurnStartCreatureRef.current = gateKey
@@ -152,7 +160,9 @@ export function createPreviousCreatureHandler({
         // BUG CLA-198: mirror the next-handler — turn-start effects run on every
         // turn step, deduped by the round-scoped gate key.
         const gateKey = turnStartGateKey(roundToSet, newActiveName)
-        const shouldApply = lastAppliedTurnStartCreatureRef.current !== gateKey
+        // CLA-360: structural second-turn entries never receive turn-start effect passes.
+        const secondTurnTarget = isSecondTurnEntry(cs.creatures.find(c => c.name === newActiveName))
+        const shouldApply = lastAppliedTurnStartCreatureRef.current !== gateKey && !secondTurnTarget
         let finalSummary = updatedSummary
         if (shouldApply) {
             lastAppliedTurnStartCreatureRef.current = gateKey
@@ -171,6 +181,7 @@ export function createPreviousCreatureHandler({
         storage.set('activeCreatureName', newActiveName, campaignName)
         setActiveCreatureName(newActiveName)
         for (const creature of cs.creatures) {
+            if (isSecondTurnEntry(creature)) continue
             clearPerRoundMajestyTrackers(creature.name, campaignName)
         }
     }

@@ -6628,7 +6628,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-360-thiefs-reflexes-inert-no-second-turn.md",
+      "verified": "verified",
       "class": "Rogue",
       "triggerConditions": "Action: passive",
       "expectedBehavior": "Take two turns during first round of any combat. First turn at normal initiative, second turn at initiative minus 10."

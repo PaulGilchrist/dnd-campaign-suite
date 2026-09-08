@@ -186,7 +186,7 @@ function CreatureCard({
                 >
                     <option value="">— No Target —</option>
                     {allCreatures
-                        .filter(c => c.name !== creature.name)
+                        .filter(c => c.name !== creature.name && !c.secondTurn)
                         .map(c => (
                             <option key={c.name} value={c.name}>{c.name}</option>
                         ))

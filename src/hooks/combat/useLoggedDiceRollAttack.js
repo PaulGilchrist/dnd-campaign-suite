@@ -360,7 +360,7 @@ export function createLogAndShow(deps) {
 
         // Initiative handling
         if (rollType === 'initiative') {
-            await processInitiativeRoll(characterName, campaignName, ctx, bonus, ctx.effectiveD20Roll, ctx.r1, ctx.r2, setPopupHtml, availableSuperiorityManeuvers, ctx.cosmicOmenAppliedBonus);
+            await processInitiativeRoll(characterName, campaignName, ctx, bonus, ctx.effectiveD20Roll, ctx.r1, ctx.r2, setPopupHtml, availableSuperiorityManeuvers, ctx.cosmicOmenAppliedBonus, characters);
         }
 
         // Consume Feats of Chaos after one d20 roll

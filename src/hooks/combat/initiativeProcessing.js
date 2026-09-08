@@ -4,8 +4,9 @@ import storage from '../../services/ui/storage.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { clearAllExpirationEffects } from '../../services/rules/effects/expirations.js';
 import { clearHuntersMarkConcentration } from '../../services/rules/effects/restRules.js';
+import { maybeGrantThiefsReflexesSecondTurn } from '../../services/combat/thiefsReflexesService.js';
 
-export async function processInitiativeRoll(characterName, campaignName, context, bonus, effectiveD20Roll, r1, r2, setPopupHtml, availableSuperiorityManeuvers, cosmicOmenAppliedBonus) {
+export async function processInitiativeRoll(characterName, campaignName, context, bonus, effectiveD20Roll, r1, r2, setPopupHtml, availableSuperiorityManeuvers, cosmicOmenAppliedBonus, characters) {
     const firstName = utils.getName(characterName);
     const tandemFtBonus = Number(getRuntimeValue(firstName, 'tandemFootworkBonus', campaignName) ?? 0);
     if (tandemFtBonus > 0) {
@@ -20,6 +21,10 @@ export async function processInitiativeRoll(characterName, campaignName, context
         if (creature) {
             creature.initiative = String(effectiveD20Roll + totalBonus);
             combatSummary.creatures.sort((a, b) => b.initiative - a.initiative);
+            // CLA-360: Thief's Reflexes — rolled initiative in round 1 grants the
+            // holder's structural second turn at initiative − 10 (spends the use once).
+            maybeGrantThiefsReflexesSecondTurn(combatSummary, firstName, campaignName, characters);
+
             storage.set('combatSummary', combatSummary, campaignName);
         }
     }
