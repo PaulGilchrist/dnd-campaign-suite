@@ -66,6 +66,8 @@ export function createNextCreatureHandler({
                     setRuntimeValue(creature.name, '_fortifiedHealth_usedRound', null, campaignName)
                     setRuntimeValue(creature.name, '_Shield_Bash_usedRound', null, campaignName)
                     setRuntimeValue(creature.name, 'piercerPunctureUsedThisTurn', null, campaignName)
+                    // CLA-356: Telekinetic Master bonus-action weapon attack — once per turn latch re-arms at round wrap.
+                    setRuntimeValue(creature.name, '_Telekinetic_Master_attack_usedRound', null, campaignName)
                 }
             }
         }

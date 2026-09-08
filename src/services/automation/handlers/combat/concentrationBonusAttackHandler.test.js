@@ -1,225 +1,176 @@
+// CLA-356 regression: Telekinetic Master (Psi Warrior lv18) concentration bonus attack.
+// The row was popup-only (no attack resolved). It must now: gate on LIVE cs concentration
+// (refuse + log, spend nothing when absent), latch once per turn, arm the current target,
+// roll a real weapon attack through applyDamageToTarget, log attack/damage/hp_change +
+// ability_use, stamp lastAttack, and refuse re-clicks the same round.
 // @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { handle } from './concentrationBonusAttackHandler.js';
-import { getCombatSummary } from '../../../encounters/combatData.js';
-import { addConcentration } from '../../../combat/concentration/concentrationService.js';
-import storage from '../../../ui/storage.js';
-import { addEntry } from '../../../ui/logService.js';
-
-// ── Mocks ──────────────────────────────────────────────────────
-
-vi.mock('../../../encounters/combatData.js', () => ({
-    getCombatSummary: vi.fn(),
-}));
-
-vi.mock('../../../combat/concentration/concentrationService.js', () => ({
-    addConcentration: vi.fn(),
-}));
-
-vi.mock('../../../ui/storage.js', () => ({
-    default: {
-        set: vi.fn(),
-    },
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+    getCombatContext: vi.fn(),
+    getTargetFromAttacker: vi.fn(),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-// ── Helpers ────────────────────────────────────────────────────
+vi.mock('../../../dice/diceRoller.js', () => ({
+    rollD20: vi.fn(),
+    rollExpression: vi.fn(),
+    rollExpressionDoubled: vi.fn(),
+}));
+
+vi.mock('../../../rules/combat/applyDamage.js', () => ({
+    applyDamageToTarget: vi.fn(),
+}));
+
+vi.mock('../../../rules/features/invisibilityService.js', () => ({
+    endInvisibilityOnHostileAction: vi.fn(),
+}));
+
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
+    getRuntimeValue: vi.fn(),
+    setRuntimeValue: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock('../../../ui/utils.js', () => ({
+    DEBUG_FORCE_CRIT: false,
+}));
+
+import { handle } from './concentrationBonusAttackHandler.js';
+import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
+import { addEntry } from '../../../ui/logService.js';
+import { rollD20, rollExpression, rollExpressionDoubled } from '../../../dice/diceRoller.js';
+import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 const campaignName = 'test-campaign';
-
-function makePlayerStats(overrides = {}) {
-    return {
-        name: 'TestCharacter',
-        ...overrides,
-    };
-}
 
 function makeAction(overrides = {}) {
     return {
         name: 'Telekinetic Master',
-        description: 'Always have Telekinesis spell prepared. Cast without spell slot. On each turn while maintaining Concentration, make one weapon attack as Bonus Action.',
         automation: {
             type: 'concentration_bonus_attack',
-            concentrationSpell: 'Telekinesis',
+            trigger: 'each_turn',
             action: 'bonus_action',
+            weaponAttack: true,
+            concentrationSpell: 'Telekinesis',
             ...overrides.automation,
         },
         ...overrides,
     };
 }
 
-// ── Tests ──────────────────────────────────────────────────────
+function makePlayerStats(overrides = {}) {
+    return {
+        name: 'EvasiveFighter',
+        attacks: [{ name: 'Scimitar', hitBonus: 9, damage: '1d6+3', damageType: 'Slashing', attackType: 'melee' }],
+        ...overrides,
+    };
+}
 
-describe('concentrationBonusAttackHandler', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
+function csWithConcentration(spell, round = 1) {
+    return {
+        round,
+        creatures: [
+            { name: 'EvasiveFighter', type: 'player', targetName: 'Thug 1', concentration: spell ? { spell, dc: 17 } : null },
+            { name: 'Thug 1', type: 'monster', ac: 11, currentHp: 32, maxHp: 32 },
+        ],
+    };
+}
+
+beforeEach(() => {
+    vi.clearAllMocks();
+    getRuntimeValue.mockReturnValue(null);
+    rollExpressionDoubled.mockReturnValue({ total: 12, rolls: [6, 6, 3] });
+    rollExpression.mockReturnValue({ total: 8, rolls: [5, 3] });
+});
+
+describe('concentrationBonusAttackHandler — CLA-356', () => {
+    it('resolves a real weapon attack when concentrating on Telekinesis', async () => {
+        getCombatContext.mockResolvedValue(csWithConcentration('Telekinesis'));
+        getTargetFromAttacker.mockReturnValue({ name: 'Thug 1', ac: 11, currentHp: 32, maxHp: 32 });
+        rollD20.mockReturnValue(15);
+        applyDamageToTarget.mockResolvedValue({ finalDamage: 8 });
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName);
+
+        expect(rollD20).toHaveBeenCalled();
+        expect(applyDamageToTarget).toHaveBeenCalledWith(
+            expect.any(Object), 'Thug 1', 8, ['Slashing'], campaignName, expect.any(Array), false, 'EvasiveFighter'
+        );
+        // once-per-turn latch stamped on the player.
+        expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', '_Telekinetic_Master_attack_usedRound', { round: 1, activeCreature: 'EvasiveFighter' }, campaignName);
+        // ability_use log records the applied attack bonus result.
+        expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            type: 'ability_use',
+            characterName: 'EvasiveFighter',
+            abilityName: 'Telekinetic Master',
+        }));
+        expect(result.payload.description).toMatch(/HIT/);
+        expect(result.payload.description).toMatch(/15\+9=24 vs AC 11/);
     });
 
-    describe('handle', () => {
-        // ── Concentration state transitions ──────────────────────
+    it('refuses (spends nothing, no attack roll) when not concentrating', async () => {
+        getCombatContext.mockResolvedValue(csWithConcentration(null));
 
-        describe('concentration state transitions', () => {
-            it('sets concentration when creature has no active concentration', async () => {
-                getCombatSummary.mockReturnValue({
-                    creatures: [{ name: 'TestCharacter', concentration: null }],
-                });
+        const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
-                const result = await handle(makeAction(), makePlayerStats(), campaignName);
+        expect(rollD20).not.toHaveBeenCalled();
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            automationType: 'concentration_bonus_attack_refused',
+        }));
+        expect(result.payload.description).toMatch(/not concentrating/i);
+    });
 
-                expect(addConcentration).toHaveBeenCalledWith(
-                    expect.objectContaining({ creatures: expect.any(Array) }),
-                    'TestCharacter',
-                    'Telekinesis',
-                    10,
-                );
-                expect(storage.set).toHaveBeenCalledWith(
-                    'combatSummary',
-                    expect.any(Object),
-                    campaignName,
-                );
-                expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                    type: 'ability_use',
-                    characterName: 'TestCharacter',
-                    abilityName: 'Telekinetic Master',
-                }));
-                expect(result).toEqual({
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: 'Telekinetic Master',
-                        automationType: 'concentration_bonus_attack',
-                        description: expect.stringContaining('Concentrating on'),
-                        automation: expect.objectContaining({ type: 'concentration_bonus_attack' }),
-                    },
-                });
-            });
+    it('refuses a second activation in the same round (once-per-turn latch)', async () => {
+        getCombatContext.mockResolvedValue(csWithConcentration('Telekinesis'));
+        getTargetFromAttacker.mockReturnValue({ name: 'Thug 1', ac: 11, currentHp: 32, maxHp: 32 });
+        rollD20.mockReturnValue(15);
+        getRuntimeValue.mockImplementation((name, key) => (key === '_Telekinetic_Master_attack_usedRound' ? { round: 1, activeCreature: 'EvasiveFighter' } : null));
 
-            it('overwrites existing concentration on a different spell', async () => {
-                getCombatSummary.mockReturnValue({
-                    creatures: [{ name: 'TestCharacter', concentration: { spell: 'Bless', dc: 10 } }],
-                });
+        const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
-                const result = await handle(makeAction(), makePlayerStats(), campaignName);
+        expect(rollD20).not.toHaveBeenCalled();
+        expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            automationType: 'concentration_bonus_attack_refused',
+        }));
+        expect(result.payload.description).toMatch(/already made/i);
+    });
 
-                expect(addConcentration).toHaveBeenCalledWith(
-                    expect.any(Object),
-                    'TestCharacter',
-                    'Telekinesis',
-                    10,
-                );
-                expect(storage.set).toHaveBeenCalled();
-                expect(addEntry).toHaveBeenCalled();
-                expect(result.payload.description).toContain('Concentrating on');
-            });
+    it('refuses with no armed target and stamps no latch', async () => {
+        getCombatContext.mockResolvedValue(csWithConcentration('Telekinesis'));
+        getTargetFromAttacker.mockReturnValue(null);
 
-            it('does nothing when already concentrating on the target spell', async () => {
-                getCombatSummary.mockReturnValue({
-                    creatures: [{ name: 'TestCharacter', concentration: { spell: 'Telekinesis', dc: 12 } }],
-                });
+        const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
-                const result = await handle(makeAction(), makePlayerStats(), campaignName);
+        expect(rollD20).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(result.payload.description).toMatch(/No target selected/i);
+    });
 
-                expect(addConcentration).not.toHaveBeenCalled();
-                expect(storage.set).not.toHaveBeenCalled();
-                expect(addEntry).not.toHaveBeenCalled();
-                expect(result.payload.description).toContain('Concentrating on');
-            });
-        });
+    it('logs a miss without applying damage', async () => {
+        getCombatContext.mockResolvedValue(csWithConcentration('Telekinesis'));
+        getTargetFromAttacker.mockReturnValue({ name: 'Thug 1', ac: 18, currentHp: 32, maxHp: 32 });
+        rollD20.mockReturnValue(5); // 5+9=14 < 18
 
-        // ── Missing / null combat summary ────────────────────────
+        const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
-        describe('missing or null combat summary', () => {
-            it('skips concentration set but still logs when combatSummary is null', async () => {
-                getCombatSummary.mockReturnValue(null);
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
+        expect(rollExpression).not.toHaveBeenCalled();
+        expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', '_Telekinetic_Master_attack_usedRound', { round: 1, activeCreature: 'EvasiveFighter' }, campaignName);
+        expect(result.payload.description).toMatch(/MISS/);
+    });
 
-                const result = await handle(makeAction(), makePlayerStats(), campaignName);
+    it('returns a no-combat popup when combat context is missing', async () => {
+        getCombatContext.mockResolvedValue(null);
 
-                expect(addConcentration).not.toHaveBeenCalled();
-                expect(storage.set).not.toHaveBeenCalled();
-                expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                    type: 'ability_use',
-                    characterName: 'TestCharacter',
-                    abilityName: 'Telekinetic Master',
-                }));
-                expect(result.payload.description).toContain('Concentrating on');
-            });
-        });
+        const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
-        // ── Default / custom values ──────────────────────────────
-
-        describe('default and custom values', () => {
-            it('uses default concentrationSpell and dc when not provided', async () => {
-                getCombatSummary.mockReturnValue({
-                    creatures: [{ name: 'TestCharacter', concentration: null }],
-                });
-
-                const action = makeAction({ automation: { concentrationSpell: undefined, dc: undefined } });
-                await handle(action, makePlayerStats(), campaignName);
-
-                expect(addConcentration).toHaveBeenCalledWith(
-                    expect.any(Object),
-                    'TestCharacter',
-                    'Telekinesis',
-                    10,
-                );
-            });
-
-            it('uses custom concentrationSpell and dc when provided', async () => {
-                getCombatSummary.mockReturnValue({
-                    creatures: [{ name: 'TestCharacter', concentration: null }],
-                });
-
-                const action = makeAction({ automation: { concentrationSpell: 'Focus', dc: 15 } });
-                await handle(action, makePlayerStats(), campaignName);
-
-                expect(addConcentration).toHaveBeenCalledWith(
-                    expect.any(Object),
-                    'TestCharacter',
-                    'Focus',
-                    15,
-                );
-            });
-        });
-
-        // ── Popup payload ────────────────────────────────────────
-
-        describe('popup payload', () => {
-            it('returns correct popup structure with automation details', async () => {
-                getCombatSummary.mockReturnValue({
-                    creatures: [{ name: 'TestCharacter', concentration: null }],
-                });
-
-                const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-                expect(result.type).toBe('popup');
-                expect(result.payload.type).toBe('automation_info');
-                expect(result.payload.name).toBe('Telekinetic Master');
-                expect(result.payload.automationType).toBe('concentration_bonus_attack');
-                expect(result.payload.automation).toEqual(makeAction().automation);
-            });
-
-            it('reflects custom action name in popup and log entry', async () => {
-                getCombatSummary.mockReturnValue({
-                    creatures: [{ name: 'TestCharacter', concentration: null }],
-                });
-
-                const action = makeAction({ name: 'Custom Feature' });
-                const result = await handle(action, makePlayerStats(), campaignName);
-
-                expect(result.payload.name).toBe('Custom Feature');
-                expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                    abilityName: 'Custom Feature',
-                }));
-            });
-        });
+        expect(rollD20).not.toHaveBeenCalled();
+        expect(result.payload.description).toMatch(/No combat context/);
     });
 });

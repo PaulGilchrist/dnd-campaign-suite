@@ -296,13 +296,24 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
                     }
                 }
                 if (feature.type === 'passive_rule' && feature.effect === 'always_prepared_spells' && feature.spells) {
-                    const majorFeatures = playerStats.class?.major?.features || [];
+                    const majorFeatures = playerStats.class?.major?.features || playerStats.class?.subclass?.features || [];
                     const majorFeatureNames = majorFeatures.map(f => f.name);
                     if (majorFeatureNames.includes(feature.name)) {
                         feature.spells.forEach(spellName => {
                             const knownSpell = spellAbilities.spells.find(s => s.name === spellName);
                             if (!knownSpell) {
-                                spellAbilities.spells.push({ name: spellName, prepared: 'Always' });
+                                const spellEntry = { name: spellName, prepared: 'Always' };
+                                // CLA-356: Telekinetic Master's always-prepared Telekinesis is a
+                                // slotless free cast — stamp the free-cast marker + Intelligence ability
+                                // so it survives the slot-level filter below on a slotless Fighter.
+                                if (feature.name === 'Telekinetic Master') {
+                                    spellEntry._telekineticMasterFreeCast = true;
+                                    spellEntry.spellCastingAbility = 'Intelligence';
+                                }
+                                spellAbilities.spells.push(spellEntry);
+                            } else if (feature.name === 'Telekinetic Master') {
+                                knownSpell._telekineticMasterFreeCast = true;
+                                knownSpell.spellCastingAbility = knownSpell.spellCastingAbility || 'Intelligence';
                             }
                         });
                     }
@@ -314,6 +325,16 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
                             const spellEntry = { name: spellName, prepared: 'Always' };
                             if (feature.automation?.casting_time) {
                                 spellEntry.casting_time = feature.automation.casting_time;
+                            }
+                            // CLA-356: Telekinetic Master (Psi Warrior lv18) — Telekinesis is a
+                            // slotless free cast. The Fighter slotless fallback container only carries
+                            // lv1 slots (Magic Missile), so the lv5 row would be silently dropped by
+                            // the slot-level filter below. Stamp the free-cast marker + Intelligence
+                            // casting ability (CLA-308 Shadow Arts carry pattern) so it survives and
+                            // casts without a spell slot; authorization lives in spellPreparationService.
+                            if (feature.name === 'Telekinetic Master') {
+                                spellEntry._telekineticMasterFreeCast = true;
+                                spellEntry.spellCastingAbility = 'Intelligence';
                             }
                             spellAbilities.spells.push(spellEntry);
                         }
@@ -574,6 +595,11 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
                     if (spell.spellCastingAbility) {
                         copy.spellCastingAbility = spell.spellCastingAbility;
                     }
+                    // CLA-356: carry the slotless free-cast marker across the detail remap
+                    // so the lv5 Telekinetic Master row survives the slot-level filter below.
+                    if (spell._telekineticMasterFreeCast) {
+                        copy._telekineticMasterFreeCast = true;
+                    }
                     if (hasMageHandLegerdemain && copy.name === 'Mage Hand') {
                         // Bonus-action casting time + invisible hand markers (popup + cast path).
                         copy.casting_time = 'Bonus Action';
@@ -680,6 +706,9 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
                 // never drop them for lacking a slot at their level (Nature Speaker lv10
                 // grants a lv5 spell while the Barbarian lv10 slot table has none).
                 if (spell._ritualOnly) return true;
+                // CLA-356: Telekinetic Master's Telekinesis is a slotless free cast — never
+                // drop it for lacking a lv5 slot (Fighter has no spellcasting table).
+                if (spell._telekineticMasterFreeCast) return true;
                 let hasAnySlot = false;
                 for (let i = 1; i <= 9; i++) {
                     if ((spellAbilities[`spell_slots_level_${i}`] || 0) > 0) {

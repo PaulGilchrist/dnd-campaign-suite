@@ -18,6 +18,10 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
   // ritual cast is always authorized and never consumes a spell slot.
   const spellEntry = playerStats?.spellAbilities?.spells?.find(s => s.name === spellName);
   if (spellEntry?._ritualOnly) return true;
+  // CLA-356: Telekinetic Master (Psi Warrior lv18) — "Always have Telekinesis prepared.
+  // Cast without spell slot." Unlimited slotless free cast (no uses limit in the feature
+  // text), so it is always authorized and never consumes a spell slot (CLA-234 pattern).
+  if (spellEntry?._telekineticMasterFreeCast) return true;
 
   const masteryLevel1 = getRuntimeValue(playerName, 'SpellMastery_level1', campaignName);
   const masteryLevel2 = getRuntimeValue(playerName, 'SpellMastery_level2', campaignName);
@@ -277,6 +281,12 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
 }
 
 function decrementFreeCastResource(playerName, spellName, spellLevel, playerStats, campaignName) {
+  // CLA-356: Telekinetic Master's Telekinesis is an UNLIMITED slotless free cast
+  // ("Cast without spell slot") — nothing to consume. Skip all counter decrements so the
+  // row never drains; concentration (not a use counter) is the gate for the bonus attack.
+  const telekineticMasterEntry = playerStats?.spellAbilities?.spells?.find(s => s.name === spellName);
+  if (telekineticMasterEntry?._telekineticMasterFreeCast) return;
+
   // CLA-252: phantasmal_creatures lives in passives[] — consume the per-spell free-cast counter.
   const phantasmalPassive = playerStats?.automation?.passives?.find(p => p.type === 'phantasmal_creatures');
   if (phantasmalPassive && (phantasmalPassive.freeCastSpells || []).includes(spellName)) {
