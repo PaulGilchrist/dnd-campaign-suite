@@ -19,6 +19,7 @@ export function useDiceRollState(props) {
     const [rerollResult, setRerollResult] = useState(null);
     const [tacticalUsed, setTacticalUsed] = useState(false);
     const [tacticalResult, setTacticalResult] = useState(null);
+    const [tacticalDeclared, setTacticalDeclared] = useState(null);
     const [strokeUsed, setStrokeUsed] = useState(false);
     const [strokeResult, setStrokeResult] = useState(null);
     const [bardicInspirationUsed, setBardicInspirationUsed] = useState(false);
@@ -111,6 +112,7 @@ export function useDiceRollState(props) {
         mode, setMode,
         rerollUsed, setRerollUsed, rerollResult, setRerollResult,
         tacticalUsed, setTacticalUsed, tacticalResult, setTacticalResult,
+        tacticalDeclared, setTacticalDeclared,
         strokeUsed, setStrokeUsed, strokeResult, setStrokeResult,
         bardicInspirationUsed, setBardicInspirationUsed, bardicInspirationResult, setBardicInspirationResult,
         bardicInspirationDefenseUsed, setBardicInspirationDefenseUsed, bardicInspirationDefenseResult, setBardicInspirationDefenseResult,

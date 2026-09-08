@@ -317,28 +317,55 @@ export async function handleSavageAttackerChoice(playerStats, campaignName, char
     return { kept: 'original', damageDifference: 0 };
 }
 
-export async function handleTacticalMind(playerStats, campaignName, popupHtml) {
+export async function handleTacticalMind(playerStats, campaignName, popupHtml, setPopupHtml) {
     if (!playerStats) return;
     const playerName = playerStats.name;
-    let currentUses = Number(getRuntimeValue(playerName, 'secondWindUses', campaignName) ?? 0);
-    const maxUses = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1]?.second_wind || 0;
-    if (currentUses <= 0) {
-        currentUses = maxUses;
-        await setRuntimeValue(playerName, 'secondWindUses', currentUses, campaignName);
-    }
-    if (currentUses <= 0) return;
-    await setRuntimeValue(playerName, 'secondWindUses', currentUses - 1, campaignName);
     const checkName = popupHtml?.name || 'Ability Check';
     const d20 = popupHtml?.rolls?.[0] || 0;
     const bonus = popupHtml?.bonus || 0;
+    const dieValue = popupHtml?.tacticalMindDie || 0;
     const originalTotal = d20 + bonus;
-    const modifiedTotal = originalTotal + popupHtml?.tacticalMindDie || 0;
+    const modifiedTotal = originalTotal + dieValue;
+
+    const refuse = (reason) => {
+        if (setPopupHtml) {
+            setPopupHtml({
+                type: 'automation_info',
+                name: 'Tactical Mind',
+                description: `<b>Tactical Mind</b><br/>${reason}`,
+            });
+        }
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: 'Tactical Mind',
+            description: `${playerName} attempted Tactical Mind on ${checkName} — refused: ${reason}`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[CharSheet] Error logging Tactical Mind refusal:', e); });
+    };
+
+    if (popupHtml?.success === true || d20 === 20) {
+        refuse('Tactical Mind can only be used when the ability check fails.');
+        return;
+    }
+    const currentUses = Number(getRuntimeValue(playerName, 'secondWindUses', campaignName) ?? 0);
+    if (!(currentUses > 0)) {
+        refuse('No Second Wind uses remaining.');
+        return;
+    }
+
+    // CLA-352: expend only if the boosted total succeeds (GM adjudication,
+    // mirrors the verified Psi-Bolstered Knack flow — sheet checks carry no DC).
+    const succeeded = popupHtml?.tacticalSuccess === true;
+    if (succeeded) {
+        await setRuntimeValue(playerName, 'secondWindUses', currentUses - 1, campaignName);
+    }
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
         abilityName: 'Tactical Mind',
-        description: `${playerName} used Tactical Mind: +${popupHtml?.tacticalMindDie || 0} to ${checkName} (d20 ${d20} + ${bonus} = ${originalTotal} → ${modifiedTotal}).`,
-        d10Roll: popupHtml?.tacticalMindDie || 0,
+        description: `${playerName} used Tactical Mind: +${dieValue} to ${checkName} (d20 ${d20} + ${bonus} = ${originalTotal} → ${modifiedTotal}). ${succeeded ? 'Check succeeded — Second Wind use expended.' : 'Check still failed — Second Wind use not expended.'}`,
+        d10Roll: dieValue,
         timestamp: Date.now(),
     });
 }

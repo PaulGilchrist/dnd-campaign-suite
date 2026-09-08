@@ -442,9 +442,9 @@ function CharSheetContent({
         return await handleSavageAttackerChoice(playerStats, campaignName, characters, popupHtml, setPopupHtml, choiceData);
     }, [playerStats, campaignName, characters, popupHtml, setPopupHtml]);
 
-    const handleTacticalMindWrapped = React.useCallback(async (dieResult) => {
-        await handleTacticalMind(playerStats, campaignName, { ...popupHtml, tacticalMindDie: dieResult });
-    }, [playerStats, campaignName, popupHtml]);
+    const handleTacticalMindWrapped = React.useCallback(async ({ dieValue, success }) => {
+        await handleTacticalMind(playerStats, campaignName, { ...popupHtml, tacticalMindDie: dieValue, tacticalSuccess: success }, setPopupHtml);
+    }, [playerStats, campaignName, popupHtml, setPopupHtml]);
 
     const handleDarkOnesLuckWrapped = React.useCallback(async (dieValue) => {
         await handleDarkOnesLuck(playerStats, campaignName, { ...popupHtml, darkOnesLuckValue: dieValue });

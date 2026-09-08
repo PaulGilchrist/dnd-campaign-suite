@@ -442,34 +442,90 @@ describe('handleTacticalMind', () => {
     vi.clearAllMocks();
   });
 
-  it('decrements secondWindUses when available', async () => {
-    const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
+  it('CLA-352: spends exactly one secondWindUses when the boosted check is declared succeeded', async () => {
+    const { getRuntimeValue, setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
     getRuntimeValue.mockReturnValue(2);
 
     await handleTacticalMind(
       mockPlayerStats,
       mockCampaignName,
-      { name: 'Athletics Check', rolls: [15], bonus: 3, tacticalMindDie: 7 }
+      { name: 'Athletics Check', rolls: [15], bonus: 3, tacticalMindDie: 7, tacticalSuccess: true },
+      vi.fn()
     );
 
     const { addEntry } = await import('../../services/ui/logService.js');
+    expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'secondWindUses', 1, mockCampaignName);
     expect(addEntry).toHaveBeenCalled();
     expect(addEntry.mock.calls[0][1].abilityName).toBe('Tactical Mind');
+    expect(addEntry.mock.calls[0][1].description).toContain('Second Wind use expended');
   });
 
-  it('resets secondWindUses to maxUses when current is 0', async () => {
-    const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
-    getRuntimeValue.mockReturnValue(0);
+  it('CLA-352: does not spend secondWindUses when the boosted check still fails', async () => {
+    const { getRuntimeValue, setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
+    getRuntimeValue.mockReturnValue(2);
 
     await handleTacticalMind(
       mockPlayerStats,
       mockCampaignName,
-      { name: 'Athletics Check', rolls: [15], bonus: 3, tacticalMindDie: 7 }
+      { name: 'Athletics Check', rolls: [5], bonus: 3, tacticalMindDie: 4, tacticalSuccess: false },
+      vi.fn()
     );
 
     const { addEntry } = await import('../../services/ui/logService.js');
+    expect(setRuntimeValue).not.toHaveBeenCalled();
     expect(addEntry).toHaveBeenCalled();
-    expect(addEntry.mock.calls[0][1].abilityName).toBe('Tactical Mind');
+    expect(addEntry.mock.calls[0][1].description).toContain('not expended');
+  });
+
+  it('CLA-352: refuses at zero uses without refilling the pool to max', async () => {
+    const { getRuntimeValue, setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
+    getRuntimeValue.mockReturnValue(0);
+    const setPopupHtml = vi.fn();
+
+    await handleTacticalMind(
+      mockPlayerStats,
+      mockCampaignName,
+      { name: 'Athletics Check', rolls: [15], bonus: 3, tacticalMindDie: 7, tacticalSuccess: true },
+      setPopupHtml
+    );
+
+    const { addEntry } = await import('../../services/ui/logService.js');
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(setPopupHtml).toHaveBeenCalled();
+    expect(setPopupHtml.mock.calls[0][0].description).toContain('No Second Wind uses remaining');
+    expect(addEntry.mock.calls[0][1].description).toContain('refused');
+  });
+
+  it('CLA-352: refuses when the check already succeeded', async () => {
+    const { getRuntimeValue, setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
+    getRuntimeValue.mockReturnValue(3);
+    const setPopupHtml = vi.fn();
+
+    await handleTacticalMind(
+      mockPlayerStats,
+      mockCampaignName,
+      { name: 'Athletics Check', rolls: [19], bonus: 3, success: true, tacticalMindDie: 7, tacticalSuccess: true },
+      setPopupHtml
+    );
+
+    const { addEntry } = await import('../../services/ui/logService.js');
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(setPopupHtml.mock.calls[0][0].description).toContain('only be used when the ability check fails');
+    expect(addEntry.mock.calls[0][1].description).toContain('refused');
+  });
+
+  it('CLA-352: treats a null uses key as zero, never a phantom refill', async () => {
+    const { getRuntimeValue, setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
+    getRuntimeValue.mockReturnValue(null);
+
+    await handleTacticalMind(
+      mockPlayerStats,
+      mockCampaignName,
+      { name: 'Athletics Check', rolls: [4], bonus: 3, tacticalMindDie: 7, tacticalSuccess: true },
+      vi.fn()
+    );
+
+    expect(setRuntimeValue).not.toHaveBeenCalled();
   });
 });
 

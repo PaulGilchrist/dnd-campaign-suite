@@ -249,7 +249,7 @@ describe('DiceRollResult', () => {
             expect(container.querySelector('.dice-roll-reroll-result')).toBeInTheDocument();
         });
 
-        it('hides tactical mind button and shows result after clicking', () => {
+        it('hides tactical mind button and shows adjudication panel after clicking', () => {
             const { container } = render(
                 <DiceRollResult
                     name="Athletics"
@@ -262,7 +262,75 @@ describe('DiceRollResult', () => {
             );
             fireEvent.click(screen.getByText(/Tactical Mind/));
             expect(screen.getByText(/Tactical Mind:/)).toBeInTheDocument();
+            expect(screen.getByText(/Succeeded/)).toBeInTheDocument();
+            expect(screen.getByText(/Still Failed/)).toBeInTheDocument();
             expect(container.querySelector('.dice-roll-reroll-result')).toBeInTheDocument();
+        });
+
+        it('CLA-352: defers the spend — declares via Succeeded / Still Failed callbacks', async () => {
+            const onTacticalMind = vi.fn();
+            render(
+                <DiceRollResult
+                    name="Athletics"
+                    type="d20"
+                    rolls={[5]}
+                    bonus={3}
+                    rollType="check"
+                    tacticalMind={true}
+                    onTacticalMind={onTacticalMind}
+                />
+            );
+            fireEvent.click(screen.getByRole('button', { name: /Tactical Mind/ }));
+            expect(onTacticalMind).not.toHaveBeenCalled();
+            fireEvent.click(screen.getByRole('button', { name: /Still Failed/ }));
+            expect(onTacticalMind).toHaveBeenCalledWith({ dieValue: expect.any(Number), success: false });
+            expect(screen.getByText(/Second Wind use not expended/)).toBeInTheDocument();
+        });
+
+        it('CLA-352: hides offer on a known-successful check', () => {
+            render(
+                <DiceRollResult
+                    name="Athletics"
+                    type="d20"
+                    rolls={[19]}
+                    bonus={3}
+                    rollType="check"
+                    success={true}
+                    tacticalMind={true}
+                />
+            );
+            expect(screen.queryByText(/Tactical Mind/)).not.toBeInTheDocument();
+        });
+
+        it('CLA-352: hides offer on a natural 20 check', () => {
+            render(
+                <DiceRollResult
+                    name="Arcana"
+                    type="d20"
+                    rolls={[20]}
+                    bonus={3}
+                    rollType="check"
+                    tacticalMind={true}
+                />
+            );
+            expect(screen.queryByText(/Tactical Mind/)).not.toBeInTheDocument();
+        });
+
+        it('CLA-352: popup total is numeric when modifier prop is undefined', () => {
+            const { container } = render(
+                <DiceRollResult
+                    name="Arcana"
+                    type="d20"
+                    rolls={[8]}
+                    bonus={3}
+                    rollType="check"
+                    tacticalMind={true}
+                />
+            );
+            fireEvent.click(screen.getByRole('button', { name: /Tactical Mind/ }));
+            const resultText = container.querySelector('.dice-roll-reroll-result').textContent;
+            expect(resultText).not.toContain('NaN');
+            expect(resultText).toMatch(/Tactical Mind: \+\d+ → \d+/);
         });
 
         it('hides superiority maneuver button and shows result after clicking', () => {

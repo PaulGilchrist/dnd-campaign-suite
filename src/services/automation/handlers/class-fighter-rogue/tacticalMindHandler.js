@@ -6,12 +6,23 @@ async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
 
+    const refuse = (reason) => {
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: action.name,
+            description: `${playerName} attempted ${action.name} — refused: ${reason}`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[tacticalMind] Error logging refusal:', e); });
+        return infoPopup(action.name, reason, auto);
+    };
+
     const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
     const isAbilityCheck = lastAttack?.rollType === 'check' || lastAttack?.rollType === 'skill';
     const isPlayerRoll = lastAttack?.attackerName === playerName;
 
     if (!isAbilityCheck || !isPlayerRoll) {
-        return infoPopup(action.name, `No recent ability check found for ${playerName}. This feature can only be used shortly after an ability check.`, auto);
+        return refuse(`No recent ability check found for ${playerName}. This feature can only be used shortly after an ability check.`);
     }
 
     const { d20, bonus: checkBonus, checkName } = lastAttack;
@@ -20,23 +31,18 @@ async function handle(action, playerStats, campaignName, _mapName) {
     const modifiedTotal = originalTotal + d10Roll;
 
     if (d20 === 20) {
-        return infoPopup(action.name, `${action.name}: Natural 20 — no bonus needed.`, auto);
+        return refuse(`${action.name}: Natural 20 — no bonus needed.`);
     }
 
     const description = `<b>${action.name}</b><br/>` +
         `${checkName}: d20(${d20}) + ${checkBonus} = ${originalTotal}` +
         ` → +1d10(${d10Roll}) = <b>${modifiedTotal}</b>`;
 
-    let currentUses = Number(getRuntimeValue(playerName, 'secondWindUses', campaignName) ?? 0);
-    const maxUses = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1]?.second_wind || 0;
+    // CLA-352: never auto-refill a zeroed pool — spend only real remaining uses.
+    const currentUses = Number(getRuntimeValue(playerName, 'secondWindUses', campaignName) ?? 0);
 
-    if (currentUses <= 0) {
-        currentUses = maxUses;
-        await setRuntimeValue(playerName, 'secondWindUses', currentUses, campaignName);
-    }
-
-    if (currentUses <= 0) {
-        return infoPopup(action.name, `${action.name}: No Second Wind uses remaining.`, auto);
+    if (!(currentUses > 0)) {
+        return refuse(`${action.name}: No Second Wind uses remaining.`);
     }
 
     await setRuntimeValue(playerName, 'secondWindUses', currentUses - 1, campaignName);
@@ -45,7 +51,7 @@ async function handle(action, playerStats, campaignName, _mapName) {
         type: 'ability_use',
         characterName: playerName,
         abilityName: action.name,
-        description: `${playerName} used ${action.name}: +${d10Roll} to ${checkName} (d20 ${d20} + ${checkBonus} = ${originalTotal} → ${modifiedTotal}).`,
+        description: `${playerName} used ${action.name}: +${d10Roll} to ${checkName} (d20 ${d20} + ${checkBonus} = ${originalTotal} → ${modifiedTotal}). Second Wind use expended; if the check still fails the GM restores the use.`,
         d10Roll,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[tacticalMind] Error:", e); });

@@ -75,7 +75,10 @@ describe('tacticalMindHandler.handle', () => {
             expect(result.payload.description).toContain('TestFighter');
             expect(result.payload.automation).toEqual(makeAction().automation);
             expect(setRuntimeValue).not.toHaveBeenCalled();
-            expect(addEntry).not.toHaveBeenCalled();
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+                description: expect.stringContaining('refused'),
+            }));
         });
     });
 
@@ -93,12 +96,14 @@ describe('tacticalMindHandler.handle', () => {
             expect(result.payload.description).toContain('Natural 20');
             expect(result.payload.automation).toEqual(makeAction().automation);
             expect(setRuntimeValue).not.toHaveBeenCalled();
-            expect(addEntry).not.toHaveBeenCalled();
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                description: expect.stringContaining('refused'),
+            }));
         });
     });
 
-    describe('early exit — secondWindUses exhausted or null', () => {
-        it.each([0, -1])('returns popup and resets to 0 when secondWindUses is %d', async (uses) => {
+    describe('CLA-352 early exit — secondWindUses exhausted or null (no phantom refill)', () => {
+        it.each([0, -1, null])('refuses, spends nothing and writes nothing when secondWindUses is %s', async (uses) => {
             getRuntimeValue.mockImplementation((name, key, _campaign) => {
                 if (name === 'campaign' && key === 'lastAttack') return mockCheck({ d20: 8 });
                 if (name === 'TestFighter' && key === 'secondWindUses') return uses;
@@ -109,24 +114,10 @@ describe('tacticalMindHandler.handle', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('No Second Wind uses remaining');
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'secondWindUses', 0, 'test-campaign');
-        });
-
-        it('resets to maxUses when secondWindUses is null', async () => {
-            getRuntimeValue.mockImplementation((name, key, _campaign) => {
-                if (name === 'campaign' && key === 'lastAttack') return mockCheck({ d20: 5 });
-                if (name === 'TestFighter' && key === 'secondWindUses') return null;
-                return undefined;
-            });
-            const randomSpy = mockRandom(3);
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Tactical Mind');
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'secondWindUses', 0, 'test-campaign');
-
-            randomSpy.mockRestore();
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                description: expect.stringContaining('refused'),
+            }));
         });
     });
 

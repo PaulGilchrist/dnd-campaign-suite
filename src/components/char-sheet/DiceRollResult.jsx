@@ -64,6 +64,34 @@ function PsiBolsteredKnackPanel({ psiBolsteredKnack, psiBolsteredKnackDieSize, s
     return null;
 }
 
+function TacticalMindAdjudicationPanel({ tacticalUsed, tacticalResult, tacticalDeclared, onDeclare }) {
+    if (!tacticalUsed || tacticalResult === null) return null;
+    return (
+        <div className="dice-roll-reroll-result">
+            <i className="fa-solid fa-hand"></i> Tactical Mind: +{tacticalResult.bonus} → <strong>{tacticalResult.total}</strong>
+            {tacticalDeclared === null && (
+                <div className="dice-roll-save-info">Second Wind use is expended only if the boosted total succeeds the DC.</div>
+            )}
+            {tacticalDeclared === true && (
+                <div className="dice-roll-save-info">Check succeeded — Second Wind use expended.</div>
+            )}
+            {tacticalDeclared === false && (
+                <div className="dice-roll-save-info">Check still failed — Second Wind use not expended.</div>
+            )}
+            {tacticalDeclared === null && (
+                <div className="dice-roll-reroll">
+                    <button className="dice-roll-reroll-btn" onClick={() => onDeclare(true)} type="button">
+                        <i className="fa-solid fa-check"></i> Succeeded
+                    </button>
+                    <button className="dice-roll-reroll-btn" onClick={() => onDeclare(false)} type="button">
+                        <i className="fa-solid fa-xmark"></i> Still Failed
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
+
 function DiceRollResult(props) {
     const {
         name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0,
@@ -103,7 +131,7 @@ function DiceRollResult(props) {
     const {
         mode, setMode,
         rerollUsed, rerollResult,
-        tacticalUsed, tacticalResult,
+        tacticalUsed, tacticalResult, tacticalDeclared,
         strokeUsed, strokeResult, setStrokeResult, setStrokeUsed,
         bardicInspirationUsed, bardicInspirationResult,
         bardicInspirationDefenseUsed, bardicInspirationDefenseResult,
@@ -130,7 +158,7 @@ function DiceRollResult(props) {
     const acDisplay = `${effectiveAc ?? targetAc ?? '—'}${acBuffLabels.length ? ` (${acBuffLabels.join(', ')})` : ''}`;
 
     const {
-        handleReroll, handleTacticalMind, handleDarkOnesLuck,
+        handleReroll, handleTacticalMind, handleTacticalDeclare, handleDarkOnesLuck,
         handleBardicInspiration, handleBardicInspirationDefense, handleBardicInspirationOffense,
         handleEmpoweredSpell, handlePuncture, handleSavageAttacker, handleSavageAttackerKeep, handleSuperiorityManeuver,
     } = handlers;
@@ -497,7 +525,7 @@ function DiceRollResult(props) {
               </div>
             )}
 
-            {tacticalMind && !tacticalUsed && (rollType === 'check' || rollType === 'skill') && (
+            {tacticalMind && !tacticalUsed && isD20 && (rollType === 'check' || rollType === 'skill') && d20TestFailed && displayRoll !== 20 && (
               <div className="dice-roll-reroll">
                 <button className="dice-roll-reroll-btn" onClick={handleTacticalMind} type="button">
                   <i className="fa-solid fa-hand"></i> Tactical Mind{tacticalMindBonus ? ` (+${tacticalMindBonus})` : ''}
@@ -642,11 +670,12 @@ function DiceRollResult(props) {
               </div>
             )}
 
-            {tacticalUsed && tacticalResult !== null && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-hand"></i> Tactical Mind: +{tacticalResult.bonus} → <strong>{tacticalResult.total}</strong>
-              </div>
-            )}
+            <TacticalMindAdjudicationPanel
+                tacticalUsed={tacticalUsed}
+                tacticalResult={tacticalResult}
+                tacticalDeclared={tacticalDeclared}
+                onDeclare={handleTacticalDeclare}
+            />
 
             {darkOnesLuckUsed && darkOnesLuckResult !== null && (
               <div className="dice-roll-reroll-result">

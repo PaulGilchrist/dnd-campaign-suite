@@ -483,7 +483,7 @@ describe('handleTacticalMind', () => {
     mockStore.clear();
   });
 
-  it('logs Tactical Mind usage and decrements secondWindUses when available', async () => {
+  it('CLA-352: logs Tactical Mind usage and decrements secondWindUses only on declared success', async () => {
     const { addEntry } = await import('../../services/ui/logService.js');
     mockStore.set('Test Character:secondWindUses', 2);
 
@@ -491,29 +491,51 @@ describe('handleTacticalMind', () => {
       level: 5,
       class: { class_levels: [undefined, undefined, undefined, undefined, { second_wind: 2 }] },
     });
-    const popupHtml = { name: 'Athletics Check', rolls: [15], bonus: 3, tacticalMindDie: 7 };
+    const popupHtml = { name: 'Athletics Check', rolls: [15], bonus: 3, tacticalMindDie: 7, tacticalSuccess: true };
 
-    await handleTacticalMind(stats, campaignName, popupHtml);
+    await handleTacticalMind(stats, campaignName, popupHtml, vi.fn());
 
     expect(addEntry).toHaveBeenCalled();
     expect(mockStore.get('Test Character:secondWindUses')).toBe(1);
   });
 
-  it('refills secondWindUses when all are exhausted', async () => {
+  it('CLA-352: does not spend or refill when the boosted check still fails', async () => {
+    const { addEntry } = await import('../../services/ui/logService.js');
+    addEntry.mockClear();
+    mockStore.set('Test Character:secondWindUses', 2);
+
+    const stats = createPlayerStats({
+      level: 5,
+      class: { class_levels: [undefined, undefined, undefined, undefined, { second_wind: 2 }] },
+    });
+    const popupHtml = { name: 'Check', rolls: [10], bonus: 2, tacticalMindDie: 5, tacticalSuccess: false };
+
+    await handleTacticalMind(stats, campaignName, popupHtml, vi.fn());
+
+    expect(mockStore.get('Test Character:secondWindUses')).toBe(2);
+    expect(addEntry).toHaveBeenCalled();
+    expect(addEntry.mock.calls[0][1].description).toContain('not expended');
+  });
+
+  it('CLA-352: refuses at zero uses instead of phantom-refilling to max', async () => {
     const { addEntry } = await import('../../services/ui/logService.js');
     addEntry.mockClear();
     mockStore.set('Test Character:secondWindUses', 0);
 
     const stats = createPlayerStats({
       level: 5,
-      class: { class_levels: [undefined, undefined, undefined, undefined, { second_wind: 2 }] },
+      class: { class_levels: [undefined, undefined, undefined, undefined, { second_wind: 4 }] },
     });
-    const popupHtml = { name: 'Check', rolls: [10], bonus: 2, tacticalMindDie: 5 };
+    const popupHtml = { name: 'Check', rolls: [10], bonus: 2, tacticalMindDie: 5, tacticalSuccess: true };
+    const setPopupHtml = vi.fn();
 
-    await handleTacticalMind(stats, campaignName, popupHtml);
+    await handleTacticalMind(stats, campaignName, popupHtml, setPopupHtml);
 
-    expect(mockStore.get('Test Character:secondWindUses')).toBe(1);
+    expect(mockStore.get('Test Character:secondWindUses')).toBe(0);
+    expect(setPopupHtml).toHaveBeenCalled();
+    expect(setPopupHtml.mock.calls[0][0].description).toContain('No Second Wind uses remaining');
     expect(addEntry).toHaveBeenCalled();
+    expect(addEntry.mock.calls[0][1].description).toContain('refused');
   });
 
 });

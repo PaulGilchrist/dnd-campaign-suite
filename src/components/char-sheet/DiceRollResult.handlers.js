@@ -2,7 +2,7 @@ import { evaluateAutoExpression } from '../../services/combat/automation/automat
 
 export function createDiceRollHandlers(props, state) {
     const {
-        bonus, modifier, total, rolls, formula, targetName, damageType,
+        bonus = 0, modifier = 0, total, rolls, formula, targetName, damageType,
         bardicInspirationDie, bardicInspirationOffenseDieSize, autoDamage,
         bardicInspirationDefenseDieSize, spellName, onReroll, onTacticalMind, onDarkOnesLuck,
         onBardicInspiration, onBardicInspirationDefense, onBardicInspirationOffense,
@@ -12,7 +12,8 @@ export function createDiceRollHandlers(props, state) {
 
     const {
         setRerollResult, setRerollUsed,
-        setTacticalResult, setTacticalUsed,
+        setTacticalResult, setTacticalUsed, tacticalResult,
+        tacticalDeclared, setTacticalDeclared,
         setBardicInspirationResult, setBardicInspirationUsed,
         setBardicInspirationDefenseResult, setBardicInspirationDefenseUsed,
         setBardicInspirationOffenseResult, setBardicInspirationOffenseUsed,
@@ -33,12 +34,21 @@ export function createDiceRollHandlers(props, state) {
         if (onReroll) onReroll({ roll: newRoll, total: newRoll + bonus + rerollBonus });
     };
 
-    const handleTacticalMind = async () => {
+    // CLA-352: roll the d10 when the offer is taken, but defer the
+    // Second Wind spend until the GM adjudicates the boosted total
+    // (mirrors the verified Psi-Bolstered Knack spend-only-if-succeeds
+    // model — the sheet check payload carries no DC).
+    const handleTacticalMind = () => {
         const dieResult = Math.floor(Math.random() * 10) + 1;
-        const newTotal = finalRoll + bonus + modifier + dieResult;
+        const newTotal = (Number(finalRoll) || 0) + (Number(bonus) || 0) + (Number(modifier) || 0) + dieResult;
         setTacticalResult({ bonus: dieResult, total: newTotal });
         setTacticalUsed(true);
-        if (onTacticalMind) await onTacticalMind(dieResult);
+    };
+
+    const handleTacticalDeclare = async (success) => {
+        if (!tacticalResult || tacticalDeclared !== null) return;
+        setTacticalDeclared(success === true);
+        if (onTacticalMind) await onTacticalMind({ dieValue: tacticalResult.bonus, success: success === true });
     };
 
     const handleDarkOnesLuck = async () => {
@@ -222,6 +232,7 @@ export function createDiceRollHandlers(props, state) {
     return {
         handleReroll,
         handleTacticalMind,
+        handleTacticalDeclare,
         handleDarkOnesLuck,
         handleBardicInspiration,
         handleBardicInspirationDefense,
