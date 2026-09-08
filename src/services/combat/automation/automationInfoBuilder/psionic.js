@@ -1,3 +1,5 @@
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js'
+
 export const psionicHandlers = {
     'psychic_spells': (feature, _playerStats) => {
         const auto = feature.automation
@@ -36,7 +38,7 @@ export const psionicHandlers = {
         return {
             type: 'telekinetic_movement',
             name: feature.name,
-            range: auto.range || '30_ft',
+            range: String(rangeToFeet(auto.range) ?? 30),
             hasAutomation: true
         }
     },

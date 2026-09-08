@@ -127,16 +127,18 @@ describe('collectAutomationFromFeatures – direct action types', () => {
     })
 })
 
-// ── Push-twice types ──
+// ── Action types ──
 
-describe('collectAutomationFromFeatures – push-twice types', () => {
-    it('categorizes arcane_charge and telekinetic_movement as two actions', () => {
+describe('collectAutomationFromFeatures – action types', () => {
+    // CLA-357: the router used to push arcane_charge/telekinetic_movement rows
+    // TWICE (sheet name-dedupe hid the dupe) — one action per feature is truth.
+    it('categorizes arcane_charge and telekinetic_movement as one action each', () => {
         const arcaneResult = collectAutomationFromFeatures([makeFeature({ type: 'arcane_charge' })], ps)
-        expect(arcaneResult.actions).toHaveLength(2)
+        expect(arcaneResult.actions).toHaveLength(1)
         expect(arcaneResult.actions.every(a => a.type === 'arcane_charge')).toBe(true)
 
         const teleResult = collectAutomationFromFeatures([makeFeature({ type: 'telekinetic_movement' })], ps)
-        expect(teleResult.actions).toHaveLength(2)
+        expect(teleResult.actions).toHaveLength(1)
     })
 })
 

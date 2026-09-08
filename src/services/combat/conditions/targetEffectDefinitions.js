@@ -745,6 +745,16 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source', 'value'],
     defaults: { value: 10 },
   },
+  {
+    effect: 'telekinetic_movement',
+    label: 'Telekinetic Moved',
+    description: 'The creature was moved up to N feet by telekinetic force.',
+    icon: 'fa-hand',
+    cls: 'effect-neutral',
+    group: 'Movement',
+    fields: ['source', 'value'],
+    defaults: { value: 30 },
+  },
 ]
 
 /**

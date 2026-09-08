@@ -281,7 +281,6 @@ export function routeAutomation(info, auto, result) {
     case 'arcane_charge':
     case 'telekinetic_movement':
         result.actions.push(info)
-        result.actions.push(info)
         break
     case 'guarded_mind':
         if (info.action === 'bonus_action') {

@@ -6593,7 +6593,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-357-telekinetic-movement-no-chooser-no-range-gate.md",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Action: 1 action; Range: 30_ft",
       "expectedBehavior": "Action to move an object or willing creature up to 30 feet."

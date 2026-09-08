@@ -107,7 +107,7 @@ describe('psionicHandlers – telekinetic_movement', () => {
         expect(result).toMatchObject({
             type: 'telekinetic_movement',
             name: 'Test Feature',
-            range: '30_ft',
+            range: '30',
             hasAutomation: true,
         })
     })
@@ -115,7 +115,7 @@ describe('psionicHandlers – telekinetic_movement', () => {
     it('passes through custom range', () => {
         const feature = makeFeature({ type: 'telekinetic_movement', range: '60_ft' })
         const result = psionicHandlers.telekinetic_movement(feature, BASE_STATS)
-        expect(result.range).toBe('60_ft')
+        expect(result.range).toBe('60')
     })
 
     it('throws when automation is null or undefined', () => {

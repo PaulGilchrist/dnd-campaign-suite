@@ -63,6 +63,7 @@ export default function useCharActionsAutomation({
             mistyWanderer: simpleModal('mistyWandererModal'),
             feyReinforcements: simpleModal('feyReinforcementsModal'),
             stepsOfTheFeyTaunt: simpleModal('stepsOfTheFeyTauntModal'),
+            telekineticMovement: simpleModal('telekineticMovementModal'),
             bonusActionChoice: simpleModal('bonusActionChoiceModal'),
             stealthAttack: simpleModal('stealthAttackModal'),
             revelationInFlesh: simpleModal('revelationInFleshModal'),

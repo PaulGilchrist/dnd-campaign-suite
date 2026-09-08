@@ -64,6 +64,7 @@ import InlineChoiceModals from './modals/InlineChoiceModals.jsx';
 import SecondaryTargetModals from './modals/SecondaryTargetModals.jsx';
 import HealingModals from './modals/HealingModals.jsx';
 import { confirmAnimateDead } from '../../services/automation/handlers/spells/animateDeadHandler.js';
+import { applyTelekineticMovement } from '../../services/automation/handlers/class-sorcerer/telekineticMovementHandler.js';
 import { confirmCreateUndead } from '../../services/automation/handlers/spells/createUndeadHandler.js';
 import { confirmSummonSpirit } from '../../services/automation/handlers/spells/summonSpiritHandler.js';
 
@@ -326,6 +327,27 @@ function SecondaryModals({
                 <StepsOfTheFeyTauntModal
                     {...mergedModalState.stepsOfTheFeyTauntModal}
                     onClose={() => setModalState({ stepsOfTheFeyTauntModal: null })}
+                />
+            )}
+            {mergedModalState.telekineticMovementModal && (
+                <CreatureSelectionModal
+                    title="Telekinetic Movement — Choose Target"
+                    icon="fa-hand"
+                    maxTargets={1}
+                    targets={mergedModalState.telekineticMovementModal.creatureTargets}
+                    description={`Move one willing creature up to ${mergedModalState.telekineticMovementModal.rangeFt} feet.`}
+                    note="Willingness is GM-adjudicated. Object movement is handled by the GM off the chooser."
+                    confirmLabel="Move"
+                    confirmIcon="fa-person-walking"
+                    onConfirm={async (selected) => {
+                        const tm = mergedModalState.telekineticMovementModal;
+                        setModalState({ telekineticMovementModal: null });
+                        const targetName = selected[0]?.name || selected[0];
+                        if (!targetName) return;
+                        const result = await applyTelekineticMovement(tm.action, tm.playerStats, tm.campaignName, targetName);
+                        if (result?.type === 'popup') setPopupHtml(result.payload);
+                    }}
+                    onSkip={() => setModalState({ telekineticMovementModal: null })}
                 />
             )}
             {mergedModalState.bonusActionChoiceModal && (
