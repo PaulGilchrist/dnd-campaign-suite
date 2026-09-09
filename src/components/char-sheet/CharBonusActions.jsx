@@ -485,6 +485,36 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                     );
                 })()}
 
+                {(() => {
+                    // CLA-366: Invoke Duplicity "Move" bonus action — while the
+                    // illusion is active, surface the move row (GM adjudicates the
+                    // illusion position; no illusion token exists). Trickster's
+                    // Transposition lets the caster swap places as part of the
+                    // same Bonus Action, so the row routes to the swap confirm.
+                    const illusionBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.effect === 'create_illusion') : null;
+                    if (!illusionBuff) return null;
+                    return (
+                        <div>
+                            <b className={"clickable" + (cannotAct ? " disabled-attack" : "")} onClick={() => {
+                                if (cannotAct) return;
+                                onAutomationAction({
+                                    name: 'Trickster\'s Transposition',
+                                    description: 'Move the Invoke Duplicity illusion up to 30 feet, swapping places with it.',
+                                    automation: {
+                                        type: 'temp_buff',
+                                        effect: 'teleport_swap_with_illusion',
+                                        action: 'bonus_action',
+                                        duration: 'while_illusion_active',
+                                        distance: '30 ft',
+                                        casting_time: '1 bonus action',
+                                        moveIllusion: true,
+                                    },
+                                });
+                            }}>Move Invoke Duplicity (Transposition):</b> <span>Move the illusion up to 30 feet (GM adjudicates its position) and swap places with it.</span>
+                        </div>
+                    );
+                })()}
+
                 {showEatTreat && (
                     <div>
                         <b className="clickable" onClick={handleEatBolsteringTreat}>Eat Bolstering Treat:</b> <span>Eat treat to gain a number of Temporary Hit Points equal to your Proficiency Bonus.</span>

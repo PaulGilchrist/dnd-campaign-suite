@@ -4,6 +4,13 @@ import { resolveTarget } from '../../common/targetResolver.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirationQueue.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { getEffectDefinition, registerTargetEffect } from '../../../combat/conditions/targetEffectDefinitions.js';
+
+function isIllusionActive(playerName, campaignName) {
+    const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
+    return (Array.isArray(stored) ? stored : []).some(b => b.effect === 'create_illusion');
+}
 
 function getAvailableSpellSlotLevel(playerStats) {
     for (let lvl = 2; lvl <= 9; lvl++) {
@@ -52,6 +59,32 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         }
     }
 
+    // CLA-366: Trickster's Transposition only triggers as part of the Bonus
+    // Action that creates or moves the Invoke Duplicity illusion. Refuse with
+    // nothing to swap with — no modal, no state, refusal logged.
+    if (auto?.effect === 'teleport_swap_with_illusion' && !isIllusionActive(playerStats.name, campaignName)) {
+        const refusalText = `${action.name}: Your Invoke Duplicity illusion is not active — there is no illusion to swap places with.`;
+        addEntry(campaignName, {
+            type: 'automation',
+            characterName: playerStats.name,
+            automationType: 'transposition_refused',
+            name: action.name,
+            description: refusalText,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[tempTeleport] Error logging refusal:", e); });
+
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description: refusalText,
+                automation: auto,
+            },
+        };
+    }
+
     return {
         type: 'modal',
         modalName: 'teleport',
@@ -83,7 +116,35 @@ export async function confirmTeleport(action, playerStats, campaignName, useExte
 
     let description;
     if (auto.effect === 'teleport_swap_with_illusion') {
-        description = `${action.name}: Swapped places with your illusion.`;
+        // CLA-366: swap must persist a state mirror + campaign log like the
+        // verified CLA-357 telekinetic_movement model — popup text alone was inert.
+        // The illusion has no token/position entity, so the distance cap is
+        // stamped for GM adjudication (isWithinRange cannot measure a phantom).
+        const rangeFt = rangeToFeet(auto.distance) ?? 30;
+        description = auto.moveIllusion
+            ? `${action.name}: Moved your Invoke Duplicity illusion up to ${rangeFt} feet and swapped places with it.`
+            : `${action.name}: Swapped places with your illusion (up to ${rangeFt} feet).`;
+
+        if (!getEffectDefinition('teleport_swap_with_illusion')) {
+            console.error('[tempTeleportHandler] Missing teleport_swap_with_illusion entry in targetEffectDefinitions registry');
+        }
+        registerTargetEffect(campaignName, playerName, 'teleport_swap_with_illusion', action.name, {
+            value: rangeFt,
+            swappedDistanceFt: rangeFt,
+            movedIllusion: !!auto.moveIllusion,
+            duration: 'instant',
+        });
+
+        const logDescription = auto.moveIllusion
+            ? `${playerName} used ${action.name} to move their Invoke Duplicity illusion up to ${rangeFt} feet and swap places with it.`
+            : `${playerName} used ${action.name} to teleport, swapping places with their Invoke Duplicity illusion (up to ${rangeFt} feet).`;
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: action.name,
+            description: logDescription,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[tempTeleport] Error logging transposition:", e); });
     } else {
         description = `${action.name}: Teleported ${distance} to an unoccupied space you can see.`;
         if (useExtended && auto.bringAllies && auto.allyCount > 0) {

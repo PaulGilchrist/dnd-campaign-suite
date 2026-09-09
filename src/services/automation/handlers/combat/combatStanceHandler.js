@@ -296,10 +296,14 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
         }
         const illusionTeleport = (playerStats.automation?.specialActions || []).find(sa => sa.effect === 'teleport_swap_with_illusion');
         if (illusionTeleport) {
+            // CLA-366: automation.specialActions entries are FLAT automation
+            // objects — re-wrap as {name, automation} so TeleportModal sees
+            // effect:'teleport_swap_with_illusion' and renders the swap panel
+            // instead of the generic Rage teleport chooser.
             return {
                 type: 'modal',
                 modalName: 'teleport',
-                payload: { action: illusionTeleport, playerStats, campaignName, triggeredByDuplicity: true },
+                payload: { action: { name: illusionTeleport.name, automation: illusionTeleport }, playerStats, campaignName, triggeredByDuplicity: true },
             };
         }
     }

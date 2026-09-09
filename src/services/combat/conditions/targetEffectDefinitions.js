@@ -755,6 +755,16 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source', 'value'],
     defaults: { value: 30 },
   },
+  {
+    effect: 'teleport_swap_with_illusion',
+    label: 'Illusion Swap',
+    description: 'The creature teleported, swapping places with its Invoke Duplicity illusion (up to N feet).',
+    icon: 'fa-arrows-rotate',
+    cls: 'effect-neutral',
+    group: 'Movement',
+    fields: ['source', 'value'],
+    defaults: { value: 30 },
+  },
 ]
 
 /**
