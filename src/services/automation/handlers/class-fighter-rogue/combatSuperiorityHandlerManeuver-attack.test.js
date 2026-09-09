@@ -172,7 +172,8 @@ describe('executeManeuver — attack/bonus action effects', () => {
             'Sweeping Attack'
         );
 
-        expect(result.payload.description).toContain('second creature within 5 feet');
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toMatch(/No other creature is within 5 feet of Goblin/);
     });
 
     it('handles ac_bonus_disengage effect', async () => {

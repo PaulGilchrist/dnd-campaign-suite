@@ -6463,7 +6463,7 @@
       "handler": "src/services/combat/automation/handlers/maneuverHandler.js",
       "router": "src/services/combat/automation/routers/maneuverRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/maneuverInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-MN-018-sweeping-attack-inert-secondary-target.md",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Action type: attack_rider; Trigger: melee_weapon_attack_hit; Uses: superiority_die",
       "expectedBehavior": "When you hit a creature with a melee attack roll using a weapon or an Unarmed Strike, you can expend one Superiority Die to attempt to damage another creature. Choose another creature within 5 feet of the original target and within your reach. If the original attack roll would hit the second creature, it takes damage equal to the number rolled on your Superiority Die. The damage type is the same as the original attack."

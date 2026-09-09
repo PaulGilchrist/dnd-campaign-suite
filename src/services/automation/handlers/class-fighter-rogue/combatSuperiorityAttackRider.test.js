@@ -576,6 +576,6 @@ describe('executeAttackRiderManeuver - no secondary targets', () => {
         );
 
         expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('second creature within 5 feet');
+        expect(result.payload.description).toMatch(/No other creature is within 5 feet of Goblin/);
     });
 });

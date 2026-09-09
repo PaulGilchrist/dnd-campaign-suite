@@ -52,11 +52,14 @@ export function getAvailableAttackRiderManeuversByTrigger(playerStats, campaignN
 
     return allManeuvers.filter(m => {
         if (!m.trigger || m.trigger === 'any') return true;
+        // MN-018: HIT-triggered riders must ALSO require the attack to have hit.
+        // Previously these branches only checked weapon/melee type, so a melee
+        // MISS still offered Sweeping Attack / the weapon_attack_hit riders.
         if (m.trigger === 'weapon_attack_hit') {
-            return isWeaponAttack;
+            return isWeaponAttack && attackInfo?.hit === true;
         }
         if (m.trigger === 'melee_weapon_attack_hit') {
-            return isMeleeAttack;
+            return isMeleeAttack && attackInfo?.hit === true;
         }
         if (m.trigger === 'attack_roll_miss') {
             return attackInfo?.hit === false;
@@ -73,7 +76,9 @@ export function getAvailableAttackRiderManeuversByTrigger(playerStats, campaignN
         if (m.trigger === 'replace_attack') {
             return attackInfo?.replacingAttack === true;
         }
-        return true;
+        // MN-018: default must be FALSE. A trigger we don't recognise must not
+        // be offered generically (this default-true is what failed open on misses).
+        return false;
     });
 }
 

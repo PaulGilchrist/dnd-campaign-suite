@@ -6,6 +6,7 @@ import { getCurrentCombatRound } from '../../../../services/encounters/combatDat
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { getMonsterData } from '../../../npcs/monsterUtils.js';
 import {
     findManeuver,
@@ -347,7 +348,70 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
     }
 
     if (maneuver.effect === 'secondary_damage') {
-        description += ` A second creature within 5 feet of the target takes ${dieValue} damage (same type as the original attack).`;
+        // MN-018: Sweeping Attack must offer a real chooser for a creature within
+        // 5 feet of the ORIGINAL target and re-use the ORIGINAL attack roll vs that
+        // creature's AC. The die is already expended above. Stash the pending
+        // payload (RAW combatants — CLA-326 crash lesson) so executeSweepingAttack
+        // can run the AC test + apply damage on confirm. No phantom damage claim.
+        const cs = await getCombatContext(campaignName);
+        const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
+        const damageType = lastAttack?.damageType || maneuver.damageType || (console.error('[MN-018] Sweeping Attack: no original attack damageType in lastAttack'), 'Slashing');
+        const attackBonus = lastAttack?.bonus || 0;
+        const originalTotal = lastAttack?.total ?? attackBonus;
+        const originalD20Roll = lastAttack?.d20Roll ?? (originalTotal - attackBonus);
+
+        const candidates = (cs?.creatures || []).filter(c =>
+            c.name !== targetName && c.name !== playerStats.name
+        );
+        const rawSecondary = [];
+        for (const c of candidates) {
+            // 5 ft of the original target gate (gridless resolves LENIENT per §7).
+            const ok = await isWithinRange(targetName, c.name, 5);
+            if (ok) rawSecondary.push(c);
+        }
+
+        if (rawSecondary.length === 0) {
+            const desc = `${maneuver.name}: ${dieDescription} No other creature is within 5 feet of ${targetName || 'the original target'}.`;
+            return {
+                type: 'popup',
+                payload: { type: 'automation_info', name: maneuver.name, description: desc, automation: auto },
+                logEntries: [{ type: 'ability_use', characterName: playerStats.name, abilityName: maneuver.name, description: desc }],
+            };
+        }
+
+        await setRuntimeValue(playerStats.name, 'pendingSweepingAttack', {
+            dieValue,
+            damageType,
+            primaryTarget: targetName,
+            targetName,
+            originalTotal,
+            originalD20Roll,
+            attackBonus,
+            secondaryTargets: rawSecondary,
+        }, campaignName);
+
+        const chooserDescription = `${maneuver.name}: ${dieDescription} Choose a creature within 5 feet of ${targetName || 'the original target'} — the original attack roll (${originalTotal}) is reused against its AC; if it would hit, it takes ${dieValue} ${damageType} damage.`;
+
+        return {
+            type: 'modal',
+            modalName: 'sweepingAttackTarget',
+            payload: {
+                playerStats,
+                campaignName,
+                dieValue,
+                damageType,
+                primaryTarget: targetName,
+                targetName,
+                secondaryTargets: rawSecondary,
+                description: chooserDescription,
+            },
+            logEntries: [{
+                type: 'ability_use',
+                characterName: playerStats.name,
+                abilityName: maneuver.name,
+                description: `${maneuver.name}: ${dieDescription} Expend 1 Superiority Die.`,
+            }],
+        };
     }
 
     if (maneuver.effect === 'attack_roll_bonus') {

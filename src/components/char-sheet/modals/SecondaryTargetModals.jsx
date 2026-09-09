@@ -49,7 +49,7 @@ export default function SecondaryTargetModals({
                 <SecondaryTargetModal
                     title="Sweeping Attack"
                     targets={sweepingAttackTargetModal.secondaryTargets}
-                    description={`Choose a creature within 5 feet of ${sweepingAttackTargetModal.primaryTarget} to take ${sweepingAttackTargetModal.dieValue} damage:`}
+                    description={`Choose a creature within 5 feet of ${sweepingAttackTargetModal.primaryTarget || sweepingAttackTargetModal.targetName || 'the original target'} to take ${sweepingAttackTargetModal.dieValue} damage:`}
                     onTargetSelected={(targetName) => handleSweepingAttackConfirm(targetName, sweepingAttackTargetModal)}
                     onSkip={() => setModalState({ sweepingAttackTargetModal: null })}
                     confirmLabel="Apply Sweeping Attack"

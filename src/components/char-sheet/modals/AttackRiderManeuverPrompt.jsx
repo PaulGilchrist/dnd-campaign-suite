@@ -10,6 +10,9 @@ function AttackRiderManeuverPrompt({ maneuvers, attack, popupHtml, onUse, onSkip
     const handleUse = async () => {
         if (!selected) return;
         const res = await onUse(selectedManeuver, attack, popupHtml);
+        // MN-018: a modal chooser (Sweeping Attack secondary-target picker) is
+        // rendered elsewhere — do NOT fall into the generic "applied" popup here.
+        if (res?.chooserOpened) return;
         setResult(res);
         setApplied(true);
     };

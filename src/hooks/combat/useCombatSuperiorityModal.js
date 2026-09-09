@@ -39,6 +39,13 @@ export function useCombatSuperiorityModal(playerStats, campaignName, rollAttack,
                 window.dispatchEvent(new CustomEvent('rally-choice-modal-show', { detail: result.payload }));
                 return;
             }
+            // MN-018: route the Sweeping Attack secondary-target chooser to the
+            // existing sweeping-attack-modal-show listener (SecondaryTargetModals)
+            // instead of letting the generic popup below claim phantom damage.
+            if (result?.type === 'modal' && result.modalName === 'sweepingAttackTarget') {
+                window.dispatchEvent(new CustomEvent('sweeping-attack-modal-show', { detail: result.payload }));
+                return;
+            }
             if (result?.effect === 'attack_roll_bonus' && result?.dieValue && rollAttack) {
                 const lastAttackRoll = await getRuntimeValue(playerStats.name, 'lastAttackRoll', campaignName);
                 const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
@@ -129,6 +136,11 @@ export function useCombatSuperiorityModal(playerStats, campaignName, rollAttack,
         }
         if (result?.type === 'modal' && result.modalName === 'rallyChoice') {
             window.dispatchEvent(new CustomEvent('rally-choice-modal-show', { detail: result.payload }));
+            return;
+        }
+        // MN-018: route Sweeping Attack chooser (mirrors the single-use branch).
+        if (result?.type === 'modal' && result.modalName === 'sweepingAttackTarget') {
+            window.dispatchEvent(new CustomEvent('sweeping-attack-modal-show', { detail: result.payload }));
             return;
         }
         if (result?.type === 'popup') {

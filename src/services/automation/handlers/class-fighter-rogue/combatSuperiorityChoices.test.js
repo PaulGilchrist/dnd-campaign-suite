@@ -137,20 +137,24 @@ describe('executeSweepingAttack', () => {
         expect(result.payload.description).toContain('Goblin is not a valid secondary target');
     });
 
-    it('applies damage to valid secondary target and clears pending data', async () => {
+    it('reuses the original attack roll vs the second AC, applies damage on hit, clears pending', async () => {
         getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
             if (key === 'pendingSweepingAttack') return {
                 dieValue: 4,
                 damageType: 'slashing',
+                primaryTarget: 'Goblin',
                 targetName: 'Goblin',
-                secondaryTargets: [{ name: 'Skeleton' }],
+                originalTotal: 15,
+                originalD20Roll: 11,
+                attackBonus: 4,
+                secondaryTargets: [{ name: 'Skeleton', ac: 11 }],
             };
             if (key === 'targetEffects') return [];
             return undefined;
         });
 
         damageUtils.getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'Skeleton' }],
+            creatures: [{ name: 'Skeleton', ac: 11 }],
         });
 
         const result = await executeSweepingAttack(
@@ -162,27 +166,32 @@ describe('executeSweepingAttack', () => {
 
         expect(result.type).toBe('popup');
         expect(result.payload.name).toBe('Sweeping Attack');
-        expect(result.payload.description).toContain('Skeleton takes');
-        expect(result.payload.description).toContain('slashing damage');
-        expect(result.logEntries).toHaveLength(1);
-        expect(result.logEntries[0].type).toBe('ability_use');
-        expect(result.logEntries[0].description).toContain('Skeleton takes');
+        expect(result.payload.description).toContain('hits Skeleton');
+        expect(result.payload.description).toContain('slashing');
+        expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
+            expect.objectContaining({ creatures: [{ name: 'Skeleton', ac: 11 }] }),
+            'Skeleton', 4, ['slashing'], 'test-campaign', [], false, 'TestFighter'
+        );
         expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'pendingSweepingAttack', null, 'test-campaign');
     });
 
-    it('uses dieValue as actualDamage when combat context is null', async () => {
+    it('MISSES (no damage) when the original roll is below the second AC', async () => {
         getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
             if (key === 'pendingSweepingAttack') return {
                 dieValue: 4,
                 damageType: 'slashing',
+                primaryTarget: 'Goblin',
                 targetName: 'Goblin',
-                secondaryTargets: [{ name: 'Skeleton' }],
+                originalTotal: 8,
+                originalD20Roll: 4,
+                attackBonus: 4,
+                secondaryTargets: [{ name: 'Skeleton', ac: 11 }],
             };
             if (key === 'targetEffects') return [];
             return undefined;
         });
 
-        damageUtils.getCombatContext.mockResolvedValue(null);
+        damageUtils.getCombatContext.mockResolvedValue({ creatures: [{ name: 'Skeleton', ac: 11 }] });
 
         const result = await executeSweepingAttack(
             { name: 'Test', automation: { type: 'combat_superiority' } },
@@ -191,25 +200,28 @@ describe('executeSweepingAttack', () => {
             'Skeleton'
         );
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('Skeleton takes 4 slashing damage');
         expect(applyDamage.applyDamageToTarget).not.toHaveBeenCalled();
+        expect(result.payload.description).toMatch(/misses Skeleton/i);
     });
 
-    it('uses applyDamageToTarget result when combat context exists', async () => {
+    it('uses applyDamageToTarget finalDamage as the applied amount', async () => {
         getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
             if (key === 'pendingSweepingAttack') return {
                 dieValue: 6,
                 damageType: 'bludgeoning',
+                primaryTarget: 'Goblin',
                 targetName: 'Goblin',
-                secondaryTargets: [{ name: 'Ogre' }],
+                originalTotal: 20,
+                originalD20Roll: 14,
+                attackBonus: 6,
+                secondaryTargets: [{ name: 'Ogre', ac: 11 }],
             };
             if (key === 'targetEffects') return [];
             return undefined;
         });
 
         damageUtils.getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'Ogre' }],
+            creatures: [{ name: 'Ogre', ac: 11 }],
         });
         applyDamage.applyDamageToTarget.mockReturnValue({ finalDamage: 2 });
 
@@ -221,7 +233,7 @@ describe('executeSweepingAttack', () => {
         );
 
         expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-            expect.objectContaining({ creatures: [{ name: 'Ogre' }] }),
+            expect.objectContaining({ creatures: [{ name: 'Ogre', ac: 11 }] }),
             'Ogre',
             6,
             ['bludgeoning'],
@@ -230,24 +242,29 @@ describe('executeSweepingAttack', () => {
             false,
             'TestFighter'
         );
-        expect(result.payload.description).toContain('Ogre takes 2 bludgeoning damage');
-        expect(result.logEntries[0].description).toContain('Ogre takes 2 bludgeoning damage');
+        expect(result.payload.description).toContain('hits Ogre');
+        expect(result.payload.description).toContain('2 bludgeoning damage');
     });
 
-    it('updates targetEffects via setRuntimeValue', async () => {
+    it('registers a secondary_damage targetEffect on a hit via setRuntimeValue', async () => {
+        applyDamage.applyDamageToTarget.mockReturnValue({ finalDamage: 4 });
         getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
             if (key === 'pendingSweepingAttack') return {
                 dieValue: 4,
                 damageType: 'slashing',
+                primaryTarget: 'Goblin',
                 targetName: 'Goblin',
-                secondaryTargets: [{ name: 'Skeleton' }],
+                originalTotal: 15,
+                originalD20Roll: 11,
+                attackBonus: 4,
+                secondaryTargets: [{ name: 'Skeleton', ac: 11 }],
             };
             if (key === 'targetEffects') return [{ target: 'Existing', effect: 'prone' }];
             return undefined;
         });
 
         damageUtils.getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'Skeleton' }],
+            creatures: [{ name: 'Skeleton', ac: 11 }],
         });
 
         await executeSweepingAttack(

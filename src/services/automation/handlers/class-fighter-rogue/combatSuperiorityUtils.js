@@ -7,6 +7,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { addCondition } from '../../../../services/combat/conditions/conditionSaveService.js';
 import { loadManeuvers } from '../../../ui/dataLoader.js';
 import { computeSuperiorityDiceMax } from '../../../rules/trackedResources.js';
@@ -352,9 +353,11 @@ export async function executeSweepingAttack(action, playerStats, campaignName, s
         };
     }
 
-    const { dieValue, damageType, targetName, secondaryTargets } = pendingData;
+    // MN-018: consume the pending payload up-front — a chooser confirm is one-shot.
+    await setRuntimeValue(playerStats.name, 'pendingSweepingAttack', null, campaignName);
 
-    const secondaryTarget = secondaryTargets.find(t => t.name === secondaryTargetName);
+    const rawSecondary = Array.isArray(pendingData.secondaryTargets) ? pendingData.secondaryTargets : [];
+    const secondaryTarget = rawSecondary.find(t => t && t.name === secondaryTargetName);
     if (!secondaryTarget) {
         return {
             type: 'popup',
@@ -366,44 +369,67 @@ export async function executeSweepingAttack(action, playerStats, campaignName, s
         };
     }
 
-    const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-    const newEffect = {
-        target: secondaryTargetName,
-        source: 'Sweeping Attack',
-        option: 'Sweeping Attack',
-        effect: 'secondary_damage',
-        value: dieValue,
-        damageType: damageType,
-        duration: 'instant',
-        saveType: null,
-        saveDc: null,
-        saveAbility: null,
-    };
-    const updatedEffects = [...storedEffects, newEffect];
-    setRuntimeValue('campaign', 'targetEffects', updatedEffects, campaignName);
+    const dieValue = pendingData.dieValue;
+    const targetName = pendingData.primaryTarget || pendingData.targetName;
+    const damageType = pendingData.damageType || (console.error('[MN-018] Sweeping Attack: original attack damageType missing'), 'Slashing');
 
-    const logEntry = {
-        type: 'ability_use',
-        characterName: playerStats.name,
-        abilityName: 'Sweeping Attack',
-        description: `Sweeping Attack: ${secondaryTargetName} takes ${dieValue} ${damageType} damage (same type as original attack against ${targetName}).`,
-    };
+    // MN-018: reuse the ORIGINAL attack roll vs the SECOND creature's AC.
+    const attackTotal = Number(pendingData.originalTotal)
+        || ((Number(pendingData.originalD20Roll) || 0) + (Number(pendingData.attackBonus) || 0));
+    const secondAc = Number(secondaryTarget.ac ?? secondaryTarget.armor_class ?? 10);
 
-    let actualDamage = dieValue;
-    const cs = await getCombatContext(campaignName);
-    const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-    if (cs) {
-        const result = applyDamageToTarget(cs, secondaryTargetName, dieValue, [damageType], campaignName, characters, false, playerStats.name);
-        if (result.finalDamage > 0) {
-            actualDamage = result.finalDamage;
-            logEntry.description = `Sweeping Attack: ${secondaryTargetName} takes ${actualDamage} ${damageType} damage (same type as original attack against ${targetName}).`;
-        }
+    // MN-018: 5 ft of the original target gate (gridless resolves LENIENT per §7 —
+    // the gate is genuinely consulted the moment a positioned map exists).
+    const inRange = await isWithinRange(targetName, secondaryTargetName, 5);
+
+    let description;
+    let actualDamage = 0;
+
+    if (!inRange) {
+        description = `<b>Sweeping Attack</b><br/>${secondaryTargetName} is not within 5 feet of ${targetName || 'the original target'} — no creature is swept.`;
+        await addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: 'Sweeping Attack',
+            description: `Sweeping Attack: ${secondaryTargetName} is not within 5 feet of ${targetName || 'the original target'} — no damage.`,
+        }).catch((e) => { console.error('[MN-018:log-error]', e); });
+    } else if (attackTotal >= secondAc) {
+        const cs = await getCombatContext(campaignName);
+        const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
+        const applyResult = await applyDamageToTarget(cs, secondaryTargetName, dieValue, [damageType], campaignName, characters, false, playerStats.name);
+        actualDamage = applyResult?.finalDamage ?? dieValue;
+
+        const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+        storedEffects.push({
+            target: secondaryTargetName,
+            source: 'Sweeping Attack',
+            option: 'Sweeping Attack',
+            effect: 'secondary_damage',
+            value: actualDamage,
+            damageType: damageType,
+            duration: 'instant',
+            saveType: null,
+            saveDc: null,
+            saveAbility: null,
+        });
+        setRuntimeValue('campaign', 'targetEffects', storedEffects, campaignName);
+
+        description = `<b>Sweeping Attack</b><br/>Original attack roll ${attackTotal} vs AC ${secondAc} hits ${secondaryTargetName}, which takes ${actualDamage} ${damageType} damage (same type as the original attack).`;
+        await addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: 'Sweeping Attack',
+            description: `Sweeping Attack: original attack roll ${attackTotal} vs AC ${secondAc} hits ${secondaryTargetName} — ${actualDamage} ${damageType} damage (same type as the attack on ${targetName || 'the original target'}).`,
+        }).catch((e) => { console.error('[MN-018:log-error]', e); });
+    } else {
+        description = `<b>Sweeping Attack</b><br/>Original attack roll ${attackTotal} vs AC ${secondAc} — misses ${secondaryTargetName}. No damage.`;
+        await addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: 'Sweeping Attack',
+            description: `Sweeping Attack: original attack roll ${attackTotal} vs AC ${secondAc} misses ${secondaryTargetName} — no damage.`,
+        }).catch((e) => { console.error('[MN-018:log-error]', e); });
     }
-
-    await setRuntimeValue(playerStats.name, 'pendingSweepingAttack', null, campaignName);
-    await addEntry(campaignName, logEntry).catch((e) => { console.error("[combatSuperiorityUtils:log-error]", e); });
-
-    const description = `<b>Sweeping Attack</b><br/>${secondaryTargetName} takes ${actualDamage} ${damageType} damage (same type as the original attack).`;
 
     return {
         type: 'popup',
@@ -412,6 +438,6 @@ export async function executeSweepingAttack(action, playerStats, campaignName, s
             name: 'Sweeping Attack',
             description,
         },
-        logEntries: [logEntry],
+        logEntries: [],
     };
 }

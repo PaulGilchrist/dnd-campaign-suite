@@ -444,6 +444,8 @@ export default function useAttackDamageResolution({
             }
             if (result?.type === 'modal' && result.modalName === 'sweepingAttackTarget') {
                 setModalState({ sweepingAttackTargetModal: result.payload });
+                await resumeAttackPipeline();
+                return { formula: updatedFormula, total: updatedTotal, rolls: updatedRolls, chooserOpened: true };
             }
 
             await resumeAttackPipeline();

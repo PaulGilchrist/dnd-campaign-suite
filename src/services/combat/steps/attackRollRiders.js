@@ -15,12 +15,13 @@ export function buildAttackRiderManeuversStep() {
     emit: 'maneuvers:handled',
     condition: (ctx) => !!ctx.setAttackRiderManeuverPrompt,
     handler: async (ctx) => {
+      const isHit = ctx.popupHtml?.hit === true || ctx.popupHtml?.isCrit === true;
       const info = {
         weaponType: ctx.attack?.weaponType,
         isUnarmedStrike: ctx.attack?.weaponType === 'unarmed',
         targetName: ctx.targetName,
+        hit: isHit,
       };
-      const isHit = ctx.popupHtml?.hit === true || ctx.popupHtml?.isCrit === true;
       if (isHit) {
         const available = await getAttackRiderOptions(ctx.playerStats, ctx.campaignName, info);
         if (available.length > 0) {

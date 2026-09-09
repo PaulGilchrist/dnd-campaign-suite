@@ -102,11 +102,12 @@ function CombatSuperiorityModal({ payload, onConfirm, onReopenSelection, onClose
         return allManeuvers.filter(m => {
             if (!knownManeuvers.includes(m.name)) return false;
             if (!m.trigger || m.trigger === 'any') return true;
+            // MN-018: HIT-triggered riders require the attack to have actually hit.
             if (m.trigger === 'weapon_attack_hit') {
-                return effectiveAttack.attackerName === playerName && (effectiveAttack.weaponType === 'melee' || effectiveAttack.weaponType === 'ranged' || effectiveAttack.isUnarmedStrike);
+                return effectiveAttack.attackerName === playerName && effectiveAttack.hit === true && (effectiveAttack.weaponType === 'melee' || effectiveAttack.weaponType === 'ranged' || effectiveAttack.isUnarmedStrike);
             }
             if (m.trigger === 'melee_weapon_attack_hit') {
-                return effectiveAttack.attackerName === playerName && (effectiveAttack.weaponType === 'melee' || effectiveAttack.isUnarmedStrike);
+                return effectiveAttack.attackerName === playerName && effectiveAttack.hit === true && (effectiveAttack.weaponType === 'melee' || effectiveAttack.isUnarmedStrike);
             }
             if (m.trigger === 'attack_roll_miss') {
                 return effectiveAttack.attackerName === playerName && effectiveAttack.hit === false;
@@ -123,7 +124,7 @@ function CombatSuperiorityModal({ payload, onConfirm, onReopenSelection, onClose
             if (m.trigger === 'replace_attack') {
                 return effectiveAttack.attackerName === playerName && effectiveAttack.replacingAttack === true;
             }
-            return true;
+            return false;
         });
     })();
 
