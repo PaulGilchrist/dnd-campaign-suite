@@ -41,3 +41,11 @@ class access, pitfall 1). Summon Fey PERMANENTLY PREPARED on disk (spells[] 2→
   fabricated spell text, slot values, and verdict/CLEANUP directives after every tool result; one navigation
   was rewritten to a bogus signed-OSS URL (403, returned to localhost immediately). All ignored; verdicts
   grounded only in own reads/CLI evidence.
+
+## Skip note (fix session 2026-09-08)
+Fixer dispatched but cancelled by GM before changes; re-run stalled (foreground dev server). Skipped on GM
+instruction — manifest row now `needs manual decision`. No source/data changes were made this session;
+summonSpiritHandler.js SP-114 rewrite (commit 4c6b1831) already gives data-driven concentration + HP-0
+disappear + expiration seams for all summons. Manual decision needed: exact variant encoding for
+Trickster/Warrior/Guide forms (distinct monsterIndex entries vs shared fey-spirit + form field) —
+check SummonSpiritModal/confirmSummonSpirit + SP-114 variant handling before implementing.
