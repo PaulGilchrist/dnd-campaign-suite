@@ -2,6 +2,7 @@ import { cloneDeep } from 'lodash'
 import storage from '../../services/ui/storage.js'
 import { rollConcentrationSave, breakConcentration, buildConcentrationPopup } from '../../services/combat/concentration/concentrationService.js'
 import { cleanupConcentrationEffects } from '../../services/combat/concentration/concentrationService.js'
+import { stripSummonedFromCombatSummary } from '../../services/combat/summons/summonedCreatureService.js'
 import { logConcentrationSave } from '../../services/encounters/combatLoggingService.js'
 import { logConditionEvent } from '../../services/encounters/combatLoggingService.js'
 
@@ -52,6 +53,9 @@ export function createConcentrationHandlers({
 
         if (!success) {
             creature.concentration = null
+            // SP-114: drop summons from THIS reference before persisting so the
+            // write-back cannot resurrect creatures cleanupConcentrationEffects removes.
+            stripSummonedFromCombatSummary(combatSummary, creatureName)
         }
 
         storage.set('combatSummary', combatSummary, campaignName)
@@ -71,6 +75,7 @@ export function createConcentrationHandlers({
         if (!combatSummary) return
         const spell = breakConcentration(combatSummary, creatureName)
         if (!spell) return
+        stripSummonedFromCombatSummary(combatSummary, creatureName)
         storage.set('combatSummary', combatSummary, campaignName)
         setCombatSummary(cloneDeep(combatSummary))
         logConditionEvent(campaignName, 'removed', creatureName, `Concentration: ${spell}`)

@@ -5,6 +5,7 @@ import utils from '../../services/ui/utils.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { useSyncedState } from '../../hooks/runtime/useSyncedState.js'
 import storage from '../../services/ui/storage.js'
+import { stripSummonedFromCombatSummary } from '../../services/combat/summons/summonedCreatureService.js'
 import { getMonsterImageUrl } from '../../services/npcs/monsterUtils.js'
 import { loadNPCs } from '../../services/npcs/npcsService.js'
 import { npcHasStatBlock } from '../../services/encounters/npcStatBlockUtils.js'
@@ -343,6 +344,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             if (creature && !e.detail.success) {
                 const concentrationSpell = creature.concentration?.spell
                 creature.concentration = null
+                stripSummonedFromCombatSummary(combatSummary, creature.name)
                 storage.set('combatSummary', combatSummary, campaignName)
                 setCombatSummary(cloneDeep(combatSummary))
                 cleanupConcentrationEffects(creature.name, concentrationSpell, campaignName)

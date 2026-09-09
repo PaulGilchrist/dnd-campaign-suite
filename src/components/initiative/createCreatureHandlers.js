@@ -4,6 +4,7 @@ import storage from '../../services/ui/storage.js'
 import { clearDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js'
 import { clearCombat, setInitiative, renameNpc, setTarget, removeNpc, addNpc } from '../../services/encounters/initiativeService.js'
 import { maybeGrantThiefsReflexesSecondTurn } from '../../services/combat/thiefsReflexesService.js'
+import { vanishSummonAtZeroHp } from '../../services/combat/summons/summonedCreatureService.js'
 
 /**
  * Creates creature operation handlers for the initiative component.
@@ -41,6 +42,10 @@ export function createCreatureHandlers({
         }
         else {
             creature.currentHp = newValue
+            // SP-114: GM setting a spell-summon's HP to 0 makes it disappear.
+            if (oldHp > 0 && newValue <= 0 && creature.summonedBy && creature.summonSource === 'spell') {
+                vanishSummonAtZeroHp(creature, combatSummary, campaignName)
+            }
         }
         storage.set('combatSummary', combatSummary, campaignName)
         setCombatSummary(cloneDeep(combatSummary))

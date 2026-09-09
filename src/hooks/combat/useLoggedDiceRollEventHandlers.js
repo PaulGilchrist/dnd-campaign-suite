@@ -8,6 +8,7 @@ import {
   normalizeSaveType,
 } from '../../services/rules/combat/applyDamage.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
+import { stripSummonedFromCombatSummary } from '../../services/combat/summons/summonedCreatureService.js';
 import { resolveCreatureType } from '../../services/combat/creatureTypeResolver.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
@@ -448,6 +449,7 @@ export function setupEventListeners(deps) {
                 if (creature && !e.detail.success) {
                     const concentrationSpell = creature.concentration?.spell;
                     creature.concentration = null;
+                    stripSummonedFromCombatSummary(combatSummary, creature.name);
                     setRuntimeValue(e.detail.targetName, 'mantleOfMajestyActive', null, campaignName);
                     storage.set('combatSummary', combatSummary, campaignName);
                     window.dispatchEvent(new CustomEvent('combat-summary-updated'));

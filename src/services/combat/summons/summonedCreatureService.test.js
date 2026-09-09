@@ -21,10 +21,15 @@ vi.mock('../../ui/storage.js', () => ({
     },
 }))
 
+vi.mock('../../ui/logService.js', () => ({
+    addEntry: vi.fn().mockResolvedValue({}),
+}))
+
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { getCombatSummary, setCombatSummaryCache } from '../../encounters/combatData.js'
 import storage from '../../ui/storage.js'
-import { isSpellSummon, removeSummonedCreatures } from './summonedCreatureService.js'
+import { addEntry } from '../../ui/logService.js'
+import { isSpellSummon, removeSummonedCreatures, vanishSummonAtZeroHp } from './summonedCreatureService.js'
 
 describe('isSpellSummon', () => {
     it('returns true when creature has summonSource === "spell"', () => {
@@ -286,5 +291,58 @@ describe('removeSummonedCreatures', () => {
         removeSummonedCreatures('Summoner', 'test-campaign')
 
         expect(window.dispatchEvent).not.toHaveBeenCalled()
+    })
+})
+
+describe('vanishSummonAtZeroHp (SP-114)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        delete window.CustomEvent
+        window.CustomEvent = class {
+            constructor(type, opts) {
+                this.type = type
+                this.bubbles = opts?.bubbles || false
+            }
+        }
+        window.dispatchEvent = vi.fn()
+    })
+
+    it('removes the summoned combatant from combatSummary in place, strips its te, and logs', () => {
+        const spirit = { name: 'Aberrant Spirit (Mind Flayer)', summonedBy: 'Wizard', summonSource: 'spell', currentHp: 0 }
+        const cs = { round: 1, creatures: [{ name: 'Thug 1' }, spirit] }
+        getRuntimeValue.mockReturnValue([
+            { effect: 'summoned', target: 'Aberrant Spirit (Mind Flayer)', source: 'Wizard', summonSource: 'spell' },
+            { effect: 'bless_bonus', target: 'Thug 1', source: 'Cleric' },
+        ])
+
+        const removed = vanishSummonAtZeroHp(spirit, cs, 'test-campaign')
+
+        expect(removed).toBe(true)
+        expect(cs.creatures.map(c => c.name)).toEqual(['Thug 1'])
+        expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, 'test-campaign')
+        expect(setCombatSummaryCache).toHaveBeenCalledWith(cs, 'test-campaign')
+        const teWrite = setRuntimeValue.mock.calls.find(c => c[1] === 'targetEffects')
+        expect(teWrite[2]).toEqual([{ effect: 'bless_bonus', target: 'Thug 1', source: 'Cleric' }])
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+            type: 'summons',
+            characterName: 'Wizard',
+            description: expect.stringContaining('disappears at 0 Hit Points'),
+        }))
+        expect(window.dispatchEvent).toHaveBeenCalled()
+    })
+
+    it('does nothing for non-summoned creatures', () => {
+        const thug = { name: 'Thug 1', currentHp: 0 }
+        const cs = { round: 1, creatures: [thug] }
+        getRuntimeValue.mockReturnValue([])
+
+        expect(vanishSummonAtZeroHp(thug, cs, 'test-campaign')).toBe(false)
+        expect(cs.creatures).toHaveLength(1)
+        expect(addEntry).not.toHaveBeenCalled()
+    })
+
+    it('does nothing without summonedBy or campaignName', () => {
+        expect(vanishSummonAtZeroHp({ name: 'X', summonSource: 'spell' }, { creatures: [] }, null)).toBe(false)
+        expect(vanishSummonAtZeroHp({ name: 'X', summonSource: 'spell' }, { creatures: [] }, 'test-campaign')).toBe(false)
     })
 })

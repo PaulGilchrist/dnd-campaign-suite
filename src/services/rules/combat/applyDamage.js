@@ -24,6 +24,7 @@ import { endCompelledDuel } from '../../automation/handlers/spells/compelledDuel
 import { createSaveListener } from '../../automation/common/savePrompt.js';
 import { revertPolymorph } from '../../automation/handlers/spells/polymorphService.js';
 import { cleanupWildShape } from '../../automation/handlers/class-druid/wildShapeCreatureBuilder.js';
+import { vanishSummonAtZeroHp, stripSummonedFromCombatSummary } from '../../combat/summons/summonedCreatureService.js';
 
 // Tracks which multi-attack sequences have already triggered Relentless Endurance.
 // Prevents follow-up hits in the same sequence from re-killing the character.
@@ -525,6 +526,13 @@ if (!Array.isArray(damageTypes)) { throw new Error('damageTypes must be an array
     const wasAlive = oldHp > 0;
    const isNowUnconscious = newHp <= 0;
 
+   // SP-114: summoned creatures disappear at 0 Hit Points (canonical "disappears
+   // when it drops to 0 Hit Points"). Mutates combatSummary in place — the
+   // combatSummaryChanged persist below writes the filtered roster.
+   if (!isPlayer && wasAlive && isNowUnconscious && creature.summonedBy && creature.summonSource === 'spell') {
+     vanishSummonAtZeroHp(creature, combatSummary, campaignName);
+   }
+
    if (!options?.skipConcentration && creature.concentration && (actualDamageTaken > 0 || options?.concentrationTotalDamage > 0)) {
      const dcDamage = options?.concentrationTotalDamage ?? actualDamageTaken;
      creature.concentration.dc = Math.max(10, Math.floor(dcDamage / 2));
@@ -623,6 +631,7 @@ if (!Array.isArray(damageTypes)) { throw new Error('damageTypes must be an array
         if (!success) {
           const spellName = creature.concentration.spell;
           creature.concentration = null;
+          stripSummonedFromCombatSummary(combatSummary, creature.name);
           npcConcentrationBroken = true;
           addEntry(campaignName, {
             type: 'condition',

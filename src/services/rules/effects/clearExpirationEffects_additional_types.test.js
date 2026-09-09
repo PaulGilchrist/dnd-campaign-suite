@@ -525,3 +525,56 @@ describe('applyHolyNimbusDamage (indirect via applyTurnStartEffects)', () => {
     expect(applyDamageToTarget).toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// SP-114: remove_summoned_creatures expiration type
+// ---------------------------------------------------------------------------
+
+import { removeSummonedCreatures } from '../../combat/summons/summonedCreatureService.js';
+import storage from '../../ui/storage.js';
+import { addEntry } from '../../ui/logService.js';
+import { clearExpirationEffects } from './expirations.js';
+
+describe('SP-114 remove_summoned_creatures expiration', () => {
+  beforeEach(() => resetMocks());
+
+  it('clears the matching caster concentration, removes summons, and logs', () => {
+    const cs = {
+      creatures: [
+        { name: 'Wizard', concentration: { spell: 'Summon Aberration', dc: 18 } },
+        { name: 'Aberrant Spirit (Mind Flayer)', summonedBy: 'Wizard', summonSource: 'spell' },
+      ],
+    };
+    getCombatSummary.mockReturnValue(cs);
+
+    clearExpirationEffects(
+      [{ type: 'remove_summoned_creatures', spell: 'Summon Aberration' }],
+      'Wizard', 'Wizard', 'test-campaign'
+    );
+
+    expect(cs.creatures.find(c => c.name === 'Wizard').concentration).toBeNull();
+    expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, 'test-campaign');
+    expect(removeSummonedCreatures).toHaveBeenCalledWith('Wizard', 'test-campaign');
+    expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+      type: 'summons',
+      characterName: 'Wizard',
+      description: expect.stringContaining('summoned creatures disappear'),
+    }));
+  });
+
+  it('leaves a different concentration spell on the caster intact', () => {
+    const cs = {
+      creatures: [{ name: 'Wizard', concentration: { spell: 'Slow', dc: 18 } }],
+    };
+    getCombatSummary.mockReturnValue(cs);
+
+    clearExpirationEffects(
+      [{ type: 'remove_summoned_creatures', spell: 'Summon Aberration' }],
+      'Wizard', 'Wizard', 'test-campaign'
+    );
+
+    expect(cs.creatures[0].concentration.spell).toBe('Slow');
+    expect(storage.set).not.toHaveBeenCalled();
+    expect(removeSummonedCreatures).toHaveBeenCalledWith('Wizard', 'test-campaign');
+  });
+});

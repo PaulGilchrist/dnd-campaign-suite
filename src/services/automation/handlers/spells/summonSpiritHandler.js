@@ -7,6 +7,7 @@ import cloneDeep from 'lodash/cloneDeep.js';
 import { loadMonsters } from '../../../ui/dataLoader.js';
 import { getMonsterSaveBonuses } from '../../../encounters/encounterToInitiative.js';
 import { addConcentration } from '../../../combat/concentration/concentrationService.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
 
 function getTargetEffects() {
     const stored = getRuntimeValue('campaign', 'targetEffects');
@@ -75,7 +76,9 @@ function buildSpiritCreature(monster, displayName, casterName, initiativeValue, 
     const baseHp = monster.hit_points || 10;
     const scale = auto.scale !== false;
 
-    const ac = scale ? baseAc + slotLevel : baseAc;
+    // SP-114: canonical summon stat blocks scale Hit Points only — AC is always
+    // the base armor_class from monsters.json (never slot-scaled).
+    const ac = baseAc;
     let hp = scale
         ? baseHp + (auto.hpPerLevelAbove || 0) * Math.max(0, slotLevel - (auto.baseLevel || slotLevel))
         : baseHp;
@@ -91,7 +94,7 @@ function buildSpiritCreature(monster, displayName, casterName, initiativeValue, 
 
     const actions = resolveMonsterActions(monster, { slotLevel, spellAttackMod, spellSaveDc, wisModifier, spellcastingModifier });
 
-    if (options.noConcentration) {
+    if (options.createThrall) {
         actions.push({
             name: "Psychic Strike",
             casting_time: "Bonus Action",
@@ -150,6 +153,29 @@ function getCasterInitiativeValue(combatSummary, casterName) {
     return initiativeValue || (Math.floor(Math.random() * 20) + 1 + casterInitBonus);
 }
 
+// SP-114: Create Thrall (2024 Warlock lv14 major) is the ONLY data source that
+// modifies Summon Aberration (no Concentration, 1 minute, temp HP, Hex rider).
+// Gate every thrall-specific behavior on the caster actually holding the feature —
+// never on the spell name alone (a Wizard's Summon Aberration is canonical).
+function hasCreateThrallFor(playerStats, spellName) {
+    const allFeatures = [
+        ...(playerStats?.class?.class_levels || []).flatMap(cl => cl.features || []),
+        ...(playerStats?.class?.subclass?.class_levels || []).flatMap(cl => cl.features || []),
+    ];
+    return allFeatures.some(f => {
+        const autos = Array.isArray(f.automation) ? f.automation : [f.automation].filter(Boolean);
+        return autos.some(a => a && a.type === 'create_thrall' && a.spell === spellName);
+    });
+}
+
+// Minutes are encoded as rounds app-wide (CLA-334 recipe: 10min=100 rounds).
+function summonDurationRounds(duration) {
+    const match = String(duration || '').toLowerCase().match(/(\d+)\s*(minute|hour)/);
+    if (!match) return undefined;
+    const n = parseInt(match[1], 10);
+    return match[2] === 'hour' ? n * 600 : n * 10;
+}
+
 async function performSummon(action, playerStats, campaignName, variant) {
     const auto = action.automation;
     const casterName = playerStats.name;
@@ -165,8 +191,12 @@ async function performSummon(action, playerStats, campaignName, variant) {
         return infoPopup(action, `Failed to load monster data for ${variant.name}.`);
     }
 
-    const isSummonAberration = action.name === 'Summon Aberration';
-    const noConcentration = !!auto.noConcentration || isSummonAberration;
+    // SP-114: concentration comes from the spell's data (auto.noConcentration is
+    // only stamped by feature flows that explicitly drop it — phantasmal/free-cast
+    // options). A caster holding the Create Thrall feature gets its verified
+    // no-Concentration/1-minute thrall modification; everyone else concentrates.
+    const createThrall = hasCreateThrallFor(playerStats, action.name);
+    const noConcentration = !!auto.noConcentration || createThrall;
     const initiativeValue = getCasterInitiativeValue(combatSummary, casterName);
 
     // CLA-252: a Phantasmal Creatures free cast (spellPreparationService stamps the spell)
@@ -175,14 +205,14 @@ async function performSummon(action, playerStats, campaignName, variant) {
     const isPhantasmalFreeCast = !!action.spell?._phantasmalCreatures;
     const halveHp = isPhantasmalFreeCast && !!(phantasmalPassive?.halvesHp ?? action.spell?._phantasmalHalvesHp);
 
-    const creature = buildSpiritCreature(monster, variant.name, casterName, initiativeValue, slotLevel, auto, playerStats, { noConcentration, warlockLevel: playerStats.level, chaModifier: (playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0), halveHp });
+    const creature = buildSpiritCreature(monster, variant.name, casterName, initiativeValue, slotLevel, auto, playerStats, { noConcentration, createThrall, warlockLevel: playerStats.level, chaModifier: (playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0), halveHp });
     if (isPhantasmalFreeCast) {
         creature.phantasmal = true;
         creature.spectral = true;
     }
     combatSummary.creatures.push(creature);
 
-    if (isSummonAberration) {
+    if (createThrall) {
         const chaMod = playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0;
         const warlockLevel = playerStats.level;
         const tempHp = warlockLevel + chaMod;
@@ -211,6 +241,13 @@ async function performSummon(action, playerStats, campaignName, variant) {
 
     if (!noConcentration) {
         addConcentration(combatSummary, casterName, action.name, getSpellSaveDc(playerStats));
+        // SP-114: spell-end removal clock ("up to N minute/hour" → rounds).
+        // Fires remove_summoned_creatures at duration expiry; cleanupConcentrationEffects
+        // consumes (and drains) this same entry on an earlier concentration break.
+        const rounds = summonDurationRounds(action.spell?.duration || auto.duration);
+        addExpiration(casterName, casterName, [
+            { type: 'remove_summoned_creatures', spell: action.name },
+        ], campaignName, rounds);
     }
     storage.set('combatSummary', cloneDeep(combatSummary), campaignName);
     setRuntimeValue('campaign', 'targetEffects', targetEffects, campaignName);

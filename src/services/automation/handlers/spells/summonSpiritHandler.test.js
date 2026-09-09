@@ -34,6 +34,14 @@ vi.mock('../../../combat/concentration/concentrationService.js', () => ({
     addConcentration: vi.fn(),
 }));
 
+vi.mock('../../../rules/effects/expirations.js', () => ({
+    addExpiration: vi.fn(),
+}));
+
+vi.mock('../buffs/tempHpService.js', () => ({
+    setTempHpOnKey: vi.fn(),
+}));
+
 vi.mock('../../../encounters/encounterToInitiative.js', () => ({
     getMonsterSaveBonuses: vi.fn().mockImplementation((monster) => {
         const map = { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 };
@@ -52,6 +60,8 @@ import { getCombatSummary } from '../../../encounters/combatData.js';
 import storage from '../../../ui/storage.js';
 import { loadMonsters } from '../../../ui/dataLoader.js';
 import { addConcentration } from '../../../combat/concentration/concentrationService.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
+import { setTempHpOnKey } from '../buffs/tempHpService.js';
 
 describe('summonSpiritHandler', () => {
     beforeEach(() => {
@@ -160,6 +170,19 @@ describe('summonSpiritHandler', () => {
             }],
         },
         {
+            index: 'aberrant-spirit-mind-flayer', name: 'Aberrant Spirit (Mind Flayer)', type: 'aberration',
+            armor_class: 11, hit_points: 40, damage_resistances: [], damage_immunities: [], immunities: [],
+            saving_throws: { str: { modifier: 2 }, dex: { modifier: 0 }, con: { modifier: 3 }, int: { modifier: 4 }, wis: { modifier: 2 }, cha: { modifier: 3 } },
+            actions: [{
+                name: 'Psychic Slam',
+                description: 'Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 3d6+spellcasting modifier Psychic damage.',
+                attack_bonus: null,
+                reach: '5 ft.',
+                damage_dice_primary: '3d6+spellcasting modifier',
+                damage_type_primary: 'psychic',
+            }],
+        },
+        {
             index: 'animate-objects-medium', name: 'Animated Object (Medium)', type: 'construct',
             armor_class: 15, hit_points: 10, damage_resistances: [], damage_immunities: [], immunities: [],
             saving_throws: {}, actions: [{
@@ -211,7 +234,7 @@ describe('summonSpiritHandler', () => {
             expect(added.summonedBy).toBe('TestCaster');
             expect(added.summonSource).toBe('spell');
             expect(added.maxHp).toBe(20);
-            expect(added.ac).toBe(11 + 2);
+            expect(added.ac).toBe(11);
 
             const effect = getRuntimeValue('campaign', 'targetEffects').find(te => te.target === 'Bestial Spirit (Air)');
             expect(effect).toMatchObject({
@@ -232,7 +255,7 @@ describe('summonSpiritHandler', () => {
             expect(result.type).toBe('popup');
         });
 
-        it('scales AC and HP by the slot level used', async () => {
+        it('scales HP by the slot level used but keeps base AC (SP-114)', async () => {
             loadMonsters.mockResolvedValue(mockMonsters);
             const combatSummary = getCombatSummary(mockCampaignName);
             const action = makeAction({ metaCtx: { slotLevel: 4 } });
@@ -240,7 +263,7 @@ describe('summonSpiritHandler', () => {
             await confirmSummonSpirit(action, mockPlayerStats, mockCampaignName, 'Bestial Spirit (Air)');
 
             const added = combatSummary.creatures.find(c => c.name === 'Bestial Spirit (Air)');
-            expect(added.ac).toBe(11 + 4);
+            expect(added.ac).toBe(11);
             expect(added.maxHp).toBe(20 + 5 * (4 - 2));
         });
 
@@ -301,6 +324,91 @@ describe('summonSpiritHandler', () => {
             expect(added.actions[0].description).toContain('1d8+2+3');
             expect(added.actions[0].attack_bonus).toBe(6);
             expect(added.actions[1].save_dc).toBe(13);
+        });
+
+        describe('SP-114 Summon Aberration concentration + duration', () => {
+            const aberrantVariants = [
+                { name: 'Aberrant Spirit (Beholderkin)', monsterIndex: 'aberrant-spirit-beholderkin' },
+                { name: 'Aberrant Spirit (Mind Flayer)', monsterIndex: 'aberrant-spirit-mind-flayer' },
+                { name: 'Aberrant Spirit (Slaad)', monsterIndex: 'aberrant-spirit-slaad' },
+            ];
+
+            function makeAberrantAction(overrides = {}) {
+                return {
+                    name: 'Summon Aberration',
+                    automation: {
+                        type: 'summon_spirit',
+                        typeLabel: 'Aberrant Spirit',
+                        baseLevel: 4,
+                        hpPerLevelAbove: 5,
+                        variants: aberrantVariants,
+                        ...overrides.automation,
+                    },
+                    spell: { level: 4, duration: 'Concentration, up to 1 hour', concentration: true },
+                    ...overrides,
+                };
+            }
+
+            const createThrallWarlock = {
+                ...mockPlayerStats,
+                class: {
+                    class_levels: [{
+                        level: 14,
+                        features: [{
+                            name: 'Create Thrall',
+                            automation: [
+                                { type: 'create_thrall', spell: 'Summon Aberration' },
+                                { type: 'passive_rule', effect: 'create_thrall_temp_hp' },
+                            ],
+                        }],
+                    }],
+                },
+            };
+
+            it('keeps canonical concentration for a caster WITHOUT the Create Thrall feature', async () => {
+                loadMonsters.mockResolvedValue(mockMonsters);
+                const combatSummary = getCombatSummary(mockCampaignName);
+
+                await confirmSummonSpirit(makeAberrantAction(), mockPlayerStats, mockCampaignName, 'Aberrant Spirit (Mind Flayer)');
+
+                const added = combatSummary.creatures.find(c => c.name === 'Aberrant Spirit (Mind Flayer)');
+                expect(added).toBeDefined();
+                expect(added.ac).toBe(11);
+                expect(added.maxHp).toBe(40);
+                expect(added.actions.map(a => a.name)).toEqual(['Psychic Slam']);
+                expect(setTempHpOnKey).not.toHaveBeenCalled();
+
+                const effect = getRuntimeValue('campaign', 'targetEffects').find(te => te.target === 'Aberrant Spirit (Mind Flayer)');
+                expect(effect).toMatchObject({ effect: 'summoned', duration: 'concentration' });
+                expect(addConcentration).toHaveBeenCalledWith(combatSummary, 'TestCaster', 'Summon Aberration', 13);
+            });
+
+            it('registers a 1-hour (600-round) concentration expiry clock on summon', async () => {
+                loadMonsters.mockResolvedValue(mockMonsters);
+                getCombatSummary(mockCampaignName);
+
+                await confirmSummonSpirit(makeAberrantAction(), mockPlayerStats, mockCampaignName, 'Aberrant Spirit (Mind Flayer)');
+
+                expect(addExpiration).toHaveBeenCalledWith('TestCaster', 'TestCaster', [
+                    { type: 'remove_summoned_creatures', spell: 'Summon Aberration' },
+                ], mockCampaignName, 600);
+            });
+
+            it('keeps Create Thrall verified behavior for a feature holder: no concentration, temp HP, Psychic Strike', async () => {
+                loadMonsters.mockResolvedValue(mockMonsters);
+                const combatSummary = getCombatSummary(mockCampaignName);
+
+                await confirmSummonSpirit(makeAberrantAction(), createThrallWarlock, mockCampaignName, 'Aberrant Spirit (Mind Flayer)');
+
+                const added = combatSummary.creatures.find(c => c.name === 'Aberrant Spirit (Mind Flayer)');
+                expect(added.actions.map(a => a.name)).toContain('Psychic Strike');
+                expect(setTempHpOnKey).toHaveBeenCalledWith('Aberrant Spirit (Mind Flayer)', 'tempHp', expect.any(Number), mockCampaignName);
+
+                const effect = getRuntimeValue('campaign', 'targetEffects').find(te => te.target === 'Aberrant Spirit (Mind Flayer)');
+                expect(effect).toMatchObject({ effect: 'summoned', duration: '1_minute' });
+                expect(addConcentration).not.toHaveBeenCalled();
+                expect(addExpiration).not.toHaveBeenCalled();
+            });
         });
 
         describe('CLA-252 Phantasmal Creatures free cast', () => {

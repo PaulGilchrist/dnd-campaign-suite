@@ -8,6 +8,7 @@ import { revertAnimalShapes } from '../../automation/handlers/spells/animalShape
 import { revertTruePolymorph } from '../../automation/handlers/spells/truePolymorphService.js';
 import { revertShapechange } from '../../automation/handlers/spells/shapechangeService.js';
 import { addEntry } from '../../ui/logService.js';
+import { removeSummonedCreatures } from '../../combat/summons/summonedCreatureService.js';
 
 function removeNpcCondition(targetName, conditionName, campaignName) {
     try {
@@ -421,6 +422,28 @@ export function clearExpirationEffects(effects, targetName, attackerName, campai
                     description: `${targetName} returns to the space it previously occupied — the ${effect.source} effect ends.`,
                     timestamp: Date.now(),
                 }).catch((e) => { console.error("[expirations] Error:", e); });
+                break;
+            }
+
+            // SP-114: summon duration clock expiry — the summoned creatures disappear
+            // and the caster's matching concentration record is cleared.
+            case 'remove_summoned_creatures': {
+                const cs = getCombatSummary(campaignName);
+                if (cs) {
+                    const casterCreature = cs.creatures.find(c => c.name === targetName);
+                    if (casterCreature?.concentration && (!effect.spell || casterCreature.concentration.spell === effect.spell)) {
+                        casterCreature.concentration = null;
+                        storage.set('combatSummary', cs, campaignName);
+                    }
+                }
+                removeSummonedCreatures(targetName, campaignName);
+                addEntry(campaignName, {
+                    type: 'summons',
+                    characterName: targetName,
+                    summonName: effect.spell || 'Summon',
+                    description: `${effect.spell || 'Summon'} ends — summoned creatures disappear.`,
+                    timestamp: Date.now(),
+                }).catch((e) => { console.error('[clearExpirationEffects:summon-expire-log-error]', e); });
                 break;
             }
 
