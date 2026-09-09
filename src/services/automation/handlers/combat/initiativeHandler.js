@@ -161,6 +161,18 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const uncannyMetabolismUsed = getRuntimeValue(playerStats.name, 'uncannyMetabolismUsed', campaignName) === true;
     if (uncannyMetabolismUsed) {
+        // CLA-372: refusals must reach the campaign log (CLA-345/355/394 family).
+        // This row is rendered by CharSpecialActions, which does NOT flush
+        // result.logEntries — so log directly here (concentrationBonusAttackHandler shape).
+        const refusalReason = 'already used — it cannot be used again until a long rest.';
+        await addEntry(campaignName, {
+            type: 'automation',
+            characterName: playerStats.name,
+            automationType: 'uncanny_metabolism_refused',
+            name: action.name,
+            description: `${action.name} refused — ${refusalReason}`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[initiativeHandler:log-error]", e); });
         return {
             type: 'popup',
             payload: {
@@ -185,7 +197,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const maxHp = playerStats.hitPoints;
     const newHp = Math.min(maxHp, currentHp + healAmount);
 
-    setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
+    // CLA-372: sequential awaits so the uncannyMetabolismUsed latch write is the
+    // LAST full-store snapshot (un-awaited same-tick POSTs race, §6-#18).
+    await setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
     logHealingToSSE(campaignName, {
         targetName: playerStats.name,
         sourceName: action.name,
@@ -197,10 +211,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const maxFP = classLevel?.focus_points || 0;
     if (maxFP > 0) {
-        setRuntimeValue(playerStats.name, 'focusPoints', maxFP, campaignName);
+        await setRuntimeValue(playerStats.name, 'focusPoints', maxFP, campaignName);
     }
 
-    setRuntimeValue(playerStats.name, 'uncannyMetabolismUsed', true, campaignName);
+    await setRuntimeValue(playerStats.name, 'uncannyMetabolismUsed', true, campaignName);
 
     addEntry(campaignName, {
         type: 'ability_use',

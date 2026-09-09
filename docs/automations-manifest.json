@@ -6844,7 +6844,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-372-once-per-LR-gate-resets-on-initiative.md",
+      "verified": "verified",
       "class": "Monk",
       "triggerConditions": "Trigger: roll_initiative; Action: passive",
       "expectedBehavior": "When you roll Initiative, you can regain all expended Focus Points. Roll your Martial Arts die and regain Hit Points equal to your Monk level plus the number rolled. Can't use again until Long Rest."

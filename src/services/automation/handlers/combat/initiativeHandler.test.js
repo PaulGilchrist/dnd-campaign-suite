@@ -616,7 +616,31 @@ describe('initiativeHandler.handle', () => {
       expect(result.payload.description).toContain('cannot be used again until a long rest');
       expect(diceRoller.rollExpression).not.toHaveBeenCalled();
       expect(healingRoll.logHealingToSSE).not.toHaveBeenCalled();
-      expect(logService.addEntry).not.toHaveBeenCalled();
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    // CLA-372: refusal must reach the campaign log (family precedent
+    // CLA-345/CLA-355/CLA-394), spending nothing.
+    it('logs uncanny_metabolism_refused on refusal with zero HP/FP deltas', async () => {
+      const ps = makeMonkStats();
+      const action = makeAction({ effect: 'regain_focus_points_and_heal' });
+      setupRuntimeMocks({
+        'Bard:uncannyMetabolismUsed:TestCampaign': true,
+        'Bard:currentHitPoints:TestCampaign': 50,
+      });
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'automation',
+        characterName: 'Bard',
+        automationType: 'uncanny_metabolism_refused',
+        name: 'Tandem Footwork',
+      }));
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(diceRoller.rollExpression).not.toHaveBeenCalled();
+      expect(healingRoll.logHealingToSSE).not.toHaveBeenCalled();
     });
 
     it('heals HP using martial arts die + monk level', async () => {

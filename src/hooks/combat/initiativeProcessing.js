@@ -29,7 +29,8 @@ export async function processInitiativeRoll(characterName, campaignName, context
         }
     }
     clearAllExpirationEffects(characterName, campaignName);
-    setRuntimeValue(characterName, 'uncannyMetabolismUsed', false, campaignName);
+    // CLA-372: do NOT clear uncannyMetabolismUsed here — it is a once-per-Long-Rest
+    // latch; Long Rest (restRules-longRest.js) is its only legitimate reset.
 
     setPopupHtml({
         type: 'd20',
