@@ -71,6 +71,8 @@ describe('executeSweepingAttack — MN-018 original-roll vs AC + real damage', (
         expect(call[7]).toBe('EvasiveFighter');
         expect(result.payload.description).toMatch(/hits Thug 2/);
         expect(result.payload.description).toMatch(/9 slashing/);
+        expect(result.payload.name).toBe('Sweeping Attack');
+        expect(result.payload.description).not.toMatch(/Sweeping Attack/);
     });
 
     it('MISSES (no damage) when the original attack total is below the second creature AC', async () => {
@@ -79,6 +81,7 @@ describe('executeSweepingAttack — MN-018 original-roll vs AC + real damage', (
 
         expect(applyDamageToTarget).not.toHaveBeenCalled();
         expect(result.payload.description).toMatch(/misses Thug 2/i);
+        expect(result.payload.description).not.toMatch(/Sweeping Attack/);
     });
 
     it('refuses when not within 5 feet of the original target — no damage applied', async () => {
@@ -88,6 +91,7 @@ describe('executeSweepingAttack — MN-018 original-roll vs AC + real damage', (
 
         expect(applyDamageToTarget).not.toHaveBeenCalled();
         expect(result.payload.description).toMatch(/not within 5 feet/i);
+        expect(result.payload.description).not.toMatch(/Sweeping Attack/);
     });
 
     it('consumes pendingSweepingAttack (one-shot)', async () => {

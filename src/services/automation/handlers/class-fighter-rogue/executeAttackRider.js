@@ -199,11 +199,11 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
         }
 
         if (rawSecondary.length === 0) {
-            const desc = `${maneuver.name}: ${dieDescription} No other creature is within 5 feet of ${targetName || 'the original target'}.`;
+            const logDescription = `${maneuver.name}: ${dieDescription} No other creature is within 5 feet of ${targetName || 'the original target'}.`;
             return {
                 type: 'popup',
-                payload: { type: 'automation_info', name: maneuver.name, description: desc, automation: auto },
-                logEntries: [{ type: 'ability_use', characterName: playerStats.name, abilityName: maneuver.name, description: desc }],
+                payload: { type: 'automation_info', name: maneuver.name, description: `${dieDescription} No other creature is within 5 feet of ${targetName || 'the original target'}.`, automation: auto },
+                logEntries: [{ type: 'ability_use', characterName: playerStats.name, abilityName: maneuver.name, description: logDescription }],
             };
         }
 

@@ -348,7 +348,7 @@ export async function executeSweepingAttack(action, playerStats, campaignName, s
             payload: {
                 type: 'automation_info',
                 name: 'Sweeping Attack',
-                description: 'Sweeping Attack: No pending data. Use from an attack rider.',
+                description: 'No pending data. Use from an attack rider.',
             },
         };
     }
@@ -364,7 +364,7 @@ export async function executeSweepingAttack(action, playerStats, campaignName, s
             payload: {
                 type: 'automation_info',
                 name: 'Sweeping Attack',
-                description: `Sweeping Attack: ${secondaryTargetName} is not a valid secondary target.`,
+                description: `${secondaryTargetName} is not a valid secondary target.`,
             },
         };
     }
@@ -386,7 +386,7 @@ export async function executeSweepingAttack(action, playerStats, campaignName, s
     let actualDamage = 0;
 
     if (!inRange) {
-        description = `<b>Sweeping Attack</b><br/>${secondaryTargetName} is not within 5 feet of ${targetName || 'the original target'} — no creature is swept.`;
+        description = `${secondaryTargetName} is not within 5 feet of ${targetName || 'the original target'} — no creature is swept.`;
         await addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerStats.name,
@@ -414,7 +414,7 @@ export async function executeSweepingAttack(action, playerStats, campaignName, s
         });
         setRuntimeValue('campaign', 'targetEffects', storedEffects, campaignName);
 
-        description = `<b>Sweeping Attack</b><br/>Original attack roll ${attackTotal} vs AC ${secondAc} hits ${secondaryTargetName}, which takes ${actualDamage} ${damageType} damage (same type as the original attack).`;
+        description = `Original attack roll ${attackTotal} vs AC ${secondAc} hits ${secondaryTargetName}, which takes ${actualDamage} ${damageType} damage (same type as the original attack).`;
         await addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerStats.name,
@@ -422,7 +422,7 @@ export async function executeSweepingAttack(action, playerStats, campaignName, s
             description: `Sweeping Attack: original attack roll ${attackTotal} vs AC ${secondAc} hits ${secondaryTargetName} — ${actualDamage} ${damageType} damage (same type as the attack on ${targetName || 'the original target'}).`,
         }).catch((e) => { console.error('[MN-018:log-error]', e); });
     } else {
-        description = `<b>Sweeping Attack</b><br/>Original attack roll ${attackTotal} vs AC ${secondAc} — misses ${secondaryTargetName}. No damage.`;
+        description = `Original attack roll ${attackTotal} vs AC ${secondAc} — misses ${secondaryTargetName}. No damage.`;
         await addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerStats.name,
