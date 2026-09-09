@@ -12,9 +12,14 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(async () => {}),
 }));
 
+vi.mock('../../../../services/ui/logService.js', () => ({
+    addEntry: vi.fn(async () => {}),
+}));
+
 const { getRuntimeValue, setRuntimeValue } = await import(
     '../../../../hooks/runtime/useRuntimeState.js'
 );
+const { addEntry } = await import('../../../../services/ui/logService.js');
 
 function makeAction(overrides = {}) {
     return {
@@ -182,6 +187,48 @@ describe('useMagicDeviceHandler', () => {
             const callArgs = setRuntimeValue.mock.calls[0];
             const buffs = callArgs[2];
             expect(buffs.map(b => b.name)).toEqual(['Buff A', 'Buff B']);
+        });
+    });
+
+    describe('campaign log (CLA-374)', () => {
+        it('logs an ability_use entry on activation with clause details', async () => {
+            getRuntimeValue.mockImplementation(makeGetRuntime([]));
+
+            await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            expect(addEntry).toHaveBeenCalledTimes(1);
+            const [campaign, entry] = addEntry.mock.calls[0];
+            expect(campaign).toBe('test-campaign');
+            expect(entry.type).toBe('ability_use');
+            expect(entry.characterName).toBe('TestRogue');
+            expect(entry.abilityName).toBe('Use Magic Device');
+            expect(entry.description).toContain('attune up to 4 magic items');
+            expect(entry.description).toContain('1d6');
+            expect(entry.description).toContain('Arcana DC 10 + spell level');
+            expect(typeof entry.timestamp).toBe('number');
+        });
+
+        it('logs an ability_use entry on deactivation', async () => {
+            getRuntimeValue.mockImplementation(makeGetRuntime([
+                { name: 'Use Magic Device', effect: 'use_magic_device' },
+            ]));
+
+            await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            expect(addEntry).toHaveBeenCalledTimes(1);
+            const [, entry] = addEntry.mock.calls[0];
+            expect(entry.type).toBe('ability_use');
+            expect(entry.description).toContain('deactivates');
+        });
+
+        it('awaits the buff write before returning (state lands before popup)', async () => {
+            getRuntimeValue.mockImplementation(makeGetRuntime([]));
+
+            await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            const writeIdx = setRuntimeValue.mock.invocationCallOrder[0];
+            const logIdx = addEntry.mock.invocationCallOrder[0];
+            expect(writeIdx).toBeLessThan(logIdx);
         });
     });
 

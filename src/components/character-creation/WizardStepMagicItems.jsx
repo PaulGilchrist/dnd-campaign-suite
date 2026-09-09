@@ -16,7 +16,9 @@ function calculateAttunementLimit(formData, classSubtypes) {
         return BASE_ATTUNEMENT_LIMIT;
     }
 
-    const subclassName = formData.class.subclass?.name;
+    // CLA-374: the wizard stores the subclass under class.subclass (5e) and
+    // class.major (2024 majors) — accept either name.
+    const subclassName = formData.class.subclass?.name || formData.class.major?.name;
     if (!subclassName) {
         return BASE_ATTUNEMENT_LIMIT;
     }
@@ -28,9 +30,11 @@ function calculateAttunementLimit(formData, classSubtypes) {
 
     const characterLevel = formData.level || 1;
 
-    const hasUseMagicDevice = subclass.class_levels?.some(cl => {
+    // CLA-374: 5e subclasses nest level-gated features under class_levels[];
+    // 2024 majors carry them flat on features[] — scan both shapes.
+    const hasUseMagicDevice = (subclass.class_levels || []).some(cl => {
         return cl.features?.some(f => f.name === 'Use Magic Device' && cl.level <= characterLevel);
-    });
+    }) || (subclass.features || []).some(f => f.name === 'Use Magic Device' && (f.level || 1) <= characterLevel);
 
     if (hasUseMagicDevice) {
         return BASE_ATTUNEMENT_LIMIT + 1;

@@ -6868,7 +6868,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-374-use-magic-device-inert-row.md",
+      "verified": "verified",
       "class": "Rogue",
       "triggerConditions": "Action: passive",
       "expectedBehavior": "Attunement: attune to up to 4 magic items at once. Charges: when using magic item property that expends charges, roll 1d6, on 6 use without expending. Scrolls: use any Spell Scroll, Intelligence as spellcasting ability. Cantrip/level 1: cast reliably. Higher level: succeed on Intelligence (Arcana) check (DC 10 + spell level) to cast. On fail, scroll disintegrates."

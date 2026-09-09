@@ -74,6 +74,10 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     // twinklingConstellationHandler (lv<10 info-popup gate + constellation
     // chooser modal → applyConstellationOption re-stamps the Starry Form buff).
     'twinkling_constellations',
+    // CLA-374: the Special Actions "Use Magic Device:" row dispatches
+    // handleUseMagicDevice (GM-adjudicated activation toggle: activeBuffs
+    // entry + ability_use log + clause summary popup).
+    'use_magic_device',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([

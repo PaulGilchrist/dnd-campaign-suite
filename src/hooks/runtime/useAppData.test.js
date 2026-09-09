@@ -108,6 +108,9 @@ describe('useAppData', () => {
       expect(result.current.classes2024).toEqual(mockClasses2024);
       expect(result.current.equipment).toEqual(mockEquipment);
       expect(result.current.magicItems).toEqual(mockMagicItems);
+      // CLA-374: magicItems2024 aliases the shared /data/magic-items.json so
+      // 2024 sheets see inventory.magicItems (was undefined -> getMagicItems []).
+      expect(result.current.magicItems2024).toEqual(mockMagicItems);
       expect(result.current.monsters).toEqual(mockMonsters);
       expect(result.current.races).toEqual(mockRaces);
       expect(result.current.races2024).toEqual(mockRaces2024);

@@ -244,6 +244,99 @@ describe('WizardStepMagicItems', () => {
       ).toBeInTheDocument();
     });
 
+    // CLA-374: 2024 wizard maps subtypes = cls.subclasses || cls.majors, and
+    // 2024 Thief majors carry features[] flat (NO class_levels) — the +1 bonus
+    // previously never fired and the cap stayed at 3 for lv13+ Thief.
+    const thief2024Subtypes = [
+      {
+        className: 'Rogue',
+        subtypes: [
+          {
+            name: 'Thief',
+            subtitle: 'Skill and Precision',
+            features: [
+              { level: 3, name: 'Fast Hands' },
+              { level: 13, name: 'Use Magic Device' },
+            ],
+          },
+        ],
+      },
+    ];
+    const fourAttuned = ['Boots', 'Cloak', 'Gloves', 'Ring'];
+
+    it('CLA-374: raises the cap to 4 for 2024 Thief lv13+ (flat features[] shape, class.subclass)', () => {
+      render(
+        <WizardStepMagicItems
+          {...createProps({
+            formData: {
+              class: { name: 'Rogue', subclass: { name: 'Thief' } },
+              level: 20,
+              inventory: { magicItems: fourAttuned },
+            },
+            allMagicItems: fourAttuned.map((name) => ({ name, requiresAttunement: true })),
+            classSubtypes: thief2024Subtypes,
+          })}
+        />,
+      );
+      expect(screen.queryByText(/items requiring attunement/)).not.toBeInTheDocument();
+    });
+
+    it('CLA-374: honors class.major naming (2024 wizard normalization)', () => {
+      render(
+        <WizardStepMagicItems
+          {...createProps({
+            formData: {
+              class: { name: 'Rogue', major: { name: 'Thief' } },
+              level: 13,
+              inventory: { magicItems: fourAttuned },
+            },
+            allMagicItems: fourAttuned.map((name) => ({ name, requiresAttunement: true })),
+            classSubtypes: thief2024Subtypes,
+          })}
+        />,
+      );
+      expect(screen.queryByText(/items requiring attunement/)).not.toBeInTheDocument();
+    });
+
+    it('CLA-374: keeps base limit 3 below lv13 for 2024 Thief shape', () => {
+      render(
+        <WizardStepMagicItems
+          {...createProps({
+            formData: {
+              class: { name: 'Rogue', subclass: { name: 'Thief' } },
+              level: 12,
+              inventory: { magicItems: fourAttuned },
+            },
+            allMagicItems: fourAttuned.map((name) => ({ name, requiresAttunement: true })),
+            classSubtypes: thief2024Subtypes,
+          })}
+        />,
+      );
+      expect(screen.getByText(/maximum of 3 items/)).toBeInTheDocument();
+    });
+
+    it('CLA-374: keeps base limit 3 without the feature in the major', () => {
+      render(
+        <WizardStepMagicItems
+          {...createProps({
+            formData: {
+              class: { name: 'Rogue', subclass: { name: 'Assassin' } },
+              level: 20,
+              inventory: { magicItems: fourAttuned },
+            },
+            allMagicItems: fourAttuned.map((name) => ({ name, requiresAttunement: true })),
+            classSubtypes: [
+              {
+                className: 'Rogue',
+                subtypes: [{ name: 'Assassin', features: [{ level: 3, name: 'Assassinate' }] }],
+              },
+            ],
+          })}
+        />,
+      );
+      expect(screen.getByText(/maximum of 3 items/)).toBeInTheDocument();
+    });
+
     it('matches selected items by index when name lookup fails', () => {
       const items = [
         { name: 'Boots of Speed', index: 'boots-speed', requiresAttunement: true },

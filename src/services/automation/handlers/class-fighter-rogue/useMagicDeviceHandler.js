@@ -1,4 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../../../services/ui/logService.js';
 
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation || {};
@@ -10,7 +11,14 @@ export async function handle(action, playerStats, campaignName) {
 
     if (isActive) {
         const newBuffs = activeBuffs.filter(b => b.name !== action.name);
-        setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
+        await setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: action.name,
+            description: `${playerName} deactivates ${action.name}. Attunement limit returns to normal.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[useMagicDevice] log error:', e); });
         return {
             type: 'popup',
             payload: {
@@ -31,10 +39,19 @@ export async function handle(action, playerStats, campaignName) {
     };
 
     const newBuffs = [...activeBuffs, buff];
-    setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
+    await setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
 
     const attunementLimit = auto.attunementLimit || 4;
+    const chargeReroll = auto.chargeReroll || '1d6';
     const chargeRerollSuccess = auto.chargeRerollSuccess || 6;
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: action.name,
+        description: `${playerName} activates ${action.name}: attune up to ${attunementLimit} magic items; charges reroll ${chargeReroll} on ${chargeRerollSuccess}; scrolls cast with INT (Arcana DC 10 + spell level, disintegrates on fail). Charges/scroll clauses GM-adjudicated.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[useMagicDevice] log error:', e); });
 
     return {
         type: 'popup',

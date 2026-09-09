@@ -75,6 +75,10 @@ function useAppData() {
     classes2024,
     equipment,
     magicItems,
+    // CLA-374: no 2024-specific magic items file exists — /data/magic-items.json
+    // is shared. Alias it so 2024 sheets (App.jsx/CharSheet.jsx select
+    // magicItems2024) don't get undefined → getMagicItems early-return [].
+    magicItems2024: magicItems,
     monsters,
     races,
     races2024,

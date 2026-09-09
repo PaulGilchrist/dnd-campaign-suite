@@ -146,15 +146,9 @@ export function collectSaveModifiers(features) {
                     canBeBonusOrPenalty: !!auto.canBeBonusOrPenalty,
                 })
             }
-            if (auto.type === 'use_magic_device') {
-                modifiers.push({
-                    source: feature.name,
-                    target: 'ability_check',
-                    condition: '',
-                    effect: 'advantage',
-                    abilities: ['INT'],
-                })
-            }
+            // CLA-374: removed dead + wrong-by-rules 'use_magic_device' INT
+            // advantage modifier — 2024 UMD grants no such advantage, and the
+            // consumers only read target==='saving_throw' so it never fired.
             if (auto.type === 'passive_immunity' && auto.save_advantage) {
                 for (const sa of auto.save_advantage) {
                     modifiers.push({
