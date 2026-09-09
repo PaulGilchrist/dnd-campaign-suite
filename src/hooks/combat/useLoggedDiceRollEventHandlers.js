@@ -20,6 +20,7 @@ import storage from '../../services/ui/storage.js';
 import { isCircleOfPowerActive } from '../../services/automation/handlers/buffs/circleOfPowerHandler.js';
 import { cleanupConcentrationEffects } from '../../services/combat/concentration/concentrationService.js';
 import { isResilientSphereActive } from '../../services/combat/automation/automationPassives.js';
+import { triggerViciousMockeryForGeneric } from '../../services/rules/features/viciousMockeryService.js';
 
 export function setupEventListeners(deps) {
     const { characterName, campaignName, logEntry, charactersRef } = deps;
@@ -337,6 +338,22 @@ export function setupEventListeners(deps) {
                 }
                 if (effectsToExpire.length > 0) {
                     addExpiration(characterName, targetName, effectsToExpire, pending.campaignName, 2);
+                }
+            }
+
+            // CLA-377: Vicious Mockery disadvantage is applied on the FAILED save only,
+            // after the save resolves (mirrors the statusEffects-on-fail leg above).
+            if (!e.detail.success && pending.viciousMockerySpell) {
+                try {
+                    await triggerViciousMockeryForGeneric(
+                        pending.viciousMockerySpell,
+                        { spellSaveDc: e.detail.saveDc, targetName: pending.targetName },
+                        pending.playerStats,
+                        pending.campaignName,
+                        pending.viciousMockeryMapName
+                    );
+                } catch (err) {
+                    console.error('[save-result-handler] Vicious Mockery trigger failed:', err);
                 }
             }
 

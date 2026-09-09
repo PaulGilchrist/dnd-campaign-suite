@@ -2,7 +2,6 @@ import { rollExpression, rollExpressionMaximized } from '../../../../dice/diceRo
 import { triggerSoulstitchSpells } from '../../postCastRiderService.js';
 import { rangeToFeet } from '../../../combat/rangeValidation.js';
 import { getCombatContext } from '../../../combat/damageUtils.js';
-import { triggerViciousMockeryForGeneric } from '../../../features/viciousMockeryService.js';
 import { computeEmpoweredEvocation } from './damageCalculation.js';
 
 async function handleSavePath(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters,
@@ -177,6 +176,14 @@ async function handleSingleTargetSave(spell, fullSpell, metaCtx, playerStats, ca
     if (spell.status_effects && spell.status_effects.length > 0) {
         context.statusEffects = spell.status_effects;
     }
+    // CLA-377: Vicious Mockery disadvantage must be gated on the RESOLVED save outcome.
+    // Stamp the cast in context; the save consumer (handleNpcSaveDamage / save-result
+    // event handler) triggers the effect on a failed save only, mirroring the
+    // statusEffects-on-fail pattern.
+    if (spell.name && spell.name.toLowerCase() === 'vicious mockery') {
+        context.viciousMockerySpell = spell;
+        context.viciousMockeryMapName = mapName;
+    }
 
     let overchannelResult;
     const damageFormula = overchannelFormula || formula;
@@ -187,14 +194,6 @@ async function handleSingleTargetSave(spell, fullSpell, metaCtx, playerStats, ca
     }
     if (overchannelResult) {
         rollDamage(spell.name, overchannelFormula || formula, overchannelResult.total, overchannelResult.rolls, overchannelResult.modifier, context);
-    }
-
-    // Vicious Mockery — trigger disadvantage effect after save+damage roll
-    if (spell.name && spell.name.toLowerCase() === 'vicious mockery') {
-        const mockeryTarget = await getTargetInfo();
-        triggerViciousMockeryForGeneric(spell, { ...metaCtx, spellSaveDc, targetName: mockeryTarget?.name }, playerStats, campaignName, mapName).catch(e => {
-            console.error('[spellCast] Vicious Mockery trigger failed:', e);
-        });
     }
 }
 

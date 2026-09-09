@@ -5,6 +5,9 @@
 // @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+vi.mock('../../../services/rules/features/viciousMockeryService.js', () => ({
+    triggerViciousMockeryForGeneric: vi.fn(() => Promise.resolve()),
+}));
 vi.mock('../../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
     rollExpressionDoubled: vi.fn(),

@@ -7,6 +7,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const flushPromises = () => new Promise(r => setTimeout(r, 0));
 
+vi.mock('../../services/rules/features/viciousMockeryService.js', () => ({
+    triggerViciousMockeryForGeneric: vi.fn(() => Promise.resolve()),
+}));
 vi.mock('../../services/rules/effects/expirations.js', () => ({ addExpiration: vi.fn() }));
 vi.mock('../../services/dice/diceRoller.js', () => ({ rollExpression: vi.fn(), rollExpressionDoubled: vi.fn() }));
 vi.mock('../../services/encounters/combatData.js', () => ({ getCombatSummary: vi.fn() }));

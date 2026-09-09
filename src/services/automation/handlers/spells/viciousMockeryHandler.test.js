@@ -64,6 +64,20 @@ describe('viciousMockeryHandler', () => {
         );
     });
 
+    it('logs the condition application for the failed-save effect (CLA-377 fail leg)', async () => {
+        const { addEntry } = await import('../../../ui/logService.js');
+
+        await handle(makeAction(), makePlayerStats(), 'test-campaign', 'TestMap');
+
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Goblin',
+            condition: 'Disadvantage on next attack',
+            reason: 'Vicious Mockery (failed save)',
+        }));
+    });
+
     it('returns popup with automation info', async () => {
         const result = await handle(makeAction(), makePlayerStats(), 'TestCampaign', 'TestMap');
 

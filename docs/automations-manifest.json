@@ -6915,7 +6915,7 @@
       "handler": "src/services/automation/handlers/spells/viciousMockeryHandler.js",
       "router": "src/services/spellCastService/savePath.js:193",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-377-vm-te-ungated-save-success.md (retyped classFeature→spell; DC 19 + 4d6@18 + forcedMode:disadvantage consumed live-exact, but te+condition log written at cast before save resolves — fires on successes)",
+      "verified": "verified",
       "class": "Bard",
       "triggerConditions": "Action; Target creature within 60ft; WIS save or",
       "expectedBehavior": "You unleash a string of insults laced with subtle enchantments at one creature you can see or hear within range. The target must succeed on a Wisdom saving throw or take 1d6 Psychic damage and have Disadvantage on the next attack roll it makes before the end of its next turn. Damage increases at levels 5 (2d6), 11 (3d6), and 17 (4d6). (Bard cantrip spell)"

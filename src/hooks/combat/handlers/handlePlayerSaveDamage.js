@@ -218,6 +218,9 @@ export function createPlayerSaveDamageHandler(deps) {
             overchannelSpellLevel: context?.overchannelSpellLevel || 1,
             statusEffects: context?.statusEffects || [],
             playerStats: context?.playerStats,
+            // CLA-377: Vicious Mockery disadvantage gated on the resolved save outcome.
+            viciousMockerySpell: context?.viciousMockerySpell || null,
+            viciousMockeryMapName: context?.viciousMockeryMapName || null,
             autoDamageSecondaryFormula: context?.autoDamageSecondaryFormula || null,
             autoDamageSecondaryName: context?.autoDamageSecondaryName || null,
             autoDamageSecondaryDamageType: context?.autoDamageSecondaryDamageType || null,

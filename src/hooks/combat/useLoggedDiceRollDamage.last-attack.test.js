@@ -14,6 +14,9 @@ import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js'
 import { createLogDamageAndShow } from './useLoggedDiceRollDamage.js';
 
 // Minimal mocks — only what the main function and its direct handler chain need.
+vi.mock('../../services/rules/features/viciousMockeryService.js', () => ({
+    triggerViciousMockeryForGeneric: vi.fn(() => Promise.resolve()),
+}));
 vi.mock('../runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(() => Promise.resolve()),

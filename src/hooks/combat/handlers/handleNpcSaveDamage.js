@@ -17,6 +17,7 @@ import { getElderChampionSaveDisadvantage } from '../../../services/combat/auras
 import { resolveCreatureType } from '../../../services/combat/creatureTypeResolver.js';
 import { isCircleOfPowerActive } from '../../../services/automation/handlers/buffs/circleOfPowerHandler.js';
 import { handleOverchannelSelfDamage } from './handleOverchannelSelfDamage.js';
+import { triggerViciousMockeryForGeneric } from '../../../services/rules/features/viciousMockeryService.js';
 
 // CLA-279: consume Radiant Soul once-per-turn when the save-damage roll carries the
 // execution-owned " + N [Radiant Soul]" adder (single-target save spells).
@@ -41,6 +42,23 @@ function hasSpellOrigin(saveModifiers, context, campaignName) {
     if (context?.isSpellDamage === true || context?.isCantrip === true || !!context?.autoDamageSchool) return true;
     const lastAttackOrigin = getRuntimeValue('campaign', 'lastAttack', campaignName) || {};
     return lastAttackOrigin.rollType === 'spell-save' || lastAttackOrigin.isSpellDamage === true;
+}
+
+// CLA-377: Vicious Mockery disadvantage is applied on the FAILED save only, after the
+// save resolves (mirrors the statusEffects-on-fail leg in handleNpcSaveDamage).
+async function triggerViciousMockeryOnFailedSave(saveResult, context, target, campaignName, saveDc) {
+    if (saveResult.success || !context?.viciousMockerySpell) return;
+    try {
+        await triggerViciousMockeryForGeneric(
+            context.viciousMockerySpell,
+            { spellSaveDc: saveDc, targetName: target.name },
+            context.playerStats,
+            campaignName,
+            context.viciousMockeryMapName ?? null
+        );
+    } catch (e) {
+        console.error('[handleNpcSaveDamage] Vicious Mockery trigger failed:', e);
+    }
 }
 
 export function createNpcSaveDamageHandler(deps) {
@@ -365,6 +383,8 @@ export function createNpcSaveDamageHandler(deps) {
                 setRuntimeValue(target.name, 'activeConditions', [...filtered, condKey], campaignName);
             }
         }
+
+        await triggerViciousMockeryOnFailedSave(saveResult, context, target, campaignName, saveDc);
 
         const popupData = {
             type: 'save-damage',

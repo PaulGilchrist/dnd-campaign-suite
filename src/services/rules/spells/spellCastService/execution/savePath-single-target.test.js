@@ -229,8 +229,8 @@ describe('savePath.js — handleSingleTargetSave', () => {
   /*  handleSingleTargetSave — Vicious Mockery                         */
   /* ---------------------------------------------------------------- */
 
-  describe('Vicious Mockery', () => {
-    it('triggers vicious mockery when spell name is Vicious Mockery', async () => {
+  describe('Vicious Mockery (CLA-377)', () => {
+    it('never triggers vicious mockery at cast time — gated on the resolved save outcome', async () => {
       const args = makeSavePathArgs({
         spell: { name: 'Vicious Mockery', level: 0, baseLevel: 0, dc: {} },
         fullSpell: { name: 'Vicious Mockery', level: 0, baseLevel: 0, dc: {} },
@@ -250,20 +250,36 @@ describe('savePath.js — handleSingleTargetSave', () => {
       );
 
       await Promise.resolve();
+      await Promise.resolve();
 
-      expect(triggerViciousMockeryForGeneric).toHaveBeenCalledWith(
-        args.spell,
-        expect.objectContaining({
-          spellSaveDc: 15,
-          targetName: 'Goblin',
-        }),
-        args.playerStats,
-        'test-campaign',
-        'test-map',
-      );
+      expect(triggerViciousMockeryForGeneric).not.toHaveBeenCalled();
     });
 
-    it('does not trigger vicious mockery for other spells', async () => {
+    it('stamps viciousMockerySpell and viciousMockeryMapName into the save context', async () => {
+      const args = makeSavePathArgs({
+        spell: { name: 'Vicious Mockery', level: 0, baseLevel: 0, dc: {} },
+        fullSpell: { name: 'Vicious Mockery', level: 0, baseLevel: 0, dc: {} },
+        mapName: 'test-map',
+        spellSaveDc: 15,
+      });
+      const rollDamageMock = vi.fn();
+      args.rollDamage = rollDamageMock;
+
+      await handleSavePath(
+        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
+        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
+        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
+        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
+        args.overchannelUseCount, args.rollAttack, args.rollDamage,
+        args.formula, args.hasInvisible,
+      );
+
+      const context = rollDamageMock.mock.calls[0][5];
+      expect(context.viciousMockerySpell).toBe(args.spell);
+      expect(context.viciousMockeryMapName).toBe('test-map');
+    });
+
+    it('does not stamp the save context for other spells', async () => {
       const args = makeSavePathArgs();
       const rollDamageMock = vi.fn();
       args.rollDamage = rollDamageMock;
@@ -277,39 +293,10 @@ describe('savePath.js — handleSingleTargetSave', () => {
         args.formula, args.hasInvisible,
       );
 
+      const context = rollDamageMock.mock.calls[0][5];
+      expect(context.viciousMockerySpell).toBeUndefined();
+      expect(context.viciousMockeryMapName).toBeUndefined();
       expect(triggerViciousMockeryForGeneric).not.toHaveBeenCalled();
-    });
-
-    it('handles vicious mockery trigger error gracefully', async () => {
-      const args = makeSavePathArgs({
-        spell: { name: 'Vicious Mockery', level: 0, baseLevel: 0, dc: {} },
-        fullSpell: { name: 'Vicious Mockery', level: 0, baseLevel: 0, dc: {} },
-        mapName: 'test-map',
-        spellSaveDc: 15,
-      });
-      const rollDamageMock = vi.fn();
-      args.rollDamage = rollDamageMock;
-      triggerViciousMockeryForGeneric.mockRejectedValue(new Error('Trigger failed'));
-
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
-
-      await Promise.resolve();
-
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[spellCast] Vicious Mockery trigger failed:',
-        expect.any(Error),
-      );
-
-      consoleSpy.mockRestore();
     });
   });
 

@@ -492,7 +492,7 @@ describe('executeSpellCast - Feature riders & special cases', () => {
   // Vicious Mockery generic
   // ------------------------------------------------------------------
   describe('Vicious Mockery generic', () => {
-    it('triggers vicious mockery for attack-roll spells named Vicious Mockery', async () => {
+    it('stamps the save context and does NOT trigger vicious mockery at cast time (CLA-377)', async () => {
       const services = makeServices({
         getTargetInfo: async () => ({ name: 'Target' }),
       })
@@ -507,7 +507,12 @@ describe('executeSpellCast - Feature riders & special cases', () => {
       await executeSpellCast(spell, makeMetaCtx({ slotLevel: 0 }), services)
 
       const vm = await import('../../../features/viciousMockeryService.js')
-      expect(vm.triggerViciousMockeryForGeneric).toHaveBeenCalled()
+      expect(vm.triggerViciousMockeryForGeneric).not.toHaveBeenCalled()
+
+      const rollDamage = services.rollDamage
+      expect(rollDamage).toHaveBeenCalled()
+      const context = rollDamage.mock.calls[rollDamage.mock.calls.length - 1][5]
+      expect(context.viciousMockerySpell).toBe(spell)
     })
   })
 
