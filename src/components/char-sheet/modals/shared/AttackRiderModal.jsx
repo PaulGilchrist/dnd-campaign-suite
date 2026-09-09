@@ -17,24 +17,28 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
     const [sfResult, setSfResult] = useState(null);
 
     useEffect(() => {
-        if (applied && !result) {
+        if (applied && !result && !versatileTricksterTargets && !stalkersFlurryTargets) {
             onClose();
         }
-    }, [applied, result, onClose]);
+    }, [applied, result, versatileTricksterTargets, stalkersFlurryTargets, onClose]);
 
     const options = action.options || action.automation?.options || [];
     const maxEffects = action.automation?.maxEffects || action.maxEffects || 1;
     const multiSelect = maxEffects > 1;
 
-    // Check for Versatile Trickster secondary targets after applying
+    // Check for Versatile Trickster secondary targets after applying.
+    // CLA-376: gate on `applied` alone — save-bearing single-option picks
+    // (Trip) return null from applyRiderOption, so `result` truthiness hid the
+    // chooser. applyRiderOption clears these keys at entry, so persisted keys
+    // here are always this cast's fresh Trip scan.
     useEffect(() => {
-        if (applied && result) {
+        if (applied) {
             const secondaryTargets = getRuntimeValue(playerStats.name, 'versatileTricksterSecondaryTargets', campaignName);
             if (secondaryTargets && secondaryTargets.length > 0) {
                 setVersatileTricksterTargets(secondaryTargets);
             }
         }
-    }, [applied, result, playerStats.name, campaignName]);
+    }, [applied, playerStats.name, campaignName]);
 
     // Check for Stalker's Flurry secondary targets after applying
     useEffect(() => {
@@ -51,11 +55,17 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
             if (selectedMulti.length === 0) return;
             const res = await applyRiderOption(action, playerStats, campaignName, targetName, selectedMulti);
             setResult(res);
+            // CLA-376: Trip save legs return null — open the VT picker off the
+            // freshly-written (entry-cleared) persisted keys, not result truthiness.
+            const vtTargets = getRuntimeValue(playerStats.name, 'versatileTricksterSecondaryTargets', campaignName);
+            if (vtTargets && vtTargets.length > 0) setVersatileTricksterTargets(vtTargets);
             setApplied(true);
         } else {
             if (!selected) return;
             const res = await applyRiderOption(action, playerStats, campaignName, targetName, selected ? [selected] : []);
             setResult(res);
+            const vtTargets = getRuntimeValue(playerStats.name, 'versatileTricksterSecondaryTargets', campaignName);
+            if (vtTargets && vtTargets.length > 0) setVersatileTricksterTargets(vtTargets);
             setApplied(true);
         }
     };

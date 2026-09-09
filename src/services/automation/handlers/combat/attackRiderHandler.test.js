@@ -298,6 +298,36 @@ describe('attackRiderHandler', () => {
             expect(result.payload.description).toContain('Cleave');
         });
 
+        it('CLA-376: clears stale Versatile Trickster keys at apply entry', async () => {
+            mockTargetEffects();
+            const action = makeAction();
+            await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Withdraw']);
+
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'versatileTricksterSecondaryTargets', null, 'campaign');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'versatileTricksterPrimaryTarget', null, 'campaign');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'versatileTricksterAction', null, 'campaign');
+        });
+
+        it('CLA-376: Trip with VT passive re-writes secondary keys after entry clear', async () => {
+            mockTargetEffects();
+            vi.mocked(isWithinRange).mockResolvedValue(true);
+            vi.mocked(getCombatContext).mockResolvedValue({
+                creatures: [
+                    { name: 'Goblin', size: 'Medium' },
+                    { name: 'Skeleton', size: 'Medium' },
+                ],
+            });
+            const stats = makePlayerStats({
+                automation: { passives: [{ type: 'passive_rule', effect: 'versatile_trickster' }] },
+            });
+            const action = makeAction();
+            await applyRiderOption(action, stats, 'campaign', 'Goblin', ['Trip']);
+
+            const vtCalls = setRuntimeValue.mock.calls.filter(c => c[1] === 'versatileTricksterSecondaryTargets');
+            expect(vtCalls[0][2]).toBeNull();
+            expect(vtCalls.at(-1)[2]).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'Skeleton' })]));
+        });
+
         it('should apply Envenom Weapons damage when CON poison save fails and passive exists', async () => {
             vi.mocked(rollExpression).mockReturnValue({ total: 8 });
             vi.mocked(getCombatContext).mockResolvedValue({

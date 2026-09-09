@@ -296,6 +296,13 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     const chosenOptions = names.map(name => options.find(o => o.name === name)).filter(Boolean);
     if (chosenOptions.length === 0) return null;
 
+    // CLA-376: clear stale Versatile Trickster picker keys at apply entry so
+    // the AttackRiderModal only ever reads this cast's freshly-written keys
+    // (stale-key replay re-surfaced the chooser on non-Trip applies).
+    setRuntimeValue(playerStats.name, 'versatileTricksterSecondaryTargets', null, campaignName);
+    setRuntimeValue(playerStats.name, 'versatileTricksterPrimaryTarget', null, campaignName);
+    setRuntimeValue(playerStats.name, 'versatileTricksterAction', null, campaignName);
+
     // Check oncePerTurn for Charger feat
     if (auto.oncePerTurn) {
         const isCsFeature = ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].includes(action.name);

@@ -19,8 +19,19 @@ vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 
+vi.mock('../../../automation/common/savePrompt.js', () => ({
+    buildSaveDc: vi.fn(() => 16),
+    createSaveListener: vi.fn(() => ({
+        promptId: 'p-test',
+        promise: Promise.resolve({ success: true, roll: 20, saveBonus: 2, total: 22 }),
+    })),
+}));
+
 const { getRuntimeValue, setRuntimeValue } = await import(
     '../../../../hooks/runtime/useRuntimeState.js'
+);
+const { buildSaveDc, createSaveListener } = await import(
+    '../../../automation/common/savePrompt.js'
 );
 const { getCombatContext } = await import(
     '../../../rules/combat/damageUtils.js'
@@ -32,6 +43,11 @@ import { applyVersatileTrickster } from './versatileTricksterHandler.js';
 beforeEach(() => {
     vi.clearAllMocks();
     vi.resetAllMocks();
+    buildSaveDc.mockReturnValue(16);
+    createSaveListener.mockReturnValue({
+        promptId: 'p-test',
+        promise: Promise.resolve({ success: true, roll: 20, saveBonus: 2, total: 22 }),
+    });
 });
 
 function makeAction(overrides = {}) {
@@ -305,6 +321,10 @@ describe('versatileTricksterHandler', () => {
 
             it('gracefully handles log failure without throwing', async () => {
                 addEntry.mockRejectedValueOnce(new Error('network error'));
+                createSaveListener.mockReturnValue({
+                    promptId: 'p-test',
+                    promise: Promise.resolve({ success: true, roll: 20, saveBonus: 2, total: 22 }),
+                });
                 getCombatContext.mockResolvedValue(
                     makeCombatContext([
                         { name: 'Goblin', size: 'Small' },
@@ -320,6 +340,95 @@ describe('versatileTricksterHandler', () => {
 
                 expect(result.type).toBe('popup');
                 expect(result.payload.type).toBe('automation_info');
+            });
+        });
+
+        describe('CLA-376 secondary-target save', () => {
+            it('runs a real DEX save via createSaveListener mirroring the primary leg', async () => {
+                getCombatContext.mockResolvedValue(
+                    makeCombatContext([{ name: 'Thug 2', size: 'Medium' }])
+                );
+
+                await applyVersatileTrickster(
+                    makeAction(),
+                    makePlayerStats(),
+                    'test-campaign',
+                    'Thug 2'
+                );
+
+                expect(buildSaveDc).toHaveBeenCalledWith(
+                    expect.objectContaining({ saveDc: 'ability', saveAbility: 'DEX' }),
+                    expect.objectContaining({ name: 'TestRogue' })
+                );
+                expect(createSaveListener).toHaveBeenCalledWith(
+                    'test-campaign',
+                    expect.objectContaining({
+                        targetName: 'Thug 2',
+                        saveType: 'DEX',
+                        saveDc: 16,
+                        dcSuccess: false,
+                        saveAbility: 'DEX',
+                        attackerName: 'TestRogue',
+                        condition: 'prone',
+                    })
+                );
+            });
+
+            it('applies prone condition to the secondary target on a failed save and logs the roll', async () => {
+                createSaveListener.mockReturnValue({
+                    promptId: 'p-test',
+                    promise: Promise.resolve({ success: false, roll: 5, saveBonus: 2, total: 7 }),
+                });
+                getCombatContext.mockResolvedValue(
+                    makeCombatContext([{ name: 'Thug 2', size: 'Medium' }])
+                );
+                getRuntimeValue.mockImplementation((key, prop) => {
+                    if (prop === 'targetEffects') return [];
+                    if (key === 'Thug 2' && prop === 'activeConditions') return [];
+                    return null;
+                });
+
+                const result = await applyVersatileTrickster(
+                    makeAction(),
+                    makePlayerStats(),
+                    'test-campaign',
+                    'Thug 2'
+                );
+
+                const proneWrites = setRuntimeValue.mock.calls.filter(
+                    (c) => c[0] === 'Thug 2' && c[1] === 'activeConditions'
+                );
+                expect(proneWrites).toHaveLength(1);
+                expect(proneWrites[0][2]).toContain('prone');
+                expect(result.payload.description).toContain('failed');
+                expect(result.payload.description).toContain('Prone');
+                expect(addEntry).toHaveBeenCalledWith(
+                    'test-campaign',
+                    expect.objectContaining({
+                        type: 'ability_use',
+                        abilityName: 'Versatile Trickster',
+                        description: expect.stringContaining('rolled 5 on DEX save (DC 16)'),
+                    })
+                );
+            });
+
+            it('does NOT write prone condition on a succeeded save', async () => {
+                getCombatContext.mockResolvedValue(
+                    makeCombatContext([{ name: 'Thug 2', size: 'Medium' }])
+                );
+
+                const result = await applyVersatileTrickster(
+                    makeAction(),
+                    makePlayerStats(),
+                    'test-campaign',
+                    'Thug 2'
+                );
+
+                const proneWrites = setRuntimeValue.mock.calls.filter(
+                    (c) => c[0] === 'Thug 2' && c[1] === 'activeConditions'
+                );
+                expect(proneWrites).toHaveLength(0);
+                expect(result.payload.description).toContain('succeeded');
             });
         });
     });

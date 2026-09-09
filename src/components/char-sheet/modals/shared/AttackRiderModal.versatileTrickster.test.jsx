@@ -102,6 +102,40 @@ describe('AttackRiderModal - Versatile Trickster', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
+    it('CLA-376: shows the chooser on a single Trip save-leg (applyRiderOption resolves null)', async () => {
+      const onClose = vi.fn();
+      applyRiderOption.mockResolvedValue(null);
+      applyVersatileTrickster.mockResolvedValue({
+        type: 'popup',
+        payload: { type: 'automation_info', name: 'Trip', description: 'Secondary target tripped.' },
+      });
+
+      render(<AttackRiderModal {...makeProps({ onClose })} />);
+      selectSingleOption('Burning Hands');
+      clickApplySingle();
+
+      await waitFor(() => {
+        expect(screen.getByText('Versatile Trickster')).toBeInTheDocument();
+        expect(screen.getByText('Orc A')).toBeInTheDocument();
+      });
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('CLA-376: closes without replaying the chooser when persisted keys are cleared (non-Trip apply)', async () => {
+      const onClose = vi.fn();
+      applyRiderOption.mockResolvedValue(null);
+      getRuntimeValue.mockReturnValue(null);
+
+      render(<AttackRiderModal {...makeProps({ onClose })} />);
+      selectSingleOption('Burning Hands');
+      clickApplySingle();
+
+      await waitFor(() => {
+        expect(onClose).toHaveBeenCalledTimes(1);
+      });
+      expect(screen.queryByText('Versatile Trickster')).not.toBeInTheDocument();
+    });
+
     it('skips Versatile Trickster when Skip is clicked without calling applyVersatileTrickster', async () => {
       const onClose = vi.fn();
       render(<AttackRiderModal {...makeProps({ onClose })} />);

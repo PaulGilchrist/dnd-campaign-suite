@@ -6891,7 +6891,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-376-versatile-trickster.md (Arcane Trickster lv13 app-canonical, not Thief; second-target never saves/prone, single-Trip chooser unreachable)",
+      "verified": "verified",
       "class": "Rogue",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "When you use Trip option of Cunning Strike on a creature, you can also use it on another creature within 5 feet of the spectral hand."
