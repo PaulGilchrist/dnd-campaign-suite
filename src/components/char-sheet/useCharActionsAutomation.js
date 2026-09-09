@@ -55,6 +55,8 @@ export default function useCharActionsAutomation({
             starryFormConstellation: simpleModal('starryFormConstellationModal'),
             twinklingConstellation: simpleModal('twinklingConstellationModal'),
             arcaneCharge: simpleModal('arcaneChargeModal'),
+            // CLA-379: warBondSummon chooser was unregistered — modal result silently dropped
+            warBondSummon: simpleModal('warBondSummonModal'),
             warMagicCantrip: simpleModal('warMagicCantripModal'),
             warMagicSpell: simpleModal('warMagicSpellModal'),
             sacredWeaponDamageType: simpleModal('sacredWeaponModal'),

@@ -1,0 +1,39 @@
+.war-bond-chooser-list {
+    max-height: 320px;
+    overflow-y: auto;
+    text-align: left;
+    margin-top: 12px;
+}
+
+.war-bond-chooser-option {
+    display: block;
+    padding: 6px 12px;
+    margin: 2px 0;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+
+.war-bond-chooser-option:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.war-bond-chooser-option.selected {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: var(--color-link);
+}
+
+.war-bond-chooser-option.capped {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.war-bond-chooser-option input {
+    margin-right: 8px;
+}
+
+.war-bond-chooser-count {
+    opacity: 0.7;
+    font-size: 0.85em;
+    margin-top: 8px;
+}

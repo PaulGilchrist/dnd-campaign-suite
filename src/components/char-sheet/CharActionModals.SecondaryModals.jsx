@@ -19,6 +19,8 @@ import DivineInterventionModal from './modals/divine/DivineInterventionModal.jsx
 import ArcaneChargeModal from './modals/arcane/ArcaneChargeModal.jsx';
 import WarMagicCantripModal from './modals/WarMagicCantripModal.jsx';
 import WarMagicSpellModal from './modals/WarMagicSpellModal.jsx';
+import WarBondChooserModal from './modals/WarBondChooserModal.jsx';
+import { handleSummon as handleWarBondSummon } from '../../services/automation/handlers/class-fighter-rogue/warBondHandler.js';
 import SacredWeaponModal from './modals/divine/SacredWeaponModal.jsx';
 import { cancelSacredWeapon } from '../../services/automation/handlers/class-cleric-paladin/sacredWeaponHandler.js';
 import PrimalCompanionBonusActionModal from './modals/PrimalCompanionBonusActionModal.jsx';
@@ -285,6 +287,17 @@ function SecondaryModals({
                 <WarMagicSpellModal
                     {...mergedModalState.warMagicSpellModal}
                     onClose={() => setModalState({ warMagicSpellModal: null })}
+                />
+            )}
+            {mergedModalState.warBondSummonModal && (
+                <WarBondChooserModal
+                    title="War Bond — Summon Bonded Weapon"
+                    icon="fa-link"
+                    options={mergedModalState.warBondSummonModal.bondedWeapons}
+                    maxChoices={1}
+                    confirmLabel="Summon"
+                    onConfirm={(selected) => handleWarBondSummon(mergedModalState.warBondSummonModal.action, mergedModalState.warBondSummonModal.playerStats, campaignName, selected[0])}
+                    onClose={() => setModalState({ warBondSummonModal: null })}
                 />
             )}
             {mergedModalState.sacredWeaponModal && (

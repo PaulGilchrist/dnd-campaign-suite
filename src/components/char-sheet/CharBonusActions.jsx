@@ -29,6 +29,9 @@ import { useSpellPositionResolver } from '../../hooks/combat/useSpellPositionRes
 import { useSpellCastExecutor } from '../../hooks/combat/useSpellCastExecutor.js';
 import { resolveSpiritualWeaponMoveAndAttack } from '../../services/rules/features/spiritualWeaponService.js';
 import ArcaneVigorModal from './ArcaneVigorModal.jsx';
+import WarBondChooserModal from './modals/WarBondChooserModal.jsx';
+import { handleBond as handleWarBondBind, inventoryWeaponNames } from '../../services/automation/handlers/class-fighter-rogue/warBondHandler.js';
+import { loadWeapons } from './modals/weapon-kind-mastery-cache.js';
 import './CharActions.css'
 
 function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, characters, onAttackClick, onResolveSpellDamage, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo, setModalState, modalState }) {
@@ -62,6 +65,29 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
     );
     const poisonDoses = useRuntimeValue(playerStats.name, 'poisonDoses', campaignName);
     const showApplyPoison = hasApplyPoison && Number(poisonDoses ?? 0) > 0 && !cannotAct;
+
+    // CLA-379: War Bond (Eldritch Knight lv3, 2024) — in-app bond writer row.
+    // warBondWeapons previously had zero production writers, so the pool was
+    // unreachable in-app. This row opens a chooser over inventory weapons
+    // (cap bondedWeaponCount) that persists warBondWeapons via handleBond.
+    const warBondRow = (playerStats.bonusActions || []).find(a =>
+        (Array.isArray(a.automation) ? a.automation : [a.automation]).some(x => x && x.type === 'war_bond_summon'));
+    const warBondInfo = (Array.isArray(warBondRow?.automation) ? warBondRow.automation : [warBondRow?.automation]).find(x => x && x.type === 'war_bond_summon');
+    const warBondMax = warBondInfo?.bondedWeaponCount || 2;
+    const storedBonded = useRuntimeValue(playerStats.name, 'warBondWeapons', campaignName);
+    const bondedWeapons = React.useMemo(() => (Array.isArray(storedBonded) ? storedBonded : []), [storedBonded]);
+    const [warBondBondModal, setWarBondBondModal] = useState(null);
+
+    const openWarBondChooser = React.useCallback(async () => {
+        try {
+            const allItems = await loadWeapons();
+            const weaponNames = new Set(allItems.filter(w => w.equipment_category === 'Weapon').map(w => w.name));
+            const options = inventoryWeaponNames(playerStats).filter(n => weaponNames.has(n));
+            setWarBondBondModal({ options, existing: bondedWeapons });
+        } catch (e) {
+            console.error('[CharBonusActions:war-bond-weapons-load]', e);
+        }
+    }, [playerStats, bondedWeapons]);
 
     // CLA-320: Soulknife Soul Blades Psychic Teleportation — the router routes
     // the auto_effect half into automation.bonusActions; render it as a
@@ -527,6 +553,12 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                     </div>
                 )}
 
+                {warBondInfo && (
+                    <div>
+                        <b className="clickable" onClick={openWarBondChooser}>Bond Weapon:</b> <span>{bondedWeapons.length > 0 ? `Bonded: ${bondedWeapons.join(', ')} (${bondedWeapons.length}/${warBondMax}).` : `No bonded weapons — choose up to ${warBondMax} from your inventory.`}</span>
+                    </div>
+                )}
+
                 {showPsychicTeleportation && (
                     <div>
                         <b className="clickable" onClick={() => onAutomationAction({
@@ -608,6 +640,19 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                         {...modalState.arcaneVigorModal}
                         onClose={() => setModalState({ arcaneVigorModal: null })}
                         onComplete={() => setModalState({ arcaneVigorModal: null })}
+                    />
+                )}
+
+                {warBondBondModal && (
+                    <WarBondChooserModal
+                        title="War Bond — Bond Weapons"
+                        icon="fa-link"
+                        options={warBondBondModal.options}
+                        maxChoices={warBondMax}
+                        existing={warBondBondModal.existing}
+                        confirmLabel="Bond"
+                        onConfirm={(selected) => handleWarBondBind(selected, playerStats, campaignName, warBondMax)}
+                        onClose={() => setWarBondBondModal(null)}
                     />
                 )}
 

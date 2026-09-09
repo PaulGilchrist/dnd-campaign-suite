@@ -6939,7 +6939,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-379-war-bond-no-bond-flow.md (Eldritch Knight lv3 app-canonical; summon row live but zero bond writers, 2-weapon modal unregistered, disarm unmodeled, zero logs)",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Ritual to create magical bond with one weapon. Can't be disarmed unless Incapacitated. Summon as Bonus Action. Can have up to two bonded weapons."
