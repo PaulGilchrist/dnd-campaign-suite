@@ -283,6 +283,65 @@ describe('clearPerRoundMajestyTrackers', () => {
   });
 });
 
+describe('CLA-370 campaign round threading and re-arm', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getRuntimeKeysByPrefix.mockReturnValue([]);
+  });
+
+  it('reads the current round with the campaign name in mark and has', () => {
+    getCurrentCombatRound.mockReturnValue(7);
+    getRuntimeValue.mockReturnValue(null);
+    expect(hasAttackerTriggeredMajesty('Bard', 'Knight 1', 'Campaign')).toBe(false);
+    expect(getCurrentCombatRound).toHaveBeenCalledWith('Campaign');
+
+    markAttackerTriggeredMajesty('Bard', 'Knight 1', 'Campaign');
+    expect(getCurrentCombatRound).toHaveBeenLastCalledWith('Campaign');
+    expect(setRuntimeValue).toHaveBeenCalledWith(
+      'Bard',
+      'unbreakableMajestyBlocked_Knight 1',
+      { round: 7 },
+      'Campaign',
+    );
+  });
+
+  it('re-arms the prompt at round wrap: round-1 stamp clears and round-2 first hit is fresh', () => {
+    const store = {};
+    getRuntimeValue.mockImplementation((_, key) => store[key]);
+    setRuntimeValue.mockImplementation((_, key, value) => { store[key] = value; });
+    getRuntimeKeysByPrefix.mockReturnValue(['unbreakableMajestyBlocked_Knight 1']);
+
+    // Round 1: first hit stamps the tracker; a re-hit in the same round stays gated.
+    getCurrentCombatRound.mockReturnValue(1);
+    markAttackerTriggeredMajesty('Bard', 'Knight 1', 'Campaign');
+    expect(hasAttackerTriggeredMajesty('Bard', 'Knight 1', 'Campaign')).toBe(true);
+
+    // Round-wrap: cache still lags at round 1 during the wrap loop — the caller
+    // passes roundToSet=2 so the stale stamp must be cleared.
+    clearPerRoundMajestyTrackers('Bard', 'Campaign', 2);
+    expect(store['unbreakableMajestyBlocked_Knight 1']).toBeNull();
+
+    // Round 2 first hit: gate re-armed, prompt can fire again.
+    getCurrentCombatRound.mockReturnValue(2);
+    expect(hasAttackerTriggeredMajesty('Bard', 'Knight 1', 'Campaign')).toBe(false);
+
+    // Stamp in round 2 uses the real round, not 1.
+    markAttackerTriggeredMajesty('Bard', 'Knight 1', 'Campaign');
+    expect(store['unbreakableMajestyBlocked_Knight 1']).toEqual({ round: 2 });
+  });
+
+  it('falls back to the campaign-keyed round read when no explicit round is passed', () => {
+    getRuntimeKeysByPrefix.mockReturnValue(['unbreakableMajestyBlocked_Orc']);
+    getCurrentCombatRound.mockReturnValue(4);
+    getRuntimeValue.mockReturnValue({ round: 3 });
+
+    clearPerRoundMajestyTrackers('Bard', 'Campaign');
+
+    expect(getCurrentCombatRound).toHaveBeenCalledWith('Campaign');
+    expect(setRuntimeValue).toHaveBeenCalledWith('Bard', 'unbreakableMajestyBlocked_Orc', null, 'Campaign');
+  });
+});
+
 describe('buildMajestyPromptData', () => {
   it('returns correct prompt data structure with attacker as target and defender as source', () => {
     const result = buildMajestyPromptData('Paladin', 'Goblin', 15);

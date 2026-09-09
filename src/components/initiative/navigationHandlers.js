@@ -46,7 +46,8 @@ export function createNextCreatureHandler({
             setCombatSummary(updatedSummary)
             for (const creature of cs.creatures) {
                 if (isSecondTurnEntry(creature)) continue
-                clearPerRoundMajestyTrackers(creature.name, campaignName)
+                // CLA-370: pass roundToSet — the cache still shows the old round here.
+                clearPerRoundMajestyTrackers(creature.name, campaignName, roundToSet)
                 if (creature.type === 'player') {
                     setRuntimeValue(creature.name, '_cunningStrikeCostUsed', 0, campaignName)
                     setRuntimeValue(creature.name, '_CunningStrike_usedRound', null, campaignName)
@@ -186,7 +187,7 @@ export function createPreviousCreatureHandler({
         setActiveCreatureName(newActiveName)
         for (const creature of cs.creatures) {
             if (isSecondTurnEntry(creature)) continue
-            clearPerRoundMajestyTrackers(creature.name, campaignName)
+            clearPerRoundMajestyTrackers(creature.name, campaignName, roundToSet)
         }
     }
 }

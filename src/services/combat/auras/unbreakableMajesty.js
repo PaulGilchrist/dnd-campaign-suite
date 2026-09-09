@@ -19,20 +19,22 @@ export function clearUnbreakableMajesty(characterName, campaignName) {
 }
 
 export function hasAttackerTriggeredMajesty(characterName, attackerName, campaignName) {
-    const round = getCurrentCombatRound();
+    const round = getCurrentCombatRound(campaignName);
     const key = `${MAJESTY_BLOCKED_KEY_PREFIX}${attackerName}`;
     const stored = getRuntimeValue(characterName, key, campaignName);
     return stored?.round === round;
 }
 
 export function markAttackerTriggeredMajesty(characterName, attackerName, campaignName) {
-    const round = getCurrentCombatRound();
+    const round = getCurrentCombatRound(campaignName);
     const key = `${MAJESTY_BLOCKED_KEY_PREFIX}${attackerName}`;
     setRuntimeValue(characterName, key, { round }, campaignName);
 }
 
-export function clearPerRoundMajestyTrackers(characterName, campaignName) {
-    const round = getCurrentCombatRound();
+// CLA-370: round must be the round the caller is entering (roundToSet at
+// round-wrap) — the combatSummary cache lags one round behind at that point.
+export function clearPerRoundMajestyTrackers(characterName, campaignName, currentRound) {
+    const round = currentRound ?? getCurrentCombatRound(campaignName);
     const keys = getRuntimeKeysByPrefix(characterName, MAJESTY_BLOCKED_KEY_PREFIX);
     for (const key of keys) {
         const stored = getRuntimeValue(characterName, key, campaignName);

@@ -6820,7 +6820,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-370-majesty-once-per-turn-rearm-stuck-round1.md",
+      "verified": "verified",
       "class": "Bard",
       "triggerConditions": "Trigger: first_attack_per_turn_against_self; Action: bonus_action",
       "expectedBehavior": "As a Bonus Action, you can assume a magically majestic presence for 1 minute or until you have the Incapacitated condition. For the duration, whenever any creature hits you with an attack roll for the first time on a turn, the attacker must succeed on a Charisma saving throw against your spell save DC, or the attack misses instead."

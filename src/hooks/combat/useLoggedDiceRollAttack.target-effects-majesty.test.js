@@ -202,6 +202,25 @@ describe('createLogAndShow - Unbreakable Majesty Save Flow', () => {
         });
     });
 
+        it('logs a fail-open timeout line when the save window expires unresolved', async () => {
+            isUnbreakableMajestyActive.mockReturnValue(true);
+            hasAttackerTriggeredMajesty.mockReturnValue(false);
+            getUnbreakableMajestySaveDc.mockReturnValue(19);
+
+            globalThis.setTimeout = (cb) => { cb(); return 0; };
+            const fn = createFn();
+            await fn('Mace', 5, 'attack', { targetName: 'Mage' });
+            globalThis.setTimeout = origSetTimeout;
+
+            const timeoutLogs = deps.logEntry.mock.calls.filter(
+                (call) => /timeout/i.test(call[0]?.description || ''),
+            );
+            expect(timeoutLogs.length).toBe(1);
+            expect(timeoutLogs[0][0].type).toBe('ability_use');
+            expect(timeoutLogs[0][0].description).toContain('DC 19');
+            expect(timeoutLogs[0][0].description).toContain('attack stands');
+        });
+
     describe('majesty does not trigger', () => {
         it('does not trigger majesty when majesty is not active on the target', async () => {
             isUnbreakableMajestyActive.mockReturnValue(false);

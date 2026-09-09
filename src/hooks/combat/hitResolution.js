@@ -76,6 +76,13 @@ export async function resolveHit(characterName, campaignName, context, bonus, ef
                 setTimeout(() => {
                     if (!saveResolved) {
                         window.removeEventListener('save-result', handler);
+                        console.error('[unbreakableMajesty] CHA save prompt timed out after 30s — attack stands unresolved (fail-open).');
+                        logEntry({
+                            type: 'ability_use',
+                            characterName: target.name,
+                            abilityName: 'Unbreakable Majesty',
+                            description: `${attackerName}'s Unbreakable Majesty CHA save (DC ${majSaveDc}) was not resolved within 30 seconds — attack stands (save-window timeout).`,
+                        });
                         resolve();
                     }
                 }, 30000);

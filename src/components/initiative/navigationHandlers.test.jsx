@@ -200,9 +200,9 @@ describe('navigationHandlers.js', () => {
             expect(setCombatSummary).toHaveBeenCalledWith(expect.objectContaining({ round: 2 }));
             expect(storage.set).toHaveBeenCalledWith('activeCreatureName', 'Alice', campaignName);
             expect(setActiveCreatureName).toHaveBeenCalledWith('Alice');
-            expect(unbreakableMajesty.clearPerRoundMajestyTrackers).toHaveBeenCalledWith('Alice', campaignName);
-            expect(unbreakableMajesty.clearPerRoundMajestyTrackers).toHaveBeenCalledWith('Bob', campaignName);
-            expect(unbreakableMajesty.clearPerRoundMajestyTrackers).toHaveBeenCalledWith('Charlie', campaignName);
+            expect(unbreakableMajesty.clearPerRoundMajestyTrackers).toHaveBeenCalledWith('Alice', campaignName, 2);
+            expect(unbreakableMajesty.clearPerRoundMajestyTrackers).toHaveBeenCalledWith('Bob', campaignName, 2);
+            expect(unbreakableMajesty.clearPerRoundMajestyTrackers).toHaveBeenCalledWith('Charlie', campaignName, 2);
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Alice', '_cunningStrikeCostUsed', 0, campaignName);
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Alice', 'surgeUsedRound', null, campaignName);
             expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Alice');
@@ -462,9 +462,9 @@ describe('navigationHandlers.js', () => {
             expect(storage.set).toHaveBeenCalledWith('activeCreatureName', 'Charlie', campaignName);
             expect(setActiveCreatureName).toHaveBeenCalledWith('Charlie');
             expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Charlie');
-            expect(unbreakableMajesty.clearPerRoundMajestyTrackers).toHaveBeenCalledWith('Alice', campaignName);
-            expect(unbreakableMajesty.clearPerRoundMajestyTrackers).toHaveBeenCalledWith('Bob', campaignName);
-            expect(unbreakableMajesty.clearPerRoundMajestyTrackers).toHaveBeenCalledWith('Charlie', campaignName);
+            expect(unbreakableMajesty.clearPerRoundMajestyTrackers).toHaveBeenCalledWith('Alice', campaignName, 2);
+            expect(unbreakableMajesty.clearPerRoundMajestyTrackers).toHaveBeenCalledWith('Bob', campaignName, 2);
+            expect(unbreakableMajesty.clearPerRoundMajestyTrackers).toHaveBeenCalledWith('Charlie', campaignName, 2);
         });
 
         it('should apply turn start effects and skip when round-scoped lastApplied already matches on previous', async () => {
