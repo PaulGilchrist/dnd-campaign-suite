@@ -1,32 +1,66 @@
 import { loadSpellData } from '../../../ui/dataLoader.js';
 import { addEntry } from '../../../ui/logService.js';
+import { rollD20, rollExpression } from '../../../dice/diceRoller.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getCombatSummary } from '../../../encounters/combatData.js';
+import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
+import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { resolveSpellDamageAtLevel } from '../../../rules/core/spellDamageUtils.js';
+import { createSaveListener } from '../../common/savePrompt.js';
+import { endInvisibilityOnHostileAction } from '../../../rules/features/invisibilityService.js';
+
+// CLA-381: once-per-turn latch (CLA-342/CLA-371 family) — stamped at the
+// confirm trigger, cleared at round-wrap beside _Slow_Fall_usedRound in
+// initiative.jsx + navigationHandlers.js.
+const USED_ROUND_KEY = '_War_Magic_usedRound';
+
+function getKnownSpellNames(playerStats) {
+    return (playerStats.spells || [])
+        .map(s => (typeof s === 'string' ? s : s?.name))
+        .filter(Boolean);
+}
+
+function refusal(action, playerName, campaignName, reason) {
+    addEntry(campaignName, {
+        type: 'automation',
+        characterName: playerName,
+        automationType: 'war_magic_refused',
+        name: action.name,
+        description: `${action.name}: ${reason}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[warMagicCantripHandler:refusal-log-error]", e); });
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            description: `${action.name} — ${reason}`,
+            automation: action.automation,
+        },
+    };
+}
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const spellListKey = auto.spellList || 'wizard_cantrips';
+    const playerName = playerStats.name;
 
-    const allSpells = await loadSpellData(playerStats);
-    if (!allSpells || !allSpells.length) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: 'No Wizard cantrips available.',
-            },
-        };
+    // CLA-381: once-per-turn gate at the row click — refuse before the chooser
+    // opens when the attack replacement is already spent this round.
+    const currentRound = (await getCombatContext(campaignName))?.round || 1;
+    const usedRound = Number(getRuntimeValue(playerName, USED_ROUND_KEY, campaignName) ?? 0);
+    if (usedRound === currentRound) {
+        return refusal(action, playerName, campaignName, 'Once per turn — attack already replaced with a cantrip this turn.');
     }
 
-    const cantrips = allSpells.filter(s => s.level === 0);
+    const allSpells = await loadSpellData(playerStats);
+    const knownNames = getKnownSpellNames(playerStats);
+    const cantrips = (allSpells || []).filter(s => s.level === 0 && knownNames.includes(s.name));
     if (!cantrips.length) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: 'No Wizard cantrips available.',
-            },
-        };
+        return refusal(action, playerName, campaignName, 'No known Wizard cantrips available.');
     }
 
     const optionNames = cantrips.map(s => s.name);
@@ -56,6 +90,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
+// CLA-381: mirrors warMagicSpellHandler.confirmWarMagicSpell minus the spell
+// slot payment — arms the card target, range-checks, rolls the cantrip
+// (spell attack or save), applies damage (lastAttack + hp_change via
+// applyDamageToTarget), and latches once per turn.
 export async function confirmWarMagicCantrip(action, playerStats, campaignName, selectedSpellName) {
     if (!selectedSpellName) {
         return {
@@ -68,12 +106,145 @@ export async function confirmWarMagicCantrip(action, playerStats, campaignName, 
         };
     }
 
+    const playerName = playerStats.name;
+
+    const allSpells = await loadSpellData(playerStats);
+    const spell = (allSpells || []).find(s => s.name === selectedSpellName && s.level === 0);
+    if (!spell) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `Cantrip "${selectedSpellName}" not found.`,
+            },
+        };
+    }
+
+    // Known-cantrip gate (defense-in-depth alongside the chooser filter).
+    if (!getKnownSpellNames(playerStats).includes(selectedSpellName)) {
+        return refusal(action, playerName, campaignName, `${selectedSpellName} is not a cantrip you have prepared.`);
+    }
+
+    const currentRound = (await getCombatContext(campaignName))?.round || 1;
+    const usedRound = Number(getRuntimeValue(playerName, USED_ROUND_KEY, campaignName) ?? 0);
+    if (usedRound === currentRound) {
+        return refusal(action, playerName, campaignName, 'Once per turn — attack already replaced with a cantrip this turn.');
+    }
+
+    // Target: the creature set on the caster's initiative card.
+    const cs = getCombatSummary(campaignName);
+    const targetName = cs ? getTargetFromAttacker(cs, playerName)?.name || null : null;
+    if (!targetName) {
+        return refusal(action, playerName, campaignName, 'requires a target — set the Target dropdown on your initiative card first.');
+    }
+
+    const inRange = await isWithinRange(playerName, targetName, rangeToFeet(spell.range));
+    if (!inRange) {
+        return refusal(action, playerName, campaignName, `${targetName} is out of range for ${selectedSpellName} (${spell.range}).`);
+    }
+
+    // CLA-371 lesson: serialize the latch — awaited stamp at the TRIGGER,
+    // before resolution, so a second same-round click reads the stamped round.
+    await setRuntimeValue(playerName, USED_ROUND_KEY, currentRound, campaignName);
+
     await addEntry(campaignName, {
         type: 'ability_use',
-        characterName: playerStats.name,
+        characterName: playerName,
         abilityName: action.name,
         description: `${action.name}: Replaced attack with cantrip "${selectedSpellName}"`,
     }).catch((e) => { console.error("[warMagicCantripHandler:log-error]", e); });
+
+    const spellDamageType = spell.damage?.damage_type || 'Force';
+    const formula = resolveSpellDamageAtLevel(spell, playerStats.level || 1);
+    const targetAc = cs?.creatures?.find(c => c.name === targetName)?.ac || 10;
+    const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
+
+    let spellDamage = 0;
+    let spellRolls = [];
+    let outcomeLine = '';
+
+    if (spell.damage && formula) {
+        if (spell.dc?.dc_type) {
+            const { promise } = createSaveListener(campaignName, {
+                targetName,
+                attackerName: playerName,
+                saveType: spell.dc.dc_type,
+                saveDc: playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 0),
+                sourceName: `${action.name} — ${selectedSpellName}`,
+            });
+            try {
+                const saveResult = await promise;
+                const success = saveResult?.success ?? false;
+                if (!success) {
+                    const result = rollExpression(formula);
+                    spellRolls = result?.rolls || [];
+                    spellDamage = result?.total || 0;
+                    if (spell.dc.dc_success === 'half') {
+                        spellDamage = Math.floor(spellDamage / 2);
+                    }
+                }
+                outcomeLine = success ? `${targetName} saved — no damage.` : `${targetName} failed the save.`;
+            } catch {
+                outcomeLine = 'Save prompt dismissed.';
+            }
+        } else {
+            // Spell attack roll against the target's AC.
+            const toHit = playerStats.spellAbilities?.toHit ?? 0;
+            const d20 = rollD20();
+            const totalAttack = d20 + toHit;
+            const hit = d20 === 1 ? false : totalAttack >= targetAc;
+            if (hit) {
+                const result = rollExpression(formula);
+                spellRolls = result?.rolls || [];
+                spellDamage = result?.total || 0;
+            }
+            addEntry(campaignName, {
+                type: 'roll',
+                characterName: playerName,
+                rollType: 'attack',
+                name: `${selectedSpellName} (${targetName})`,
+                rolls: [d20],
+                total: totalAttack,
+                bonus: toHit,
+                isNatural20: d20 === 20,
+                isNatural1: d20 === 1,
+                targetName,
+                targetAc,
+                damageType: spellDamageType,
+                hit,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error("[warMagicCantripHandler:attack-roll-log-error]", e); });
+            outcomeLine = `${d20} + ${toHit} = ${totalAttack} vs AC ${targetAc} — ${hit ? 'HIT' : 'MISS'}.`;
+        }
+
+        if (spellDamage > 0) {
+            const applyResult = await applyDamageToTarget(cs, targetName, spellDamage, [spellDamageType], campaignName, characters, false, playerName);
+            spellDamage = applyResult?.finalDamage ?? spellDamage;
+            if (spellDamage > 0) {
+                endInvisibilityOnHostileAction(playerName, campaignName);
+                addEntry(campaignName, {
+                    type: 'roll',
+                    characterName: playerName,
+                    rollType: 'damage',
+                    name: `${selectedSpellName} (${targetName})`,
+                    formula,
+                    rolls: spellRolls,
+                    total: spellDamage,
+                    damageType: spellDamageType,
+                    targetName,
+                    finalDamage: spellDamage,
+                    timestamp: Date.now(),
+                }).catch((e) => { console.error("[warMagicCantripHandler:damage-log-error]", e); });
+            }
+        }
+    }
+
+    const popupDescription =
+        `<b>${action.name}</b>: Cast <b>${selectedSpellName}</b> at <b>${targetName}</b>. ` +
+        outcomeLine +
+        (spellDamage > 0 ? ` Dealt <b>${spellDamage}</b> ${spellDamageType} damage.` : (spell.damage ? ' No damage dealt.' : '')) +
+        '<br/>No spell slot consumed (cantrip).';
 
     return {
         type: 'popup',
@@ -81,7 +252,7 @@ export async function confirmWarMagicCantrip(action, playerStats, campaignName, 
             type: 'automation_info',
             name: action.name,
             automationType: 'war_magic_cantrip',
-            description: `${action.name}: Replaced one attack with the cantrip <b>${selectedSpellName}</b>.`,
+            description: popupDescription,
             automation: action.automation,
         },
     };

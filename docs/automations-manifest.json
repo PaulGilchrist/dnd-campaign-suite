@@ -6974,7 +6974,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-381-war-magic-cantrip-stub.md (EK lv7 app-canonical; row+chooser live but cantrip never fires, no latch/replacement, chooser known-gate-free; lv18 war_magic_spell sibling live proves unported cantrip stub)",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Action: 1 action; Action: action",
       "expectedBehavior": "Replace one attack with a Wizard cantrip (casting time: action)."
