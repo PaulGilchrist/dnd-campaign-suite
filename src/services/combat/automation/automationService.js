@@ -70,6 +70,10 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     // (spellPreparationService); making those rows clickable would dispatch
     // handleSpellCast on unrelated free-cast features.
     'misty_wanderer',
+    // CLA-368: the Special Actions "Twinkling Constellations:" row dispatches
+    // twinklingConstellationHandler (lv<10 info-popup gate + constellation
+    // chooser modal → applyConstellationOption re-stamps the Starry Form buff).
+    'twinkling_constellations',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([

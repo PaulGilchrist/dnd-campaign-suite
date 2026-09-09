@@ -3,7 +3,7 @@ import { applyConstellationOption } from '../../../services/automation/handlers/
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import '../CharSheet.css';
 
-function ConstellationSelectionModal({ action, playerStats, campaignName, isTwinkled, onConfirm, onClose }) {
+function ConstellationSelectionModal({ action, playerStats, campaignName, isTwinkled, onConfirm, onClose, applyOption = applyConstellationOption }) {
     const [selected, setSelected] = useState(null);
     const [result, setResult] = useState(null);
 
@@ -20,7 +20,7 @@ function ConstellationSelectionModal({ action, playerStats, campaignName, isTwin
 
     const handleApply = async () => {
         if (!selected) return;
-        const res = await applyConstellationOption(action, playerStats, campaignName, selected);
+        const res = await applyOption(action, playerStats, campaignName, selected);
         setResult(res);
         onConfirm(selected);
     };

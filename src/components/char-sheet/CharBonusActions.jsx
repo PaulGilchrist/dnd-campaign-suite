@@ -451,7 +451,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                                     spellAttackMod,
                                     range: '60_ft',
                                 },
-                            })}>Starry Form: Luminous Arrow:</b> <span>Ranged spell attack, 60 ft. On a hit: ${damageDice} + ${wisMod} Radiant damage.</span>
+                            })}>Starry Form: Luminous Arrow:</b> <span>{`Ranged spell attack, 60 ft. On a hit: ${damageDice} + ${wisMod} Radiant damage.`}</span>
                         </div>
                     );
                 })()}

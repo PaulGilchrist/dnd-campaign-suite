@@ -30,6 +30,8 @@ import GnomishLineageModal from './GnomishLineageModal.jsx';
 import FeyReinforcementsModal from './modals/FeyReinforcementsModal.jsx';
 import MistyWandererModal from './modals/MistyWandererModal.jsx';
 import FiendishLegacyModal from './modals/FiendishLegacyModal.jsx';
+import ConstellationSelectionModal from './modals/ConstellationSelectionModal.jsx';
+import { applyConstellationOption as applyTwinklingConstellation } from '../../services/automation/handlers/class-sorcerer/twinklingConstellationHandler.js';
 
 function getEventDisplayLabel(eventType, eventData) {
     if (eventType === 'attack') {
@@ -65,6 +67,7 @@ function CharSpecialActionsModals({
     multiResistanceModal, setMultiResistanceModal,
     stepsOfTheFeyTauntModal, setStepsOfTheFeyTauntModal,
     mistyWandererModal, setMistyWandererModal,
+    twinklingConstellationModal, setTwinklingConstellationModal,
     hurlThroughHellModal, setHurlThroughHellModal,
     clairvoyantCombatantModal, setClairvoyantCombatantModal,
     portentModal,
@@ -281,6 +284,17 @@ function CharSpecialActionsModals({
                 <MistyWandererModal
                     {...mistyWandererModal}
                     onClose={() => setMistyWandererModal(null)}
+                />
+            )}
+            {twinklingConstellationModal && (
+                <ConstellationSelectionModal
+                    action={twinklingConstellationModal.action}
+                    playerStats={twinklingConstellationModal.playerStats}
+                    campaignName={twinklingConstellationModal.campaignName}
+                    isTwinkled={true}
+                    applyOption={applyTwinklingConstellation}
+                    onConfirm={() => {}}
+                    onClose={() => setTwinklingConstellationModal(null)}
                 />
             )}
             {hurlThroughHellModal && (

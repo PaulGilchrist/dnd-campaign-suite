@@ -158,7 +158,7 @@ describe('CharSummary - Fly Speed', () => {
 
     it.each([
         [{ effect: 'fly_speed_equals_walk_speed' }, /fly 25 ft/, 'fly_speed_equals_walk_speed'],
-        [{ effect: 'fly_speed_20_hover' }, /fly 20 ft/, 'fly_speed_20_hover'],
+        [{ effect: 'fly_speed_20_hover' }, /fly 20 ft\. +\(hover\)/, 'fly_speed_20_hover'],
         [{ effect: 'glistening_flight', flySpeed: 40 }, /fly 25 ft\. +\(hover\)/, 'glistening_flight'],
         [{ effect: 'dragon_wings', flySpeed: 60 }, /fly 60 ft\. +\(hover\)/, 'dragon_wings'],
     ])('renders fly speed correctly for %s buff', (buff, expectedText, _label) => {

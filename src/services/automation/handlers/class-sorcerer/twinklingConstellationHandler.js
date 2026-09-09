@@ -1,4 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
 
 const CONSTELLATION_OPTIONS = ['Archer', 'Chalice', 'Dragon'];
 
@@ -46,11 +47,6 @@ export async function applyConstellationOption(action, playerStats, campaignName
     const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
     const activeBuffs = Array.isArray(stored) ? stored : [];
 
-    const existingStarryFormIndex = activeBuffs.findIndex(b => b.name === 'Starry Form');
-    if (existingStarryFormIndex !== -1) {
-        activeBuffs.splice(existingStarryFormIndex, 1);
-    }
-
     const buffEntry = {
         name: 'Starry Form',
         effect: 'starry_form',
@@ -65,8 +61,23 @@ export async function applyConstellationOption(action, playerStats, campaignName
         buffEntry.flySpeed = 20;
     }
 
-    activeBuffs.push(buffEntry);
-    await setRuntimeValue(playerName, 'activeBuffs', activeBuffs, campaignName);
+    // Build a NEW array (never splice the store's own reference): in-place
+    // mutation makes setRuntimeValue's dirty-check see the same reference and
+    // silently skip the POST (CLA-368).
+    const newBuffs = [...activeBuffs.filter(b => b.name !== 'Starry Form'), buffEntry];
+    await setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
+
+    const storedEffects = getRuntimeValue('campaign', 'targetEffects');
+    const allTargetEffects = Array.isArray(storedEffects) ? storedEffects : [];
+    const starryTargetEffect = {
+        effect: 'starry_form',
+        source: playerName,
+        target: playerName,
+        constellation: optionName,
+        duration: '1_minute',
+    };
+    const newTargetEffects = [...allTargetEffects.filter(te => te.effect !== 'starry_form' || te.source !== playerName), starryTargetEffect];
+    setRuntimeValue('campaign', 'targetEffects', newTargetEffects, campaignName, true);
 
     const optionEffects = [];
 
@@ -84,6 +95,14 @@ export async function applyConstellationOption(action, playerStats, campaignName
     }
 
     const description = `${optionName} constellation chosen (Twinkling Constellations). ${optionEffects.join('. ')}.`;
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: action.name,
+        description: `${playerName} changed Starry Form constellation to ${optionName} with Twinkling Constellations. ${optionEffects.join('. ')}.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[twinklingConstellationHandler:log-error]", e); });
 
     return {
         type: 'popup',

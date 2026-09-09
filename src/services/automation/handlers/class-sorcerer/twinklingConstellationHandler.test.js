@@ -11,8 +11,13 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
+vi.mock('../../../ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
+}));
+
 import { handle, applyConstellationOption } from './twinklingConstellationHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import * as logService from '../../../ui/logService.js';
 
 const campaignName = 'TestCampaign';
 
@@ -217,6 +222,86 @@ describe('twinklingConstellationHandler', () => {
             expect.objectContaining({ constellation: 'Chalice' }),
           ]),
           campaignName,
+        );
+      });
+    });
+
+    describe('CLA-368: campaign log + hover buff stamp', () => {
+      it('writes an ability_use campaign-log entry on successful apply', async () => {
+        await applyConstellationOption(
+          makeAction(),
+          makePlayerStats({ level: 10 }),
+          campaignName,
+          'Archer',
+        );
+
+        expect(logService.addEntry).toHaveBeenCalledWith(
+          campaignName,
+          expect.objectContaining({
+            type: 'ability_use',
+            characterName: 'TestSorcerer',
+            abilityName: 'Twinkling Constellations',
+          }),
+        );
+        const entry = logService.addEntry.mock.calls[0][1];
+        expect(entry.description).toContain('changed Starry Form constellation to Archer');
+      });
+
+      it('does not log when the constellation option is invalid', async () => {
+        await applyConstellationOption(
+          makeAction(),
+          makePlayerStats({ level: 10 }),
+          campaignName,
+          'NotAConstellation',
+        );
+
+        expect(logService.addEntry).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+      });
+
+      it('stamps fly_speed_20_hover + flySpeed 20 for Dragon at level 10+', async () => {
+        await applyConstellationOption(
+          makeAction(),
+          makePlayerStats({ level: 10 }),
+          campaignName,
+          'Dragon',
+        );
+
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+          'TestSorcerer',
+          'activeBuffs',
+          expect.arrayContaining([
+            expect.objectContaining({
+              constellation: 'Dragon',
+              effect: 'fly_speed_20_hover',
+              flySpeed: 20,
+            }),
+          ]),
+          campaignName,
+        );
+      });
+
+      it('mirrors the starry_form campaign target-effect on re-swap', async () => {
+        await applyConstellationOption(
+          makeAction(),
+          makePlayerStats({ level: 10 }),
+          campaignName,
+          'Chalice',
+        );
+
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+          'campaign',
+          'targetEffects',
+          expect.arrayContaining([
+            expect.objectContaining({
+              effect: 'starry_form',
+              source: 'TestSorcerer',
+              target: 'TestSorcerer',
+              constellation: 'Chalice',
+            }),
+          ]),
+          campaignName,
+          true,
         );
       });
     });

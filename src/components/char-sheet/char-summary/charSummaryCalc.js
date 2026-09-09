@@ -240,6 +240,7 @@ export function computeCharSummaryContext(playerStats, campaignName, characters,
     let acrobaticMovementActive = false;
     let glisteningFlightHover = false;
     let dragonWingsHover = false;
+    let starryFormHover = false;
     let tremorsenseActive = false;
     const largeFormActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'large_form');
     const huntersMarkActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === "Hunter's Mark");
@@ -247,7 +248,7 @@ export function computeCharSummaryContext(playerStats, campaignName, characters,
     const aspectOption = aspectBuff?.optionName || null;
     activeBuffs.forEach(buff => {
         if (buff.effect === 'fly_speed_equals_walk_speed') hasFlySpeedBuff = true;
-        if (buff.effect === 'fly_speed_20_hover') flySpeed = 20;
+        if (buff.effect === 'fly_speed_20_hover') { flySpeed = 20; starryFormHover = true; }
         if (buff.effect === 'telekinetic_leap') flySpeed = buff.flySpeed;
         if (buff.effect === 'avenging_angel_flight') flySpeed = buff.flySpeed || 60;
         if (buff.effect === 'speed_boost' && buff.speedBonus) buffSpeedBonus += buff.speedBonus;
@@ -362,7 +363,7 @@ export function computeCharSummaryContext(playerStats, campaignName, characters,
         flySpeed, hasFlySpeedBuff, swimSpeed, climbSpeed, seeInvisibilityActive,
         hasteAcBonus, shieldAcBonus, baitAndSwitchBonus, shieldOfFaithBonus, defensiveDuelistBonus,
         barkskinActive, mageArmorActive, mageArmorAc, iceWalkActive, acrobaticMovementActive,
-        glisteningFlightHover, dragonWingsHover, tremorsenseActive, largeFormActive,
+        glisteningFlightHover, dragonWingsHover, starryFormHover, tremorsenseActive, largeFormActive,
         huntersMarkActive, dexBonus, shieldOfFaithActive, baitAndSwitchActive, baitAndSwitchBonusValue,
         baitAndSwitchSource, smiteOfProtectionCoverActive, bulwarkOfForceCoverActive,
         naturesSanctuaryCoverActive, effectiveInitiative, totalSpeedWithBuff,
