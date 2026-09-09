@@ -1,2 +1,0 @@
-Total messages: 149 (Errors: 0, Warnings: 133)
-Returning 0 messages for level "error"
