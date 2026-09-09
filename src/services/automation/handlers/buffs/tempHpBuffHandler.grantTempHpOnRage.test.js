@@ -21,7 +21,7 @@ import * as automationService from '../../../combat/automation/automationService
 import * as tempHpService from './tempHpService.js';
 import { campaignName, makePlayerStats, makeAction } from './tempHpBuff.test-utils.js';
 
-describe('grantTempHpOnRage', () => {
+describe('grantTempHpOnRage', async () => {
   beforeEach(() => {
     useRuntimeState.getRuntimeValue.mockClear();
     useRuntimeState.setRuntimeValue.mockClear();
@@ -29,102 +29,102 @@ describe('grantTempHpOnRage', () => {
     tempHpService.setTempHp.mockClear();
   });
 
-  describe('early exits (returns false)', () => {
-    it('returns false when triggerOnRage is not set', () => {
+  describe('early exits (returns false)', async () => {
+    it('returns false when triggerOnRage is not set', async () => {
       const action = makeAction({ triggerOnRage: false });
       const ps = makePlayerStats();
 
-      const result = grantTempHpOnRage(action, ps, campaignName);
+      const result = await grantTempHpOnRage(action, ps, campaignName);
 
-      expect(result).toBe(false);
+      expect(result).toBe(0);
       expect(automationService.evaluateAutoExpression).not.toHaveBeenCalled();
       expect(tempHpService.setTempHp).not.toHaveBeenCalled();
     });
 
-    it('returns false when triggerOnRage is missing entirely', () => {
+    it('returns false when triggerOnRage is missing entirely', async () => {
       const action = makeAction({ triggerOnRage: undefined });
       const ps = makePlayerStats();
 
-      const result = grantTempHpOnRage(action, ps, campaignName);
+      const result = await grantTempHpOnRage(action, ps, campaignName);
 
-      expect(result).toBe(false);
+      expect(result).toBe(0);
       expect(automationService.evaluateAutoExpression).not.toHaveBeenCalled();
     });
 
-    it('returns false when tempHpExpression is empty string', () => {
+    it('returns false when tempHpExpression is empty string', async () => {
       const action = makeAction({ triggerOnRage: true, tempHpExpression: '' });
       const ps = makePlayerStats();
 
-      const result = grantTempHpOnRage(action, ps, campaignName);
+      const result = await grantTempHpOnRage(action, ps, campaignName);
 
-      expect(result).toBe(false);
+      expect(result).toBe(0);
       expect(automationService.evaluateAutoExpression).not.toHaveBeenCalled();
       expect(tempHpService.setTempHp).not.toHaveBeenCalled();
     });
 
-    it('returns false when tempHpExpression is null', () => {
+    it('returns false when tempHpExpression is null', async () => {
       const action = makeAction({ triggerOnRage: true, tempHpExpression: null });
       const ps = makePlayerStats();
 
-      const result = grantTempHpOnRage(action, ps, campaignName);
+      const result = await grantTempHpOnRage(action, ps, campaignName);
 
-      expect(result).toBe(false);
+      expect(result).toBe(0);
       expect(automationService.evaluateAutoExpression).not.toHaveBeenCalled();
     });
 
-    it('returns false when evaluated amount is zero', () => {
+    it('returns false when evaluated amount is zero', async () => {
       const action = makeAction({ triggerOnRage: true, tempHpExpression: '0' });
       automationService.evaluateAutoExpression.mockReturnValue(0);
 
-      const result = grantTempHpOnRage(action, makePlayerStats(), campaignName);
+      const result = await grantTempHpOnRage(action, makePlayerStats(), campaignName);
 
-      expect(result).toBe(false);
+      expect(result).toBe(0);
       expect(tempHpService.setTempHp).not.toHaveBeenCalled();
     });
 
-    it('returns false when evaluated amount is negative', () => {
+    it('returns false when evaluated amount is negative', async () => {
       const action = makeAction({ triggerOnRage: true, tempHpExpression: '-5' });
       automationService.evaluateAutoExpression.mockReturnValue(-5);
 
-      const result = grantTempHpOnRage(action, makePlayerStats(), campaignName);
+      const result = await grantTempHpOnRage(action, makePlayerStats(), campaignName);
 
-      expect(result).toBe(false);
+      expect(result).toBe(0);
       expect(tempHpService.setTempHp).not.toHaveBeenCalled();
     });
 
-    it('returns false when evaluated amount is NaN', () => {
+    it('returns false when evaluated amount is NaN', async () => {
       const action = makeAction({ triggerOnRage: true, tempHpExpression: 'invalid_expr' });
       automationService.evaluateAutoExpression.mockReturnValue(NaN);
 
-      const result = grantTempHpOnRage(action, makePlayerStats(), campaignName);
+      const result = await grantTempHpOnRage(action, makePlayerStats(), campaignName);
 
-      expect(result).toBe(false);
+      expect(result).toBe(0);
       expect(tempHpService.setTempHp).not.toHaveBeenCalled();
     });
 
-    it('returns false when evaluated amount is a non-number string', () => {
+    it('returns false when evaluated amount is a non-number string', async () => {
       const action = makeAction({ triggerOnRage: true, tempHpExpression: 'abc' });
       automationService.evaluateAutoExpression.mockReturnValue('not-a-number');
 
-      const result = grantTempHpOnRage(action, makePlayerStats(), campaignName);
+      const result = await grantTempHpOnRage(action, makePlayerStats(), campaignName);
 
-      expect(result).toBe(false);
+      expect(result).toBe(0);
       expect(tempHpService.setTempHp).not.toHaveBeenCalled();
     });
 
-    it('returns false when evaluated amount is null', () => {
+    it('returns false when evaluated amount is null', async () => {
       const action = makeAction({ triggerOnRage: true, tempHpExpression: 'null_expr' });
       automationService.evaluateAutoExpression.mockReturnValue(null);
 
-      const result = grantTempHpOnRage(action, makePlayerStats(), campaignName);
+      const result = await grantTempHpOnRage(action, makePlayerStats(), campaignName);
 
-      expect(result).toBe(false);
+      expect(result).toBe(0);
       expect(tempHpService.setTempHp).not.toHaveBeenCalled();
     });
   });
 
-  describe('sets tempHp and returns true', () => {
-    it('grants tempHp using evaluated amount when it exceeds existing', () => {
+  describe('sets tempHp and returns true', async () => {
+    it('grants tempHp using evaluated amount when it exceeds existing', async () => {
       const action = makeAction({
         triggerOnRage: true,
         tempHpExpression: 'rage_temp_hp',
@@ -133,14 +133,14 @@ describe('grantTempHpOnRage', () => {
 
       automationService.evaluateAutoExpression.mockReturnValue(10);
 
-      const result = grantTempHpOnRage(action, ps, campaignName);
+      const result = await grantTempHpOnRage(action, ps, campaignName);
 
-      expect(result).toBe(true);
+      expect(result).toBe(10);
       expect(automationService.evaluateAutoExpression).toHaveBeenCalledWith('rage_temp_hp', ps);
       expect(tempHpService.setTempHp).toHaveBeenCalledWith('Grog', 10, campaignName);
     });
 
-    it('passes evaluated amount directly to setTempHp', () => {
+    it('passes evaluated amount directly to setTempHp', async () => {
       const action = makeAction({
         triggerOnRage: true,
         tempHpExpression: 'level + 5',
@@ -155,7 +155,7 @@ describe('grantTempHpOnRage', () => {
       expect(tempHpService.setTempHp).toHaveBeenCalledWith('Grog', 12, campaignName);
     });
 
-    it('calls setTempHp with the exact evaluated number', () => {
+    it('calls setTempHp with the exact evaluated number', async () => {
       const action = makeAction({
         triggerOnRage: true,
         tempHpExpression: '1d12 + 3',
@@ -170,8 +170,8 @@ describe('grantTempHpOnRage', () => {
     });
   });
 
-  describe('integration with setTempHp', () => {
-    it('delegates max logic to setTempHp for existing tempHp comparison', () => {
+  describe('integration with setTempHp', async () => {
+    it('delegates max logic to setTempHp for existing tempHp comparison', async () => {
       const action = makeAction({
         triggerOnRage: true,
         tempHpExpression: 'rage_temp_hp',
@@ -180,9 +180,9 @@ describe('grantTempHpOnRage', () => {
 
       tempHpService.setTempHp.mockReturnValue(15);
 
-      const result = grantTempHpOnRage(action, ps, campaignName);
+      const result = await grantTempHpOnRage(action, ps, campaignName);
 
-      expect(result).toBe(true);
+      expect(result).toBe(9);
       expect(tempHpService.setTempHp).toHaveBeenCalledTimes(1);
       expect(tempHpService.setTempHp).toHaveBeenCalledWith('Grog', 9, campaignName);
     });

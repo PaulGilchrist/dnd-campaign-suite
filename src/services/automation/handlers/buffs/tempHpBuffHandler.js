@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeObject } from '../../../../hooks/runtime/useRuntimeState.js';
 import { setTempHp } from './tempHpService.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
@@ -6,6 +6,8 @@ import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getCurrentCombatRound } from '../../../encounters/combatData.js';
 import { resolveFeatChosenAbility } from '../../../shared/abilityLookup.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 
 function getBardicDieSize(playerStats) {
     const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
@@ -267,19 +269,19 @@ export async function confirmMantleOfInspiration(action, playerStats, campaignNa
     };
 }
 
-export function grantTempHpOnRage(action, playerStats, campaignName) {
+export async function grantTempHpOnRage(action, playerStats, campaignName) {
     const auto = action.automation;
-    if (!auto.triggerOnRage) return false;
+    if (!auto.triggerOnRage) return 0;
 
     const tempHpExpression = auto.tempHpExpression || '';
-    if (!tempHpExpression) return false;
+    if (!tempHpExpression) return 0;
 
     const amount = evaluateAutoExpression(tempHpExpression, playerStats);
-    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) return false;
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) return 0;
 
     setTempHp(playerStats.name, amount, campaignName);
 
-    return true;
+    return amount;
 }
 
 function rollDiceExpression(expr, playerStats) {
@@ -301,11 +303,42 @@ export async function handleVitalityOfTheTree(action, playerStats, campaignName,
     const auto = action.automation;
     const playerName = playerStats.name;
 
+    // CLA-378: gate the offer on a live Rage buff + the turn-start availability flag.
+    const activeBuffs = Array.isArray(getRuntimeValue(playerName, 'activeBuffs', campaignName))
+        ? getRuntimeValue(playerName, 'activeBuffs', campaignName)
+        : [];
+    const rageActive = activeBuffs.some(b => b.name === 'Rage');
+    const offerAvailable = !!getRuntimeValue(playerName, 'vitalityOfTheTreeAvailable', campaignName);
+    if (!rageActive || !offerAvailable) {
+        const reason = !rageActive
+            ? 'requires Rage to be active.'
+            : 'can only be used at the start of your turns while raging.';
+        await addEntry(campaignName, {
+            type: 'automation',
+            automationType: 'vitality_of_the_tree_refused',
+            characterName: playerName,
+            name: action.name,
+            description: `${action.name} refused — ${reason}`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[vitalityOfTheTree] Error logging refusal:', e); });
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description: reason,
+                automation: auto,
+            },
+        };
+    }
+
     const currentRound = getCurrentCombatRound(campaignName);
     const rageActivationRound = getRuntimeValue(playerName, 'vitalityOfTheTreeRageRound');
 
     const roundsElapsed = currentRound - (rageActivationRound ?? currentRound);
-    const maxTargets = Math.max(1, roundsElapsed);
+    // CLA-378: RAW is one creature per turn — clamp maxTargets to 1 code-side.
+    const maxTargets = 1;
 
     const tempHpAmount = rollDiceExpression(auto.ongoingHealingExpression, playerStats);
     if (typeof tempHpAmount !== 'number' || tempHpAmount <= 0) {
@@ -327,6 +360,14 @@ export async function handleVitalityOfTheTree(action, playerStats, campaignName,
         : [];
 
     if (roundsElapsed <= 0) {
+        await addEntry(campaignName, {
+            type: 'automation',
+            automationType: 'vitality_of_the_tree_refused',
+            characterName: playerName,
+            name: action.name,
+            description: `${action.name} refused — this is the same round your Rage activated.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[vitalityOfTheTree] Error logging refusal:', e); });
         return {
             type: 'popup',
             payload: {
@@ -353,16 +394,94 @@ export async function handleVitalityOfTheTree(action, playerStats, campaignName,
     };
 }
 
-export async function confirmVitalityOfTheTree(action, playerStats, campaignName, selectedTargets, tempHp, maxTargets) {
+export async function confirmVitalityOfTheTree(action, playerStats, campaignName, selectedTargets, tempHp, _maxTargets) {
     const auto = action.automation;
     const playerName = playerStats.name;
-    const finalTargets = (selectedTargets || []).slice(0, maxTargets || 999);
 
-    for (const targetName of finalTargets) {
-        setTempHp(targetName, tempHp, campaignName);
+    // CLA-378: re-gate at confirm — Rage may have ended between opening the picker and confirming.
+    const activeBuffs = Array.isArray(getRuntimeValue(playerName, 'activeBuffs', campaignName))
+        ? getRuntimeValue(playerName, 'activeBuffs', campaignName)
+        : [];
+    const rageActive = activeBuffs.some(b => b.name === 'Rage');
+    if (!rageActive) {
+        await addEntry(campaignName, {
+            type: 'automation',
+            automationType: 'vitality_of_the_tree_refused',
+            characterName: playerName,
+            name: action.name,
+            description: `${action.name} refused — requires Rage to be active.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[vitalityOfTheTree] Error logging refusal:', e); });
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description: `${action.name}: Requires Rage to be active. No temp HP granted.`,
+                automation: auto,
+            },
+        };
     }
 
-    const targetList = finalTargets.length > 0 ? finalTargets.join(', ') : 'no targets selected';
+    // CLA-378: RAW — one creature per turn; clamp maxTargets to 1 code-side.
+    const cap = 1;
+    const rangeFt = rangeToFeet(auto.healingRange || '10 ft');
+
+    const granted = [];
+    for (const targetName of (selectedTargets || []).slice(0, cap)) {
+        if (targetName === playerName) {
+            await addEntry(campaignName, {
+                type: 'automation',
+                automationType: 'vitality_of_the_tree_refused',
+                characterName: playerName,
+                name: action.name,
+                description: `${action.name} refused — you must choose another creature.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[vitalityOfTheTree] Error logging refusal:', e); });
+            continue;
+        }
+        const inRange = await isWithinRange(playerName, targetName, rangeFt);
+        if (!inRange) {
+            await addEntry(campaignName, {
+                type: 'automation',
+                automationType: 'vitality_of_the_tree_refused',
+                characterName: playerName,
+                name: action.name,
+                description: `${action.name} refused — ${targetName} is not within ${rangeFt} feet.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[vitalityOfTheTree] Error logging refusal:', e); });
+            continue;
+        }
+        setTempHp(targetName, tempHp, campaignName);
+        granted.push(targetName);
+    }
+
+    if (granted.length === 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description: `${action.name}: No targets granted.`,
+                automation: auto,
+            },
+        };
+    }
+
+    // CLA-378: record attribution on the rage anchor so the rage-end branch strips exactly
+    // these allies' THP, and spend the once-per-turn availability (single merged write).
+    const round = getCurrentCombatRound(campaignName);
+    const existing = Array.isArray(getRuntimeValue(playerName, 'vitalityOfTheTreeGrantedTargets', campaignName))
+        ? getRuntimeValue(playerName, 'vitalityOfTheTreeGrantedTargets', campaignName)
+        : [];
+    await setRuntimeObject(playerName, {
+        vitalityOfTheTreeGrantedTargets: [...existing, ...granted.map(t => ({ target: t, amount: tempHp, round }))],
+        vitalityOfTheTreeAvailable: false,
+    }, campaignName);
+
+    const targetList = granted.join(', ');
     const description = `${action.name}: Granted ${tempHp} temporary hit points to ${targetList}.`;
 
     await addEntry(campaignName, {

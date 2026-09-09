@@ -40,13 +40,30 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             };
         }
         const newBuffs = activeBuffs.filter(b => b.name !== action.name);
-        setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
         if (action.name === 'Rage') {
+            // CLA-378: leftover Vitality of the Tree temp HP must vanish when Rage ends.
+            const strippedTargets = (getRuntimeValue(playerName, 'vitalityOfTheTreeGrantedTargets', campaignName) || [])
+                .map(g => (g && g.target) || g)
+                .filter(Boolean);
+            const remainingBuffs = newBuffs.filter(b => b.name !== 'Rage of the Gods');
             clearExtendedFlag(playerName, campaignName);
-            const remainingBuffs = activeBuffs.filter(b => b.name !== 'Rage of the Gods');
-            if (remainingBuffs.length !== activeBuffs.length) {
-                setRuntimeValue(playerName, 'activeBuffs', remainingBuffs, campaignName);
+            await setRuntimeValue(playerName, 'activeBuffs', remainingBuffs, campaignName);
+            await setRuntimeValue(playerName, 'tempHp', 0, campaignName);
+            await setRuntimeValue(playerName, 'vitalityOfTheTreeAvailable', false, campaignName);
+            await setRuntimeValue(playerName, 'vitalityOfTheTreeRageRound', null, campaignName);
+            await setRuntimeValue(playerName, 'vitalityOfTheTreeGrantedTargets', null, campaignName);
+            for (const targetName of strippedTargets) {
+                await setRuntimeValue(targetName, 'tempHp', 0, campaignName);
             }
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName: playerName,
+                abilityName: 'Rage',
+                description: `${playerName}'s Rage ended. Vitality of the Tree temporary hit points vanish${strippedTargets.length > 0 ? ` for ${strippedTargets.join(', ')}` : ''}.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error("[combatStanceHandler:log-error]", e); });
+        } else {
+            await setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
         }
         return {
             type: 'popup',
@@ -236,7 +253,11 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
     const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
     const activeBuffs = Array.isArray(stored) ? stored : [];
     const newBuffs = [...activeBuffs, buff];
-    setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
+    // CLA-378: for Rage the buff write is deferred until after the triggerOnRage
+    // temp HP grant so its full-store POST is the last (superset) write (§6-#18).
+    if (action.name !== 'Rage') {
+        await setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
+    }
 
     if (isWildHeart && chosenOption) {
         addEntry(campaignName, {
@@ -247,9 +268,13 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
         }).catch((e) => { console.error("[combatStanceHandler:log-error]", e); });
     }
 
+    const specialActions = playerStats.automation?.specialActions || [];
+
     if (action.name === 'Rage') {
         const currentRound = getCurrentCombatRound(campaignName);
         await setRuntimeValue(playerName, 'vitalityOfTheTreeRageRound', currentRound, campaignName);
+        await setRuntimeValue(playerName, 'vitalityOfTheTreeGrantedTargets', null, campaignName);
+        await setRuntimeValue(playerName, 'vitalityOfTheTreeAvailable', false, campaignName);
 
         const currentConditions = getRuntimeValue(playerName, 'activeConditions', campaignName) || [];
         if (Array.isArray(currentConditions)) {
@@ -258,16 +283,35 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
                 return lower !== 'charmed' && lower !== 'frightened';
             });
             if (filtered.length !== currentConditions.length) {
-                setRuntimeValue(playerName, 'activeConditions', filtered, campaignName);
+                await setRuntimeValue(playerName, 'activeConditions', filtered, campaignName);
             }
         }
 
-        const specialActions = playerStats.automation?.specialActions || [];
+        let surgeAmount = 0;
+        let surgeName = '';
         for (const sa of specialActions) {
             if (sa.triggerOnRage) {
-                grantTempHpOnRage({ name: sa.name, automation: sa }, playerStats, campaignName);
+                // CLA-378: awaited so the temp HP write lands before the buff POST (§6-#18 race).
+                const amount = await grantTempHpOnRage({ name: sa.name, automation: sa }, playerStats, campaignName);
+                if (typeof amount === 'number' && amount > surgeAmount) {
+                    surgeAmount = amount;
+                    surgeName = sa.name;
+                }
             }
         }
+
+        // Last (superset) full-store POST: carries buffs + rage anchor + surge THP together.
+        await setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
+
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: 'Rage',
+            description: surgeAmount > 0
+                ? `${playerName} activated Rage. ${surgeName} (Vitality Surge) grants ${surgeAmount} temporary hit points.`
+                : `${playerName} activated Rage.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[combatStanceHandler:log-error]", e); });
 
         const teleportFeature = specialActions.find(sa => sa.effect === 'teleport_on_rage');
         if (teleportFeature) {
