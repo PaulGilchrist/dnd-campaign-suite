@@ -35,6 +35,37 @@ export async function handle(action, playerStats, campaignName) {
         };
     }
 
+    // CLA-371: RAW trigger requires a HIT ("When an attacker ... hits you with
+    // an attack roll"). A missed attack stores hit:false / primaryDamage:null —
+    // refuse BEFORE any spend (no heal, no buff, no latch stamp, no ability_use).
+    // Refusal mirrors the verified gates: quiveringPalmHandler / CLA-342
+    // "did not hit" refusals + this handler's own _refused log shape.
+    const primaryDamage = lastAttack.primaryDamage || 0;
+    if (lastAttack.attackEvent?.hit === false || primaryDamage <= 0) {
+        const missReason = lastAttack.attackEvent?.hit === false
+            ? 'the last attack missed you'
+            : 'the last attack dealt you no damage';
+        const refusalText = `${featureName} triggers only when an attack hits you — ${missReason}. Your Reaction is not spent.`;
+        const refusalType = `${featureName.toLowerCase().replace(/'/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')}_refused`;
+        addEntry(campaignName, {
+            type: 'automation',
+            characterName: playerName,
+            automationType: refusalType,
+            name: featureName,
+            description: refusalText,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[superiorHunterDefense] Error logging miss refusal:", e); });
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: refusalText,
+                automation: auto,
+            },
+        };
+    }
+
     // CLA-345: Reaction-economy round latch — one triggering turn can only be
     // defended once. Mirrors the CLA-335 Stone's Endurance / CLA-315 Slow Fall
     // recipe: stamp holder playerStats.name with a round read from a FRESH
@@ -66,7 +97,14 @@ export async function handle(action, playerStats, campaignName) {
         };
     }
 
-    const primaryDamage = lastAttack.primaryDamage || 0;
+    // CLA-371: Serialize the latch — stamp at the TRIGGER, before any spend
+    // (heal/buff/expiration/logs). setRuntimeValue commits to the local store
+    // synchronously, so a second same-round click now reads the stamped round at
+    // the latch check above and refuses instead of double-spending (the old
+    // late stamp at the bottom of the handler lost the write→read race —
+    // CLA-342/CLA-353 "stamp at trigger" recipe).
+    await setRuntimeValue(playerName, usedRoundKey, currentRound, campaignName);
+
     const secondaryDamage = lastAttack.secondaryDamage || 0;
     const primaryDamageType = lastAttack.primaryDamageType || lastAttack.attackEvent?.damageType || 'untyped';
     const secondaryDamageType = lastAttack.secondaryDamageType || null;
@@ -118,8 +156,6 @@ export async function handle(action, playerStats, campaignName) {
     addExpiration(playerName, playerName, [
         { type: 'remove_active_buff', buffName: featureName },
     ], campaignName, 1);
-
-    await setRuntimeValue(playerName, usedRoundKey, currentRound, campaignName);
 
     const healText = actualHeal > 0 ? ` Retroactively healed for ${actualHeal} HP (${Math.floor(resistedAmount / 2)} from ${resistedAmount} ${damageType} damage halved by resistance).` : '';
 

@@ -166,7 +166,7 @@ describe('superiorHunterDefenseHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
-            const buffsArg = setRuntimeValue.mock.calls[0][2];
+            const buffsArg = setRuntimeValue.mock.calls.find(c => c[1] === 'activeBuffs')[2];
 
             // Shield preserved
             expect(buffsArg).toEqual(expect.arrayContaining([
@@ -524,10 +524,10 @@ describe('superiorHunterDefenseHandler', () => {
             }));
         });
 
-        it('handles primaryDamage being 0 with no secondary damage', async () => {
+        it('refuses when primaryDamage is 0 (no damage dealt — CLA-371 hit gate)', async () => {
             getRuntimeValue.mockReturnValue([]);
             damageRollback.findLastAttack.mockResolvedValue({
-                attackEvent: { damageType: 'fire', primaryDamage: 0, targetName: 'Test Ranger' },
+                attackEvent: { damageType: 'fire', hit: true, primaryDamage: 0, targetName: 'Test Ranger' },
                 attackerName: 'Goblin',
                 targetName: 'Test Ranger',
                 primaryDamage: 0,
@@ -538,8 +538,135 @@ describe('superiorHunterDefenseHandler', () => {
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
-            expect(result.payload.description).toContain('Resistance to fire damage');
-            expect(result.payload.description).toContain('0 fire');
+            expect(result.payload.description).toContain('dealt you no damage');
+            expect(result.payload.description).toContain('Reaction is not spent');
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'automation',
+                automationType: 'superior_hunters_defense_refused',
+            }));
+            expect(applyHealingToTarget).not.toHaveBeenCalled();
+            expect(addExpiration).not.toHaveBeenCalled();
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+            }));
+        });
+    });
+
+    describe('CLA-371 hit gate + latch serialization', () => {
+        const uncannyAction = () => ({
+            name: 'Uncanny Dodge',
+            automation: { type: 'superior_hunter_defense', casting_time: '1 reaction' },
+        });
+
+        const missAttack = () => ({
+            attackEvent: { damageType: 'piercing', primaryDamageType: 'Piercing', hit: false, damageApplied: false, targetName: 'Test Ranger' },
+            attackerName: 'Thug 1',
+            targetName: 'Test Ranger',
+            primaryDamage: 0,
+            secondaryDamage: 0,
+            totalDamage: 0,
+            damageTypes: ['Piercing'],
+            primaryDamageType: 'Piercing',
+            secondaryDamageType: null,
+        });
+
+        const hitAttack = (primaryDamage) => ({
+            attackEvent: { damageType: 'Bludgeoning', primaryDamageType: 'Bludgeoning', hit: true, damageApplied: true, targetName: 'Test Ranger' },
+            attackerName: 'Thug 1',
+            targetName: 'Test Ranger',
+            primaryDamage,
+            secondaryDamage: 0,
+            totalDamage: primaryDamage,
+            damageTypes: ['Bludgeoning'],
+            primaryDamageType: 'Bludgeoning',
+            secondaryDamageType: null,
+        });
+
+        // Simulates the live runtime store so a second same-turn click reads
+        // the latch value the first click stamped (the write→read race of CLA-371).
+        async function armedRuntime(round) {
+            const store = { _Superior_Hunters_Defense_usedRound: null, activeBuffs: [] };
+            getRuntimeValue.mockImplementation((name, key) => store[key] ?? null);
+            setRuntimeValue.mockImplementation((name, key, value) => { store[key] = value; });
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({ round, creatures: [{ name: 'Thug 1' }, { name: 'Test Ranger' }], activeCreatureName: 'Thug 1' });
+            return store;
+        }
+
+        it('refuses a MISS click: refused log only, no ability_use, no buff, no heal, no latch stamp', async () => {
+            const store = await armedRuntime(1);
+            damageRollback.findLastAttack.mockResolvedValue(missAttack());
+
+            const result = await handle(uncannyAction(), makePlayerStats(), 'test-campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('triggers only when an attack hits you');
+            expect(result.payload.description).toContain('the last attack missed you');
+            expect(result.payload.description).toContain('Reaction is not spent');
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'automation',
+                automationType: 'uncanny_dodge_refused',
+                characterName: 'Test Ranger',
+            }));
+            expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'ability_use' }));
+            expect(applyHealingToTarget).not.toHaveBeenCalled();
+            expect(addExpiration).not.toHaveBeenCalled();
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(store._Superior_Hunters_Defense_usedRound).toBeNull();
+        });
+
+        it('on a HIT: halves exactly once and stamps the latch BEFORE any spend', async () => {
+            await armedRuntime(1);
+            applyHealingToTarget.mockResolvedValue({ actualHeal: 3, oldHp: 97, newHp: 100 });
+            damageRollback.findLastAttack.mockResolvedValue(hitAttack(7));
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            expect(applyHealingToTarget).toHaveBeenCalledWith(expect.anything(), 'Test Ranger', 3, 'test-campaign');
+            expect(result.payload.description).toContain('Retroactively healed for 3 HP');
+
+            const abilityUseLogs = addEntry.mock.calls.filter(c => c[1]?.type === 'ability_use');
+            expect(abilityUseLogs).toHaveLength(1);
+
+            const latchOrder = setRuntimeValue.mock.invocationCallOrder;
+            const latchIdx = setRuntimeValue.mock.calls.findIndex(c => c[1] === '_Superior_Hunters_Defense_usedRound');
+            const buffIdx = setRuntimeValue.mock.calls.findIndex(c => c[1] === 'activeBuffs');
+            expect(latchIdx).toBeGreaterThanOrEqual(0);
+            expect(latchIdx).toBeLessThan(buffIdx);
+            expect(latchOrder[latchIdx]).toBeLessThan(applyHealingToTarget.mock.invocationCallOrder[0]);
+        });
+
+        it('second same-turn click after a HIT spend is refused (no double-spend)', async () => {
+            const store = await armedRuntime(1);
+            applyHealingToTarget.mockResolvedValue({ actualHeal: 3, oldHp: 97, newHp: 100 });
+            damageRollback.findLastAttack.mockResolvedValue(hitAttack(7));
+
+            await handle(uncannyAction(), makePlayerStats(), 'test-campaign');
+            const second = await handle(uncannyAction(), makePlayerStats(), 'test-campaign');
+
+            expect(store._Superior_Hunters_Defense_usedRound).toBe(1);
+            expect(second.payload.description).toContain('already used Uncanny Dodge this round');
+            // first click: hp_change + ability_use; second click: refusal only
+            expect(addEntry).toHaveBeenCalledTimes(3);
+            expect(addEntry.mock.calls.filter(c => c[1]?.automationType === 'uncanny_dodge_refused')).toHaveLength(0);
+            expect(addEntry.mock.calls.filter(c => c[1]?.automationType === 'superior_hunters_defense_refused')).toHaveLength(1);
+            const abilityUseLogs = addEntry.mock.calls.filter(c => c[1]?.type === 'ability_use');
+            expect(abilityUseLogs).toHaveLength(1);
+            expect(applyHealingToTarget).toHaveBeenCalledTimes(1);
+            expect(setRuntimeValue.mock.calls.filter(c => c[1] === 'activeBuffs')).toHaveLength(1);
+        });
+
+        it('re-arms next round: hit + cleared latch spends again', async () => {
+            const store = await armedRuntime(3);
+            store._Superior_Hunters_Defense_usedRound = 2;
+            applyHealingToTarget.mockResolvedValue({ actualHeal: 3, oldHp: 97, newHp: 100 });
+            damageRollback.findLastAttack.mockResolvedValue(hitAttack(7));
+
+            const result = await handle(uncannyAction(), makePlayerStats(), 'test-campaign');
+
+            expect(result.payload.description).toContain('Resistance to Bludgeoning damage');
+            expect(store._Superior_Hunters_Defense_usedRound).toBe(3);
         });
     });
 
