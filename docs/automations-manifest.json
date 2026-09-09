@@ -6724,7 +6724,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-366-transposition-popup-only.md",
       "class": "Cleric",
       "triggerConditions": "Action: bonus_action; Range: self",
       "expectedBehavior": "Whenever you take the Bonus Action to create or move the illusion of your Invoke Duplicity, you can teleport, swapping places with the illusion."
@@ -6736,7 +6736,7 @@
       "handler": "src/services/combat/automation/handlers/maneuverHandler.js",
       "router": "src/services/combat/automation/routers/maneuverRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/maneuverInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-MN-020-trip-attack-save-dc-understated.md",
       "class": "Fighter",
       "triggerConditions": "Action type: attack_rider; Trigger: weapon_attack_hit; Uses: superiority_die",
       "expectedBehavior": "When you hit a creature with an attack roll using a weapon or an Unarmed Strike, you can expend one Superiority Die and add the die to the attack's damage roll. If the target is Large or smaller, it must succeed on a Strength saving throw or fall Prone."
@@ -6748,7 +6748,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-SP-124-true-polymorph-confirm-crash.md",
       "class": "Spell",
       "triggerConditions": "",
       "expectedBehavior": "Choose one creature or nonmagical object that you can see within range. The creature shape-shifts into a different creature or a nonmagical object, or the object shape-shifts into a creature (the object must be neither worn or carried). The transformation lasts for the duration or until the target dies or is destroyed, but if you maintain Concentration on this spell for the full duration, the spell lasts until dispelled. An unwilling creature can make a Wisdom saving throw, and if it succeeds, it isn't affected by this spell. Creature into Creature. If you turn a creature into another kind of creature, the new form can be any kind you choose that has a Challenge Rating equal to or less than the target's Challenge Rating or level. These Temporary Hit Points vanish if any remain when the spell ends.. The target gains a number of Temporary Hit Points equal to the Hit Points of the new form. The spell ends early on the target if it has no Temporary Hit Points left. The target is limited in the actions it can perform by the anatomy of its new form, and it can't speak or cast spells. The target's gear melds into the new form. The creature can't use or otherwise benefit from any of that equipment. Object into Creature. You can turn an object into any kind of creature, as long as the creature's size is no larger than the object's size and the creature has a Challenge Rating of 9 or lower. The creature is Friendly to you and your allies. In combat, it takes its turns immediately after yours, and it obeys your commands. If the spell lasts more than an hour, you no longer control the creature. It might remain Friendly to you, depending on how you have treated it. Creature into Object. If you turn a creature into an object, it transforms along with whatever it is wearing and carrying into that form, as long as the object's size is no larger than the creature's size. The creature's statistics become those of the object, and the creature has no memory of time spent in this form after the spell ends and it returns to normal."
@@ -6760,7 +6760,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified 2026-09-09 — CD-gated WIS save vs real DC 11 (lv6 app PB+3), fail→Frightened+Incapacitated 1min (rounds=10 expiry), non-undead control never offered, SR restores CD",
       "class": "Cleric",
       "triggerConditions": "Action: 1 action; Range: 30 ft; Save: WIS",
       "expectedBehavior": "As a Action, you present your Holy Symbol and censure Undead creatures. Each Undead of your choice within 30 feet of you must make a Wisdom saving throw. If the creature fails its save, it has the Frightened and Incapacitated conditions for 1 minute."
@@ -6772,7 +6772,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-368-twinkling-row-inert.md",
       "class": "Druid",
       "triggerConditions": "Action: passive",
       "expectedBehavior": "The constellations of your Starry Form improve. The 1d8 of the Archer and the Chalice becomes 2d8, and while the Dragon is active, you have a Fly Speed of 20 feet and can hover. Moreover, at the start of each of your turns while in your Starry Form. you can change which constellation glimmers on your body."
@@ -6784,7 +6784,7 @@
       "handler": "src/services/combat/automation/handlers/fightingStyleHandler.js",
       "router": "src/services/combat/automation/routers/fightingStyleRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/fightingStyleInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified 2026-09-09 — live on lv18 BM host: off-hand Bonus row 1d6→1d6+3, main attack unchanged, light+non-light gate removes bonus row entirely; consumers attackCalc2024.js includeAbilityBonusInDamage + buildTwoWeaponFightingStep",
       "class": "Fighting Style",
       "triggerConditions": "",
       "expectedBehavior": "If you are wielding a light melee weapon that you are holding in one hand, a light melee weapon that you are holding in the other hand, and no armor shields, you can add your ability modifier to the damage of the second attack."
@@ -6796,7 +6796,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified 2026-09-09 — lv18 BM host: maneuver log 'Rolled d12', pool delta exactly 1, sheet header 'Superiority Die: d12'; banding automationExpressions.js lv>=18→12 (style-d6 branch BM-exempt)",
       "class": "Fighter",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "Superiority Die becomes d12."
@@ -6808,7 +6808,7 @@
       "handler": "src/services/combat/automation/handlers/fightingStyleHandler.js",
       "router": "src/services/combat/automation/routers/fightingStyleRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/fightingStyleInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified 2026-09-09 — manifest wording IS app-canonical (AC-based fighting style, fighting-styles.json + rules-armorClass.js:37-55; die-upgrade text is the separate 2024 FEAT path). Live: unarmed AC 10→12 (+2), armed gate reverts to 10, log targetAc proof",
       "class": "Fighting Style",
       "triggerConditions": "",
       "expectedBehavior": "While you are unarmed and not holding anything in both hands, you gain a +2 bonus to AC."
@@ -6820,7 +6820,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-370-majesty-once-per-turn-rearm-stuck-round1.md",
       "class": "Bard",
       "triggerConditions": "Trigger: first_attack_per_turn_against_self; Action: bonus_action",
       "expectedBehavior": "As a Bonus Action, you can assume a magically majestic presence for 1 minute or until you have the Incapacitated condition. For the duration, whenever any creature hits you with an attack roll for the first time on a turn, the attacker must succeed on a Charisma saving throw against your spell save DC, or the attack misses instead."
@@ -6832,7 +6832,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-371-uncanny-dodge-miss-gate-consumes.md",
       "class": "Rogue",
       "triggerConditions": "Action: 1 reaction",
       "expectedBehavior": "When an attacker that you can see hits you with an attack roll, you can take a Reaction to halve the attack's damage against you (round down)."
@@ -6844,7 +6844,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-372-once-per-LR-gate-resets-on-initiative.md",
       "class": "Monk",
       "triggerConditions": "Trigger: roll_initiative; Action: passive",
       "expectedBehavior": "When you roll Initiative, you can regain all expended Focus Points. Roll your Martial Arts die and regain Hit Points equal to your Monk level plus the number rolled. Can't use again until Long Rest."
@@ -6856,7 +6856,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified 2026-09-09 — Oath of Ancients lv15 app-canonical (host edited Devotion→Ancients lv20); live lethal-hit intercept: HP 1 + heal delta 61 = 1+3x20 exact, no death saves, latch blocks 2nd lethal (death modal appears), LR re-arms; age clause display-only §7; gaps: no ability_use log, intercepted-leg damage log swallowed",
       "class": "Paladin",
       "triggerConditions": "Automation type: passive_immunity",
       "expectedBehavior": "When reduced to 0 HP but not killed, drop to 1 HP and regain 3x Paladin level Hit Points. Can't be aged magically, cease visibly aging. Once per Long Rest."
@@ -6868,21 +6868,21 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-374-use-magic-device-inert-row.md",
       "class": "Rogue",
       "triggerConditions": "Action: passive",
       "expectedBehavior": "Attunement: attune to up to 4 magic items at once. Charges: when using magic item property that expends charges, roll 1d6, on 6 use without expending. Scrolls: use any Spell Scroll, Intelligence as spellcasting ability. Cantrip/level 1: cast reliably. Higher level: succeed on Intelligence (Arcana) check (DC 10 + spell level) to cast. On fail, scroll disintegrates."
     },
     {
       "id": "CLA-375",
-      "name": "Versatile \u2013 Human",
-      "type": "classFeature",
-      "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
-      "router": "src/services/combat/automation/routers/classFeatureRouter.js",
-      "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
-      "triggerConditions": "Passive",
-      "expectedBehavior": "You gain an Origin feat of your choice. Skilled is recommended. (Human trait)"
+      "name": "Versatile – Human",
+      "type": "racialTrait",
+      "handler": "src/services/character/featValidation.js (getRaceFeatChoices, getFeatLimits, validateFeats)",
+      "router": "src/components/character-creation/WizardStepFeats.jsx (step 8 feats chooser + .versatile-trait-info)",
+      "infoBuilder": "src/services/character/skillValidation/feat-helpers.js (countSkilledUses) + skilled-pool.js (granted-feat benefits)",
+      "verified": "verified 2026-09-09 — Origin-feat chooser live (11-feat pool, 1 of 1 limit, cap warning on 2nd tick), Skilled persisted to disk feats[], exclusive-skill cells +0→+2 exact; host LightfootHalfling now lv1 Human",
+      "triggerConditions": "Passive (character creation/edit wizard; Passive feat derivation per §42o model)",
+      "expectedBehavior": "You gain an Origin feat of your choice. Skilled is recommended. (2024 Human RACE trait — retyped from classFeature 2026-09-09; data at public/data/2024/races.json Versatile proficiency_choices choose:1 from 11 Origin feats; granted feat persists to feats[], benefits via standard feat pipeline; NOT a combat automation)"
     },
     {
       "id": "CLA-376",
@@ -6891,7 +6891,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-376-versatile-trickster.md (Arcane Trickster lv13 app-canonical, not Thief; second-target never saves/prone, single-Trip chooser unreachable)",
       "class": "Rogue",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "When you use Trip option of Cunning Strike on a creature, you can also use it on another creature within 5 feet of the spectral hand."
@@ -6903,7 +6903,7 @@
       "handler": "src/services/combat/automation/handlers/weaponMasteryHandler.js",
       "router": "src/services/combat/automation/routers/weaponMasteryRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/weaponMasteryInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-WM-008-vex-te-self-erased-on-granting-hit.md",
       "class": "Barbarian",
       "triggerConditions": "",
       "expectedBehavior": "If you hit a creature with this weapon and deal damage to it, you have Advantage on your next attack roll against that creature before the end of your next turn."
@@ -6911,11 +6911,11 @@
     {
       "id": "CLA-377",
       "name": "Vicious Mockery",
-      "type": "classFeature",
-      "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
-      "router": "src/services/combat/automation/routers/classFeatureRouter.js",
+      "type": "spell",
+      "handler": "src/services/automation/handlers/spells/viciousMockeryHandler.js",
+      "router": "src/services/spellCastService/savePath.js:193",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-377-vm-te-ungated-save-success.md (retyped classFeature→spell; DC 19 + 4d6@18 + forcedMode:disadvantage consumed live-exact, but te+condition log written at cast before save resolves — fires on successes)",
       "class": "Bard",
       "triggerConditions": "Action; Target creature within 60ft; WIS save or",
       "expectedBehavior": "You unleash a string of insults laced with subtle enchantments at one creature you can see or hear within range. The target must succeed on a Wisdom saving throw or take 1d6 Psychic damage and have Disadvantage on the next attack roll it makes before the end of its next turn. Damage increases at levels 5 (2d6), 11 (3d6), and 17 (4d6). (Bard cantrip spell)"
@@ -6927,7 +6927,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-378-rage-end-thp-no-strip.md",
       "class": "Barbarian",
       "triggerConditions": "Action: 1 bonus action; Range: undefined",
       "expectedBehavior": "Your Rage taps into the life force of the World Tree. You gain the following benefits. Vitality Surge: When you activate your Rage, you gain a number of Temporary Hit Points equal to your Barbarian level. Life-Giving Force: At the start of each of your turns while your Rage is active, you can choose another creature within 10 feet of yourself to gain Temporary Hit Points. To determine the number of Temporary Hit Points, roll a number of d6s equal to your Rage Damage bonus, and add them together. If any of these Temporary Hit Points remain when your Rage ends, they vanish."
@@ -6939,7 +6939,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-379-war-bond-no-bond-flow.md (Eldritch Knight lv3 app-canonical; summon row live but zero bond writers, 2-weapon modal unregistered, disarm unmodeled, zero logs)",
       "class": "Fighter",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Ritual to create magical bond with one weapon. Can't be disarmed unless Incapacitated. Summon as Bonus Action. Can have up to two bonded weapons."
@@ -6951,7 +6951,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-FT-099-war-caster-reactive-spell-dead-picker.md (clause A CON-advantage live-exact gated; clause B reactive-spell picker dead: automation_info pre-empts picker, no leaving-reach producer)",
       "triggerConditions": "When making concentration_saving_throws checks; Reaction when a creature provokes an Opportunity Attack by leaving your reach (creature_leaves_reach)",
       "expectedBehavior": "You have Advantage on Constitution saving throws that you make to maintain Concentration. Reactive Spell benefit (2024 feats.json benefits[2], automation type reaction_spell): when a creature provokes an Opportunity Attack from you by leaving your reach, you can take a Reaction to cast a spell at that creature rather than making the Opportunity Attack; the spell must have a casting time of one action and target only that creature."
     },
@@ -6962,7 +6962,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-09-09) — War Domain lv6 free_spell/channel_divinity/noConcentration app-canonical; live both spells: CD 3→2, slots unchanged + 'Free Cast' stamp, cs.concentration NULL, SW 10-round clock + entity, SoF +2 AC; paid controls slot+conc exact. Residuals: SoF expiry ∞ (no 1-min clock), one CD covers both spells (RAW per-spell)",
       "class": "Cleric",
       "triggerConditions": "Action: action; Spell: Shield of Faith,Spiritual Weapon",
       "expectedBehavior": "You can expend a use of your Channel Divinity to cast Shield of Faith or Spiritual Weapon rather than expending a spell slot. When you cast either spell in this way, the spell doesn't require Concentration. Instead the spell lasts for 1 minute."
@@ -6974,7 +6974,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-381-war-magic-cantrip-stub.md (EK lv7 app-canonical; row+chooser live but cantrip never fires, no latch/replacement, chooser known-gate-free; lv18 war_magic_spell sibling live proves unported cantrip stub)",
       "class": "Fighter",
       "triggerConditions": "Action: 1 action; Action: action",
       "expectedBehavior": "Replace one attack with a Wizard cantrip (casting time: action)."
@@ -6986,7 +6986,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-382-war-priest-popup-only.md (War Domain lv3 bonus_action_attack; popup-only, no damage leg, uses gate dead via raw usesMax=0, warPriestUses zombie counter)",
       "class": "Cleric",
       "triggerConditions": "Action: bonus_action; Uses: WIS modifier_min_1",
       "expectedBehavior": "As a Bonus Action, you can make one attack with a weapon or an Unarmed Strike. You can use this Bonus Action a number of times equal to your Wisdom modifier (minimum of once)."
@@ -6998,7 +6998,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-SP-125-warding-bond-ac-clock-gaps.md",
       "class": "Spell",
       "triggerConditions": "Action: 1 action; Duration: 1 hour",
       "expectedBehavior": "You touch another creature that is willing and create a mystic connection between you and the target until the spell ends. While the target is within 60 feet of you, it gains a +1 bonus to AC and saving throws, and it has Resistance to all damage. Also, each time it takes damage, you take the same amount of damage. The spell ends if you drop to 0 Hit Points or if you and the target become separated by more than 60 feet. It also ends if the spell is cast again on either of the connected creatures."
@@ -7010,7 +7010,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-383-warding-flare-post-roll-simulation.md",
       "class": "Cleric",
       "triggerConditions": "Trigger: attack_roll_within_30ft; Action: 1 reaction",
       "expectedBehavior": "When a creature that you can see within 30 feet of yourself makes an attack roll, you can take a Reaction to impose Disadvantage on the attack roll, causing light to flare before it hits or misses. You can use this feature a number of times equal to your Wisdom modifier (minimum of once)."
@@ -7022,7 +7022,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-384-warping-implosion-generic-save-attack-no-teleport.md (Aberrant Sorcery lv18 app-canonical; generic save_attack DC/damage/latch live-exact, but teleport/pull/5SP-restore dead code — dedicated handler unreachable behind save_attack dispatch)",
       "class": "Sorcerer",
       "triggerConditions": "Action: 1 action; Target: creatures in emanation_30ft; Save: STR DC",
       "expectedBehavior": "Action, teleport to unoccupied space within 120 feet. Each creature within 30 feet of space you left makes Strength save or takes 3d10 Force damage and pulled toward space you left. Once per Long Rest (or spend 5 SP to restore)."
@@ -7034,7 +7034,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified 2026-09-09 — Path of Zealot lv3 pool scaling lv20=7d12 exact; multi-dice chooser live (3d12: pool 7→4, heal +27 exact, hp_change+healing_pool log); at-0 refusal; LR refill 0→7; host DraconicDragon Zealot lv20 PERMANENT (retest-ready for CLA-394)",
       "class": "Barbarian",
       "triggerConditions": "Action: bonus_action; Pool: 4d12; Range: undefined",
       "expectedBehavior": "A divine entity helps ensure you can continue the fight. You have a pool of four d12s that you can spend to heal yourself. As a Bonus Action, you can expend dice from the pool, roll them, and regain a number of Hit Points equal to the roll's total. Your pool regains all expended dice when you finish a Long Rest. The pool's maximum number of dice increases by one when you reach Barbarian levels 6 (5 dice), 12 (6 dice), and 17 (7 dice)."
