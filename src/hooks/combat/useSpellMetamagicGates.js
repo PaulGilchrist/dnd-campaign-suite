@@ -13,7 +13,18 @@ export async function gateMetamagic(spell, metaCtx, {
   hasMaterial, setPopupHtml, isSorcerer, playerStats, campaignName, cfSetPending, setSecondaryTargetModal, characters, onExecute
 }) {
   const consumedMaterial = getConsumedMaterial(spell);
-  if (consumedMaterial && !hasMaterial(playerStats, consumedMaterial.itemName)) {
+  // CLA-312: gate free-cast authorization on the EFFECTIVE cast level.
+  const gateLevel = (spell.isUpcast && spell.upcastLevel) || spell.level;
+  const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, spell.name, gateLevel, playerStats, campaignName);
+  // CLA-388: Wild Companion casts Find Familiar "without Material components" — a paid
+  // grant stamp waives the consumed-material requirement AND its consumption. Without the
+  // grant the consumed-material gate stays enforced.
+  const materialsWaived = freeCastAuthorized && [...(playerStats.automation?.actions || []),
+    ...(playerStats.automation?.bonusActions || []),
+    ...(playerStats.automation?.specialActions || [])].some(e =>
+      e.type === 'free_spell' && e.resourceCost === 'wild_companion' &&
+      (Array.isArray(e.spell) ? e.spell : [e.spell]).includes(spell.name));
+  if (consumedMaterial && !materialsWaived && !hasMaterial(playerStats, consumedMaterial.itemName)) {
     if (setPopupHtml) {
       setPopupHtml({
         type: 'automation_info',
@@ -49,9 +60,6 @@ export async function gateMetamagic(spell, metaCtx, {
         const spendPowerWordSlot = async () => {
           const isUpcast = spell.isUpcast;
           const upcastLevel = spell.upcastLevel;
-          // CLA-312: gate free-cast authorization on the EFFECTIVE cast level.
-          const gateLevel = (isUpcast && upcastLevel) || spell.level;
-          const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, spell.name, gateLevel, playerStats, campaignName);
           const result = await prepareSpellCast(spell, metaCtx, {
             playerName: playerStats.name,
             playerStats,
@@ -140,18 +148,14 @@ export async function gateMetamagic(spell, metaCtx, {
 
     if (isCantrip && cantripAutoLevel) {
       const preparedSpell = { ...spell, level: cantripAutoLevel, baseLevel: 0 };
-      if (consumedMaterial) await consumeMaterial(playerStats, consumedMaterial.itemName, campaignName);
+      if (consumedMaterial && !materialsWaived) await consumeMaterial(playerStats, consumedMaterial.itemName, campaignName);
       onExecute(preparedSpell, metaCtx);
     } else if (metaCtx.oldConcentrationSpell !== undefined) {
-      if (consumedMaterial) await consumeMaterial(playerStats, consumedMaterial.itemName, campaignName);
+      if (consumedMaterial && !materialsWaived) await consumeMaterial(playerStats, consumedMaterial.itemName, campaignName);
       onExecute(spell, metaCtx);
     } else {
       const isUpcast = spell.isUpcast;
       const upcastLevel = spell.upcastLevel;
-      // CLA-312: gate free-cast authorization on the EFFECTIVE cast level —
-      // a higher-level cast of a free-cast feature spell must pay its slot.
-      const gateLevel = (isUpcast && upcastLevel) || spell.level;
-      const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, spell.name, gateLevel, playerStats, campaignName);
       const result = await prepareSpellCast(spell, metaCtx, {
         playerName: playerStats.name,
         playerStats,
@@ -169,7 +173,7 @@ export async function gateMetamagic(spell, metaCtx, {
       if (!metaCtx.slotLevel && upcastLevel) {
         metaCtx.slotLevel = upcastLevel;
       }
-      if (consumedMaterial) await consumeMaterial(playerStats, consumedMaterial.itemName, campaignName);
+      if (consumedMaterial && !materialsWaived) await consumeMaterial(playerStats, consumedMaterial.itemName, campaignName);
       onExecute(result.modifiedSpell, result.metaCtx);
     }
     return;

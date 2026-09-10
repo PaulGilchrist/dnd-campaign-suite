@@ -1,5 +1,6 @@
 import React from 'react'
 import { getRuntimeValue, setRuntimeBatch } from '../../../hooks/runtime/useRuntimeState.js'
+import { addEntry } from '../../../services/ui/logService.js'
 import './ResourcePoolModal.css'
 
 function WildCompanionModal({ playerStats, campaignName, onClose }) {
@@ -32,25 +33,40 @@ function WildCompanionModal({ playerStats, campaignName, onClose }) {
 
   const slotHasAvailable = currentSlots[selectedLevel] > 0
 
+  // CLA-388: pay BEFORE stamping the grant, in ONE atomic setRuntimeBatch (spend + grant
+  // in the same full-store POST — two sequential writes race per §6-#18). Log ability_use
+  // directly at confirm (CLA-359: modal legs bypass the generic logEntries flusher).
   const handleSpellSlot = () => {
     if (!slotHasAvailable) return
-    const updates = {
+    setRuntimeBatch(name, {
       [`spell_slots_level_${selectedLevel}`]: currentSlots[selectedLevel] - 1,
-    }
-    setRuntimeBatch(name, updates, campaignName)
-    const freeCastKey = `_Wild_Companion_freeCast`
-    setRuntimeBatch(name, { [freeCastKey]: ['Find Familiar'] }, campaignName)
+      _Wild_Companion_freeCast: ['Find Familiar'],
+    }, campaignName)
+    addEntry(campaignName, {
+      type: 'ability_use',
+      characterName: name,
+      abilityName: 'Wild Companion',
+      spellName: 'Find Familiar',
+      description: `Wild Companion: expended a level ${selectedLevel} spell slot to cast Find Familiar without Material components. The familiar is Fey and disappears when you finish a Long Rest.`,
+      timestamp: Date.now(),
+    }).catch((e) => { console.error('[WildCompanionModal:log-error]', e) })
     onClose()
   }
 
   const handleWildShape = () => {
     if (currentWS <= 0) return
-    const updates = {
+    setRuntimeBatch(name, {
       wildShapeUses: currentWS - 1,
-    }
-    setRuntimeBatch(name, updates, campaignName)
-    const freeCastKey = `_Wild_Companion_freeCast`
-    setRuntimeBatch(name, { [freeCastKey]: ['Find Familiar'] }, campaignName)
+      _Wild_Companion_freeCast: ['Find Familiar'],
+    }, campaignName)
+    addEntry(campaignName, {
+      type: 'ability_use',
+      characterName: name,
+      abilityName: 'Wild Companion',
+      spellName: 'Find Familiar',
+      description: `Wild Companion: expended 1 Wild Shape use to cast Find Familiar without Material components. The familiar is Fey and disappears when you finish a Long Rest.`,
+      timestamp: Date.now(),
+    }).catch((e) => { console.error('[WildCompanionModal:log-error]', e) })
     onClose()
   }
 

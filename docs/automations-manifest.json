@@ -7095,7 +7095,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-388-wild-companion-unpaid-unlimited-free-cast.md (row grants UNPAID unlimited free Find Familiar: resourceCost 'wild_companion' zero consumers, slot+wildShapeUse ledgers untouched; WildCompanionModal dead (zero modalName producers); _Wild_Companion_freeCast consume-free + LR-immune; FEY familiar zero producers; materials gate fires backwards vs no-material clause)",
+      "verified": "verified",
       "class": "Druid",
       "triggerConditions": "Action: action; Spell: Find Familiar",
       "expectedBehavior": "You can summon a nature spirit that assumes an animal form to aid you. As a Action, you can expend a spell slot or a use of Wild Shape to cast the Find Familiar spell without Material components. When you cast the spell in this way, the familiar is Fey and disappears when you finish a Long Rest."

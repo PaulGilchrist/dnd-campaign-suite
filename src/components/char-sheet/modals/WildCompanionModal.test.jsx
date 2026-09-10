@@ -13,6 +13,12 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeBatch: (...args) => mockSetRuntimeBatch(...args),
 }));
 
+const mockAddEntry = vi.fn().mockResolvedValue(undefined);
+
+vi.mock('../../../services/ui/logService.js', () => ({
+  addEntry: (...args) => mockAddEntry(...args),
+}));
+
 import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js';
 
 // ── Test fixtures ──
@@ -121,12 +127,16 @@ describe('WildCompanionModal', () => {
 
   // ── Expend spell slot ──
 
-  it('decrements the selected spell slot when expended', () => {
+  // CLA-388: payment + grant stamp in ONE atomic setRuntimeBatch (two sequential
+  // full-store POSTs race per §6-#18) + ability_use log at confirm (CLA-359).
+
+  it('expends the selected spell slot AND stamps the grant in one atomic batch', () => {
     render(<WildCompanionModal {...makeProps()} />);
     fireEvent.click(screen.getByRole('button', { name: /Expend Level 1 Slot/i }));
+    expect(mockSetRuntimeBatch).toHaveBeenCalledTimes(1);
     expect(mockSetRuntimeBatch).toHaveBeenCalledWith(
       'Druid1',
-      { spell_slots_level_1: 3 },
+      { spell_slots_level_1: 3, _Wild_Companion_freeCast: ['Find Familiar'] },
       'test-campaign'
     );
   });
@@ -136,21 +146,25 @@ describe('WildCompanionModal', () => {
     const radios = document.querySelectorAll('input[name="wildCompanionSlotLevel"]');
     fireEvent.click(radios[2]); // level 3
     fireEvent.click(screen.getByRole('button', { name: /Expend Level 3 Slot/i }));
+    expect(mockSetRuntimeBatch).toHaveBeenCalledTimes(1);
     expect(mockSetRuntimeBatch).toHaveBeenCalledWith(
       'Druid1',
-      { spell_slots_level_3: 1 },
+      { spell_slots_level_3: 1, _Wild_Companion_freeCast: ['Find Familiar'] },
       'test-campaign'
     );
   });
 
-  it('sets the freeCast targetEffect when expending a spell slot', () => {
+  it('logs ability_use when expending a spell slot', () => {
     render(<WildCompanionModal {...makeProps()} />);
     fireEvent.click(screen.getByRole('button', { name: /Expend Level 1 Slot/i }));
-    expect(mockSetRuntimeBatch).toHaveBeenCalledWith(
-      'Druid1',
-      { _Wild_Companion_freeCast: ['Find Familiar'] },
-      'test-campaign'
-    );
+    expect(mockAddEntry).toHaveBeenCalledWith('test-campaign',
+      expect.objectContaining({
+        type: 'ability_use',
+        characterName: 'Druid1',
+        abilityName: 'Wild Companion',
+        spellName: 'Find Familiar',
+        description: expect.stringContaining('expended a level 1 spell slot'),
+      }));
   });
 
   it('calls onClose after expending a spell slot', () => {
@@ -182,19 +196,23 @@ describe('WildCompanionModal', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('expend wild shape decrements uses and sets freeCast', () => {
+  it('expend wild shape decrements uses AND stamps the grant in one atomic batch, logging ability_use', () => {
     render(<WildCompanionModal {...makeProps()} />);
     fireEvent.click(screen.getByRole('button', { name: /Expend 1 Wild Shape/i }));
+    expect(mockSetRuntimeBatch).toHaveBeenCalledTimes(1);
     expect(mockSetRuntimeBatch).toHaveBeenCalledWith(
       'Druid1',
-      { wildShapeUses: 1 },
+      { wildShapeUses: 1, _Wild_Companion_freeCast: ['Find Familiar'] },
       'test-campaign'
     );
-    expect(mockSetRuntimeBatch).toHaveBeenCalledWith(
-      'Druid1',
-      { _Wild_Companion_freeCast: ['Find Familiar'] },
-      'test-campaign'
-    );
+    expect(mockAddEntry).toHaveBeenCalledWith('test-campaign',
+      expect.objectContaining({
+        type: 'ability_use',
+        characterName: 'Druid1',
+        abilityName: 'Wild Companion',
+        spellName: 'Find Familiar',
+        description: expect.stringContaining('expended 1 Wild Shape use'),
+      }));
   });
 
   it('calls onClose after expending wild shape', () => {
@@ -223,7 +241,7 @@ describe('WildCompanionModal', () => {
     fireEvent.click(screen.getByRole('button', { name: /Expend 1 Wild Shape/i }));
     expect(mockSetRuntimeBatch).toHaveBeenCalledWith(
       'Druid1',
-      { wildShapeUses: 0 },
+      { wildShapeUses: 0, _Wild_Companion_freeCast: ['Find Familiar'] },
       'test-campaign'
     );
   });

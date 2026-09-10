@@ -422,6 +422,28 @@ function decrementFreeCastResource(playerName, spellName, spellLevel, playerStat
     setRuntimeValue(playerName, '_Bewitching_Magic_freeCast', null, campaignName);
   }
 
+  // CLA-388: Wild Companion (Druid lv2, 2024) — consume the PAID grant on cast so the
+  // shared `_Wild_Companion_freeCast` array is no longer unlimited (Bewitching Magic
+  // consume-shared-array precedent). Log the slotless cast as a summons row; the FEY
+  // familiar is log-recorded (no familiar combatant entity architecture exists app-wide).
+  const wildCompanionGrant = allActions.some(e =>
+    e.type === 'free_spell' && e.resourceCost === 'wild_companion' &&
+    (Array.isArray(e.spell) ? e.spell : [e.spell]).includes(spellName));
+  if (wildCompanionGrant) {
+    const wildCompanionFreeCast = getRuntimeValue(playerName, '_Wild_Companion_freeCast', campaignName);
+    if (Array.isArray(wildCompanionFreeCast) && wildCompanionFreeCast.includes(spellName)) {
+      setRuntimeValue(playerName, '_Wild_Companion_freeCast', null, campaignName);
+      addEntry(campaignName, {
+        type: 'summons',
+        characterName: playerName,
+        summonName: 'Familiar',
+        description: `${playerName} casts ${spellName} via Wild Companion — no spell slot consumed, Material components waived. Familiar (FEY) appears; it disappears when you finish a Long Rest.`,
+        summonedCreatures: ['Familiar'],
+        timestamp: Date.now(),
+      }).catch((e) => { console.error('[spellPreparationService:log-error]', e); });
+    }
+  }
+
   const sigSpells = getRuntimeValue(playerName, 'SignatureSpells_selection', campaignName);
   if (Array.isArray(sigSpells) && sigSpells.includes(spellName) && spellLevel === 3) {
     const usedKey = `SignatureSpells_${spellName.replace(/\s+/g, '_')}_used`;

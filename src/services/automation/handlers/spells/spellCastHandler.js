@@ -13,6 +13,55 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     let spellName = auto.spell || action.name;
 
+    // CLA-388: Wild Companion (Druid lv2, 2024) — "expend a spell slot or a use of
+    // Wild Shape to cast Find Familiar without Material components". Route to the
+    // WildCompanion chooser modal (registered in useCharActionsAutomation modalMap +
+    // CharActionModals render) so payment happens BEFORE the free-cast grant stamp.
+    // Refuse at both-zero with popup + wild_companion_refused log (CLA-359 shape).
+    if (auto.resourceCost === 'wild_companion') {
+        const playerName = playerStats.name;
+        let anySlotAvailable = false;
+        for (let lvl = 1; lvl <= 9; lvl++) {
+            const slotKey = `spell_slots_level_${lvl}`;
+            const max = playerStats.spellAbilities?.[slotKey] || 0;
+            const stored = getRuntimeValue(playerName, slotKey, campaignName);
+            const available = stored != null ? Number(stored) : max;
+            if (available > 0) { anySlotAvailable = true; break; }
+        }
+        const maxWS = playerStats._trackedResources?.wildShapeUses?.max
+            || playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape
+            || 0;
+        const storedWS = getRuntimeValue(playerName, 'wildShapeUses', campaignName);
+        const currentWS = storedWS != null ? Number(storedWS) : maxWS;
+
+        if (!anySlotAvailable && currentWS <= 0) {
+            const reason = 'Wild Companion requires expending a spell slot or a use of Wild Shape — none remaining.';
+            addEntry(campaignName, {
+                type: 'automation',
+                characterName: playerName,
+                automationType: 'wild_companion_refused',
+                name: action.name,
+                description: `${action.name} refused — ${reason}`,
+            }).catch((e) => { console.error('[spellCastHandler:log-error]', e); });
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    automationType: auto.type,
+                    description: reason,
+                    automation: auto,
+                },
+            };
+        }
+
+        return {
+            type: 'modal',
+            modalName: 'wildCompanion',
+            payload: { action, playerStats, campaignName },
+        };
+    }
+
     // Mantle of Majesty: set activeBuffs for concentration-gated free cast
     if (action.name === 'Mantle of Majesty' && auto.type === 'free_spell' && auto.concentration) {
         const activeBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);

@@ -228,7 +228,10 @@ export const LONG_REST_RESOURCES = [
    // CLA-382: War Priest app-data recharges on a Short Rest; the Long Rest null
    // re-arm here is the harmless superset that stops a spent numeric 0 pinning
    // the pool past a long rest via the server override.
-   'warPriestUses'
+   'warPriestUses',
+   // CLA-388: a paid-but-unspent Wild Companion Find Familiar grant must not survive a
+   // Long Rest ("the familiar disappears when you finish a Long Rest") — null re-arm.
+   '_Wild_Companion_freeCast'
  ]
 
 export function getLongRestResources() {
