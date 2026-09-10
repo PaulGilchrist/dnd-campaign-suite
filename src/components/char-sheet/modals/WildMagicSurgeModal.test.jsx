@@ -74,6 +74,33 @@ describe('WildMagicSurgeModal', () => {
             });
         });
 
+        it('persists the rolled surge via onSurgeSelected when Done is clicked (CLA-389)', async () => {
+            handler.onSurgeSelected.mockResolvedValue({ type: 'popup', payload: {} });
+            render(<WildMagicSurgeModal {...defaultProps} />);
+            const doneBtn = screen.getByRole('button', { name: 'Done' });
+            fireEvent.click(doneBtn);
+            await waitFor(() => {
+                expect(handler.onSurgeSelected).toHaveBeenCalledWith(
+                    'Wild Magic Surge',
+                    { name: 'TestSorcerer' },
+                    'test-campaign',
+                    42,
+                    expect.objectContaining({ effect: 'Effect 11' })
+                );
+                expect(defaultProps.onClose).toHaveBeenCalled();
+            });
+        });
+
+        it('closes without persisting when roll has no matching surge entry', async () => {
+            render(<WildMagicSurgeModal {...defaultProps} roll={999} />);
+            const doneBtn = screen.getByRole('button', { name: 'Done' });
+            fireEvent.click(doneBtn);
+            await waitFor(() => {
+                expect(handler.onSurgeSelected).not.toHaveBeenCalled();
+                expect(defaultProps.onClose).toHaveBeenCalled();
+            });
+        });
+
         it('shows no effect when roll is outside the table range', () => {
             render(<WildMagicSurgeModal {...defaultProps} roll={999} />);
             expect(screen.getByTestId('wild-magic-surge-modal')).toBeInTheDocument();

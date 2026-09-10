@@ -7107,7 +7107,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-389-wild-magic-surge-popup-swallowed-no-record.md",
+      "verified": "verified",
       "class": "Sorcerer",
       "triggerConditions": "Trigger: after_sorcerer_spell_slot",
       "expectedBehavior": "Once per turn, you can roll 1d20 immediately after you cast a Sorcerer spell with a spell slot. If you roll a 20, roll on the Wild Magic Surge table. If the magical effect is a spell, it is too wild to be affected by your Metamagic."

@@ -283,15 +283,15 @@ describe('useSpellMetamagicFlow — spell confirm handlers verify behavior', () 
     }));
   });
 
-  it('clears pending state and logs entry for Magic Missile confirm with distribution', () => {
+  it('clears pending state and logs entry for Magic Missile confirm with distribution', async () => {
     const { result, onExecute, spell } = renderHookWithSpell(
       (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
       'Magic Missile',
       { level: 1 },
     );
 
-    act(() => {
-      result.current.handleMagicMissileConfirm({
+    await act(async () => {
+      await result.current.handleMagicMissileConfirm({
         distribution: { 'Goblin A': 2, 'Goblin B': 1 },
       });
     });
@@ -304,15 +304,15 @@ describe('useSpellMetamagicFlow — spell confirm handlers verify behavior', () 
     expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('does not execute or log when Magic Missile distribution is all zeros', () => {
+  it('does not execute or log when Magic Missile distribution is all zeros', async () => {
     const { result, onExecute } = renderHookWithSpell(
       (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
       'Magic Missile',
       { level: 1 },
     );
 
-    act(() => {
-      result.current.handleMagicMissileConfirm({
+    await act(async () => {
+      await result.current.handleMagicMissileConfirm({
         distribution: { 'Goblin A': 0, 'Goblin B': 0 },
       });
     });

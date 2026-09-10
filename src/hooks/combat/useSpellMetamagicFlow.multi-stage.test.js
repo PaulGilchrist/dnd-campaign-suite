@@ -150,7 +150,12 @@ vi.mock('../../services/rules/spells/materialComponents.js', () => ({
 }));
 
 vi.mock('../../services/rules/spells/spellPreparationService.js', () => ({
-  prepareSpellCast: vi.fn(() => Promise.resolve({ modifiedSpell: {}, metaCtx: {} })),
+  prepareSpellCast: vi.fn(async (spell, metaCtx) => ({
+    modifiedSpell: spell,
+    metaCtx: { ...metaCtx },
+    slotConsumed: false,
+    freeCastUsed: false,
+  })),
   isFreeCastAuthorized: vi.fn(() => false),
   incrementFreeCastResource: vi.fn(),
 }));
@@ -213,18 +218,18 @@ describe('useSpellMetamagicFlow — handleMagicMissileConfirm', () => {
     getMultiTargetSpreadForSpell.mockReturnValue(null);
   });
 
-  it('calls onExecute with magicMissileDistribution when targets selected', () => {
+  it('calls onExecute with magicMissileDistribution when targets selected', async () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
       useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', onExecute)
     );
 
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Magic Missile', level: 1 }));
+    await act(async () => {
+      await result.current.gateMetamagic(makeSpell({ name: 'Magic Missile', level: 1 }));
     });
 
-    act(() => {
-      result.current.handleMagicMissileConfirm({ distribution: { 'Goblin A': 1, 'Goblin B': 1 } });
+    await act(async () => {
+      await result.current.handleMagicMissileConfirm({ distribution: { 'Goblin A': 1, 'Goblin B': 1 } });
     });
 
     expect(onExecute).toHaveBeenCalledWith(
@@ -234,18 +239,18 @@ describe('useSpellMetamagicFlow — handleMagicMissileConfirm', () => {
     expect(result.current.pendingMagicMissile).toBeNull();
   });
 
-  it('passes slotLevel derived from spell level in distribution', () => {
+  it('passes slotLevel derived from spell level in distribution', async () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
       useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', onExecute)
     );
 
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Magic Missile', level: 2 }));
+    await act(async () => {
+      await result.current.gateMetamagic(makeSpell({ name: 'Magic Missile', level: 2 }));
     });
 
-    act(() => {
-      result.current.handleMagicMissileConfirm({ distribution: { 'Goblin A': 2 } });
+    await act(async () => {
+      await result.current.handleMagicMissileConfirm({ distribution: { 'Goblin A': 2 } });
     });
 
     expect(onExecute).toHaveBeenCalledWith(
@@ -254,32 +259,61 @@ describe('useSpellMetamagicFlow — handleMagicMissileConfirm', () => {
     );
   });
 
-  it('does nothing when all distribution values are 0', () => {
+  it('pays the spell slot via prepareSpellCast before executing', async () => {
+    const { prepareSpellCast, isFreeCastAuthorized } = await import('../../services/rules/spells/spellPreparationService.js');
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
       useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', onExecute)
     );
 
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Magic Missile', level: 1 }));
+    await act(async () => {
+      await result.current.gateMetamagic(makeSpell({ name: 'Magic Missile', level: 1 }));
     });
 
-    act(() => {
-      result.current.handleMagicMissileConfirm({ distribution: { 'Goblin A': 0, 'Goblin B': 0 } });
+    await act(async () => {
+      await result.current.handleMagicMissileConfirm({ distribution: { 'Goblin A': 3 } });
+    });
+
+    expect(isFreeCastAuthorized).toHaveBeenCalledWith('TestSorcerer', 'Magic Missile', 1, expect.any(Object), 'test-campaign');
+    expect(prepareSpellCast).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Magic Missile', level: 1 }),
+      expect.objectContaining({ magicMissileDistribution: { 'Goblin A': 3 }, slotLevel: 1 }),
+      expect.objectContaining({ playerName: 'TestSorcerer', campaignName: 'test-campaign' })
+    );
+    expect(onExecute).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Magic Missile' }),
+      expect.objectContaining({ magicMissileDistribution: { 'Goblin A': 3 }, slotLevel: 1 })
+    );
+  });
+
+  it('does nothing when all distribution values are 0', async () => {
+    const onExecute = vi.fn();
+    const { prepareSpellCast } = await import('../../services/rules/spells/spellPreparationService.js');
+    const { result } = renderHook(() =>
+      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', onExecute)
+    );
+
+    await act(async () => {
+      await result.current.gateMetamagic(makeSpell({ name: 'Magic Missile', level: 1 }));
+    });
+
+    await act(async () => {
+      await result.current.handleMagicMissileConfirm({ distribution: { 'Goblin A': 0, 'Goblin B': 0 } });
     });
 
     expect(onExecute).not.toHaveBeenCalled();
+    expect(prepareSpellCast).not.toHaveBeenCalled();
     expect(result.current.pendingMagicMissile).toBeNull();
   });
 
-  it('does nothing when there is no pending magicMissile', () => {
+  it('does nothing when there is no pending magicMissile', async () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
       useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', onExecute)
     );
 
-    act(() => {
-      result.current.handleMagicMissileConfirm({ distribution: { 'Goblin A': 1 } });
+    await act(async () => {
+      await result.current.handleMagicMissileConfirm({ distribution: { 'Goblin A': 1 } });
     });
 
     expect(onExecute).not.toHaveBeenCalled();

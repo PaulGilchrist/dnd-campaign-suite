@@ -28,6 +28,8 @@ export function useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTar
                 } else {
                     setPopupHtml(popup.payload);
                 }
+            } else if (result && result.type === 'popup') {
+                setPopupHtml(result.payload);
             } else if (result && result.modalName) {
                 if (setModalState) {
                     handleModalResult(result, setModalState);

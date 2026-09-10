@@ -156,6 +156,40 @@ describe('wildMagicSurgeHandler', () => {
             expect(result.payload.description).toContain('not a 20');
         });
 
+        it('should log the d20 roll to campaign log when roll is not 20 (CLA-389)', async () => {
+            runtimeState.getRuntimeValue.mockReturnValue(null);
+            mockMathRandom(0.5);
+
+            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+            expect(logService.addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestSorcerer',
+                abilityName: 'Wild Magic Surge',
+                description: expect.stringContaining('not a 20'),
+            }));
+            expect(logService.addEntry.mock.calls[0][1].description).toContain('Rolled 11');
+        });
+
+        it('should log once-per-turn refusal to campaign log (CLA-389)', async () => {
+            damageUtils.getCombatContext.mockResolvedValue({ round: 3, activeCreatureName: 'TestSorcerer' });
+            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
+                if (key === 'surgeUsedRound') return { round: 3, activeCreature: 'TestSorcerer' };
+                return null;
+            });
+
+            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+            expect(logService.addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestSorcerer',
+                abilityName: 'Wild Magic Surge',
+                description: expect.stringContaining('already used this turn'),
+            }));
+        });
+
         it('should return modal with roll mode when d20 roll is exactly 20 and table exists', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(null);
             // Math.floor(0.99 * 20) + 1 = 20

@@ -25,7 +25,16 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     if (!auto?.autoSurge) {
         const skip = await checkOncePerTurn(action.name, 'surgeUsedRound', playerName, campaignName);
-        if (skip) return skip;
+        if (skip) {
+            await addEntry(campaignName, {
+                type: 'ability_use',
+                characterName: playerName,
+                abilityName: action.name,
+                description: `${action.name}: already used this turn — no surge roll.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error("[wildMagicSurge] Error logging refusal:", e); });
+            return skip;
+        }
     }
 
     const activeEffects = await getSurgeEffects(playerName, campaignName);
@@ -56,6 +65,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     if (!auto?.autoSurge && !hasRollOnTableEffect && d20Roll !== 20) {
+        await addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: action.name,
+            description: `${action.name}: Rolled ${d20Roll} on d20 (not a 20). No surge occurs.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[wildMagicSurge] Error logging roll:", e); });
         return {
             type: 'popup',
             payload: {

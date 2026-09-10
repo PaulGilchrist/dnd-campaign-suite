@@ -208,7 +208,7 @@ export function useComplexSpellHandlers(createConfirmHandler, playerStats, campa
     onExecute(preparedResult.modifiedSpell, preparedResult.metaCtx)
   }, [playerStats, campaignName, onExecute])
 
-  const handleMagicMissileConfirm = React.useCallback((result) => {
+  const handleMagicMissileConfirm = React.useCallback(async (result) => {
     const pending = getPending('magicMissile')
     if (!pending) return
 
@@ -222,8 +222,18 @@ export function useComplexSpellHandlers(createConfirmHandler, playerStats, campa
 
     const slotLevel = spell.level || 1
     const finalMetaCtx = { magicMissileDistribution: distribution, slotLevel }
-    onExecute(spell, finalMetaCtx)
-  }, [getPending, onExecute, cfClearPending])
+    // CLA-389: the magic-missile gate early-returns before gateMetamagic's generic
+    // prepareSpellCast, so the slot was never paid here. Mirror handleAnimalFriendshipConfirm.
+    const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, spell.name, slotLevel, playerStats, campaignName)
+    const preparedResult = await prepareSpellCast(spell, finalMetaCtx, {
+      playerName: playerStats.name,
+      playerStats,
+      campaignName,
+      isUpcast: false,
+      freeCastAuthorized,
+    })
+    onExecute(preparedResult.modifiedSpell, preparedResult.metaCtx)
+  }, [getPending, onExecute, cfClearPending, playerStats, campaignName])
 
   const handleMagicMissileSkip = React.useCallback(() => {
     cfClearPending('magicMissile')

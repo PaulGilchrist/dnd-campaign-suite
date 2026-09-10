@@ -44,6 +44,19 @@ function WildMagicSurgeModal({ featureName, surgeTable, campaignName, playerStat
         setSelectedSurge(surge);
     };
 
+    const handleRollModeDone = async () => {
+        if (roll && currentRollSurge) {
+            await onSurgeSelected(
+                featureName,
+                playerStats || { name: 'Player' },
+                campaignName,
+                roll,
+                currentRollSurge
+            );
+        }
+        onClose();
+    };
+
     const roll1Surge = roll1 ? getSurgeForRoll(roll1) : null;
     const roll2Surge = roll2 ? getSurgeForRoll(roll2) : null;
     const currentRollSurge = roll ? getSurgeForRoll(roll) : null;
@@ -151,7 +164,7 @@ function WildMagicSurgeModal({ featureName, surgeTable, campaignName, playerStat
                     </div>
                 </div>
                 <div className="sp-actions">
-                    <button className="sp-roll-btn" onClick={onClose}>Done</button>
+                    <button className="sp-roll-btn" onClick={handleRollModeDone}>Done</button>
                 </div>
             </div>
         </div>
