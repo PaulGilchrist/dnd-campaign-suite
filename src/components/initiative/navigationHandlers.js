@@ -67,6 +67,8 @@ export function createNextCreatureHandler({
                     setRuntimeValue(creature.name, '_Warding_Flare_usedRound', null, campaignName)
                     // CLA-381: War Magic cantrip-replacement once-per-turn latch re-arms at round wrap.
                     setRuntimeValue(creature.name, '_War_Magic_usedRound', null, campaignName)
+                    // FT-099: War Caster Reactive Spell once-per-round reaction latch re-arms at round wrap.
+                    setRuntimeValue(creature.name, '_Reactive_Spell_usedRound', null, campaignName)
                     // FT-094: Telekinetic Shove once-per-turn latch re-arms at round wrap.
                     setRuntimeValue(creature.name, '_Telekinetic_Shove_usedRound', null, campaignName)
                     // CLA-361: Thought Shield reflect round latch re-arms at round wrap.

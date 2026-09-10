@@ -120,3 +120,16 @@
         display: none;
     }
 }
+
+/* FT-099: Reactive Spell picker (CharReactions) — scoped to the picker list */
+.reactive-spell-list {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.reactive-spell-list .reactive-spell-row {
+    padding: 4px 0;
+    color: #4fc3f7;
+}

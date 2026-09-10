@@ -6951,7 +6951,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-FT-099-war-caster-reactive-spell-dead-picker.md (clause A CON-advantage live-exact gated; clause B reactive-spell picker dead: automation_info pre-empts picker, no leaving-reach producer)",
+      "verified": "verified",
       "triggerConditions": "When making concentration_saving_throws checks; Reaction when a creature provokes an Opportunity Attack by leaving your reach (creature_leaves_reach)",
       "expectedBehavior": "You have Advantage on Constitution saving throws that you make to maintain Concentration. Reactive Spell benefit (2024 feats.json benefits[2], automation type reaction_spell): when a creature provokes an Opportunity Attack from you by leaving your reach, you can take a Reaction to cast a spell at that creature rather than making the Opportunity Attack; the spell must have a casting time of one action and target only that creature."
     },

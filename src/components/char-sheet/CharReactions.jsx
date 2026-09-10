@@ -289,12 +289,15 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         }
 
         if (result.type === 'popup') {
-            if (result.payload.type === 'automation_info') {
-                setPopupHtml(result.payload);
+            // FT-099: eligibleSpells checked FIRST — the Reactive Spell picker
+            // must render clickable rows; the read-only automation_info popup is
+            // the fallback (refusals, "no spells available").
+            if (Array.isArray(result.payload.eligibleSpells) && result.payload.eligibleSpells.length > 0) {
+                setReactiveSpellEligible(result.payload.eligibleSpells);
                 return;
             }
-            if (result.payload.eligibleSpells && result.payload.eligibleSpells.length > 0) {
-                setReactiveSpellEligible(result.payload.eligibleSpells);
+            if (result.payload.type === 'automation_info') {
+                setPopupHtml(result.payload);
             }
             return;
         }
@@ -433,12 +436,40 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         setReactiveSpellEligible(null);
         setSelectedSpell(null);
 
-        const targetName = getTargetFromAttacker(await getCombatContext(campaignName), playerStats.name)?.name || 'unknown target';
-        applyWarCasterReaction(targetName, spell.name, spell, playerStats, campaignName);
+        const cs = await getCombatContext(campaignName);
+        const target = getTargetFromAttacker(cs, playerStats.name);
+        if (!target) {
+            setPopupHtml({
+                type: 'automation_info',
+                name: 'Reactive Spell',
+                description: 'Reactive Spell requires a target — set the Target dropdown on your initiative card first. Nothing was cast.',
+            });
+            addEntry(campaignName, {
+                type: 'automation',
+                characterName: playerStats.name,
+                automationType: 'reactive_spell_refused',
+                name: 'Reactive Spell',
+                description: 'Reactive Spell: requires a target — nothing was cast.',
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[CharReactions:reactive-spell-refusal-log-error]', e); });
+            return;
+        }
 
+        const applied = await applyWarCasterReaction(target.name, spell.name, spell, playerStats, campaignName);
+        if (!applied?.ok) {
+            setPopupHtml({
+                type: 'automation_info',
+                name: 'Reactive Spell',
+                description: `Reactive Spell — ${applied?.refused || 'Refused.'} No spell slot consumed.`,
+            });
+            return;
+        }
+
+        // Real cast leg — gateMetamagic → prepareSpellCast pays the slot
+        // numerically, then reactionCastAction resolves the spell.
         await resolveReactionSpellPositions();
         gateMetamagic(spell, metaCtx);
-    }, [gateMetamagic, resolveReactionSpellPositions, campaignName, playerStats]);
+    }, [gateMetamagic, resolveReactionSpellPositions, campaignName, playerStats, setPopupHtml]);
 
     const handleInspiringMovementConfirm = React.useCallback(async (allyName) => {
         if (!modalState.inspiringMovementAllyModal) return;
@@ -552,9 +583,9 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                             <i className="fa-solid fa-wand-magic-sparkles"></i>Reactive Spell
                         </div>
                         <div>Select a single target spell with casting time of 1 action to cast as a reaction:</div>
-                        <div className="attacks" style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <div className="reactive-spell-list">
                             {[...reactiveSpellEligible].sort((a, b) => a.name.localeCompare(b.name)).map((spellData) => (
-                                <div key={spellData.name} className="clickable" style={{ padding: '4px 0', color: '#4fc3f7' }}
+                                <div key={spellData.name} className="clickable reactive-spell-row"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         setReactiveSpellEligible(null);
@@ -569,7 +600,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                                 </div>
                             ))}
                         </div>
-                        <div className="dice-roll-hint" style={{ marginTop: '8px' }}>click to dismiss</div>
+                        <div className="dice-roll-hint">click to dismiss</div>
                     </div>
                 </Popup>
             )}

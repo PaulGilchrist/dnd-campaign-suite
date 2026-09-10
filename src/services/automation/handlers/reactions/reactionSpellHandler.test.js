@@ -9,6 +9,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, applyWarCasterReaction } from './reactionSpellHandler.js';
 import * as logService from '../../../ui/logService.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
+import { getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 
 vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn().mockResolvedValue(undefined),
@@ -17,6 +19,19 @@ vi.mock('../../../ui/logService.js', () => ({
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
+}));
+
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+    getCombatContext: vi.fn().mockResolvedValue({ round: 1 }),
+    getTargetFromAttacker: vi.fn(() => ({ name: 'Goblin' })),
+}));
+
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+    isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
+vi.mock('../../../rules/combat/rangeValidation.js', () => ({
+    rangeToFeet: vi.fn((range) => (range === 'Self' ? null : 120)),
 }));
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -53,6 +68,10 @@ function makeAction(overrides = {}) {
 describe('reactionSpellHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        useRuntimeState.getRuntimeValue.mockReset().mockReturnValue(null);
+        useRuntimeState.setRuntimeValue.mockReset().mockResolvedValue(undefined);
+        getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+        isWithinRange.mockReset().mockResolvedValue(true);
     });
 
     describe('handle — return structure', () => {
@@ -246,62 +265,146 @@ describe('reactionSpellHandler', () => {
         });
     });
 
+    describe('handle — once-per-round latch (FT-099)', () => {
+        it('refuses at the row click when the latch is stamped this round — picker never opens, zero spend', async () => {
+            useRuntimeState.getRuntimeValue.mockImplementation((_c, key) => {
+                if (key === '_Reactive_Spell_usedRound') return 1;
+                return null;
+            });
+
+            const result = await handle(makeAction(), makePlayerStats(), campaignName);
+
+            expect(result.payload.eligibleSpells).toBeUndefined();
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.description).toContain('already used this round');
+            const refusalLog = logService.addEntry.mock.calls.find(c => c[1]?.automationType === 'reactive_spell_refused');
+            expect(refusalLog).toBeTruthy();
+            expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+        });
+
+        it('refuses without an armed target', async () => {
+            getTargetFromAttacker.mockReturnValueOnce(null);
+
+            const result = await handle(makeAction(), makePlayerStats(), campaignName);
+
+            expect(result.payload.eligibleSpells).toBeUndefined();
+            expect(result.payload.description).toContain('requires a target');
+            const refusalLog = logService.addEntry.mock.calls.find(c => c[1]?.automationType === 'reactive_spell_refused');
+            expect(refusalLog).toBeTruthy();
+        });
+
+        it('excludes Self-target spells from eligibility', async () => {
+            const ps = makePlayerStats({ spellAbilities: { spells: [
+                { name: 'Armor of Agathys', casting_time: '1 action', prepared: 'Always', level: 1, range: 'Self' },
+                { name: 'Fire Bolt', casting_time: '1 action', prepared: 'Always', level: 0, range: '120 feet' },
+            ] } });
+
+            const result = await handle(makeAction(), ps, campaignName);
+
+            const names = result.payload.eligibleSpells.map(s => s.name);
+            expect(names).toEqual(['Fire Bolt']);
+            expect(result.payload.hasWarnings).toBe(true);
+        });
+    });
+
     describe('applyWarCasterReaction', () => {
-        it('stores reaction with target, spell, and character info', async () => {
+        beforeEach(() => {
+            useRuntimeState.getRuntimeValue.mockImplementation((_c, key) => {
+                if (key === 'warCasterReactions') return [];
+                return null;
+            });
+        });
+
+        it('stamps the round latch awaited before recording, stores reaction, and returns ok', async () => {
             const ps = makePlayerStats();
-            const spellData = { name: 'Burning Hands', level: 3 };
+            const spellData = { name: 'Burning Hands', level: 3, range: '120 feet' };
 
-            useRuntimeState.getRuntimeValue.mockReturnValue([]);
+            const result = await applyWarCasterReaction('Goblin', 'Burning Hands', spellData, ps, campaignName);
 
-            applyWarCasterReaction('Goblin', 'Burning Hands', spellData, ps, campaignName);
-
-            expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'warCasterReactions',
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        targetName: 'Goblin',
-                        spellName: 'Burning Hands',
-                        spellData,
-                        characterName: playerName,
-                    }),
-                ]),
-                campaignName,
-            );
+            expect(result).toEqual({ ok: true });
+            const latchCall = useRuntimeState.setRuntimeValue.mock.calls.find(c => c[1] === '_Reactive_Spell_usedRound');
+            expect(latchCall).toBeTruthy();
+            expect(latchCall[0]).toBe(playerName);
+            expect(latchCall[2]).toBe(1);
+            const storedCall = useRuntimeState.setRuntimeValue.mock.calls.find(c => c[1] === 'warCasterReactions');
+            const latchIdx = useRuntimeState.setRuntimeValue.mock.calls.indexOf(latchCall);
+            const storedIdx = useRuntimeState.setRuntimeValue.mock.calls.indexOf(storedCall);
+            expect(latchIdx).toBeLessThan(storedIdx);
+            expect(storedCall[2]).toEqual(expect.arrayContaining([
+                expect.objectContaining({
+                    targetName: 'Goblin',
+                    spellName: 'Burning Hands',
+                    spellData,
+                    characterName: playerName,
+                }),
+            ]));
         });
 
         it('returns ok:true on success', async () => {
             const ps = makePlayerStats();
-            const spellData = { name: 'Burning Hands', level: 3 };
+            const spellData = { name: 'Burning Hands', level: 3, range: '120 feet' };
 
-            useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-            const result = applyWarCasterReaction('Goblin', 'Burning Hands', spellData, ps, campaignName);
+            const result = await applyWarCasterReaction('Goblin', 'Burning Hands', spellData, ps, campaignName);
 
             expect(result).toEqual({ ok: true });
         });
 
-        it('appends to existing reactions', async () => {
+        it('appends to existing reactions without mutating the stored array', async () => {
             const ps = makePlayerStats();
-            const spellData = { name: 'Fireball', level: 3 };
+            const spellData = { name: 'Fireball', level: 3, range: '150 feet' };
+            const existing = [{ targetName: 'Orc', spellName: 'Magic Missile' }];
 
-            useRuntimeState.getRuntimeValue.mockReturnValue([
-                { targetName: 'Orc', spellName: 'Magic Missile' },
-            ]);
+            useRuntimeState.getRuntimeValue.mockImplementation((_c, key) => (key === 'warCasterReactions' ? existing : null));
 
-            applyWarCasterReaction('Goblin', 'Fireball', spellData, ps, campaignName);
+            await applyWarCasterReaction('Goblin', 'Fireball', spellData, ps, campaignName);
 
             const storedCall = useRuntimeState.setRuntimeValue.mock.calls.find(c => c[1] === 'warCasterReactions');
-            expect(storedCall[2].length).toBe(2);
+            expect(storedCall[2]).toHaveLength(2);
+            expect(existing).toHaveLength(1);
+        });
+
+        it('refuses on the same-round latch with zero spend and a refused log', async () => {
+            const ps = makePlayerStats();
+            const spellData = { name: 'Burning Hands', level: 3, range: '120 feet' };
+
+            useRuntimeState.getRuntimeValue.mockImplementation((_c, key) => {
+                if (key === '_Reactive_Spell_usedRound') return 1;
+                return null;
+            });
+
+            const result = await applyWarCasterReaction('Goblin', 'Burning Hands', spellData, ps, campaignName);
+
+            expect(result.ok).toBe(false);
+            expect(result.refused).toContain('already used this round');
+            expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+            expect(logService.addEntry).toHaveBeenCalledWith(
+                campaignName,
+                expect.objectContaining({ automationType: 'reactive_spell_refused' }),
+            );
+        });
+
+        it('refuses when the leaving creature is out of the spell range — no latch, no log spend', async () => {
+            const ps = makePlayerStats();
+            const spellData = { name: 'Fire Bolt', level: 0, range: '120 feet' };
+
+            isWithinRange.mockResolvedValueOnce(false);
+
+            const result = await applyWarCasterReaction('Goblin', 'Fire Bolt', spellData, ps, campaignName);
+
+            expect(result.ok).toBe(false);
+            expect(result.refused).toContain('out of range');
+            expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+            expect(logService.addEntry).toHaveBeenCalledWith(
+                campaignName,
+                expect.objectContaining({ automationType: 'reactive_spell_refused' }),
+            );
         });
 
         it('logs an ability_use entry', async () => {
             const ps = makePlayerStats();
-            const spellData = { name: 'Burning Hands', level: 3 };
+            const spellData = { name: 'Burning Hands', level: 3, range: '120 feet' };
 
-            useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-            applyWarCasterReaction('Goblin', 'Burning Hands', spellData, ps, campaignName);
+            await applyWarCasterReaction('Goblin', 'Burning Hands', spellData, ps, campaignName);
 
             expect(logService.addEntry).toHaveBeenCalledWith(
                 campaignName,
