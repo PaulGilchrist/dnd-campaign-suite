@@ -83,6 +83,7 @@ vi.mock('./loggedDiceRollUtils.js', () => ({
     hasPotentCantrip: vi.fn(),
     getShieldAcBonus: vi.fn(),
     getShieldOfFaithAcBonus: vi.fn(),
+    getWardingBondAcBonus: vi.fn(() => 0),
     applyMinDamageAdjustment: vi.fn((d) => d),
 }));
 

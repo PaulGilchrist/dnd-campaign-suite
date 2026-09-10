@@ -1,8 +1,14 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { addExpiration } from '../../../rules/effects/expirations.js';
+import { KEY } from '../../../rules/effects/expirations.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getCombatSummary } from '../../../encounters/combatData.js';
+import { getCombatSummary, getCurrentCombatRound } from '../../../encounters/combatData.js';
 import { getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
+
+// SP-125: duration is 1 hour. Engine encodes minutes as rounds (CLA-334
+// recipe: minutes × 10 rounds/minute) → 60 minutes = 600 rounds. No
+// expireOnCreatureName anchor (CLA-345 anchor-first-turn drain warning):
+// an anchor drains the bond at the anchor's NEXT turn-start (round+1).
+const WARDING_BOND_ROUNDS = 600;
 
 const ALL_DAMAGES = [
     'acid', 'bludgeoning', 'cold', 'fire', 'lightning',
@@ -40,21 +46,24 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    // Check if warding bond is already active on the target
-    const targetBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName);
-    const targetActiveBuffs = Array.isArray(targetBuffs) ? targetBuffs : [];
-    const existingBond = targetActiveBuffs.find(b => b.effect === 'warding_bond');
+    // RAW: casting again on EITHER connected creature ends the previous bond
+    // (SP-125: scan the caster store too — if the target's buff expired early,
+    // a stale caster-side bond must not stack into duplicates).
+    const rawTargetBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName);
+    const targetActiveBuffs = Array.isArray(rawTargetBuffs) ? rawTargetBuffs : [];
+    const rawCasterBuffs = getRuntimeValue(casterName, 'activeBuffs', campaignName);
+    const casterActiveBuffs = Array.isArray(rawCasterBuffs) ? rawCasterBuffs : [];
+    const existingBond = targetActiveBuffs.find(b => b.effect === 'warding_bond')
+        || casterActiveBuffs.find(b => b.effect === 'warding_bond');
 
     if (existingBond) {
-        // Remove existing warding bond from target
-        const filteredTargetBuffs = targetActiveBuffs.filter(b => b.effect !== 'warding_bond');
-        setRuntimeValue(targetName, 'activeBuffs', filteredTargetBuffs, campaignName);
-
-        // Remove bond from caster
-        const casterBuffs = getRuntimeValue(casterName, 'activeBuffs', campaignName);
-        const casterActiveBuffs = Array.isArray(casterBuffs) ? casterBuffs : [];
-        const newCasterBuffs = casterActiveBuffs.filter(b => b.effect !== 'warding_bond');
-        setRuntimeValue(casterName, 'activeBuffs', newCasterBuffs, campaignName);
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: casterName,
+            abilityName: action.name,
+            description: `Casting ${action.name} again ends the previous Warding Bond.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[wardingBond] Recast-break log error:', e); });
     }
 
     // Apply warding bond buff to target: AC +1, save +1, resistance to all damage
@@ -68,28 +77,39 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         sourceCharacter: casterName,
     };
 
-    const filteredTargetBuffs = existingBond
-        ? targetActiveBuffs.filter(b => b.effect !== 'warding_bond')
-        : targetActiveBuffs;
-    const finalTargetBuffs = [...filteredTargetBuffs, targetBuff];
-    setRuntimeValue(targetName, 'activeBuffs', finalTargetBuffs, campaignName);
+    const finalTargetBuffs = [...targetActiveBuffs.filter(b => b.effect !== 'warding_bond'), targetBuff];
 
     // Store bond relationship on caster
-    const casterBuffs = getRuntimeValue(casterName, 'activeBuffs', campaignName);
-    const casterActiveBuffs = Array.isArray(casterBuffs) ? casterBuffs : [];
-    const newCasterBuffs = [...casterActiveBuffs, {
+    const finalCasterBuffs = [...casterActiveBuffs.filter(b => b.effect !== 'warding_bond'), {
         name: action.name,
         effect: 'warding_bond',
         duration: auto.duration || '1 hour',
         sourceCharacter: casterName,
         bondTarget: targetName,
     }];
-    setRuntimeValue(casterName, 'activeBuffs', newCasterBuffs, campaignName);
 
-    // Add expiration: expires on initiative roll (when caster becomes active), short rest, long rest
-    addExpiration(casterName, targetName, [
-        { type: 'remove_active_buff', buffName: action.name }
-    ], campaignName, undefined, casterName);
+    await setRuntimeValue(targetName, 'activeBuffs', finalTargetBuffs, campaignName);
+    await setRuntimeValue(casterName, 'activeBuffs', finalCasterBuffs, campaignName);
+
+    // SP-125: 1-hour clocks (CLA-334 minutes×10 → 600 rounds) for BOTH bonded
+    // buffs, with NO expireOnCreatureName anchor (CLA-345 anchor-first-turn drain:
+    // an anchor strips the ward at the caster's NEXT turn-start, round+1).
+    // Registered in ONE merged write (§6-#18: sequential addExpiration calls race —
+    // each POST wholesale-replaces the char store, so only one clock survived live).
+    // Keeps any non-warding-bond expirations so stale ward clocks cannot strip
+    // the new bond after recast.
+    const rawExpirations = getRuntimeValue(casterName, KEY, campaignName);
+    const keptExpirations = (Array.isArray(rawExpirations) ? rawExpirations : [])
+        .filter(e => !(e.effects || []).some(ef => ef.type === 'remove_active_buff' && ef.buffName === action.name));
+    const appliedRound = getCurrentCombatRound(campaignName);
+    const wardClock = (target) => ({
+        target,
+        effects: [{ type: 'remove_active_buff', buffName: action.name }],
+        appliedRound,
+        expiryRounds: WARDING_BOND_ROUNDS,
+        expireOnCreatureName: null,
+    });
+    await setRuntimeValue(casterName, KEY, [...keptExpirations, wardClock(targetName), wardClock(casterName)], campaignName);
 
     await addEntry(campaignName, {
         type: 'ability_use',

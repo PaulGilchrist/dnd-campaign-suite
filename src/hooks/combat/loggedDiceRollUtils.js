@@ -58,6 +58,15 @@ export function getShieldOfFaithAcBonus(characterName, campaignName) {
     return shieldOfFaithActive ? 2 : 0;
 }
 
+// SP-125: Warding Bond grants the warded target +1 AC while the bond lasts.
+export function getWardingBondAcBonus(characterName, campaignName) {
+    if (!characterName) return 0;
+    const activeBuffs = getRuntimeValue(characterName, 'activeBuffs', campaignName) || [];
+    if (!Array.isArray(activeBuffs)) return 0;
+    const wardBuff = activeBuffs.find(b => b.effect === 'warding_bond' && b.acBonus);
+    return wardBuff ? Number(wardBuff.acBonus) || 0 : 0;
+}
+
 // SP-109: Slow imposes a -2 AC penalty on the target until the spell ends.
 export function getSlowAcPenalty(characterName, campaignName) {
     if (!characterName) return 0;

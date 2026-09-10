@@ -171,9 +171,10 @@ describe('wardingBondService', () => {
             expect(addEntry).toHaveBeenCalled();
         });
 
-        it('does nothing when distance exceeds 60 feet', () => {
+        it('SP-125: ends the bond when separation exceeds 60 feet', () => {
             setupWardingBond('Paladin');
             getDistanceFeet.mockReturnValue(120);
+            paladin.currentHp = 10;
 
             applyWardingBond(
                 goblin,
@@ -183,7 +184,39 @@ describe('wardingBondService', () => {
             );
 
             expect(getDistanceFeet).toHaveBeenCalled();
-            expect(addEntry).not.toHaveBeenCalled();
+            // No mirror damage — the bond has ended instead.
+            expect(paladin.currentHp).toBe(10);
+            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                type: 'ability_use',
+                abilityName: 'Warding Bond',
+                description: expect.stringContaining('more than 60 feet'),
+            }));
+            // Bond buffs stripped from both connected creatures.
+            const buffStrips = setRuntimeValue.mock.calls.filter(c => c[1] === 'activeBuffs');
+            expect(buffStrips.map(c => c[0])).toEqual(expect.arrayContaining(['Goblin', 'Paladin']));
+            buffStrips.forEach(c => expect(c[2].some(b => b.effect === 'warding_bond')).toBe(false));
+        });
+
+        it('SP-125: ends the bond when mirror damage drops the caster to 0 HP', () => {
+            setupWardingBond('Paladin');
+            getDistanceFeet.mockReturnValue(30);
+            paladin.currentHp = 2;
+
+            applyWardingBond(
+                goblin,
+                makeCombatSummary(paladin, goblin),
+                campaignName,
+                5,
+            );
+
+            expect(paladin.currentHp).toBe(0);
+            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                type: 'ability_use',
+                abilityName: 'Warding Bond',
+                description: expect.stringContaining('dropped to 0 hit points'),
+            }));
+            const buffStrips = setRuntimeValue.mock.calls.filter(c => c[1] === 'activeBuffs');
+            expect(buffStrips.map(c => c[0])).toEqual(expect.arrayContaining(['Goblin', 'Paladin']));
         });
 
         it('triggers when distance is exactly 60 feet', () => {

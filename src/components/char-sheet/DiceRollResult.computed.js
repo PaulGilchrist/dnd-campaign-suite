@@ -4,7 +4,7 @@ export function useDiceRollState(props) {
     const {
         rolls, rollType, bonus = 0, modifier = 0, total = 0,
         targetAc, hit, isAutoMiss, coverAcBonus, defensiveDuelistBonus, baitAndSwitchBonus,
-        shieldAcBonus, shieldOfFaithAcBonus, slowAcPenalty,
+        shieldAcBonus, shieldOfFaithAcBonus, wardingBondAcBonus, slowAcPenalty,
         reliableTalent, d20Floor10, starryDragonFloor, strSaveReplace, strCheckReplace, strScore,
         wisCheckReplace, wisCheckMinBonus, luckyRerolled, luckyRerollValue,
         targetName, homingStrikesBonus,
@@ -90,7 +90,7 @@ export function useDiceRollState(props) {
     // from the forwarded per-bonus fields so computedHit agrees with hit.
     const effectiveAc = props.effectiveAc !== undefined
         ? props.effectiveAc
-        : (targetAc !== undefined ? targetAc + (coverAcBonus || 0) + (defensiveDuelistBonus || 0) + (baitAndSwitchBonus || 0) + (shieldAcBonus || 0) + (shieldOfFaithAcBonus || 0) - (slowAcPenalty || 0) : undefined);
+        : (targetAc !== undefined ? targetAc + (coverAcBonus || 0) + (defensiveDuelistBonus || 0) + (baitAndSwitchBonus || 0) + (shieldAcBonus || 0) + (shieldOfFaithAcBonus || 0) + (wardingBondAcBonus || 0) - (slowAcPenalty || 0) : undefined);
     const computedHit = isAutoMiss ? false : (targetName && hit !== undefined && effectiveAc !== undefined ? finalTotal >= effectiveAc : hit);
 
     const isSaveDamageType = type === 'save-damage';

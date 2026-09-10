@@ -1,3 +1,6 @@
+// SP-125: the AC resolver must fold the warded target's warding_bond acBonus
+// (+1 AC) into effectiveAc and forward it to the log/popup payloads — mirrors the
+// verified SP-105 Shield of Faith forwarding pattern.
 // SP-105: the popup/log payload must forward the resolver's authoritative
 // effectiveAc (+2 Shield of Faith, +5 Shield) so computedHit can never flip
 // a resolved MISS into a damage-applying HIT.
@@ -81,7 +84,7 @@ vi.mock('./loggedDiceRollUtils.js', () => ({
     hasPotentCantrip: vi.fn(),
     getShieldAcBonus: vi.fn(),
     getShieldOfFaithAcBonus: vi.fn(),
-    getWardingBondAcBonus: vi.fn(() => 0),
+    getWardingBondAcBonus: vi.fn(),
     applyMinDamageAdjustment: vi.fn((d) => d),
 }));
 
@@ -175,20 +178,21 @@ import { isUnbreakableMajestyActive, hasAttackerTriggeredMajesty } from '../../s
 import {
     getShieldAcBonus,
     getShieldOfFaithAcBonus,
+    getWardingBondAcBonus,
     applyMinDamageAdjustment,
 } from './loggedDiceRollUtils.js';
 import { createLogAndShow } from './useLoggedDiceRollAttack.js';
 
-describe('useLoggedDiceRollAttack — SP-105 effective AC forwarding', () => {
+describe('useLoggedDiceRollAttack — SP-125 Warding Bond AC fold', () => {
     let deps;
     let fn;
 
     beforeEach(() => {
         vi.clearAllMocks();
         deps = {
-            characterName: 'Zombie 1',
+            characterName: 'Thug 1',
             campaignName: 'test-campaign',
-            characters: [{ name: 'Divine_Cleric', computedStats: { armorClass: 12 } }],
+            characters: [{ name: 'EvasiveFighter', computedStats: { armorClass: 10 } }],
             setPopupHtml: vi.fn(),
             logEntry: vi.fn(),
         };
@@ -196,74 +200,57 @@ describe('useLoggedDiceRollAttack — SP-105 effective AC forwarding', () => {
 
         rollD20.mockReturnValue(9);
         rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-        getTargetFromAttacker.mockReturnValue({ name: 'Divine_Cleric', type: 'player', ac: 12 });
+        getTargetFromAttacker.mockReturnValue({ name: 'EvasiveFighter', type: 'player', ac: 10 });
         findCreatureByName.mockReturnValue(null);
-        loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Divine_Cleric', type: 'player', ac: 12 }] });
+        loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'EvasiveFighter', type: 'player', ac: 10 }] });
         isUnbreakableMajestyActive.mockReturnValue(false);
         hasAttackerTriggeredMajesty.mockReturnValue(false);
         getRuntimeValue.mockReturnValue(null);
         getShieldAcBonus.mockReturnValue(0);
         getShieldOfFaithAcBonus.mockReturnValue(0);
+        getWardingBondAcBonus.mockReturnValue(0);
         applyMinDamageAdjustment.mockImplementation((d) => d);
         utils.getName.mockImplementation((n) => n);
     });
 
-    it('forwards shieldOfFaithAcBonus and effectiveAc (AC 14) to popup and log on a boundary miss', async () => {
-        getShieldOfFaithAcBonus.mockReturnValue(2);
-        await fn('Slam', 3, 'attack', { targetName: 'Divine_Cleric' });
+    it('control: no ward → effectiveAc is base AC 10 and total 12 hits', async () => {
+        await fn('Mace', 3, 'attack', { targetName: 'EvasiveFighter' });
 
         const popup = deps.setPopupHtml.mock.calls[0][0];
-        expect(popup.targetAc).toBe(12);
-        expect(popup.effectiveAc).toBe(14);
-        expect(popup.shieldOfFaithAcBonus).toBe(2);
-        expect(popup.hit).toBe(false);
+        expect(popup.targetAc).toBe(10);
+        expect(popup.effectiveAc).toBe(10);
+        expect(popup.wardingBondAcBonus).toBe(0);
+        expect(popup.hit).toBe(true);
+    });
+
+    it('folds warding_bond acBonus into effectiveAc (AC 11) and flips boundary total 11 to HIT', async () => {
+        getWardingBondAcBonus.mockReturnValue(1);
+        rollD20.mockReturnValue(8); // 8 + 3 = 11 — MISS vs AC 10 control would hit; vs AC 11 exact boundary
+        await fn('Mace', 3, 'attack', { targetName: 'EvasiveFighter' });
+
+        const popup = deps.setPopupHtml.mock.calls[0][0];
+        expect(popup.targetAc).toBe(10);
+        expect(popup.effectiveAc).toBe(11);
+        expect(popup.wardingBondAcBonus).toBe(1);
+        expect(popup.hit).toBe(true);
 
         expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
             type: 'roll',
             rollType: 'attack',
-            targetAc: 12,
-            effectiveAc: 14,
-            shieldOfFaithAcBonus: 2,
-            hit: false,
+            targetAc: 10,
+            effectiveAc: 11,
+            wardingBondAcBonus: 1,
+            hit: true,
         }));
     });
 
-    it('flips to HIT at exactly AC 14 with Shield of Faith still forwarded', async () => {
-        getShieldOfFaithAcBonus.mockReturnValue(2);
-        rollD20.mockReturnValue(11);
-        await fn('Slam', 3, 'attack', { targetName: 'Divine_Cleric' });
+    it('refuses at AC 11 boundary: total 10 now misses', async () => {
+        getWardingBondAcBonus.mockReturnValue(1);
+        rollD20.mockReturnValue(7); // 7 + 3 = 10 < 11
+        await fn('Mace', 3, 'attack', { targetName: 'EvasiveFighter' });
 
         const popup = deps.setPopupHtml.mock.calls[0][0];
-        expect(popup.effectiveAc).toBe(14);
-        expect(popup.hit).toBe(true);
-    });
-
-    it('forwards shield spell +5 into effectiveAc and payload', async () => {
-        getShieldAcBonus.mockReturnValue(5);
-        await fn('Slam', 3, 'attack', { targetName: 'Divine_Cleric' });
-
-        const popup = deps.setPopupHtml.mock.calls[0][0];
-        expect(popup.effectiveAc).toBe(17);
-        expect(popup.shieldAcBonus).toBe(5);
-        expect(popup.hit).toBe(false);
-    });
-
-    it('control: no AC buffs → effectiveAc equals base AC and boundary total 12 hits', async () => {
-        await fn('Slam', 3, 'attack', { targetName: 'Divine_Cleric' });
-
-        const popup = deps.setPopupHtml.mock.calls[0][0];
-        expect(popup.effectiveAc).toBe(12);
-        expect(popup.shieldOfFaithAcBonus).toBe(0);
-        expect(popup.hit).toBe(true);
-    });
-
-    it('folds cover bonus into the forwarded effectiveAc', async () => {
-        getShieldOfFaithAcBonus.mockReturnValue(2);
-        await fn('Slam', 3, 'attack', { targetName: 'Divine_Cleric', coverAcBonus: 2, coverLevel: 'half' });
-
-        const popup = deps.setPopupHtml.mock.calls[0][0];
-        expect(popup.effectiveAc).toBe(16);
-        expect(popup.coverAcBonus).toBe(2);
+        expect(popup.effectiveAc).toBe(11);
         expect(popup.hit).toBe(false);
     });
 });

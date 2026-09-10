@@ -113,9 +113,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             const currentHp = getRuntimeValue(lookupName, 'currentHitPoints') ?? maxHp
             const activeBuffs = getRuntimeValue(lookupName, 'activeBuffs') || []
             const shieldOfFaithBonus = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shield_of_faith') ? 2 : 0
+            const wardingBondBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.effect === 'warding_bond' && b.acBonus) : null
+            const wardingBondBonus = wardingBondBuff ? Number(wardingBondBuff.acBonus) || 0 : 0
             const barkskinActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'barkskin')
             const circleFormsAC = c.wildShapeSource ? (getRuntimeValue(c.name, 'circleFormsAC') ?? null) : null
-            const ac = circleFormsAC ?? (barkskinActive ? 17 : (stats?.armorClass ?? 10) + shieldOfFaithBonus)
+            const ac = circleFormsAC ?? (barkskinActive ? 17 : (stats?.armorClass ?? 10) + shieldOfFaithBonus + wardingBondBonus)
             return {
                 ...c,
                 imagePath: character?.imagePath || '',

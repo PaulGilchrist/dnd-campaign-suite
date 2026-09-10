@@ -8,6 +8,7 @@ import {
     getShieldAcBonus,
     getShieldOfFaithAcBonus,
     getSlowAcPenalty,
+    getWardingBondAcBonus,
 } from './loggedDiceRollUtils.js';
 import { isResilientSphereActive } from '../../services/combat/automation/automationPassives.js';
 import { endSanctuary } from '../../services/automation/handlers/spells/sanctuaryHandler.js';
@@ -110,6 +111,7 @@ export function createLogAndShow(deps) {
 
         ctx._shieldAcBonus = getShieldAcBonus(target?.name, campaignName);
         ctx._shieldOfFaithAcBonus = getShieldOfFaithAcBonus(target?.name, campaignName);
+        ctx._wardingBondAcBonus = getWardingBondAcBonus(target?.name, campaignName);
         ctx._slowAcPenalty = getSlowAcPenalty(target?.name, campaignName);
 
         // Bi die size for bardic inspiration defense (attack-only)
@@ -185,6 +187,7 @@ export function createLogAndShow(deps) {
             effectiveAc: ctx.effectiveAc,
             shieldAcBonus: ctx._shieldAcBonus || 0,
             shieldOfFaithAcBonus: ctx._shieldOfFaithAcBonus || 0,
+            wardingBondAcBonus: ctx._wardingBondAcBonus || 0,
             slowAcPenalty: ctx._slowAcPenalty || 0,
             damageType: context?.damageType,
             hit: ctx.hit,
@@ -248,6 +251,7 @@ export function createLogAndShow(deps) {
                 effectiveAc: ctx.effectiveAc,
                 shieldAcBonus: ctx._shieldAcBonus || 0,
                 shieldOfFaithAcBonus: ctx._shieldOfFaithAcBonus || 0,
+                wardingBondAcBonus: ctx._wardingBondAcBonus || 0,
                 slowAcPenalty: ctx._slowAcPenalty || 0,
                 hit: ctx.hit,
                 isAutoMiss: ctx.isAutoMiss,

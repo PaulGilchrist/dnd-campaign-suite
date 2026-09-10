@@ -30,7 +30,8 @@ export async function resolveHit(characterName, campaignName, context, bonus, ef
 
     const coverAcBonus = context?.coverAcBonus || 0;
     // SP-109: Slow imposes a -2 AC penalty on the target while it is slowed.
-    const effectiveAc = target ? targetAc + coverAcBonus + (context?.defensiveDuelistBonus || 0) + (context?.baitAndSwitchBonus || 0) + (context._shieldAcBonus || 0) + (context._shieldOfFaithAcBonus || 0) - (context._slowAcPenalty || 0) : undefined;
+    // SP-125: Warding Bond grants the warded target +1 AC (from activeBuffs acBonus).
+    const effectiveAc = target ? targetAc + coverAcBonus + (context?.defensiveDuelistBonus || 0) + (context?.baitAndSwitchBonus || 0) + (context._shieldAcBonus || 0) + (context._shieldOfFaithAcBonus || 0) + (context._wardingBondAcBonus || 0) - (context._slowAcPenalty || 0) : undefined;
     hit = isAutoMiss ? false : (target ? (effectiveD20Roll + context.effectiveBonus >= effectiveAc) : undefined);
 
     // Unbreakable Majesty on hit
