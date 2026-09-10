@@ -9,6 +9,7 @@ import { sendSavePrompt } from '../../../services/combat/conditions/savePromptSe
 import { computeConditionEffects } from '../../../services/combat/conditions/conditionEffects.js';
 import { isCircleOfPowerActive } from '../../../services/automation/handlers/buffs/circleOfPowerHandler.js';
 import { isDeathWardActive } from '../../../services/automation/handlers/buffs/deathWardHandler.js';
+import { hasBuffEffect } from '../../../services/automation/common/buffToggle.js';
 import { registerPendingSavePrompt } from '../../../services/combat/auras/pendingSaveRegistry.js';
 import { registerPendingPopupSetter } from '../../../services/combat/auras/pendingPopupRegistry.js';
 import utils from '../../../services/ui/utils.js';
@@ -202,10 +203,12 @@ export function createPlayerSaveDamageHandler(deps) {
             saveDisadvantage = disadvantageSources > 1;
         }
 
+        // CLA-394: Zealous Presence buff (advantage_attacks_and_saves) grants blanket save advantage.
         const saveAdvantage = !!(targetConditionEffects.saveAdvantageCount > 0 ||
             (targetConditionEffects.saveAdvantageAbilities && targetConditionEffects.saveAdvantageAbilities.includes((saveType || '').substring(0, 3).toUpperCase())) ||
             isCircleOfPowerActive(target.name, campaignName) ||
-            isDeathWardActive(target.name, campaignName));
+            isDeathWardActive(target.name, campaignName) ||
+            hasBuffEffect(target.name, 'advantage_attacks_and_saves', campaignName));
 
         const pendingData = {
             targetName: target.name, rawDamage: adjustedTotal, saveDc, saveType, dcSuccess,

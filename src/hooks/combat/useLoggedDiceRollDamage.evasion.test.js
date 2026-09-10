@@ -200,7 +200,7 @@ describe('createLogDamageAndShow - NPC save damage with evasion', () => {
                 'DEX',
                 15,
                 false,
-                undefined
+                false
             );
         });
 
@@ -214,7 +214,7 @@ describe('createLogDamageAndShow - NPC save damage with evasion', () => {
                 'DEX',
                 15,
                 true,
-                undefined
+                false
             );
         });
 

@@ -15,6 +15,7 @@ import storage from '../../services/ui/storage.js';
 import './SavePromptModal.css';
 import { getPendingPopupSetter } from '../../services/combat/auras/pendingPopupRegistry.js';
 import { isCircleOfPowerActive } from '../../services/automation/handlers/buffs/circleOfPowerHandler.js';
+import { hasBuffEffect } from '../../services/automation/common/buffToggle.js';
 import { createFanaticalFocusHandler, createDisciplinedSurvivorHandler, createGuardedMindHandler, createLivingLegendHandler, createIndomitableHandler } from './savePromptHandlers.js';
 import { evaluateAutoExpression } from '../../services/combat/automation/automationService.js';
 
@@ -205,6 +206,12 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
       if (isDodgeActive && isDexSave) {
         hasAdvantage = true;
       }
+    }
+
+    // CLA-394 Zealous Presence: blanket advantage on saving throws (buff effect
+    // advantage_attacks_and_saves) — mirrors the Dodge block shape.
+    if (!hasAdvantage && !hasDisadvantage && hasBuffEffect(current?.targetName, 'advantage_attacks_and_saves', campaignName)) {
+      hasAdvantage = true;
     }
 
     // Beacon of Hope: advantage on Wisdom saving throws

@@ -33,3 +33,7 @@ export function getActiveBuffs(playerName, campaignName) {
 export function isBuffActive(playerName, buffName, campaignName) {
     return getActiveBuffs(playerName, campaignName).some(b => b.name === buffName);
 }
+
+export function hasBuffEffect(playerName, effect, campaignName) {
+    return getActiveBuffs(playerName, campaignName).some(b => b.effect === effect);
+}

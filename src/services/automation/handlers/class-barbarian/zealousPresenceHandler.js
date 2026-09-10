@@ -3,6 +3,8 @@ import { addExpiration } from '../../../rules/effects/expirations.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { toggleBuff } from '../../common/buffToggle.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 
 const ZEALOUS_PRESENCE_KEY = 'zealousPresenceActive';
 
@@ -61,13 +63,21 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         }
     }
 
-    // Gather creature targets from combat context (exclude self)
+    // CLA-394: Gather creature targets from combat context (exclude self),
+    // range-gated to "within 60 feet" (CLA-378 recipe — gridless resolves
+    // lenient, but the gate is consulted).
     const combatSummary = await getCombatContext(campaignName);
-    const creatureTargets = combatSummary?.creatures
-        ? combatSummary.creatures
-            .filter(c => c.name !== playerName)
-            .map(c => ({ name: c.name }))
-        : [];
+    const rangeFt = rangeToFeet(auto.range || '60_ft');
+    const creatureTargets = [];
+    if (combatSummary?.creatures) {
+        for (const c of combatSummary.creatures) {
+            if (c.name === playerName) continue;
+            const inRange = await isWithinRange(playerName, c.name, rangeFt);
+            if (inRange) {
+                creatureTargets.push({ name: c.name });
+            }
+        }
+    }
 
     return {
         type: 'modal',
@@ -90,16 +100,19 @@ export async function confirmZealousPresence(action, playerStats, campaignName, 
     // Activate the Zealous Presence marker
     await setRuntimeValue(playerName, ZEALOUS_PRESENCE_KEY, true, campaignName);
 
-    // Apply buff to each selected creature
+    // Apply buff to each selected creature. CLA-394: toggleBuff signature is
+    // (source, name, auto, campaign, target) — pass the barbarian as source so
+    // buff attribution reads sourceCharacter=DraconicDragon, not the target.
     for (const targetName of finalTargets) {
         toggleBuff(
-            targetName,
+            playerName,
             'Zealous Presence',
             {
                 effect: 'advantage_attacks_and_saves',
                 duration: auto.duration || 'until_start_of_next_turn',
             },
-            campaignName
+            campaignName,
+            targetName
         );
 
         // Register expiration for start of barbarian's next turn

@@ -16,6 +16,7 @@ import { getCoronaSaveDisadvantage } from '../../../services/combat/auras/corona
 import { getElderChampionSaveDisadvantage } from '../../../services/combat/auras/elderChampionAuraUtils.js';
 import { resolveCreatureType } from '../../../services/combat/creatureTypeResolver.js';
 import { isCircleOfPowerActive } from '../../../services/automation/handlers/buffs/circleOfPowerHandler.js';
+import { hasBuffEffect } from '../../../services/automation/common/buffToggle.js';
 import { handleOverchannelSelfDamage } from './handleOverchannelSelfDamage.js';
 import { triggerViciousMockeryForGeneric } from '../../../services/rules/features/viciousMockeryService.js';
 
@@ -106,7 +107,8 @@ export function createNpcSaveDamageHandler(deps) {
         const isSoulstitchProtected = hasSoulstitchProtection(target.name, characterName, campaignName);
         const targetCharacter = (characters || []).find(c => utils.getName(c.name) === target.name);
         const targetSaveModifiers = targetCharacter?.saveModifiers || targetCharacter?.computedStats?.saveModifiers || [];
-        const advantage = hasSpellOrigin(targetSaveModifiers, context, campaignName) || isCircleOfPowerActive(target.name, campaignName);
+        // CLA-394: Zealous Presence buff (advantage_attacks_and_saves) grants blanket save advantage.
+        const advantage = hasSpellOrigin(targetSaveModifiers, context, campaignName) || isCircleOfPowerActive(target.name, campaignName) || hasBuffEffect(target.name, 'advantage_attacks_and_saves', campaignName);
         const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage, advantage);
         const normalizedSaveType = normalizeSaveType(saveType);
         const targetConditions = getRuntimeValue(target.name, 'activeConditions', campaignName) || [];

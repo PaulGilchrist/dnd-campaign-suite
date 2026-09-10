@@ -29,6 +29,10 @@ vi.mock('../../common/buffToggle.js', () => ({
     toggleBuff: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+    isWithinRange: vi.fn(async () => true),
+}));
+
 // ── Imports ────────────────────────────────────────────────────────
 
 import { handle, confirmZealousPresence } from './zealousPresenceHandler.js';
@@ -38,6 +42,7 @@ import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
 import { toggleBuff } from '../../common/buffToggle.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -322,6 +327,40 @@ describe('zealousPresenceHandler.handle', () => {
             expect(result.payload.maxTargets).toBe(5);
         });
 
+        it('CLA-394: range-gates chooser targets via isWithinRange at 60 ft (gridless lenient pass)', async () => {
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'TestBarbarian' },
+                    { name: 'AllyNear' },
+                    { name: 'AllyFar' },
+                ],
+            });
+            isWithinRange.mockImplementation(async (_src, target, _ft) => {
+                if (target === 'AllyFar') return false;
+                return true;
+            });
+
+            const result = await handle(action, playerStats, campaignName, null);
+
+            expect(result.type).toBe('modal');
+            expect(result.payload.creatureTargets).toEqual([{ name: 'AllyNear' }]);
+            expect(isWithinRange).toHaveBeenCalledWith(playerName, 'AllyNear', 60);
+            expect(isWithinRange).toHaveBeenCalledWith(playerName, 'AllyFar', 60);
+            expect(isWithinRange).not.toHaveBeenCalledWith(playerName, 'TestBarbarian', expect.anything());
+        });
+
+        it('CLA-394: consults the gate for every non-self creature when gridless (all pass lenient)', async () => {
+            const result = await handle(action, playerStats, campaignName, null);
+
+            expect(result.type).toBe('modal');
+            expect(result.payload.creatureTargets).toEqual([
+                { name: 'Enemy1' },
+                { name: 'Enemy2' },
+                { name: 'Ally1' },
+            ]);
+            expect(isWithinRange).toHaveBeenCalledTimes(3);
+        });
+
         it('passes action and playerStats into payload', async () => {
             const result = await handle(action, playerStats, campaignName, null);
 
@@ -374,22 +413,24 @@ describe('zealousPresenceHandler.confirmZealousPresence', () => {
             await confirmZealousPresence(action, playerStats, campaignName, ['Enemy1', 'Enemy2']);
 
             expect(toggleBuff).toHaveBeenCalledWith(
-                'Enemy1',
+                playerName,
                 'Zealous Presence',
                 {
                     effect: 'advantage_attacks_and_saves',
                     duration: 'until_start_of_next_turn',
                 },
                 campaignName,
+                'Enemy1',
             );
             expect(toggleBuff).toHaveBeenCalledWith(
-                'Enemy2',
+                playerName,
                 'Zealous Presence',
                 {
                     effect: 'advantage_attacks_and_saves',
                     duration: 'until_start_of_next_turn',
                 },
                 campaignName,
+                'Enemy2',
             );
         });
 
@@ -442,9 +483,9 @@ describe('zealousPresenceHandler.confirmZealousPresence', () => {
             await confirmZealousPresence(action, playerStats, campaignName, ['Enemy1', 'Enemy2', 'Enemy3']);
 
             expect(toggleBuff).toHaveBeenCalledTimes(2);
-            expect(toggleBuff).toHaveBeenCalledWith('Enemy1', 'Zealous Presence', expect.any(Object), campaignName);
-            expect(toggleBuff).toHaveBeenCalledWith('Enemy2', 'Zealous Presence', expect.any(Object), campaignName);
-            expect(toggleBuff).not.toHaveBeenCalledWith('Enemy3', expect.anything(), expect.anything(), expect.anything());
+            expect(toggleBuff).toHaveBeenCalledWith(playerName, 'Zealous Presence', expect.any(Object), campaignName, 'Enemy1');
+            expect(toggleBuff).toHaveBeenCalledWith(playerName, 'Zealous Presence', expect.any(Object), campaignName, 'Enemy2');
+            expect(toggleBuff).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(), expect.anything(), 'Enemy3');
         });
 
         it('caps targets at maxTargets=1 when specified', async () => {
@@ -453,7 +494,7 @@ describe('zealousPresenceHandler.confirmZealousPresence', () => {
             await confirmZealousPresence(action, playerStats, campaignName, ['Enemy1', 'Enemy2']);
 
             expect(toggleBuff).toHaveBeenCalledTimes(1);
-            expect(toggleBuff).toHaveBeenCalledWith('Enemy1', 'Zealous Presence', expect.any(Object), campaignName);
+            expect(toggleBuff).toHaveBeenCalledWith(playerName, 'Zealous Presence', expect.any(Object), campaignName, 'Enemy1');
         });
 
         it('handles empty or undefined targetNames', async () => {
@@ -480,13 +521,14 @@ describe('zealousPresenceHandler.confirmZealousPresence', () => {
             await confirmZealousPresence(action, playerStats, campaignName, ['Enemy1']);
 
             expect(toggleBuff).toHaveBeenCalledWith(
-                'Enemy1',
+                playerName,
                 'Zealous Presence',
                 {
                     effect: 'advantage_attacks_and_saves',
                     duration: 'one_round',
                 },
                 campaignName,
+                'Enemy1',
             );
         });
 
@@ -496,13 +538,14 @@ describe('zealousPresenceHandler.confirmZealousPresence', () => {
             await confirmZealousPresence(action, playerStats, campaignName, ['Enemy1']);
 
             expect(toggleBuff).toHaveBeenCalledWith(
-                'Enemy1',
+                playerName,
                 'Zealous Presence',
                 {
                     effect: 'advantage_attacks_and_saves',
                     duration: 'until_start_of_next_turn',
                 },
                 campaignName,
+                'Enemy1',
             );
         });
 

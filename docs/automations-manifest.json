@@ -7167,7 +7167,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-394-zealous-presence-save-adv-inert.md",
+      "verified": "verified",
       "class": "Barbarian",
       "triggerConditions": "Action: 1 bonus action; Action: bonus_action; Range: 60 ft; Duration: until_start_of_next_turn",
       "expectedBehavior": "As a Bonus Action, you unleash a battle cry infused with divine energy. Up to ten other creatures of your choice within 60 feet of you gain Advantage on attack rolls and saving throws until the start of your next turn. Once you use this feature, you can't use it again until you finish a Long Rest unless you expend a use of your Rage (no action required) to restore your use of it."

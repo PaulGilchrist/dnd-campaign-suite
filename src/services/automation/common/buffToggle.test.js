@@ -5,7 +5,7 @@
 // @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { clearRuntimeState, setRuntimeValue as setRuntimeProp, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
-import { toggleBuff, getActiveBuffs, isBuffActive } from './buffToggle.js';
+import { toggleBuff, getActiveBuffs, isBuffActive, hasBuffEffect } from './buffToggle.js';
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -235,5 +235,33 @@ describe('isBuffActive', () => {
 
         expect(isBuffActive('multi-char', 'Bless', campaign)).toBe(true);
         expect(isBuffActive('multi-char', 'Invisibility', campaign)).toBe(false);
+    });
+});
+
+describe('hasBuffEffect', () => {
+    const campaign = 'TestCampaign';
+
+    it('CLA-394: returns true when a buff with the effect is active', () => {
+        clearRuntimeState('zealot-target');
+        setRuntimeProp('zealot-target', 'activeBuffs', [
+            { name: 'Zealous Presence', effect: 'advantage_attacks_and_saves' },
+        ], campaign);
+
+        expect(hasBuffEffect('zealot-target', 'advantage_attacks_and_saves', campaign)).toBe(true);
+    });
+
+    it('returns false when no active buff carries the effect', () => {
+        clearRuntimeState('plain-target');
+        setRuntimeProp('plain-target', 'activeBuffs', [
+            { name: 'Haste', effect: '+speed' },
+        ], campaign);
+
+        expect(hasBuffEffect('plain-target', 'advantage_attacks_and_saves', campaign)).toBe(false);
+    });
+
+    it('returns false when activeBuffs is empty or missing', () => {
+        clearRuntimeState('empty-target');
+
+        expect(hasBuffEffect('empty-target', 'advantage_attacks_and_saves', campaign)).toBe(false);
     });
 });
