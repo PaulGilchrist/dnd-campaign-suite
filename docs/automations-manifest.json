@@ -6736,7 +6736,7 @@
       "handler": "src/services/combat/automation/handlers/maneuverHandler.js",
       "router": "src/services/combat/automation/routers/maneuverRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/maneuverInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-MN-020-trip-attack-save-dc-understated.md",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Action type: attack_rider; Trigger: weapon_attack_hit; Uses: superiority_die",
       "expectedBehavior": "When you hit a creature with an attack roll using a weapon or an Unarmed Strike, you can expend one Superiority Die and add the die to the attack's damage roll. If the target is Large or smaller, it must succeed on a Strength saving throw or fall Prone."

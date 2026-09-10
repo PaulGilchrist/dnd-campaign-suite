@@ -245,11 +245,13 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
 
     if (maneuver.damageBonus) {
         description += ` Added ${dieValue} to the damage roll.`;
+        // MN-020: the accumulated description already carries the save outcome and
+        // any condition text ("fell Prone") — the log must carry the same full text.
         const logEntry = {
             type: 'ability_use',
             characterName: playerStats.name,
             abilityName: maneuver.name,
-            description: `${maneuver.name}: ${dieDescription} Added ${dieValue} to the damage roll.`,
+            description: `${maneuver.name}: ${description}`,
         };
 
         return {
@@ -268,7 +270,7 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: maneuver.name,
-        description: `${maneuver.name}: ${dieDescription}`,
+        description: `${maneuver.name}: ${description}`,
     };
 
     return {

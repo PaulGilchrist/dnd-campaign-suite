@@ -1,4 +1,3 @@
-import { getSaveDc } from '../automationExpressions.js'
 import { getAbilityModifier } from '../../../shared/abilityLookup.js'
 
 function resolveSaveAbility(auto) {
@@ -43,10 +42,12 @@ export const combatSuperiorityHandlers = {
         const auto = feature.automation
         const saveAbilities = resolveSaveAbility(auto)
         const saveAbility = pickBestSaveAbility(playerStats.abilities, saveAbilities)
-        const prof = playerStats.proficiency || 0
-        const saveDc = auto.saveDc === 'ability'
-            ? getSaveDc(playerStats, saveAbility, prof)
-            : auto.saveDc || 10
+        // MN-020: never bake a numeric DC here — collectAutomationFromFeatures runs
+        // BEFORE rules.getAbilities folds ability `.bonus` (CLA-229 fingerprint), so a
+        // build-time 8 + mod + PB baked DC 14 for a STR +3 host. Pass the 'ability'
+        // token through and let buildSaveDc resolve it against computed abilities at
+        // prompt time (CLA-342 Stunning Strike data-fix precedent).
+        const saveDc = auto.saveDc || 'ability'
         const maxOptions = computeMaxOptions(playerStats, auto)
         return {
             type: 'combat_superiority',

@@ -25,7 +25,7 @@ describe('combatSuperiorityHandlers – combat_superiority', () => {
             chooseOne: false,
             hasAutomation: true,
         })
-        expect(result.saveDc).toBe(10)
+        expect(result.saveDc).toBe('ability')
     })
 
     it('uses explicit saveDc when not ability', () => {
@@ -34,14 +34,18 @@ describe('combatSuperiorityHandlers – combat_superiority', () => {
         expect(result.saveDc).toBe(15)
     })
 
-    it('computes saveDc from ability when saveDc is "ability"', () => {
+    // MN-020: the builder must NOT bake a numeric DC — collectAutomationFromFeatures
+    // runs before rules.getAbilities folds ability `.bonus`, so baking produced DC 14
+    // for a STR +3 lv18 host. The 'ability' token resolves at prompt time via
+    // buildSaveDc (CLA-342 precedent).
+    it('passes the saveDc token through without baking a number', () => {
         const feature = makeFeature({ type: 'combat_superiority', saveDc: 'ability' })
         const result = combatSuperiorityHandlers.combat_superiority(feature, BASE_STATS)
-        expect(result.saveDc).toBe(15)
+        expect(result.saveDc).toBe('ability')
         expect(result.saveAbility).toBe('STR')
     })
 
-    it('computes saveDc from custom saveAbility when saveDc is "ability"', () => {
+    it('passes through custom saveAbility with the saveDc token', () => {
         const feature = makeFeature({
             type: 'combat_superiority',
             saveDc: 'ability',
@@ -49,7 +53,7 @@ describe('combatSuperiorityHandlers – combat_superiority', () => {
             saveType: 'WIS',
         })
         const result = combatSuperiorityHandlers.combat_superiority(feature, BASE_STATS)
-        expect(result.saveDc).toBe(16)
+        expect(result.saveDc).toBe('ability')
         expect(result.saveAbility).toBe('WIS')
         expect(result.saveType).toBe('WIS')
     })
@@ -85,13 +89,30 @@ describe('combatSuperiorityHandlers – combat_superiority', () => {
     it('handles missing proficiency in playerStats', () => {
         const feature = makeFeature({ type: 'combat_superiority', saveDc: 'ability' })
         const result = combatSuperiorityHandlers.combat_superiority(feature, { ...BASE_STATS, proficiency: undefined })
-        expect(result.saveDc).toBe(12)
+        expect(result.saveDc).toBe('ability')
     })
 
     it('handles empty abilities array in playerStats', () => {
         const feature = makeFeature({ type: 'combat_superiority', saveDc: 'ability' })
         const result = combatSuperiorityHandlers.combat_superiority(feature, { ...BASE_STATS, abilities: [] })
-        expect(result.saveDc).toBe(11)
+        expect(result.saveDc).toBe('ability')
+    })
+
+    // MN-020: DC resolution moved to prompt time (buildSaveDc) — a STR +3 PB +6
+    // host must resolve 17 there, not the old baked 8 + 0 + 6 = 14.
+    it('resolves 17 for a STR +3 PB +6 host via buildSaveDc at prompt time', async () => {
+        const { buildSaveDc } = await import('../../../automation/common/savePrompt.js')
+        const feature = makeFeature({ type: 'combat_superiority', saveDc: 'ability', saveAbility: ['STR', 'DEX'] })
+        const result = combatSuperiorityHandlers.combat_superiority(feature, BASE_STATS)
+        const computedStats = {
+            proficiency: 6,
+            abilities: [
+                { name: 'Strength', bonus: 3 },
+                { name: 'Dexterity', bonus: 0 },
+            ],
+        }
+        expect(result.saveDc).toBe('ability')
+        expect(buildSaveDc(result, computedStats)).toBe(17)
     })
 })
 

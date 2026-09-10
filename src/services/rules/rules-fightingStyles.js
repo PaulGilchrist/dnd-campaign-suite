@@ -204,14 +204,16 @@ export function applyFightingStyleSpecialActionsUniversal(playerStats) {
                    name: 'Combat Superiority',
                    description: 'You learn one maneuver of your choice from the Battle Master. You have one superiority die (d6) to fuel that maneuver. Use Combat Superiority during combat to deploy a maneuver.',
                    type: 'combat_superiority',
-                   automation: {
-                       type: 'combat_superiority',
-                       dieExpression: '6',
-                       uses_max: 1,
-                       maxOptions: 1,
-                       maxOptionsScaling: {},
-                       hasAutomation: true,
-                   },
+                    automation: {
+                        type: 'combat_superiority',
+                        dieExpression: '6',
+                        uses_max: 1,
+                        maxOptions: 1,
+                        maxOptionsScaling: {},
+                        saveDc: 'ability',
+                        saveAbility: ['STR', 'DEX'],
+                        hasAutomation: true,
+                    },
                    hasAutomation: true,
                });
            }

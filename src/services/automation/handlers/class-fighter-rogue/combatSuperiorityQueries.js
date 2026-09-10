@@ -122,6 +122,17 @@ function characterSuperiorityDieExpression(playerStats) {
     return specialAction?.automation?.dieExpression || 'superiority_die';
 }
 
+// MN-020: mirror the die-expression passthrough for the SAVE spec — poller legs
+// rebuild their own action, so the raw 'ability' token + STR/DEX saveAbility must
+// survive the trip to executeAttackRiderManeuver/buildSaveDc (never a baked number).
+function characterSuperioritySaveSpec(playerStats) {
+    const specialAction = (playerStats?.specialActions || []).find(a => a.type === 'combat_superiority');
+    return {
+        saveDc: specialAction?.automation?.saveDc || 'ability',
+        saveAbility: specialAction?.automation?.saveAbility || ['STR', 'DEX'],
+    };
+}
+
 export async function handleAttackRiderPrompt(action, playerStats, campaignName, _mapName) {
     const pending = getRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt', campaignName);
     if (!pending || !pending.attackContext) { return null; }
@@ -155,6 +166,7 @@ export async function handleAttackRiderPrompt(action, playerStats, campaignName,
                 automation: {
                     type: 'combat_superiority',
                     dieExpression: characterSuperiorityDieExpression(playerStats),
+                    ...characterSuperioritySaveSpec(playerStats),
                 },
             },
             playerStats,
@@ -164,7 +176,7 @@ export async function handleAttackRiderPrompt(action, playerStats, campaignName,
             maxOptions: available.length,
             selectionMode: false,
             attackContext,
-            saveDc: attackContext?.saveDc || null,
+            saveDc: attackContext?.saveDc || characterSuperioritySaveSpec(playerStats).saveDc,
             saveType: attackContext?.saveType || null,
         },
     };
