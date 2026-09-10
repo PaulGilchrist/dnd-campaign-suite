@@ -7059,7 +7059,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-09-09) — Summary 'Weapon Mastery:' count-span opens WeaponKindMasteryModal (individual kind-tagged weapons from shared equipment.json); _Weapon_Kind_Mastery_chosenWeapons array persists across reload (curl + ability_use log); count cap enforced lv18=6 / lv1=3 (app classes.json house table 3@1/4@4/5@10/6@16, diverges from canonical 2@1→5@17 §28); chosen kind fires live (Shortsword Vex 'applied Vex to Thug 1' + pendingExpirations rounds2); unchosen Shortbow control = zero mastery writes (automationPassives.js:90-99 baseMastery gate holds). Gaps: LR no rest-driven reset consumer (re-open anytime superset); attacks-grid Mastery cells display text for unchosen (display-only §95); WM-008 Vex te self-erase cited not re-filed",
       "class": "Fighter",
       "triggerConditions": "Action: passive",
       "expectedBehavior": "Your training with weapons allows you to use the mastery properties of three kinds of Simple or Martial weapons of your choice. Whenever you finish a Long Rest, you can practice weapon drills and change one of those weapon choices. When you reach certain Fighter levels, you gain the ability to use the mastery properties of more kinds of weapons."
@@ -7071,7 +7071,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-SP-126-web-web-type-no-handler.md (cast pays lv2 slot + concentration via generic confirm wrapper but gateWeb stamps type:'web' which HANDLER_MAP lacks → executeHandler null: zero DEX saves, zero Restrained, zero effect logs; web_area_save confirmer dead — never destructured; processWebAreaSave/_web_<caster> zero callers)",
       "class": "Spell",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "You conjure a mass of sticky webbing at a point within range. The webs fill a 20-foot Cube there for the duration. The webs are Difficult Terrain, and the area within them is Lightly Obscured. If the webs aren't anchored between two solid masses (such as walls or trees) or layered across a floor, wall, or ceiling, the web collapses on itself, and the spell ends at the start of your next turn. Webs layered over a flat surface have a depth of 5 feet. The first time a creature enters the webs on a turn or starts its turn there, it must succeed on a Dexterity saving throw or have the Restrained condition while in the webs or until it breaks free. A creature Restrained by the webs can take an action to make a Strength (Athletics) check against your spell save DC. If it succeeds, it is no longer Restrained. The webs are flammable. Any 5-foot Cube of webs exposed to fire burns away in 1 round, dealing 2d4 Fire damage to any creature that starts its turn in the fire."
@@ -7083,7 +7083,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-09-09) — app data = Warrior of the OPEN HAND majors lv6 (row class 'Monk' accurate; subclass attribution recorded). Live on lv18 host: Bonus Actions b.clickable row; full-HP click refuses WITHOUT spending; heal Δ+54 = 3×18 exact (hp_change isHealing logged); uses wholenessofbodyUses 1→0 (trackedResources:244) + 0-uses refusal popup; Long Rest key→null→re-arm, second use +54 exact; CLA-372 initiative-seam wipe NOT reproduced (key survived 2 initiative rolls). Gaps: no ability_use spend log (hp_change only); refusals popup-only no _refused log",
       "class": "Monk",
       "triggerConditions": "Action: 1 bonus action; Action: bonus_action",
       "expectedBehavior": "As a Bonus Action, you can regain Hit Points equal to three times your Monk level. You must finish a Long Rest before you can use this feature again."
@@ -7095,7 +7095,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-388-wild-companion-unpaid-unlimited-free-cast.md (row grants UNPAID unlimited free Find Familiar: resourceCost 'wild_companion' zero consumers, slot+wildShapeUse ledgers untouched; WildCompanionModal dead (zero modalName producers); _Wild_Companion_freeCast consume-free + LR-immune; FEY familiar zero producers; materials gate fires backwards vs no-material clause)",
       "class": "Druid",
       "triggerConditions": "Action: action; Spell: Find Familiar",
       "expectedBehavior": "You can summon a nature spirit that assumes an animal form to aid you. As a Action, you can expend a spell slot or a use of Wild Shape to cast the Find Familiar spell without Material components. When you cast the spell in this way, the familiar is Fey and disappears when you finish a Long Rest."
