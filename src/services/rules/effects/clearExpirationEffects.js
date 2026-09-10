@@ -190,6 +190,18 @@ export function clearExpirationEffects(effects, targetName, attackerName, campai
                 break;
             }
 
+            case 'wrath_of_the_sea_end': {
+                setRuntimeValue(targetName, 'wrathOfTheSeaActive', false, campaignName);
+                addEntry(campaignName, {
+                    type: 'ability_use',
+                    characterName: targetName,
+                    abilityName: 'Wrath of the Sea',
+                    description: `${targetName}'s Wrath of the Sea emanation ended (10-minute duration expired).`,
+                    timestamp: Date.now(),
+                }).catch((e) => { console.error('[clearExpirationEffects:wrath-of-the-sea-end-log-error]', e); });
+                break;
+            }
+
             case 'large_form_end': {
                 setRuntimeValue(targetName, 'largeFormActive', false, campaignName);
                 const buffs = Array.isArray(getRuntimeValue(targetName, 'activeBuffs')) ? getRuntimeValue(targetName, 'activeBuffs') : [];

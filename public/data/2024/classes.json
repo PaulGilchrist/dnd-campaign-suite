@@ -4249,7 +4249,7 @@
               "effect": "push",
               "effectValue": "15_ft",
               "resourceCost": "wild_shape",
-              "duration": "1_minute",
+              "duration": "10_minutes",
               "casting_time": "1 bonus action"
             }
           },

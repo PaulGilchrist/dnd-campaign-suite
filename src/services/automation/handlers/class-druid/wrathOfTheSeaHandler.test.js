@@ -27,6 +27,20 @@ vi.mock('../../../encounters/combatData.js', () => ({
     loadCombatSummary: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+    isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
+vi.mock('../../../rules/effects/expirations.js', () => ({
+    addExpiration: vi.fn(),
+}));
+
+vi.mock('../../../combat/conditions/targetEffectDefinitions.js', () => ({
+    TARGET_EFFECT_DEFINITIONS: [],
+    getEffectDefinition: vi.fn(),
+    registerTargetEffect: vi.fn(),
+}));
+
 vi.mock('../../../rules/combat/applyDamage.js', () => ({
     applyDamageToTarget: vi.fn(),
 }));
@@ -45,6 +59,7 @@ vi.mock('../../../../services/ui/storage.js', () => ({
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getTargetFromAttacker: vi.fn(),
+    getCombatContext: vi.fn(),
 }));
 
 import { handle } from './wrathOfTheSeaHandler.js';
@@ -57,7 +72,10 @@ import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { endInvisibilityOnHostileAction } from '../../../rules/features/invisibilityService.js';
 import { sendSavePrompt } from '../../../combat/conditions/savePromptService.js';
 import storage from '../../../../services/ui/storage.js';
-import { getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
+import { getTargetFromAttacker, getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
+import { registerTargetEffect } from '../../../combat/conditions/targetEffectDefinitions.js';
 
 const playerName = 'Maribelle';
 const campaignName = 'test-campaign';
@@ -91,6 +109,9 @@ function mockNonAllyAttack() {
 function setupBaseMocks() {
     vi.clearAllMocks();
     global.window = { dispatchEvent: vi.fn() };
+    getCombatContext.mockResolvedValue({ round: 1, activeCreatureName: playerName, creatures: [] });
+    isWithinRange.mockResolvedValue(true);
+    addExpiration.mockReturnValue(undefined);
 }
 
 function setupSavePath(wisMod = 1, dc = 12, saveBonus = 0, saveRoll = 5, finalDamage = 6) {
@@ -659,7 +680,7 @@ describe('wrathOfTheSeaHandler', () => {
             expect(result.type).toBe('popup');
         });
 
-        it('throws when action has no automation field and wrath is already active', async () => {
+        it('returns a refusal popup when action has no automation field and wrath is already active', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (name === playerName && key === 'wrathOfTheSeaActive') return true;
                 return undefined;
@@ -668,15 +689,17 @@ describe('wrathOfTheSeaHandler', () => {
             loadCombatSummary.mockResolvedValue({
                 creatures: [{ name: playerName, targetName: 'Enemy' }, { name: 'Enemy' }],
             });
-            getTargetFromAttacker.mockReturnValue({ name: 'Enemy', type: 'npc', saveBonuses: { con: 0 } });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 10 });
-            rollD20.mockReturnValue(5);
+            getTargetFromAttacker.mockReturnValue(null);
 
             const actionWithoutAutomation = { name: 'Wrath of the Sea' };
-            await expect(handle(actionWithoutAutomation, makePlayerStats(), campaignName)).rejects.toThrow();
+            const result = await handle(actionWithoutAutomation, makePlayerStats(), campaignName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('No current target selected');
+            expect(applyDamageToTarget).not.toHaveBeenCalled();
         });
 
-        it('throws when action has null automation field and wrath is already active', async () => {
+        it('returns a refusal popup when action has null automation field and wrath is already active', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (name === playerName && key === 'wrathOfTheSeaActive') return true;
                 return undefined;
@@ -685,12 +708,14 @@ describe('wrathOfTheSeaHandler', () => {
             loadCombatSummary.mockResolvedValue({
                 creatures: [{ name: playerName, targetName: 'Enemy' }, { name: 'Enemy' }],
             });
-            getTargetFromAttacker.mockReturnValue({ name: 'Enemy', type: 'npc', saveBonuses: { con: 0 } });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 10 });
-            rollD20.mockReturnValue(5);
+            getTargetFromAttacker.mockReturnValue(null);
 
             const actionWithNullAutomation = { name: 'Wrath of the Sea', automation: null };
-            await expect(handle(actionWithNullAutomation, makePlayerStats(), campaignName)).rejects.toThrow();
+            const result = await handle(actionWithNullAutomation, makePlayerStats(), campaignName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('No current target selected');
+            expect(applyDamageToTarget).not.toHaveBeenCalled();
         });
 
         it('handles NPC with missing saveBonuses', async () => {
@@ -740,6 +765,184 @@ describe('wrathOfTheSeaHandler', () => {
             const result = await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
 
             expect(result).toBeNull();
+        });
+    });
+
+    describe('CLA-393 gated attack leg + push + duration clock', () => {
+        const LATCH_KEY = '_Wrath_of_the_Sea_usedRound';
+
+        function setupArmedAttack(latchRound = 0) {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (name === playerName && key === 'wrathOfTheSeaActive') return true;
+                if (name === playerName && key === LATCH_KEY) return latchRound;
+                return undefined;
+            });
+            getCombatContext.mockResolvedValue({ round: 1, activeCreatureName: playerName, creatures: [] });
+            isWithinRange.mockResolvedValue(true);
+            rollExpression.mockReturnValue({ total: 12, rolls: [6, 4, 2], modifier: 0 });
+            rollD20.mockReturnValue(1);
+            loadCombatSummary.mockResolvedValue({
+                round: 1,
+                activeCreatureName: playerName,
+                creatures: [{ name: playerName, targetName: 'Thug 1' }, { name: 'Thug 1', type: 'npc', saveBonuses: { con: 2 } }],
+            });
+            getTargetFromAttacker.mockReturnValue({ name: 'Thug 1', type: 'npc', saveBonuses: { con: 2 } });
+            applyDamageToTarget.mockReturnValue({ finalDamage: 12, newHp: 20 });
+        }
+
+        it('refuses a same-round second attack with zero save, damage, push or spend', async () => {
+            setupArmedAttack(1);
+
+            const result = await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('already been used this round');
+            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                automationType: 'wrath_of_the_sea_refused',
+            }));
+            expect(rollD20).not.toHaveBeenCalled();
+            expect(applyDamageToTarget).not.toHaveBeenCalled();
+            expect(registerTargetEffect).not.toHaveBeenCalled();
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(playerName, 'wildShapeUses', expect.any(Number), campaignName);
+        });
+
+        it('refuses when it is not the holder\'s turn, spending nothing', async () => {
+            setupArmedAttack();
+            getCombatContext.mockResolvedValue({ round: 1, activeCreatureName: 'AasimarTest', creatures: [] });
+
+            const result = await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('AasimarTest');
+            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                automationType: 'wrath_of_the_sea_refused',
+            }));
+            expect(rollD20).not.toHaveBeenCalled();
+            expect(applyDamageToTarget).not.toHaveBeenCalled();
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(playerName, LATCH_KEY, expect.any(Number), campaignName);
+        });
+
+        it('refuses a target outside the 5-foot Emanation and does not stamp the latch', async () => {
+            setupArmedAttack();
+            isWithinRange.mockResolvedValue(false);
+
+            const result = await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('outside the 5-foot Emanation');
+            expect(isWithinRange).toHaveBeenCalledWith(playerName, 'Thug 1', 5);
+            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                automationType: 'wrath_of_the_sea_refused',
+            }));
+            expect(applyDamageToTarget).not.toHaveBeenCalled();
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(playerName, LATCH_KEY, expect.any(Number), campaignName);
+        });
+
+        it('stamps the round latch awaited at the trigger BEFORE damage is applied', async () => {
+            setupArmedAttack();
+            const latchIdx = { value: 0 };
+            setRuntimeValue.mockImplementation(async (name, key) => {
+                if (name === playerName && key === LATCH_KEY) latchIdx.value = setRuntimeValue.mock.calls.length;
+            });
+
+            await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, LATCH_KEY, 1, campaignName);
+            expect(latchIdx.value).toBeGreaterThan(0);
+            expect(latchIdx.value).toBeLessThan(applyDamageToTarget.mock.invocationCallOrder[0]);
+        });
+
+        it('fires again on the next round once the latch round differs', async () => {
+            setupArmedAttack(1);
+            getCombatContext.mockResolvedValue({ round: 2, activeCreatureName: playerName, creatures: [] });
+
+            const result = await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.results[0].damage).toBe(12);
+            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, LATCH_KEY, 2, campaignName);
+        });
+
+        it('registers a push target effect on a failed NPC save and logs the push', async () => {
+            setupArmedAttack();
+
+            const result = await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
+
+            expect(registerTargetEffect).toHaveBeenCalledWith(campaignName, 'Thug 1', 'push', 'Wrath of the Sea', {
+                value: 15,
+                movedDistanceFt: 15,
+                duration: 'instant',
+            });
+            expect(result.payload.results[0].pushed).toBe(true);
+            expect(result.payload.description).toContain('pushed up to 15 feet');
+            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                rollType: 'save-damage',
+                pushedDistanceFt: 15,
+            }));
+        });
+
+        it('does not register push on a successful save', async () => {
+            setupArmedAttack();
+            rollD20.mockReturnValue(16);
+
+            const result = await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
+
+            expect(registerTargetEffect).not.toHaveBeenCalled();
+            expect(result.payload.results[0].pushed).toBe(false);
+        });
+
+        it('does not push a Huge creature', async () => {
+            setupArmedAttack();
+            getTargetFromAttacker.mockReturnValue({ name: 'Hill Giant 1', type: 'npc', saveBonuses: { con: 5 }, size: 'Huge' });
+
+            const result = await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
+
+            expect(registerTargetEffect).not.toHaveBeenCalled();
+            expect(result.payload.results[0].pushed).toBe(false);
+        });
+
+        it('applies damage with the hp log NOT suppressed (hp_change pairing)', async () => {
+            setupArmedAttack();
+
+            await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
+
+            expect(applyDamageToTarget).toHaveBeenCalledWith(
+                expect.anything(), 'Thug 1', 12, ['cold'], campaignName,
+                expect.anything(), false, playerName, false
+            );
+        });
+
+        it('manifest leg registers the 10-minute expiration clock (rounds 100)', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (name === playerName && key === 'wrathOfTheSeaActive') return false;
+                if (name === playerName && key === 'wildShapeUses') return 4;
+                return undefined;
+            });
+
+            const result = await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
+
+            expect(result.type).toBe('popup');
+            expect(addExpiration).toHaveBeenCalledWith(
+                playerName, playerName, [{ type: 'wrath_of_the_sea_end' }], campaignName, 100
+            );
+        });
+
+        it('manifest leg honors the fixed 10_minutes data duration token', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (name === playerName && key === 'wrathOfTheSeaActive') return false;
+                if (name === playerName && key === 'wildShapeUses') return 2;
+                return undefined;
+            });
+
+            const action = {
+                name: 'Wrath of the Sea',
+                automation: { type: 'wrath_of_the_sea', duration: '10_minutes' },
+            };
+            await handle(action, makePlayerStats(), campaignName);
+
+            expect(addExpiration).toHaveBeenCalledWith(
+                playerName, playerName, [{ type: 'wrath_of_the_sea_end' }], campaignName, 100
+            );
         });
     });
 });

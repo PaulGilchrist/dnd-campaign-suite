@@ -65,6 +65,8 @@ export function createNextCreatureHandler({
                     setRuntimeValue(creature.name, '_ShadowyDodge_appliedAttack', null, campaignName)
                     setRuntimeValue(creature.name, '_Slow_Fall_usedRound', null, campaignName)
                     setRuntimeValue(creature.name, '_Stones_Endurance_usedRound', null, campaignName)
+                    // CLA-393: Wrath of the Sea once-per-turn attack latch re-arms at round wrap.
+                    setRuntimeValue(creature.name, '_Wrath_of_the_Sea_usedRound', null, campaignName)
                     // CLA-383: Warding Flare reaction round latch re-arms at round wrap.
                     setRuntimeValue(creature.name, '_Warding_Flare_usedRound', null, campaignName)
                     // CLA-381: War Magic cantrip-replacement once-per-turn latch re-arms at round wrap.

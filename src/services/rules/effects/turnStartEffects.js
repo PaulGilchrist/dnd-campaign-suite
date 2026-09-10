@@ -216,6 +216,21 @@ export async function applyTurnStartEffects(activeName, playerStats, campaignNam
         }
     }
 
+    // CLA-393: Wrath of the Sea Emanation ends early if the holder has the
+    // Incapacitated condition (Cloak of Shadows precedent).
+    if (activeName && getRuntimeValue(activeName, 'wrathOfTheSeaActive', campaignName)) {
+        const wrathConds = getRuntimeValue(activeName, 'activeConditions', campaignName);
+        if (Array.isArray(wrathConds) && wrathConds.some(c => String(c).toLowerCase() === 'incapacitated')) {
+            setRuntimeValue(activeName, 'wrathOfTheSeaActive', false, campaignName);
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName: activeName,
+                abilityName: 'Wrath of the Sea',
+                description: `${activeName}'s Wrath of the Sea Emanation ended early — Incapacitated.`,
+            }).catch((e) => { console.error('[turnStartEffects:wrath-of-the-sea-incapacitated-log-error]', e); });
+        }
+    }
+
     // Cloak of Shadows: end when incapacitated
     if (activeName) {
         const cloakBuffs = getRuntimeValue(activeName, 'activeBuffs', campaignName);
