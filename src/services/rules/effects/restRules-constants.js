@@ -68,6 +68,9 @@ export const SHORT_REST_RESOURCES = [
   'psionicEnergy',
   // CLA-355: Telekinetic Thrust re-arms on a Short or Long Rest (app-data truth)
   'telekineticThrustUses',
+  // CLA-382: War Priest recharges on a Short Rest (classes.json 'short_rest').
+  // Null = re-arm (handler reads `getRuntimeValue(...) ?? usesMax`).
+  'warPriestUses',
   'focusPoints',
   'superiorityDice',
   'kiPoints',
@@ -220,9 +223,13 @@ export const LONG_REST_RESOURCES = [
    '_guardedMind_usedRest',
    'poisonedWeaponsActive',
    '_RendMind_Used',
-   // CLA-355: Telekinetic Thrust re-arms on a Long Rest (null = re-armed)
-   'telekineticThrustUses'
-]
+    // CLA-355: Telekinetic Thrust re-arms on a Long Rest (null = re-armed)
+    'telekineticThrustUses',
+   // CLA-382: War Priest app-data recharges on a Short Rest; the Long Rest null
+   // re-arm here is the harmless superset that stops a spent numeric 0 pinning
+   // the pool past a long rest via the server override.
+   'warPriestUses'
+ ]
 
 export function getLongRestResources() {
   return [...LONG_REST_RESOURCES]

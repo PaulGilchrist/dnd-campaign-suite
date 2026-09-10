@@ -6986,7 +6986,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-382-war-priest-popup-only.md (War Domain lv3 bonus_action_attack; popup-only, no damage leg, uses gate dead via raw usesMax=0, warPriestUses zombie counter)",
+      "verified": "verified",
       "class": "Cleric",
       "triggerConditions": "Action: bonus_action; Uses: WIS modifier_min_1",
       "expectedBehavior": "As a Bonus Action, you can make one attack with a weapon or an Unarmed Strike. You can use this Bonus Action a number of times equal to your Wisdom modifier (minimum of once)."

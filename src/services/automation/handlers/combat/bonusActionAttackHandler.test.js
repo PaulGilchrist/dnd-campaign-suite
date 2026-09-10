@@ -40,6 +40,15 @@ vi.mock('../../../shared/popupResponse.js', () => ({
     })),
 }));
 
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+    getCombatContext: vi.fn(),
+    getTargetFromAttacker: vi.fn(),
+}));
+
+vi.mock('../../../ui/logService.js', () => ({
+    addEntry: vi.fn().mockResolvedValue(undefined),
+}));
+
 // ── Re-imports after mocking ───────────────────────────────────
 
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -47,6 +56,8 @@ import { findLastAttack } from '../../common/damageRollback.js';
 import { isPolearmWeapon } from '../../common/polearmUtils.js';
 import { MELEE_REACH_FEET } from '../../../combat/baseCombatActions.js';
 import { automationInfoPopup } from '../../../shared/popupResponse.js';
+import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
+import { addEntry } from '../../../ui/logService.js';
 
 // ── Constants ──────────────────────────────────────────────────
 
@@ -71,8 +82,20 @@ function makePlayerStats(overrides = {}) {
         name: 'TestHero',
         proficiency: 3,
         inventory: { equipped: [] },
+        attacks: [
+            { name: 'Unarmed Strike', weaponType: 'unarmed', hitBonus: 2, damage: '1d4-1', damageType: 'Bludgeoning', range: 5, properties: [] },
+        ],
         ...overrides,
     };
+}
+
+function mockUses(value) {
+    getRuntimeValue.mockImplementation((_name, key) => (key === 'warPriestUses' ? value : null));
+}
+
+function armCombat(targetName = 'Goblin') {
+    getCombatContext.mockResolvedValue({ creatures: [{ name: 'TestHero', targetName }, { name: targetName }], round: 1 });
+    getTargetFromAttacker.mockImplementation((cs, attackerName) => cs?.creatures?.find(c => c.name === cs?.creatures?.find(x => x.name === attackerName)?.targetName) || null);
 }
 
 // ── Tests ──────────────────────────────────────────────────────
@@ -107,20 +130,23 @@ describe('bonusActionAttackHandler', () => {
         });
 
         describe('uses tracking', () => {
-            it('should return popup with default recharge text when uses exhausted', async () => {
+            it('should refuse with recharge text and log a refusal when uses exhausted', async () => {
                 const action = makeAction({ automation: { usesMax: 3 } });
-                getRuntimeValue.mockReturnValue(0);
+                mockUses(0);
 
                 const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'map', []);
 
                 expect(result.type).toBe('popup');
                 expect(result.payload.description).toBe('Bonus Action Attack has no uses remaining. Recharges on a Long Rest.');
                 expect(setRuntimeValue).not.toHaveBeenCalled();
+                expect(addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, expect.objectContaining({
+                    automationType: 'bonus_action_attack_refused',
+                }));
             });
 
             it('should return popup with custom recharge text when uses exhausted', async () => {
                 const action = makeAction({ automation: { usesMax: 1, recharge: 'Short Rest' } });
-                getRuntimeValue.mockReturnValue(0);
+                mockUses(0);
 
                 const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'map', []);
 
@@ -128,13 +154,14 @@ describe('bonusActionAttackHandler', () => {
                 expect(setRuntimeValue).not.toHaveBeenCalled();
             });
 
-            it('should decrement uses and call setRuntimeValue with campaign name', async () => {
+            it('should decrement uses and return attack_roll', async () => {
                 const action = makeAction({ automation: { usesMax: 3 } });
-                getRuntimeValue.mockReturnValue(2);
+                mockUses(2);
+                armCombat();
 
                 const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'map', []);
 
-                expect(result.type).toBe('popup');
+                expect(result.type).toBe('attack_roll');
                 expect(setRuntimeValue).toHaveBeenCalledWith(
                     'TestHero',
                     'warPriestUses',
@@ -145,10 +172,12 @@ describe('bonusActionAttackHandler', () => {
 
             it('should use custom resourceKey when provided', async () => {
                 const action = makeAction({ automation: { usesMax: 1, resourceKey: 'warPriestUses' } });
-                getRuntimeValue.mockReturnValue(1);
+                mockUses(1);
+                armCombat();
 
-                await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'map', []);
+                const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'map', []);
 
+                expect(result.type).toBe('attack_roll');
                 expect(setRuntimeValue).toHaveBeenCalledWith(
                     'TestHero',
                     'warPriestUses',
@@ -159,7 +188,7 @@ describe('bonusActionAttackHandler', () => {
 
             it('should skip use tracking when usesMax is not positive', async () => {
                 const action = makeAction({ automation: { usesMax: 0 } });
-                getRuntimeValue.mockReturnValue(0);
+                mockUses(0);
 
                 const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'map', []);
 
@@ -169,10 +198,12 @@ describe('bonusActionAttackHandler', () => {
 
             it('should decrement float values correctly', async () => {
                 const action = makeAction({ automation: { usesMax: 3 } });
-                getRuntimeValue.mockReturnValue(2.5);
+                mockUses(2.5);
+                armCombat();
 
-                await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'map', []);
+                const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'map', []);
 
+                expect(result.type).toBe('attack_roll');
                 expect(setRuntimeValue).toHaveBeenCalledWith(
                     'TestHero',
                     'warPriestUses',
@@ -183,7 +214,7 @@ describe('bonusActionAttackHandler', () => {
 
             it('should treat non-positive currentUses as exhausted', async () => {
                 const action = makeAction({ automation: { usesMax: 3 } });
-                getRuntimeValue.mockReturnValue(-1);
+                mockUses(-1);
 
                 const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'map', []);
 
@@ -193,16 +224,152 @@ describe('bonusActionAttackHandler', () => {
 
             it('should default to usesMax when getRuntimeValue returns null or undefined', async () => {
                 const action = makeAction({ automation: { usesMax: 2 } });
-                getRuntimeValue.mockReturnValue(null);
+                mockUses(null);
+                armCombat();
 
-                await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'map', []);
+                const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'map', []);
 
+                expect(result.type).toBe('attack_roll');
                 expect(setRuntimeValue).toHaveBeenCalledWith(
                     'TestHero',
                     'warPriestUses',
                     1,
                     CAMPAIGN_NAME,
                 );
+            });
+        });
+
+        describe('CLA-382 War Priest (uses_expression, no trigger)', () => {
+            const warPriestAction = () => makeAction({
+                name: 'War Priest',
+                automation: {
+                    type: 'bonus_action_attack',
+                    action: 'bonus_action',
+                    uses_expression: 'WIS modifier_min_1',
+                    recharge: 'short_rest',
+                    casting_time: '1 bonus action',
+                },
+            });
+
+            const wisCleric = (wisBonus) => makePlayerStats({
+                abilities: [{ name: 'Wisdom', bonus: wisBonus }, { name: 'Strength', bonus: -1 }],
+            });
+
+            it('should resolve usesMax from uses_expression and spend one use with an attack_roll', async () => {
+                armCombat('Thug 1');
+                mockUses(null); // fresh: null → usesMax
+
+                const result = await handle(warPriestAction(), wisCleric(4), CAMPAIGN_NAME, 'map', []);
+
+                expect(result.type).toBe('attack_roll');
+                expect(result.payload.attack.type).toBe('Bonus Action');
+                expect(result.payload.attack.hitBonus).toBe(2);
+                expect(result.payload.attack.damage).toBe('1d4-1');
+                expect(result.payload.attack.damageType).toBe('Bludgeoning');
+                expect(result.payload.attack.autoDamageFormula).toBe('1d4-1');
+                expect(result.payload.attack.name).toContain('War Priest');
+                expect(result.payload.attack.name).toContain('Unarmed Strike');
+                expect(result.payload.targetName).toBe('Thug 1');
+                expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'warPriestUses', 3, CAMPAIGN_NAME);
+                expect(addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, expect.objectContaining({
+                    type: 'ability_use',
+                    abilityName: 'War Priest',
+                }));
+            });
+
+            it('should honour WIS negative floor of 1 in uses_expression', async () => {
+                armCombat('Thug 1');
+                mockUses(1);
+
+                const result = await handle(warPriestAction(), wisCleric(-2), CAMPAIGN_NAME, 'map', []);
+
+                expect(result.type).toBe('attack_roll');
+                expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'warPriestUses', 0, CAMPAIGN_NAME);
+            });
+
+            it('should refuse with war_priest_refused log at 0 uses, spending nothing', async () => {
+                mockUses(0);
+
+                const result = await handle(warPriestAction(), wisCleric(4), CAMPAIGN_NAME, 'map', []);
+
+                expect(result.type).toBe('popup');
+                expect(result.payload.description).toBe('War Priest has no uses remaining. Recharges on a Short Rest.');
+                expect(setRuntimeValue).not.toHaveBeenCalled();
+                expect(addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, expect.objectContaining({
+                    type: 'automation',
+                    automationType: 'war_priest_refused',
+                }));
+            });
+
+            it('should fall back to Unarmed Strike when no equipped weapon rows', async () => {
+                armCombat('Thug 1');
+                mockUses(2);
+
+                const result = await handle(warPriestAction(), wisCleric(4), CAMPAIGN_NAME, 'map', []);
+
+                expect(result.type).toBe('attack_roll');
+                expect(result.payload.attack.name).toBe('War Priest (Unarmed Strike)');
+                expect(result.payload.attack.autoDamageName).toBe('War Priest (Unarmed Strike)');
+            });
+
+            it('should prefer equipped melee weapon over ranged (ranged row may sit first)', async () => {
+                armCombat('Thug 1');
+                mockUses(2);
+                const stats = makePlayerStats({
+                    attacks: [
+                        { name: 'Shortbow', weaponType: 'ranged', hitBonus: 5, damage: '1d6+2', damageType: 'Piercing', range: 80, properties: [] },
+                        { name: 'Scimitar', weaponType: 'melee', hitBonus: 5, damage: '1d6+2', damageType: 'Slashing', range: 5, properties: [] },
+                    ],
+                });
+
+                const result = await handle(warPriestAction(), stats, CAMPAIGN_NAME, 'map', []);
+
+                expect(result.payload.attack.name).toBe('War Priest (Scimitar)');
+                expect(result.payload.attack.damageType).toBe('Slashing');
+            });
+
+            it('should not pick a Loading ranged weapon and fall back to Unarmed Strike', async () => {
+                armCombat('Thug 1');
+                mockUses(2);
+                const stats = makePlayerStats({
+                    attacks: [
+                        { name: 'Heavy Crossbow', weaponType: 'ranged', hitBonus: 5, damage: '1d10+2', damageType: 'Piercing', range: 100, properties: ['Heavy', 'Loading'] },
+                        { name: 'Unarmed Strike', weaponType: 'unarmed', hitBonus: 2, damage: '1d4-1', damageType: 'Bludgeoning', range: 5, properties: [] },
+                    ],
+                });
+
+                const result = await handle(warPriestAction(), stats, CAMPAIGN_NAME, 'map', []);
+
+                expect(result.payload.attack.name).toBe('War Priest (Unarmed Strike)');
+            });
+
+            it('should refuse without spending when no target is armed', async () => {
+                mockUses(2);
+                getCombatContext.mockResolvedValue({ creatures: [{ name: 'TestHero', targetName: null }], round: 1 });
+                getTargetFromAttacker.mockReturnValue(null);
+
+                const result = await handle(warPriestAction(), wisCleric(4), CAMPAIGN_NAME, 'map', []);
+
+                expect(result.type).toBe('popup');
+                expect(result.payload.description).toContain('No target selected');
+                expect(setRuntimeValue).not.toHaveBeenCalled();
+                expect(addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, expect.objectContaining({
+                    automationType: 'war_priest_refused',
+                }));
+            });
+
+            it('should refuse without spending when no attack rows exist', async () => {
+                armCombat('Thug 1');
+                mockUses(2);
+
+                const result = await handle(warPriestAction(), makePlayerStats({ attacks: [] }), CAMPAIGN_NAME, 'map', []);
+
+                expect(result.type).toBe('popup');
+                expect(result.payload.description).toContain('No usable weapon');
+                expect(setRuntimeValue).not.toHaveBeenCalled();
+                expect(addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, expect.objectContaining({
+                    automationType: 'war_priest_refused',
+                }));
             });
         });
 
