@@ -4,21 +4,19 @@
 // @improved-by-ai
 // @cleaned-by-ai
 // @cleaned-by-ai
+// CLA-384: the confirm leg was unreachable dead code — locked contract is now
+// resource spend (uses OR 5 SP restore) + teleport te marker + refusal logs.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, applyWarpingImplosion } from './warpingImplosionHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as metamagic from '../../../../hooks/combat/useMetamagic.js';
-import * as diceRoller from '../../../dice/diceRoller.js';
 import { addEntry } from '../../../ui/logService.js';
 import * as savePrompt from '../../common/savePrompt.js';
 import * as mapsService from '../../../maps/mapsService.js';
 import * as classFeatures from '../../../../services/character/classFeatures.js';
 import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
-
-vi.mock('../../../dice/diceRoller.js', () => ({
-    rollExpression: vi.fn(),
-}));
+import * as teDefs from '../../../combat/conditions/targetEffectDefinitions.js';
 
 vi.mock('../../../maps/mapsService.js', () => ({
     loadMapData: vi.fn(() => Promise.resolve(null)),
@@ -52,6 +50,11 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
+}));
+
+vi.mock('../../../combat/conditions/targetEffectDefinitions.js', () => ({
+    registerTargetEffect: vi.fn(),
+    getEffectDefinition: vi.fn(),
 }));
 
 const campaignName = 'TestCampaign';
@@ -91,13 +94,12 @@ const makePlayerStats = (overrides = {}) => ({
 describe('warpingImplosionHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        diceRoller.rollExpression.mockReturnValue({ total: 27, rolls: [10, 10, 7], modifier: 0 });
         runtimeState.getRuntimeValue.mockReturnValue(null);
         metamagic.getCurrentSorceryPoints.mockReturnValue(10);
         metamagic.spendSorceryPoints.mockReturnValue(undefined);
         addEntry.mockResolvedValue(undefined);
         runtimeState.setRuntimeValue.mockResolvedValue(undefined);
-        savePrompt.buildSaveDc.mockReturnValue(14);
+        savePrompt.buildSaveDc.mockReturnValue(13);
         mapsService.loadMapData.mockResolvedValue(null);
         classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 20 });
         rangeValidation.rangeToFeet.mockReturnValue(undefined);
@@ -112,9 +114,10 @@ describe('warpingImplosionHandler', () => {
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('warpingImplosion');
             expect(result.payload.saveType).toBe('STR');
-            expect(result.payload.saveDc).toBe(14);
+            expect(result.payload.saveDc).toBe(13);
             expect(result.payload.damageType).toBe('Force');
             expect(result.payload.damageExpression).toBe('3d10');
+            expect(result.payload.shape).toBe('emanation_30ft');
             expect(result.payload.teleportRange).toBe(120);
             expect(result.payload.restoreCost).toBe(5);
             expect(result.payload.canRestore).toBe(true);
@@ -122,7 +125,16 @@ describe('warpingImplosionHandler', () => {
             expect(result.payload.campaignName).toBe(campaignName);
         });
 
-        it('returns popup when no uses and cannot restore', async () => {
+        it('opens the chooser WITHOUT consuming the use at picker-open', async () => {
+            runtimeState.getRuntimeValue.mockReturnValue(1);
+
+            await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+            expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
+        });
+
+        it('refuses with popup + warping_implosion_refused log when no uses and cannot restore', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(0);
             metamagic.getCurrentSorceryPoints.mockReturnValue(2);
 
@@ -132,6 +144,14 @@ describe('warpingImplosionHandler', () => {
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toContain('No remaining uses');
             expect(result.payload.description).toContain('cannot restore');
+            expect(result.logEntries).toHaveLength(1);
+            expect(result.logEntries[0]).toEqual(expect.objectContaining({
+                type: 'automation',
+                automationType: 'warping_implosion_refused',
+                characterName: playerName,
+            }));
+            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+            expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
         });
 
         it('returns modal when no uses but can restore', async () => {
@@ -224,10 +244,7 @@ describe('warpingImplosionHandler', () => {
 
         it('uses custom resourceKey for uses tracking', async () => {
             const action = makeAction({ automation: { resourceKey: 'customUses' } });
-            runtimeState.getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'customUses') return 1;
-                return 1;
-            });
+            runtimeState.getRuntimeValue.mockReturnValue(1);
 
             const result = await handle(action, makePlayerStats(), campaignName, null);
 
@@ -256,158 +273,91 @@ describe('warpingImplosionHandler', () => {
     });
 
     describe('applyWarpingImplosion', () => {
-        it('returns popup when no uses remaining and not restoring', async () => {
+        it('refuses with popup + refused log when no uses remaining and not restoring', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(0);
 
-            const result = await applyWarpingImplosion(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                ['Enemy1'],
-                { gridX: 5, gridY: 5 },
-                false
-            );
+            const result = await applyWarpingImplosion(makeAction(), makePlayerStats(), campaignName, false);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toContain('No remaining uses');
+            expect(result.logEntries[0].automationType).toBe('warping_implosion_refused');
+            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+            expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
+            expect(teDefs.registerTargetEffect).not.toHaveBeenCalled();
         });
 
-        it('returns popup when not enough sorcery points to restore', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
+        it('refuses with popup + refused log when not enough sorcery points to restore', async () => {
+            runtimeState.getRuntimeValue.mockReturnValue(0);
             metamagic.getCurrentSorceryPoints.mockReturnValue(2);
 
-            const result = await applyWarpingImplosion(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                ['Enemy1'],
-                { gridX: 5, gridY: 5 },
-                true
-            );
+            const result = await applyWarpingImplosion(makeAction(), makePlayerStats(), campaignName, true);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Not enough Sorcery Points');
+            expect(result.logEntries[0].automationType).toBe('warping_implosion_refused');
+            expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
+            expect(teDefs.registerTargetEffect).not.toHaveBeenCalled();
         });
 
-        it('spends sorcery points when restoring successfully', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
+        it('spends 5 sorcery points and writes the teleport marker when restoring', async () => {
+            runtimeState.getRuntimeValue.mockReturnValue(0);
             metamagic.getCurrentSorceryPoints.mockReturnValue(10);
 
-            await applyWarpingImplosion(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                ['Enemy1'],
-                { gridX: 5, gridY: 5 },
-                true
-            );
+            const result = await applyWarpingImplosion(makeAction(), makePlayerStats(), campaignName, true);
 
-            expect(metamagic.spendSorceryPoints).toHaveBeenCalledWith(
-                playerName,
-                5,
+            expect(result.type).toBe('confirmed');
+            expect(result.restored).toBe(true);
+            expect(metamagic.spendSorceryPoints).toHaveBeenCalledWith(playerName, 5, campaignName, 20);
+            expect(teDefs.registerTargetEffect).toHaveBeenCalledWith(
                 campaignName,
-                20
+                playerName,
+                'warping_implosion_teleport',
+                'Warping Implosion',
+                expect.objectContaining({ duration: 'instant', value: 120 })
             );
+            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('decrements uses when not restoring', async () => {
+        it('decrements uses when not restoring and writes the teleport marker', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(1);
 
-            await applyWarpingImplosion(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                ['Enemy1'],
-                { gridX: 5, gridY: 5 },
-                false
-            );
+            const result = await applyWarpingImplosion(makeAction(), makePlayerStats(), campaignName, false);
 
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+            expect(result.type).toBe('confirmed');
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(playerName, 'warpingimplosionUses', 0, campaignName);
+            expect(teDefs.registerTargetEffect).toHaveBeenCalledWith(
+                campaignName,
                 playerName,
-                'warpingimplosionUses',
-                0,
-                campaignName
+                'warping_implosion_teleport',
+                'Warping Implosion',
+                expect.objectContaining({ duration: 'instant', value: 120 })
             );
+            expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
         });
 
         it('uses custom resourceKey for uses tracking', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(1);
             const action = makeAction({ automation: { resourceKey: 'customImplosionUses' } });
 
-            await applyWarpingImplosion(
-                action,
-                makePlayerStats(),
-                campaignName,
-                ['Enemy1'],
-                { gridX: 5, gridY: 5 },
-                false
-            );
+            await applyWarpingImplosion(action, makePlayerStats(), campaignName, false);
 
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                'customImplosionUses',
-                0,
-                campaignName
-            );
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(playerName, 'customImplosionUses', 0, campaignName);
         });
 
-        it('returns roll result with damage data', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
+        it('respects custom restoreCost when spending SP', async () => {
+            runtimeState.getRuntimeValue.mockReturnValue(0);
+            metamagic.getCurrentSorceryPoints.mockReturnValue(10);
+            const action = makeAction({ automation: { restoreCost: 3 } });
 
-            const result = await applyWarpingImplosion(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                ['Enemy1'],
-                { gridX: 5, gridY: 5 },
-                false
-            );
+            await applyWarpingImplosion(action, makePlayerStats(), campaignName, true);
 
-            expect(result.type).toBe('roll');
-            expect(result.payload.rollType).toBe('damage');
-            expect(result.payload.name).toBe('Warping Implosion');
-            expect(result.payload.formula).toBe('3d10');
-            expect(result.payload.total).toBe(27);
-            expect(result.payload.rolls).toEqual([10, 10, 7]);
-            expect(result.payload.modifier).toBe(0);
+            expect(metamagic.spendSorceryPoints).toHaveBeenCalledWith(playerName, 3, campaignName, 20);
         });
 
-        it('includes save configuration and notes in roll payload', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-            savePrompt.buildSaveDc.mockReturnValue(15);
+        it('logs an ability_use entry with teleport, save and pull details', async () => {
+            runtimeState.getRuntimeValue.mockImplementation((name, key) => (key === 'warpingimplosionUses' ? 1 : null));
 
-            const result = await applyWarpingImplosion(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                ['Enemy1'],
-                { gridX: 5, gridY: 5 },
-                false
-            );
-
-            expect(result.payload.contextConfig.damageType).toBe('Force');
-            expect(result.payload.contextConfig.saveDc).toBe(15);
-            expect(result.payload.contextConfig.saveType).toBe('STR');
-            expect(result.payload.contextConfig.attackerName).toBe(playerName);
-            expect(result.payload.notes).toContain('Teleported to an unoccupied space within 120 feet');
-            expect(result.payload.notes).toContain('30 feet');
-            expect(result.payload.notes).toContain('STR saving throw');
-            expect(result.payload.notes).toContain('DC 15');
-            expect(result.payload.notes).toContain('27 Force damage');
-        });
-
-        it('adds campaign log entry for ability use', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-
-            await applyWarpingImplosion(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                ['Enemy1'],
-                { gridX: 5, gridY: 5 },
-                false
-            );
+            await applyWarpingImplosion(makeAction(), makePlayerStats(), campaignName, false);
 
             expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 type: 'ability_use',
@@ -415,245 +365,35 @@ describe('warpingImplosionHandler', () => {
                 abilityName: 'Warping Implosion',
                 timestamp: expect.any(Number),
             }));
+            const description = addEntry.mock.calls[0][1].description;
+            expect(description).toContain('teleported to an unoccupied space within 120 feet');
+            expect(description).toContain('30 feet');
+            expect(description).toContain('STR');
+            expect(description).toContain('DC 13');
+            expect(description).toContain('pulled toward');
         });
 
-        it('includes restored note when using sorcery points', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
+        it('notes the SP restore in the ability_use log', async () => {
+            runtimeState.getRuntimeValue.mockReturnValue(0);
             metamagic.getCurrentSorceryPoints.mockReturnValue(10);
 
-            const result = await applyWarpingImplosion(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                [],
-                { gridX: 5, gridY: 5 },
-                true
-            );
+            await applyWarpingImplosion(makeAction(), makePlayerStats(), campaignName, true);
 
-            expect(result.payload.notes).toContain('Restored with 5 Sorcery Points');
+            const description = addEntry.mock.calls[0][1].description;
+            expect(description).toContain('Restored with 5 Sorcery Points');
         });
 
-        it('dispels magical darkness when shape is an area shape', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-            const action = makeAction({ automation: { shape: 'sphere' } });
-
-            const result = await applyWarpingImplosion(
-                action,
-                makePlayerStats(),
-                campaignName,
-                [],
-                { gridX: 5, gridY: 5 },
-                false
-            );
-
-            expect(result.payload.notes).toContain('Magical Darkness in the area is dispelled');
-        });
-
-        it('does not dispel darkness for non-area or missing shapes', async () => {
+        it('notes magical darkness dispelled for area shapes only', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(1);
 
-            let result = await applyWarpingImplosion(
-                makeAction({ automation: { shape: 'single_target' } }),
-                makePlayerStats(),
-                campaignName,
-                [],
-                { gridX: 5, gridY: 5 },
-                false
-            );
-            expect(result.payload.notes).not.toContain('Magical Darkness');
-
-            result = await applyWarpingImplosion(
-                makeAction({ automation: { shape: undefined } }),
-                makePlayerStats(),
-                campaignName,
-                [],
-                { gridX: 5, gridY: 5 },
-                false
-            );
-            expect(result.payload.notes).not.toContain('Magical Darkness');
-
-            result = await applyWarpingImplosion(
-                makeAction({ automation: { shape: '' } }),
-                makePlayerStats(),
-                campaignName,
-                [],
-                { gridX: 5, gridY: 5 },
-                false
-            );
-            expect(result.payload.notes).not.toContain('Magical Darkness');
-        });
-
-        it('handles null or empty damage result gracefully', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-
-            diceRoller.rollExpression.mockReturnValue(null);
-            let result = await applyWarpingImplosion(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                [],
-                { gridX: 5, gridY: 5 },
-                false
-            );
-            expect(result.payload.total).toBe(0);
-            expect(result.payload.rolls).toEqual([]);
-            expect(result.payload.modifier).toBe(0);
-
-            diceRoller.rollExpression.mockReturnValue({});
-            result = await applyWarpingImplosion(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                [],
-                { gridX: 5, gridY: 5 },
-                false
-            );
-            expect(result.payload.total).toBe(0);
-            expect(result.payload.rolls).toEqual([]);
-            expect(result.payload.modifier).toBe(0);
-        });
-
-        it('uses custom action name when provided', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-            const action = makeAction({ name: 'Custom Warping Implosion' });
-
-            const result = await applyWarpingImplosion(
-                action,
-                makePlayerStats(),
-                campaignName,
-                [],
-                { gridX: 5, gridY: 5 },
-                false
-            );
-
-            expect(result.payload.name).toBe('Custom Warping Implosion');
-            expect(result.payload.contextConfig.attackerName).toBe('TestHero');
-        });
-
-        it('uses custom saveType from automation', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-            const action = makeAction({ automation: { saveType: 'DEX' } });
-
-            const result = await applyWarpingImplosion(
-                action,
-                makePlayerStats(),
-                campaignName,
-                [],
-                { gridX: 5, gridY: 5 },
-                false
-            );
-
-            expect(result.payload.contextConfig.saveType).toBe('DEX');
-        });
-
-        it('handles spentSP as 0 (falsy) by decrementing uses', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-
-            await applyWarpingImplosion(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                ['Enemy1'],
-                { gridX: 5, gridY: 5 },
-                0
-            );
-
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                'warpingimplosionUses',
-                0,
-                campaignName
-            );
-            expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
-        });
-
-        it('handles null or undefined targets in log entry', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-
-            await applyWarpingImplosion(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                null,
-                { gridX: 5, gridY: 5 },
-                false
-            );
-            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                description: expect.stringContaining('0 creature'),
-            }));
+            let result = null;
+            await applyWarpingImplosion(makeAction({ automation: { shape: 'sphere' } }), makePlayerStats(), campaignName, false);
+            expect(addEntry.mock.calls[0][1].description).toContain('Magical Darkness in the area is dispelled');
 
             addEntry.mockClear();
-            await applyWarpingImplosion(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                undefined,
-                { gridX: 5, gridY: 5 },
-                false
-            );
-            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                description: expect.stringContaining('0 creature'),
-            }));
-        });
-
-        it('respects custom restoreCost when spending SP', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-            metamagic.getCurrentSorceryPoints.mockReturnValue(10);
-            const action = makeAction({ automation: { restoreCost: 3 } });
-
-            await applyWarpingImplosion(
-                action,
-                makePlayerStats(),
-                campaignName,
-                [],
-                { gridX: 5, gridY: 5 },
-                true
-            );
-
-            expect(metamagic.spendSorceryPoints).toHaveBeenCalledWith(
-                playerName,
-                3,
-                campaignName,
-                20
-            );
-        });
-
-        it('uses custom uses value and decrements correctly', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(3);
-            const action = makeAction({ automation: { uses: 3 } });
-
-            await applyWarpingImplosion(
-                action,
-                makePlayerStats(),
-                campaignName,
-                ['Enemy1'],
-                { gridX: 5, gridY: 5 },
-                false
-            );
-
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                'warpingimplosionUses',
-                2,
-                campaignName
-            );
-        });
-
-        it('includes target count in log description', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-
-            await applyWarpingImplosion(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                ['Enemy1', 'Enemy2', 'Enemy3'],
-                { gridX: 5, gridY: 5 },
-                false
-            );
-
-            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                description: expect.stringContaining('3 creature'),
-            }));
+            result = await applyWarpingImplosion(makeAction({ automation: { shape: 'single_target' } }), makePlayerStats(), campaignName, false);
+            expect(result.type).toBe('confirmed');
+            expect(addEntry.mock.calls[0][1].description).not.toContain('Magical Darkness');
         });
     });
 });
