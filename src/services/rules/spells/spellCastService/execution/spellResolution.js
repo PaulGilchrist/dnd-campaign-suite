@@ -29,7 +29,19 @@ function resolveSpellResolution(spell, metaCtx, playerStats, campaignName, getTa
     };
 
     const buffs = getActiveBuffs(playerStats.name, campaignName);
-    if (buffs.some(b => b.blocksSpellcasting)) {
+    const blockingBuff = buffs.find(b => b.blocksSpellcasting);
+    if (blockingBuff) {
+        const blockName = blockingBuff.name || 'Shape-Shift';
+        const refusalType = String(blockingBuff.effect || blockName).toLowerCase().replace(/\s+/g, '_') + '_refused';
+        addEntry(campaignName, {
+            type: 'automation',
+            automationType: refusalType,
+            creatureName: playerStats.name,
+            characterName: playerStats.name,
+            name: blockName,
+            description: `${spell.name} blocked — ${playerStats.name} cannot cast spells while under ${blockName}.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[spellResolution:blocked-by-buff-log-error]", e); });
         return { blockedByBuffs: true };
     }
 

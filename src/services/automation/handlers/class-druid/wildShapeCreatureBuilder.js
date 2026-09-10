@@ -109,13 +109,19 @@ export async function activateWildShape(druidName, baseMonster, druidStats, camp
     setCombatSummaryCache(combatSummary, campaignName);
 
     const targetEffects = getTargetEffects();
-    targetEffects.push({
+    const wildShapeEffect = {
         target: druidName,
         source: druidName,
         effect: WILD_SHAPE_EFFECT,
         beastName: baseMonster.name,
-    });
-    setRuntimeValue('campaign', 'targetEffects', targetEffects, campaignName);
+    };
+    // New-array spread: mutating the store's array in place makes valuesEqual
+    // see a===b and silently skip the POST (playbook 44d).
+    const updatedTargetEffects = [
+        ...targetEffects.filter(te => !(te.effect === WILD_SHAPE_EFFECT && te.target === druidName)),
+        wildShapeEffect,
+    ];
+    setRuntimeValue('campaign', 'targetEffects', updatedTargetEffects, campaignName);
 
     const maxWS = druidStats.class?.class_levels?.find(cl => cl.level === druidStats.level)?.wild_shape || 0;
     const currentWS = Number(getRuntimeValue(druidName, 'wildShapeUses', campaignName) ?? maxWS);

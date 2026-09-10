@@ -121,7 +121,9 @@ vi.mock('./helpers.js', () => ({
 vi.mock('./blockChecks.js', () => ({
   checkGlobeOfInvulnerability: vi.fn(() => Promise.resolve(null)),
   checkForcecageBlocked: vi.fn(() => Promise.resolve(null)),
+  checkBlockedBySpellcastingBuff: vi.fn(() => Promise.resolve(null)),
 }));
+
 
 vi.mock('./modalSpells.js', () => ({
   handlePowerWordHeal: vi.fn(() => Promise.resolve({ handled: false })),
@@ -390,6 +392,37 @@ describe('executeSpellCast — block checks', () => {
       );
 
       expect(result).toBe(blockResult);
+    });
+  });
+
+  /* ---------------------------------------------------------------- */
+  /*  Block checks — shape_shift blocksSpellcasting (CLA-391)         */
+  /* ---------------------------------------------------------------- */
+
+  describe('blocksSpellcasting buff (Wild Shape)', () => {
+    it('returns the refusal popup produced by checkBlockedBySpellcastingBuff (CLA-391)', async () => {
+      const { checkBlockedBySpellcastingBuff } = await import('./blockChecks.js');
+      const blockResult = { automationPopup: { type: 'popup', payload: { type: 'automation_info', name: 'Wild Shape', description: 'Fireball cannot be cast while TestWizard is under Wild Shape — no Spellcasting is allowed.' } } };
+      checkBlockedBySpellcastingBuff.mockResolvedValue(blockResult);
+
+      const result = await executeSpellCast(
+        makeSpell(),
+        makeMetaCtx(),
+        {
+          rollAttack: vi.fn(),
+          rollDamage: vi.fn(),
+          playerStats: makePlayerStats(),
+          getTargetInfo: vi.fn(() => Promise.resolve({ name: 'Goblin' })),
+          campaignName: 'test-campaign',
+        },
+      );
+
+      expect(result).toBe(blockResult);
+      expect(checkBlockedBySpellcastingBuff).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Fireball' }),
+        expect.objectContaining({ name: 'TestWizard' }),
+        'test-campaign',
+      );
     });
   });
 });

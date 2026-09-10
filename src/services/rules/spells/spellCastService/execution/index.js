@@ -21,7 +21,7 @@ import { triggerConfusion } from '../../../features/confusionService.js';
 import { resolveHealingBonusesWithDetails, hasHealingMaximizationForTarget, hasRerollHealingOnes } from '../../../../combat/automation/automationService.js';
 import { rollExpression, rollExpressionMaximized, applyHealingRerollOnes } from '../../../../dice/diceRoller.js';
 import { refundSpellBreakerSlot, applyHexEffects, applyPowerWordHealToTarget, applyPowerWordKillToTarget, triggerDispelMagic, triggerExpertDivination, triggerArcaneWard, applyRegenerateSpell } from './helpers.js';
-import { checkGlobeOfInvulnerability, checkForcecageBlocked } from './blockChecks.js';
+import { checkGlobeOfInvulnerability, checkForcecageBlocked, checkBlockedBySpellcastingBuff } from './blockChecks.js';
 import { handlePowerWordHeal, handlePowerWordKill, handleMassSuggestion, handleCalmEmotions, handleHypnoticPatternEarly, handleConfusionEarly, handleShapechange, handleFear, handleConjureVolley, handleSilence, handleSleep } from './modalSpells.js';
 import { handleRegenerate, handleSeeInvisibility, handleFleshToStone, handleHoldMonster, handleBanishment, handleConfusion, handleMaze, handlePowerWordStun, handleHypnoticPattern, handleSlow, handleBane, handleBless, handleBeaconOfHope, handleMassSuggestion as handleMassSuggestionTrigger, handleSuggestion, handleCommand, handleOttoDance, handleResilientSphere, handleBlur, handleExpeditiousRetreat, handleFriends, handleCrownOfMadness, handleAnimalFriendship, handleDominateBeast, handleDominateMonster, handleDominatePerson, handleRayOfEnfeeblement, handleCompelledDuel, handleGlobeOfInvulnerability, handleForcecage, handleStinkingCloud, handleSleetStorm, handleFaerieFire, handleTashasHideousLaughter, handleImprisonment, handleHeroism, handleLongstrider, handleSpareTheDying, handleEnhanceAbility, handleProtectionFromEnergy, handleProtectionFromPoison, handleResistance, handleGenericAutomation } from './triggerSpells.js';
 import { computeRange, computeEmpoweredEvocation, computeBlessedStrikes, computeRadiantSoul, computeOverchannel } from './damageCalculation.js';
@@ -47,8 +47,8 @@ function computePsychicDamageType(spell, psychicSpellsConfig, damageType) {
 
 export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, featEffects, campaignName, mapName, characters }) {
     // --- Block checks ---
-    const buffs = (await import('./spellResolution.js')).getActiveBuffs(playerStats.name, campaignName);
-    if (buffs.some(b => b.blocksSpellcasting)) return;
+    const buffBlock = await checkBlockedBySpellcastingBuff(spell, playerStats, campaignName);
+    if (buffBlock) return buffBlock;
 
     const globeTargetName = getTargetInfo ? (await getTargetInfo())?.name || null : null;
     const globeBlock = await checkGlobeOfInvulnerability(spell, globeTargetName, playerStats, campaignName);

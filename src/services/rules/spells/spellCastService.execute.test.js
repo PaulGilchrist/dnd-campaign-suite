@@ -194,7 +194,7 @@ describe('executeSpellCast', () => {
   /* ---------------------------------------------------------------- */
 
   describe('spellcasting-blocked by buffs', () => {
-    it('returns early when a buff blocks spellcasting', async () => {
+    it('refuses with popup + refused log and returns early when a buff blocks spellcasting (CLA-391)', async () => {
       const buffService = await import('../../combat/buffs/buffService.js')
       vi.mocked(buffService.getActiveBuffs).mockReturnValue([
         { name: 'Silence', blocksSpellcasting: true },
@@ -203,7 +203,8 @@ describe('executeSpellCast', () => {
       const services = makeServices()
       const result = await executeSpellCast(makeSpell(), makeMetaCtx(), services)
 
-      expect(result).toBeUndefined()
+      expect(result?.automationPopup?.payload?.type).toBe('automation_info')
+      expect(result.automationPopup.payload.description).toContain('Fireball cannot be cast')
       expect(services.rollAttack).not.toHaveBeenCalled()
       expect(services.rollDamage).not.toHaveBeenCalled()
     })

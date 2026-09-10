@@ -243,6 +243,19 @@ describe('spellResolution', () => {
       expect(result).toEqual({ blockedByBuffs: true });
     });
 
+    it('logs a *_refused automation entry when blocked by a blocksSpellcasting buff (CLA-391)', () => {
+      getActiveBuffs.mockReturnValue([{ name: 'Wild Shape', effect: 'shape_shift', blocksSpellcasting: true }]);
+
+      resolveSpellResolution(makeSpell(), {}, makePlayerStats(), 'test-campaign', null);
+
+      const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'shape_shift_refused');
+      expect(refusal).toBeDefined();
+      expect(refusal.type).toBe('automation');
+      expect(refusal.creatureName).toBe('TestWizard');
+      expect(refusal.name).toBe('Wild Shape');
+      expect(refusal.description).toContain('Fireball blocked');
+    });
+
     it('continues normally when no buff blocks spellcasting', () => {
       getActiveBuffs.mockReturnValue([{ name: 'Shield', blocksSpellcasting: false }]);
 

@@ -9,6 +9,7 @@ import { npcToMonsterFormat } from '../../services/encounters/npcStatBlockUtils.
 
 vi.mock('../../services/ui/dataLoader.js', () => ({
     loadMonsters: vi.fn(() => Promise.resolve([])),
+    fetchRaceData: vi.fn(() => Promise.resolve(null)),
 }));
 vi.mock('../../services/encounters/combatData.js', () => ({
     getCombatSummary: vi.fn(() => null),

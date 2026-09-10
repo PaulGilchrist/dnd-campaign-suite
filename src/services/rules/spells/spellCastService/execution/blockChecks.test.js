@@ -34,12 +34,18 @@ vi.mock('../../../../automation/handlers/spells/imprisonmentHandler.js', () => (
   isImprisonmentBlocked: vi.fn(() => false),
 }));
 
+vi.mock('./spellResolution.js', () => ({
+  getActiveBuffs: vi.fn(() => []),
+}));
+
 /* ------------------------------------------------------------------ */
 /*  SUT imports                                                        */
 /* ------------------------------------------------------------------ */
 
 const { getRuntimeValue } = await import('../../../../../hooks/runtime/useRuntimeState.js');
 const { addEntry } = await import('../../../../ui/logService.js');
+const { checkBlockedBySpellcastingBuff } = await import('./blockChecks.js');
+const { getActiveBuffs } = await import('./spellResolution.js');
 const { isForcecageBlocked } = await import('../../../../automation/handlers/spells/forcecageHandler.js');
 const { isMazeBlocked } = await import('../../../../automation/handlers/spells/mazeHandler.js');
 const { isBanishmentBlocked } = await import('../../../../automation/handlers/spells/banishmentHandler.js');
@@ -388,6 +394,28 @@ describe('blockChecks.js', () => {
       expect(isMazeBlocked).toHaveBeenCalledWith('TestWizard', 'Goblin', 'test-campaign');
       expect(isBanishmentBlocked).toHaveBeenCalledWith('TestWizard', 'Goblin', 'test-campaign');
       expect(isImprisonmentBlocked).toHaveBeenCalledWith('TestWizard', 'Goblin', 'test-campaign');
+    });
+  });
+
+  describe('checkBlockedBySpellcastingBuff (CLA-391)', () => {
+    it('returns null when no buff blocks spellcasting', async () => {
+      getActiveBuffs.mockReturnValue([{ name: 'Shield', blocksSpellcasting: false }]);
+      const result = await checkBlockedBySpellcastingBuff({ name: 'Fireball' }, { name: 'TestWizard' }, 'test-campaign');
+      expect(result).toBeNull();
+    });
+
+    it('refuses with popup + shape_shift_refused log when Wild Shape blocks casting', async () => {
+      getActiveBuffs.mockReturnValue([{ name: 'Wild Shape', effect: 'shape_shift', blocksSpellcasting: true }]);
+
+      const result = await checkBlockedBySpellcastingBuff({ name: 'Entangle' }, { name: 'Wild_Sage_Druid' }, 'test-campaign');
+
+      expect(result?.automationPopup?.payload?.type).toBe('automation_info');
+      expect(result.automationPopup.payload.name).toBe('Wild Shape');
+      expect(result.automationPopup.payload.description).toContain('Entangle cannot be cast');
+      const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'shape_shift_refused');
+      expect(refusal).toBeDefined();
+      expect(refusal.creatureName).toBe('Wild_Sage_Druid');
+      expect(refusal.description).toContain('Entangle blocked');
     });
   });
 });

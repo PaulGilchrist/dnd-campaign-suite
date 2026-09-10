@@ -240,10 +240,15 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
  }
 
     // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
-    // Preserve Mage Armor (8-hour duration, not cleared on short rest)
+    // Preserve Mage Armor (8-hour duration, not cleared on short rest) and
+    // Wild Shape (CLA-391: its te/THP/combatSummary marks already survive a
+    // short rest — keeping the buff keeps the form's state coherent; a Short
+    // Rest restores uses rather than ending the form).
     const activeBuffsForShortRest = getRuntimeValue(name, 'activeBuffs') || [];
+    const shapeShiftBuffsForShortRest = (Array.isArray(activeBuffsForShortRest) ? activeBuffsForShortRest : [])
+        .filter(b => b.effect === 'shape_shift');
     const filteredBuffsForShortRest = Array.isArray(activeBuffsForShortRest)
-        ? activeBuffsForShortRest.filter(b => b.name === 'Mage Armor')
+        ? activeBuffsForShortRest.filter(b => b.name === 'Mage Armor' || b.effect === 'shape_shift')
         : [];
     updates.activeBuffs = filteredBuffsForShortRest;
     updates.activeConditions = [];
@@ -437,6 +442,14 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
 
   setRuntimeValue(name, 'resistanceUsedThisTurn', null, campaignName)
   clearAllExpirationEffects(name, campaignName)
+  // CLA-391: shared rest cleanup preserves only Mage Armor/Death Ward —
+  // re-stamp the Wild Shape buff so its te/THP/combatSummary state stays coherent.
+  if (shapeShiftBuffsForShortRest.length > 0) {
+    const buffsAfterClear = getRuntimeValue(name, 'activeBuffs') || [];
+    if (!(Array.isArray(buffsAfterClear) ? buffsAfterClear : []).some(b => b.effect === 'shape_shift')) {
+      setRuntimeValue(name, 'activeBuffs', [...(Array.isArray(buffsAfterClear) ? buffsAfterClear : []), ...shapeShiftBuffsForShortRest], campaignName);
+    }
+  }
   clearHuntersMarkConcentration(name, campaignName)
   clearAllConcentrations(campaignName, name)
 

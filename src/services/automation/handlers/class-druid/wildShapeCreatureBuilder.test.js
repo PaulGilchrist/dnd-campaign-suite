@@ -210,6 +210,48 @@ describe('wildShapeCreatureBuilder', () => {
             });
         });
 
+        it('writes a NEW targetEffects array on every activation so the POST is not skipped (CLA-391)', async () => {
+            // Simulate a hydrated runtime store: the store hands back the SAME
+            // array reference each read. An in-place push would make the
+            // valuesEqual a===b dirty-check skip the POST (playbook 44d).
+            const storedEffects = [];
+            getCombatContext.mockResolvedValue({ creatures: [{ name: 'Maribelle', type: 'player' }] });
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (name === 'campaign' && key === 'targetEffects') return storedEffects;
+                return undefined;
+            });
+
+            await activateWildShape('Maribelle', giantSpider, druidStats, campaignName);
+
+            const teWrite = setRuntimeValue.mock.calls.find(c => c[0] === 'campaign' && c[1] === 'targetEffects');
+            expect(teWrite).toBeDefined();
+            const written = teWrite[2];
+            expect(written).not.toBe(storedEffects);
+            expect(written).toEqual([
+                { target: 'Maribelle', source: 'Maribelle', effect: 'wild_shape', beastName: 'Giant Spider' },
+            ]);
+        });
+
+        it('replaces the prior wild_shape te instead of stacking on re-activation', async () => {
+            const storedEffects = [
+                { target: 'Other', source: 'Other', effect: 'other_effect' },
+                { target: 'Maribelle', source: 'Maribelle', effect: 'wild_shape', beastName: 'Rat' },
+            ];
+            getCombatContext.mockResolvedValue({ creatures: [{ name: 'Maribelle', type: 'player' }] });
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (name === 'campaign' && key === 'targetEffects') return storedEffects;
+                return undefined;
+            });
+
+            await activateWildShape('Maribelle', giantSpider, druidStats, campaignName);
+
+            const teWrite = setRuntimeValue.mock.calls.find(c => c[0] === 'campaign' && c[1] === 'targetEffects');
+            expect(teWrite[2]).toEqual([
+                { target: 'Other', source: 'Other', effect: 'other_effect' },
+                { target: 'Maribelle', source: 'Maribelle', effect: 'wild_shape', beastName: 'Giant Spider' },
+            ]);
+        });
+
         it('does not add lunarFormAction when no monsters loaded', async () => {
             const cs = { creatures: [{ name: 'Maribelle', type: 'player', initiative: '20' }] };
             getCombatContext.mockResolvedValue(cs);

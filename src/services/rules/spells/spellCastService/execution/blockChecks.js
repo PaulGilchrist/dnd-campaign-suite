@@ -5,6 +5,36 @@ import { isMazeBlocked } from '../../../../automation/handlers/spells/mazeHandle
 import { isBanishmentBlocked } from '../../../../automation/handlers/spells/banishmentHandler.js';
 import { isImprisonmentBlocked } from '../../../../automation/handlers/spells/imprisonmentHandler.js';
 
+// CLA-391: refuse casts while a blocksSpellcasting buff (Wild Shape shape_shift)
+// is active. Refusal at this execution seam keeps the paid slot (§4 convention)
+// but must log and popup — never silent.
+export async function checkBlockedBySpellcastingBuff(spell, playerStats, campaignName) {
+    const buffs = (await import('./spellResolution.js')).getActiveBuffs(playerStats.name, campaignName);
+    const blockingBuff = buffs.find(b => b.blocksSpellcasting);
+    if (!blockingBuff) return null;
+    const blockName = blockingBuff.name || 'Shape-Shift';
+    const refusalType = String(blockingBuff.effect || blockName).toLowerCase().replace(/\s+/g, '_') + '_refused';
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: refusalType,
+        creatureName: playerStats.name,
+        characterName: playerStats.name,
+        name: blockName,
+        description: `${spell.name} blocked — ${playerStats.name} cannot cast spells while under ${blockName}.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[blockChecks:blocked-by-buff-log-error]", e); });
+    return {
+        automationPopup: {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: blockName,
+                description: `${spell.name} cannot be cast while ${playerStats.name} is under ${blockName} — no Spellcasting is allowed.`,
+            },
+        },
+    };
+}
+
 export async function checkGlobeOfInvulnerability(spell, targetName, playerStats, campaignName) {
     const effectiveSpellLevel = spell.level ?? spell.baseLevel ?? 1;
     if (effectiveSpellLevel <= 5 && targetName) {

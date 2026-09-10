@@ -153,9 +153,7 @@ const ClericFeatures = function ClericFeatures({ playerStats, campaignName }) {
 
   function formatDuration(duration, playerStats) {
       if (duration === 'half_druid_level_hours') {
-          const druidLevel = playerStats?.class?.class_levels?.find(cl => cl.level === playerStats?.level);
-          const wildShape = druidLevel?.wild_shape || 0;
-          const hours = Math.floor(wildShape / 2);
+          const hours = Math.floor((playerStats?.level || 0) / 2);
           return `${hours} hour${hours !== 1 ? 's' : ''}`;
       }
       return duration;

@@ -1,9 +1,52 @@
 import { cloneDeep } from 'lodash'
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
-import { loadMonsters } from '../../services/ui/dataLoader.js'
+import { loadMonsters, fetchRaceData } from '../../services/ui/dataLoader.js'
 import { npcToMonsterFormat } from '../../services/encounters/npcStatBlockUtils.js'
 import { getCombatSummary } from '../../services/encounters/combatData.js'
 import { getMonsterData } from '../../services/npcs/monsterUtils.js'
+
+const ABILITY_INCREASE_KEYS = ['featIncrease', 'backgroundIncrease', 'racialIncrease', 'miscIncrease']
+
+// CLA-391: raw character ability entries carry baseScore (+feat/background/... increases),
+// never a computed `.score`. Prefer an explicit score, else derive from baseScore + increases.
+function getDruidAbilityScore(druidCharacter, abilityName) {
+    const abilities = druidCharacter?.computedStats?.abilities || druidCharacter?.abilities || []
+    const ability = abilities.find(a => a.name === abilityName)
+    if (!ability) return null
+    if (typeof ability.score === 'number') return ability.score
+    if (typeof ability.baseScore === 'number') {
+        const increases = ABILITY_INCREASE_KEYS.reduce((sum, k) => sum + (Number(ability[k]) || 0), 0)
+        return ability.baseScore + increases
+    }
+    return null
+}
+
+// Retain the caster's INT/WIS/CHA scores, creature type, and languages on a
+// merged beast stat block (CLA-391 canonical: "retain your creature type,
+// Intelligence/Wisdom/Charisma scores, ... languages").
+function applyDruidRetainedTraits(merged, druidCharacter) {
+    if (!druidCharacter) return
+    const retained = { int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' }
+    for (const [abbr, name] of Object.entries(retained)) {
+        const score = getDruidAbilityScore(druidCharacter, name)
+        if (score == null) continue
+        merged.ability_scores[abbr] = score
+        if (merged.ability_score_modifiers) {
+            merged.ability_score_modifiers[abbr] = Math.floor((score - 10) / 2)
+        }
+    }
+    const druidLanguages = druidCharacter.computedStats?.languages || druidCharacter.languages
+    if (druidLanguages) merged.languages = Array.isArray(druidLanguages) ? druidLanguages.join(', ') : druidLanguages
+}
+
+// Wild Shape retains the caster's creature type (canonical: Humanoid, not the Beast's).
+async function applyDruidRetainedCreatureType(merged, druidCharacter, characterRules) {
+    if (!druidCharacter?.race) return
+    const raceName = druidCharacter.race?.name || druidCharacter.race
+    const raceData = await fetchRaceData(raceName, characterRules || '2024')
+    const creatureType = raceData?.creature_type
+    if (creatureType) merged.type = creatureType
+}
 
 /**
  * Builds the handleNpcClick handler for the initiative component.
@@ -46,18 +89,9 @@ export function createNpcClickHandler({
                     merged.armor_class = circleFormsAC
                 }
                 const druidCharacter = characters.find(c => c.name === runtimeCreature.wildShapeSource || c.name.startsWith(runtimeCreature.wildShapeSource + ' '))
-                if (druidCharacter) {
-                    const druidAbilities = druidCharacter.computedStats?.abilities || druidCharacter.abilities || []
-                    const intScore = druidAbilities.find(a => a.name === 'Intelligence')?.score
-                    const wisScore = druidAbilities.find(a => a.name === 'Wisdom')?.score
-                    const chaScore = druidAbilities.find(a => a.name === 'Charisma')?.score
-                    if (intScore != null) merged.ability_scores.int = intScore
-                    if (wisScore != null) merged.ability_scores.wis = wisScore
-                    if (chaScore != null) merged.ability_scores.cha = chaScore
-                    const druidLanguages = druidCharacter.computedStats?.languages || druidCharacter.languages
-                    if (druidLanguages) merged.languages = Array.isArray(druidLanguages) ? druidLanguages.join(', ') : druidLanguages
-                }
-                const isMoonDruid = druidCharacter?.computedStats?.class?.major?.name === 'Circle of the Moon' || druidCharacter?.computedStats?.class?.subclass?.name === 'Circle of the Moon'
+                applyDruidRetainedTraits(merged, druidCharacter)
+                await applyDruidRetainedCreatureType(merged, druidCharacter, druidCharacter?.rules)
+                const isMoonDruid = druidCharacter?.computedStats?.class?.major?.name === 'Circle of the Moon' || druidCharacter?.computedStats?.class?.subclass?.name === 'Circle of the Moon' || druidCharacter?.class?.major?.name === 'Circle of the Moon' || druidCharacter?.class?.subclass?.name === 'Circle of the Moon'
                 const beastSaves = {}
                 for (const abbr of ['str', 'dex', 'con', 'int', 'wis', 'cha']) {
                     if (baseMonster.saving_throws?.[abbr]?.modifier != null) {
@@ -71,8 +105,7 @@ export function createNpcClickHandler({
                     merged.saving_throws[abbr] = { modifier: mod }
                 }
                 if (isMoonDruid && druidCharacter) {
-                    const druidAbilities = druidCharacter.computedStats?.abilities || druidCharacter.abilities || []
-                    const wisScore = druidAbilities.find(a => a.name === 'Wisdom')?.score
+                    const wisScore = getDruidAbilityScore(druidCharacter, 'Wisdom')
                     const wisMod = Math.floor(((wisScore ?? 10) - 10) / 2)
                     merged.saving_throws.con.modifier = beastSaves.con + wisMod
                 }
@@ -119,17 +152,7 @@ export function createNpcClickHandler({
                 }
                 const casterName = runtimeCreature.polymorphSource
                 const druidCharacter = characters.find(c => c.name === casterName || c.name.startsWith(casterName + ' '))
-                if (druidCharacter) {
-                    const druidAbilities = druidCharacter.computedStats?.abilities || druidCharacter.abilities || []
-                    const intScore = druidAbilities.find(a => a.name === 'Intelligence')?.score
-                    const wisScore = druidAbilities.find(a => a.name === 'Wisdom')?.score
-                    const chaScore = druidAbilities.find(a => a.name === 'Charisma')?.score
-                    if (intScore != null) merged.ability_scores.int = intScore
-                    if (wisScore != null) merged.ability_scores.wis = wisScore
-                    if (chaScore != null) merged.ability_scores.cha = chaScore
-                    const druidLanguages = druidCharacter.computedStats?.languages || druidCharacter.languages
-                    if (druidLanguages) merged.languages = Array.isArray(druidLanguages) ? druidLanguages.join(', ') : druidLanguages
-                }
+                applyDruidRetainedTraits(merged, druidCharacter)
                 const beastSaves = {}
                 for (const abbr of ['str', 'dex', 'con', 'int', 'wis', 'cha']) {
                     if (baseMonster.saving_throws?.[abbr]?.modifier != null) {
@@ -168,17 +191,7 @@ export function createNpcClickHandler({
                 }
                 const casterName = runtimeCreature.shapechangeSource
                 const druidCharacter = characters.find(c => c.name === casterName || c.name.startsWith(casterName + ' '))
-                if (druidCharacter) {
-                    const druidAbilities = druidCharacter.computedStats?.abilities || druidCharacter.abilities || []
-                    const intScore = druidAbilities.find(a => a.name === 'Intelligence')?.score
-                    const wisScore = druidAbilities.find(a => a.name === 'Wisdom')?.score
-                    const chaScore = druidAbilities.find(a => a.name === 'Charisma')?.score
-                    if (intScore != null) merged.ability_scores.int = intScore
-                    if (wisScore != null) merged.ability_scores.wis = wisScore
-                    if (chaScore != null) merged.ability_scores.cha = chaScore
-                    const druidLanguages = druidCharacter.computedStats?.languages || druidCharacter.languages
-                    if (druidLanguages) merged.languages = Array.isArray(druidLanguages) ? druidLanguages.join(', ') : druidLanguages
-                }
+                applyDruidRetainedTraits(merged, druidCharacter)
                 const beastSaves = {}
                 for (const abbr of ['str', 'dex', 'con', 'int', 'wis', 'cha']) {
                     if (baseMonster.saving_throws?.[abbr]?.modifier != null) {
@@ -228,17 +241,8 @@ export function createNpcClickHandler({
                 }
                 if (runtimeCreature.wildShapeSource) {
                     const druidCharacter = characters.find(c => c.name === runtimeCreature.wildShapeSource || c.name.startsWith(runtimeCreature.wildShapeSource + ' '))
-                    if (druidCharacter) {
-                        const druidAbilities = druidCharacter.computedStats?.abilities || druidCharacter.abilities || []
-                        const intScore = druidAbilities.find(a => a.name === 'Intelligence')?.score
-                        const wisScore = druidAbilities.find(a => a.name === 'Wisdom')?.score
-                        const chaScore = druidAbilities.find(a => a.name === 'Charisma')?.score
-                        if (intScore != null) merged.ability_scores.int = intScore
-                        if (wisScore != null) merged.ability_scores.wis = wisScore
-                        if (chaScore != null) merged.ability_scores.cha = chaScore
-                        const druidLanguages = druidCharacter.computedStats?.languages || druidCharacter.languages
-                        if (druidLanguages) merged.languages = Array.isArray(druidLanguages) ? druidLanguages.join(', ') : druidLanguages
-                    }
+                    applyDruidRetainedTraits(merged, druidCharacter)
+                    await applyDruidRetainedCreatureType(merged, druidCharacter, druidCharacter?.rules)
                 }
                 setViewingMonster(merged)
                 setViewingMonsterCreatureName(creature.name)

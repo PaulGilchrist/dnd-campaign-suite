@@ -2,7 +2,7 @@
 // @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createNpcClickHandler } from './createNpcClickHandler.js';
-import { loadMonsters } from '../../services/ui/dataLoader.js';
+import { loadMonsters, fetchRaceData } from '../../services/ui/dataLoader.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { getMonsterData } from '../../services/npcs/monsterUtils.js';
 import { npcToMonsterFormat } from '../../services/encounters/npcStatBlockUtils.js';
@@ -10,6 +10,7 @@ import * as runtimeState from '../../hooks/runtime/useRuntimeState.js';
 
 vi.mock('../../services/ui/dataLoader.js', () => ({
     loadMonsters: vi.fn(() => Promise.resolve([])),
+    fetchRaceData: vi.fn(() => Promise.resolve(null)),
 }));
 vi.mock('../../services/encounters/combatData.js', () => ({
     getCombatSummary: vi.fn(() => null),
@@ -414,5 +415,114 @@ describe('createNpcClickHandler - Wild Shape form path', () => {
 
         const monster = setViewingMonster.mock.calls[0][0];
         expect(monster.hit_points).toBe(25);
+    });
+});
+
+describe('createNpcClickHandler - Wild Shape raw-disk druid retention (CLA-391)', () => {
+    const baseRat = {
+        index: 'rat',
+        name: 'Rat',
+        armor_class: 10,
+        hit_points: 1,
+        ability_scores: { str: 2, dex: 11, con: 9, int: 2, wis: 10, cha: 4 },
+        ability_score_modifiers: { str: -4, dex: 0, con: -1, int: -4, wis: 0, cha: -3 },
+        actions: [],
+        size: 'Tiny',
+        type: 'Beast',
+        challenge_rating: 0,
+    };
+
+    // Raw character JSON as persisted to disk: abilities carry baseScore +
+    // increases and NEVER a computed `.score`; no computedStats wrapper.
+    const rawDiskDruidCharacters = [
+        {
+            name: 'Wild_Sage_Druid',
+            rules: '2024',
+            race: { name: 'Human', subrace: { name: '' } },
+            languages: ['Common', 'Druidic'],
+            abilities: [
+                { name: 'Strength', baseScore: 8, featIncrease: 0, backgroundIncrease: 0, miscIncrease: 0 },
+                { name: 'Dexterity', baseScore: 8, featIncrease: 0, backgroundIncrease: 0, miscIncrease: 0 },
+                { name: 'Constitution', baseScore: 8, featIncrease: 0, backgroundIncrease: 0, miscIncrease: 0 },
+                { name: 'Intelligence', baseScore: 8, featIncrease: 0, backgroundIncrease: 1, miscIncrease: 0 },
+                { name: 'Wisdom', baseScore: 16, featIncrease: 0, backgroundIncrease: 0, miscIncrease: 0 },
+                { name: 'Charisma', baseScore: 8, featIncrease: 0, backgroundIncrease: 1, miscIncrease: 0 },
+            ],
+        },
+    ];
+
+    let handler;
+    let setViewingMonster;
+    let setViewingMonsterCreatureName;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        setViewingMonster = vi.fn();
+        setViewingMonsterCreatureName = vi.fn();
+        handler = createNpcClickHandler({
+            isLocalhost: true,
+            campaignNpcs: [],
+            campaignName: 'test-campaign',
+            characters: rawDiskDruidCharacters,
+            setViewingMonster,
+            setViewingMonsterCreatureName,
+        });
+        vi.mocked(getMonsterData).mockResolvedValue(null);
+        vi.mocked(npcToMonsterFormat).mockReturnValue(null);
+        vi.mocked(fetchRaceData).mockResolvedValue({ name: 'Human', creature_type: 'Humanoid' });
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it('retains druid INT/WIS/CHA derived from baseScore+increases, not the beast scores', async () => {
+        mockRuntimeValues();
+        vi.mocked(getCombatSummary).mockReturnValue({
+            creatures: [makeCombatCreature({ name: 'Wild_Sage_Druid', wildShapeSource: 'Wild_Sage_Druid', beastIndex: 'rat', beastName: 'Rat' })],
+        });
+        vi.mocked(loadMonsters).mockResolvedValue([baseRat]);
+
+        await handler({ name: 'Wild_Sage_Druid' });
+
+        const monster = setViewingMonster.mock.calls[0][0];
+        expect(monster.ability_scores.int).toBe(9);
+        expect(monster.ability_scores.wis).toBe(16);
+        expect(monster.ability_scores.cha).toBe(9);
+        expect(monster.ability_scores.str).toBe(2);
+        expect(monster.ability_scores.dex).toBe(11);
+        expect(monster.ability_score_modifiers.int).toBe(-1);
+        expect(monster.ability_score_modifiers.wis).toBe(3);
+        expect(monster.ability_score_modifiers.cha).toBe(-1);
+        expect(monster.ability_score_modifiers.str).toBe(-4);
+    });
+
+    it('retains the druid humanoid creature type and merges languages', async () => {
+        mockRuntimeValues();
+        vi.mocked(getCombatSummary).mockReturnValue({
+            creatures: [makeCombatCreature({ name: 'Wild_Sage_Druid', wildShapeSource: 'Wild_Sage_Druid', beastIndex: 'rat', beastName: 'Rat' })],
+        });
+        vi.mocked(loadMonsters).mockResolvedValue([baseRat]);
+
+        await handler({ name: 'Wild_Sage_Druid' });
+
+        const monster = setViewingMonster.mock.calls[0][0];
+        expect(monster.type).toBe('Humanoid');
+        expect(fetchRaceData).toHaveBeenCalledWith('Human', '2024');
+        expect(monster.languages).toBe('Common, Druidic');
+    });
+
+    it('keeps the beast type when race data carries no creature_type', async () => {
+        vi.mocked(fetchRaceData).mockResolvedValue({ name: 'Human' });
+        mockRuntimeValues();
+        vi.mocked(getCombatSummary).mockReturnValue({
+            creatures: [makeCombatCreature({ name: 'Wild_Sage_Druid', wildShapeSource: 'Wild_Sage_Druid', beastIndex: 'rat', beastName: 'Rat' })],
+        });
+        vi.mocked(loadMonsters).mockResolvedValue([baseRat]);
+
+        await handler({ name: 'Wild_Sage_Druid' });
+
+        const monster = setViewingMonster.mock.calls[0][0];
+        expect(monster.type).toBe('Beast');
     });
 });

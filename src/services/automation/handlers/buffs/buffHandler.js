@@ -139,20 +139,34 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         }
     }
 
-    // Wild Shape: check uses before toggling
+    // Wild Shape: uses gate applies to the ON leg only — toggling OFF must
+    // always be able to end the form, even at 0 uses (CLA-391).
     if (auto?.effect === 'shape_shift') {
-        const maxWS = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0;
-        const currentWS = Number(getRuntimeValue(playerStats.name, 'wildShapeUses', campaignName) ?? maxWS);
-        if (currentWS <= 0) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
+        const storedWSBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+        const formActive = (Array.isArray(storedWSBuffs) ? storedWSBuffs : []).some(b => b.name === action.name);
+        if (!formActive) {
+            const maxWS = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0;
+            const currentWS = Number(getRuntimeValue(playerStats.name, 'wildShapeUses', campaignName) ?? maxWS);
+            if (currentWS <= 0) {
+                addEntry(campaignName, {
+                    type: 'automation',
+                    automationType: 'wild_shape_refused',
+                    characterName: playerStats.name,
+                    creatureName: playerStats.name,
                     name: action.name,
                     description: `${action.name}: No Wild Shape uses remaining.`,
-                    automation: auto,
-                },
-            };
+                    timestamp: Date.now(),
+                }).catch((e) => { console.error('[buffHandler] Wild Shape refusal log error:', e); });
+                return {
+                    type: 'popup',
+                    payload: {
+                        type: 'automation_info',
+                        name: action.name,
+                        description: `${action.name}: No Wild Shape uses remaining.`,
+                        automation: auto,
+                    },
+                };
+            }
         }
 
         const { wasActive } = toggleBuff(
@@ -344,8 +358,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const displayTarget = targetName === playerStats.name ? 'yourself' : targetName;
     let durationDisplay = auto.duration || '10 min';
     if (auto.effect === 'shape_shift' && durationDisplay === 'half_druid_level_hours') {
-        const wildShape = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0;
-        durationDisplay = `${Math.floor(wildShape / 2)} hours`;
+        durationDisplay = `${Math.floor((playerStats.level || 0) / 2)} hours`;
     }
     const usesDisplay = usesKey != null && !wasActive
         ? ` (${usesAfterActivation} use${usesAfterActivation !== 1 ? 's' : ''} remaining)`

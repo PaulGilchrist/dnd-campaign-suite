@@ -360,6 +360,17 @@ describe('applyShortRest', () => {
       expect(getBatchUpdates().activeBuffs).toEqual([{ name: 'Mage Armor' }])
     })
 
+    it('preserves shape_shift buff on short rest (CLA-391: SR re-arms uses, does not end the form)', async () => {
+      vi.clearAllMocks()
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+        if (key === 'activeBuffs') return [{ name: 'Wild Shape', effect: 'shape_shift' }, { name: 'Shield' }]
+        return undefined
+      })
+      const stats = makeStats({ class: { name: 'Druid' }, level: 20 })
+      await applyShortRest(stats, CAMPAIGN)
+      expect(getBatchUpdates().activeBuffs).toEqual([{ name: 'Wild Shape', effect: 'shape_shift' }])
+    })
+
     it('handles Vow of Enmity target buff filtering on short rest', async () => {
       vi.clearAllMocks()
       vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {

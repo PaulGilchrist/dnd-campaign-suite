@@ -118,7 +118,9 @@ vi.mock('./helpers.js', () => ({
 vi.mock('./blockChecks.js', () => ({
   checkGlobeOfInvulnerability: vi.fn(() => Promise.resolve(null)),
   checkForcecageBlocked: vi.fn(() => Promise.resolve(null)),
+  checkBlockedBySpellcastingBuff: vi.fn(() => Promise.resolve(null)),
 }));
+
 
 vi.mock('./modalSpells.js', () => ({
   handlePowerWordHeal: vi.fn(() => Promise.resolve({ handled: false })),

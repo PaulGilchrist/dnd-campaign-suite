@@ -445,6 +445,23 @@ describe('DruidFeatures (via CharClassFeatures entry point)', () => {
       expect(screen.getByText('Some Buff: 10_minutes')).toBeInTheDocument();
     });
 
+    it('formats half_druid_level_hours as half of Druid LEVEL not half of uses (CLA-391)', () => {
+      setBuffs([{ name: 'Wild Shape', effect: 'shape_shift', duration: 'half_druid_level_hours' }]);
+      const stats = buildPlayerStats({
+        level: 20,
+        class: {
+          name: 'Druid',
+          major: {},
+          subclass: {},
+          class_levels: [{ level: 20, wild_shape: 4 }],
+          fightingStyles: [],
+        },
+      });
+      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
+      expect(screen.getByText('Wild Shape: 10 hours')).toBeInTheDocument();
+      expect(screen.queryByText('Wild Shape: 2 hours')).not.toBeInTheDocument();
+    });
+
     it('suppresses non-multi-minute duration badges', () => {
       setBuffs([{ name: 'Some Buff', duration: '1_round' }]);
       const stats = buildPlayerStats({ level: 2 });
