@@ -7022,7 +7022,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-384-warping-implosion-generic-save-attack-no-teleport.md (Aberrant Sorcery lv18 app-canonical; generic save_attack DC/damage/latch live-exact, but teleport/pull/5SP-restore dead code — dedicated handler unreachable behind save_attack dispatch)",
+      "verified": "verified",
       "class": "Sorcerer",
       "triggerConditions": "Action: 1 action; Target: creatures in emanation_30ft; Save: STR DC",
       "expectedBehavior": "Action, teleport to unoccupied space within 120 feet. Each creature within 30 feet of space you left makes Strength save or takes 3d10 Force damage and pulled toward space you left. Once per Long Rest (or spend 5 SP to restore)."

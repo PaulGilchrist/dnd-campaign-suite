@@ -8,6 +8,7 @@ import { addEntry } from '../../../../services/ui/logService.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
+import { registerTargetEffect } from '../../../../services/combat/conditions/targetEffectDefinitions.js';
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { renderTargetList, persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
@@ -32,6 +33,8 @@ function SaveAttackAoeModal({
     overchannelActive = false,
     overchannelUseCount = 0,
     overchannelSpellLevel = 1,
+    pullMarkerEffect = null,
+    logSaveSuccess = false,
     onClose,
 }) {
     const [summary, setSummary] = useState(null);
@@ -223,6 +226,28 @@ function SaveAttackAoeModal({
                     }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging save:', e); });
                 }
 
+                if (!success && pullMarkerEffect) {
+                    // CLA-384: feature-flagged save-fail marker (e.g. Warping Implosion pull).
+                    registerTargetEffect(campaignName, targetName, pullMarkerEffect, action.name, { duration: 'instant' });
+                }
+                if (success && logSaveSuccess) {
+                    addEntry(campaignName, {
+                        type: 'roll',
+                        rollType: 'save-damage',
+                        characterName: playerStats.name,
+                        name: action.name,
+                        targetName,
+                        saveType: saveType,
+                        saveDc: saveDc,
+                        dcSuccess: dcSuccess,
+                        saveResult: 'success',
+                        saveRoll: saveRoll,
+                        saveBonus,
+                        finalDamage: 0,
+                        timestamp: Date.now(),
+                    }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging save success:', e); });
+                }
+
                 if (hasRiderDisadvantage) {
                     const updatedEffects = targetEffects.filter(te => !(te.target === targetName && te.effect === 'disadvantage_on_next_save'));
                     setRuntimeValue('campaign', 'targetEffects', updatedEffects, campaignName);
@@ -347,7 +372,7 @@ function SaveAttackAoeModal({
         clearSoulstitchStamp(playerStats.name, campaignName);
 
         return { results, prompts };
-    }, [campaignName, action.name, action.automation?.scaling, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel]);
+    }, [campaignName, action.name, action.automation?.scaling, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess]);
 
     const handleSaveResult = useCallback(async (event, ctx) => {
         const detail = event.detail;
@@ -456,6 +481,28 @@ function SaveAttackAoeModal({
             }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging player damage:', e); });
         }
 
+        if (!success && pullMarkerEffect) {
+            // CLA-384: feature-flagged save-fail marker (e.g. Warping Implosion pull).
+            registerTargetEffect(campaignName, targetName, pullMarkerEffect, action.name, { duration: 'instant' });
+        }
+        if (success && logSaveSuccess) {
+            addEntry(campaignName, {
+                type: 'roll',
+                rollType: 'save-damage',
+                characterName: playerStats.name,
+                name: action.name,
+                targetName,
+                saveType: detail.saveType,
+                saveDc: detail.saveDc,
+                dcSuccess: detail.dcSuccess,
+                saveResult: 'success',
+                saveRoll: detail.roll ?? 0,
+                saveBonus,
+                finalDamage: 0,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging player save success:', e); });
+        }
+
         addTargetResult(campaignName, {
             targetName,
             saveResult: isSoulstitchProtected ? 'soulstitch_auto_success' : (success ? 'success' : 'failure'),
@@ -491,7 +538,7 @@ function SaveAttackAoeModal({
             });
             setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
         }
-    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action.name, action.automation?.scaling, playerStats, saveDc, saveType, pendingPrompts, overchannelActive]);
+    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action.name, action.automation?.scaling, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess]);
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;

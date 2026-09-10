@@ -45,6 +45,8 @@ export default function useCharActionsAutomation({
             invokeDuplicity: simpleModal('invokeDuplicityModal'),
             saveAttackHeal: simpleModal('saveAttackHealModal'),
             saveAttackAoe: simpleModal('saveAttackAoeModal'),
+            // CLA-384: warpingImplosion chooser was unregistered — modal result silently dropped
+            warpingImplosion: simpleModal('warpingImplosionModal'),
             aoeCondition: simpleModal('aoeConditionModal'),
             elementalAttunement: simpleModal('elementalAttunementModal'),
             elementalBurst: simpleModal('elementalBurstModal'),

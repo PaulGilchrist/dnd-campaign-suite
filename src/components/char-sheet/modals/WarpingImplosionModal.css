@@ -1,0 +1,14 @@
+.warping-implosion-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.warping-implosion-actions .sp-roll-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    text-align: left;
+}

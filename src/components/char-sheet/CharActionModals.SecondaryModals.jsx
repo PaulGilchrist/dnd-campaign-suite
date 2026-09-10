@@ -3,6 +3,7 @@ import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx';
 import CreatureSelectionModal from './modals/shared/CreatureSelectionModal.jsx';
 import SaveAttackHealModal from './modals/shared/SaveAttackHealModal.jsx';
 import SaveAttackAoeModal from './modals/shared/SaveAttackAoeModal.jsx';
+import WarpingImplosionModal from './modals/WarpingImplosionModal.jsx';
 import AOEConditionModal from './modals/shared/AOEConditionModal.jsx';
 import FearModal from './modals/shared/FearModal.jsx';
 import HypnoticPatternModal from './modals/shared/HypnoticPatternModal.jsx';
@@ -184,6 +185,12 @@ function SecondaryModals({
                 <SaveAttackAoeModal
                     {...mergedModalState.saveAttackAoeModal}
                     onClose={() => setModalState({ saveAttackAoeModal: null })}
+                />
+            )}
+            {mergedModalState.warpingImplosionModal && (
+                <WarpingImplosionModal
+                    {...mergedModalState.warpingImplosionModal}
+                    onClose={() => setModalState({ warpingImplosionModal: null })}
                 />
             )}
             {mergedModalState.aoeConditionModal && (

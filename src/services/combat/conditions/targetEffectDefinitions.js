@@ -765,6 +765,25 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source', 'value'],
     defaults: { value: 30 },
   },
+  {
+    effect: 'warping_implosion_teleport',
+    label: 'Warping Implosion',
+    description: 'The creature cast Warping Implosion, teleporting to an unoccupied space within 120 feet.',
+    icon: 'fa-arrow-right-arrow-left',
+    cls: 'effect-neutral',
+    group: 'Movement',
+    fields: ['source', 'value'],
+    defaults: { value: 120 },
+  },
+  {
+    effect: 'pulled_toward',
+    label: 'Pulled Toward',
+    description: 'The creature failed its save and was pulled toward the space the caster teleported from.',
+    icon: 'fa-arrows-to-circle',
+    cls: 'effect-debuff',
+    group: 'Movement',
+    fields: ['source'],
+  },
 ]
 
 /**

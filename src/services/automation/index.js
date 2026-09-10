@@ -711,6 +711,12 @@ export async function executeHandler(action, playerStats, campaignName, mapName,
         // (no type-level handler) — route by effect to its registered handler so
         // the Bonus Actions row expends the Psionic Energy die and logs.
         handler = handlePsychicTeleportation;
+    } else if (auto.type === 'save_attack' && auto.resourceCost === 'sorcery_points' && auto.restoreCost) {
+        // CLA-384: Warping Implosion ships type 'save_attack' in classes.json, so
+        // the generic save_attack handler always beat its dedicated warping_implosion
+        // entry — route on the sorcery_points+restoreCost fingerprint (unique across
+        // both ruleset data files) so the teleport chooser and 5 SP restore are live.
+        handler = handleWarpingImplosion;
     } else {
         handler = HANDLER_MAP[auto.type];
     }
