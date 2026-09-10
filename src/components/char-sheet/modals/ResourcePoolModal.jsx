@@ -1,6 +1,7 @@
 import React from 'react'
 import { getRuntimeValue, setRuntimeBatch } from '../../../hooks/runtime/useRuntimeState.js'
 import { getCurrentCombatRound } from '../../../services/encounters/combatData.js'
+import { addEntry } from '../../../services/ui/logService.js'
 import './ResourcePoolModal.css'
 
 const FWD_USED_KEY = 'wildResurgenceFwdUsedRound'
@@ -39,7 +40,7 @@ function ResourcePoolModal({ playerStats, campaignName, automation, onClose }) {
   const revHasConversion = reverseConversion === 'wild_shape_to_spell_slot'
   const isArchdruid = conversion === 'wild_shape_to_spell_slot' && conversionRate === '2_levels_per_use'
 
-  const currentRound = getCurrentCombatRound()
+  const currentRound = getCurrentCombatRound(campaignName)
   const fwdUsedRound = getRuntimeValue(name, FWD_USED_KEY)
   const fwdPrereqsMet = fwdHasConversion && currentWS === 0 && (fwdUsedRound !== currentRound)
 
@@ -59,6 +60,13 @@ function ResourcePoolModal({ playerStats, campaignName, automation, onClose }) {
       [FWD_USED_KEY]: currentRound,
     }
     setRuntimeBatch(name, updates, campaignName)
+    addEntry(campaignName, {
+      type: 'ability_use',
+      characterName: name,
+      abilityName: 'Wild Resurgence',
+      description: `${name} expended a level ${selectedLevel} spell slot to regain one use of Wild Shape.`,
+      timestamp: Date.now(),
+    }).catch((e) => { console.error('[resourcePoolModal:log-error]', e) })
     onClose()
   }
 
@@ -70,6 +78,13 @@ function ResourcePoolModal({ playerStats, campaignName, automation, onClose }) {
       [REV_USED_KEY]: true,
     }
     setRuntimeBatch(name, updates, campaignName)
+    addEntry(campaignName, {
+      type: 'ability_use',
+      characterName: name,
+      abilityName: 'Wild Resurgence',
+      description: `${name} expended one use of Wild Shape to regain a level 1 spell slot.`,
+      timestamp: Date.now(),
+    }).catch((e) => { console.error('[resourcePoolModal:log-error]', e) })
     onClose()
   }
 
