@@ -156,7 +156,8 @@ export default function useAttackDamageResolution({
     const proceedWithDamage = (attack, formula, total, rolls, modifier, critLabels, pipelineCtx) => {
         console.log('[sw-debug] proceedWithDamage attack.damageType=', attack?.damageType, 'formula=', formula);
         if (buildCtxSync) {
-            (mapName ? buildCtx(attack) : buildCtxSync(attack)).then(ctx => {
+            // WM-008: damage-phase ctx rebuild must NOT consume one-shot attack te.
+            (mapName ? buildCtx(attack, { consumeAttackTe: false }) : buildCtxSync(attack, { consumeAttackTe: false })).then(ctx => {
                 const merged = {
                     ...ctx,
                     ...pendingCtxOverrides,

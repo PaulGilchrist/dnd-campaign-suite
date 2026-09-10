@@ -91,7 +91,8 @@ export function buildBuildContextStep() {
       const buildFn = ctx.mapName ? ctx.buildCtx : ctx.buildCtxSync;
       if (!buildFn) return { data: {} };
 
-      const buildResult = await buildFn(ctx.attack);
+      // WM-008: damage-phase ctx rebuild — do not consume one-shot attack te.
+      const buildResult = await buildFn(ctx.attack, { consumeAttackTe: false });
       const sneakDice = buildResult?.sneakAttackDice || 0;
       const data = { buildCtxResult: buildResult, sneakDice };
       if (!ctx.targetName && buildResult?.targetName) data.targetName = buildResult.targetName;

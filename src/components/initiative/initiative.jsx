@@ -382,6 +382,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             const summary = getCombatSummary(campaignName)
             if (!summary) return
             let clearedHuntersMark = false
+            // WM-008: re-roll of initiative restarts the round structure — clear the
+            // campaign-level weapon-mastery auto-apply latch so Vex can re-arm.
+            setRuntimeValue('campaign', '_Vex_appliedTarget', null, campaignName)
             for (const creature of (summary?.creatures || [])) {
                 if (isSecondTurnEntry(creature)) continue
                 if (creature.type === 'player') {

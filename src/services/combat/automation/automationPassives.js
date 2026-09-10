@@ -97,6 +97,16 @@ export function collectWeaponMastery(weaponName, playerStats) {
         }
     }
 
+    // WM-008: kind-bucket gate. When the player has a weapon_kind_mastery passive,
+    // the base mastery is only usable on weapons in the chosen kinds bucket — this
+    // must be applied BEFORE the replaceMastery branch, otherwise Tactical Master
+    // (replaceMastery) bypassed the gate and a non-chosen weapon (e.g. Shortbow with
+    // chosenWeapons=['Shortsword']) kept its raw Vex mastery and auto-applied it.
+    const hasKindGate = passives.some(p => p.type === 'weapon_kind_mastery');
+    if (hasKindGate && !hasKindMasteryMatch) {
+        baseMastery = null;
+    }
+
     if (replaceMastery) {
         if (baseMastery) {
             // Tactical Master: only offer replacement when weapon has a usable mastery

@@ -354,7 +354,8 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
         const ctx = makeCtx({ buildCtxSync: buildCtxSyncMock });
         const result = await steps[5].handler(ctx);
 
-        expect(buildCtxSyncMock).toHaveBeenCalledWith({});
+        // WM-008: damage-phase ctx rebuild must not consume one-shot attack te.
+        expect(buildCtxSyncMock).toHaveBeenCalledWith({}, { consumeAttackTe: false });
         expect(result.data.buildCtxResult).toEqual({ sneakAttackDice: 2, targetName: 'Orc' });
         expect(result.data.sneakDice).toBe(2);
       });

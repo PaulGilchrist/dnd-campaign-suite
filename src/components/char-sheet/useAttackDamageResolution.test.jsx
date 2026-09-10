@@ -98,7 +98,7 @@ describe('useAttackDamageResolution', () => {
             await resolveAttackDamage(attack);
 
             expect(rollExpression).toHaveBeenCalledWith('1d8+3 [slashing]');
-            expect(deps.buildCtxSync).toHaveBeenCalledWith(attack);
+            expect(deps.buildCtxSync).toHaveBeenCalledWith(attack, { consumeAttackTe: false });
             expect(deps.rollDamage).toHaveBeenCalledWith(
                 'Longsword',
                 expect.any(String),
@@ -156,7 +156,7 @@ describe('useAttackDamageResolution', () => {
 
             await resolveAttackDamage(attack);
 
-            expect(testDeps.buildCtx).toHaveBeenCalledWith(attack);
+            expect(testDeps.buildCtx).toHaveBeenCalledWith(attack, { consumeAttackTe: false });
             expect(testDeps.buildCtxSync).not.toHaveBeenCalled();
         });
     });

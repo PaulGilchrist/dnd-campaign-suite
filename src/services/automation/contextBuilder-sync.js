@@ -28,7 +28,26 @@ function allyIsIncapacitated(c) {
     });
 }
 
-export async function buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, _featRangeEffects) {
+// WM-008: consume a one-shot advantage te matched by predicate. Clears the te (and the
+// campaign _Vex_appliedTarget auto-apply latch when requested). Returns 'advantage' when
+// a match was consumed, otherwise undefined (caller leaves forcedMode unchanged).
+function consumeOneShotAdvantageTe(playerName, targetName, campaignName, matchFn, clearVexLatch) {
+    const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    if (!storedEffects.some(te => matchFn(te, playerName, targetName))) return undefined;
+    const cleanedEffects = storedEffects.filter(te => !matchFn(te, playerName, targetName));
+    setRuntimeValue('campaign', 'targetEffects', cleanedEffects, campaignName);
+    if (clearVexLatch) {
+        setRuntimeValue('campaign', '_Vex_appliedTarget', null, campaignName);
+    }
+    return 'advantage';
+}
+
+export async function buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, _featRangeEffects, opts = {}) {
+    // WM-008: one-shot attack te (vex/distracting) is consumed by the NEXT attack ROLL
+    // only. Damage-phase ctx rebuilds (proceedWithDamage / buildContext / cunningStrike)
+    // run after the roll and must not consume the te the same attack's tacticalMaster
+    // step has just stamped — that self-erase meant Vex advantage was never produced.
+    const consumeAttackTe = opts.consumeAttackTe !== false;
     const playerName = playerStats.name;
 
     return buildBaseAttackContext(playerName, campaignName, attack.damageType).then(async ({ target, targetName, resistanceNotice }) => {
@@ -527,35 +546,22 @@ export async function buildAttackContextSync(attack, playerStats, campaignName, 
                 forcedMode = 'disadvantage';
             }
         }
-        if (forcedMode === undefined && targetName) {
-            const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-            const distractingEffect = storedEffects.find(
-                te => te.effect === 'distracting_strike_advantage' && te.target === targetName && te.source !== playerName
+        if (forcedMode === undefined && targetName && consumeAttackTe) {
+            forcedMode = consumeOneShotAdvantageTe(
+                playerName,
+                targetName,
+                campaignName,
+                (te, pn, tn) => te.effect === 'distracting_strike_advantage' && te.target === tn && te.source !== pn
             );
-            if (distractingEffect) {
-                forcedMode = 'advantage';
-                const cleanedEffects = storedEffects.filter(
-                    te => !(te.effect === 'distracting_strike_advantage' && te.target === targetName && te.source !== playerName)
-                );
-                if (cleanedEffects.length !== storedEffects.length) {
-                    setRuntimeValue('campaign', 'targetEffects', cleanedEffects, campaignName);
-                }
-            }
         }
-        if (forcedMode === undefined && targetName) {
-            const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-            const vexEffect = storedEffects.find(
-                te => te.effect === 'next_attack_advantage' && te.target === playerName && te.vexTarget === targetName
+        if (forcedMode === undefined && targetName && consumeAttackTe) {
+            forcedMode = consumeOneShotAdvantageTe(
+                playerName,
+                targetName,
+                campaignName,
+                (te, pn, tn) => te.effect === 'next_attack_advantage' && te.target === pn && te.vexTarget === tn,
+                true
             );
-            if (vexEffect) {
-                forcedMode = 'advantage';
-                const cleanedEffects = storedEffects.filter(
-                    te => !(te.effect === 'next_attack_advantage' && te.target === playerName && te.vexTarget === targetName)
-                );
-                if (cleanedEffects.length !== storedEffects.length) {
-                    setRuntimeValue('campaign', 'targetEffects', cleanedEffects, campaignName);
-                }
-            }
         }
         if (targetName) {
             const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];

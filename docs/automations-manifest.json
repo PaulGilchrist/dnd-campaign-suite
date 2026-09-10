@@ -6903,7 +6903,7 @@
       "handler": "src/services/combat/automation/handlers/weaponMasteryHandler.js",
       "router": "src/services/combat/automation/routers/weaponMasteryRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/weaponMasteryInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-WM-008-vex-te-self-erased-on-granting-hit.md",
+      "verified": "verified",
       "class": "Barbarian",
       "triggerConditions": "",
       "expectedBehavior": "If you hit a creature with this weapon and deal damage to it, you have Advantage on your next attack roll against that creature before the end of your next turn."

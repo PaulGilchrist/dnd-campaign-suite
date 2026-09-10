@@ -44,6 +44,8 @@ export function createNextCreatureHandler({
             updatedSummary.round = roundToSet
             updatedSummary.creatures = updatedSummary.creatures.filter(c => !isSecondTurnEntry(c))
             setCombatSummary(updatedSummary)
+            // WM-008: campaign-level weapon-mastery auto-apply latch re-arms at round wrap.
+            setRuntimeValue('campaign', '_Vex_appliedTarget', null, campaignName)
             for (const creature of cs.creatures) {
                 if (isSecondTurnEntry(creature)) continue
                 // CLA-370: pass roundToSet — the cache still shows the old round here.

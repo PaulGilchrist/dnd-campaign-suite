@@ -12,12 +12,12 @@ import { hasAuraOfProtection } from '../combat/auras/auraOfProtection.js';
 import { isWithinRange } from '../rules/combat/rangeCheck.js';
 import { buildAttackContextSync } from './contextBuilder-sync.js';
 
-export function buildAttackContext(attack, playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects) {
+export function buildAttackContext(attack, playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects, opts) {
     if (!mapName) {
-        return buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, featRangeEffects);
+        return buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, featRangeEffects, opts);
     }
 
-    const basePromise = buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, featRangeEffects);
+    const basePromise = buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, featRangeEffects, opts);
 
     return Promise.all([
         basePromise,

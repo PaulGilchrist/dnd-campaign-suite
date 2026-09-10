@@ -64,7 +64,8 @@ export function buildCunningStrikeStep() {
       if (!attackHit) return { data: { sneakDice: 0 } };
 
       const buildFn = ctx.mapName ? ctx.buildCtx : ctx.buildCtxSync;
-      const buildResult = buildFn ? await buildFn(ctx.attack) : null;
+      // WM-008: damage-phase ctx rebuild — do not consume one-shot attack te.
+      const buildResult = buildFn ? await buildFn(ctx.attack, { consumeAttackTe: false }) : null;
       const sneakDice = buildResult?.sneakAttackDice || 0;
 
       const passives = ctx.playerStats.automation?.passives || [];
