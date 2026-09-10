@@ -7010,7 +7010,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-383-warding-flare-post-roll-simulation.md",
+      "verified": "verified",
       "class": "Cleric",
       "triggerConditions": "Trigger: attack_roll_within_30ft; Action: 1 reaction",
       "expectedBehavior": "When a creature that you can see within 30 feet of yourself makes an attack roll, you can take a Reaction to impose Disadvantage on the attack roll, causing light to flare before it hits or misses. You can use this feature a number of times equal to your Wisdom modifier (minimum of once)."

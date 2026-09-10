@@ -428,27 +428,85 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
         result = await handleDisadvantageDebuff(action, playerStats, campaignName, _mapName, lastAttackerName, combatSummary);
     } else if (effect === 'disadvantage_on_attack_roll') {
+        // CLA-383: attacks resolve atomically (no pre-roll reaction seam), so a
+        // post-roll second-d20 simulation never touches the real attack roll and
+        // re-fired unlimited times on one resolved attack. Adjudicate instead like
+        // the verified pre-hit te producers (CLA-377 Vicious Mockery, Sap, Tumble):
+        // gate the trigger, spend one use, and write te disadvantage_next_attack so
+        // the attacker's next attack roll resolves with forcedMode:'disadvantage'.
+        const refusalTag = featureName.toLowerCase().replace(/\s+/g, '_') + '_refused';
+        const refuse = (description) => {
+            addEntry(campaignName, {
+                type: 'automation',
+                characterName: playerName,
+                automationType: refusalTag,
+                name: featureName,
+                description,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error("[reactionDebuff] Error:", e); });
+            return infoPopup(action.name, description, auto);
+        };
+
         const attackResult = await findLastAttack(campaignName);
         const attackEvent = attackResult.attackEvent;
         if (!attackEvent) {
-            return infoPopup(action.name, `No recent attack roll found. ${action.name} can only be used after an attack roll.`, auto);
+            return refuse(`No recent attack roll found. ${featureName} can only be used in reaction to an attack roll.`);
         }
 
-        const attackerName = attackResult.attackerName;
+        const attackAttackerName = attackResult.attackerName;
+        if (!attackAttackerName || attackAttackerName === playerName) {
+            return refuse(`${featureName} cannot be used against your own attack rolls.`);
+        }
 
-        const rangeFt = auto.range ? parseInt(auto.range.replace(/[^0-9]/g, '')) || 30 : 30;
+        const flareDefenderName = attackEvent.targetName;
+        const currentRound = combatSummary.round || 1;
 
-        if (_mapName && rangeFt != null) {
+        const rangeFt = rangeToFeet(auto.range || '30_ft');
+        if (_mapName) {
             const positions = await resolveMapPositions(campaignName, playerName);
             if (positions?.attackerPos && positions?.targetPos) {
-                const inRange = await isWithinRange(playerName, attackerName, rangeFt);
+                const inRange = await isWithinRange(playerName, attackAttackerName, rangeFt);
                 if (!inRange) {
-                    return infoPopup(action.name, `${attackerName} is out of range.`, auto);
+                    return refuse(`${attackAttackerName} is out of range of ${playerName} — ${featureName} requires the attacker to be within ${rangeFt} feet.`);
                 }
             }
         }
 
-        result = await handleDisadvantageDebuff(action, playerStats, campaignName, _mapName, attackerName, combatSummary);
+        const latchKey = '_' + featureName.replace(/\s+/g, '_') + '_usedRound';
+        if (getRuntimeValue(playerName, latchKey) === currentRound) {
+            return refuse(`${featureName} has already been used this round — a Reaction can only be taken once per round. It re-arms when the next round begins.`);
+        }
+
+        const flareEffects = [...(getRuntimeValue('campaign', 'targetEffects') || [])];
+        const flareEffect = {
+            effect: 'disadvantage_next_attack',
+            target: attackAttackerName,
+            source: playerName,
+            duration: 'until_used',
+            appliedRound: currentRound,
+            timestamp: Date.now(),
+        };
+        const flareIndex = flareEffects.findIndex(
+            te => te.effect === 'disadvantage_next_attack' && te.target === attackAttackerName && te.source === playerName
+        );
+        if (flareIndex === -1) {
+            flareEffects.push(flareEffect);
+        } else {
+            flareEffects[flareIndex] = flareEffect;
+        }
+        await setRuntimeValue('campaign', 'targetEffects', flareEffects, campaignName);
+
+        await setRuntimeValue(playerName, latchKey, currentRound, campaignName);
+
+        addExpiration(playerName, attackAttackerName, [
+            { type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: playerName },
+        ], campaignName, undefined, playerName);
+
+        let flareDescription = `<b>${action.name}</b><br/>Light flares between ${flareDefenderName || 'the target'} and ${attackAttackerName}.<br/>`;
+        flareDescription += `${attackAttackerName} has Disadvantage on its next attack roll (until used, or until the start of ${playerName}'s next turn).`;
+
+        attackerName = attackAttackerName;
+        result = infoPopup(action.name, flareDescription, auto, { defenderName: flareDefenderName, attackerName: attackAttackerName });
     } else if (effect === 'teleport_and_slow') {
         result = await handleTeleportAndSlow(action, playerStats, campaignName, _mapName);
     } else {
@@ -541,13 +599,22 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             }
         }
 
-        const logDefenderName = defenderName || 'the target';
         addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerName,
             abilityName: featureName,
-            description: result.payload.description,
-            targetName: logDefenderName,
+            description: `${playerName} used ${featureName} to give ${attackerName} Disadvantage on their next attack roll.`,
+            targetName: attackerName,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[reactionDebuff] Error:", e); });
+
+        addEntry(campaignName, {
+            type: 'condition',
+            characterName: playerName,
+            targetName: attackerName,
+            condition: 'Disadvantage on next attack',
+            source: featureName,
+            description: `${attackerName} has Disadvantage on its next attack roll (from ${playerName}'s ${featureName}).`,
             timestamp: Date.now(),
         }).catch((e) => { console.error("[reactionDebuff] Error:", e); });
 
