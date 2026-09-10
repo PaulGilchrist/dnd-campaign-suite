@@ -71,6 +71,17 @@ describe('truePolymorphService.applyTruePolymorph', () => {
     expect(runTruePolymorphHandler).not.toHaveBeenCalled();
   });
 
+  it('SP-124: guards missing spell (no TypeError) when confirm wiring passes undefined', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await applyTruePolymorph(undefined, {}, makePlayerStats(), campaignName, null);
+
+    expect(result).toBeNull();
+    expect(runTruePolymorphHandler).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
   it('dispatches to the handler and returns its result', async () => {
     const popup = { type: 'popup', payload: { type: 'true_polymorph_select', targetName } };
     runTruePolymorphHandler.mockResolvedValue(popup);

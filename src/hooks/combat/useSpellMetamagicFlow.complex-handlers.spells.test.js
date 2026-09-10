@@ -596,6 +596,53 @@ describe('useSpellMetamagicFlow — Polymorph', () => {
   });
 });
 
+// ─── True Polymorph ──────────────────────────────────────────────────────────
+
+describe('useSpellMetamagicFlow — True Polymorph', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('SP-124: injects pending spell (not the names array) at target confirm and pays the slot', async () => {
+    const { applyTruePolymorph } = await import('../../services/automation/handlers/spells/truePolymorphService.js');
+    const { prepareSpellCast } = await import('../../services/rules/spells/spellPreparationService.js');
+    const { result } = setupHook(vi.fn(), { name: 'True Polymorph', level: 9 });
+
+    act(() => {
+      result.current.handleTruePolymorphPathSelect('creature_to_creature');
+    });
+
+    await act(async () => {
+      await result.current.handleTruePolymorphTargetConfirm(['Goblin A']);
+    });
+
+    // Regression: the modal emits onConfirm(names) — the wrapper must inject pending so
+    // applyTruePolymorph gets the real spell object, not undefined (the old crash).
+    expect(applyTruePolymorph).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'True Polymorph' }),
+      expect.objectContaining({ truePolymorphTarget: 'Goblin A' }),
+      expect.any(Object),
+      'TestCampaign',
+      null,
+    );
+    // DEFECT D: slot pays at confirm on this modal chain.
+    expect(prepareSpellCast).toHaveBeenCalled();
+    expect(result.current.pendingTruePolymorph).toBeNull();
+  });
+
+  it('SP-124: object_into_creature pays the slot at path-select', async () => {
+    const { prepareSpellCast } = await import('../../services/rules/spells/spellPreparationService.js');
+    const { result } = setupHook(vi.fn(), { name: 'True Polymorph', level: 9 });
+
+    await act(async () => {
+      await result.current.handleTruePolymorphPathSelect('object_into_creature');
+    });
+
+    expect(prepareSpellCast).toHaveBeenCalled();
+    expect(result.current.pendingTruePolymorph).toBeNull();
+  });
+});
+
 // ─── Animal Shapes ───────────────────────────────────────────────────────────
 
 describe('useSpellMetamagicFlow — Animal Shapes', () => {

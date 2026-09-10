@@ -321,32 +321,34 @@ describe('useSpellMetamagicFlow — confirm handlers set popup html', () => {
   // ── Two-stage handler (True Polymorph) ───────────────────────────────────
 
   describe('two-stage True Polymorph handler', () => {
-    it('calls setPopupHtml after path select + target confirm for object_into_creature', async () => {
+    it('resolves object_into_creature at path-select (pays slot, no target-confirm needed)', async () => {
       const { result, setPopupHtml } = renderWithSpell('True Polymorph', 9);
+      const { prepareSpellCast } = await import('../../../services/rules/spells/spellPreparationService.js');
 
       await act(async () => {
-        result.current.handleTruePolymorphPathSelect('object_into_creature');
-      });
-
-      await act(async () => {
-        await result.current.handleTruePolymorphTargetConfirm([['Goblin A']]);
+        await result.current.handleTruePolymorphPathSelect('object_into_creature');
       });
 
       expect(setPopupHtml).toHaveBeenCalledWith('true-polymorph-popup');
+      expect(prepareSpellCast).toHaveBeenCalled();
+      expect(result.current.pendingTruePolymorph).toBeNull();
     });
 
     it('calls setPopupHtml after path select + target confirm for creature_to_creature', async () => {
       const { result, setPopupHtml } = renderWithSpell('True Polymorph', 9);
+      const { prepareSpellCast } = await import('../../../services/rules/spells/spellPreparationService.js');
 
       await act(async () => {
         result.current.handleTruePolymorphPathSelect('creature_to_creature');
       });
 
       await act(async () => {
-        await result.current.handleTruePolymorphTargetConfirm([['Goblin A']]);
+        await result.current.handleTruePolymorphTargetConfirm(['Goblin A']);
       });
 
       expect(setPopupHtml).toHaveBeenCalledWith('true-polymorph-popup');
+      expect(prepareSpellCast).toHaveBeenCalled();
+      expect(result.current.pendingTruePolymorph).toBeNull();
     });
   });
 

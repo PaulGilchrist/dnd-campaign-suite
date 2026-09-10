@@ -132,7 +132,7 @@ describe('truePolymorphService.summonCreatureFromObject', () => {
     expect(wolf.monsterIndex).toBe('wolf');
   });
 
-  it('calculates AC as base + slot level', async () => {
+  it('uses canonical monster AC — no slot scaling (43g)', async () => {
     const monster = {
       index: 'wolf',
       name: 'Wolf',
@@ -151,7 +151,7 @@ describe('truePolymorphService.summonCreatureFromObject', () => {
 
     const cs = getCombatSummary(campaignName);
     const wolf = cs.creatures.find(c => c.name === 'Wolf');
-    expect(wolf.ac).toBe(16); // 13 + 3
+    expect(wolf.ac).toBe(13); // canonical monsters.json armor_class — no slot scaling (43g)
   });
 
   it('uses base HP regardless of slot level', async () => {

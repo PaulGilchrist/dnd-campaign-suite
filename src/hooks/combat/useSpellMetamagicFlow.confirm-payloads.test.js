@@ -252,13 +252,11 @@ describe('useSpellMetamagicFlow — confirm handlers set popup html', () => {
       overrideValue: { payload: 'polymorph-popup' },
     },
     {
-      name: 'True Polymorph (object_into_creature)',
+      name: 'True Polymorph (object_into_creature resolves at path-select)',
       spellName: 'True Polymorph',
       spellLevel: 9,
-      preHandler: 'handleTruePolymorphPathSelect',
-      preHandlerArg: ['object_into_creature'],
-      handler: 'handleTruePolymorphTargetConfirm',
-      handlerArg: [['Goblin A']],
+      handler: 'handleTruePolymorphPathSelect',
+      handlerArg: ['object_into_creature'],
       expectedPayload: 'true-polymorph-popup',
     },
     {

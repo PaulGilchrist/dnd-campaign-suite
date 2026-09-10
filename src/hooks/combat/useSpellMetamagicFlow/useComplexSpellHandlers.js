@@ -111,6 +111,21 @@ export function useComplexSpellHandlers(createConfirmHandler, playerStats, campa
     if (!pending) return
     if (path === 'object_into_creature') {
       cfClearPending('truePolymorph')
+      const isCantrip = (pending.spell?.level === 0)
+      if (!isCantrip && pending.spell) {
+        const upcastLevel = pending.spell.upcastLevel
+        const isUpcast = upcastLevel != null && upcastLevel !== pending.spell.level
+        const gateLevel = isUpcast ? upcastLevel : (pending.spell.level ?? pending.spellLevel ?? 0)
+        const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, pending.spellName, gateLevel, playerStats, campaignName)
+        await prepareSpellCast(pending.spell, {}, {
+          playerName: playerStats.name,
+          playerStats,
+          campaignName,
+          isUpcast,
+          upcastLevel,
+          freeCastAuthorized,
+        })
+      }
       const popup = await applyTruePolymorph(pending.spell, {
         truePolymorphTarget: null,
         truePolymorphPath: path,
@@ -124,19 +139,23 @@ export function useComplexSpellHandlers(createConfirmHandler, playerStats, campa
     cfSetPending('truePolymorph', { ...pending, path })
   }, [getPending, cfSetPending, cfClearPending, playerStats, campaignName, setPopupHtml])
 
-  const handleTruePolymorphTargetConfirm = React.useCallback(async (pending, result) => {
+  const handleTruePolymorphTargetConfirm = createConfirmHandler('truePolymorph', async (pending, result) => {
+    if (!pending?.spell) {
+      console.error('[useComplexSpellHandlers] handleTruePolymorphTargetConfirm: no pending spell')
+      return
+    }
     const targetName = Array.isArray(result) ? result[0] : result
     const path = pending.path || 'creature_to_creature'
     const popup = await applyTruePolymorph(pending.spell, {
       truePolymorphTarget: targetName || null,
       truePolymorphPath: path,
       characters: pending.characters || [],
+      slotLevel: pending.spellLevel || pending.spell.level || 9,
     }, playerStats, campaignName, null)
     if (popup?.payload && setPopupHtml) {
       setPopupHtml(popup.payload)
     }
-    cfClearPending('truePolymorph')
-  }, [playerStats, campaignName, setPopupHtml, cfClearPending])
+  }, (pending) => pending.creatureTargets)
 
   const handleCharmPersonConfirm = React.useCallback(async (pending, result) => {
     const targetNames = Array.isArray(result) ? result : [result]
