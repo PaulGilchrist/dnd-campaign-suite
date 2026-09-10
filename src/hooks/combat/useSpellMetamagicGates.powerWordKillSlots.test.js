@@ -48,6 +48,10 @@ vi.mock('../../services/rules/spells/spellCastService/execution/../../../../auto
   handle: vi.fn(),
 }));
 
+vi.mock('../../services/rules/combat/damageUtils.js', () => ({
+  getCombatContext: vi.fn(async () => ({ creatures: [{ name: 'Archmage 1' }, { name: 'Wight 1' }] })),
+}));
+
 const CAMPAIGN = 'test-campaign';
 
 function makeWizard() {
@@ -161,16 +165,17 @@ describe('SP-089 Power Word Kill lv9 slot consumption + effect routing', () => {
     expect(slotLogs()).toHaveLength(0);
   });
 
-  it('handlePowerWordKill routes multiTarget to applyPowerWordKillToTarget (12d12/kill legs)', async () => {
+  it('CLA-392: handlePowerWordKill applies to the FIRST resolved target AND the multiTarget second target', async () => {
     const apply = vi.fn(() => Promise.resolve());
     const getTargetInfo = vi.fn(() => Promise.resolve({ name: 'Archmage 1' }));
 
     const result = await handlePowerWordKill(makePowerWordKill(), { multiTarget: 'Wight 1' }, getTargetInfo, makeWizard(), CAMPAIGN, apply);
 
     expect(result).toEqual({ handled: true });
-    expect(apply).toHaveBeenCalledTimes(1);
-    expect(apply).toHaveBeenCalledWith('Wight 1', expect.objectContaining({ name: 'DivinationWizard' }), CAMPAIGN);
-    expect(getTargetInfo).not.toHaveBeenCalled();
+    expect(getTargetInfo).toHaveBeenCalledTimes(1);
+    expect(apply).toHaveBeenCalledTimes(2);
+    expect(apply).toHaveBeenNthCalledWith(1, 'Archmage 1', expect.objectContaining({ name: 'DivinationWizard' }), CAMPAIGN, expect.anything());
+    expect(apply).toHaveBeenNthCalledWith(2, 'Wight 1', expect.objectContaining({ name: 'DivinationWizard' }), CAMPAIGN, expect.anything());
   });
 
   it('handlePowerWordKill routes single resolved target to applyPowerWordKillToTarget', async () => {
@@ -181,7 +186,7 @@ describe('SP-089 Power Word Kill lv9 slot consumption + effect routing', () => {
 
     expect(result).toEqual({ handled: true });
     expect(getTargetInfo).toHaveBeenCalledTimes(1);
-    expect(apply).toHaveBeenCalledWith('Wight 1', expect.objectContaining({ name: 'DivinationWizard' }), CAMPAIGN);
+    expect(apply).toHaveBeenCalledWith('Wight 1', expect.objectContaining({ name: 'DivinationWizard' }), CAMPAIGN, expect.anything());
   });
 
   it('handlePowerWordKill ignores non-PWK spells', async () => {

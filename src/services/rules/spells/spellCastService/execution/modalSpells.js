@@ -1,14 +1,21 @@
 import { handle as handleShapechangeHandler } from '../../../../automation/handlers/spells/shapechangeHandler.js';
+import { getCombatContext } from '../../../combat/damageUtils.js';
 
+// CLA-392: Words of Creation spread — the spell ALWAYS affects the resolved
+// first target, plus the optional second creature in metaCtx.multiTarget.
+// The old if/else applied to multiTarget OR first target, silently skipping
+// the first when a second was chosen. The 10-ft second-target gate has no
+// live position seam on this chooser path (gridless lenient pass — adjudicated).
 async function handlePowerWordHeal(spell, metaCtx, getTargetInfo, playerStats, campaignName, applyPowerWordHealToTarget) {
     if (spell.name.toLowerCase() === 'power word heal') {
-        if (metaCtx?.multiTarget) {
-            await applyPowerWordHealToTarget(metaCtx.multiTarget, playerStats, campaignName);
-        } else {
-            const target = await getTargetInfo();
-            if (target?.name) {
-                await applyPowerWordHealToTarget(target.name, playerStats, campaignName);
-            }
+        const target = await getTargetInfo();
+        const firstTargetName = target?.name || null;
+        const sharedCombatSummary = (firstTargetName || metaCtx?.multiTarget) ? await getCombatContext(campaignName) : null;
+        if (firstTargetName) {
+            await applyPowerWordHealToTarget(firstTargetName, playerStats, campaignName, sharedCombatSummary);
+        }
+        if (metaCtx?.multiTarget && metaCtx.multiTarget !== firstTargetName) {
+            await applyPowerWordHealToTarget(metaCtx.multiTarget, playerStats, campaignName, sharedCombatSummary);
         }
         return { handled: true };
     }
@@ -17,13 +24,14 @@ async function handlePowerWordHeal(spell, metaCtx, getTargetInfo, playerStats, c
 
 async function handlePowerWordKill(spell, metaCtx, getTargetInfo, playerStats, campaignName, applyPowerWordKillToTarget) {
     if (spell.name && spell.name.toLowerCase() === 'power word kill') {
-        if (metaCtx?.multiTarget) {
-            await applyPowerWordKillToTarget(metaCtx.multiTarget, playerStats, campaignName);
-        } else {
-            const target = await getTargetInfo();
-            if (target?.name) {
-                await applyPowerWordKillToTarget(target.name, playerStats, campaignName);
-            }
+        const target = await getTargetInfo();
+        const firstTargetName = target?.name || null;
+        const sharedCombatSummary = (firstTargetName || metaCtx?.multiTarget) ? await getCombatContext(campaignName) : null;
+        if (firstTargetName) {
+            await applyPowerWordKillToTarget(firstTargetName, playerStats, campaignName, sharedCombatSummary);
+        }
+        if (metaCtx?.multiTarget && metaCtx.multiTarget !== firstTargetName) {
+            await applyPowerWordKillToTarget(metaCtx.multiTarget, playerStats, campaignName, sharedCombatSummary);
         }
         return { handled: true };
     }

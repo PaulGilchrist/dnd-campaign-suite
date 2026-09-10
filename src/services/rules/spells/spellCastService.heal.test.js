@@ -264,7 +264,7 @@ describe('executeSpellCast - heal spells', () => {
       return makeSpell({ name: 'Power Word Heal', level: 9 })
     }
 
-    it('heals only multiTarget when metaCtx.multiTarget is provided', async () => {
+    it('CLA-392: heals the first target AND multiTarget when metaCtx.multiTarget is provided', async () => {
       vi.mocked(damageUtils.getCombatContext).mockResolvedValue({
         creatures: [
           { name: 'Target', maxHp: 100, currentHp: 30 },
@@ -277,7 +277,8 @@ describe('executeSpellCast - heal spells', () => {
 
       await executeSpellCast(makePowerWordHealSpell(), { slotLevel: 9, multiTarget: 'Target2' }, services)
 
-      expect(applyHealing.applyHealingToTarget).toHaveBeenCalledTimes(1)
+      expect(applyHealing.applyHealingToTarget).toHaveBeenCalledTimes(2)
+      expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(expect.any(Object), 'Target', expect.any(Number), CAMPAIGN)
       expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(expect.any(Object), 'Target2', expect.any(Number), CAMPAIGN)
     })
 

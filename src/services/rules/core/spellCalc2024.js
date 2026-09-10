@@ -298,7 +298,13 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
                 if (feature.type === 'passive_rule' && feature.effect === 'always_prepared_spells' && feature.spells) {
                     const majorFeatures = playerStats.class?.major?.features || playerStats.class?.subclass?.features || [];
                     const majorFeatureNames = majorFeatures.map(f => f.name);
-                    if (majorFeatureNames.includes(feature.name)) {
+                    // CLA-392: base-class always_prepared grants (e.g. Bard lv20 Words of
+                    // Creation) live in class_levels[].features, never in class.major —
+                    // include level-gated base feature names so they auto-prepare too.
+                    const baseFeatureNames = (playerStats.class?.class_levels || [])
+                        .filter(cl => cl && cl.level <= playerStats.level)
+                        .flatMap(cl => (cl.features || []).map(f => f.name));
+                    if (majorFeatureNames.includes(feature.name) || baseFeatureNames.includes(feature.name)) {
                         feature.spells.forEach(spellName => {
                             const knownSpell = spellAbilities.spells.find(s => s.name === spellName);
                             if (!knownSpell) {

@@ -102,6 +102,95 @@ describe('spellCalc2024-automation', () => {
       expect(result.spells.map(s => s.name)).toEqual(['Fire Bolt']);
     });
 
+    it('CLA-392: adds always_prepared_spells from a BASE class feature (Words of Creation lv20)', () => {
+      const allSpells = [
+        makeSpell('Power Word Heal', 9),
+        makeSpell('Power Word Kill', 9),
+      ];
+      const lv20Spellcasting = { cantrips_known: 6, spell_slots: { '9': 1 } };
+      const stats = makePlayerStats({
+        level: 20,
+        class: {
+          name: 'Bard',
+          class_levels: [
+            ...Array.from({ length: 19 }, (_, i) => ({ level: i + 1, spellcasting: { cantrips_known: 4, spell_slots: { '1': 4 } } })),
+            {
+              level: 20,
+              spellcasting: lv20Spellcasting,
+              features: [{ name: 'Words of Creation', level: 20, type: 'class_feature' }],
+            },
+          ],
+          spell_casting_ability: 'Charisma',
+        },
+        abilities: [{ name: 'Charisma', baseScore: 20, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 5 }],
+      });
+      stats.automation = {
+        passives: [{
+          type: 'passive_rule',
+          effect: 'always_prepared_spells',
+          name: 'Words of Creation',
+          spells: ['Power Word Heal', 'Power Word Kill'],
+        }],
+      };
+
+      const result = getSpellAbilities(allSpells, stats);
+
+      const pwh = result.spells.find(s => s.name === 'Power Word Heal');
+      const pwk = result.spells.find(s => s.name === 'Power Word Kill');
+      expect(pwh).toBeDefined();
+      expect(pwh.prepared).toBe('Always');
+      expect(pwk).toBeDefined();
+      expect(pwk.prepared).toBe('Always');
+    });
+
+    it('CLA-392: still skips always_prepared_spells when the name matches no major OR base class feature', () => {
+      const allSpells = [makeSpell('Power Word Kill', 9)];
+      const stats = makePlayerStats({
+        level: 20,
+        class: {
+          name: 'Bard',
+          class_levels: [
+            ...Array.from({ length: 19 }, (_, i) => ({ level: i + 1, spellcasting: { cantrips_known: 4, spell_slots: { '1': 4 } } })),
+            { level: 20, spellcasting: { cantrips_known: 6, spell_slots: { '9': 1 } }, features: [{ name: 'Words of Creation', level: 20 }] },
+          ],
+          spell_casting_ability: 'Charisma',
+        },
+        abilities: [{ name: 'Charisma', baseScore: 20, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 5 }],
+      });
+      stats.automation = {
+        passives: [{ type: 'passive_rule', effect: 'always_prepared_spells', name: 'Mystic Theurge Bonus', spells: ['Power Word Kill'] }],
+      };
+
+      const result = getSpellAbilities(allSpells, stats);
+
+      expect(result.spells.map(s => s.name)).not.toContain('Power Word Kill');
+    });
+
+    it('CLA-392: does not inject always_prepared_spells from a base class feature above the current level', () => {
+      const allSpells = [makeSpell('Power Word Kill', 9)];
+      const stats = makePlayerStats({
+        level: 18,
+        class: {
+          name: 'Bard',
+          class_levels: [
+            ...Array.from({ length: 17 }, (_, i) => ({ level: i + 1, spellcasting: { cantrips_known: 4, spell_slots: { '1': 4 } } })),
+            { level: 18, spellcasting: { cantrips_known: 4, spell_slots: { '9': 1 } } },
+            { level: 19, spellcasting: { cantrips_known: 4, spell_slots: { '9': 1 } } },
+            { level: 20, spellcasting: { cantrips_known: 4, spell_slots: { '9': 1 } }, features: [{ name: 'Words of Creation', level: 20 }] },
+          ],
+          spell_casting_ability: 'Charisma',
+        },
+        abilities: [{ name: 'Charisma', baseScore: 20, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 5 }],
+      });
+      stats.automation = {
+        passives: [{ type: 'passive_rule', effect: 'always_prepared_spells', name: 'Words of Creation', spells: ['Power Word Kill'] }],
+      };
+
+      const result = getSpellAbilities(allSpells, stats);
+
+      expect(result.spells.map(s => s.name)).not.toContain('Power Word Kill');
+    });
+
     it('skips passive_rule when spells array is missing', () => {
       const stats = makePlayerStats();
       stats.automation = {

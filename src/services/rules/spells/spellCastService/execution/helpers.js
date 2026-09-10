@@ -166,8 +166,11 @@ async function triggerDispelMagic(metaCtx, spell, playerStats, campaignName, _ma
     }
 }
 
-async function applyPowerWordHealToTarget(targetName, playerStats, campaignName) {
-    const combatSummary = await getCombatContext(campaignName);
+async function applyPowerWordHealToTarget(targetName, playerStats, campaignName, sharedCombatSummary) {
+    // CLA-392: optional shared combatSummary — when the Words of Creation spread
+    // heals two targets, both legs mutate ONE fetched snapshot so the second
+    // leg's full-store write can never resurrect the first target (§6-#18 race).
+    const combatSummary = sharedCombatSummary || await getCombatContext(campaignName);
     if (!combatSummary) return;
 
     const creature = combatSummary.creatures.find(c => c.name === targetName);
@@ -242,8 +245,11 @@ async function applyPowerWordHealToTarget(targetName, playerStats, campaignName)
     }
 }
 
-async function applyPowerWordKillToTarget(targetName, playerStats, campaignName) {
-    const combatSummary = await getCombatContext(campaignName);
+async function applyPowerWordKillToTarget(targetName, playerStats, campaignName, sharedCombatSummary) {
+    // CLA-392: optional shared combatSummary — both spread legs mutate ONE
+    // fetched snapshot so the second leg's full-store write can never
+    // resurrect the first target (§6-#18 race).
+    const combatSummary = sharedCombatSummary || await getCombatContext(campaignName);
     if (!combatSummary) return;
 
     const creature = combatSummary.creatures.find(c => c.name === targetName);
@@ -267,7 +273,7 @@ async function applyPowerWordKillToTarget(targetName, playerStats, campaignName)
             note: 'Power Word Kill',
         }).catch((e) => { console.error("[spellCast] Error:", e); });
 
-        applyDamageToTarget(combatSummary, targetName, currentHp, ['Psychic'], campaignName, [], false, playerStats.name);
+        await applyDamageToTarget(combatSummary, targetName, currentHp, ['Psychic'], campaignName, [], false, playerStats.name);
 
         window.dispatchEvent(new CustomEvent('damage-popup', {
             detail: {
@@ -282,7 +288,7 @@ async function applyPowerWordKillToTarget(targetName, playerStats, campaignName)
         const damageFormula = '12d12';
         const damageResult = rollExpression(damageFormula);
         const totalDamage = damageResult?.total ?? 0;
-        applyDamageToTarget(combatSummary, targetName, totalDamage, ['Psychic'], campaignName, [], false, playerStats.name);
+        await applyDamageToTarget(combatSummary, targetName, totalDamage, ['Psychic'], campaignName, [], false, playerStats.name);
 
         window.dispatchEvent(new CustomEvent('damage-popup', {
             detail: {
