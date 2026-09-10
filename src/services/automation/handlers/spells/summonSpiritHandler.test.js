@@ -4,6 +4,8 @@
 // @improved-by-ai
 // @cleaned-by-ai
 import { handle, confirmSummonSpirit } from './summonSpiritHandler.js';
+import summonFeySpells from '../../../../../public/data/2024/spells.json' with { type: 'json' };
+import summonFeyMonsters from '../../../../../public/data/monsters.json' with { type: 'json' };
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -468,6 +470,82 @@ describe('summonSpiritHandler', () => {
                 const logged = addEntry.mock.calls.find(c => c[1]?.type === 'summons');
                 expect(logged[1].description).not.toContain('slot level');
                 expect(logged[1].description).toContain('15/15 HP');
+            });
+        });
+
+        describe('SP-120 Summon Fey form chooser (locked to disk data)', () => {
+            const summonFeySpell = summonFeySpells.find(s => s.index === 'summon-fey');
+            const summonFeyVariants = summonFeySpell.automation.variants;
+
+            it('encodes three Trickster/Warrior/Guide variants with distinct monsterIndex entries', () => {
+                expect(summonFeyVariants.map(v => v.name)).toEqual([
+                    'Fey Spirit (Trickster)',
+                    'Fey Spirit (Warrior)',
+                    'Fey Spirit (Guide)',
+                ]);
+                summonFeyVariants.forEach(v => {
+                    expect(summonFeyMonsters.find(m => m.index === v.monsterIndex)?.name).toBe(v.name);
+                });
+            });
+
+            it('offers the summonSpirit chooser modal instead of auto-summoning', async () => {
+                const action = {
+                    name: 'Summon Fey',
+                    automation: summonFeySpell.automation,
+                    spell: { level: 4, duration: summonFeySpell.duration, concentration: true },
+                };
+
+                const result = await handle(action, mockPlayerStats, mockCampaignName);
+
+                expect(result.type).toBe('modal');
+                expect(result.modalName).toBe('summonSpirit');
+            });
+
+            summonFeyVariants.forEach(variant => {
+                it(`summons ${variant.name} with base AC 12, scaled HP, concentration and a slot-level log`, async () => {
+                    loadMonsters.mockResolvedValue(summonFeyMonsters);
+                    const combatSummary = getCombatSummary(mockCampaignName);
+                    const action = {
+                        name: 'Summon Fey',
+                        automation: summonFeySpell.automation,
+                        spell: { level: 4, duration: summonFeySpell.duration, concentration: true },
+                    };
+
+                    await confirmSummonSpirit(action, mockPlayerStats, mockCampaignName, variant.name);
+
+                    const added = combatSummary.creatures.find(c => c.name === variant.name);
+                    expect(added).toBeDefined();
+                    expect(added.ac).toBe(12);
+                    expect(added.maxHp).toBe(30);
+                    expect(added.summonedBy).toBe('TestCaster');
+                    expect(added.monsterIndex).toBe(variant.monsterIndex);
+
+                    const effect = getRuntimeValue('campaign', 'targetEffects').find(te => te.target === variant.name);
+                    expect(effect).toMatchObject({ effect: 'summoned', source: 'TestCaster', duration: 'concentration' });
+                    expect(addConcentration).toHaveBeenCalledWith(combatSummary, 'TestCaster', 'Summon Fey', 13);
+
+                    const logged = addEntry.mock.calls.filter(c => c[1]?.type === 'summons');
+                    expect(logged).toHaveLength(1);
+                    expect(logged[0][1].description).toContain('slot level 4');
+                    expect(logged[0][1].description).toContain(variant.name);
+                    expect(logged[0][1].description).toContain('30/30 HP');
+                });
+            });
+
+            it('scales HP above base level while keeping base AC', async () => {
+                loadMonsters.mockResolvedValue(summonFeyMonsters);
+                const combatSummary = getCombatSummary(mockCampaignName);
+                const action = {
+                    name: 'Summon Fey',
+                    automation: summonFeySpell.automation,
+                    spell: { level: 5, duration: summonFeySpell.duration, concentration: true },
+                };
+
+                await confirmSummonSpirit(action, mockPlayerStats, mockCampaignName, 'Fey Spirit (Trickster)');
+
+                const added = combatSummary.creatures.find(c => c.name === 'Fey Spirit (Trickster)');
+                expect(added.ac).toBe(12);
+                expect(added.maxHp).toBe(40);
             });
         });
 

@@ -20786,6 +20786,297 @@
     "description": "A fey spirit summoned by Summon Fey or Fey Spirit. Uses spell attack modifier and caster's Proficiency Bonus."
   },
   {
+    "index": "fey-spirit-trickster",
+    "name": "Fey Spirit (Trickster)",
+    "size": "Small",
+    "type": "fey",
+    "subtype": "",
+    "alignment": "unaligned",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 12,
+    "armor_class_details": null,
+    "hit_points": 30,
+    "hit_dice": "4d8+12",
+    "speed": {
+      "walk": "30 ft.",
+      "fly": "30 ft."
+    },
+    "ability_scores": {
+      "str": 13,
+      "dex": 16,
+      "con": 14,
+      "int": 14,
+      "wis": 11,
+      "cha": 16
+    },
+    "ability_score_modifiers": {
+      "str": 1,
+      "dex": 3,
+      "con": 2,
+      "int": 2,
+      "wis": 0,
+      "cha": 3
+    },
+    "saving_throws": {
+      "str": {
+        "modifier": 1
+      },
+      "dex": {
+        "modifier": 3
+      },
+      "con": {
+        "modifier": 2
+      },
+      "int": {
+        "modifier": 2
+      },
+      "wis": {
+        "modifier": 0
+      },
+      "cha": {
+        "modifier": 3
+      }
+    },
+    "skills": {},
+    "senses": {
+      "darkvision": 60,
+      "passive_perception": 10
+    },
+    "languages": "Sylvan, understands your languages",
+    "challenge_rating": "0",
+    "xp": 0,
+    "proficiency_bonus": null,
+    "legendary_resistance": null,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "environments": [
+      "forest",
+      "grassland",
+      "swamp"
+    ],
+    "immunities": [
+      "charmed"
+    ],
+    "damage_immunities": [],
+    "damage_resistances": [],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [],
+    "actions": [
+      {
+        "name": "Fey Blade",
+        "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 2d6+3+spell level Force damage.",
+        "attack_bonus": null,
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d6+3+spell level",
+        "damage_type_primary": "Force"
+      }
+    ],
+    "traits": [],
+    "reactions": [],
+    "legendary_actions": [],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "2024 Player's Handbook",
+    "page": null,
+    "description": "A fey spirit summoned by Summon Fey (Trickster form). Uses spell attack modifier and caster's Proficiency Bonus."
+  },
+  {
+    "index": "fey-spirit-warrior",
+    "name": "Fey Spirit (Warrior)",
+    "size": "Small",
+    "type": "fey",
+    "subtype": "",
+    "alignment": "unaligned",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 12,
+    "armor_class_details": null,
+    "hit_points": 30,
+    "hit_dice": "4d8+12",
+    "speed": {
+      "walk": "30 ft.",
+      "fly": "30 ft."
+    },
+    "ability_scores": {
+      "str": 13,
+      "dex": 16,
+      "con": 14,
+      "int": 14,
+      "wis": 11,
+      "cha": 16
+    },
+    "ability_score_modifiers": {
+      "str": 1,
+      "dex": 3,
+      "con": 2,
+      "int": 2,
+      "wis": 0,
+      "cha": 3
+    },
+    "saving_throws": {
+      "str": {
+        "modifier": 1
+      },
+      "dex": {
+        "modifier": 3
+      },
+      "con": {
+        "modifier": 2
+      },
+      "int": {
+        "modifier": 2
+      },
+      "wis": {
+        "modifier": 0
+      },
+      "cha": {
+        "modifier": 3
+      }
+    },
+    "skills": {},
+    "senses": {
+      "darkvision": 60,
+      "passive_perception": 10
+    },
+    "languages": "Sylvan, understands your languages",
+    "challenge_rating": "0",
+    "xp": 0,
+    "proficiency_bonus": null,
+    "legendary_resistance": null,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "environments": [
+      "forest",
+      "grassland",
+      "swamp"
+    ],
+    "immunities": [
+      "charmed"
+    ],
+    "damage_immunities": [],
+    "damage_resistances": [],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [],
+    "actions": [
+      {
+        "name": "Fey Blade",
+        "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 2d6+3+spell level Force damage.",
+        "attack_bonus": null,
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d6+3+spell level",
+        "damage_type_primary": "Force"
+      }
+    ],
+    "traits": [],
+    "reactions": [],
+    "legendary_actions": [],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "2024 Player's Handbook",
+    "page": null,
+    "description": "A fey spirit summoned by Summon Fey (Warrior form). Uses spell attack modifier and caster's Proficiency Bonus."
+  },
+  {
+    "index": "fey-spirit-guide",
+    "name": "Fey Spirit (Guide)",
+    "size": "Small",
+    "type": "fey",
+    "subtype": "",
+    "alignment": "unaligned",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 12,
+    "armor_class_details": null,
+    "hit_points": 30,
+    "hit_dice": "4d8+12",
+    "speed": {
+      "walk": "30 ft.",
+      "fly": "30 ft."
+    },
+    "ability_scores": {
+      "str": 13,
+      "dex": 16,
+      "con": 14,
+      "int": 14,
+      "wis": 11,
+      "cha": 16
+    },
+    "ability_score_modifiers": {
+      "str": 1,
+      "dex": 3,
+      "con": 2,
+      "int": 2,
+      "wis": 0,
+      "cha": 3
+    },
+    "saving_throws": {
+      "str": {
+        "modifier": 1
+      },
+      "dex": {
+        "modifier": 3
+      },
+      "con": {
+        "modifier": 2
+      },
+      "int": {
+        "modifier": 2
+      },
+      "wis": {
+        "modifier": 0
+      },
+      "cha": {
+        "modifier": 3
+      }
+    },
+    "skills": {},
+    "senses": {
+      "darkvision": 60,
+      "passive_perception": 10
+    },
+    "languages": "Sylvan, understands your languages",
+    "challenge_rating": "0",
+    "xp": 0,
+    "proficiency_bonus": null,
+    "legendary_resistance": null,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "environments": [
+      "forest",
+      "grassland",
+      "swamp"
+    ],
+    "immunities": [
+      "charmed"
+    ],
+    "damage_immunities": [],
+    "damage_resistances": [],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [],
+    "actions": [
+      {
+        "name": "Fey Blade",
+        "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 2d6+3+spell level Force damage.",
+        "attack_bonus": null,
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d6+3+spell level",
+        "damage_type_primary": "Force"
+      }
+    ],
+    "traits": [],
+    "reactions": [],
+    "legendary_actions": [],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "2024 Player's Handbook",
+    "page": null,
+    "description": "A fey spirit summoned by Summon Fey (Guide form). Uses spell attack modifier and caster's Proficiency Bonus."
+  },
+  {
     "index": "fiend-cultist",
     "name": "Fiend Cultist",
     "size": "Medium",

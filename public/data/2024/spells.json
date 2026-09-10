@@ -13006,8 +13006,16 @@
             "hpPerLevelAbove": 10,
             "variants": [
                 {
-                    "name": "Fey Spirit",
-                    "monsterIndex": "fey-spirit"
+                    "name": "Fey Spirit (Trickster)",
+                    "monsterIndex": "fey-spirit-trickster"
+                },
+                {
+                    "name": "Fey Spirit (Warrior)",
+                    "monsterIndex": "fey-spirit-warrior"
+                },
+                {
+                    "name": "Fey Spirit (Guide)",
+                    "monsterIndex": "fey-spirit-guide"
                 }
             ]
         }
