@@ -4,6 +4,7 @@ import { getCurrentCombatRound, getActiveCreatureName, getCombatSummary } from '
 import { expireForCreature, expireForTarget } from './expirationQueue.js';
 import { processSleetStormAreaSave } from '../../automation/handlers/spells/sleetStormHandler.js';
 import { processStinkingCloudAreaSave } from '../../automation/handlers/spells/stinkingCloudHandler.js';
+import { processWebAreaSave } from '../../automation/handlers/spells/webAreaSaveHandler.js';
 
 /**
  * Expire stale pendingExpirations at the start of each creature's turn.
@@ -89,6 +90,26 @@ export async function expireStaleEffects(campaignName, overrideActiveName) {
                 try {
                     await processStinkingCloudAreaSave(te.source, activeName, campaignName, cloudTracking.mapName);
                 } catch (_e) { console.error(`[expireStaleEffects] Stinking Cloud turn-start save failed for ${activeName}:`, _e); }
+            }
+
+            // Phase 5: SP-126 Web recurring turn-start STR saves. Each creature
+            // carrying a live `web` zone te (written at cast by webAreaSaveHandler,
+            // swept by the concentration break) re-saves at the caster's DC when
+            // its own turn starts (SP-111 stinking_cloud Phase 4 pattern).
+            // Restrained on a failed save; already-Restrained creatures skip —
+            // breaking free via a STR (Athletics) action is a GM-adjudicated
+            // residual with no modal consumer in this engine.
+            const allWebEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+            const webEffects = Array.isArray(allWebEffects)
+                ? allWebEffects.filter(te => te && te.effect === 'web' && te.target === activeName)
+                : [];
+            for (const te of webEffects) {
+                const casterTrackingKey = `_web_${String(te.source || '').replace(/\s+/g, '_')}`;
+                const webTracking = getRuntimeValue(te.source, casterTrackingKey, campaignName);
+                if (!webTracking || !webTracking.saveDc) continue;
+                try {
+                    await processWebAreaSave(te.source, activeName, campaignName, webTracking.mapName);
+                } catch (_e) { console.error(`[expireStaleEffects] Web turn-start save failed for ${activeName}:`, _e); }
             }
         }
     } catch (_e) { console.error('[expireStaleEffects] Zone save expiration processing failed:', _e); }

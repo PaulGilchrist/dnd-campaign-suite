@@ -10,17 +10,25 @@ import { addConcentration } from '../../../combat/concentration/concentrationSer
 import { getCombatSummary } from '../../../encounters/combatData.js';
 import storage from '../../../ui/storage.js';
 import { playerIsImmuneToCondition } from '../../../combat/automation/automationImmunities.js';
+import { getEffectDefinition } from '../../../combat/conditions/targetEffectDefinitions.js';
 
 /**
  * Web spell handler for 2024 ruleset.
  * Mechanics:
  * - 60-foot range, 20-foot Cube of sticky webbing
- * - Difficult Terrain, Lightly Obscured
  * - Concentration, up to 1 hour
- * - DEX save on entry or start of turn — Restrained on failure
- * - STR save each turn — Restrained on failure
- * - Restrained creature can use Action for STR (Athletics) check vs spell DC to break free
- * - Flammable: 5-ft cube exposed to fire burns in 1 round, 2d4 Fire damage to creatures starting turn in fire
+ * - DEX save at cast for every creature in the area — Restrained on failure
+ * - Zone tracking lives under `_web_<caster>` on the caster's store
+ *   (SP-108 sleetStorm pattern); a `web` zone te marks every creature in the
+ *   area. expireStaleEffects Phase 5 re-forces a recurring STR save at each
+ *   carrier's TURN START — Restrained on failure; success leaves it free.
+ *   Already-Restrained creatures skip the recurring save (breaking free via
+ *   a STR (Athletics) action is a GM-adjudicated residual).
+ * - Expires at spell end (1 hour = 600 rounds, CLA-334 encoding) or when
+ *   concentration breaks (duration:'concentration' te sweep).
+ * Accepted gaps (no consumers in this engine): Difficult Terrain / Lightly
+ * Obscured prose, STR (Athletics) break-free modal, anchoring/collapse,
+ * flammability / 2d4 fire / burn-away.
  */
 
 export async function handle(action, playerStats, campaignName, _mapName) {
@@ -62,6 +70,69 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         saveDc: dc,
         attackScope: 'aoe',
     });
+
+    // Store the web zone area for recurring turn-start saves
+    // (SP-108 sleetStorm `_sleetStorm_<caster>` pattern).
+    const trackingKey = `_web_${casterName.replace(/\s+/g, '_')}`;
+    setRuntimeValue(casterName, trackingKey, {
+        caster: casterName,
+        mapName: _mapName,
+        campaignName,
+        saveDc: dc,
+        saveType: 'DEX',
+        radius: 20, // 20-foot cube
+        timestamp: Date.now(),
+        duration: auto.duration || action.spell?.duration || 'Concentration, up to 1 hour',
+    }, campaignName);
+
+    // Zone marker te for every creature in the area (registry 'web') — the
+    // expireStaleEffects Phase 5 seam re-forces a save for each carrier at
+    // its turn start while concentration persists.
+    if (!getEffectDefinition('web')) {
+        console.error('[webAreaSaveHandler] "web" missing from targetEffectDefinitions registry');
+    }
+    const storedZoneEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const zoneEffects = Array.isArray(storedZoneEffects) ? [...storedZoneEffects] : [];
+    for (const zoneTarget of targets) {
+        const webEffect = {
+            target: zoneTarget.name,
+            effect: 'web',
+            source: casterName,
+            dc: dc,
+            duration: 'concentration',
+        };
+        const existingIdx = zoneEffects.findIndex(
+            te => te.target === zoneTarget.name && te.effect === 'web' && te.source === casterName
+        );
+        if (existingIdx >= 0) {
+            zoneEffects[existingIdx] = webEffect;
+        } else {
+            zoneEffects.push(webEffect);
+        }
+    }
+    setRuntimeValue('campaign', 'targetEffects', zoneEffects, campaignName);
+
+    // Expiration: the zone lasts at most 1 hour (600 rounds — CLA-334
+    // minutes-as-rounds encoding) even with sustained concentration; the
+    // zone te + tracking key are swept here, concentration loss sweeps the
+    // duration:'concentration' tes separately via cleanupConcentrationEffects.
+    const durationRounds = (() => {
+        const lower = (auto.duration || action.spell?.duration || 'Concentration, up to 1 hour').toLowerCase();
+        const hourMatch = lower.match(/(\d+)\s*_?\s*hour/);
+        if (hourMatch) return parseInt(hourMatch[1], 10) * 600;
+        const minuteMatch = lower.match(/(\d+)\s*_?\s*minute/);
+        if (minuteMatch) return parseInt(minuteMatch[1], 10) * 10;
+        const roundMatch = lower.match(/(\d+)\s*_?round/);
+        if (roundMatch) return parseInt(roundMatch[1], 10);
+        return undefined;
+    })();
+
+    if (durationRounds) {
+        addExpiration(casterName, casterName, [
+            { type: 'clear_runtime_value', creatureName: casterName, key: trackingKey },
+            { type: 'remove_target_effect', effectKey: 'web', source: casterName },
+        ], campaignName, durationRounds);
+    }
 
     // Register concentration for this spell
     const combatSummary = getCombatSummary(campaignName);
@@ -146,15 +217,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 appliedDamage: 0,
             });
 
-            // Add expiration for concentration — Restrained removed when concentration breaks
+            // Add expiration for concentration — Restrained removed when the
+            // spell ends (600 rounds) — ONE merged entry (two sequential
+            // addExpiration calls race server-side, playbook 42ab).
             addExpiration(casterName, targetName, [
                 { type: 'condition', condition: 'restrained' },
-            ], campaignName);
-
-            // Also expire restrained on initiative roll
-            addExpiration(casterName, targetName, [
-                { type: 'condition', condition: 'restrained' },
-            ], campaignName, undefined, casterName);
+            ], campaignName, durationRounds);
 
             addEntry(campaignName, {
                 type: 'condition',

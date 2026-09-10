@@ -626,7 +626,7 @@ export function useSimpleSpellHandlers(createConfirmHandler, createSkipHandler, 
     const action = {
       name: pending.spellName,
       spell: pending.spell,
-      automation: { type: 'web', saveDc: pending.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2), saveType: 'DEX' },
+      automation: { type: 'web_area_save', saveDc: pending.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2), saveType: 'DEX' },
       metaCtx: { targets: result },
     }
     await executeHandler(action, playerStats, campaignName, null)

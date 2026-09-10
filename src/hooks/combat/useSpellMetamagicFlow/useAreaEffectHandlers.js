@@ -127,16 +127,6 @@ export function useAreaEffectHandlers(createSkipHandler, playerStats, campaignNa
     }
   }, [playerStats, campaignName, setPopupHtml])
 
-  const handleWebConfirm = React.useCallback(async (pending, result) => {
-    const action = {
-      name: pending.spellName,
-      spell: pending.spell,
-      automation: { type: 'web_area_save', saveType: 'DEX', saveDc: playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2) },
-      metaCtx: { targets: result },
-    }
-    await executeHandler(action, playerStats, campaignName, null)
-  }, [playerStats, campaignName])
-
   const handleSleetStormConfirm = React.useCallback(async (pending, result) => {
     const action = {
       name: pending.spellName,
@@ -157,7 +147,6 @@ export function useAreaEffectHandlers(createSkipHandler, playerStats, campaignNa
     handleAntimagicFieldConfirm, handleAntimagicFieldSkip,
     handleStinkingCloudConfirm,
     handleConfusionConfirm,
-    handleWebConfirm,
     handleSleetStormConfirm,
   }
 }

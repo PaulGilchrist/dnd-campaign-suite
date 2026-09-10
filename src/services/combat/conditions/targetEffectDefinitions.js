@@ -713,6 +713,15 @@ const TARGET_EFFECT_DEFINITIONS = [
     group: 'Spells',
     fields: ['source'],
   },
+  {
+    effect: 'web',
+    label: 'Web',
+    description: 'Inside sticky webbing (20-foot Cube): Difficult Terrain, Lightly Obscured. The first time the creature enters the webs on a turn or starts its turn there it must make a DEX save (DC indicated) or have the Restrained condition. A creature Restrained by the webs can take an action to make a Strength (Athletics) check against the DC to break free. Concentration, up to 1 hour.',
+    icon: 'fa-spider',
+    cls: 'effect-debuff',
+    group: 'Spells',
+    fields: ['source', 'dc'],
+  },
 
   // ── Movement ────────────────────────────────────────────
   {
