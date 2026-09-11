@@ -7,15 +7,30 @@ const CONDITIONS_THAT_CANNOT_ACT = new Set([
 
 const CONDITIONS_THAT_SPEED_ZERO = new Set([
     'grappled', 'paralyzed', 'petrified', 'restrained', 'stunned', 'unconscious', 'speed_zero', 'forcecaged', 'mazed',
+ ])
+
+const SAVE_MODIFIER_TARGETS = new Set([
+  'saving_throw', 'save', 'concentration_saving_throws', 'death_saving_throws',
 ])
+
+const SAVE_CONDITION_LABELS = {
+  charmed: 'charmed',
+  frightened: 'frightened',
+  poison: 'poisoned',
+}
+
+const IMMUNITY_BUCKETS = {
+  advantage: 'saveAdvantage',
+  disadvantage: 'saveDisadvantage',
+}
 
 // !!! ADDING A NEW TARGET EFFECT? !!!
 // First check if it exists in src/services/combat/conditions/targetEffectDefinitions.js
 // Every new te.effect value MUST be added there with label/description/group/icon.
 // The GM UI depends on this registry to display manual-add options.
 
-function computeConditionEffects(conditions = [], saveModifiers = [], targetEffects = [], isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, seeInvisibilityActive = false, attackerName = null, isLivingLegendActive = false, isElderChampionActive = false, isElderChampionAttackerActive = false, holyAuraTargets = [], isProtectionFromPoisonActive = false, isTranceOfOrderActive = false, hasPowerfulBuild = false, attackerSenses = null) {
-  const effects = {
+function buildBaseEffects() {
+  return {
     attackAdvantageCount: 0,
     attackAdvantageReasons: [],
     attackDisadvantageCount: 0,
@@ -107,44 +122,483 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     toppleSaveAbility: null,
     saveBonusExpression: null,
    }
+}
+
+function pushSaveEffectForModifier(effects, mod, label) {
+  if (mod.effect === 'advantage') effects.saveAdvantage.push(label);
+  if (mod.effect === 'disadvantage') effects.saveDisadvantage.push(label);
+}
+
+function applyConditionSaveModifier(effects, mod, conditionSet) {
+  const label = SAVE_CONDITION_LABELS[mod.condition]
+  if (label) {
+    if (conditionSet.has(label)) pushSaveEffectForModifier(effects, mod, label);
+    return;
+  }
+  if (mod.condition === 'magic' && mod.abilities && mod.abilities.length > 0) {
+    // Track per-ability advantage for traits like Gnomish Cunning
+    if (mod.effect === 'advantage') effects.saveAdvantageAbilities = [...(effects.saveAdvantageAbilities || []), ...mod.abilities];
+    if (mod.effect === 'disadvantage') effects.saveDisadvantageAbilities = [...(effects.saveDisadvantageAbilities || []), ...mod.abilities];
+    return;
+  }
+  if (mod.condition === 'against_spell') pushSaveEffectForModifier(effects, mod, 'against_spell');
+  // 'visible_effect' modifiers are suppressed here (Danger Sense handled below via activeSaveModifiers)
+}
+
+// Handle passive_immunity save advantage (e.g., Psychic Defense) — applies regardless of current conditions
+function applyPassiveImmunityModifier(effects, mod) {
+  if (!mod.saveType || !mod.condition || mod.target !== 'saving_throw') return;
+  if (mod.abilities && mod.abilities.length > 0) return;
+  const bucket = IMMUNITY_BUCKETS[mod.effect];
+  if (bucket && !effects[bucket].includes(mod.condition)) {
+    effects[bucket].push(mod.condition);
+  }
+}
+
+function applyConditionEffect(effects, condition, ctx) {
+  const handler = CONDITION_EFFECT_HANDLERS[condition]
+  if (!handler) return
+  handler(effects, ctx)
+}
+
+const CONDITION_EFFECT_HANDLERS = {
+  blinded: (effects) => {
+    effects.attackDisadvantageCount++
+    effects.targetAdvantageCount++
+    effects.targetAdvantageReasons.push('Blinded')
+  },
+  charmed: (effects) => {
+    effects.attackDisadvantageCount++
+    effects.saveDisadvantage.push('dex')
+  },
+  frightened: (effects) => {
+    effects.attackDisadvantageCount++
+    effects.abilityCheckDisadvantage = true
+  },
+  grappled: (effects) => {
+    effects.speedZero = true
+    effects.attackDisadvantageCount++
+  },
+  incapacitated: (effects) => {
+    effects.cannotAct = true
+    effects.concentrationBroken = true
+  },
+  invisible: (effects, ctx) => {
+    if (ctx.seeInvisibilityActive || ctx.hasFaerieFire) return
+    // Faerie Fire prevents benefiting from Invisible — suppress the advantage/disadvantage
+    effects.attackAdvantageCount++
+    effects.attackAdvantageReasons.push('Invisible')
+    effects.targetDisadvantageCount++
+  },
+  paralyzed: (effects) => {
+    effects.cannotAct = true
+    effects.speedZero = true
+    effects.autoFailSaves.push('str', 'dex')
+    effects.targetAdvantageCount++
+    effects.targetAdvantageReasons.push('Paralyzed')
+    effects.autoCritWithin5ft = true
+  },
+  petrified: (effects) => {
+    effects.cannotAct = true
+    effects.speedZero = true
+    effects.targetAdvantageCount++
+    effects.targetAdvantageReasons.push('Petrified')
+    effects.autoFailSaves.push('str', 'dex')
+    effects.resistantToAll = true
+    effects.poisonImmune = true
+  },
+  poisoned: (effects) => {
+    effects.attackDisadvantageCount++
+    effects.abilityCheckDisadvantage = true
+  },
+  prone: (effects) => {
+    effects.attackDisadvantageCount++
+    effects.targetAdvantageIfWithin5ft = true
+    effects.targetDisadvantageIfBeyond5ft = true
+  },
+  speed_zero: (effects) => {
+    effects.speedZero = true
+  },
+  restrained: (effects) => {
+    effects.speedZero = true
+    effects.attackDisadvantageCount++
+    effects.targetAdvantageCount++
+    effects.targetAdvantageReasons.push('Restrained')
+    effects.saveDisadvantage.push('dex')
+  },
+  stunned: (effects) => {
+    effects.cannotAct = true
+    effects.speedZero = true
+    effects.autoFailSaves.push('str', 'dex')
+    effects.targetAdvantageCount++
+    effects.targetAdvantageReasons.push('Stunned')
+  },
+  unconscious: (effects) => {
+    effects.cannotAct = true
+    effects.speedZero = true
+    effects.targetAdvantageCount++
+    effects.targetAdvantageReasons.push('Unconscious')
+    effects.autoFailSaves.push('str', 'dex')
+    effects.autoCritWithin5ft = true
+  },
+  dazed: (effects) => {
+    effects.dazed = true
+    effects.targetAdvantageCount++
+    effects.targetAdvantageReasons.push('Dazed')
+  },
+  slow: (effects) => {
+    effects.speedHalved = true;
+    effects.acPenalty = (effects.acPenalty || 0) + 2;
+    effects.slowNoReactions = true;
+    effects.slowActionLimit = true;
+    effects.slowSingleAttackLimit = true;
+    effects.slowSomaticFailure = true;
+    // DEX save disadvantage from Slow
+    if (!effects.saveDisadvantage.includes('dex')) {
+      effects.saveDisadvantage.push('dex');
+    }
+  },
+  // Forcecaged: trapped in cage, can't leave by nonmagical means — speed 0
+  forcecaged: (effects) => {
+    effects.speedZero = true;
+    effects.cannotAct = true;
+    effects.concentrationBroken = true;
+  },
+  // Mazed: banished to labyrinthine demiplane, can't attack or be attacked
+  mazed: (effects) => {
+    effects.speedZero = true;
+    effects.cannotAct = true;
+    effects.concentrationBroken = true;
+  },
+}
+
+// Helper function for blindsight/truesight checks
+function attackerHasBlindsightOrTruesight(senses) {
+  if (!senses || !Array.isArray(senses)) return false;
+  return senses.some(s => {
+    const name = (s.name || s.type || '').toLowerCase();
+    return name === 'blindsight' || name === 'truesight';
+  });
+}
+
+function addUniqueReason(reasons, value) {
+  if (value && !reasons.includes(value)) reasons.push(value);
+}
+
+function bumpCount(effects, key) {
+  effects[key] = (effects[key] || 0) + 1;
+}
+
+const EARLY_TARGET_EFFECT_HANDLERS = {
+  disadvantage_on_next_save: (effects) => {
+    effects.riderSaveDisadvantage = true;
+    bumpCount(effects, 'saveDisadvantageCount');
+  },
+  next_attack_advantage: (effects, te) => {
+    if (te.vexTarget) {
+      effects.vexAdvantageTargets = [...(effects.vexAdvantageTargets || []), te.vexTarget];
+    } else {
+      bumpCount(effects, 'attackAdvantageCount');
+      effects.attackAdvantageReasons.push(te.source || 'Next Attack Advantage');
+    }
+  },
+  next_attack_bonus: (effects, te) => {
+    effects.riderAttackBonus = (effects.riderAttackBonus || 0) + (parseInt(te.value, 10) || 5);
+  },
+  distracting_strike_advantage: (effects, te) => {
+    bumpCount(effects, 'targetAdvantageCount');
+    effects.targetAdvantageReasons.push(te.source || 'Next Attack Adv vs Target');
+  },
+  crusher_enhanced_critical: (effects, te) => {
+    bumpCount(effects, 'targetAdvantageCount');
+    effects.targetAdvantageReasons.push(te.source || 'Attack Adv');
+  },
+  slasher_enhanced_critical: (effects) => {
+    bumpCount(effects, 'targetAttackDisadvantageCount');
+  },
+  disadvantage_next_attack: (effects) => {
+    bumpCount(effects, 'attackDisadvantageCount');
+  },
+  reckless_attack: (effects) => {
+    bumpCount(effects, 'targetAdvantageCount');
+    effects.targetAdvantageReasons.push('Reckless Attack');
+  },
+  disadvantage_perception_checks: (effects) => {
+    effects.abilityCheckDisadvantage = true;
+  },
+  escape_the_horde: (effects) => {
+    bumpCount(effects, 'targetDisadvantageCount');
+  },
+  protection: (effects) => {
+    bumpCount(effects, 'targetDisadvantageCount');
+  },
+  multiattack_defense: (effects) => {
+    bumpCount(effects, 'targetDisadvantageCount');
+  },
+  taunting_step: (effects, te) => {
+    effects.attacksOtherDisadvantageSource = te.source;
+  },
+  compelled_duel: (effects, te) => {
+    effects.attacksOtherDisadvantageSource = te.source;
+  },
+  no_reactions: (effects) => {
+    effects.riderNoReactions = true;
+  },
+  speed_reduction: (effects, te) => {
+    effects.speedReduction = (effects.speedReduction || 0) + (te.value || 10);
+  },
+  push: (effects, te) => {
+    effects.pushEffect = true;
+    if (!effects.pushDistance) {
+      effects.pushDistance = te.value || 10;
+    }
+  },
+  damage_bonus: (effects, te) => {
+    effects.riderAttackBonus = (effects.riderAttackBonus || 0) + (te.value || 0);
+    if (te.damageExpression) {
+      effects.riderDamageExpression = te.damageExpression;
+      effects.riderDamageType = te.damageType || '';
+    }
+  },
+  prone_and_push: (effects, te) => {
+    effects.pushEffect = true;
+    if (!effects.pushDistance) {
+      effects.pushDistance = te.value || 10;
+    }
+    effects.proneEffect = true;
+  },
+}
+
+const LATE_TARGET_EFFECT_HANDLERS = {
+  // Handle mass_fear effect
+  mass_fear: (effects, te) => {
+    effects.saveType = te.saveType || 'WIS';
+    effects.saveDc = te.saveDc;
+    effects.saveAbility = te.saveAbility;
+    effects.conditionToApply = te.condition || 'frightened';
+    effects.conditionDuration = te.duration || 'until_start_of_next_turn';
+    effects.massFearRange = te.range || '10_ft';
+  },
+  // Handle Death Strike — doubles damage on failed CON save
+  death_strike: (effects, te) => {
+    effects.saveType = te.saveType || 'CON';
+    effects.saveDc = te.saveDc;
+    effects.saveAbility = te.saveAbility;
+    effects.damageDoubled = !!te.damageDoubled;
+  },
+  // Handle direct condition application (no save required, e.g., Withdraw noOAs)
+  no_opportunity_attacks: (effects, te) => {
+    if (!te.saveType) effects.riderCannotOpportunityAttack = true;
+  },
+  // Handle Hurl Through Hell — incapacitated condition with save
+  incapacitated: (effects, te) => {
+    if (!te.saveType) return;
+    effects.saveType = te.saveType;
+    effects.saveDc = te.saveDc;
+    effects.saveAbility = te.saveAbility;
+    effects.conditionToApply = 'incapacitated';
+    effects.conditionDuration = te.duration || 'until_end_of_next_turn';
+    effects.hurlThroughHell = true;
+  },
+  // Handle Clairvoyant Combatant — target has Disadvantage on attacks against you, you have Advantage on attacks against target
+  clairvoyant_combatant: (effects, te) => {
+    if (te.attackerAdvantage) {
+      bumpCount(effects, 'targetAdvantageCount');
+      effects.targetAdvantageReasons.push('Clairvoyant Combatant');
+    }
+    if (te.defenderDisadvantage) {
+      bumpCount(effects, 'targetDisadvantageCount');
+    }
+  },
+  // Handle Foresight — the target has Advantage on D20 Tests, and other creatures have Disadvantage on attack rolls against it (unless attacker has Blindsight or Truesight)
+  foresight: (effects, te, attackerSenses) => {
+    bumpCount(effects, 'attackAdvantageCount');
+    effects.attackAdvantageReasons.push('Foresight');
+    bumpCount(effects, 'saveAdvantageCount');
+    effects.saveAdvantageReasons.push('Foresight');
+    effects.abilityCheckAdvantage = true;
+    effects.abilityCheckAdvantageReasons = ['Foresight'];
+    if (!attackerHasBlindsightOrTruesight(attackerSenses)) {
+      bumpCount(effects, 'targetDisadvantageCount');
+    }
+  },
+  // Handle Blur — creatures have Disadvantage on attack rolls against the target (unless attacker has Blindsight or Truesight)
+  blur: (effects, te, attackerSenses) => {
+    if (!attackerHasBlindsightOrTruesight(attackerSenses)) {
+      bumpCount(effects, 'targetDisadvantageCount');
+    }
+  },
+  // Handle Faerie Fire — attack rolls against affected creature have Advantage if attacker can see it, and creature can't benefit from Invisible
+  faerie_fire: (effects, te) => {
+    bumpCount(effects, 'targetAdvantageCount');
+    if (!effects.targetAdvantageReasons) {
+      effects.targetAdvantageReasons = [];
+    }
+    addUniqueReason(effects.targetAdvantageReasons, te.source);
+    // Prevent benefiting from Invisible — suppress invisible's attackAdvantage when faerie_fire is active
+    effects.noAdvantageAgainstInvisible = true;
+  },
+  // Handle Hex — target has Disadvantage on ability checks of chosen ability
+  hex_ability_check_disadvantage: (effects, te) => {
+    if (!effects.abilityCheckDisadvantageAbilities) {
+      effects.abilityCheckDisadvantageAbilities = [];
+    }
+    addUniqueReason(effects.abilityCheckDisadvantageAbilities, te.ability);
+  },
+  // Handle Enhance Ability — target has Advantage on ability checks of chosen ability
+  enhance_ability: (effects, te) => {
+    if (!effects.abilityCheckAdvantageAbilities) {
+      effects.abilityCheckAdvantageAbilities = [];
+    }
+    if (te.ability) {
+      addUniqueReason(effects.abilityCheckAdvantageAbilities, String(te.ability).toUpperCase());
+    }
+  },
+  // Handle Adv Check (advantage_abilities) — target has Advantage on all ability checks
+  advantage_abilities: (effects, te) => {
+    effects.abilityCheckAdvantage = true;
+    if (!effects.abilityCheckAdvantageReasons) {
+      effects.abilityCheckAdvantageReasons = [];
+    }
+    addUniqueReason(effects.abilityCheckAdvantageReasons, te.source);
+  },
+  // Handle Adv (advantage_attacks) — target has Advantage on attack rolls
+  advantage_attacks: (effects, te) => {
+    bumpCount(effects, 'attackAdvantageCount');
+    if (!effects.attackAdvantageReasons) {
+      effects.attackAdvantageReasons = [];
+    }
+    addUniqueReason(effects.attackAdvantageReasons, te.source);
+  },
+  // Handle Adv Save (advantage_saves) — target has Advantage on saving throws
+  advantage_saves: (effects, te) => {
+    bumpCount(effects, 'saveAdvantageCount');
+    if (!effects.saveAdvantageReasons) {
+      effects.saveAdvantageReasons = [];
+    }
+    addUniqueReason(effects.saveAdvantageReasons, te.source);
+  },
+  // Handle Eldritch Hex — target has Disadvantage on saves of chosen ability
+  hex_save_disadvantage: (effects, te) => {
+    if (!effects.saveDisadvantage.includes(te.ability?.toLowerCase())) {
+      effects.saveDisadvantage.push(te.ability?.toLowerCase());
+    }
+    bumpCount(effects, 'saveDisadvantageCount');
+  },
+  // Handle Ray of Enfeeblement debuff — STR check disadvantage + damage reduction
+  ray_of_enfeeble_debuff: (effects, te) => {
+    if (te.strCheckDisadvantage) effects.strCheckDisadvantage = true;
+    if (te.rayOfEnfeebleDamageReduction) effects.rayOfEnfeebleDamageReduction = true;
+  },
+  // Handle Resistance — reduce damage of chosen type by 1d4 (once per turn)
+  resistance_damage_reduction: (effects) => {
+    effects.resistanceDamageReduction = true;
+  },
+  // Handle Cleave — extra melee attack against second creature within 5 ft
+  cleave: (effects, te) => {
+    effects.cleaveAttack = true;
+    effects.cleaveTarget = te.target;
+    effects.cleaveSource = te.source;
+  },
+  // Handle Nick — extra attack as part of Attack action (Light weapon)
+  nick: (effects, te) => {
+    effects.nickExtraAttack = true;
+    effects.nickTarget = te.target;
+    effects.nickSource = te.source;
+  },
+  // Handle Topple — CON save, Prone condition on failure
+  topple: (effects, te) => {
+    effects.toppleEffect = true;
+    effects.saveType = te.saveType || 'CON';
+    effects.saveDc = te.saveDc || 'ability';
+    effects.saveAbility = te.saveAbility || 'CON';
+    effects.conditionToApply = 'prone';
+    effects.conditionDuration = te.duration || 'until_start_of_next_turn';
+  },
+  // Handle Slow — AC penalty and DEX save disadvantage
+  ac_penalty: (effects, te) => {
+    effects.acPenalty = (effects.acPenalty || 0) + (te.value || 2);
+  },
+  dodge: (effects) => {
+    bumpCount(effects, 'targetDisadvantageCount');
+    if (!effects.saveAdvantage.includes('dex')) {
+      effects.saveAdvantage.push('dex');
+    }
+  },
+  bane_penalty: (effects) => {
+    effects.banePenalty = true;
+  },
+  bless_bonus: (effects) => {
+    effects.blessBonus = true;
+  },
+  beacon_of_hope: (effects) => {
+    effects.beaconOfHope = true;
+    effects.saveAdvantageAbilities = [...new Set([...(effects.saveAdvantageAbilities || []), 'WIS'])];
+    effects.saveAdvantageReasons.push('Beacon of Hope');
+  },
+  holy_aura: (effects, te) => {
+    bumpCount(effects, 'targetDisadvantageCount');
+    bumpCount(effects, 'saveAdvantageCount');
+    if (!effects.saveAdvantageReasons) {
+      effects.saveAdvantageReasons = [];
+    }
+    addUniqueReason(effects.saveAdvantageReasons, te.source);
+    effects.saveAdvantageReasons.push('Holy Aura');
+  },
+  circle_of_power: (effects) => {
+    effects.saveAdvantage.push('against_spell');
+    effects.saveAdvantageReasons.push('Circle of Power');
+  },
+  pass_without_trace_bonus: (effects, te) => {
+    effects.passWithoutTraceBonus = te.bonusExpression || '10';
+  },
+  dex_save_disadvantage: (effects) => {
+    effects.slowDexSaveDisadvantage = true;
+    if (!effects.saveDisadvantage.includes('dex')) {
+      effects.saveDisadvantage.push('dex');
+    }
+  },
+  // Handle Heroism — Advantage on Wisdom saving throws
+  wisdom_save_advantage: (effects, te) => {
+    effects.saveAdvantageAbilities = [...(effects.saveAdvantageAbilities || []), 'WIS'];
+    bumpCount(effects, 'saveAdvantageCount');
+    effects.saveAdvantageReasons = [...(effects.saveAdvantageReasons || []), te.source || 'Heroism'];
+  },
+}
+
+function applyTargetEffect(effects, te, attackerSenses) {
+  const early = EARLY_TARGET_EFFECT_HANDLERS[te.effect];
+  if (early) early(effects, te);
+
+  if (te.noOpportunityAttacks) {
+    effects.riderCannotOpportunityAttack = true;
+  }
+  // Handle Cunning Strike and similar save-based condition effects
+  if (te.saveType && te.condition) {
+    effects.saveType = te.saveType;
+    effects.saveDc = te.saveDc;
+    effects.saveAbility = te.saveAbility;
+    effects.conditionToApply = te.condition;
+    effects.conditionDuration = te.duration || 'until_start_of_next_turn';
+  }
+
+  const late = LATE_TARGET_EFFECT_HANDLERS[te.effect];
+  if (late) late(effects, te, attackerSenses);
+  // banishment / forcecage / prismatic_spray_indigo / prismatic_spray_violet are
+  // tracked for cleanup or escape attempts only — no direct stat modification here.
+}
+
+function computeConditionEffects(conditions = [], saveModifiers = [], targetEffects = [], isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, seeInvisibilityActive = false, attackerName = null, isLivingLegendActive = false, isElderChampionActive = false, isElderChampionAttackerActive = false, holyAuraTargets = [], isProtectionFromPoisonActive = false, isTranceOfOrderActive = false, hasPowerfulBuild = false, attackerSenses = null) {
+  const effects = buildBaseEffects()
 
   const conditionSet = new Set(conditions)
 
   for (const mod of saveModifiers) {
-    if (mod.target !== 'saving_throw' && mod.target !== 'save' && mod.target !== 'concentration_saving_throws' && mod.target !== 'death_saving_throws') continue;
-    if (mod.condition === 'charmed' && conditionSet.has('charmed')) {
-      if (mod.effect === 'advantage') effects.saveAdvantage.push('charmed');
-      if (mod.effect === 'disadvantage') effects.saveDisadvantage.push('charmed');
-       } else if (mod.condition === 'frightened' && conditionSet.has('frightened')) {
-      if (mod.effect === 'advantage') effects.saveAdvantage.push('frightened');
-      if (mod.effect === 'disadvantage') effects.saveDisadvantage.push('frightened');
-       } else if (mod.condition === 'poison' && conditionSet.has('poisoned')) {
-        if (mod.effect === 'advantage') effects.saveAdvantage.push('poisoned');
-        if (mod.effect === 'disadvantage') effects.saveDisadvantage.push('poisoned');
-        } else if (mod.condition === 'magic' && mod.abilities && mod.abilities.length > 0) {
-        // Track per-ability advantage for traits like Gnomish Cunning
-        if (mod.effect === 'advantage') effects.saveAdvantageAbilities = [...(effects.saveAdvantageAbilities || []), ...mod.abilities];
-        if (mod.effect === 'disadvantage') effects.saveDisadvantageAbilities = [...(effects.saveDisadvantageAbilities || []), ...mod.abilities];
-        } else if (mod.condition === 'against_spell') {
-        if (mod.effect === 'advantage') effects.saveAdvantage.push('against_spell');
-        if (mod.effect === 'disadvantage') effects.saveDisadvantage.push('against_spell');
-        } else if (mod.condition === 'visible_effect' && [...CONDITIONS_THAT_CANNOT_ACT].some(c => conditionSet.has(c))) {
-        continue; // Danger Sense disabled while incapacitated
-       }
-    }
+    if (SAVE_MODIFIER_TARGETS.has(mod.target)) applyConditionSaveModifier(effects, mod, conditionSet);
+  }
 
-  // Handle passive_immunity save advantage (e.g., Psychic Defense) — applies regardless of current conditions
   for (const mod of saveModifiers) {
-    if (mod.saveType && mod.condition && mod.target === 'saving_throw' && mod.effect === 'advantage' && (!mod.abilities || mod.abilities.length === 0)) {
-      if (!effects.saveAdvantage.includes(mod.condition)) {
-        effects.saveAdvantage.push(mod.condition);
-      }
-    }
-    if (mod.saveType && mod.condition && mod.target === 'saving_throw' && mod.effect === 'disadvantage' && (!mod.abilities || mod.abilities.length === 0)) {
-      if (!effects.saveDisadvantage.includes(mod.condition)) {
-        effects.saveDisadvantage.push(mod.condition);
-      }
-    }
+    applyPassiveImmunityModifier(effects, mod);
   }
 
   const isIncapacitated = [...CONDITIONS_THAT_CANNOT_ACT].some(c => conditionSet.has(c));
@@ -159,466 +613,16 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     effects.saveAdvantageReasons = [...(effects.saveAdvantageReasons || []), 'Protection from Poison'];
   }
 
+  const conditionCtx = {
+    seeInvisibilityActive,
+    hasFaerieFire: targetEffects.some(te => te.effect === 'faerie_fire'),
+  }
   for (const key of conditionSet) {
-    switch (key) {
-        case 'blinded':
-         effects.attackDisadvantageCount++
-         effects.targetAdvantageCount++
-         effects.targetAdvantageReasons.push('Blinded')
-         break
-
-        case 'charmed':
-          effects.attackDisadvantageCount++
-          effects.saveDisadvantage.push('dex')
-          break
-
-        case 'frightened':
-        effects.attackDisadvantageCount++
-        effects.abilityCheckDisadvantage = true
-        break
-
-       case 'grappled':
-        effects.speedZero = true
-        effects.attackDisadvantageCount++
-        break
-
-       case 'incapacitated':
-        effects.cannotAct = true
-        effects.concentrationBroken = true
-        break
-
-        case 'invisible':
-          if (!seeInvisibilityActive) {
-            // Faerie Fire prevents benefiting from Invisible — suppress the advantage/disadvantage
-            const hasFaerieFire = targetEffects.some(te => te.effect === 'faerie_fire')
-            if (!hasFaerieFire) {
-              effects.attackAdvantageCount++
-              effects.attackAdvantageReasons.push('Invisible')
-              effects.targetDisadvantageCount++
-            }
-          }
-          break
-
-        case 'paralyzed':
-         effects.cannotAct = true
-         effects.speedZero = true
-         effects.autoFailSaves.push('str', 'dex')
-         effects.targetAdvantageCount++
-         effects.targetAdvantageReasons.push('Paralyzed')
-         effects.autoCritWithin5ft = true
-         break
-
-        case 'petrified':
-         effects.cannotAct = true
-         effects.speedZero = true
-         effects.targetAdvantageCount++
-         effects.targetAdvantageReasons.push('Petrified')
-         effects.autoFailSaves.push('str', 'dex')
-         effects.resistantToAll = true
-         effects.poisonImmune = true
-         break
-
-       case 'poisoned':
-        effects.attackDisadvantageCount++
-        effects.abilityCheckDisadvantage = true
-        break
-
-       case 'prone':
-        effects.attackDisadvantageCount++
-        effects.targetAdvantageIfWithin5ft = true
-        effects.targetDisadvantageIfBeyond5ft = true
-        break
-
-       case 'speed_zero':
-        effects.speedZero = true
-        break
-
-        case 'restrained':
-         effects.speedZero = true
-         effects.attackDisadvantageCount++
-         effects.targetAdvantageCount++
-         effects.targetAdvantageReasons.push('Restrained')
-         effects.saveDisadvantage.push('dex')
-         break
-
-        case 'stunned':
-         effects.cannotAct = true
-         effects.speedZero = true
-         effects.autoFailSaves.push('str', 'dex')
-         effects.targetAdvantageCount++
-         effects.targetAdvantageReasons.push('Stunned')
-         break
-
-        case 'unconscious':
-          effects.cannotAct = true
-          effects.speedZero = true
-          effects.targetAdvantageCount++
-          effects.targetAdvantageReasons.push('Unconscious')
-          effects.autoFailSaves.push('str', 'dex')
-          effects.autoCritWithin5ft = true
-          break
-
-        case 'dazed':
-          effects.dazed = true
-          effects.targetAdvantageCount++
-          effects.targetAdvantageReasons.push('Dazed')
-          break
-
-         case 'slow':
-           effects.speedHalved = true;
-           effects.acPenalty = (effects.acPenalty || 0) + 2;
-           effects.slowNoReactions = true;
-           effects.slowActionLimit = true;
-           effects.slowSingleAttackLimit = true;
-           effects.slowSomaticFailure = true;
-           // DEX save disadvantage from Slow
-           if (!effects.saveDisadvantage.includes('dex')) {
-             effects.saveDisadvantage.push('dex');
-           }
-           break;
-
-          case 'forcecaged':
-            // Forcecaged: trapped in cage, can't leave by nonmagical means
-            // Speed is 0 (can't move out of cage)
-            effects.speedZero = true;
-            effects.cannotAct = true;
-            effects.concentrationBroken = true;
-            break;
-          case 'mazed':
-            // Mazed: banished to labyrinthine demiplane, can't attack or be attacked
-            // Speed is 0, cannot act, concentration broken
-            effects.speedZero = true;
-            effects.cannotAct = true;
-            effects.concentrationBroken = true;
-            break;
-          }
-    }
-
-  // Helper function for blindsight/truesight checks
-  function attackerHasBlindsightOrTruesight(senses) {
-    if (!senses || !Array.isArray(senses)) return false;
-    return senses.some(s => {
-      const name = (s.name || s.type || '').toLowerCase();
-      return name === 'blindsight' || name === 'truesight';
-    });
+    applyConditionEffect(effects, key, conditionCtx)
   }
 
   for (const te of targetEffects) {
-    if (te.effect === 'disadvantage_on_next_save') {
-      effects.riderSaveDisadvantage = true;
-      effects.saveDisadvantageCount = (effects.saveDisadvantageCount || 0) + 1;
-    }
-    if (te.effect === 'next_attack_advantage') {
-      if (te.vexTarget) {
-        effects.vexAdvantageTargets = [...(effects.vexAdvantageTargets || []), te.vexTarget];
-      } else {
-        effects.attackAdvantageCount = (effects.attackAdvantageCount || 0) + 1;
-        effects.attackAdvantageReasons.push(te.source || 'Next Attack Advantage');
-      }
-    }
-    if (te.effect === 'next_attack_bonus') {
-      effects.riderAttackBonus = (effects.riderAttackBonus || 0) + (parseInt(te.value, 10) || 5);
-    }
-    if (te.effect === 'distracting_strike_advantage') {
-      effects.targetAdvantageCount = (effects.targetAdvantageCount || 0) + 1;
-      effects.targetAdvantageReasons.push(te.source || 'Next Attack Adv vs Target');
-    }
-    if (te.effect === 'crusher_enhanced_critical') {
-      effects.targetAdvantageCount = (effects.targetAdvantageCount || 0) + 1;
-      effects.targetAdvantageReasons.push(te.source || 'Attack Adv');
-    }
-    if (te.effect === 'slasher_enhanced_critical') {
-      effects.targetAttackDisadvantageCount = (effects.targetAttackDisadvantageCount || 0) + 1;
-    }
-    if (te.effect === 'disadvantage_next_attack') {
-      effects.attackDisadvantageCount = (effects.attackDisadvantageCount || 0) + 1;
-    }
-    if (te.effect === 'reckless_attack') {
-      effects.targetAdvantageCount = (effects.targetAdvantageCount || 0) + 1;
-      effects.targetAdvantageReasons.push('Reckless Attack');
-    }
-    if (te.effect === 'disadvantage_perception_checks') {
-      effects.abilityCheckDisadvantage = true;
-    }
-    if (te.effect === 'escape_the_horde') {
-      effects.targetDisadvantageCount = (effects.targetDisadvantageCount || 0) + 1;
-    }
-    if (te.effect === 'protection') {
-      effects.targetDisadvantageCount = (effects.targetDisadvantageCount || 0) + 1;
-    }
-    if (te.effect === 'multiattack_defense') {
-      effects.targetDisadvantageCount = (effects.targetDisadvantageCount || 0) + 1;
-    }
-    if (te.effect === 'taunting_step' || te.effect === 'compelled_duel') {
-      effects.attacksOtherDisadvantageSource = te.source;
-    }
-    if (te.noOpportunityAttacks) {
-      effects.riderCannotOpportunityAttack = true;
-    }
-    if (te.effect === 'no_reactions') {
-      effects.riderNoReactions = true;
-    }
-
-    if (te.effect === 'speed_reduction') {
-      effects.speedReduction = (effects.speedReduction || 0) + (te.value || 10);
-    }
-    if (te.effect === 'push') {
-      effects.pushEffect = true;
-      if (!effects.pushDistance) {
-        effects.pushDistance = te.value || 10;
-      }
-    }
-    if (te.effect === 'damage_bonus') {
-      effects.riderAttackBonus = (effects.riderAttackBonus || 0) + (te.value || 0);
-      if (te.damageExpression) {
-        effects.riderDamageExpression = te.damageExpression;
-        effects.riderDamageType = te.damageType || '';
-      }
-    }
-    if (te.effect === 'prone_and_push') {
-      effects.pushEffect = true;
-      if (!effects.pushDistance) {
-        effects.pushDistance = te.value || 10;
-      }
-      effects.proneEffect = true;
-    }
-    // Handle Cunning Strike and similar save-based condition effects
-    if (te.saveType && te.condition) {
-      effects.saveType = te.saveType;
-      effects.saveDc = te.saveDc;
-      effects.saveAbility = te.saveAbility;
-      effects.conditionToApply = te.condition;
-      effects.conditionDuration = te.duration || 'until_start_of_next_turn';
-    }
-    // Handle mass_fear effect
-    if (te.effect === 'mass_fear') {
-      effects.saveType = te.saveType || 'WIS';
-      effects.saveDc = te.saveDc;
-      effects.saveAbility = te.saveAbility;
-      effects.conditionToApply = te.condition || 'frightened';
-      effects.conditionDuration = te.duration || 'until_start_of_next_turn';
-      effects.massFearRange = te.range || '10_ft';
-    }
-    // Handle Death Strike — doubles damage on failed CON save
-    if (te.effect === 'death_strike') {
-      effects.saveType = te.saveType || 'CON';
-      effects.saveDc = te.saveDc;
-      effects.saveAbility = te.saveAbility;
-      effects.damageDoubled = !!te.damageDoubled;
-    }
-    // Handle direct condition application (no save required, e.g., Withdraw noOAs)
-    if (te.effect === 'no_opportunity_attacks' && !te.saveType) {
-      effects.riderCannotOpportunityAttack = true;
-    }
-    // Handle Banishment — incapacitated condition with concentration
-    if (te.effect === 'banishment') {
-      // Banishment grants Incapacitated (handled by condition switch) and tracks the effect
-      // The permanent banishment flag is stored but doesn't change combat mechanics
-    }
-    // Handle Forcecage — tracks trapped creature for escape CHA save
-    if (te.effect === 'forcecage') {
-      // Forcecage prevents nonmagical escape and requires CHA save for teleportation
-      // The DC is stored in te.dc for escape checks
-      // No direct combat stat modification — the effect is tracked for escape attempts
-    }
-    // Handle Prismatic Spray Indigo — Restrained with recurring CON saves (tracked via initiative component)
-    if (te.effect === 'prismatic_spray_indigo') {
-      // The Restrained condition is already applied; this tracks the effect for cleanup
-      // Recurring CON saves are handled by the initiative component
-    }
-    // Handle Prismatic Spray Violet — Blinded with WIS save at caster's next turn (tracked via initiative component)
-    if (te.effect === 'prismatic_spray_violet') {
-      // The Blinded condition is already applied; this tracks the effect for cleanup
-      // WIS save for banishment is handled by the initiative component
-    }
-    // Handle Hurl Through Hell — incapacitated condition with save
-    if (te.effect === 'incapacitated' && te.saveType) {
-      effects.saveType = te.saveType;
-      effects.saveDc = te.saveDc;
-      effects.saveAbility = te.saveAbility;
-      effects.conditionToApply = 'incapacitated';
-      effects.conditionDuration = te.duration || 'until_end_of_next_turn';
-      effects.hurlThroughHell = true;
-    }
-    // Handle Clairvoyant Combatant — target has Disadvantage on attacks against you, you have Advantage on attacks against target
-    if (te.effect === 'clairvoyant_combatant') {
-      if (te.attackerAdvantage) {
-        effects.targetAdvantageCount = (effects.targetAdvantageCount || 0) + 1;
-        effects.targetAdvantageReasons.push('Clairvoyant Combatant');
-      }
-      if (te.defenderDisadvantage) {
-        effects.targetDisadvantageCount = (effects.targetDisadvantageCount || 0) + 1;
-      }
-    }
-    // Handle Foresight — the target has Advantage on D20 Tests, and other creatures have Disadvantage on attack rolls against it (unless attacker has Blindsight or Truesight)
-    if (te.effect === 'foresight') {
-      effects.attackAdvantageCount = (effects.attackAdvantageCount || 0) + 1;
-      effects.attackAdvantageReasons.push('Foresight');
-      effects.saveAdvantageCount = (effects.saveAdvantageCount || 0) + 1;
-      effects.saveAdvantageReasons.push('Foresight');
-      effects.abilityCheckAdvantage = true;
-      effects.abilityCheckAdvantageReasons = ['Foresight'];
-      if (!attackerHasBlindsightOrTruesight(attackerSenses)) {
-        effects.targetDisadvantageCount = (effects.targetDisadvantageCount || 0) + 1;
-      }
-    }
-    // Handle Blur — creatures have Disadvantage on attack rolls against the target (unless attacker has Blindsight or Truesight)
-    if (te.effect === 'blur') {
-      if (!attackerHasBlindsightOrTruesight(attackerSenses)) {
-        effects.targetDisadvantageCount = (effects.targetDisadvantageCount || 0) + 1;
-      }
-    }
-    // Handle Faerie Fire — attack rolls against affected creature have Advantage if attacker can see it, and creature can't benefit from Invisible
-    if (te.effect === 'faerie_fire') {
-      effects.targetAdvantageCount = (effects.targetAdvantageCount || 0) + 1;
-      if (!effects.targetAdvantageReasons) {
-        effects.targetAdvantageReasons = [];
-      }
-      if (te.source && !effects.targetAdvantageReasons.includes(te.source)) {
-        effects.targetAdvantageReasons.push(te.source);
-      }
-      // Prevent benefiting from Invisible — suppress invisible's attackAdvantage when faerie_fire is active
-      effects.noAdvantageAgainstInvisible = true;
-    }
-    // Handle Hex — target has Disadvantage on ability checks of chosen ability
-    if (te.effect === 'hex_ability_check_disadvantage') {
-      if (!effects.abilityCheckDisadvantageAbilities) {
-        effects.abilityCheckDisadvantageAbilities = [];
-      }
-      if (te.ability && !effects.abilityCheckDisadvantageAbilities.includes(te.ability)) {
-        effects.abilityCheckDisadvantageAbilities.push(te.ability);
-      }
-    }
-    // Handle Enhance Ability — target has Advantage on ability checks of chosen ability
-    if (te.effect === 'enhance_ability') {
-      if (!effects.abilityCheckAdvantageAbilities) {
-        effects.abilityCheckAdvantageAbilities = [];
-      }
-      if (te.ability) {
-        const ability = String(te.ability).toUpperCase();
-        if (!effects.abilityCheckAdvantageAbilities.includes(ability)) {
-          effects.abilityCheckAdvantageAbilities.push(ability);
-        }
-      }
-    }
-    // Handle Adv Check (advantage_abilities) — target has Advantage on all ability checks
-    if (te.effect === 'advantage_abilities') {
-      effects.abilityCheckAdvantage = true;
-      if (!effects.abilityCheckAdvantageReasons) {
-        effects.abilityCheckAdvantageReasons = [];
-      }
-      if (te.source && !effects.abilityCheckAdvantageReasons.includes(te.source)) {
-        effects.abilityCheckAdvantageReasons.push(te.source);
-      }
-    }
-    // Handle Adv (advantage_attacks) — target has Advantage on attack rolls
-    if (te.effect === 'advantage_attacks') {
-      effects.attackAdvantageCount = (effects.attackAdvantageCount || 0) + 1;
-      if (!effects.attackAdvantageReasons) {
-        effects.attackAdvantageReasons = [];
-      }
-      if (te.source && !effects.attackAdvantageReasons.includes(te.source)) {
-        effects.attackAdvantageReasons.push(te.source);
-      }
-    }
-    // Handle Adv Save (advantage_saves) — target has Advantage on saving throws
-    if (te.effect === 'advantage_saves') {
-      effects.saveAdvantageCount = (effects.saveAdvantageCount || 0) + 1;
-      if (!effects.saveAdvantageReasons) {
-        effects.saveAdvantageReasons = [];
-      }
-      if (te.source && !effects.saveAdvantageReasons.includes(te.source)) {
-        effects.saveAdvantageReasons.push(te.source);
-      }
-    }
-    // Handle Eldritch Hex — target has Disadvantage on saves of chosen ability
-    if (te.effect === 'hex_save_disadvantage') {
-      if (!effects.saveDisadvantage.includes(te.ability?.toLowerCase())) {
-        effects.saveDisadvantage.push(te.ability?.toLowerCase());
-      }
-      effects.saveDisadvantageCount = (effects.saveDisadvantageCount || 0) + 1;
-    }
-    // Handle Ray of Enfeeblement debuff — STR check disadvantage + damage reduction
-    if (te.effect === 'ray_of_enfeeble_debuff') {
-      if (te.strCheckDisadvantage) effects.strCheckDisadvantage = true;
-      if (te.rayOfEnfeebleDamageReduction) effects.rayOfEnfeebleDamageReduction = true;
-    }
-    // Handle Resistance — reduce damage of chosen type by 1d4 (once per turn)
-    if (te.effect === 'resistance_damage_reduction') {
-      effects.resistanceDamageReduction = true;
-    }
-    // Handle Cleave — extra melee attack against second creature within 5 ft
-    if (te.effect === 'cleave') {
-      effects.cleaveAttack = true;
-      effects.cleaveTarget = te.target;
-      effects.cleaveSource = te.source;
-    }
-    // Handle Nick — extra attack as part of Attack action (Light weapon)
-    if (te.effect === 'nick') {
-      effects.nickExtraAttack = true;
-      effects.nickTarget = te.target;
-      effects.nickSource = te.source;
-    }
-    // Handle Topple — CON save, Prone condition on failure
-    if (te.effect === 'topple') {
-      effects.toppleEffect = true;
-      effects.saveType = te.saveType || 'CON';
-      effects.saveDc = te.saveDc || 'ability';
-      effects.saveAbility = te.saveAbility || 'CON';
-      effects.conditionToApply = 'prone';
-      effects.conditionDuration = te.duration || 'until_start_of_next_turn';
-    }
-    // Handle Slow — AC penalty and DEX save disadvantage
-    if (te.effect === 'ac_penalty') {
-      effects.acPenalty = (effects.acPenalty || 0) + (te.value || 2);
-    }
-    if (te.effect === 'dodge') {
-      effects.targetDisadvantageCount = (effects.targetDisadvantageCount || 0) + 1;
-      if (!effects.saveAdvantage.includes('dex')) {
-        effects.saveAdvantage.push('dex');
-      }
-    }
-    if (te.effect === 'bane_penalty') {
-      effects.banePenalty = true;
-    }
-    if (te.effect === 'bless_bonus') {
-      effects.blessBonus = true;
-    }
-    if (te.effect === 'beacon_of_hope') {
-      effects.beaconOfHope = true;
-      effects.saveAdvantageAbilities = [...new Set([...(effects.saveAdvantageAbilities || []), 'WIS'])];
-      effects.saveAdvantageReasons.push('Beacon of Hope');
-    }
-    if (te.effect === 'holy_aura') {
-      effects.targetDisadvantageCount = (effects.targetDisadvantageCount || 0) + 1;
-      effects.saveAdvantageCount = (effects.saveAdvantageCount || 0) + 1;
-      if (!effects.saveAdvantageReasons) {
-        effects.saveAdvantageReasons = [];
-      }
-      if (te.source && !effects.saveAdvantageReasons.includes(te.source)) {
-        effects.saveAdvantageReasons.push(te.source);
-      }
-      effects.saveAdvantageReasons.push('Holy Aura');
-    }
-    if (te.effect === 'circle_of_power') {
-      effects.saveAdvantage.push('against_spell');
-      effects.saveAdvantageReasons.push('Circle of Power');
-    }
-    if (te.effect === 'pass_without_trace_bonus') {
-      effects.passWithoutTraceBonus = te.bonusExpression || '10';
-    }
-    if (te.effect === 'dex_save_disadvantage') {
-      effects.slowDexSaveDisadvantage = true;
-      if (!effects.saveDisadvantage.includes('dex')) {
-        effects.saveDisadvantage.push('dex');
-      }
-    }
-    // Handle Heroism — Advantage on Wisdom saving throws
-    if (te.effect === 'wisdom_save_advantage') {
-      effects.saveAdvantageAbilities = [...(effects.saveAdvantageAbilities || []), 'WIS'];
-      effects.saveAdvantageCount = (effects.saveAdvantageCount || 0) + 1;
-      effects.saveAdvantageReasons = [...(effects.saveAdvantageReasons || []), te.source || 'Heroism'];
-    }
+    applyTargetEffect(effects, te, attackerSenses);
   }
 
   return effects

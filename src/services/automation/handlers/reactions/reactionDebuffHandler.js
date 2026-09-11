@@ -317,23 +317,7 @@ function parseMagicItemName(itemName) {
     return { baseName: itemName, magicBonus: 0 };
 }
 
-export async function handle(action, playerStats, campaignName, _mapName) {
-    const auto = action.automation;
-    const playerName = playerStats.name;
-    const featureName = action.name || 'Feature';
-
-    if (auto.requiresShield && !hasShield(playerStats)) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName}: You must be holding a Shield to use this Reaction.`,
-                automation: auto,
-            },
-        };
-    }
-
+function resolveUsesBudget(auto, playerStats, featureName) {
     const usesKey = getRuntimeUsesKey(featureName);
     const usesMax = auto.uses_expression
         ? (typeof auto.uses_expression === 'number'
@@ -347,288 +331,291 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         : 0;
 
     const effectiveUsesMax = usesMax || bardicUsesMax;
+    const effectiveUsesKey = bardicUsesMax > 0 ? 'bardicInspirationUses' : usesKey;
 
-    if (effectiveUsesMax > 0) {
-        const effectiveUsesKey = bardicUsesMax > 0 ? 'bardicInspirationUses' : usesKey;
-        const currentUses = Number(getRuntimeValue(playerName, effectiveUsesKey) ?? effectiveUsesMax);
-        if (currentUses <= 0) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: featureName,
-                    description: `${featureName} has no uses remaining. Recharges on a ${auto.recharge === 'short_rest' ? 'Short or Long Rest' : 'Long Rest'}.`,
-                    automation: auto,
-                },
-            };
+    return { effectiveUsesMax, effectiveUsesKey };
+}
+
+function currentUsesFor(playerName, budget) {
+    return Number(getRuntimeValue(playerName, budget.effectiveUsesKey) ?? budget.effectiveUsesMax);
+}
+
+async function spendUse(playerName, budget, campaignName) {
+    const currentUses = currentUsesFor(playerName, budget);
+    await setRuntimeValue(playerName, budget.effectiveUsesKey, currentUses - 1, campaignName);
+}
+
+const refused = (response) => ({ refused: true, response });
+const applied = (response, attackerName = null) => ({ refused: false, response, attackerName });
+
+async function handleAttacksVsAlly(action, auto, playerStats, playerName, campaignName, _mapName, combatSummary) {
+    const attackResult = await findLastAttack(campaignName);
+    const attackEvent = attackResult.attackEvent;
+    if (!attackEvent) {
+        return refused(infoPopup(action.name, `No recent attack found. ${action.name} can only be used after an attack roll.`, auto));
+    }
+
+    const lastAttackerName = attackResult.attackerName;
+    const defenderName = attackEvent.targetName;
+    if (!defenderName) {
+        return refused(infoPopup(action.name, `Could not determine who was attacked. Cannot apply ${action.name}.`, auto));
+    }
+
+    const rangeFt = auto.range ? parseInt(auto.range.replace(/[^0-9]/g, '')) || 5 : 5;
+    if (_mapName && rangeFt != null) {
+        const positions = await resolveMapPositions(campaignName, playerName);
+        if (positions?.attackerPos && positions?.targetPos) {
+            const inRange = await isWithinRange(playerName, lastAttackerName, rangeFt);
+            if (!inRange) {
+                return refused(infoPopup(action.name, `${lastAttackerName} is out of range.`, auto));
+            }
         }
     }
 
-    const combatSummary = await getCombatContext(campaignName);
-    if (!combatSummary) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `No combat context found. Cannot apply ${featureName}.`,
-                automation: auto,
-            },
-        };
-    }
+    const duration = auto.duration || 'until_start_of_next_turn';
 
-    const effect = auto.effect || '';
-    let attackerName = null;
-
-    let result;
-
-    if (effect === 'disadvantage_on_attacks_vs_ally') {
-        const attackResult = await findLastAttack(campaignName);
-        const attackEvent = attackResult.attackEvent;
-        if (!attackEvent) {
-            return infoPopup(action.name, `No recent attack found. ${action.name} can only be used after an attack roll.`, auto);
-        }
-
-        const lastAttackerName = attackResult.attackerName;
-        const defenderName = attackEvent.targetName;
-        if (!defenderName) {
-            return infoPopup(action.name, `Could not determine who was attacked. Cannot apply ${action.name}.`, auto);
-        }
-
-        const rangeFt = auto.range ? parseInt(auto.range.replace(/[^0-9]/g, '')) || 5 : 5;
-        if (_mapName && rangeFt != null) {
-            const positions = await resolveMapPositions(campaignName, playerName);
-            if (positions?.attackerPos && positions?.targetPos) {
-                const inRange = await isWithinRange(playerName, lastAttackerName, rangeFt);
-                if (!inRange) {
-                    return infoPopup(action.name, `${lastAttackerName} is out of range.`, auto);
-                }
-            }
-        }
-
-        const duration = auto.duration || 'until_start_of_next_turn';
-
-        const storedEffects = [...getRuntimeValue('campaign', 'targetEffects') || []];
-        const protectionEffect = {
-            effect: 'protection',
-            target: defenderName,
-            source: playerName,
-            duration: duration,
-            timestamp: Date.now(),
-        };
-        const existingIndex = storedEffects.findIndex(
-            te => te.effect === 'protection' && te.target === defenderName
-        );
-        if (existingIndex === -1) {
-            storedEffects.push(protectionEffect);
-        } else {
-            storedEffects[existingIndex] = protectionEffect;
-        }
-        await setRuntimeValue('campaign', 'targetEffects', storedEffects, campaignName);
-
-        result = await handleDisadvantageDebuff(action, playerStats, campaignName, _mapName, lastAttackerName, combatSummary);
-    } else if (effect === 'disadvantage_on_attack_roll') {
-        // CLA-383: attacks resolve atomically (no pre-roll reaction seam), so a
-        // post-roll second-d20 simulation never touches the real attack roll and
-        // re-fired unlimited times on one resolved attack. Adjudicate instead like
-        // the verified pre-hit te producers (CLA-377 Vicious Mockery, Sap, Tumble):
-        // gate the trigger, spend one use, and write te disadvantage_next_attack so
-        // the attacker's next attack roll resolves with forcedMode:'disadvantage'.
-        const refusalTag = featureName.toLowerCase().replace(/\s+/g, '_') + '_refused';
-        const refuse = (description) => {
-            addEntry(campaignName, {
-                type: 'automation',
-                characterName: playerName,
-                automationType: refusalTag,
-                name: featureName,
-                description,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[reactionDebuff] Error:", e); });
-            return infoPopup(action.name, description, auto);
-        };
-
-        const attackResult = await findLastAttack(campaignName);
-        const attackEvent = attackResult.attackEvent;
-        if (!attackEvent) {
-            return refuse(`No recent attack roll found. ${featureName} can only be used in reaction to an attack roll.`);
-        }
-
-        const attackAttackerName = attackResult.attackerName;
-        if (!attackAttackerName || attackAttackerName === playerName) {
-            return refuse(`${featureName} cannot be used against your own attack rolls.`);
-        }
-
-        const flareDefenderName = attackEvent.targetName;
-        const currentRound = combatSummary.round || 1;
-
-        const rangeFt = rangeToFeet(auto.range || '30_ft');
-        if (_mapName) {
-            const positions = await resolveMapPositions(campaignName, playerName);
-            if (positions?.attackerPos && positions?.targetPos) {
-                const inRange = await isWithinRange(playerName, attackAttackerName, rangeFt);
-                if (!inRange) {
-                    return refuse(`${attackAttackerName} is out of range of ${playerName} — ${featureName} requires the attacker to be within ${rangeFt} feet.`);
-                }
-            }
-        }
-
-        const latchKey = '_' + featureName.replace(/\s+/g, '_') + '_usedRound';
-        if (getRuntimeValue(playerName, latchKey) === currentRound) {
-            return refuse(`${featureName} has already been used this round — a Reaction can only be taken once per round. It re-arms when the next round begins.`);
-        }
-
-        const flareEffects = [...(getRuntimeValue('campaign', 'targetEffects') || [])];
-        const flareEffect = {
-            effect: 'disadvantage_next_attack',
-            target: attackAttackerName,
-            source: playerName,
-            duration: 'until_used',
-            appliedRound: currentRound,
-            timestamp: Date.now(),
-        };
-        const flareIndex = flareEffects.findIndex(
-            te => te.effect === 'disadvantage_next_attack' && te.target === attackAttackerName && te.source === playerName
-        );
-        if (flareIndex === -1) {
-            flareEffects.push(flareEffect);
-        } else {
-            flareEffects[flareIndex] = flareEffect;
-        }
-        await setRuntimeValue('campaign', 'targetEffects', flareEffects, campaignName);
-
-        await setRuntimeValue(playerName, latchKey, currentRound, campaignName);
-
-        addExpiration(playerName, attackAttackerName, [
-            { type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: playerName },
-        ], campaignName, undefined, playerName);
-
-        let flareDescription = `<b>${action.name}</b><br/>Light flares between ${flareDefenderName || 'the target'} and ${attackAttackerName}.<br/>`;
-        flareDescription += `${attackAttackerName} has Disadvantage on its next attack roll (until used, or until the start of ${playerName}'s next turn).`;
-
-        attackerName = attackAttackerName;
-        result = infoPopup(action.name, flareDescription, auto, { defenderName: flareDefenderName, attackerName: attackAttackerName });
-    } else if (effect === 'teleport_and_slow') {
-        result = await handleTeleportAndSlow(action, playerStats, campaignName, _mapName);
+    const storedEffects = [...getRuntimeValue('campaign', 'targetEffects') || []];
+    const protectionEffect = {
+        effect: 'protection',
+        target: defenderName,
+        source: playerName,
+        duration: duration,
+        timestamp: Date.now(),
+    };
+    const existingIndex = storedEffects.findIndex(
+        te => te.effect === 'protection' && te.target === defenderName
+    );
+    if (existingIndex === -1) {
+        storedEffects.push(protectionEffect);
     } else {
-        const targetInfo = await resolveTarget(campaignName, playerName);
-        if (!targetInfo?.target) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: featureName,
-                    description: `${featureName} requires a target. Select a creature in combat and try again.`,
-                    automation: auto,
-                },
-            };
-        }
+        storedEffects[existingIndex] = protectionEffect;
+    }
+    await setRuntimeValue('campaign', 'targetEffects', storedEffects, campaignName);
 
-        attackerName = targetInfo.target.name;
-        const rangeFt = auto.range ? parseInt(auto.range.replace(/[^0-9]/g, '')) || 60 : 60;
+    const result = await handleDisadvantageDebuff(action, playerStats, campaignName, _mapName, lastAttackerName, combatSummary);
+    return applied(result);
+}
 
-        if (_mapName && rangeFt != null) {
-            const positions = await resolveMapPositions(campaignName, playerName);
-            if (positions?.attackerPos && positions?.targetPos) {
-                const inRange = await isWithinRange(playerName, attackerName, rangeFt);
-                if (!inRange) {
-                    return {
-                        type: 'popup',
-                        payload: {
-                            type: 'automation_info',
-                            name: featureName,
-                            description: `${attackerName} is out of range.`,
-                            automation: auto,
-                        },
-                    };
-                }
+// CLA-383: attacks resolve atomically (no pre-roll reaction seam), so a
+// post-roll second-d20 simulation never touches the real attack roll and
+// re-fired unlimited times on one resolved attack. Adjudicate instead like
+// the verified pre-hit te producers (CLA-377 Vicious Mockery, Sap, Tumble):
+// gate the trigger, spend one use, and write te disadvantage_next_attack so
+// the attacker's next attack roll resolves with forcedMode:'disadvantage'.
+async function handleWardingFlare(action, auto, playerName, featureName, campaignName, _mapName, combatSummary) {
+    const refusalTag = featureName.toLowerCase().replace(/\s+/g, '_') + '_refused';
+    const refuse = (description) => {
+        addEntry(campaignName, {
+            type: 'automation',
+            characterName: playerName,
+            automationType: refusalTag,
+            name: featureName,
+            description,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[reactionDebuff] Error:", e); });
+        return refused(infoPopup(action.name, description, auto));
+    };
+
+    const attackResult = await findLastAttack(campaignName);
+    const attackEvent = attackResult.attackEvent;
+    if (!attackEvent) {
+        return refuse(`No recent attack roll found. ${featureName} can only be used in reaction to an attack roll.`);
+    }
+
+    const attackAttackerName = attackResult.attackerName;
+    if (!attackAttackerName || attackAttackerName === playerName) {
+        return refuse(`${featureName} cannot be used against your own attack rolls.`);
+    }
+
+    const flareDefenderName = attackEvent.targetName;
+    const currentRound = combatSummary.round || 1;
+
+    const rangeFt = rangeToFeet(auto.range || '30_ft');
+    if (_mapName) {
+        const positions = await resolveMapPositions(campaignName, playerName);
+        if (positions?.attackerPos && positions?.targetPos) {
+            const inRange = await isWithinRange(playerName, attackAttackerName, rangeFt);
+            if (!inRange) {
+                return refuse(`${attackAttackerName} is out of range of ${playerName} — ${featureName} requires the attacker to be within ${rangeFt} feet.`);
             }
         }
-
-        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-        const bardicDieSize = classLevel?.bardic_die || 6;
-        const biDieRoll = Math.floor(Math.random() * bardicDieSize) + 1;
-
-        const attackResult = await findLastAttack(campaignName);
-        const attackEvent = attackResult.attackEvent;
-        const hasAttack = attackEvent && attackResult.attackerName === attackerName;
-
-        if (!hasAttack) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: featureName,
-                    description: `No recent roll found for ${attackerName} (attack, damage, or ability check). ${featureName} must be used shortly after the roll.`,
-                    automation: auto,
-                },
-            };
-        }
-
-        if (attackEvent?.damageTypes?.length || attackResult.totalDamage > 0) {
-            result = await handleDamageDebuff(action, playerStats, campaignName, _mapName, attackerName, bardicDieSize, biDieRoll, combatSummary);
-        } else {
-            result = await handleAttackRollDebuff(action, playerStats, campaignName, _mapName, attackerName, bardicDieSize, biDieRoll, combatSummary);
-        }
     }
 
-    if (effectiveUsesMax > 0) {
-        const effectiveUsesKey = bardicUsesMax > 0 ? 'bardicInspirationUses' : usesKey;
-        const currentUses = Number(getRuntimeValue(playerName, effectiveUsesKey) ?? effectiveUsesMax);
-        await setRuntimeValue(playerName, effectiveUsesKey, currentUses - 1, campaignName);
+    const latchKey = '_' + featureName.replace(/\s+/g, '_') + '_usedRound';
+    if (getRuntimeValue(playerName, latchKey) === currentRound) {
+        return refuse(`${featureName} has already been used this round — a Reaction can only be taken once per round. It re-arms when the next round begins.`);
     }
 
-    if (effect === 'disadvantage_on_attacks_vs_ally') {
-        const defenderName = result?.defenderName || 'the target';
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerName,
-            abilityName: featureName,
-            description: result.payload.description,
-            targetName: defenderName,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[reactionDebuff] Error:", e); });
-        return result;
+    const flareEffects = [...(getRuntimeValue('campaign', 'targetEffects') || [])];
+    const flareEffect = {
+        effect: 'disadvantage_next_attack',
+        target: attackAttackerName,
+        source: playerName,
+        duration: 'until_used',
+        appliedRound: currentRound,
+        timestamp: Date.now(),
+    };
+    const flareIndex = flareEffects.findIndex(
+        te => te.effect === 'disadvantage_next_attack' && te.target === attackAttackerName && te.source === playerName
+    );
+    if (flareIndex === -1) {
+        flareEffects.push(flareEffect);
+    } else {
+        flareEffects[flareIndex] = flareEffect;
+    }
+    await setRuntimeValue('campaign', 'targetEffects', flareEffects, campaignName);
+
+    await setRuntimeValue(playerName, latchKey, currentRound, campaignName);
+
+    addExpiration(playerName, attackAttackerName, [
+        { type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: playerName },
+    ], campaignName, undefined, playerName);
+
+    let flareDescription = `<b>${action.name}</b><br/>Light flares between ${flareDefenderName || 'the target'} and ${attackAttackerName}.<br/>`;
+    flareDescription += `${attackAttackerName} has Disadvantage on its next attack roll (until used, or until the start of ${playerName}'s next turn).`;
+
+    return applied(infoPopup(action.name, flareDescription, auto, { defenderName: flareDefenderName, attackerName: attackAttackerName }), attackAttackerName);
+}
+
+async function handleBardicRoll(action, auto, playerStats, playerName, featureName, campaignName, _mapName, combatSummary) {
+    const targetInfo = await resolveTarget(campaignName, playerName);
+    if (!targetInfo?.target) {
+        return refused(infoPopup(featureName, `${featureName} requires a target. Select a creature in combat and try again.`, auto));
     }
 
-    if (effect === 'disadvantage_on_attack_roll') {
-        const defenderName = result?.defenderName;
-        if (defenderName) {
-            const tempHpAmount = await applyImprovedWardingFlare(playerStats, campaignName, defenderName);
-            if (tempHpAmount) {
-                result.payload.description += `<br/><br/>${defenderName} gains ${tempHpAmount} Temporary Hit Points from Improved Warding Flare.`;
+    const attackerName = targetInfo.target.name;
+    const rangeFt = auto.range ? parseInt(auto.range.replace(/[^0-9]/g, '')) || 60 : 60;
+
+    if (_mapName && rangeFt != null) {
+        const positions = await resolveMapPositions(campaignName, playerName);
+        if (positions?.attackerPos && positions?.targetPos) {
+            const inRange = await isWithinRange(playerName, attackerName, rangeFt);
+            if (!inRange) {
+                return refused(infoPopup(featureName, `${attackerName} is out of range.`, auto));
             }
         }
+    }
 
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerName,
-            abilityName: featureName,
-            description: `${playerName} used ${featureName} to give ${attackerName} Disadvantage on their next attack roll.`,
-            targetName: attackerName,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[reactionDebuff] Error:", e); });
+    const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+    const bardicDieSize = classLevel?.bardic_die || 6;
+    const biDieRoll = Math.floor(Math.random() * bardicDieSize) + 1;
 
-        addEntry(campaignName, {
-            type: 'condition',
-            characterName: playerName,
-            targetName: attackerName,
-            condition: 'Disadvantage on next attack',
-            source: featureName,
-            description: `${attackerName} has Disadvantage on its next attack roll (from ${playerName}'s ${featureName}).`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[reactionDebuff] Error:", e); });
+    const attackResult = await findLastAttack(campaignName);
+    const attackEvent = attackResult.attackEvent;
+    const hasAttack = attackEvent && attackResult.attackerName === attackerName;
 
-        return result;
+    if (!hasAttack) {
+        return refused(infoPopup(featureName, `No recent roll found for ${attackerName} (attack, damage, or ability check). ${featureName} must be used shortly after the roll.`, auto));
+    }
+
+    if (attackEvent?.damageTypes?.length || attackResult.totalDamage > 0) {
+        const result = await handleDamageDebuff(action, playerStats, campaignName, _mapName, attackerName, bardicDieSize, biDieRoll, combatSummary);
+        return applied(result, attackerName);
+    }
+
+    const result = await handleAttackRollDebuff(action, playerStats, campaignName, _mapName, attackerName, bardicDieSize, biDieRoll, combatSummary);
+    return applied(result, attackerName);
+}
+
+async function logAttacksVsAllyTail(playerName, featureName, campaignName, result) {
+    const defenderName = result?.defenderName || 'the target';
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: featureName,
+        description: result.payload.description,
+        targetName: defenderName,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[reactionDebuff] Error:", e); });
+    return result;
+}
+
+async function logWardingFlareTail(action, playerStats, playerName, featureName, campaignName, attackerName, result) {
+    const defenderName = result?.defenderName;
+    if (defenderName) {
+        const tempHpAmount = await applyImprovedWardingFlare(playerStats, campaignName, defenderName);
+        if (tempHpAmount) {
+            result.payload.description += `<br/><br/>${defenderName} gains ${tempHpAmount} Temporary Hit Points from Improved Warding Flare.`;
+        }
     }
 
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
         abilityName: featureName,
-        description: result.payload.description,
+        description: `${playerName} used ${featureName} to give ${attackerName} Disadvantage on their next attack roll.`,
         targetName: attackerName,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[reactionDebuff] Error:", e); });
 
+    addEntry(campaignName, {
+        type: 'condition',
+        characterName: playerName,
+        targetName: attackerName,
+        condition: 'Disadvantage on next attack',
+        source: featureName,
+        description: `${attackerName} has Disadvantage on its next attack roll (from ${playerName}'s ${featureName}).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[reactionDebuff] Error:", e); });
+
     return result;
+}
+
+export async function handle(action, playerStats, campaignName, _mapName) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+    const featureName = action.name || 'Feature';
+
+    if (auto.requiresShield && !hasShield(playerStats)) {
+        return infoPopup(featureName, `${featureName}: You must be holding a Shield to use this Reaction.`, auto);
+    }
+
+    const budget = resolveUsesBudget(auto, playerStats, featureName);
+
+    if (budget.effectiveUsesMax > 0 && currentUsesFor(playerName, budget) <= 0) {
+        return infoPopup(featureName, `${featureName} has no uses remaining. Recharges on a ${auto.recharge === 'short_rest' ? 'Short or Long Rest' : 'Long Rest'}.`, auto);
+    }
+
+    const combatSummary = await getCombatContext(campaignName);
+    if (!combatSummary) {
+        return infoPopup(featureName, `No combat context found. Cannot apply ${featureName}.`, auto);
+    }
+
+    const effect = auto.effect || '';
+    let outcome;
+
+    if (effect === 'disadvantage_on_attacks_vs_ally') {
+        outcome = await handleAttacksVsAlly(action, auto, playerStats, playerName, campaignName, _mapName, combatSummary);
+    } else if (effect === 'disadvantage_on_attack_roll') {
+        outcome = await handleWardingFlare(action, auto, playerName, featureName, campaignName, _mapName, combatSummary);
+    } else if (effect === 'teleport_and_slow') {
+        outcome = applied(await handleTeleportAndSlow(action, playerStats, campaignName, _mapName));
+    } else {
+        outcome = await handleBardicRoll(action, auto, playerStats, playerName, featureName, campaignName, _mapName, combatSummary);
+    }
+
+    if (outcome.refused) return outcome.response;
+
+    if (budget.effectiveUsesMax > 0) {
+        await spendUse(playerName, budget, campaignName);
+    }
+
+    if (effect === 'disadvantage_on_attacks_vs_ally') {
+        return logAttacksVsAllyTail(playerName, featureName, campaignName, outcome.response);
+    }
+
+    if (effect === 'disadvantage_on_attack_roll') {
+        return logWardingFlareTail(action, playerStats, playerName, featureName, campaignName, outcome.attackerName, outcome.response);
+    }
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: featureName,
+        description: outcome.response.payload.description,
+        targetName: outcome.attackerName,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[reactionDebuff] Error:", e); });
+
+    return outcome.response;
 }

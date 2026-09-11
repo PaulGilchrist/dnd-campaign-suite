@@ -3,6 +3,82 @@ import { executeSpellCast } from '../../services/rules/spells/spellCastService.j
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
 import { getClassFeatures } from '../../services/character/classFeatures.js'
 
+const MONK_KI_FEATURES = ['Flurry of Blows', 'Patient Defense', 'Step of the Wind', 'Heightened Flurry of Blows', 'Heightened Patient Defense', 'Heightened Step of the Wind', 'Hand of Healing', 'Stunning Strike'];
+
+async function gateStunningStrike({ action, auto, playerName, campaignName, getRuntimeValue, addEntry, setPopupHtml }) {
+    if (!(action.name === 'Stunning Strike' && auto?.trigger === 'monk_weapon_or_unarmed_hit')) {
+        return { armed: false, round: 1, blocked: false };
+    }
+    const lastAttack = getRuntimeValue('campaign', 'lastAttack', campaignName);
+    const combat = await getCombatContext(campaignName);
+    const stunningStrikeRound = combat?.round || 1;
+    const denyStunningStrike = (reason) => {
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: action.name,
+            description: `${action.name} blocked — ${reason}`,
+        }).catch((e) => { console.error("[useCharActionsAutomation:log-error]", e); });
+        setPopupHtml(`<b>${action.name}</b><br/>${reason}`);
+    };
+    const used = getRuntimeValue(playerName, '_StunningStrike_usedRound', campaignName);
+    if (used && stunningStrikeRound <= (used.round ?? stunningStrikeRound)) {
+        denyStunningStrike('Once per turn — already used this turn.');
+        return { armed: false, round: stunningStrikeRound, blocked: true };
+    }
+    if (!lastAttack || lastAttack.attackerName !== playerName) {
+        denyStunningStrike('Last attack was not made by you.');
+        return { armed: false, round: stunningStrikeRound, blocked: true };
+    }
+    if (lastAttack.weaponType !== 'melee' || lastAttack.isAutoMiss === true) {
+        denyStunningStrike('Requires a melee weapon attack.');
+        return { armed: false, round: stunningStrikeRound, blocked: true };
+    }
+    if (lastAttack.hit !== true) {
+        denyStunningStrike('Last melee attack did not hit.');
+        return { armed: false, round: stunningStrikeRound, blocked: true };
+    }
+    return { armed: true, round: stunningStrikeRound, blocked: false };
+}
+
+async function spendMonkFocusPoint({ action, auto, playerStats, playerName, campaignName, cloakActive, hasFlurryHealingHarm, stunningStrikeArmed, stunningStrikeRound, getRuntimeValue, setRuntimeValue, setPopupHtml, addEntry }) {
+    // Spend 1 focus point for monk Ki features before dispatching
+    // Skip FP cost for Hand of Healing and Flurry of Blows when Flurry of Healing and Harm is active
+    // Skip FP cost for Flurry of Blows when Cloak of Shadows (Shadow Flurry) is active
+    // Skip pre-spend for 2024 patient_defense: patientDefenseHandler is the sole FP
+    // writer (focus mode spends 1 FP, plain Disengage spends none) — pre-spending here
+    // double-charged and blocked the plain-Disengage fallback (CLA-247)
+    // Skip pre-spend for step_of_the_wind too: stepOfTheWindHandler is the sole FP
+    // writer for both rulesets (gates FP>=1, spends once, writes the Disengage te) —
+    // pre-spending here double-charged 2 FP per click (CLA-333)
+    if (!(MONK_KI_FEATURES.includes(action.name) && auto?.type !== 'patient_defense' && auto?.type !== 'step_of_the_wind')) {
+        return true;
+    }
+    const skipFP = (hasFlurryHealingHarm && (action.name === 'Hand of Healing' || action.name === 'Flurry of Blows' || action.name === 'Heightened Flurry of Blows'))
+        || (cloakActive && (action.name === 'Flurry of Blows' || action.name === 'Heightened Flurry of Blows'));
+    if (skipFP) return true;
+    const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+    const maxFP = classLevel?.focus_points || getClassFeatures(playerStats)?.maxFocusPoints || 0;
+    const storedFP = getRuntimeValue(playerStats.name, 'focusPoints', campaignName);
+    const currentFP = storedFP != null ? Number(storedFP) : (playerStats._trackedResources?.focusPoints?.current ?? maxFP);
+    if (currentFP <= 0) {
+        setPopupHtml(`<b>${action.name}</b><br/>No ${playerStats.rules === '2024' ? "Focus Points" : 'ki points'} remaining.`);
+        return false;
+    }
+    await setRuntimeValue(playerStats.name, 'focusPoints', currentFP - 1, campaignName);
+    window.dispatchEvent(new CustomEvent('focus-points-updated'));
+    if (stunningStrikeArmed) {
+        await setRuntimeValue(playerStats.name, '_StunningStrike_usedRound', { round: stunningStrikeRound, activeCreature: playerName }, campaignName);
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: action.name,
+            description: `${action.name} — expended 1 ${playerStats.rules === '2024' ? 'Focus Point' : 'ki point'} to attempt to stun ${getRuntimeValue('campaign', 'lastAttack', campaignName)?.targetName || 'target'}.`,
+        }).catch((e) => { console.error("[useCharActionsAutomation:log-error]", e); });
+    }
+    return true;
+}
+
 export default function useCharActionsAutomation({
     cannotAct,
     playerStats,
@@ -21,7 +97,6 @@ export default function useCharActionsAutomation({
     onBuffsChange,
 }) {
     async function handleAutomationAction(action) {
-        const MONK_KI_FEATURES = ['Flurry of Blows', 'Patient Defense', 'Step of the Wind', 'Heightened Flurry of Blows', 'Heightened Patient Defense', 'Heightened Step of the Wind', 'Hand of Healing', 'Stunning Strike'];
         const HAS_FLURRY_HEALING_HARM = playerStats.specialActions?.some(f => f.name === "Flurry of Healing and Harm");
 
         const simpleModal = (stateKey) => (payload) => setModalState({ [stateKey]: payload });
@@ -156,40 +231,10 @@ export default function useCharActionsAutomation({
         // CLA-342: Stunning Strike fires only when your own melee weapon/unarmed
         // attack HIT, once per turn — refuse before any Focus Point/ki is spent
         // (mirrors the verified quiveringPalmHandler lastAttack hit gates).
-        let stunningStrikeArmed = false;
-        let stunningStrikeRound = 1;
-        if (action.name === 'Stunning Strike' && auto?.trigger === 'monk_weapon_or_unarmed_hit') {
-            const lastAttack = getRuntimeValue('campaign', 'lastAttack', campaignName);
-            const combat = await getCombatContext(campaignName);
-            stunningStrikeRound = combat?.round || 1;
-            const denyStunningStrike = (reason) => {
-                addEntry(campaignName, {
-                    type: 'ability_use',
-                    characterName: playerName,
-                    abilityName: action.name,
-                    description: `${action.name} blocked — ${reason}`,
-                }).catch((e) => { console.error("[useCharActionsAutomation:log-error]", e); });
-                setPopupHtml(`<b>${action.name}</b><br/>${reason}`);
-            };
-            const used = getRuntimeValue(playerName, '_StunningStrike_usedRound', campaignName);
-            if (used && stunningStrikeRound <= (used.round ?? stunningStrikeRound)) {
-                denyStunningStrike('Once per turn — already used this turn.');
-                return;
-            }
-            if (!lastAttack || lastAttack.attackerName !== playerName) {
-                denyStunningStrike('Last attack was not made by you.');
-                return;
-            }
-            if (lastAttack.weaponType !== 'melee' || lastAttack.isAutoMiss === true) {
-                denyStunningStrike('Requires a melee weapon attack.');
-                return;
-            }
-            if (lastAttack.hit !== true) {
-                denyStunningStrike('Last melee attack did not hit.');
-                return;
-            }
-            stunningStrikeArmed = true;
-        }
+        const ssGate = await gateStunningStrike({ action, auto, playerName, campaignName, getRuntimeValue, addEntry, setPopupHtml });
+        if (ssGate.blocked) return;
+        const stunningStrikeArmed = ssGate.armed;
+        const stunningStrikeRound = ssGate.round;
 
         // If feature has options that need choosing (e.g. Blessed Strikes), present choice
         if (auto?.type === 'damage_bonus' && auto?.options?.length > 0) {
@@ -211,40 +256,8 @@ export default function useCharActionsAutomation({
             }
         }
 
-        // Spend 1 focus point for monk Ki features before dispatching
-        // Skip FP cost for Hand of Healing and Flurry of Blows when Flurry of Healing and Harm is active
-        // Skip FP cost for Flurry of Blows when Cloak of Shadows (Shadow Flurry) is active
-        // Skip pre-spend for 2024 patient_defense: patientDefenseHandler is the sole FP
-        // writer (focus mode spends 1 FP, plain Disengage spends none) — pre-spending here
-        // double-charged and blocked the plain-Disengage fallback (CLA-247)
-        // Skip pre-spend for step_of_the_wind too: stepOfTheWindHandler is the sole FP
-        // writer for both rulesets (gates FP>=1, spends once, writes the Disengage te) —
-        // pre-spending here double-charged 2 FP per click (CLA-333)
-        if (MONK_KI_FEATURES.includes(action.name) && auto?.type !== 'patient_defense' && auto?.type !== 'step_of_the_wind') {
-            const skipFP = (HAS_FLURRY_HEALING_HARM && (action.name === 'Hand of Healing' || action.name === 'Flurry of Blows' || action.name === 'Heightened Flurry of Blows'))
-                || (cloakActive && (action.name === 'Flurry of Blows' || action.name === 'Heightened Flurry of Blows'));
-            if (!skipFP) {
-                const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-                const maxFP = classLevel?.focus_points || getClassFeatures(playerStats)?.maxFocusPoints || 0;
-                const storedFP = getRuntimeValue(playerStats.name, 'focusPoints', campaignName);
-                const currentFP = storedFP != null ? Number(storedFP) : (playerStats._trackedResources?.focusPoints?.current ?? maxFP);
-                if (currentFP <= 0) {
-                    setPopupHtml(`<b>${action.name}</b><br/>No ${playerStats.rules === '2024' ? "Focus Points" : 'ki points'} remaining.`);
-                    return;
-                }
-                await setRuntimeValue(playerStats.name, 'focusPoints', currentFP - 1, campaignName);
-                window.dispatchEvent(new CustomEvent('focus-points-updated'));
-                if (stunningStrikeArmed) {
-                    await setRuntimeValue(playerStats.name, '_StunningStrike_usedRound', { round: stunningStrikeRound, activeCreature: playerName }, campaignName);
-                    addEntry(campaignName, {
-                        type: 'ability_use',
-                        characterName: playerName,
-                        abilityName: action.name,
-                        description: `${action.name} — expended 1 ${playerStats.rules === '2024' ? 'Focus Point' : 'ki point'} to attempt to stun ${getRuntimeValue('campaign', 'lastAttack', campaignName)?.targetName || 'target'}.`,
-                    }).catch((e) => { console.error("[useCharActionsAutomation:log-error]", e); });
-                }
-            }
-        }
+        const fpProceed = await spendMonkFocusPoint({ action, auto, playerStats, playerName, campaignName, cloakActive, hasFlurryHealingHarm: HAS_FLURRY_HEALING_HARM, stunningStrikeArmed, stunningStrikeRound, getRuntimeValue, setRuntimeValue, setPopupHtml, addEntry });
+        if (!fpProceed) return;
 
         // Check trigger conditions for gated actions
         if (auto?.trigger && auto.trigger !== '') {

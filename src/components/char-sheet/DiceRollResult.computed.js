@@ -1,10 +1,62 @@
 import { useState } from 'react';
 
+const DAMAGE_ROLL_TYPES = new Set(['damage', 'save-damage', 'aoe-damage', 'overchannel-damage', 'graze-damage']);
+const CHECK_ROLL_TYPES = new Set(['check', 'skill']);
+
+function computeIsDamageType(type, rollType) {
+    return DAMAGE_ROLL_TYPES.has(type) || DAMAGE_ROLL_TYPES.has(rollType);
+}
+
+function computeFinalRoll(mode, safeRolls) {
+    const r1 = safeRolls[0] || 0;
+    const r2 = safeRolls[1] || 0;
+    if (mode === 'advantage') return Math.max(r1, r2);
+    if (mode === 'disadvantage') return Math.min(r1, r2);
+    return r1;
+}
+
+function computeDisplayRoll({ luckyRerolled, luckyRerollValue, strokeResult, rerollResult, bardicInspirationResult, finalRoll }) {
+    if (luckyRerolled) return luckyRerollValue;
+    if (strokeResult !== null) return 20;
+    if (rerollResult !== null) return rerollResult.roll;
+    if (bardicInspirationResult !== null) return bardicInspirationResult.d20Roll;
+    return finalRoll;
+}
+
+function computeDisplayTotal({ luckyRerolled, luckyRerollValue, bonus, modifier, strokeResult, rerollResult, bardicInspirationResult, originalTotal }) {
+    if (luckyRerolled) return luckyRerollValue + bonus + modifier;
+    if (strokeResult !== null) return 20 + bonus + modifier;
+    if (rerollResult !== null) return rerollResult.total;
+    if (bardicInspirationResult !== null) return bardicInspirationResult.total;
+    return originalTotal;
+}
+
+function computeBaseTotal({ starryDragonFloorTotal, d20Floor10Total, reliableTalentTotal, wisCheckApplies, wisDisplayTotal, finalDisplayTotal }) {
+    if (starryDragonFloorTotal !== null) return starryDragonFloorTotal;
+    if (d20Floor10Total !== null) return d20Floor10Total;
+    if (reliableTalentTotal !== null) return reliableTalentTotal;
+    if (wisCheckApplies) return wisDisplayTotal;
+    return finalDisplayTotal;
+}
+
+function computeEffectiveAc(props) {
+    if (props.effectiveAc !== undefined) return props.effectiveAc;
+    if (props.targetAc === undefined) return undefined;
+    return props.targetAc + (props.coverAcBonus || 0) + (props.defensiveDuelistBonus || 0) + (props.baitAndSwitchBonus || 0)
+        + (props.shieldAcBonus || 0) + (props.shieldOfFaithAcBonus || 0) + (props.wardingBondAcBonus || 0) - (props.slowAcPenalty || 0);
+}
+
+function computeD20TestFailed({ waitingForPlayerSave, computedHit, isAutoMiss, saveResult, success }) {
+    if (waitingForPlayerSave) return false;
+    if (computedHit !== undefined) return !computedHit && !isAutoMiss;
+    if (saveResult && saveResult.success !== undefined) return saveResult.success !== true;
+    return success !== true;
+}
+
 export function useDiceRollState(props) {
     const {
         rolls, rollType, bonus = 0, modifier = 0, total = 0,
-        targetAc, hit, isAutoMiss, coverAcBonus, defensiveDuelistBonus, baitAndSwitchBonus,
-        shieldAcBonus, shieldOfFaithAcBonus, wardingBondAcBonus, slowAcPenalty,
+        hit, isAutoMiss,
         reliableTalent, d20Floor10, starryDragonFloor, strSaveReplace, strCheckReplace, strScore,
         wisCheckReplace, wisCheckMinBonus, luckyRerolled, luckyRerollValue,
         targetName, homingStrikesBonus,
@@ -44,40 +96,26 @@ export function useDiceRollState(props) {
     const [savageAttackerResult, setSavageAttackerResult] = useState(null);
 
     const isD20 = type === 'd20';
-    const isDamageType = type === 'damage' || rollType === 'damage' || type === 'save-damage' || rollType === 'save-damage' || type === 'aoe-damage' || rollType === 'aoe-damage' || type === 'overchannel-damage' || rollType === 'overchannel-damage' || type === 'graze-damage' || rollType === 'graze-damage';
+    const isDamageType = computeIsDamageType(type, rollType);
     const isHealType = type === 'heal';
     const isCritDamage = isDamageType && (isCrit || isAutoCrit);
 
     const safeRolls = Array.isArray(rolls) ? rolls : [];
-    let finalRoll = 0;
-
-    if (isD20) {
-        const r1 = safeRolls[0] || 0;
-        const r2 = safeRolls[1] || 0;
-
-        if (mode === 'advantage') {
-            finalRoll = Math.max(r1, r2);
-        } else if (mode === 'disadvantage') {
-            finalRoll = Math.min(r1, r2);
-        } else {
-            finalRoll = r1;
-        }
-    } else {
-        finalRoll = safeRolls.reduce((sum, r) => sum + r, 0);
-    }
+    const finalRoll = isD20 ? computeFinalRoll(mode, safeRolls) : safeRolls.reduce((sum, r) => sum + r, 0);
 
     const originalTotal = (isDamageType || isHealType) ? total : (finalRoll + bonus + modifier);
-    const displayRoll = luckyRerolled ? luckyRerollValue : (strokeResult !== null ? 20 : (rerollResult !== null ? rerollResult.roll : (bardicInspirationResult !== null ? bardicInspirationResult.d20Roll : finalRoll)));
-    const displayTotal = luckyRerolled ? (luckyRerollValue + bonus + modifier) : (strokeResult !== null ? 20 + bonus + modifier : (rerollResult !== null ? rerollResult.total : (bardicInspirationResult !== null ? bardicInspirationResult.total : originalTotal)));
-    const appliesReplace = (strSaveReplace && rollType === 'save') || (strCheckReplace && (rollType === 'check' || rollType === 'skill'));
+    const displayRoll = computeDisplayRoll({ luckyRerolled, luckyRerollValue, strokeResult, rerollResult, bardicInspirationResult, finalRoll });
+    const displayTotal = computeDisplayTotal({ luckyRerolled, luckyRerollValue, bonus, modifier, strokeResult, rerollResult, bardicInspirationResult, originalTotal });
+    const appliesReplace = (strSaveReplace && rollType === 'save') || (strCheckReplace && CHECK_ROLL_TYPES.has(rollType));
     const strReplaceApplied = appliesReplace && displayTotal < (strScore || 10);
     const finalDisplayTotal = strReplaceApplied ? strScore : displayTotal;
     const wisBonus = wisCheckReplace ? (wisCheckMinBonus || 1) : bonus;
-    const wisDisplayTotal = wisCheckReplace && (rollType === 'check' || rollType === 'skill') ? finalRoll + wisBonus + modifier : displayTotal;
-    const reliableTalentTotal = reliableTalent && (rollType === 'check' || rollType === 'skill') && displayRoll <= 9 ? 10 + bonus + modifier : null;
+    const wisCheckApplies = wisCheckReplace && CHECK_ROLL_TYPES.has(rollType);
+    const wisDisplayTotal = wisCheckApplies ? finalRoll + wisBonus + modifier : displayTotal;
+    const reliableTalentTotal = reliableTalent && CHECK_ROLL_TYPES.has(rollType) && displayRoll <= 9 ? 10 + bonus + modifier : null;
     const d20Floor10Total = d20Floor10 && displayRoll <= 9 ? 10 + bonus + modifier : null;
     const starryDragonFloorTotal = starryDragonFloor && displayRoll <= 9 ? 10 + bonus + modifier : null;
-    const baseTotal = (starryDragonFloorTotal !== null ? starryDragonFloorTotal : d20Floor10Total !== null ? d20Floor10Total : reliableTalentTotal !== null ? reliableTalentTotal : (wisCheckReplace && (rollType === 'check' || rollType === 'skill') ? wisDisplayTotal : finalDisplayTotal));
+    const baseTotal = computeBaseTotal({ starryDragonFloorTotal, d20Floor10Total, reliableTalentTotal, wisCheckApplies, rollType, wisDisplayTotal, finalDisplayTotal });
     // CLA-320: Homing Strikes (Soul Blades) — the authoritative resolver has
     // already folded the psionic die into the attack; mirror it here so the
     // popup's recomputed hit agrees with the flipped hit and "Done" appears.
@@ -88,9 +126,7 @@ export function useDiceRollState(props) {
     // SP-105: trust the resolver's authoritative effectiveAc when forwarded
     // (covers Shield of Faith, Shield, cover, reactions); otherwise recompute
     // from the forwarded per-bonus fields so computedHit agrees with hit.
-    const effectiveAc = props.effectiveAc !== undefined
-        ? props.effectiveAc
-        : (targetAc !== undefined ? targetAc + (coverAcBonus || 0) + (defensiveDuelistBonus || 0) + (baitAndSwitchBonus || 0) + (shieldAcBonus || 0) + (shieldOfFaithAcBonus || 0) + (wardingBondAcBonus || 0) - (slowAcPenalty || 0) : undefined);
+    const effectiveAc = computeEffectiveAc(props);
     const computedHit = isAutoMiss ? false : (targetName && hit !== undefined && effectiveAc !== undefined ? finalTotal >= effectiveAc : hit);
 
     const isSaveDamageType = type === 'save-damage';
@@ -100,13 +136,7 @@ export function useDiceRollState(props) {
     // !isAutoMiss; Psi-Bolstered Knack: success !== true). When no outcome
     // flag is known (adjudicated check), the offer stands.
     const { saveResult, success, waitingForPlayerSave } = props;
-    const d20TestFailed = waitingForPlayerSave
-        ? false
-        : computedHit !== undefined
-            ? (!computedHit && !isAutoMiss)
-            : (saveResult && saveResult.success !== undefined)
-                ? saveResult.success !== true
-                : success !== true;
+    const d20TestFailed = computeD20TestFailed({ waitingForPlayerSave, computedHit, isAutoMiss, saveResult, success });
 
     return {
         mode, setMode,

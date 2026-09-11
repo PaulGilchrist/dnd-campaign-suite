@@ -33,6 +33,193 @@ export function extractDamageDiceFromDescription(description, existingDamageDice
   return hitMatch ? hitMatch[1].replace(/\s+/g, ' ').trim() : null;
 }
 
+function psychicStrikePreconditionFailed(name, target, allTargetEffects) {
+  if (name !== 'Psychic Strike') return false;
+  if (!target) {
+    alert('Psychic Strike requires a target to be selected.');
+    return true;
+  }
+  const hexEffect = allTargetEffects.find(te => te.target === target.name && te.effect === 'hex_ability_check_disadvantage');
+  if (!hexEffect) {
+    alert('Psychic Strike can only be used on a creature under the warlock\'s Hex spell.');
+    return true;
+  }
+  return false;
+}
+
+function computeGrazeSettings(isMeleeAttack, monsterCharacter) {
+  if (!isMeleeAttack || !monsterCharacter?.computedStats) return { grazeDamage: false, grazeAbilityMod: 0 };
+  const weaponMastery = monsterCharacter.computedStats.automation?.passives?.find(p => p.type === 'weapon_mastery_choice');
+  if (weaponMastery?.chosenMastery !== 'Graze') return { grazeDamage: false, grazeAbilityMod: 0 };
+  const strAbility = monsterCharacter.computedStats.abilities?.find(a => a.name === 'Strength');
+  return { grazeDamage: true, grazeAbilityMod: strAbility?.bonus || 0 };
+}
+
+function resolveTargetDefense(target, creatures, primaryDamageType) {
+  if (!target) return { targetComputed: null, resistanceNotice: null };
+  const targetStats = target.type === 'player'
+    ? (creatures || []).find(c => c.name === target.name)
+    : null;
+  const targetComputed = targetStats?.computedStats || targetStats;
+  const resistanceNotice = getResistanceNotice(
+    primaryDamageType,
+    target.type === 'player' ? (targetComputed?.resistances || []) : (target.resistances || []),
+    target.type === 'player' ? (targetComputed?.immunities || []) : (target.immunities || []),
+    target.name
+  );
+  return { targetComputed, resistanceNotice };
+}
+
+function applyElusive(targetEffectData, target, targetComputed, targetConditions) {
+  if (target?.type !== 'player' || !targetComputed) return;
+  const hasElusive = [
+    ...(targetComputed.actions || []),
+    ...(targetComputed.bonusActions || []),
+    ...(targetComputed.reactions || []),
+    ...(targetComputed.specialActions || [])
+  ].some(a => a.name === 'Elusive');
+  const isIncapacitated = targetConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c));
+  if (hasElusive && !isIncapacitated) {
+    targetEffectData.noAdvantageAgainst = true;
+  }
+}
+
+function applyProtectionFromEvilPenalty(targetEffectData, target, campaignName, getAttackerCreature) {
+  if (!isProtectionFromEvilAndGoodActive(target?.name, campaignName)) return;
+  const attackerCreature = getAttackerCreature();
+  if (attackerCreature && isCreatureWarded(resolveCreatureType(attackerCreature), target?.name, campaignName)) {
+    targetEffectData.targetDisadvantageCount = (targetEffectData.targetDisadvantageCount || 0) + 1;
+  }
+}
+
+function computeMapRangeState(mapData, target, monsterName, attackRange) {
+  const state = { isAutoMiss: false, rangeReason: null, rangeForcedMode: null };
+  if (!mapData || !target) return state;
+  const attackerPlaced = (mapData?.placedItems || []).find(i => i.name === monsterName) || null;
+  let targetPos = null;
+  const targetPlayer = mapData?.players?.find(p => p.name === target.name);
+  const targetNpc = mapData?.placedItems?.length
+    ? getNearestPlacedItem(mapData.placedItems, target.name, attackerPlaced ? { gridX: attackerPlaced.gridX, gridY: attackerPlaced.gridY } : null)
+    : null;
+  if (targetPlayer) {
+    targetPos = { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY };
+  } else if (targetNpc) {
+    targetPos = { gridX: targetNpc.gridX, gridY: targetNpc.gridY };
+  }
+  if (!attackerPlaced || !targetPos) return state;
+  const distanceFt = getDistanceFeet(
+    { gridX: attackerPlaced.gridX, gridY: attackerPlaced.gridY },
+    targetPos
+  );
+  const rangeResult = computeRangeEffect(attackRange, distanceFt);
+  if (rangeResult.mode === 'disadvantage') {
+    state.rangeForcedMode = 'disadvantage';
+    state.rangeReason = rangeResult.reason;
+  } else if (rangeResult.mode === 'miss') {
+    state.isAutoMiss = true;
+    state.rangeReason = rangeResult.reason;
+  }
+  return state;
+}
+
+const NO_COVER = { coverAcBonus: 0, coverLevel: null, coverReason: null };
+
+function computeBulwarkCover(target, characters) {
+  for (const player of characters) {
+    if (!getRuntimeValue(player.name, 'bulwarkOfForceActive')) continue;
+    const bulwarkTargets = getRuntimeValue(player.name, 'bulwarkOfForceTargets') || [];
+    if (bulwarkTargets.includes(target?.name)) {
+      return { coverAcBonus: 2, coverLevel: 'half', coverReason: 'Bulwark of Force' };
+    }
+  }
+  return null;
+}
+
+function computeSanctuaryCover(target, characters, campaignName) {
+  for (const player of characters) {
+    const sanctuaryCreatures = getRuntimeValue(player.name, 'naturesSanctuaryCreatures', campaignName) || [];
+    if (sanctuaryCreatures.includes(target.name)) {
+      return { coverAcBonus: 2, coverLevel: 'half', coverReason: 'Nature\'s Sanctuary' };
+    }
+  }
+  return null;
+}
+
+function computeSmiteCover(target, characters, mapData, campaignName) {
+  for (const player of characters) {
+    if (!getRuntimeValue(player.name, 'smiteOfProtectionActive', campaignName)) continue;
+    const playerStats = player.computedStats;
+    if (!playerStats?.automation?.passives?.some(p => p.name === 'Aura of Protection')) continue;
+    const paladinPos = mapData.players?.find(p => p.name === player.name);
+    const targetPlayer = mapData.players?.find(p => p.name === target.name);
+    if (!paladinPos || !targetPlayer) continue;
+    const auraRange = playerStats?.automation?.passives?.some(p => p.name === 'Aura Expansion') ? 30 : 10;
+    if (isDistanceInRange(getDistanceFeet(paladinPos, targetPlayer), auraRange)) {
+      return { coverAcBonus: 2, coverLevel: 'half', coverReason: 'Smite of Protection' };
+    }
+  }
+  return null;
+}
+
+function computeCoverState(isAutoMiss, target, characters, mapData, campaignName) {
+  if (isAutoMiss) return NO_COVER;
+  if (characters) {
+    const bulwark = computeBulwarkCover(target, characters);
+    if (bulwark) return bulwark;
+  }
+  if (characters && target) {
+    const sanctuary = computeSanctuaryCover(target, characters, campaignName);
+    if (sanctuary) return sanctuary;
+  }
+  if (characters && target && mapData) {
+    const smite = computeSmiteCover(target, characters, mapData, campaignName);
+    if (smite) return smite;
+  }
+  return NO_COVER;
+}
+
+function buildAttackRollOptions(v) {
+  return {
+    damageType: formatDamageTypes(v.primaryDamageType),
+    damageTypeChoices: getDamageTypeChoices(v.action),
+    resistanceNotice: v.resistanceNotice,
+    forcedMode: v.rangeForcedMode || (v.forcedMode !== 'normal' ? v.forcedMode : undefined),
+    isMelee: v.isMelee,
+    isAutoCrit: v.isAutoCrit,
+    isAutoMiss: v.isAutoMiss,
+    rangeReason: v.rangeReason,
+    coverAcBonus: v.coverAcBonus,
+    coverLevel: v.coverLevel,
+    coverReason: v.coverReason,
+    autoDamageFormula: extractDamageDiceFromDescription(v.action?.description, v.action?.damage_dice_primary) || null,
+    autoDamageName: v.name,
+    autoDamageSecondaryFormula: v.action?.damage_dice_secondary || null,
+    autoDamageSecondaryName: v.name,
+    autoDamageSecondaryDamageType: v.action?.damage_type_secondary ? formatDamageTypes([v.action.damage_type_secondary]) : null,
+    targetName: v.target?.name,
+    attackerName: v.monsterName,
+    grazeDamage: v.grazeDamage,
+    grazeAbilityMod: v.grazeAbilityMod,
+    grazeAbilityName: 'STR',
+    saveDc: v.action?.save_dc || null,
+    saveType: v.action?.save_type ? toAbbr(v.action.save_type) : null,
+    dcSuccess: v.action?.save_dc != null ? 'half' : null,
+    saveConditions: extractConditionsFromSaveEffect(v.action?.save_effect),
+    // CLA-324: spell-origin marker for monster spell attacks (against_spell gates).
+    isSpellDamage: v.action?.spell_attack_bonus != null || v.action?.spell_save_dc != null || /spell attack/i.test(v.action?.description || ''),
+  };
+}
+
+function blockStinkingCloudAction(campaignName, monsterName, name) {
+  addEntry(campaignName, {
+    type: 'automation blocked',
+    characterName: monsterName,
+    abilityName: name,
+    description: `${monsterName} is Poisoned by Stinking Cloud and can't take an Action or Bonus Action — ${name} refused.`,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error('[MonsterCardModal] Error:', e); });
+}
+
 function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureName, mapName, characters }) {
   const monsterName = creatureName || monster?.name || 'Monster';
   const creatureTempHp = getRuntimeValue(monsterName, 'tempHp', campaignName) || 0;
@@ -196,44 +383,15 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   }, []);
 
   const handleAttack = (name, bonus, action) => {
-    if (name === 'Psychic Strike') {
-      const target = getTarget();
-      if (!target) {
-        alert('Psychic Strike requires a target to be selected.');
-        return;
-      }
-      const hexEffect = allTargetEffects.find(te => te.target === target.name && te.effect === 'hex_ability_check_disadvantage');
-      if (!hexEffect) {
-        alert('Psychic Strike can only be used on a creature under the warlock\'s Hex spell.');
-        return;
-      }
-    }
-
     const target = getTarget();
-    const primaryDamageType = action?.damage_type_primary ? [action.damage_type_primary] : [];
+    if (psychicStrikePreconditionFailed(name, target, allTargetEffects)) return;
 
-    const isMeleeAttack = (action?.reach ? rangeToFeet(action.reach) : (action?.range ? rangeToFeet(action.range) : 30)) <= 5;
-    let grazeDamage = false;
-    let grazeAbilityMod = 0;
-    if (isMeleeAttack && monsterCharacter?.computedStats) {
-      const weaponMastery = monsterCharacter.computedStats.automation?.passives?.find(p => p.type === 'weapon_mastery_choice');
-      const chosenMastery = weaponMastery?.chosenMastery;
-      if (chosenMastery === 'Graze') {
-        grazeDamage = true;
-        const strAbility = monsterCharacter.computedStats.abilities?.find(a => a.name === 'Strength');
-        grazeAbilityMod = strAbility?.bonus || 0;
-      }
-    }
-    const targetStats = target?.type === 'player'
-      ? (creatures || []).find(c => c.name === target.name)
-      : null;
-    const targetComputed = targetStats?.computedStats || targetStats;
-    const resistanceNotice = target ? getResistanceNotice(
-      primaryDamageType,
-      target.type === 'player' ? (targetComputed?.resistances || []) : (target.resistances || []),
-      target.type === 'player' ? (targetComputed?.immunities || []) : (target.immunities || []),
-      target.name
-    ) : null;
+    const primaryDamageType = action?.damage_type_primary ? [action.damage_type_primary] : [];
+    const attackRange = action?.reach ? rangeToFeet(action.reach) : (action?.range ? rangeToFeet(action.range) : 30);
+    const isMeleeAttack = attackRange <= 5;
+
+    const { grazeDamage, grazeAbilityMod } = computeGrazeSettings(isMeleeAttack, monsterCharacter);
+    const { targetComputed, resistanceNotice } = resolveTargetDefense(target, creatures, primaryDamageType);
 
     const attacker = getAttackerCreature();
     const attackerConditions = (attacker?.conditions || []).map(c => c.key)
@@ -246,13 +404,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const attackerCannotAct = attackerConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c)) || cloudActionBlock
     if (attackerCannotAct) {
         if (cloudActionBlock) {
-            addEntry(campaignName, {
-                type: 'automation blocked',
-                characterName: monsterName,
-                abilityName: name,
-                description: `${monsterName} is Poisoned by Stinking Cloud and can't take an Action or Bonus Action — ${name} refused.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[MonsterCardModal] Error:', e); });
+            blockStinkingCloudAction(campaignName, monsterName, name);
         }
         return
     }
@@ -263,120 +415,26 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const riderAttackBonus = targetEffectData.riderAttackBonus || 0;
     const effectiveBonus = bonus + riderAttackBonus;
 
-    const targetIsPlayer = target?.type === 'player'
-    if (targetIsPlayer && targetComputed) {
-      const hasElusive = [
-        ...(targetComputed.actions || []),
-        ...(targetComputed.bonusActions || []),
-        ...(targetComputed.reactions || []),
-        ...(targetComputed.specialActions || [])
-      ].some(a => a.name === 'Elusive')
-      const isIncapacitated = targetConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c))
-      if (hasElusive && !isIncapacitated) {
-        targetEffectData.noAdvantageAgainst = true
-      }
-    }
-
-    const attackRange = action?.reach ? rangeToFeet(action.reach) : (action?.range ? rangeToFeet(action.range) : 30);
-
-    if (isProtectionFromEvilAndGoodActive(target?.name, campaignName)) {
-      const attackerCreature = getAttackerCreature();
-      if (attackerCreature && isCreatureWarded(resolveCreatureType(attackerCreature), target?.name, campaignName)) {
-        targetEffectData.targetDisadvantageCount = (targetEffectData.targetDisadvantageCount || 0) + 1;
-      }
-    }
+    applyElusive(targetEffectData, target, targetComputed, targetConditions);
+    applyProtectionFromEvilPenalty(targetEffectData, target, campaignName, getAttackerCreature);
 
     const forcedMode = combineAttackModes(attackerEffects, targetEffectData, attackRange, target?.name);
 
     const isMelee = attackRange <= 5
     const isAutoCrit = isMelee && targetEffectData.autoCritWithin5ft
 
-    let isAutoMiss = false;
-    let rangeReason = null;
-    let rangeForcedMode = null;
-    let coverAcBonus = 0;
-    let coverLevel = null;
-    let coverReason = null;
-    if (mapData && target) {
-      const attackerPlaced = (mapData?.placedItems || []).find(i => i.name === monsterName) || null;
-      let targetPos = null;
-      const targetPlayer = mapData?.players?.find(p => p.name === target.name);
-      const targetNpc = mapData?.placedItems?.length
-        ? getNearestPlacedItem(mapData.placedItems, target.name, attackerPlaced ? { gridX: attackerPlaced.gridX, gridY: attackerPlaced.gridY } : null)
-        : null;
-      if (targetPlayer) {
-        targetPos = { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY };
-      } else if (targetNpc) {
-        targetPos = { gridX: targetNpc.gridX, gridY: targetNpc.gridY };
-      }
-      if (attackerPlaced && targetPos) {
-        const distanceFt = getDistanceFeet(
-          { gridX: attackerPlaced.gridX, gridY: attackerPlaced.gridY },
-          targetPos
-        );
-        const rangeResult = computeRangeEffect(attackRange, distanceFt);
-        if (rangeResult.mode === 'disadvantage') {
-          rangeForcedMode = 'disadvantage';
-          rangeReason = rangeResult.reason;
-        } else if (rangeResult.mode === 'miss') {
-          isAutoMiss = true;
-          rangeReason = rangeResult.reason;
-        }
-      }
-    }
+    const { isAutoMiss, rangeReason, rangeForcedMode } = computeMapRangeState(mapData, target, monsterName, attackRange);
+    const { coverAcBonus, coverLevel, coverReason } = computeCoverState(isAutoMiss, target, characters, mapData, campaignName);
 
-    if (!isAutoMiss && characters) {
-      for (const player of characters) {
-        const bulwarkActive = getRuntimeValue(player.name, 'bulwarkOfForceActive');
-        if (bulwarkActive) {
-          const bulwarkTargets = getRuntimeValue(player.name, 'bulwarkOfForceTargets') || [];
-          if (bulwarkTargets.includes(target?.name) && coverAcBonus < 2) {
-            coverAcBonus = 2;
-            coverLevel = 'half';
-            coverReason = 'Bulwark of Force';
-            break;
-          }
-        }
-      }
-    }
-
-    if (!isAutoMiss && coverAcBonus < 2 && characters && target) {
-      for (const player of characters) {
-        const sanctuaryCreatures = getRuntimeValue(player.name, 'naturesSanctuaryCreatures', campaignName) || [];
-        if (sanctuaryCreatures.includes(target.name)) {
-          coverAcBonus = 2;
-          coverLevel = 'half';
-          coverReason = 'Nature\'s Sanctuary';
-          break;
-        }
-      }
-    }
-
-    if (!isAutoMiss && coverAcBonus < 2 && characters && target && mapData) {
-      for (const player of characters) {
-        const smiteCoverActive = getRuntimeValue(player.name, 'smiteOfProtectionActive', campaignName);
-        if (!smiteCoverActive) continue;
-        const playerStats = player.computedStats;
-        const hasAura = playerStats?.automation?.passives?.some(p => p.name === 'Aura of Protection');
-        if (!hasAura) continue;
-        const paladinPos = mapData.players?.find(p => p.name === player.name);
-        const targetPlayer = mapData.players?.find(p => p.name === target.name);
-        if (!paladinPos || !targetPlayer) continue;
-        const auraRange = playerStats?.automation?.passives?.some(p => p.name === 'Aura Expansion') ? 30 : 10;
-        if (isDistanceInRange(getDistanceFeet(paladinPos, targetPlayer), auraRange)) {
-          coverAcBonus = 2;
-          coverLevel = 'half';
-          coverReason = 'Smite of Protection';
-          break;
-        }
-      }
-    }
-
-    rollAttack(name, effectiveBonus, {
-      damageType: formatDamageTypes(primaryDamageType),
-      damageTypeChoices: getDamageTypeChoices(action),
+    rollAttack(name, effectiveBonus, buildAttackRollOptions({
+      action,
+      name,
+      target,
+      monsterName,
+      primaryDamageType,
       resistanceNotice,
-      forcedMode: rangeForcedMode || (forcedMode !== 'normal' ? forcedMode : undefined),
+      forcedMode,
+      rangeForcedMode,
       isMelee,
       isAutoCrit,
       isAutoMiss,
@@ -384,23 +442,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       coverAcBonus,
       coverLevel,
       coverReason,
-      autoDamageFormula: extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary) || null,
-      autoDamageName: name,
-      autoDamageSecondaryFormula: action?.damage_dice_secondary || null,
-      autoDamageSecondaryName: name,
-      autoDamageSecondaryDamageType: action?.damage_type_secondary ? formatDamageTypes([action.damage_type_secondary]) : null,
-      targetName: target?.name,
-      attackerName: monsterName,
       grazeDamage,
       grazeAbilityMod,
-      grazeAbilityName: 'STR',
-      saveDc: action?.save_dc || null,
-      saveType: action?.save_type ? toAbbr(action.save_type) : null,
-      dcSuccess: action?.save_dc != null ? 'half' : null,
-      saveConditions: extractConditionsFromSaveEffect(action?.save_effect),
-      // CLA-324: spell-origin marker for monster spell attacks (against_spell gates).
-      isSpellDamage: action?.spell_attack_bonus != null || action?.spell_save_dc != null || /spell attack/i.test(action?.description || ''),
-    });
+    }));
   };
 
   const handleDamage = (name, formula, damageType, action) => {

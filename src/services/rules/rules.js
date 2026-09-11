@@ -40,6 +40,277 @@ export { getArmorClass } from './rules-armorClass.js';
 export { getLanguages } from './rules-languages.js';
 export { getMagicItems } from './rules-magicItems.js';
 
+const byName = (a, b) => a.name.localeCompare(b.name);
+
+function resortActionArrays(playerStats) {
+    playerStats.actions = uniqBy(playerStats.actions, 'name').sort(byName);
+    playerStats.bonusActions = uniqBy(playerStats.bonusActions, 'name').sort(byName);
+    playerStats.reactions = uniqBy(playerStats.reactions, 'name').sort(byName);
+    playerStats.specialActions = uniqBy(playerStats.specialActions, 'name').sort(byName);
+    playerStats.characterAdvancement = uniqBy(playerStats.characterAdvancement, 'name').sort(byName);
+}
+
+function applyAbilityScoreFeatIncreases(playerStats, featBuffs) {
+    const computedFeatIncreases = {};
+    featBuffs.abilityScoreIncreases.forEach(inc => {
+        if (inc.name && inc.name !== 'any') {
+            const key = inc.name.toLowerCase();
+            computedFeatIncreases[key] = (computedFeatIncreases[key] || 0) + (typeof inc.amount === 'number' ? inc.amount : 1);
+        }
+    });
+    playerStats.abilities.forEach(ability => {
+        const computed = computedFeatIncreases[String(ability.name).toLowerCase()] || 0;
+        ability.featIncrease = Math.max(ability.featIncrease || 0, computed);
+    });
+}
+
+async function applyProficiencyFeatBuffs(playerStats, featBuffs) {
+    // Apply all_skills proficiency feat buffs to skillProficiencies
+    const allSkillProfs = featBuffs.proficiencies.filter(p => p.name === 'all_skills' && p.type === 'skill');
+    if (allSkillProfs.length > 0) {
+        const skills = await loadSkills();
+        const allSkillNames = skills.map(s => s.name);
+        playerStats.skillProficiencies = [...new Set([...playerStats.skillProficiencies, ...allSkillNames])];
+    }
+
+    // Proficiency choice feat buffs (tool choices handled by toolLimits, skill/armor choices handled by wizard)
+    // No placeholder strings are added to proficiencies — the user makes explicit choices elsewhere.
+
+    // Apply expertise feat buffs (e.g., Keen Mind Lore Knowledge, Observant's Keen Observer)
+    // The user's expertise choices are stored in formData.expertSkills and merged here.
+    // The wizard enforces proficiency-first and feat-restricted skill lists.
+    // Also support expertSkills field (wizard form field name) for both 5e and 2024
+    if (playerStats.expertSkills && Array.isArray(playerStats.expertSkills)) {
+        playerStats.expertSkills.forEach(s => {
+            if (typeof s === 'string' && s.length > 0 && playerStats.expertise) {
+                playerStats.expertise.push(s);
+            }
+        });
+    }
+
+    // Apply non-choice, non-skill proficiency feat buffs (e.g., Heavily Armored → Heavy Armor)
+    const featNonChoiceProfs = featBuffs.proficiencies.filter(p => p.type === 'proficiency' && !p.isChoice);
+    if (featNonChoiceProfs.length > 0) {
+        let profs = playerStats.proficiencies;
+        if (!Array.isArray(profs)) {
+            console.error('rules: expected proficiencies to be an array for', playerStats.name);
+            throw new Error('Missing array: proficiencies for ' + playerStats.name);
+        }
+        const existingProfs = new Set(profs);
+        featNonChoiceProfs.forEach(fp => {
+            if (fp.name && !existingProfs.has(fp.name)) {
+                profs = [...profs, fp.name];
+                existingProfs.add(fp.name);
+            }
+        });
+        playerStats.proficiencies = profs;
+    }
+}
+
+function findProcessedAttackRider(playerStats, name) {
+    return (playerStats.automation?.passives || []).find(
+        p => p.name === name && p.type === 'attack_rider'
+    ) || (playerStats.automation?.actions || []).find(
+        p => p.name === name && p.type === 'attack_rider'
+    ) || (playerStats.automation?.bonusActions || []).find(
+        p => p.name === name && p.type === 'attack_rider'
+    ) || (playerStats.automation?.reactions || []).find(
+        p => p.name === name && p.type === 'attack_rider'
+    );
+}
+
+function categorizeFeatEntry(playerStats, featFeature, featEntry, featureCategories) {
+    // Categorize by automation.casting_time
+    const castingTime = featFeature.automation?.casting_time;
+    if (castingTime) {
+        const ct = normalizeCastingTime(castingTime);
+        if (ct === '1 action' && !playerStats.actions.some(f => f.name === featFeature.name)) {
+            playerStats.actions = [...playerStats.actions, featEntry];
+        } else if (ct === '1 bonus action' && !playerStats.bonusActions.some(f => f.name === featFeature.name)) {
+            playerStats.bonusActions = [...playerStats.bonusActions, featEntry];
+        } else if (ct === '1 reaction' && !playerStats.reactions.some(f => f.name === featFeature.name)) {
+            playerStats.reactions = [...playerStats.reactions, featEntry];
+        } else if (ct === 'passive' && featureCategories.characterAdvancement.includes(featFeature.name) && !playerStats.characterAdvancement.some(f => f.name === featFeature.name)) {
+            playerStats.characterAdvancement = [...playerStats.characterAdvancement, featEntry];
+        } else {
+            playerStats.specialActions = [...playerStats.specialActions, featEntry];
+        }
+    } else {
+        // No automation.casting_time — go to specialActions unless name matches a category
+        if (featureCategories.characterAdvancement.includes(featFeature.name) && !playerStats.characterAdvancement.some(f => f.name === featFeature.name)) {
+            playerStats.characterAdvancement = [...playerStats.characterAdvancement, featEntry];
+        } else if (featureCategories.actions.includes(featFeature.name) && !playerStats.actions.some(f => f.name === featFeature.name)) {
+            playerStats.actions = [...playerStats.actions, featEntry];
+        } else if (featureCategories.bonusActions.includes(featFeature.name) && !playerStats.bonusActions.some(f => f.name === featFeature.name)) {
+            playerStats.bonusActions = [...playerStats.bonusActions, featEntry];
+        } else if (featureCategories.reactions.includes(featFeature.name) && !playerStats.reactions.some(f => f.name === featFeature.name)) {
+            playerStats.reactions = [...playerStats.reactions, featEntry];
+        } else if (featFeature.isBonusAction && !playerStats.bonusActions.some(f => f.name === featFeature.name)) {
+            // FT-047: bonus_action feat benefits without automation.casting_time
+            // (e.g. Keen Mind "Quiet Study") were silently dropped by this
+            // replace-only fallback. featBuffService tags them isBonusAction —
+            // append them to Bonus Actions as informational no-roll rows.
+            playerStats.bonusActions = [...playerStats.bonusActions, featEntry];
+        } else {
+            const existingIndex = playerStats.specialActions.findIndex(f => f.name === featFeature.name);
+            if (existingIndex !== -1 && !playerStats.specialActions[existingIndex].description && featEntry.description) {
+                playerStats.specialActions = [...playerStats.specialActions.slice(0, existingIndex), featEntry, ...playerStats.specialActions.slice(existingIndex + 1)];
+            }
+        }
+    }
+}
+
+// Add feat features to their proper action arrays based on casting_time for display
+// Feat names are stored in the character's JSON and are sufficient to compute
+// automation when playerStats are computed - feat features are NOT stored in
+// formData.specialActions during character creation
+function addFeatFeatures(playerStats, playerSummary, featFeatures, allFeatures) {
+    if (featFeatures.length === 0) return;
+
+    // Add feat features to allFeatures for automation processing
+    featFeatures.forEach(featFeature => {
+        if (!featFeature.name) return;
+        allFeatures.push({
+            name: featFeature.name,
+            description: featFeature.description || '',
+            type: featFeature.type || 'passive',
+            source: 'feat',
+            automation: featFeature.automation,
+            featName: featFeature.featName,
+        });
+    });
+    // Re-process automation with feat features included
+    playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+    renameMagicInitiateFeatures(playerStats, playerSummary);
+    mergeAutomationSpecialActions(playerStats);
+
+    const featureCategories = getCategories(playerStats.rules || '5e');
+
+    // Now create feat entries with processed automation (options instead of effects)
+    for (const featFeature of featFeatures) {
+        if (!featFeature.name) continue;
+
+        // Look up the processed automation info from playerStats.automation
+        // This ensures feat actions have 'options' (processed) instead of 'effects' (raw)
+        const processedAutomation = findProcessedAttackRider(playerStats, featFeature.name);
+
+        const featEntry = {
+            name: featFeature.name,
+            description: featFeature.description || '',
+            type: featFeature.type || 'passive',
+            source: 'feat',
+            automation: processedAutomation || featFeature.automation,
+        };
+
+        categorizeFeatEntry(playerStats, featFeature, featEntry, featureCategories);
+    }
+}
+
+function freeSpellAlreadyAdded(playerStats, predicate) {
+    return (playerStats.automation?.specialActions || []).some(predicate);
+}
+
+// Add Magic Initiate level 1 spell free_spell features
+function addMagicInitiateFreeCasts(playerStats) {
+    const miInstances = playerStats.magicInitiateInstances || [];
+    miInstances.forEach((inst, idx) => {
+        if (!inst.level1Spell) return;
+        const featureName = `Level 1 Spell [Instance ${idx + 1}]`;
+        // Check if this specific spell is already in automation.specialActions
+        const alreadyAdded = freeSpellAlreadyAdded(playerStats, a =>
+            a.type === 'free_spell' &&
+            (a.spell === inst.level1Spell || (Array.isArray(a.spell) && a.spell.includes(inst.level1Spell)))
+        );
+        if (alreadyAdded) return;
+        const newFeature = {
+            name: featureName,
+            description: `Magic Initiate (${inst.class}): Cast ${inst.level1Spell} once for free. Recharges on long rest.`,
+            type: 'free_spell',
+            automation: {
+                type: 'free_spell',
+                spell: inst.level1Spell,
+                name: featureName,
+                uses: 1,
+                recharge: 'long_rest',
+            },
+        };
+        playerStats.specialActions.push(newFeature);
+        playerStats.automation.specialActions.push({
+            type: 'free_spell',
+            spell: inst.level1Spell,
+            name: featureName,
+            uses: 1,
+            recharge: 'long_rest',
+        });
+    });
+}
+
+// Add Fey Touched level 1 spell free_spell feature
+function addFeyTouchedFreeCast(playerStats) {
+    const ftSpell = playerStats.feyTouchedSpell;
+    if (!ftSpell) return;
+    const ftAlreadyAdded = freeSpellAlreadyAdded(playerStats, a =>
+        a.type === 'free_spell' &&
+        (a.spell === ftSpell || (Array.isArray(a.spell) && a.spell.includes(ftSpell)))
+    );
+    if (ftAlreadyAdded) return;
+    const ftFeatureName = 'Fey Magic';
+    const newFtFeature = {
+        name: ftFeatureName,
+        description: `Fey Touched: Cast ${ftSpell} once for free. Recharges on long rest.`,
+        type: 'free_spell',
+        automation: {
+            type: 'free_spell',
+            spell: ftSpell,
+            name: ftFeatureName,
+            uses: 1,
+            recharge: 'long_rest',
+        },
+    };
+    playerStats.specialActions.push(newFtFeature);
+    playerStats.automation.specialActions.push({
+        type: 'free_spell',
+        spell: ftSpell,
+        name: ftFeatureName,
+        uses: 1,
+        recharge: 'long_rest',
+    });
+}
+
+// FT-070: Shadow Touched free casts — BOTH the chosen spell and Invisibility,
+// one free cast PER SPELL per Long Rest (RAW: "cast each of these spells… can't
+// cast that spell in this way again until you finish a Long Rest"). The entry is
+// built with perSpellTracking so spellPreparationService consumes a per-spell
+// counter (`_Shadow_Magic_<Spell>_freeCastCount`, CLA-308 naming) — the previous
+// chosen-spell-only entry left Invisibility inert (slot always consumed) and a
+// shared feature counter let either spell steal the other's free cast.
+function addShadowTouchedFreeCasts(playerStats) {
+    const stSpell = playerStats.shadowTouchedSpell;
+    if (!stSpell) return;
+    const stSpells = [...new Set([stSpell, 'Invisibility'])];
+    const stAlreadyAdded = freeSpellAlreadyAdded(playerStats, a =>
+        a.type === 'free_spell' && a.name === 'Shadow Magic'
+    );
+    if (stAlreadyAdded) return;
+    const stFeatureName = 'Shadow Magic';
+    const stAutomationEntry = {
+        type: 'free_spell',
+        spell: stSpells,
+        name: stFeatureName,
+        uses: 1,
+        recharge: 'long_rest',
+        perSpellTracking: true,
+    };
+    const newStFeature = {
+        name: stFeatureName,
+        description: `Shadow Touched: Cast ${stSpells.join(' or ')} once each for free. Recharges on long rest.`,
+        type: 'free_spell',
+        automation: stAutomationEntry,
+    };
+    playerStats.specialActions.push(newStFeature);
+    playerStats.automation.specialActions.push(stAutomationEntry);
+}
+
 const rules = {
      // === SHARED METHODS (identical in both rulesets) ===
 
@@ -199,149 +470,12 @@ const rules = {
       // JSON predates feat persistence still receive their computed increases.
       const featData = await loadFeatData(is2024(playerStats, playerSummary) ? '2024' : '5e');
       const featBuffs = computeAllFeatBuffs(playerStats, featData);
-      const computedFeatIncreases = {};
-      featBuffs.abilityScoreIncreases.forEach(inc => {
-          if (inc.name && inc.name !== 'any') {
-              const key = inc.name.toLowerCase();
-              computedFeatIncreases[key] = (computedFeatIncreases[key] || 0) + (typeof inc.amount === 'number' ? inc.amount : 1);
-          }
-      });
-      playerStats.abilities.forEach(ability => {
-          const computed = computedFeatIncreases[String(ability.name).toLowerCase()] || 0;
-          ability.featIncrease = Math.max(ability.featIncrease || 0, computed);
-      });
 
-      // Apply all_skills proficiency feat buffs to skillProficiencies
-      const allSkillProfs = featBuffs.proficiencies.filter(p => p.name === 'all_skills' && p.type === 'skill');
-      if (allSkillProfs.length > 0) {
-          const skills = await loadSkills();
-          const allSkillNames = skills.map(s => s.name);
-          playerStats.skillProficiencies = [...new Set([...playerStats.skillProficiencies, ...allSkillNames])];
-      }
+      applyAbilityScoreFeatIncreases(playerStats, featBuffs);
+      await applyProficiencyFeatBuffs(playerStats, featBuffs);
 
-      // Proficiency choice feat buffs (tool choices handled by toolLimits, skill/armor choices handled by wizard)
-      // No placeholder strings are added to proficiencies — the user makes explicit choices elsewhere.
-
-      // Apply expertise feat buffs (e.g., Keen Mind Lore Knowledge, Observant's Keen Observer)
-      // The user's expertise choices are stored in formData.expertSkills and merged here.
-      // The wizard enforces proficiency-first and feat-restricted skill lists.
-      // Also support expertSkills field (wizard form field name) for both 5e and 2024
-      if (playerStats.expertSkills && Array.isArray(playerStats.expertSkills)) {
-          playerStats.expertSkills.forEach(s => {
-              if (typeof s === 'string' && s.length > 0 && playerStats.expertise) {
-                  playerStats.expertise.push(s);
-              }
-          });
-      }
-
-      // Apply non-choice, non-skill proficiency feat buffs (e.g., Heavily Armored → Heavy Armor)
-      const featNonChoiceProfs = featBuffs.proficiencies.filter(p => p.type === 'proficiency' && !p.isChoice);
-      if (featNonChoiceProfs.length > 0) {
-          let profs = playerStats.proficiencies;
-          if (!Array.isArray(profs)) {
-              console.error('rules: expected proficiencies to be an array for', playerStats.name);
-              throw new Error('Missing array: proficiencies for ' + playerStats.name);
-          }
-          const existingProfs = new Set(profs);
-          featNonChoiceProfs.forEach(fp => {
-              if (fp.name && !existingProfs.has(fp.name)) {
-                  profs = [...profs, fp.name];
-                  existingProfs.add(fp.name);
-              }
-          });
-          playerStats.proficiencies = profs;
-      }
-
-      // Add feat features to their proper action arrays based on casting_time for display
-      // Feat names are stored in the character's JSON and are sufficient to compute
-      // automation when playerStats are computed - feat features are NOT stored in
-      // formData.specialActions during character creation
       const featFeatures = featBuffs.features;
-
-      // Add feat features to allFeatures for automation processing
-      if (featFeatures.length > 0) {
-          featFeatures.forEach(featFeature => {
-              if (!featFeature.name) return;
-              allFeatures.push({
-                  name: featFeature.name,
-                  description: featFeature.description || '',
-                  type: featFeature.type || 'passive',
-                  source: 'feat',
-                  automation: featFeature.automation,
-                  featName: featFeature.featName,
-              });
-          });
-          // Re-process automation with feat features included
-          playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
-          renameMagicInitiateFeatures(playerStats, playerSummary);
-          mergeAutomationSpecialActions(playerStats);
-
-          // Now create feat entries with processed automation (options instead of effects)
-          for (const featFeature of featFeatures) {
-              if (!featFeature.name) continue;
-
-              // Look up the processed automation info from playerStats.automation
-              // This ensures feat actions have 'options' (processed) instead of 'effects' (raw)
-              const processedAutomation = (playerStats.automation?.passives || []).find(
-                  p => p.name === featFeature.name && p.type === 'attack_rider'
-              ) || (playerStats.automation?.actions || []).find(
-                  p => p.name === featFeature.name && p.type === 'attack_rider'
-              ) || (playerStats.automation?.bonusActions || []).find(
-                  p => p.name === featFeature.name && p.type === 'attack_rider'
-              ) || (playerStats.automation?.reactions || []).find(
-                  p => p.name === featFeature.name && p.type === 'attack_rider'
-              );
-
-              const featEntry = {
-                  name: featFeature.name,
-                  description: featFeature.description || '',
-                  type: featFeature.type || 'passive',
-                  source: 'feat',
-                  automation: processedAutomation || featFeature.automation,
-              };
-
-              const featureCategories = getCategories(playerStats.rules || '5e');
-
-              // Categorize by automation.casting_time
-              let castingTime = featFeature.automation?.casting_time;
-              if (castingTime) {
-                  const ct = normalizeCastingTime(castingTime);
-                  if (ct === '1 action' && !playerStats.actions.some(f => f.name === featFeature.name)) {
-                      playerStats.actions = [...playerStats.actions, featEntry];
-                  } else if (ct === '1 bonus action' && !playerStats.bonusActions.some(f => f.name === featFeature.name)) {
-                      playerStats.bonusActions = [...playerStats.bonusActions, featEntry];
-                  } else if (ct === '1 reaction' && !playerStats.reactions.some(f => f.name === featFeature.name)) {
-                      playerStats.reactions = [...playerStats.reactions, featEntry];
-                  } else if (ct === 'passive' && featureCategories.characterAdvancement.includes(featFeature.name) && !playerStats.characterAdvancement.some(f => f.name === featFeature.name)) {
-                      playerStats.characterAdvancement = [...playerStats.characterAdvancement, featEntry];
-                  } else {
-                      playerStats.specialActions = [...playerStats.specialActions, featEntry];
-                  }
-              } else {
-                  // No automation.casting_time — go to specialActions unless name matches a category
-                  if (featureCategories.characterAdvancement.includes(featFeature.name) && !playerStats.characterAdvancement.some(f => f.name === featFeature.name)) {
-                      playerStats.characterAdvancement = [...playerStats.characterAdvancement, featEntry];
-                  } else if (featureCategories.actions.includes(featFeature.name) && !playerStats.actions.some(f => f.name === featFeature.name)) {
-                      playerStats.actions = [...playerStats.actions, featEntry];
-                  } else if (featureCategories.bonusActions.includes(featFeature.name) && !playerStats.bonusActions.some(f => f.name === featFeature.name)) {
-                      playerStats.bonusActions = [...playerStats.bonusActions, featEntry];
-                   } else if (featureCategories.reactions.includes(featFeature.name) && !playerStats.reactions.some(f => f.name === featFeature.name)) {
-                       playerStats.reactions = [...playerStats.reactions, featEntry];
-                    } else if (featFeature.isBonusAction && !playerStats.bonusActions.some(f => f.name === featFeature.name)) {
-                       // FT-047: bonus_action feat benefits without automation.casting_time
-                       // (e.g. Keen Mind "Quiet Study") were silently dropped by this
-                       // replace-only fallback. featBuffService tags them isBonusAction —
-                       // append them to Bonus Actions as informational no-roll rows.
-                       playerStats.bonusActions = [...playerStats.bonusActions, featEntry];
-                    } else {
-                       const existingIndex = playerStats.specialActions.findIndex(f => f.name === featFeature.name);
-                       if (existingIndex !== -1 && !playerStats.specialActions[existingIndex].description && featEntry.description) {
-                           playerStats.specialActions = [...playerStats.specialActions.slice(0, existingIndex), featEntry, ...playerStats.specialActions.slice(existingIndex + 1)];
-                       }
-                   }
-              }
-          }
-      }
+      addFeatFeatures(playerStats, playerSummary, featFeatures, allFeatures);
 
       // CLA-396: Recompute save proficiencies unconditionally — allFeatures is
       // complete (class/subclass/racial/background pushed earlier, feat features
@@ -349,123 +483,16 @@ const rules = {
       // feature-based save grant (e.g. Iron Mind) for zero-feat characters.
       playerStats.saveProficiencies = getAllSaveProficiencies(allFeatures, playerStats);
 
-      // Add Magic Initiate level 1 spell free_spell features
-      const miInstances = playerStats.magicInitiateInstances || [];
-      miInstances.forEach((inst, idx) => {
-        if (inst.level1Spell) {
-          const featureName = `Level 1 Spell [Instance ${idx + 1}]`;
-          // Check if this specific spell is already in automation.specialActions
-          const miAutomation = playerStats.automation?.specialActions || [];
-          const alreadyAdded = miAutomation.some(a =>
-            a.type === 'free_spell' &&
-            (a.spell === inst.level1Spell || (Array.isArray(a.spell) && a.spell.includes(inst.level1Spell)))
-          );
-          if (alreadyAdded) return;
-          const newFeature = {
-            name: featureName,
-            description: `Magic Initiate (${inst.class}): Cast ${inst.level1Spell} once for free. Recharges on long rest.`,
-            type: 'free_spell',
-            automation: {
-              type: 'free_spell',
-              spell: inst.level1Spell,
-              name: featureName,
-              uses: 1,
-              recharge: 'long_rest',
-            },
-          };
-          playerStats.specialActions.push(newFeature);
-          playerStats.automation.specialActions.push({
-            type: 'free_spell',
-            spell: inst.level1Spell,
-            name: featureName,
-            uses: 1,
-            recharge: 'long_rest',
-          });
-        }
-      });
-
-      // Add Fey Touched level 1 spell free_spell feature
-      const ftSpell = playerStats.feyTouchedSpell;
-      if (ftSpell) {
-        const ftAutomation = playerStats.automation?.specialActions || [];
-        const ftAlreadyAdded = ftAutomation.some(a =>
-          a.type === 'free_spell' &&
-          (a.spell === ftSpell || (Array.isArray(a.spell) && a.spell.includes(ftSpell)))
-        );
-        if (!ftAlreadyAdded) {
-          const ftFeatureName = 'Fey Magic';
-          const newFtFeature = {
-            name: ftFeatureName,
-            description: `Fey Touched: Cast ${ftSpell} once for free. Recharges on long rest.`,
-            type: 'free_spell',
-            automation: {
-              type: 'free_spell',
-              spell: ftSpell,
-              name: ftFeatureName,
-              uses: 1,
-              recharge: 'long_rest',
-            },
-          };
-          playerStats.specialActions.push(newFtFeature);
-          playerStats.automation.specialActions.push({
-            type: 'free_spell',
-            spell: ftSpell,
-            name: ftFeatureName,
-            uses: 1,
-            recharge: 'long_rest',
-          });
-        }
-      }
-
-      // FT-070: Shadow Touched free casts — BOTH the chosen spell and Invisibility,
-      // one free cast PER SPELL per Long Rest (RAW: "cast each of these spells… can't
-      // cast that spell in this way again until you finish a Long Rest"). The entry is
-      // built with perSpellTracking so spellPreparationService consumes a per-spell
-      // counter (`_Shadow_Magic_<Spell>_freeCastCount`, CLA-308 naming) — the previous
-      // chosen-spell-only entry left Invisibility inert (slot always consumed) and a
-      // shared feature counter let either spell steal the other's free cast.
-      const stSpell = playerStats.shadowTouchedSpell;
-      if (stSpell) {
-        const stSpells = [...new Set([stSpell, 'Invisibility'])];
-        const stAutomation = playerStats.automation?.specialActions || [];
-        const stAlreadyAdded = stAutomation.some(a =>
-          a.type === 'free_spell' && a.name === 'Shadow Magic'
-        );
-        if (!stAlreadyAdded) {
-          const stFeatureName = 'Shadow Magic';
-          const stAutomationEntry = {
-            type: 'free_spell',
-            spell: stSpells,
-            name: stFeatureName,
-            uses: 1,
-            recharge: 'long_rest',
-            perSpellTracking: true,
-          };
-          const newStFeature = {
-            name: stFeatureName,
-            description: `Shadow Touched: Cast ${stSpells.join(' or ')} once each for free. Recharges on long rest.`,
-            type: 'free_spell',
-            automation: stAutomationEntry,
-          };
-          playerStats.specialActions.push(newStFeature);
-          playerStats.automation.specialActions.push(stAutomationEntry);
-        }
-      }
+      addMagicInitiateFreeCasts(playerStats);
+      addFeyTouchedFreeCast(playerStats);
+      addShadowTouchedFreeCasts(playerStats);
 
       // Re-sort all action arrays after feat features are merged
-      playerStats.actions = uniqBy(playerStats.actions, 'name').sort((a, b) => a.name.localeCompare(b.name));
-      playerStats.bonusActions = uniqBy(playerStats.bonusActions, 'name').sort((a, b) => a.name.localeCompare(b.name));
-      playerStats.reactions = uniqBy(playerStats.reactions, 'name').sort((a, b) => a.name.localeCompare(b.name));
-      playerStats.specialActions = uniqBy(playerStats.specialActions, 'name').sort((a, b) => a.name.localeCompare(b.name));
-      playerStats.characterAdvancement = uniqBy(playerStats.characterAdvancement, 'name').sort((a, b) => a.name.localeCompare(b.name));
+      resortActionArrays(playerStats);
 
       await processManeuvers(playerStats, playerSummary, allFeatures, collectAutomationFromFeatures, mergeAutomationSpecialActions);
 
-      playerStats.actions = uniqBy(playerStats.actions, 'name').sort((a, b) => a.name.localeCompare(b.name));
-      playerStats.bonusActions = uniqBy(playerStats.bonusActions, 'name').sort((a, b) => a.name.localeCompare(b.name));
-      playerStats.reactions = uniqBy(playerStats.reactions, 'name').sort((a, b) => a.name.localeCompare(b.name));
-      playerStats.specialActions = uniqBy(playerStats.specialActions, 'name').sort((a, b) => a.name.localeCompare(b.name));
-      playerStats.characterAdvancement = uniqBy(playerStats.characterAdvancement, 'name').sort((a, b) => a.name.localeCompare(b.name));
+      resortActionArrays(playerStats);
       playerStats.saveModifiers = collectSaveModifiers(allFeatures);
       // CLA-209: Add Powerful Build grapple escape advantage after the FINAL saveModifiers
       // collection — any earlier push is clobbered by the re-collection above.

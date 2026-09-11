@@ -8,214 +8,239 @@ import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from 
 import { addEntry } from '../../services/ui/logService.js';
 
 export async function processAttackAfterResult(hit, isAutoMiss, targetName, characterName, campaignName, context, combatSummary, characters, logEntry, setPopupHtml, state) {
+    if (context?.rollType !== 'attack') return;
     const { effectiveD20, r1, r2, bonus, effectiveD20Roll, isCrit, targetAc, effectiveAc, homingStrikesUsed, homingStrikesBonus, homingStrikesAttempted, hit: finalHit, isAutoMiss: finalAutoMiss } = state;
 
-    if (context?.rollType === 'attack') {
-        const hsUsed = homingStrikesUsed;
-        const hsBonus = homingStrikesBonus;
-        setRuntimeValue(characterName, 'lastAttackRoll', {
-            attackName: context?.attackName || context?.autoDamageName || context.name,
-            attackerName: context?.attackerName || characterName,
-            d20: effectiveD20,
-            bonus: hsUsed ? (bonus + hsBonus) : bonus,
-            targetName,
-            targetAc,
-            hit: finalHit,
-            isCrit,
-            effectiveAc,
-            coverAcBonus: context?.coverAcBonus || 0,
-            homingStrikesBonus: hsUsed ? hsBonus : undefined,
-            timestamp: Date.now(),
-        }, campaignName);
+    storeLastAttackRoll({ characterName, campaignName, context, effectiveD20, bonus, targetName, targetAc, effectiveAc, finalHit, isCrit, homingStrikesUsed, homingStrikesBonus });
 
-        if (combatSummary && targetName) {
-            const lastAttackData = {
-                attackerName: characterName,
-                targetName,
-                d20: effectiveD20,
-                d20Rolls: [r1, r2],
-                bonus: context.effectiveBonus,
-                total: effectiveD20 + context.effectiveBonus,
-                targetAc,
-                effectiveAc,
-                hit: finalHit,
-                isCrit,
-                weaponType: context?.isMelee != null
-                    ? (context.isMelee ? 'melee' : 'ranged')
-                    : (context?.damageType === 'ranged' ? 'ranged' : 'melee'),
-                isUnarmedStrike: context?.isUnarmedStrike || false,
-                isAutoMiss: finalAutoMiss,
-                isNatural20: effectiveD20Roll === 20,
-                isNatural1: effectiveD20Roll === 1,
-                attackName: context.name,
-                rollType: context?.rollType,
-                damageType: context?.damageType || null,
-                damageFormula: context?.autoDamageFormula || null,
-                damageName: context?.autoDamageName || null,
-                damageSchool: context?.autoDamageSchool || null,
-                saveDc: context?.saveDc || null,
-                saveType: context?.saveType || null,
-                dcSuccess: context?.dcSuccess || null,
-                metamagicTwinTarget: context?.metamagicTwinTarget || null,
-                metamagicHeighten: context?.metamagicHeighten || null,
-                isCantrip: context?.isCantrip || null,
-                overchannelActive: context?.overchannelActive || null,
-                overchannelUseCount: context?.overchannelUseCount || null,
-                overchannelSpellLevel: context?.overchannelSpellLevel || null,
-                secondaryFormula: context?.autoDamageSecondaryFormula || null,
-                secondaryDamageType: context?.autoDamageSecondaryDamageType || null,
-                rangeReason: context?.rangeReason || null,
-                coverLevel: context?.coverLevel || null,
-                coverAcBonus: context?.coverAcBonus || 0,
-                coverReason: context?.coverReason || null,
-                resistanceNotice: context?.resistanceNotice || null,
-                forcedMode: context?.forcedMode || null,
-                isAutoCrit: context?.isAutoCrit || false,
-                autoReroll: context?.autoReroll || null,
-                autoRerollBonus: context?.autoRerollBonus || null,
-                defensiveDuelistBonus: context?.defensiveDuelistBonus || 0,
-                baitAndSwitchBonus: context?.baitAndSwitchBonus || 0,
-                statusEffects: context?.statusEffects || null,
-                affectedTargets: context?.affectedTargets || [targetName],
-                // CLA-320: machine-readable Homing Strikes evidence + Psychic
-                // Blade trigger stamp so the manual Reactions row can enforce
-                // its trigger and refuse an already-resolved miss.
-                isPsychicBlade: context?.isPsychicBlade === true,
-                homingStrikesAttempted: !!homingStrikesAttempted,
-                homingStrikesUsed: !!homingStrikesUsed,
-                homingStrikesBonus: homingStrikesUsed ? homingStrikesBonus : null,
-            };
-            setRuntimeValue('campaign', 'lastAttack', lastAttackData, campaignName);
-        }
-
-        // MN-017: a Riposte attack that misses must not leave a stale Superiority
-        // Die armed — the damage pipeline (pendingRiposteDieValue consumer) only
-        // runs on hits, so clear the armed die here and log the spent reaction.
-        if (finalHit === false) {
-            const pendingRiposteDie = getRuntimeValue(characterName, 'pendingRiposteDieValue', campaignName);
-            if (pendingRiposteDie != null && Number(pendingRiposteDie) > 0) {
-                setRuntimeValue(characterName, 'pendingRiposteDieValue', null, campaignName);
-                addEntry(campaignName, {
-                    type: 'ability_use',
-                    characterName,
-                    abilityName: 'Riposte',
-                    description: `${characterName}'s Riposte attack against ${targetName || 'unknown target'} missed — Superiority Die expended, no damage dealt.`,
-                    targetName: targetName || null,
-                    timestamp: Date.now(),
-                }).catch((e) => { console.error('[MN-017 Riposte] Error logging miss:', e); });
-            }
-        }
-
-        setRuntimeValue(characterName, '_lastRollContext', {
-            type: 'attack',
-            attackName: context.name,
-            damageFormula: context?.autoDamageFormula || null,
-            damageType: context?.damageType || null,
-            targetName,
-            oldTotal: effectiveD20 + bonus,
-            oldHit: hit,
-            timestamp: Date.now(),
-        }, campaignName);
-
-        setRuntimeValue(characterName, 'pendingCombatSuperiorityPrompt', {
-            rollType: 'attack',
-            attackContext: {
-                hit: finalHit,
-                isCrit: isCrit,
-                weaponType: context?.damageType === 'ranged' ? 'ranged' : 'melee',
-                isUnarmedStrike: context?.isUnarmedStrike || false,
-                targetName: targetName,
-                saveDc: context?.saveDc || null,
-                saveType: context?.saveType || null,
-                timestamp: Date.now(),
-            },
-            timestamp: Date.now(),
-        }, campaignName);
-
-        // CLA-230: one-shot "next attack roll" advantage is consumed by the ONE
-        // attack that rolls (Moonlight Step / Shadow Step / Steady Aim / Blink).
-        // Strip the attacker's non-vex next_attack_advantage te once the roll
-        // resolves — hit OR miss both consume it; an auto-miss rolls no d20, so
-        // the advantage survives. Runs BEFORE the miss-effects block below so te
-        // granted by this same miss (Vex-style triggers) is not self-consumed.
-        // Vex te (vexTarget) is consumed separately below on a hit vs that target.
-        if (!finalAutoMiss) {
-            const attackerEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-            const oneShotAdvantage = attackerEffects.filter(
-                te => te.effect === 'next_attack_advantage' && te.target === characterName && !te.vexTarget
-            );
-            if (oneShotAdvantage.length > 0) {
-                const clearedEffects = attackerEffects.filter(
-                    te => !(te.effect === 'next_attack_advantage' && te.target === characterName && !te.vexTarget)
-                );
-                setRuntimeValue('campaign', 'targetEffects', clearedEffects, campaignName);
-            }
-        }
-
-        // Miss effects (vex, etc.)
-        if (!finalHit && !finalAutoMiss && targetName && context?.playerStats?.automation?.passives) {
-            const missEffects = context.playerStats.automation.passives.filter(
-                p => p.type === 'auto_effect' && p.trigger === 'miss' && p.effect === 'next_attack_advantage'
-            );
-            if (missEffects.length > 0) {
-                const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-                for (const effect of missEffects) {
-                    const newEffect = {
-                        target: characterName,
-                        source: effect.name,
-                        effect: 'next_attack_advantage',
-                        vexTarget: targetName,
-                        duration: effect.duration || 'until_start_of_next_turn',
-                    };
-                    storedEffects.push(newEffect);
-                }
-                setRuntimeValue('campaign', 'targetEffects', storedEffects, campaignName);
-                for (const effect of missEffects) {
-                    addEntry(campaignName, {
-                        type: 'ability_use',
-                        characterName: characterName,
-                        abilityName: effect.name,
-                        description: `${characterName}'s ${effect.name} grants advantage on the next attack roll against ${targetName}`,
-                        targetName: targetName,
-                    }).catch((e) => { console.error("[attackPostProcessing:log-error]", e); });
-                }
-            }
-        }
-
-        // Graze damage
-        if (context?.grazeDamage && targetName && !finalHit && !finalAutoMiss) {
-            await processGrazeDamage(context, targetName, characterName, campaignName, characters, logEntry, setPopupHtml);
-        }
-
-        // Vex/distracting strike/sap clearing on hit — each reads original effects and writes independently (matches original behavior)
-        if (targetName && finalHit) {
-            const allEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-            // Vex clearing
-            const vexEffects = allEffects.filter(te => te.effect === 'next_attack_advantage' && te.target === characterName && te.vexTarget === targetName);
-            if (vexEffects.length > 0) {
-                const clearedEffects = allEffects.filter(te => !(te.effect === 'next_attack_advantage' && te.target === characterName && te.vexTarget === targetName));
-                setRuntimeValue('campaign', 'targetEffects', clearedEffects, campaignName);
-            }
-            // Distracting strike clearing
-            const distractingEffects = allEffects.filter(te => te.effect === 'distracting_strike_advantage' && te.target === targetName && te.source !== characterName);
-            if (distractingEffects.length > 0) {
-                const clearedEffects = allEffects.filter(te => !(te.effect === 'distracting_strike_advantage' && te.target === targetName && te.source !== characterName));
-                setRuntimeValue('campaign', 'targetEffects', clearedEffects, campaignName);
-            }
-        }
-
-        // Sap / Hand of Harm clearing: disadvantage_next_attack is consumed by the
-        // attacker's next attack roll regardless of hit or miss — re-read the freshest
-        // value so it composes with the hit-only clears above
-        if (targetName) {
-            const freshestEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-            const sapEffects = freshestEffects.filter(te => te.effect === 'disadvantage_next_attack' && te.target === characterName);
-            if (sapEffects.length > 0) {
-                const clearedEffects = freshestEffects.filter(te => !(te.effect === 'disadvantage_next_attack' && te.target === characterName));
-                setRuntimeValue('campaign', 'targetEffects', clearedEffects, campaignName);
-            }
-        }
+    if (combatSummary && targetName) {
+        storeCampaignLastAttack({ characterName, campaignName, context, targetName, effectiveD20, effectiveD20Roll, r1, r2, finalHit, finalAutoMiss, isCrit, targetAc, effectiveAc, homingStrikesUsed, homingStrikesBonus, homingStrikesAttempted });
     }
+
+    // MN-017: a Riposte attack that misses must not leave a stale Superiority
+    // Die armed — the damage pipeline (pendingRiposteDieValue consumer) only
+    // runs on hits, so clear the armed die here and log the spent reaction.
+    clearRiposteDieOnMiss({ finalHit, characterName, targetName, campaignName });
+
+    storeRollContextAndSuperiorityPrompt({ characterName, campaignName, context, targetName, effectiveD20, bonus, hit, finalHit, isCrit });
+
+    // CLA-230: one-shot "next attack roll" advantage is consumed by the ONE
+    // attack that rolls (Moonlight Step / Shadow Step / Steady Aim / Blink).
+    // Strip the attacker's non-vex next_attack_advantage te once the roll
+    // resolves — hit OR miss both consume it; an auto-miss rolls no d20, so
+    // the advantage survives. Runs BEFORE the miss-effects block below so te
+    // granted by this same miss (Vex-style triggers) is not self-consumed.
+    consumeOneShotAdvantage({ characterName, campaignName, finalAutoMiss });
+
+    // Miss effects (vex, etc.)
+    grantMissAdvantageEffects({ finalHit, finalAutoMiss, targetName, context, characterName, campaignName });
+
+    // Graze damage
+    if (context?.grazeDamage && targetName && !finalHit && !finalAutoMiss) {
+        await processGrazeDamage(context, targetName, characterName, campaignName, characters, logEntry, setPopupHtml);
+    }
+
+    // Vex/distracting strike/sap clearing on hit — each reads original effects and writes independently (matches original behavior)
+    clearHitConsumedEffects({ targetName, characterName, finalHit, campaignName });
+
+    // Sap / Hand of Harm clearing: disadvantage_next_attack is consumed by the
+    // attacker's next attack roll regardless of hit or miss — re-read the freshest
+    // value so it composes with the hit-only clears above
+    clearSapDisadvantage({ targetName, characterName, campaignName });
+}
+
+function storeLastAttackRoll({ characterName, campaignName, context, effectiveD20, bonus, targetName, targetAc, effectiveAc, finalHit, isCrit, homingStrikesUsed, homingStrikesBonus }) {
+    const { name, attackName, autoDamageName, attackerName, coverAcBonus } = context || {};
+    setRuntimeValue(characterName, 'lastAttackRoll', {
+        attackName: attackName || autoDamageName || name,
+        attackerName: attackerName || characterName,
+        d20: effectiveD20,
+        bonus: homingStrikesUsed ? (bonus + homingStrikesBonus) : bonus,
+        targetName,
+        targetAc,
+        hit: finalHit,
+        isCrit,
+        effectiveAc,
+        coverAcBonus: coverAcBonus || 0,
+        homingStrikesBonus: homingStrikesUsed ? homingStrikesBonus : undefined,
+        timestamp: Date.now(),
+    }, campaignName);
+}
+
+function storeCampaignLastAttack({ characterName, campaignName, context, targetName, effectiveD20, effectiveD20Roll, r1, r2, finalHit, finalAutoMiss, isCrit, targetAc, effectiveAc, homingStrikesUsed, homingStrikesBonus, homingStrikesAttempted }) {
+    const { name, rollType, effectiveBonus, isMelee, damageType, isUnarmedStrike, autoDamageFormula, autoDamageName, autoDamageSchool, saveDc, saveType, dcSuccess, metamagicTwinTarget, metamagicHeighten, isCantrip, overchannelActive, overchannelUseCount, overchannelSpellLevel, autoDamageSecondaryFormula, autoDamageSecondaryDamageType, rangeReason, coverLevel, coverAcBonus, coverReason, resistanceNotice, forcedMode, isAutoCrit, autoReroll, autoRerollBonus, defensiveDuelistBonus, baitAndSwitchBonus, statusEffects, affectedTargets, isPsychicBlade } = context || {};
+    setRuntimeValue('campaign', 'lastAttack', {
+        attackerName: characterName,
+        targetName,
+        d20: effectiveD20,
+        d20Rolls: [r1, r2],
+        bonus: effectiveBonus,
+        total: effectiveD20 + effectiveBonus,
+        targetAc,
+        effectiveAc,
+        hit: finalHit,
+        isCrit,
+        weaponType: isMelee != null
+            ? (isMelee ? 'melee' : 'ranged')
+            : (damageType === 'ranged' ? 'ranged' : 'melee'),
+        isUnarmedStrike: isUnarmedStrike || false,
+        isAutoMiss: finalAutoMiss,
+        isNatural20: effectiveD20Roll === 20,
+        isNatural1: effectiveD20Roll === 1,
+        attackName: name,
+        rollType,
+        damageType: damageType || null,
+        damageFormula: autoDamageFormula || null,
+        damageName: autoDamageName || null,
+        damageSchool: autoDamageSchool || null,
+        saveDc: saveDc || null,
+        saveType: saveType || null,
+        dcSuccess: dcSuccess || null,
+        metamagicTwinTarget: metamagicTwinTarget || null,
+        metamagicHeighten: metamagicHeighten || null,
+        isCantrip: isCantrip || null,
+        overchannelActive: overchannelActive || null,
+        overchannelUseCount: overchannelUseCount || null,
+        overchannelSpellLevel: overchannelSpellLevel || null,
+        secondaryFormula: autoDamageSecondaryFormula || null,
+        secondaryDamageType: autoDamageSecondaryDamageType || null,
+        rangeReason: rangeReason || null,
+        coverLevel: coverLevel || null,
+        coverAcBonus: coverAcBonus || 0,
+        coverReason: coverReason || null,
+        resistanceNotice: resistanceNotice || null,
+        forcedMode: forcedMode || null,
+        isAutoCrit: isAutoCrit || false,
+        autoReroll: autoReroll || null,
+        autoRerollBonus: autoRerollBonus || null,
+        defensiveDuelistBonus: defensiveDuelistBonus || 0,
+        baitAndSwitchBonus: baitAndSwitchBonus || 0,
+        statusEffects: statusEffects || null,
+        affectedTargets: affectedTargets || [targetName],
+        // CLA-320: machine-readable Homing Strikes evidence + Psychic
+        // Blade trigger stamp so the manual Reactions row can enforce
+        // its trigger and refuse an already-resolved miss.
+        isPsychicBlade: isPsychicBlade === true,
+        homingStrikesAttempted: !!homingStrikesAttempted,
+        homingStrikesUsed: !!homingStrikesUsed,
+        homingStrikesBonus: homingStrikesUsed ? homingStrikesBonus : null,
+    }, campaignName);
+}
+
+function clearRiposteDieOnMiss({ finalHit, characterName, targetName, campaignName }) {
+    if (finalHit !== false) return;
+    const pendingRiposteDie = getRuntimeValue(characterName, 'pendingRiposteDieValue', campaignName);
+    if (!(pendingRiposteDie != null && Number(pendingRiposteDie) > 0)) return;
+    setRuntimeValue(characterName, 'pendingRiposteDieValue', null, campaignName);
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName,
+        abilityName: 'Riposte',
+        description: `${characterName}'s Riposte attack against ${targetName || 'unknown target'} missed — Superiority Die expended, no damage dealt.`,
+        targetName: targetName || null,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[MN-017 Riposte] Error logging miss:', e); });
+}
+
+function storeRollContextAndSuperiorityPrompt({ characterName, campaignName, context, targetName, effectiveD20, bonus, hit, finalHit, isCrit }) {
+    const { name, autoDamageFormula, damageType, saveDc, saveType, isUnarmedStrike } = context || {};
+    setRuntimeValue(characterName, '_lastRollContext', {
+        type: 'attack',
+        attackName: name,
+        damageFormula: autoDamageFormula || null,
+        damageType: damageType || null,
+        targetName,
+        oldTotal: effectiveD20 + bonus,
+        oldHit: hit,
+        timestamp: Date.now(),
+    }, campaignName);
+
+    setRuntimeValue(characterName, 'pendingCombatSuperiorityPrompt', {
+        rollType: 'attack',
+        attackContext: {
+            hit: finalHit,
+            isCrit: isCrit,
+            weaponType: damageType === 'ranged' ? 'ranged' : 'melee',
+            isUnarmedStrike: isUnarmedStrike || false,
+            targetName: targetName,
+            saveDc: saveDc || null,
+            saveType: saveType || null,
+            timestamp: Date.now(),
+        },
+        timestamp: Date.now(),
+    }, campaignName);
+}
+
+function consumeOneShotAdvantage({ characterName, campaignName, finalAutoMiss }) {
+    if (finalAutoMiss) return;
+    const attackerEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const oneShotAdvantage = attackerEffects.filter(
+        te => te.effect === 'next_attack_advantage' && te.target === characterName && !te.vexTarget
+    );
+    if (oneShotAdvantage.length === 0) return;
+    const clearedEffects = attackerEffects.filter(
+        te => !(te.effect === 'next_attack_advantage' && te.target === characterName && !te.vexTarget)
+    );
+    setRuntimeValue('campaign', 'targetEffects', clearedEffects, campaignName);
+}
+
+function grantMissAdvantageEffects({ finalHit, finalAutoMiss, targetName, context, characterName, campaignName }) {
+    if (finalHit || finalAutoMiss || !targetName) return;
+    const passives = context?.playerStats?.automation?.passives;
+    if (!passives) return;
+    const missEffects = passives.filter(
+        p => p.type === 'auto_effect' && p.trigger === 'miss' && p.effect === 'next_attack_advantage'
+    );
+    if (missEffects.length === 0) return;
+    const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    for (const effect of missEffects) {
+        const newEffect = {
+            target: characterName,
+            source: effect.name,
+            effect: 'next_attack_advantage',
+            vexTarget: targetName,
+            duration: effect.duration || 'until_start_of_next_turn',
+        };
+        storedEffects.push(newEffect);
+    }
+    setRuntimeValue('campaign', 'targetEffects', storedEffects, campaignName);
+    for (const effect of missEffects) {
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: characterName,
+            abilityName: effect.name,
+            description: `${characterName}'s ${effect.name} grants advantage on the next attack roll against ${targetName}`,
+            targetName: targetName,
+        }).catch((e) => { console.error("[attackPostProcessing:log-error]", e); });
+    }
+}
+
+// Vex + distracting strike clearing — both read the same original snapshot and
+// write independently (matches original behavior).
+function clearHitConsumedEffects({ targetName, characterName, finalHit, campaignName }) {
+    if (!targetName || !finalHit) return;
+    const allEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    // Vex clearing
+    const vexEffects = allEffects.filter(te => te.effect === 'next_attack_advantage' && te.target === characterName && te.vexTarget === targetName);
+    if (vexEffects.length > 0) {
+        const clearedEffects = allEffects.filter(te => !(te.effect === 'next_attack_advantage' && te.target === characterName && te.vexTarget === targetName));
+        setRuntimeValue('campaign', 'targetEffects', clearedEffects, campaignName);
+    }
+    // Distracting strike clearing
+    const distractingEffects = allEffects.filter(te => te.effect === 'distracting_strike_advantage' && te.target === targetName && te.source !== characterName);
+    if (distractingEffects.length > 0) {
+        const clearedEffects = allEffects.filter(te => !(te.effect === 'distracting_strike_advantage' && te.target === targetName && te.source !== characterName));
+        setRuntimeValue('campaign', 'targetEffects', clearedEffects, campaignName);
+    }
+}
+
+function clearSapDisadvantage({ targetName, characterName, campaignName }) {
+    if (!targetName) return;
+    const freshestEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const sapEffects = freshestEffects.filter(te => te.effect === 'disadvantage_next_attack' && te.target === characterName);
+    if (sapEffects.length === 0) return;
+    const clearedEffects = freshestEffects.filter(te => !(te.effect === 'disadvantage_next_attack' && te.target === characterName));
+    setRuntimeValue('campaign', 'targetEffects', clearedEffects, campaignName);
 }
 
 async function processGrazeDamage(context, targetName, characterName, campaignName, characters, logEntry, setPopupHtml) {

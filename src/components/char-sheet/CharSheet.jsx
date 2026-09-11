@@ -26,6 +26,140 @@ import { confirmTruePolymorphTransform, applyObjectTransform } from '../../servi
 import './CharSheet.css'
 import './CharSheet.shieldOfFaith.css'
 
+function findPassive(stats, predicate) {
+    return (stats.automation?.passives || []).find(predicate);
+}
+
+function applyCotlLandType(processingSummary, cotlLandTypeRuntime) {
+    if (!cotlLandTypeRuntime || !processingSummary.class) return;
+    if (processingSummary.class.subclass) {
+        processingSummary.class.subclass.type = cotlLandTypeRuntime;
+    } else if (processingSummary.class.major) {
+        processingSummary.class.major.type = cotlLandTypeRuntime;
+    }
+}
+
+// Load prepared spells from runtime state (2024: only wizards track prepared vs known)
+function applyPreparedSpells(stats, playerSummary) {
+    if (playerSummary.rules !== '2024' || playerSummary.class?.name === 'Wizard') {
+        const preparedSpells = getRuntimeValue(playerSummary.name, 'preparedSpells');
+        const preparedSpellsArray = Array.isArray(preparedSpells) ? preparedSpells : [];
+
+        if (preparedSpellsArray.length && stats.spellAbilities?.spells?.length) {
+            try {
+                const mutableSpells = stats.spellAbilities.spells.map(spell => cloneDeep(spell));
+                mutableSpells.forEach(spell => {
+                    if (preparedSpellsArray.includes(spell.name)) {
+                        if (spell.prepared === '') {
+                            spell.prepared = 'Prepared';
+                        }
+                    } else {
+                        if (spell.prepared === 'Prepared') {
+                            spell.prepared = '';
+                        }
+                    }
+                });
+                stats.spellAbilities = { ...stats.spellAbilities, spells: mutableSpells };
+            } catch (e) {
+                console.error('Error applying preparedSpells:', e, { preparedSpells, spellsLength: stats.spellAbilities?.spells?.length });
+            }
+        }
+    }
+}
+
+// Apply Aspect of the Wilds passive effects
+function applyAspectOfTheWilds(stats, aspectOption) {
+    if (!aspectOption || stats.rules !== '2024') return;
+    if (aspectOption === 'Owl') {
+        const existingDv = stats.senses?.find(s => s.name === 'Darkvision');
+        if (existingDv) {
+            const rangeMatch = existingDv.value.match(/(\d+)/);
+            if (rangeMatch) {
+                existingDv.value = `${parseInt(rangeMatch[1], 10) + 60} ft.`;
+            }
+        } else {
+            if (!stats.senses) stats.senses = [];
+            stats.senses.push({ name: 'Darkvision', value: '60 ft.' });
+        }
+    } else if (aspectOption === 'Panther') {
+        stats.climbSpeed = stats.race?.subrace?.speed || stats.race?.speed || 30;
+    } else if (aspectOption === 'Salmon') {
+        stats.swimSpeed = stats.race?.subrace?.speed || stats.race?.speed || 30;
+    }
+}
+
+// Apply Roving (Ranger level 6): climb speed and swim speed equal to walking speed
+// Roving increases speed by 10 and sets climb/swim speeds when not wearing heavy armor
+function applyRovingSpeeds(stats) {
+    const equippedItems = stats.inventory?.equipped || [];
+    const allEquipmentList = stats.equipment || [];
+    let isWearingHeavyArmor = false;
+    for (const itemName of equippedItems) {
+        const parsedName = itemName.includes('(') ? itemName.substring(0, itemName.indexOf('(')).trim() : itemName;
+        const item = allEquipmentList.find(eq => eq.name === parsedName || eq.name === itemName);
+        if (item && item.armor_category === 'Heavy') {
+            isWearingHeavyArmor = true;
+            break;
+        }
+    }
+    if (isWearingHeavyArmor) return;
+    if (!stats.climbSpeed) {
+        stats.climbSpeed = (stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30) + 10;
+    }
+    if (!stats.swimSpeed) {
+        stats.swimSpeed = (stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30) + 10;
+    }
+}
+
+// Inject synthetic "Use Bardic Inspiration" feature if this character has an active BI die
+function injectBardicInspirationFeatures(stats, playerSummary, campaignName) {
+    const biDie = getRuntimeValue(playerSummary.name, 'bardicInspirationDie', campaignName);
+    if (!biDie) return;
+    if (!stats.specialActions) stats.specialActions = [];
+    const grantedBy = getRuntimeValue(playerSummary.name, 'bardicInspirationGrantedBy', campaignName) || 'unknown';
+
+    if (!stats.specialActions.some(f => f.name === 'Use Bardic Inspiration')) {
+        stats.specialActions.unshift({
+            name: 'Use Bardic Inspiration',
+            description: `Roll your Bardic Inspiration die (1d${biDie}) and add the result to an ability check. Die granted by ${grantedBy}.`,
+            automation: {
+                type: 'bardic_inspiration_use',
+            },
+        });
+    }
+
+    // Combat Inspiration (College of Valor) options:
+    // Defense — reaction to add BI die to AC when hit
+    // Offense — add BI die to damage after hitting
+    const combatOptRaw = getRuntimeValue(playerSummary.name, 'bardicInspirationCombatOptions', campaignName);
+    let combatOpts = [];
+    try { combatOpts = JSON.parse(combatOptRaw) || []; } catch (_e) { /* combatOpts is not valid JSON, ignore */ }
+
+    if (!stats.reactions) stats.reactions = [];
+
+    if (combatOpts.includes('defense_add_to_ac') &&
+        !stats.reactions.some(f => f.name === 'Combat Inspiration - Defense')) {
+        stats.reactions.unshift({
+            name: 'Combat Inspiration - Defense',
+            description: `Use your Reaction when hit by an attack roll to roll your Bardic Inspiration die (1d${biDie}) and add the number rolled to your AC. Die granted by ${grantedBy}.`,
+            automation: {
+                type: 'bardic_inspiration_defense',
+            },
+        });
+    }
+
+    if (combatOpts.includes('offense_add_to_damage') &&
+        !stats.reactions.some(f => f.name === 'Combat Inspiration - Offense')) {
+        stats.reactions.unshift({
+            name: 'Combat Inspiration - Offense',
+            description: `Use your Reaction after hitting a target with an attack roll to roll your Bardic Inspiration die (1d${biDie}) and add the number rolled to the attack's damage. Die granted by ${grantedBy}.`,
+            automation: {
+                type: 'bardic_inspiration_offense',
+            },
+        });
+    }
+}
+
 function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters }) {
     const [playerStats, setPlayerStats] = React.useState(null);
     const [charActionsModalState, setCharActionsModalState] = React.useState({});
@@ -108,64 +242,14 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             const effectiveRaces = playerSummary.rules === '2024' ? allRaces2024 : allRaces;
             const effectiveMagicItems = playerSummary.rules === '2024' ? allMagicItems2024 : allMagicItems;
             const processingSummary = cloneDeep(playerSummary);
-            if (cotlLandTypeRuntime && processingSummary.class) {
-                if (processingSummary.class.subclass) {
-                    processingSummary.class.subclass.type = cotlLandTypeRuntime;
-                } else if (processingSummary.class.major) {
-                    processingSummary.class.major.type = cotlLandTypeRuntime;
-                }
-            }
+            applyCotlLandType(processingSummary, cotlLandTypeRuntime);
             const stats = await rulesFactory.getPlayerStats(effectiveClasses, allEquipment, effectiveMagicItems, effectiveRaces, spellData, processingSummary);
 
-            // Load prepared spells from runtime state (2024: only wizards track prepared vs known)
-            if (playerSummary.rules !== '2024' || playerSummary.class?.name === 'Wizard') {
-                const preparedSpells = getRuntimeValue(playerSummary.name, 'preparedSpells');
-                const preparedSpellsArray = Array.isArray(preparedSpells) ? preparedSpells : [];
-
-                if (preparedSpellsArray.length && stats.spellAbilities?.spells?.length) {
-                    try {
-                        const mutableSpells = stats.spellAbilities.spells.map(spell => cloneDeep(spell));
-                        mutableSpells.forEach(spell => {
-                            if (preparedSpellsArray.includes(spell.name)) {
-                                if (spell.prepared === '') {
-                                    spell.prepared = 'Prepared';
-                                }
-                            } else {
-                                if (spell.prepared === 'Prepared') {
-                                    spell.prepared = '';
-                                }
-                            }
-                        });
-                        stats.spellAbilities = { ...stats.spellAbilities, spells: mutableSpells };
-                    } catch (e) {
-                        console.error('Error applying preparedSpells:', e, { preparedSpells, spellsLength: stats.spellAbilities?.spells?.length });
-                    }
-                }
-            }
-
-            // Apply Aspect of the Wilds passive effects
-            const aspectOption = getRuntimeValue(playerSummary.name, 'aspectOfTheWildsOption');
-            if (aspectOption && stats.rules === '2024') {
-                if (aspectOption === 'Owl') {
-                    const existingDv = stats.senses?.find(s => s.name === 'Darkvision');
-                    if (existingDv) {
-                        const rangeMatch = existingDv.value.match(/(\d+)/);
-                        if (rangeMatch) {
-                            existingDv.value = `${parseInt(rangeMatch[1], 10) + 60} ft.`;
-                        }
-                    } else {
-                        if (!stats.senses) stats.senses = [];
-                        stats.senses.push({ name: 'Darkvision', value: '60 ft.' });
-                    }
-                } else if (aspectOption === 'Panther') {
-                    stats.climbSpeed = stats.race?.subrace?.speed || stats.race?.speed || 30;
-                } else if (aspectOption === 'Salmon') {
-                    stats.swimSpeed = stats.race?.subrace?.speed || stats.race?.speed || 30;
-                }
-            }
+            applyPreparedSpells(stats, playerSummary);
+            applyAspectOfTheWilds(stats, getRuntimeValue(playerSummary.name, 'aspectOfTheWildsOption'));
 
             // Apply Aquatic Affinity passive (Circle of the Sea level 6 swim speed + emanation range)
-            const aquaticAffinityPassive = (stats.automation?.passives || []).find(p => p.effect === 'aquatic_affinity');
+            const aquaticAffinityPassive = findPassive(stats, p => p.effect === 'aquatic_affinity');
             if (aquaticAffinityPassive) {
                 if (!stats.swimSpeed) {
                     stats.swimSpeed = stats.race?.subrace?.speed || stats.race?.speed || 30;
@@ -174,7 +258,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             }
 
             // Apply Second-Storywork passive (Rogue level 3: climb speed = walk speed, jump uses DEX)
-            const secondStoryworkPassive = (stats.automation?.passives || []).find(p => p.effect === 'second_storywork');
+            const secondStoryworkPassive = findPassive(stats, p => p.effect === 'second_storywork');
             if (secondStoryworkPassive) {
                 const speed = stats.race?.subrace?.speed || stats.race?.speed || 30;
                 if (!stats.climbSpeed) {
@@ -183,95 +267,27 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             }
 
             // Apply Athlete feat: climb speed equal to speed
-            const athleteClimbPassive = (stats.automation?.passives || []).find(p => p.effect === 'climb_speed');
+            const athleteClimbPassive = findPassive(stats, p => p.effect === 'climb_speed');
             if (athleteClimbPassive && !stats.climbSpeed) {
                 stats.climbSpeed = stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30;
             }
 
             // Apply Roving (Ranger level 6): climb speed and swim speed equal to walking speed
-            // Roving increases speed by 10 and sets climb/swim speeds when not wearing heavy armor
-            const rovingPassive = (stats.automation?.passives || []).find(p => p.name === 'Roving');
-            if (rovingPassive) {
-                const equippedItems = stats.inventory?.equipped || [];
-                const allEquipment = stats.equipment || [];
-                let isWearingHeavyArmor = false;
-                for (const itemName of equippedItems) {
-                    const parsedName = itemName.includes('(') ? itemName.substring(0, itemName.indexOf('(')).trim() : itemName;
-                    const item = allEquipment.find(eq => eq.name === parsedName || eq.name === itemName);
-                    if (item && item.armor_category === 'Heavy') {
-                        isWearingHeavyArmor = true;
-                        break;
-                    }
-                }
-                if (!isWearingHeavyArmor) {
-                    if (!stats.climbSpeed) {
-                        stats.climbSpeed = (stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30) + 10;
-                    }
-                    if (!stats.swimSpeed) {
-                        stats.swimSpeed = (stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30) + 10;
-                    }
-                }
+            if (findPassive(stats, p => p.name === 'Roving')) {
+                applyRovingSpeeds(stats);
             }
 
             // Expose Athlete Hop Up flag: stand from prone with only 5 ft of movement
-            const athleteHopUpPassive = (stats.automation?.passives || []).find(p => p.effect === 'stand_from_prone');
-            if (athleteHopUpPassive) {
+            if (findPassive(stats, p => p.effect === 'stand_from_prone')) {
                 stats.athleteStandFromProne = true;
             }
 
             // Expose Athlete Jumping flag: running jump requires only 5 ft of movement
-            const athleteJumpPassive = (stats.automation?.passives || []).find(p => p.effect === 'reduced_running_jump_requirement');
-            if (athleteJumpPassive) {
+            if (findPassive(stats, p => p.effect === 'reduced_running_jump_requirement')) {
                 stats.athleteReducedJumpRequirement = true;
             }
 
-            // Inject synthetic "Use Bardic Inspiration" feature if this character has an active BI die
-            const biDie = getRuntimeValue(playerSummary.name, 'bardicInspirationDie', campaignName);
-            if (biDie) {
-                if (!stats.specialActions) stats.specialActions = [];
-                const grantedBy = getRuntimeValue(playerSummary.name, 'bardicInspirationGrantedBy', campaignName) || 'unknown';
-
-                if (!stats.specialActions.some(f => f.name === 'Use Bardic Inspiration')) {
-                    stats.specialActions.unshift({
-                        name: 'Use Bardic Inspiration',
-                        description: `Roll your Bardic Inspiration die (1d${biDie}) and add the result to an ability check. Die granted by ${grantedBy}.`,
-                        automation: {
-                            type: 'bardic_inspiration_use',
-                        },
-                    });
-                }
-
-                // Combat Inspiration (College of Valor) options:
-                // Defense — reaction to add BI die to AC when hit
-                // Offense — add BI die to damage after hitting
-                const combatOptRaw = getRuntimeValue(playerSummary.name, 'bardicInspirationCombatOptions', campaignName);
-                let combatOpts = [];
-                try { combatOpts = JSON.parse(combatOptRaw) || []; } catch (_e) { /* combatOpts is not valid JSON, ignore */ }
-
-                if (!stats.reactions) stats.reactions = [];
-
-                if (combatOpts.includes('defense_add_to_ac') &&
-                    !stats.reactions.some(f => f.name === 'Combat Inspiration - Defense')) {
-                    stats.reactions.unshift({
-                        name: 'Combat Inspiration - Defense',
-                        description: `Use your Reaction when hit by an attack roll to roll your Bardic Inspiration die (1d${biDie}) and add the number rolled to your AC. Die granted by ${grantedBy}.`,
-                        automation: {
-                            type: 'bardic_inspiration_defense',
-                        },
-                    });
-                }
-
-                if (combatOpts.includes('offense_add_to_damage') &&
-                    !stats.reactions.some(f => f.name === 'Combat Inspiration - Offense')) {
-                    stats.reactions.unshift({
-                        name: 'Combat Inspiration - Offense',
-                        description: `Use your Reaction after hitting a target with an attack roll to roll your Bardic Inspiration die (1d${biDie}) and add the number rolled to the attack's damage. Die granted by ${grantedBy}.`,
-                        automation: {
-                            type: 'bardic_inspiration_offense',
-                        },
-                    });
-                }
-            }
+            injectBardicInspirationFeatures(stats, playerSummary, campaignName);
 
             setPlayerStats(stats);
         };

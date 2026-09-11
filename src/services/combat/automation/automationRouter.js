@@ -1,701 +1,301 @@
 import { normalizeCastingTime } from '../../shared/castingTimeUtils.js'
 
+const CRITICAL_TRIGGER_RE = /_crit|critical_/
+
+function pushTo(bucketName) {
+    return (info, auto, result) => result[bucketName].push(info)
+}
+
+function pushToBoth(firstBucket, secondBucket) {
+    return (info, auto, result) => {
+        result[firstBucket].push(info)
+        result[secondBucket].push(info)
+    }
+}
+
+// Routing for save-based spells/features: critical triggers become passives,
+// bonus-action casts go to bonusActions, everything else to actions.
+function routeSaveStyle(info, auto, result) {
+    if (info.trigger && (CRITICAL_TRIGGER_RE.test(info.trigger) || info.trigger === 'cunning_strike_poison_save_fail')) {
+        result.passives.push(info)
+    } else if (info.action === 'bonus_action') {
+        result.bonusActions.push(info)
+    } else {
+        result.actions.push(info)
+    }
+}
+
+function routeCtPassiveBonusOrAction(info, auto, result, ct) {
+    if (ct === 'passive') {
+        result.specialActions.push(info)
+    } else if (info.action === 'bonus_action') {
+        result.bonusActions.push(info)
+    } else {
+        result.actions.push(info)
+    }
+}
+
+function routeBonusByCt(info, auto, result, ct) {
+    if (ct === '1 bonus action') {
+        result.bonusActions.push(info)
+    } else {
+        result.actions.push(info)
+    }
+}
+
+function routeFireBurn(info, auto, result, ct) {
+    if (ct === '1 action') {
+        result.actions.push(info)
+    } else {
+        result.passives.push(info)
+    }
+}
+
+function routeCtPassiveOrReaction(info, auto, result, ct) {
+    if (ct === 'passive') {
+        result.specialActions.push(info)
+    } else {
+        result.reactions.push(info)
+    }
+}
+
+function routeAutoReroll(info, auto, result, ct) {
+    if (ct === '1 action') {
+        result.actions.push(info)
+    } else if (ct === 'passive') {
+        result.specialActions.push(info)
+    } else {
+        result.reactions.push(info)
+    }
+}
+
+function routeAttackRider(info, auto, result, ct) {
+    if (info.chooseOne || info.maxEffects > 1 || (info.oncePerTurn && ct === 'passive') || info.trigger) {
+        result.passives.push(info)
+    } else {
+        result.actions.push(info)
+    }
+}
+
+function routePassiveUnlessPsychicTeleport(info, auto, result) {
+    if (auto.effect === 'psychic_teleportation') {
+        result.bonusActions.push(info)
+    } else {
+        result.passives.push(info)
+    }
+}
+
+function routePassiveSpecial(info, auto, result) {
+    result.passives.push(info)
+    result.specialActions.push(info)
+}
+
+const PASSIVE_RULE_SPECIAL_EFFECTS = {
+    ritual_spells: 'ritualSpells',
+    superior_defense: 'specialActions',
+    grapple_damage: 'specialActions',
+}
+
+function routePassiveRule(info, auto, result) {
+    const specialBucket = PASSIVE_RULE_SPECIAL_EFFECTS[info.effect]
+    if (specialBucket) {
+        result[specialBucket].push(info)
+        return
+    }
+    if (info.effect === 'bonus_healing') {
+        result.specialActions.push(info)
+    }
+    result.passives.push(info)
+    if (info.effect === 'primal_knowledge' && info.primalKnowledge.length > 0) {
+        result.primalKnowledge.push(...info.primalKnowledge)
+    }
+}
+
+function routeCosmicOmen(info, auto, result, ct) {
+    if (ct === '1 bonus action') {
+        result.bonusActions.push(info)
+    } else if (ct === '1 reaction') {
+        result.reactions.push(info)
+    } else {
+        result.actions.push(info)
+    }
+}
+
+function routeCombatSuperiority(info, auto, result) {
+    if (info.oncePerTurn) {
+        result.actions.push(info)
+    } else {
+        result.specialActions.push(info)
+    }
+    if (info.bonusActionManeuvers) {
+        result.bonusActions.push(...info.bonusActionManeuvers)
+    }
+}
+
+function routeBonusByAction(info, auto, result) {
+    if (info.action === 'bonus_action') {
+        result.bonusActions.push(info)
+    } else {
+        result.actions.push(info)
+    }
+}
+
+function routeMistyWanderer(info, auto, result, ct) {
+    if (ct === 'passive') {
+        result.specialActions.push(info)
+    } else if (ct === '1 bonus action') {
+        result.bonusActions.push(info)
+    } else {
+        result.actions.push(info)
+    }
+}
+
+function routeModifyD20Roll(info, auto, result, ct) {
+    if (ct === '1 reaction') {
+        result.reactions.push(info)
+    } else if (ct === '1 bonus action') {
+        result.bonusActions.push(info)
+    } else {
+        result.passives.push(info)
+    }
+}
+
+function routeDamageTypeChoice(info, auto, result) {
+    if (info.effect === 'elemental_affinity') {
+        result.specialActions.push(info)
+    } else {
+        result.passives.push(info)
+    }
+}
+
+function routeMeta(info, auto, result) {
+    if (info.effect === 'heroic_inspiration_on_long_rest') {
+        result.passives.push(info)
+    } else {
+        result.specialActions.push(info)
+    }
+}
+
+function assign(map, handler, types) {
+    for (const type of types) {
+        map[type] = handler
+    }
+}
+
+const ROUTES = {}
+
+assign(ROUTES, routeSaveStyle, [
+    'save_attack', 'save_only', 'charm_person', 'elemental_burst', 'wrath_of_the_sea',
+    'oceanic_gift', 'flesh_to_stone', 'hold_monster', 'banishment', 'maze',
+    'hypnotic_pattern', 'power_word_stun', 'sleep', 'resilient_sphere', 'mass_suggestion',
+    'suggestion', 'ottos_dance', 'stinking_cloud', 'sleet_storm', 'confusion',
+    'tashas_laughter', 'imprisonment', 'forcecage', 'prismatic_spray', 'slow',
+    'healing', 'healing_pool', 'self_healing', 'damage_bonus',
+])
+
+assign(ROUTES, routeCtPassiveBonusOrAction, [
+    'extra_action', 'heroes_feast', 'buff_ally', 'bardic_inspiration', 'bonus_attacks',
+    'bonus_action_attack', 'free_spell', 'fey_reinforcements', 'divine_intervention',
+])
+
+assign(ROUTES, pushTo('actions'), [
+    'resource_pool', 'open_hand_technique', 'spell_modifier', 'font_of_magic', 'divine_spark',
+    'set_condition', 'sorcery_aura', 'sorcery_incarnate', 'nature_sanctuary',
+    'warding_bond', 'war_magic_cantrip', 'war_magic_spell', 'arcane_charge',
+    'telekinetic_movement', 'combat_superiority_grant_attack', 'primal_companion_command',
+    'primal_companion_restore', 'remove_curse', 'spare_the_dying', 'bastion_of_law',
+    'contact_patron', 'dragon_companion', 'stealth_attack',
+])
+
+assign(ROUTES, routeBonusByCt, [
+    'clouds_jaunt', 'sanctuary', 'illusory_reality', 'lesser_restoration', 'protection_from_poison',
+])
+
+assign(ROUTES, routeFireBurn, ['fire_burn', 'frosts_chill', 'hills_tumble'])
+
+assign(ROUTES, pushTo('reactions'), [
+    'stones_endurance', 'storms_thunder', 'reaction_damage', 'reaction_bonus',
+    'bardic_inspiration_offense', 'piercer_puncture', 'combat_superiority_reaction',
+    'combat_superiority_commanding_presence_reaction', 'telekinetic_thrust', 'glorious_defense',
+    'relentless_avenger', 'soul_of_vengeance', 'sentinel_guardian', 'reaction_save',
+    'reaction_spell', 'shadowy_dodge', 'interception', 'protection', 'misty_escape',
+    'beguiling_defenses', 'searing_vengeance', 'illusory_self', 'superior_hunter_defense',
+    'lucky_point', 'spell_thief', 'shield', 'restore_balance', 'projected_ward',
+])
+
+assign(ROUTES, routeCtPassiveOrReaction, [
+    'countercharm', 'damage_reduction', 'psionic_strike', 'reaction_debuff',
+    'bardic_inspiration_defense', 'reaction_save_heal', 'animal_aspect',
+])
+
+assign(ROUTES, pushTo('bonusActions'), [
+    'nature_sanctuary_move', 'combat_superiority_bonus_action', 'know_enemy', 'war_bond_summon',
+    'bulwark_of_force', 'primal_companion_bonus_action_command', 'steps_of_the_fey',
+    'bonus_action_choice', 'steady_aim', 'mage_hand_control', 'fast_hands',
+    'arcane_ward_bonus_action', 'third_eye', 'apply_poison',
+])
+
+assign(ROUTES, pushTo('specialActions'), [
+    'temp_buff', 'temp_hp_buff', 'damage_aura', 'combat_stance', 'initiative_action',
+    'starry_form', 'twinkling_constellations', 'tactical_mind', 'quivering_palm',
+    'combat_superiority_movement', 'combat_superiority_skill_check', 'living_legend',
+    'cloak_of_shadows', 'holy_nimbus', 'holy_aura', 'avenging_angel', 'magical_cunning',
+    'elder_champion', 'large_form', 'celestial_resilience', 'hunter_prey',
+    'revelation_in_flesh', 'peerless_athlete', 'dragon_wings', 'clairvoyant_combatant',
+    'create_thrall', 'celestial_revelation', 'elfish_lineage', 'gnomish_lineage',
+    'fiendish_legacy', 'memorize_spell', 'signature_spells', 'spell_mastery', 'portent',
+    'web_area_save', 'sleet_storm_area_save', 'faerie_fire', 'brew_poison',
+    'minor_telekinesis_spell',
+])
+
+assign(ROUTES, pushTo('passives'), [
+    'survive_and_heal', 'shadow_step_rider', 'primal_companion_double_strike',
+    'primal_companion_double_strike_damage', 'primal_companion_spell_share',
+    'primal_companion_dodge', 'holy_nimbus_radiant_damage', 'umbral_sight',
+    'naturally_stealthy', 'cantrip_spellcasting_ability', 'dark_ones_blessing',
+    'dark_ones_luck', 'superior_hunter_prey', 'magical_ambush', 'versatile_trickster',
+    'stroke_of_luck', 'supreme_sneak', 'save_proficiency', 'expert_divination',
+    'radiant_soul', 'hurl_through_hell', 'create_thrall_temp_hp', 'divination_savant',
+    'evocation_savant', 'illusion_savant', 'arcane_ward', 'spell_breaker', 'sentinel',
+    'potent_cantrip', 'soulstitch_spells', 'empowered_evocation', 'improved_illusions',
+    'overchannel', 'pass_without_trace', 'wild_magic_surge', 'wild_magic_tamed',
+    'feats_of_chaos', 'phantasmal_creatures', 'shadow_arts',
+])
+
+assign(ROUTES, routePassiveUnlessPsychicTeleport, [
+    'passive_buff', 'passive_immunity', 'condition_immunity_while_active', 'resistance',
+    'land_resistance', 'psionic_sorcery', 'psionic_spells_list', 'psychic_spells',
+    'auto_effect', 'healing_bonus',
+])
+
+assign(ROUTES, routePassiveSpecial, [
+    'resource_restoration', 'natural_recovery', 'circle_of_the_land_spells',
+    'font_of_inspiration', 'conditional_advantage', 'conditional_replacement', 'evasion',
+    'conditional_disadvantage', 'mastery_rider', 'weapon_kind_mastery', 'bewitching_magic',
+    'post_cast_rider', 'post_cast_self_heal', 'post_cast_ally_heal', 'post_cast_smite_cover',
+    'post_cast_inspiring_smite', 'multi_target_spread', 'jack_of_all_trades',
+    'reliable_talent', 'divine_order', 'moonlight_step_rider', 'damage_type_modifier',
+    'weapon_mastery_choice',
+])
+
+assign(ROUTES, routeBonusByAction, [
+    'guarded_mind', 'concentration_bonus_attack', 'telekinetic_leap', 'primal_companion_summon',
+    'trance_of_order', 'clockwork_cavalcade', 'telekinetic_shove',
+])
+
+ROUTES.auto_reroll = routeAutoReroll
+ROUTES.attack_rider = routeAttackRider
+ROUTES.passive_rule = routePassiveRule
+ROUTES.cosmic_omen = routeCosmicOmen
+ROUTES.combat_superiority = routeCombatSuperiority
+ROUTES.misty_wanderer = routeMistyWanderer
+ROUTES.modify_d20_roll = routeModifyD20Roll
+ROUTES.damage_type_choice = routeDamageTypeChoice
+ROUTES.meta = routeMeta
+ROUTES.use_magic_device = pushToBoth('passives', 'specialActions')
+
 export function routeAutomation(info, auto, result) {
     const ct = normalizeCastingTime(info.casting_time)
-    switch (info.type) {
-    case 'save_attack':
-    case 'save_only':
-    case 'charm_person':
-    case 'elemental_burst':
-    case 'wrath_of_the_sea':
-    case 'oceanic_gift':
-    case 'flesh_to_stone':
-    case 'hold_monster':
-    case 'banishment':
-    case 'maze':
-    case 'hypnotic_pattern':
-    case 'power_word_stun':
-    case 'sleep':
-    case 'resilient_sphere':
-    case 'mass_suggestion':
-    case 'suggestion':
-    case 'ottos_dance':
-    case 'stinking_cloud':
-    case 'sleet_storm':
-    case 'confusion':
-    case 'tashas_laughter':
-    case 'imprisonment':
-    case 'forcecage':
-    case 'prismatic_spray':
-    case 'slow':
-    case 'healing':
-    case 'healing_pool':
-    case 'self_healing':
-    case 'damage_bonus':
-        if (info.trigger && (info.trigger.includes('_crit') || info.trigger.includes('_critical') || info.trigger.includes('critical_') || info.trigger === 'cunning_strike_poison_save_fail')) {
-            result.passives.push(info)
-        } else if (info.action === 'bonus_action') {
-            result.bonusActions.push(info)
-        } else {
-            result.actions.push(info)
-        }
-        break
-    case 'extra_action':
-    case 'heroes_feast':
-    case 'buff_ally':
-    case 'bardic_inspiration':
-    case 'bonus_attacks':
-    case 'bonus_action_attack':
-    case 'free_spell':
-    case 'fey_reinforcements':
-    case 'divine_intervention':
-        if (ct === 'passive') {
-            result.specialActions.push(info)
-        } else if (info.action === 'bonus_action') {
-            result.bonusActions.push(info)
-        } else {
-            result.actions.push(info)
-        }
-        break
-
-    case 'resource_pool':
-    case 'open_hand_technique':
-    case 'spell_modifier':
-    case 'font_of_magic':
-    case 'divine_spark':
-    case 'set_condition':
-    case 'sorcery_aura':
-    case 'sorcery_incarnate':
-    case 'nature_sanctuary':
-        result.actions.push(info)
-        break
-    case 'clouds_jaunt':
-    case 'sanctuary':
-        if (ct === '1 bonus action') {
-            result.bonusActions.push(info)
-        } else {
-            result.actions.push(info)
-        }
-        break
-    case 'fire_burn':
-    case 'frosts_chill':
-    case 'hills_tumble':
-        if (ct === '1 action') {
-            result.actions.push(info)
-        } else {
-            result.passives.push(info)
-        }
-        break
-    case 'stones_endurance':
-    case 'storms_thunder':
-        if (ct === '1 reaction') {
-            result.reactions.push(info)
-        } else {
-            result.reactions.push(info)
-        }
-        break
-    case 'reaction_damage':
-        if (auto.trigger === 'psychic_damage_received') {
-            result.reactions.push(info)
-        } else {
-            result.reactions.push(info)
-        }
-        break
-    case 'countercharm':
-    case 'damage_reduction':
-    case 'psionic_strike':
-    case 'reaction_debuff':
-    case 'bardic_inspiration_defense':
-    case 'reaction_save_heal':
-    case 'animal_aspect':
-        if (ct === 'passive') {
-            result.specialActions.push(info)
-        } else {
-            result.reactions.push(info)
-        }
-        break
-    case 'reaction_bonus':
-    case 'bardic_inspiration_offense':
-    case 'piercer_puncture':
-        result.reactions.push(info)
-        break
-    case 'nature_sanctuary_move':
-        result.bonusActions.push(info)
-        break
-    case 'auto_reroll':
-        if (ct === '1 action') {
-            result.actions.push(info)
-        } else if (ct === 'passive') {
-            result.specialActions.push(info)
-        } else {
-            result.reactions.push(info)
-        }
-        break
-    case 'temp_buff':
-    case 'temp_hp_buff':
-    case 'damage_aura':
-    case 'combat_stance':
-    case 'initiative_action':
-        result.specialActions.push(info)
-        break
-    case 'attack_rider':
-        if (info.chooseOne || info.maxEffects > 1 || (info.oncePerTurn && ct === 'passive') || info.trigger) {
-            result.passives.push(info)
-        } else {
-            result.actions.push(info)
-        }
-        break
-    case 'passive_buff':
-    case 'passive_immunity':
-    case 'condition_immunity_while_active':
-    case 'resistance':
-    case 'land_resistance':
-    case 'psionic_sorcery':
-    case 'psionic_spells_list':
-    case 'psychic_spells':
-    case 'auto_effect':
-    case 'healing_bonus': {
-        if (auto.effect === 'psychic_teleportation') {
-            result.bonusActions.push(info)
-        } else {
-            result.passives.push(info)
-        }
-        break
-    }
-    case 'survive_and_heal': {
-        result.passives.push(info)
-        break
-    }
-    case 'resource_restoration':
-    case 'natural_recovery':
-    case 'circle_of_the_land_spells':
-    case 'font_of_inspiration':
-    case 'conditional_advantage':
-    case 'conditional_replacement':
-    case 'evasion':
-    case 'conditional_disadvantage':
-    case 'mastery_rider':
-    case 'weapon_kind_mastery':
-    case 'bewitching_magic':
-    case 'post_cast_rider':
-    case 'post_cast_self_heal':
-    case 'post_cast_ally_heal':
-    case 'post_cast_smite_cover':
-    case 'post_cast_inspiring_smite':
-    case 'multi_target_spread':
-    case 'jack_of_all_trades':
-    case 'reliable_talent':
-    case 'divine_order':
-    case 'moonlight_step_rider':
-    case 'damage_type_modifier':
-    case 'weapon_mastery_choice':
-        result.passives.push(info)
-        result.specialActions.push(info)
-        if (info.type === 'passive_rule' && info.effect === 'primal_knowledge' && info.primalKnowledge.length > 0) {
-            result.primalKnowledge.push(...info.primalKnowledge)
-        }
-        break
-    case 'passive_rule':
-        if (info.effect === 'superior_defense') {
-            result.specialActions.push(info)
-        } else if (info.effect === 'grapple_damage') {
-            result.specialActions.push(info)
-        } else if (info.effect === 'ritual_spells') {
-            result.ritualSpells.push(info)
-        } else if (info.effect === 'bonus_healing') {
-            result.passives.push(info)
-            result.specialActions.push(info)
-        } else if (info.effect === 'tavern_brawler_push' || info.effect === 'tavern_brawler_reroll_ones' || info.effect === 'ignore_loading_crossbows' || info.effect === 'no_melee_disadvantage_crossbows') {
-            result.passives.push(info)
-        } else {
-            result.passives.push(info)
-            if (info.effect === 'primal_knowledge' && info.primalKnowledge.length > 0) {
-                result.primalKnowledge.push(...info.primalKnowledge)
-            }
-        }
-        break
-    case 'starry_form':
-        result.specialActions.push(info)
-        break
-    case 'warding_bond':
-        result.actions.push(info)
-        break
-    case 'cosmic_omen':
-        if (ct === '1 bonus action') {
-            result.bonusActions.push(info)
-        } else if (ct === '1 reaction') {
-            result.reactions.push(info)
-        } else {
-            result.actions.push(info)
-        }
-        break
-    case 'twinkling_constellations':
-        result.specialActions.push(info)
-        break
-    case 'tactical_mind':
-        result.specialActions.push(info)
-        break
-    case 'quivering_palm':
-        result.specialActions.push(info)
-        break
-    case 'combat_superiority':
-        if (info.oncePerTurn) {
-            result.actions.push(info)
-        } else {
-            result.specialActions.push(info)
-        }
-        if (info.bonusActionManeuvers) {
-            result.bonusActions.push(...info.bonusActionManeuvers)
-        }
-        break
-    case 'combat_superiority_bonus_action':
-        result.bonusActions.push(info)
-        break
-    case 'combat_superiority_reaction':
-        result.reactions.push(info)
-        break
-    case 'combat_superiority_grant_attack':
-        result.actions.push(info)
-        break
-    case 'combat_superiority_movement':
-        result.specialActions.push(info)
-        break
-    case 'combat_superiority_skill_check':
-        result.specialActions.push(info)
-        break
-    case 'combat_superiority_commanding_presence_reaction':
-        result.reactions.push(info)
-        break
-    case 'know_enemy':
-        result.bonusActions.push(info)
-        break
-    case 'war_bond_summon':
-        result.bonusActions.push(info)
-        break
-    case 'war_magic_cantrip':
-        result.actions.push(info)
-        break
-    case 'war_magic_spell':
-        result.actions.push(info)
-        break
-    case 'arcane_charge':
-    case 'telekinetic_movement':
-        result.actions.push(info)
-        break
-    case 'guarded_mind':
-        if (info.action === 'bonus_action') {
-            result.bonusActions.push(info)
-        } else {
-            result.actions.push(info)
-        }
-        break
-    case 'bulwark_of_force':
-        result.bonusActions.push(info)
-        break
-    case 'concentration_bonus_attack':
-        if (info.action === 'bonus_action') {
-            result.bonusActions.push(info)
-        } else {
-            result.actions.push(info)
-        }
-        break
-    case 'telekinetic_leap':
-        if (info.action === 'bonus_action') {
-            result.bonusActions.push(info)
-        } else {
-            result.actions.push(info)
-        }
-        break
-    case 'telekinetic_thrust':
-    case 'glorious_defense':
-    case 'relentless_avenger':
-    case 'soul_of_vengeance':
-    case 'sentinel_guardian':
-        result.reactions.push(info)
-        break
-    case 'living_legend':
-        result.specialActions.push(info)
-        break
-    case 'shadow_step_rider':
-        result.passives.push(info)
-        break
-    case 'cloak_of_shadows':
-        result.specialActions.push(info)
-        break
-    case 'holy_nimbus':
-        result.specialActions.push(info)
-        break
-    case 'holy_aura':
-        result.specialActions.push(info)
-        break
-    case 'avenging_angel':
-        result.specialActions.push(info)
-        break
-    case 'primal_companion_summon':
-        if (info.action === 'bonus_action') {
-            result.bonusActions.push(info)
-        } else {
-            result.actions.push(info)
-        }
-        break
-    case 'primal_companion_command':
-        result.actions.push(info)
-        break
-    case 'primal_companion_restore':
-        result.actions.push(info)
-        break
-    case 'primal_companion_bonus_action_command':
-        result.bonusActions.push(info)
-        break
-    case 'primal_companion_double_strike':
-        result.passives.push(info)
-        break
-    case 'primal_companion_double_strike_damage':
-        result.passives.push(info)
-        break
-    case 'primal_companion_spell_share':
-        result.passives.push(info)
-        break
-    case 'primal_companion_dodge':
-        result.passives.push(info)
-        break
-    case 'magical_cunning':
-        result.specialActions.push(info)
-        break
-    case 'holy_nimbus_radiant_damage':
-        result.passives.push(info)
-        break
-    case 'elder_champion':
-        result.specialActions.push(info)
-        break
-    case 'large_form':
-        result.specialActions.push(info)
-        break
-    case 'umbral_sight':
-        result.passives.push(info)
-        break
-    case 'naturally_stealthy':
-        result.passives.push(info)
-        break
-    case 'reaction_save':
-        result.reactions.push(info)
-        break
-    case 'reaction_spell':
-        result.reactions.push(info)
-        break
-    case 'misty_wanderer':
-        if (ct === 'passive') {
-            result.specialActions.push(info)
-        } else if (ct === '1 bonus action') {
-            result.bonusActions.push(info)
-        } else {
-            result.actions.push(info)
-        }
-        break
-    case 'steps_of_the_fey':
-        result.bonusActions.push(info)
-        break
-    case 'celestial_resilience':
-        result.specialActions.push(info)
-        break
-    case 'shadowy_dodge':
-        result.reactions.push(info)
-        break
-    case 'interception':
-        result.reactions.push(info)
-        break
-    case 'protection':
-        result.reactions.push(info)
-        break
-    case 'misty_escape':
-        result.reactions.push(info)
-        break
-    case 'beguiling_defenses':
-        result.reactions.push(info)
-        break
-    case 'searing_vengeance':
-        result.reactions.push(info)
-        break
-    case 'illusory_self':
-        result.reactions.push(info)
-        break
-    case 'illusory_reality':
-        if (ct === '1 bonus action') {
-            result.bonusActions.push(info)
-        } else {
-            result.actions.push(info)
-        }
-        break
-    case 'cantrip_spellcasting_ability':
-        result.passives.push(info)
-        break
-    case 'dark_ones_blessing':
-        result.passives.push(info)
-        break
-    case 'dark_ones_luck':
-        result.passives.push(info)
-        break
-    case 'hunter_prey':
-        result.specialActions.push(info)
-        break
-    case 'superior_hunter_prey':
-        result.passives.push(info)
-        break
-    case 'superior_hunter_defense':
-        result.reactions.push(info)
-        break
-    case 'bonus_action_choice':
-        result.bonusActions.push(info)
-        break
-    case 'steady_aim':
-        result.bonusActions.push(info)
-        break
-    case 'mage_hand_control':
-        result.bonusActions.push(info)
-        break
-    case 'lesser_restoration':
-        if (ct === '1 bonus action') {
-            result.bonusActions.push(info)
-        } else {
-            result.actions.push(info)
-        }
-        break
-    case 'remove_curse':
-        result.actions.push(info)
-        break
-    case 'spare_the_dying':
-        result.actions.push(info)
-        break
-    case 'protection_from_poison':
-        if (ct === '1 bonus action') {
-            result.bonusActions.push(info)
-        } else {
-            result.actions.push(info)
-        }
-        break
-    case 'magical_ambush':
-        result.passives.push(info)
-        break
-    case 'versatile_trickster':
-        result.passives.push(info)
-        break
-    case 'stroke_of_luck':
-        result.passives.push(info)
-        break
-    case 'lucky_point':
-        result.reactions.push(info)
-        break
-    case 'modify_d20_roll':
-        if (ct === '1 reaction') {
-            result.reactions.push(info)
-        } else if (ct === '1 bonus action') {
-            result.bonusActions.push(info)
-        } else {
-            result.passives.push(info)
-        }
-        break
-    case 'spell_thief':
-        result.reactions.push(info)
-        break
-    case 'shield':
-        result.reactions.push(info)
-        break
-    case 'fast_hands':
-        result.bonusActions.push(info)
-        break
-    case 'stealth_attack':
-        result.actions.push(info)
-        break
-    case 'revelation_in_flesh':
-        result.specialActions.push(info)
-        break
-    case 'supreme_sneak':
-        result.passives.push(info)
-        break
-    case 'use_magic_device':
-        result.passives.push(info)
-        result.specialActions.push(info)
-        break
-    case 'peerless_athlete':
-        result.specialActions.push(info)
-        break
-    case 'save_proficiency':
-        result.passives.push(info)
-        break
-    case 'expert_divination':
-        result.passives.push(info)
-        break
-    case 'restore_balance':
-        result.reactions.push(info)
-        break
-    case 'bastion_of_law':
-        result.actions.push(info)
-        break
-    case 'trance_of_order':
-        if (info.action === 'bonus_action') {
-            result.bonusActions.push(info)
-        } else {
-            result.actions.push(info)
-        }
-        break
-    case 'clockwork_cavalcade':
-        if (info.action === 'bonus_action') {
-            result.bonusActions.push(info)
-        } else {
-            result.actions.push(info)
-        }
-        break
-    case 'contact_patron':
-        result.actions.push(info)
-        break
-    case 'damage_type_choice':
-        if (info.effect === 'elemental_affinity') {
-            result.specialActions.push(info)
-        } else {
-            result.passives.push(info)
-        }
-        break
-    case 'radiant_soul':
-        result.passives.push(info)
-        break
-    case 'dragon_wings':
-        result.specialActions.push(info)
-        break
-    case 'dragon_companion':
-        result.actions.push(info)
-        break
-    case 'hurl_through_hell':
-        result.passives.push(info)
-        break
-    case 'clairvoyant_combatant':
-        result.specialActions.push(info)
-        break
-    case 'create_thrall':
-        result.specialActions.push(info)
-        break
-    case 'create_thrall_temp_hp':
-        result.passives.push(info)
-        break
-    case 'celestial_revelation':
-        result.specialActions.push(info)
-        break
-    case 'elfish_lineage':
-        result.specialActions.push(info)
-        break
-    case 'gnomish_lineage':
-        result.specialActions.push(info)
-        break
-    case 'fiendish_legacy':
-        result.specialActions.push(info)
-        break
-    case 'memorize_spell':
-        result.specialActions.push(info);
-        break;
-    case 'signature_spells':
-        result.specialActions.push(info);
-        break;
-    case 'spell_mastery':
-        result.specialActions.push(info);
-        break;
-    case 'divination_savant':
-        result.passives.push(info);
-        break;
-    case 'evocation_savant':
-        result.passives.push(info);
-        break;
-    case 'illusion_savant':
-        result.passives.push(info);
-        break;
-    case 'arcane_ward':
-        result.passives.push(info);
-        break;
-    case 'arcane_ward_bonus_action':
-        result.bonusActions.push(info);
-        break;
-    case 'projected_ward':
-        result.reactions.push(info);
-        break;
-    case 'spell_breaker':
-        result.passives.push(info);
-        break;
-    case 'telekinetic_shove':
-        if (info.action === 'bonus_action') {
-            result.bonusActions.push(info);
-        } else {
-            result.actions.push(info);
-        }
-        break;
-    case 'sentinel':
-        result.passives.push(info);
-        break;
-    case 'portent':
-        result.specialActions.push(info)
-        break
-    case 'potent_cantrip':
-        result.passives.push(info)
-        break
-    case 'soulstitch_spells':
-        result.passives.push(info)
-        break
-    case 'empowered_evocation':
-        result.passives.push(info)
-        break
-    case 'improved_illusions':
-        result.passives.push(info)
-        break
-    case 'overchannel':
-        result.passives.push(info)
-        break
-    case 'pass_without_trace':
-        result.passives.push(info)
-        break
-    case 'third_eye':
-        result.bonusActions.push(info);
-        break;
-    case 'wild_magic_surge':
-        result.passives.push(info);
-        break;
-    case 'wild_magic_tamed':
-        result.passives.push(info);
-        break;
-    case 'feats_of_chaos':
-        result.passives.push(info);
-        break;
-    case 'phantasmal_creatures':
-        result.passives.push(info)
-        break;
-    // CLA-308: Shadow Arts passive marker (passive row — consumption rides the
-    // spell rows via spellPreparationService, never an interactive row click).
-    case 'shadow_arts':
-        result.passives.push(info)
-        break;
-    case 'meta':
-        if (info.effect === 'heroic_inspiration_on_long_rest') {
-            result.passives.push(info);
-        } else {
-            result.specialActions.push(info);
-        }
-        break;
-    case 'web_area_save':
-        result.specialActions.push(info)
-        break;
-    case 'sleet_storm_area_save':
-        result.specialActions.push(info)
-        break;
-    case 'faerie_fire':
-        result.specialActions.push(info)
-        break;
-    case 'brew_poison':
-        result.specialActions.push(info)
-        break
-    case 'apply_poison':
-        result.bonusActions.push(info)
-        break
-    case 'minor_telekinesis_spell':
-        result.specialActions.push(info)
-        break;
-    default:
-        result.specialActions.push(info)
-        break;
-    }
+    const route = ROUTES[info.type] || pushTo('specialActions')
+    route(info, auto, result, ct)
 }

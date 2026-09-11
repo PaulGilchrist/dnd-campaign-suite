@@ -457,81 +457,53 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     };
 }
 
-async function applyRiderEffect(action, playerStats, campaignName, targetName, option, _mapName) {
-    const auto = action.automation || action;
-    if (!targetName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                automationType: auto.type,
-                description: `${option.name}: ${option.effect}<br/><br/><i>No target selected — effect noted for manual application.</i>`,
-                automation: auto,
-            },
-        };
+function riderNotice(name, auto, description) {
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name,
+            automationType: auto.type,
+            description,
+            automation: auto,
+        },
+    };
+}
+
+// Remove Psychic Veil buff (and its Invisible condition) from the attacker
+// when a psychic-fueled rider triggers.
+function stripPsychicVeil(playerStats, campaignName) {
+    const attackerBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+    const attackerBuffArray = Array.isArray(attackerBuffs) ? attackerBuffs : [];
+    if (!attackerBuffArray.some(b => b.name === 'Psychic Veil')) return;
+
+    const attackerConditions = getRuntimeValue(playerStats.name, 'activeConditions') || [];
+    const attackerCondArray = Array.isArray(attackerConditions) ? attackerConditions : [];
+    const filteredConditions = attackerCondArray.filter(c => String(c).toLowerCase() !== 'invisible');
+    if (filteredConditions.length !== attackerCondArray.length) {
+        setRuntimeValue(playerStats.name, 'activeConditions', filteredConditions, campaignName);
     }
-
-    // Handle sudden_strike: record for bonus action attack
-    if (option.effect === 'sudden_strike') {
-        setRuntimeValue(playerStats.name, 'pendingSuddenStrike', true, campaignName);
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                automationType: auto.type,
-                description: `Sudden Strike enabled. Make a bonus action attack against a different creature within 5 ft of ${targetName}.`,
-                automation: auto,
-            },
-        };
+    const filteredBuffs = attackerBuffArray.filter(b => b.name !== 'Psychic Veil');
+    if (filteredBuffs.length !== attackerBuffArray.length) {
+        setRuntimeValue(playerStats.name, 'activeBuffs', filteredBuffs, campaignName);
     }
+}
 
-    // Handle mass_fear: resolve saves directly
-    if (option.effect === 'mass_fear') {
-        const attackerBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
-        const attackerBuffArray = Array.isArray(attackerBuffs) ? attackerBuffs : [];
-        if (attackerBuffArray.some(b => b.name === 'Psychic Veil')) {
-            const attackerConditions = getRuntimeValue(playerStats.name, 'activeConditions') || [];
-            const attackerCondArray = Array.isArray(attackerConditions) ? attackerConditions : [];
-            const filteredConditions = attackerCondArray.filter(c => String(c).toLowerCase() !== 'invisible');
-            if (filteredConditions.length !== attackerCondArray.length) {
-                setRuntimeValue(playerStats.name, 'activeConditions', filteredConditions, campaignName);
-            }
-            const filteredBuffs = attackerBuffArray.filter(b => b.name !== 'Psychic Veil');
-            if (filteredBuffs.length !== attackerBuffArray.length) {
-                setRuntimeValue(playerStats.name, 'activeBuffs', filteredBuffs, campaignName);
-            }
-        }
+// Push effect: just log and popup, no targetEffect (push is instant)
+function applyPushEffect(action, auto, playerStats, campaignName, targetName, option) {
+    const pushDistance = option.value || 10;
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: action.name,
+        description: `${playerStats.name} pushed ${targetName} ${pushDistance} feet away.`,
+        targetName: targetName,
+    }).catch((e) => { console.error("[attackRiderHandler:log-error]", e); });
+    return riderNotice(action.name, auto, `${targetName} was pushed ${pushDistance} feet away.`);
+}
 
-        return resolveMassFear(campaignName, playerStats.name, targetName, option, playerStats, _mapName);
-    }
-
-    // Push effect: just log and popup, no targetEffect (push is instant)
-    if (option.effect === 'push') {
-        const pushDistance = option.value || 10;
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: action.name,
-            description: `${playerStats.name} pushed ${targetName} ${pushDistance} feet away.`,
-            targetName: targetName,
-        }).catch((e) => { console.error("[attackRiderHandler:log-error]", e); });
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                automationType: auto.type,
-                description: `${targetName} was pushed ${pushDistance} feet away.`,
-                automation: auto,
-            },
-        };
-    }
-
-    // Default: apply standard rider effect
-    const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-    const newEffect = {
+function buildRiderEffect(action, targetName, playerStats, option, auto) {
+    return {
         target: targetName,
         source: playerStats.name,
         option: option.name,
@@ -555,160 +527,176 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
         damageType: option.damageType || null,
         label: auto.name || action.name,
     };
-    const updatedEffects = [...storedEffects, newEffect];
-    setRuntimeValue('campaign', 'targetEffects', updatedEffects, campaignName);
+}
 
-    // Log speed_reduction effect immediately (before save handling)
-    if (option.effect === 'speed_reduction') {
-        const speedValue = option.value || 10;
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: action.name,
-            description: `${playerStats.name} used Hamstring on ${targetName}: target's Speed reduced by ${speedValue} ft until the start of ${playerStats.name}'s next turn`,
-            targetName: targetName,
-        }).catch((e) => { console.error("[attackRiderHandler:log-error]", e); });
+// Log speed_reduction effect immediately (before save handling)
+function logSpeedReduction(action, playerStats, campaignName, targetName, option) {
+    const speedValue = option.value || 10;
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: action.name,
+        description: `${playerStats.name} used Hamstring on ${targetName}: target's Speed reduced by ${speedValue} ft until the start of ${playerStats.name}'s next turn`,
+        targetName: targetName,
+    }).catch((e) => { console.error("[attackRiderHandler:log-error]", e); });
 
-        // FT-082: register expiry so "until the start of your next turn" is
-        // enforced. Drain seam: expireStaleEffects phase 1 (navigationHandlers
-        // / sseHandlers turn boundaries) expires entries whose
-        // expireOnCreatureName matches the newly active store owner once the
-        // round has advanced — i.e. at the holder's next turn start (same
-        // verified pattern as slasher.js slasher_enhanced_critical).
-        // Scoped by effect+source+option+target so other speed_reduction
-        // writers (Slow mastery, giant ancestry) are untouched.
-        if (!option.saveType) {
-            addExpiration(playerStats.name, targetName, [
-                { type: 'remove_target_effect', effectKey: 'speed_reduction', source: playerStats.name, option: option.name, target: targetName }
-            ], campaignName, undefined, playerStats.name);
-        }
+    // FT-082: register expiry so "until the start of your next turn" is
+    // enforced. Drain seam: expireStaleEffects phase 1 (navigationHandlers
+    // / sseHandlers turn boundaries) expires entries whose
+    // expireOnCreatureName matches the newly active store owner once the
+    // round has advanced — i.e. at the holder's next turn start (same
+    // verified pattern as slasher.js slasher_enhanced_critical).
+    // Scoped by effect+source+option+target so other speed_reduction
+    // writers (Slow mastery, giant ancestry) are untouched.
+    if (!option.saveType) {
+        addExpiration(playerStats.name, targetName, [
+            { type: 'remove_target_effect', effectKey: 'speed_reduction', source: playerStats.name, option: option.name, target: targetName }
+        ], campaignName, undefined, playerStats.name);
+    }
+}
+
+// Envenom Weapons: when Poison option of Cunning Strike fails, apply 2d6 Poison damage ignoring resistance
+async function applyEnvenomWeapons(playerStats, campaignName, targetName) {
+    const passives = playerStats.automation?.passives || [];
+    const envenomPassive = passives.find(p =>
+        p.type === 'damage_bonus' &&
+        p.trigger === 'cunning_strike_poison_save_fail' &&
+        p.name === 'Envenom Weapons'
+    );
+    if (!envenomPassive) return;
+
+    const rollResult = rollExpression(envenomPassive.automation?.damageExpression || '2d6');
+    const poisonDamage = rollResult?.total || 7;
+    if (poisonDamage <= 0) return;
+
+    const combatSummary = await getCombatContext(campaignName);
+    if (!combatSummary) return;
+
+    const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
+    await applyDamageToTarget(
+        combatSummary,
+        targetName,
+        poisonDamage,
+        [envenomPassive.automation?.damageType || 'Poison'],
+        campaignName,
+        characters,
+        true,
+        playerStats.name
+    );
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: 'Envenom Weapons',
+        description: `2d6 Poison damage (${poisonDamage}) applied to ${targetName} on failed Cunning Strike poison save`,
+    }).catch((e) => { console.error("[attackRiderHandler:log-error]", e); });
+}
+
+async function handleRiderSave(action, playerStats, campaignName, targetName, option) {
+    const saveDc = buildSaveDc(option, playerStats);
+    const { promise } = createSaveListener(campaignName, {
+        targetName,
+        saveType: option.saveType,
+        saveDc,
+        dcSuccess: false,
+        saveAbility: option.saveAbility,
+    });
+
+    const saveResult = await promise;
+
+    if (saveResult.success === false && option.condition) {
+        const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+        const filtered = conditions.filter(c => String(c).toLowerCase() !== option.condition.toLowerCase());
+        const updatedConditions = [...filtered, option.condition];
+        setRuntimeValue(targetName, 'activeConditions', updatedConditions, campaignName);
     }
 
-    if (option.saveType) {
-        const saveDc = buildSaveDc(option, playerStats);
-        const { promise } = createSaveListener(campaignName, {
-            targetName,
-            saveType: option.saveType,
-            saveDc,
-            dcSuccess: false,
-            saveAbility: option.saveAbility,
-        });
-
-        const saveResult = await promise;
-
-        if (saveResult.success === false && option.condition) {
-            const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
-            const filtered = conditions.filter(c => String(c).toLowerCase() !== option.condition.toLowerCase());
-            const updatedConditions = [...filtered, option.condition];
-            setRuntimeValue(targetName, 'activeConditions', updatedConditions, campaignName);
-        }
-
-        // Envenom Weapons: when Poison option of Cunning Strike fails, apply 2d6 Poison damage ignoring resistance
-        if (saveResult.success === false && option.effect === 'poisoned' && option.saveType === 'CON') {
-            const passives = playerStats.automation?.passives || [];
-            const envenomPassive = passives.find(p =>
-                p.type === 'damage_bonus' &&
-                p.trigger === 'cunning_strike_poison_save_fail' &&
-                p.name === 'Envenom Weapons'
-            );
-            if (envenomPassive) {
-                const rollResult = rollExpression(envenomPassive.automation?.damageExpression || '2d6');
-                const poisonDamage = rollResult?.total || 7;
-                if (poisonDamage > 0) {
-                    const combatSummary = await getCombatContext(campaignName);
-                    if (combatSummary) {
-                        const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-                        await applyDamageToTarget(
-                            combatSummary,
-                            targetName,
-                            poisonDamage,
-                            [envenomPassive.automation?.damageType || 'Poison'],
-                            campaignName,
-                            characters,
-                            true,
-                            playerStats.name
-                        );
-                        addEntry(campaignName, {
-                            type: 'ability_use',
-                            characterName: playerStats.name,
-                            abilityName: 'Envenom Weapons',
-                            description: `2d6 Poison damage (${poisonDamage}) applied to ${targetName} on failed Cunning Strike poison save`,
-                        }).catch((e) => { console.error("[attackRiderHandler:log-error]", e); });
-                    }
-                }
-            }
-        }
-
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: action.name,
-            description: `${option.name} applied to ${targetName} — ${targetName} rolled ${saveResult.roll} on ${option.saveType} save (DC ${saveDc}), ${saveResult.success ? 'succeeded' : 'failed'} — ${saveResult.success ? 'no effect' : `${option.condition} condition applied`}`,
-        }).catch((e) => { console.error("[attackRiderHandler:log-error]", e); });
-
-        // Handle Psychic Veil interaction
-        const attackerBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
-        const attackerBuffArray = Array.isArray(attackerBuffs) ? attackerBuffs : [];
-        if (attackerBuffArray.some(b => b.name === 'Psychic Veil')) {
-            const attackerConditions = getRuntimeValue(playerStats.name, 'activeConditions') || [];
-            const attackerCondArray = Array.isArray(attackerConditions) ? attackerConditions : [];
-            const filteredConditions = attackerCondArray.filter(c => String(c).toLowerCase() !== 'invisible');
-            if (filteredConditions.length !== attackerCondArray.length) {
-                setRuntimeValue(playerStats.name, 'activeConditions', filteredConditions, campaignName);
-            }
-            const filteredBuffs = attackerBuffArray.filter(b => b.name !== 'Psychic Veil');
-            if (filteredBuffs.length !== attackerBuffArray.length) {
-                setRuntimeValue(playerStats.name, 'activeBuffs', filteredBuffs, campaignName);
-            }
-        }
-
-        return null;
+    if (saveResult.success === false && option.effect === 'poisoned' && option.saveType === 'CON') {
+        await applyEnvenomWeapons(playerStats, campaignName, targetName);
     }
 
-    // Build description for Cunning Strike options
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: action.name,
+        description: `${option.name} applied to ${targetName} — ${targetName} rolled ${saveResult.roll} on ${option.saveType} save (DC ${saveDc}), ${saveResult.success ? 'succeeded' : 'failed'} — ${saveResult.success ? 'no effect' : `${option.condition} condition applied`}`,
+    }).catch((e) => { console.error("[attackRiderHandler:log-error]", e); });
+
+    // Handle Psychic Veil interaction
+    stripPsychicVeil(playerStats, campaignName);
+
+    return null;
+}
+
+// Ordered dispatch for no-save Cunning Strike option descriptions
+const NO_SAVE_DESCRIPTION_RULES = [
+    [o => o.effect === 'poisoned', () => ' — target must make a Constitution save or be Poisoned for 1 minute (repeats save at end of each turn)'],
+    [o => o.effect === 'prone', () => ' — target must make a Dexterity save or gain the Prone condition'],
+    [o => o.effect === 'no_opportunity_attacks' && o.movement, () => ' — move up to half Speed without provoking Opportunity Attacks'],
+    [o => o.effect === 'ally_movement' && o.movement, () => ' — ally moves up to half Speed without provoking Opportunity Attacks'],
+    [o => o.effect === 'daze', () => ' — target must make a Constitution save or on next turn can only do one of: move, action, or Bonus Action'],
+    [o => o.effect === 'unconscious', () => ' — target must make a Constitution save or be Unconscious for 1 minute (repeats save at end of each turn)'],
+    [o => o.effect === 'blinded', () => ' — target must make a Dexterity save or be Blinded until end of its next turn'],
+    [o => o.effect === 'speed_reduction', o => ` — target's Speed reduced by ${o.value || 10} ft until the start of your next turn`],
+    [o => o.noOpportunityAttacks, () => ' — target cannot make Opportunity Attacks until the start of your next turn'],
+    [o => o.effect === 'disadvantage_on_next_save', () => ' — target has Disadvantage on the next saving throw it makes'],
+    [o => o.effect === 'next_attack_advantage', (o, targetName) => ` — the next attack against ${targetName} gains +${o.value || '5'}`],
+    [o => o.effect === 'damage_bonus', o => ` — ${o.damageExpression || '1d6'} extra damage`],
+];
+
+// Build description for Cunning Strike options
+function buildNoSaveDescription(action, playerStats, campaignName, targetName, option) {
     let desc = `${option.name} applied to ${targetName}`;
-    if (option.effect === 'poisoned') {
-        desc += ' — target must make a Constitution save or be Poisoned for 1 minute (repeats save at end of each turn)';
-    } else if (option.effect === 'prone') {
-        desc += ' — target must make a Dexterity save or gain the Prone condition';
-    } else if (option.effect === 'no_opportunity_attacks' && option.movement) {
-        desc += ' — move up to half Speed without provoking Opportunity Attacks';
+    const rule = NO_SAVE_DESCRIPTION_RULES.find(([when]) => when(option));
+    if (rule) desc += rule[1](option, targetName);
+
+    if (option.effect === 'no_opportunity_attacks' && option.movement) {
         addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerStats.name,
             abilityName: 'Cunning Strike',
             description: `${option.name} — ${playerStats.name} can move up to half Speed without provoking Opportunity Attacks.`,
         }).catch((e) => { console.error("[attackRiderHandler:log-error]", e); });
-    } else if (option.effect === 'ally_movement' && option.movement) {
-        desc += ' — ally moves up to half Speed without provoking Opportunity Attacks';
-    } else if (option.effect === 'daze') {
-        desc += ' — target must make a Constitution save or on next turn can only do one of: move, action, or Bonus Action';
-    } else if (option.effect === 'unconscious') {
-        desc += ' — target must make a Constitution save or be Unconscious for 1 minute (repeats save at end of each turn)';
-    } else if (option.effect === 'blinded') {
-        desc += ' — target must make a Dexterity save or be Blinded until end of its next turn';
-    } else if (option.effect === 'speed_reduction') {
-        desc += ` — target's Speed reduced by ${option.value || 10} ft until the start of your next turn`;
-    } else if (option.noOpportunityAttacks) {
-        desc += ' — target cannot make Opportunity Attacks until the start of your next turn';
-    } else if (option.effect === 'disadvantage_on_next_save') {
-        desc += ' — target has Disadvantage on the next saving throw it makes';
-    } else if (option.effect === 'next_attack_advantage') {
-        desc += ` — the next attack against ${targetName} gains +${option.value || '5'}`;
-    } else if (option.effect === 'damage_bonus') {
-        desc += ` — ${option.damageExpression || '1d6'} extra damage`;
+    }
+    return desc;
+}
+
+async function applyRiderEffect(action, playerStats, campaignName, targetName, option, _mapName) {
+    const auto = action.automation || action;
+    if (!targetName) {
+        return riderNotice(action.name, auto, `${option.name}: ${option.effect}<br/><br/><i>No target selected — effect noted for manual application.</i>`);
     }
 
-    return {
-        type: 'popup',
-        payload: {
-            type: 'automation_info',
-            name: action.name,
-            automationType: auto.type,
-            description: desc,
-            automation: auto,
-        },
-    };
+    // Handle sudden_strike: record for bonus action attack
+    if (option.effect === 'sudden_strike') {
+        setRuntimeValue(playerStats.name, 'pendingSuddenStrike', true, campaignName);
+        return riderNotice(action.name, auto, `Sudden Strike enabled. Make a bonus action attack against a different creature within 5 ft of ${targetName}.`);
+    }
+
+    // Handle mass_fear: resolve saves directly
+    if (option.effect === 'mass_fear') {
+        stripPsychicVeil(playerStats, campaignName);
+        return resolveMassFear(campaignName, playerStats.name, targetName, option, playerStats, _mapName);
+    }
+
+    if (option.effect === 'push') {
+        return applyPushEffect(action, auto, playerStats, campaignName, targetName, option);
+    }
+
+    // Default: apply standard rider effect
+    const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const newEffect = buildRiderEffect(action, targetName, playerStats, option, auto);
+    const updatedEffects = [...storedEffects, newEffect];
+    setRuntimeValue('campaign', 'targetEffects', updatedEffects, campaignName);
+
+    if (option.effect === 'speed_reduction') {
+        logSpeedReduction(action, playerStats, campaignName, targetName, option);
+    }
+
+    if (option.saveType) {
+        return handleRiderSave(action, playerStats, campaignName, targetName, option);
+    }
+
+    return riderNotice(action.name, auto, buildNoSaveDescription(action, playerStats, campaignName, targetName, option));
 }
 
 

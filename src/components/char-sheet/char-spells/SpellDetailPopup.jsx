@@ -9,6 +9,61 @@ import { getConsumedMaterial } from '../../../services/rules/spells/materialComp
 import { hasMaterial } from '../../../services/rules/spells/materialComponents.js';
 import { isSpellBreakerBonusActionSpell } from '../../../services/ui/spellSectionUtils.js';
 
+function computeCanCast({ isRaging, isCantrip, quickRitualActive, isUpcastable, hasAnySlots, freeCastAuthorized, spell, playerStats, isWarlock, warlockSlotLevel, psionicSorceryAvailable }) {
+  if (!isRaging) {
+    if (isCantrip || quickRitualActive) return true;
+    if (isUpcastable) return hasAnySlots;
+    return freeCastAuthorized || (() => {
+      const baseKey = `spell_slots_level_${spell.level}`;
+      const stored = getRuntimeValue(playerStats.name, baseKey);
+      const max = (playerStats.spellAbilities && playerStats.spellAbilities[baseKey]) || 0;
+      return (stored != null ? stored : max) > 0;
+    })() || (isWarlock && warlockSlotLevel !== null) || (psionicSorceryAvailable >= spell.level);
+  }
+  return false;
+}
+
+function SlotsRemainingText({ isWarlock, warlockSlotLevel, spell, playerStats, psionicSorceryAvailable }) {
+  const displayKey = isWarlock && warlockSlotLevel ? `spell_slots_level_${warlockSlotLevel}` : `spell_slots_level_${spell.level}`;
+  const stored = getRuntimeValue(playerStats.name, displayKey);
+  const max = (playerStats.spellAbilities && playerStats.spellAbilities[displayKey]) || 0;
+  const slots = stored != null ? stored : max;
+  let psionicSuffix = null;
+  if (psionicSorceryAvailable > 0) {
+    const baseKey = `spell_slots_level_${spell.level}`;
+    const baseStored = getRuntimeValue(playerStats.name, baseKey);
+    const baseMax = (playerStats.spellAbilities && playerStats.spellAbilities[baseKey]) || 0;
+    const baseSlots = baseStored != null ? baseStored : baseMax;
+    psionicSuffix = baseSlots > 0 ? ` or ${psionicSorceryAvailable} SP` : `${psionicSorceryAvailable} SP`;
+  }
+  return <>{slots > 0 ? `${slots} slot${slots !== 1 ? 's' : ''}` : slots}{psionicSuffix}</>;
+}
+
+function FreeCastNotices({ freeCastAuthorized, isShadowArtsFreeCast, isPhantasmalFreeCast, shadowArtsFreeCastCount, spell, canCast, isCantrip }) {
+  return (
+    <>
+      {freeCastAuthorized && spell._ritualOnly && (
+        <p className="spell-detail-free-cast"><i className="fa-solid fa-scroll"></i> Ritual Cast — cast as a Ritual, no spell slot consumed</p>
+      )}
+      {freeCastAuthorized && !spell._ritualOnly && !isShadowArtsFreeCast && (
+        <p className="spell-detail-free-cast"><i className="fa-solid fa-bolt"></i> Free Cast — no spell slot consumed</p>
+      )}
+      {freeCastAuthorized && isShadowArtsFreeCast && (
+        <p className="spell-detail-free-cast"><i className="fa-solid fa-moon"></i> Shadow Arts free cast — no spell slot consumed ({shadowArtsFreeCastCount} use{shadowArtsFreeCastCount === 1 ? '' : 's'} of {spell.name} left until your next Long Rest)</p>
+      )}
+      {isPhantasmalFreeCast && (
+        <p className="spell-detail-free-cast"><i className="fa-solid fa-ghost"></i> Phantasmal Creatures free cast — spectral Illusion version, half HP</p>
+      )}
+      {!canCast && !isCantrip && !freeCastAuthorized && isShadowArtsFreeCast && (
+        <p className="spell-detail-no-slots"><i className="fa-solid fa-moon"></i> Shadow Arts: {spell.name} already cast — finish a Long Rest to regain it.</p>
+      )}
+      {!canCast && !isCantrip && !freeCastAuthorized && !isShadowArtsFreeCast && (
+        <p className="spell-detail-no-slots">No spell slots available for this level.</p>
+      )}
+    </>
+  );
+}
+
 function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, upcastLevels = [], playerLevel = 1 }) {
   const isCantrip = spell.level === 0;
   const slotDmg = spell.damage?.damage_at_slot_level;
@@ -140,12 +195,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
   };
 
   const isRaging = getActiveBuffs(playerStats.name, campaignName).some(b => b.name === 'Rage');
-  const canCast = !isRaging && (isCantrip || (quickRitualActive || (isUpcastable ? hasAnySlots : ((freeCastAuthorized || (() => {
-    const baseKey = `spell_slots_level_${spell.level}`;
-    const stored = getRuntimeValue(playerStats.name, baseKey);
-    const max = (playerStats.spellAbilities && playerStats.spellAbilities[baseKey]) || 0;
-    return (stored != null ? stored : max) > 0;
-  })() || (isWarlock && warlockSlotLevel !== null)) || (_psionicSorceryAvailable >= spell.level)))));
+  const canCast = computeCanCast({ isRaging, isCantrip, quickRitualActive, isUpcastable, hasAnySlots, freeCastAuthorized, spell, playerStats, isWarlock, warlockSlotLevel, psionicSorceryAvailable: _psionicSorceryAvailable });
 
   const showUpcastSelector = isUpcastable && upcastLevels.length > 1;
 
@@ -165,20 +215,8 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
           {spell.spellCastingAbility && <span><b>Casting Ability:</b> {spell.spellCastingAbility}</span>}
           {spell.area_of_effect && <span><b>Area:</b> {spell.area_of_effect.type || spell.area_of_effect.shape}{spell.area_of_effect.size ? ` - ${spell.area_of_effect.size}` : ''}</span>}
            {!isCantrip && !showUpcastSelector && (
-             <span><b>Slots Remaining:</b> {(() => {
-               const displayKey = isWarlock && warlockSlotLevel ? `spell_slots_level_${warlockSlotLevel}` : `spell_slots_level_${spell.level}`;
-               const stored = getRuntimeValue(playerStats.name, displayKey);
-               const max = (playerStats.spellAbilities && playerStats.spellAbilities[displayKey]) || 0;
-               const slots = stored != null ? stored : max;
-               return slots > 0 ? `${slots} slot${slots !== 1 ? 's' : ''}` : slots;
-             })()}{!isCantrip && !showUpcastSelector && _psionicSorceryAvailable > 0 && (() => {
-               const baseKey = `spell_slots_level_${spell.level}`;
-               const stored = getRuntimeValue(playerStats.name, baseKey);
-               const max = (playerStats.spellAbilities && playerStats.spellAbilities[baseKey]) || 0;
-              const slots = stored != null ? stored : max;
-              return slots > 0 ? ` or ${_psionicSorceryAvailable} SP` : `${_psionicSorceryAvailable} SP`;
-            })()}</span>
-          )}
+             <span><b>Slots Remaining:</b> <SlotsRemainingText isWarlock={isWarlock} warlockSlotLevel={warlockSlotLevel} spell={spell} playerStats={playerStats} psionicSorceryAvailable={_psionicSorceryAvailable} /></span>
+           )}
         </div>
         {showUpcastSelector && (
           <div className="spell-detail-upcast">
@@ -314,24 +352,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
             <i className="fa-solid fa-times"></i> Close
           </button>
         </div>
-          {freeCastAuthorized && spell._ritualOnly && (
-            <p className="spell-detail-free-cast"><i className="fa-solid fa-scroll"></i> Ritual Cast — cast as a Ritual, no spell slot consumed</p>
-          )}
-          {freeCastAuthorized && !spell._ritualOnly && !isShadowArtsFreeCast && (
-            <p className="spell-detail-free-cast"><i className="fa-solid fa-bolt"></i> Free Cast — no spell slot consumed</p>
-          )}
-          {freeCastAuthorized && isShadowArtsFreeCast && (
-            <p className="spell-detail-free-cast"><i className="fa-solid fa-moon"></i> Shadow Arts free cast — no spell slot consumed ({shadowArtsFreeCastCount} use{shadowArtsFreeCastCount === 1 ? '' : 's'} of {spell.name} left until your next Long Rest)</p>
-          )}
-          {isPhantasmalFreeCast && (
-            <p className="spell-detail-free-cast"><i className="fa-solid fa-ghost"></i> Phantasmal Creatures free cast — spectral Illusion version, half HP</p>
-          )}
-          {!canCast && !isCantrip && !freeCastAuthorized && isShadowArtsFreeCast && (
-          <p className="spell-detail-no-slots"><i className="fa-solid fa-moon"></i> Shadow Arts: {spell.name} already cast — finish a Long Rest to regain it.</p>
-        )}
-          {!canCast && !isCantrip && !freeCastAuthorized && !isShadowArtsFreeCast && (
-          <p className="spell-detail-no-slots">No spell slots available for this level.</p>
-        )}
+          <FreeCastNotices freeCastAuthorized={freeCastAuthorized} isShadowArtsFreeCast={isShadowArtsFreeCast} isPhantasmalFreeCast={isPhantasmalFreeCast} shadowArtsFreeCastCount={shadowArtsFreeCastCount} spell={spell} canCast={canCast} isCantrip={isCantrip} />
       </div>
     </div>
   );

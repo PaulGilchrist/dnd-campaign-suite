@@ -45,19 +45,25 @@ function computePsychicDamageType(spell, psychicSpellsConfig, damageType) {
     return damageType;
 }
 
-export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, featEffects, campaignName, mapName, characters }) {
-    // --- Block checks ---
-    const buffBlock = await checkBlockedBySpellcastingBuff(spell, playerStats, campaignName);
-    if (buffBlock) return buffBlock;
+// Wrappers for the handled-trigger chain: passThrough returns the handler's
+// `result` when handled; swallow returns undefined (matching bare `return;`).
+const passThrough = (r) => (r.handled ? { value: r.result } : null);
+const swallow = (r) => (r.handled ? { value: undefined } : null);
 
-    const globeTargetName = getTargetInfo ? (await getTargetInfo())?.name || null : null;
-    const globeBlock = await checkGlobeOfInvulnerability(spell, globeTargetName, playerStats, campaignName);
-    if (globeBlock) return globeBlock;
+// Run a chain of handled-result trigger thunks in exact order. Sync thunks
+// resolve immediately; async thunks are awaited — preserving the original
+// await points of each handler invocation.
+async function runTriggerChain(triggers) {
+    for (const trigger of triggers) {
+        const outcome = trigger();
+        const settled = outcome && typeof outcome.then === 'function' ? await outcome : outcome;
+        if (settled) return settled;
+    }
+    return null;
+}
 
-    const forcecageBlock = await checkForcecageBlocked(spell, globeTargetName, playerStats, campaignName);
-    if (forcecageBlock) return forcecageBlock;
-
-    // Antimagic Field checks
+// Antimagic Field: block when caster or target is inside an active field.
+async function checkAntimagicField(spell, playerStats, globeTargetName, campaignName) {
     const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
     const antimagicEffects = storedEffects.filter(te => te.effect === 'antimagic_field');
     const casterAffected = antimagicEffects.some(te => te.target === playerStats.name);
@@ -79,7 +85,10 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         return { automationPopup: { type: 'popup', payload: { type: 'automation_info', name: 'Antimagic Field', description: `${spell.name} is blocked by Antimagic Field protecting ${globeTargetName}.` } } };
     }
 
-    // --- Spell resolution (inline) ---
+    return null;
+}
+
+function resolveMagicalAmbushInvisible(playerStats, campaignName) {
     const passives = playerStats.automation?.passives;
     if (passives == null) {
         console.error('[spellCast] magicalAmbush check: playerStats.automation.passives is missing');
@@ -92,78 +101,68 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         throw new Error('activeConditions must be an array for caster');
     }
     const casterConditions = rawConditions;
-    const hasInvisible = magicalAmbush && casterConditions.some(c => String(c).toLowerCase() === 'invisible');
+    return magicalAmbush && casterConditions.some(c => String(c).toLowerCase() === 'invisible');
+}
 
-    if (spell.components && spell.components.includes('V')) {
-        const silenceCaster = getSilenceSource(playerStats.name, campaignName);
-        if (silenceCaster && isCreatureInSilenceZone(playerStats.name, silenceCaster, campaignName)) {
-            await addEntry(campaignName, {
-                type: 'automation',
-                creatureName: playerStats.name,
-                name: 'Silence',
-                description: `${spell.name} blocked — ${playerStats.name} is inside ${silenceCaster}'s Silence zone; Verbal components are impossible there.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[index:silence-log-error]", e); });
-            return {
-                automationPopup: {
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: 'Silence',
-                        description: `${spell.name} cannot be cast — ${playerStats.name} is inside a Silence zone and Verbal spell components are impossible there.`,
-                    },
+// Silence: verbal components are impossible inside a Silence zone.
+async function checkSilenceBlock(spell, playerStats, campaignName) {
+    if (!(spell.components && spell.components.includes('V'))) return null;
+    const silenceCaster = getSilenceSource(playerStats.name, campaignName);
+    if (silenceCaster && isCreatureInSilenceZone(playerStats.name, silenceCaster, campaignName)) {
+        await addEntry(campaignName, {
+            type: 'automation',
+            creatureName: playerStats.name,
+            name: 'Silence',
+            description: `${spell.name} blocked — ${playerStats.name} is inside ${silenceCaster}'s Silence zone; Verbal components are impossible there.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[index:silence-log-error]", e); });
+        return {
+            automationPopup: {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Silence',
+                    description: `${spell.name} cannot be cast — ${playerStats.name} is inside a Silence zone and Verbal spell components are impossible there.`,
                 },
-            };
-        }
+            },
+        };
     }
+    return null;
+}
 
-    const psychicSpellsConfig = getPsychicSpellsConfig(playerStats);
-    if (psychicSpellsConfig && spell.components) {
-        const spellSchool = (spell.school || '').toLowerCase();
-        const reducedSchools = (psychicSpellsConfig.spellSchools || []).map(s => s.toLowerCase());
-        if (reducedSchools.includes(spellSchool)) {
-            const reducedComponents = (psychicSpellsConfig.componentReduction || []).map(c => c.toUpperCase());
-            spell.components = spell.components.filter(c => !reducedComponents.includes(c.toUpperCase()));
-        }
+function applyPsychicComponentReduction(spell, psychicSpellsConfig) {
+    if (!(psychicSpellsConfig && spell.components)) return;
+    const spellSchool = (spell.school || '').toLowerCase();
+    const reducedSchools = (psychicSpellsConfig.spellSchools || []).map(s => s.toLowerCase());
+    if (reducedSchools.includes(spellSchool)) {
+        const reducedComponents = (psychicSpellsConfig.componentReduction || []).map(c => c.toUpperCase());
+        spell.components = spell.components.filter(c => !reducedComponents.includes(c.toUpperCase()));
     }
+}
 
-    if (spell.name && spell.name.toLowerCase() !== 'friends') {
-        endFriendsOnHostileAction(playerStats.name, campaignName);
-    }
-    endInvisibilityOnHostileAction(playerStats.name, campaignName);
-
-    if (spell.casting_time === '1 action') {
-        setRuntimeValue(playerStats.name, 'lastActionSpellCast', 1, campaignName);
-    }
-
-    // Full spell data lookup
+// Full spell data lookup
+async function lookupFullSpell(spell, playerStats) {
     let fullSpell = spell;
     const needsLookup = !spell.area_of_effect || (spell.automation?.type && !spell.automation?.effects);
-    if (needsLookup) {
-        try {
-            const spellsUrl = playerStats.rules === '2024' ? '/data/2024/spells.json' : '/data/spells.json';
-            const response = await fetch(spellsUrl);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const allSpells = await response.json();
-            const lookup = allSpells.find(s => s.name === spell.name);
-            if (lookup) {
-                fullSpell = { ...spell, ...lookup, index: undefined, name: spell.name };
-            } else {
-                console.error('[spellCast] Spell not found in spells.json:', spell.name);
-            }
-        } catch (e) {
-            console.error('[spellCast] Failed to look up full spell data for:', spell.name, e);
+    if (!needsLookup) return fullSpell;
+    try {
+        const spellsUrl = playerStats.rules === '2024' ? '/data/2024/spells.json' : '/data/spells.json';
+        const response = await fetch(spellsUrl);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const allSpells = await response.json();
+        const lookup = allSpells.find(s => s.name === spell.name);
+        if (lookup) {
+            fullSpell = { ...spell, ...lookup, index: undefined, name: spell.name };
+        } else {
+            console.error('[spellCast] Spell not found in spells.json:', spell.name);
         }
+    } catch (e) {
+        console.error('[spellCast] Failed to look up full spell data for:', spell.name, e);
     }
+    return fullSpell;
+}
 
-    // Spell stats
-    const innateSorceryActive = isInnateSorceryActive(playerStats.name, campaignName);
-    const damageInfo = resolveSpellDamageWithTypes(spell, spell.level || 1);
-    const formula = damageInfo?.formula || null;
-    const damageType = damageInfo?.primaryType || spell.damage?.damage_type || '';
-    const effectiveDamageType = computePsychicDamageType(spell, psychicSpellsConfig, damageType);
-
-    const cantripSpellAbility = spell.spellCastingAbility || playerStats.spellAbilities?.spellCastingAbility;
+function computeSpellStats(playerStats, cantripSpellAbility) {
     let spellToHit = playerStats.spellAbilities?.toHit || 0;
     let spellSaveDc;
     if (playerStats.spellAbilities?.saveDc == null) {
@@ -193,415 +192,263 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         spellCastingMod = playerStats.spellAbilities.modifier || 0;
     }
 
-    // Generic spell cast log
-    if (spell.name !== 'Hex') {
-        const resolvedTarget = await getTargetInfo();
-        const resolvedTargetName = resolvedTarget?.name || null;
-        const spellDescription = fullSpell.description ? fullSpell.description.join(' ') : '';
-        addEntry(campaignName, {
-            type: 'spell', characterName: playerStats.name, targetName: resolvedTargetName,
-            spellName: spell.name, spellLevel: spell.level || 0, castingTime: spell.casting_time,
-            damageType: damageType || null, damageFormula: formula || null,
-            saveDC: spell.dc ? spellSaveDc : null, concentration: !!spell.concentration,
-            description: spellDescription || null, timestamp: Date.now(),
-        }).catch((e) => { console.error("[index:log-error]", e); });
+    return { spellToHit, spellSaveDc, spellCastingMod };
+}
+
+// Generic spell cast log
+async function logGenericSpellCast(spell, fullSpell, playerStats, campaignName, getTargetInfo, spellSaveDc, damageType, formula) {
+    if (spell.name === 'Hex') return;
+    const resolvedTarget = await getTargetInfo();
+    const resolvedTargetName = resolvedTarget?.name || null;
+    const spellDescription = fullSpell.description ? fullSpell.description.join(' ') : '';
+    addEntry(campaignName, {
+        type: 'spell', characterName: playerStats.name, targetName: resolvedTargetName,
+        spellName: spell.name, spellLevel: spell.level || 0, castingTime: spell.casting_time,
+        damageType: damageType || null, damageFormula: formula || null,
+        saveDC: spell.dc ? spellSaveDc : null, concentration: !!spell.concentration,
+        description: spellDescription || null, timestamp: Date.now(),
+    }).catch((e) => { console.error("[index:log-error]", e); });
+}
+
+// --- NO DAMAGE PATH: handled-trigger chain in exact original order.
+// Returns { handled, value } — value is what executeSpellCast must return.
+async function runNoDamagePath(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, spellSaveDc, innateSorceryActive, hasInvisible, spellCastingMod, rollDamage) {
+    const noDamageTriggers = [
+        async () => passThrough(await handleRegenerate(spell, getTargetInfo, applyRegenerateSpell, playerStats, campaignName)),
+        () => passThrough(handleFear(spell, spellSaveDc, playerStats, campaignName, metaCtx, innateSorceryActive)),
+        () => passThrough(handleConjureVolley(spell, fullSpell)),
+        async () => swallow(await handleSeeInvisibility(spell, metaCtx, playerStats, campaignName, mapName)),
+        async () => swallow(await handleFleshToStone(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
+        async () => swallow(await handleHoldMonster(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
+        async () => swallow(await handleBanishment(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
+        async () => swallow(await handleConfusion(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
+        async () => swallow(await handleMaze(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
+        async () => passThrough(await handlePowerWordStun(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
+        async () => swallow(await handleHypnoticPattern(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
+        async () => swallow(await handleSlow(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
+        async () => swallow(await handleBane(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
+        async () => swallow(await handleBless(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
+        async () => swallow(await handleBeaconOfHope(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
+        async () => swallow(await handleMassSuggestionTrigger(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
+        async () => swallow(await handleSuggestion(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
+        async () => passThrough(await handleCommand(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName)),
+        async () => swallow(await handleOttoDance(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
+        async () => swallow(await handleResilientSphere(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
+        async () => swallow(await handleBlur(spell, metaCtx, playerStats, campaignName, mapName)),
+        async () => swallow(await handleExpeditiousRetreat(spell, metaCtx, playerStats, campaignName, mapName)),
+        async () => passThrough(await handleFriends(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName)),
+        async () => passThrough(await handleCrownOfMadness(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName)),
+        async () => passThrough(await handleAnimalFriendship(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
+        async () => passThrough(await handleDominateBeast(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName)),
+        async () => passThrough(await handleDominateMonster(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName)),
+        async () => passThrough(await handleDominatePerson(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName)),
+        async () => swallow(await handleRayOfEnfeeblement(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName)),
+        async () => passThrough(await handleCompelledDuel(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName)),
+        async () => passThrough(await handleGlobeOfInvulnerability(spell, metaCtx, playerStats, campaignName, mapName)),
+        async () => passThrough(await handleForcecage(spell, metaCtx, playerStats, campaignName, mapName)),
+        () => passThrough(handleSilence(spell, fullSpell, metaCtx, spellSaveDc, playerStats, campaignName, null, (cn) => getCombatSummary(cn))),
+        async () => swallow(await handleStinkingCloud(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
+        async () => swallow(await handleSleetStorm(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
+        async () => passThrough(await handleFaerieFire(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
+        async () => passThrough(await handleTashasHideousLaughter(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
+        async () => passThrough(await handleImprisonment(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
+        async () => passThrough(await handleHeroism(spell, playerStats, campaignName, mapName, characters, executeHandler)),
+        async () => swallow(await handleHolyAuraTrigger(spell, metaCtx, playerStats, campaignName, mapName)),
+        async () => passThrough(await handleLongstrider(spell, playerStats, campaignName, mapName, executeHandler)),
+        async () => passThrough(await handleSpareTheDying(spell, playerStats, campaignName, mapName, characters, executeHandler)),
+        async () => passThrough(await handleEnhanceAbility(spell, metaCtx, playerStats, campaignName, mapName, characters, executeHandler)),
+    ];
+    const earlyOutcome = await runTriggerChain(noDamageTriggers);
+    if (earlyOutcome) return { handled: true, value: earlyOutcome.value };
+
+    // Status effects fallback
+    if (spell.dc && spell.status_effects && spell.status_effects.length > 0 && !fullSpell.area_of_effect) {
+        const target = await getTargetInfo();
+        const context = {
+            targetName: target?.name, attackerName: playerStats.name, ...metaCtx,
+            saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
+            saveType: spell.dc.dc_type, dcSuccess: spell.dc.dc_success,
+            metamagicHeighten: hasInvisible || metaCtx?.metamagicHeighten,
+            isCantrip: spell.baseLevel === 0 || spell.level === 0,
+        };
+        if (spell.status_effects && spell.status_effects.length > 0) {
+            context.statusEffects = spell.status_effects;
+        }
+        rollDamage(spell.name, '0', 0, [], 0, context);
     }
 
-    // --- Power Word Heal/Kill ---
-    const pwhResult = await handlePowerWordHeal(spell, metaCtx, getTargetInfo, playerStats, campaignName, applyPowerWordHealToTarget);
-    if (pwhResult.handled) return pwhResult.result;
+    const massHealingOutcome = await runTriggerChain([
+        async () => swallow(await handleMassCureWoundsTrigger(spell, metaCtx, playerStats, campaignName, mapName)),
+        async () => swallow(await handleMassHealingWordTrigger(spell, metaCtx, playerStats, campaignName, mapName)),
+        async () => swallow(await handlePrayerOfHealingTrigger(spell, metaCtx, playerStats, campaignName, mapName)),
+        async () => swallow(await handleFalseLifeTrigger(spell, metaCtx, playerStats, campaignName, mapName)),
+    ]);
+    if (massHealingOutcome) return { handled: true, value: massHealingOutcome.value };
 
-    const pwkResult = await handlePowerWordKill(spell, metaCtx, getTargetInfo, playerStats, campaignName, applyPowerWordKillToTarget);
-    if (pwkResult.handled) return pwkResult.result;
-
-    // --- Modal spells (early returns) ---
-    let massSuggestionResult = handleMassSuggestion(spell, spellSaveDc, playerStats, campaignName);
-    if (massSuggestionResult.handled) return massSuggestionResult.result;
-
-    let calmEmotionsResult = handleCalmEmotions(fullSpell, spellSaveDc, playerStats, campaignName, metaCtx);
-    if (calmEmotionsResult.handled) return calmEmotionsResult.result;
-
-    let hypnoticPatternEarlyResult = handleHypnoticPatternEarly(fullSpell, spellSaveDc, playerStats, campaignName, metaCtx, innateSorceryActive);
-    if (hypnoticPatternEarlyResult.handled) return hypnoticPatternEarlyResult.result;
-
-    let confusionEarlyResult = handleConfusionEarly(fullSpell, spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName, (s, m, p, c, mp) => triggerConfusion(s, m, p, c, mp));
-    if (confusionEarlyResult.handled) return confusionEarlyResult.result?.result;
-
-    let shapechangeResult = handleShapechange(fullSpell, metaCtx, playerStats, campaignName, mapName, characters);
-    if (shapechangeResult.handled) return shapechangeResult.result;
-
-    let sleepResult = handleSleep(fullSpell, spellSaveDc, playerStats, campaignName, metaCtx, characters);
-    if (sleepResult.handled) return sleepResult.result;
-
-    // --- Generic automation routing ---
-    let genericAutomationResult = await handleGenericAutomation(spell, executeHandler, (sp, mc, ps, cn) => triggerArcaneWard(sp, mc, ps, cn), playerStats, campaignName, mapName, characters, metaCtx);
-    if (genericAutomationResult.handled) {
-        if (genericAutomationResult.result) return genericAutomationResult.result;
-        return;
+    // Generic healing path
+    if (spell.heal_at_slot_level) {
+        return { handled: true, value: await runGenericHealPath(spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, spellCastingMod) };
     }
 
-    // --- NO DAMAGE PATH ---
-    if (!formula) {
-        let regenerateResult = await handleRegenerate(spell, getTargetInfo, applyRegenerateSpell, playerStats, campaignName);
-        if (regenerateResult.handled) return regenerateResult.result;
+    triggerHealingWord(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+        console.error('[spellCast] Healing Word trigger failed:', e);
+    });
 
-        let fearResult = handleFear(spell, spellSaveDc, playerStats, campaignName, metaCtx, innateSorceryActive);
-        if (fearResult.handled) return fearResult.result;
+    const protectionOutcome = await runTriggerChain([
+        async () => swallow(await handleProtectionFromEnergy(spell, playerStats, campaignName, mapName, executeHandler)),
+        async () => swallow(await handleProtectionFromPoison(spell, playerStats, campaignName, mapName, executeHandler)),
+    ]);
+    if (protectionOutcome) return { handled: true, value: protectionOutcome.value };
 
-        let conjureVolleyResult = handleConjureVolley(spell, fullSpell);
-        if (conjureVolleyResult.handled) return conjureVolleyResult.result;
-
-        let seeInvisibilityResult = await handleSeeInvisibility(spell, metaCtx, playerStats, campaignName, mapName);
-        if (seeInvisibilityResult.handled) return;
-
-        let fleshToStoneResult = await handleFleshToStone(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName);
-        if (fleshToStoneResult.handled) return;
-
-        let holdMonsterResult = await handleHoldMonster(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName);
-        if (holdMonsterResult.handled) return;
-
-        let banishmentResult = await handleBanishment(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName);
-        if (banishmentResult.handled) return;
-
-        let confusionResult = await handleConfusion(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName);
-        if (confusionResult.handled) return;
-
-        let mazeResult = await handleMaze(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName);
-        if (mazeResult.handled) return;
-
-        let powerWordStunResult = await handlePowerWordStun(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName);
-        if (powerWordStunResult.handled) return powerWordStunResult.result;
-
-        let hypnoticPatternResult = await handleHypnoticPattern(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName);
-        if (hypnoticPatternResult.handled) return;
-
-        let slowResult = await handleSlow(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName);
-        if (slowResult.handled) return;
-
-        let baneResult = await handleBane(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName);
-        if (baneResult.handled) return;
-
-        let blessResult = await handleBless(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName);
-        if (blessResult.handled) return;
-
-        let beaconOfHopeResult = await handleBeaconOfHope(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName);
-        if (beaconOfHopeResult.handled) return;
-
-        let massSuggestionTriggerResult = await handleMassSuggestionTrigger(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName);
-        if (massSuggestionTriggerResult.handled) return;
-
-        let suggestionResult = await handleSuggestion(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName);
-        if (suggestionResult.handled) return;
-
-        let commandResult = await handleCommand(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName);
-        if (commandResult.handled) return commandResult.result;
-
-        let ottoDanceResult = await handleOttoDance(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName);
-        if (ottoDanceResult.handled) return;
-
-        let resilientSphereResult = await handleResilientSphere(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName);
-        if (resilientSphereResult.handled) return;
-
-        let blurResult = await handleBlur(spell, metaCtx, playerStats, campaignName, mapName);
-        if (blurResult.handled) return;
-
-        let expeditiousRetreatResult = await handleExpeditiousRetreat(spell, metaCtx, playerStats, campaignName, mapName);
-        if (expeditiousRetreatResult.handled) return;
-
-        let friendsResult = await handleFriends(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName);
-        if (friendsResult.handled) return friendsResult.result;
-
-        let crownOfMadnessResult = await handleCrownOfMadness(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName);
-        if (crownOfMadnessResult.handled) return crownOfMadnessResult.result;
-
-        let animalFriendshipResult = await handleAnimalFriendship(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName);
-        if (animalFriendshipResult.handled) return animalFriendshipResult.result;
-
-        let dominateBeastResult = await handleDominateBeast(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName);
-        if (dominateBeastResult.handled) return dominateBeastResult.result;
-
-        let dominateMonsterResult = await handleDominateMonster(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName);
-        if (dominateMonsterResult.handled) return dominateMonsterResult.result;
-
-        let dominatePersonResult = await handleDominatePerson(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName);
-        if (dominatePersonResult.handled) return dominatePersonResult.result;
-
-        let rayOfEnfeeblementResult = await handleRayOfEnfeeblement(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName);
-        if (rayOfEnfeeblementResult.handled) return;
-
-        let compelledDuelResult = await handleCompelledDuel(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName);
-        if (compelledDuelResult.handled) return compelledDuelResult.result;
-
-        let globeOfInvulnerabilityResult = await handleGlobeOfInvulnerability(spell, metaCtx, playerStats, campaignName, mapName);
-        if (globeOfInvulnerabilityResult.handled) return globeOfInvulnerabilityResult.result;
-
-        let forcecageResult = await handleForcecage(spell, metaCtx, playerStats, campaignName, mapName);
-        if (forcecageResult.handled) return forcecageResult.result;
-
-        let silenceResult = handleSilence(spell, fullSpell, metaCtx, spellSaveDc, playerStats, campaignName, null, (cn) => getCombatSummary(cn));
-        if (silenceResult.handled) return silenceResult.result;
-
-        let stinkingCloudResult = await handleStinkingCloud(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName);
-        if (stinkingCloudResult.handled) return;
-
-        let sleetStormResult = await handleSleetStorm(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName);
-        if (sleetStormResult.handled) return;
-
-        let faerieFireResult = await handleFaerieFire(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName);
-        if (faerieFireResult.handled) return faerieFireResult.result;
-
-        let tashasHideousLaughterResult = await handleTashasHideousLaughter(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName);
-        if (tashasHideousLaughterResult.handled) return tashasHideousLaughterResult.result;
-
-        let imprisonmentResult = await handleImprisonment(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName);
-        if (imprisonmentResult.handled) return imprisonmentResult.result;
-
-        let heroismResult = await handleHeroism(spell, playerStats, campaignName, mapName, characters, executeHandler);
-        if (heroismResult.handled) return heroismResult.result;
-
-        let holyAuraResult = await handleHolyAuraTrigger(spell, metaCtx, playerStats, campaignName, mapName);
-        if (holyAuraResult.handled) return;
-
-        let longstriderResult = await handleLongstrider(spell, playerStats, campaignName, mapName, executeHandler);
-        if (longstriderResult.handled) return longstriderResult.result;
-
-        let spareTheDyingResult = await handleSpareTheDying(spell, playerStats, campaignName, mapName, characters, executeHandler);
-        if (spareTheDyingResult.handled) return spareTheDyingResult.result;
-
-        let enhanceAbilityResult = await handleEnhanceAbility(spell, metaCtx, playerStats, campaignName, mapName, characters, executeHandler);
-        if (enhanceAbilityResult.handled) return enhanceAbilityResult.result;
-
-        // Status effects fallback
-        if (spell.dc && spell.status_effects && spell.status_effects.length > 0 && !fullSpell.area_of_effect) {
-            const target = await getTargetInfo();
-            const context = {
-                targetName: target?.name, attackerName: playerStats.name, ...metaCtx,
-                saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
-                saveType: spell.dc.dc_type, dcSuccess: spell.dc.dc_success,
-                metamagicHeighten: hasInvisible || metaCtx?.metamagicHeighten,
-                isCantrip: spell.baseLevel === 0 || spell.level === 0,
-            };
-            if (spell.status_effects && spell.status_effects.length > 0) {
-                context.statusEffects = spell.status_effects;
-            }
-            rollDamage(spell.name, '0', 0, [], 0, context);
-        }
-
-        let massCureWoundsResult = await handleMassCureWoundsTrigger(spell, metaCtx, playerStats, campaignName, mapName);
-        if (massCureWoundsResult.handled) return;
-
-        let massHealingWordResult = await handleMassHealingWordTrigger(spell, metaCtx, playerStats, campaignName, mapName);
-        if (massHealingWordResult.handled) return;
-
-        let prayerOfHealingResult = await handlePrayerOfHealingTrigger(spell, metaCtx, playerStats, campaignName, mapName);
-        if (prayerOfHealingResult.handled) return;
-
-        let falseLifeResult = await handleFalseLifeTrigger(spell, metaCtx, playerStats, campaignName, mapName);
-        if (falseLifeResult.handled) return;
-
-        // Generic healing path
-        if (spell.heal_at_slot_level) {
-            const explicitTarget = metaCtx?.targetName ? { name: metaCtx.targetName } : null;
-            const target = explicitTarget || await getTargetInfo();
-            let genericHealResult = null;
-            if (target?.name) {
-                if (metaCtx?.slotLevel == null && spell.level == null) {
-                    console.error('[spellCast] executeSpellCast: slot level is missing (metaCtx.slotLevel and spell.level) for healing spell');
-                    throw new Error('slot level is required for healing spell');
-                }
-                const slotLevel = metaCtx?.slotLevel || spell.level;
-                const healAtSlotLevel = spell.heal_at_slot_level;
-                let expression = healAtSlotLevel[slotLevel];
-                if (!expression) {
-                    const levels = Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b);
-                    const highestBelow = levels.filter(l => l <= slotLevel).pop();
-                    if (highestBelow) {
-                        expression = healAtSlotLevel[highestBelow];
-                    }
-                }
-                if (expression) {
-                    const targetChar = (characters || []).find(c => c.name === target.name);
-                    const targetStats = targetChar?.computedStats || targetChar;
-                    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName, targetStats);
-                    if (expression === 'max') {
-                        const isTargetPlayer = target.name === playerStats.name || (characters || []).some(c => c.name === target.name && c.type === 'player');
-                        const maxHp = isTargetPlayer
-                            ? (getRuntimeValue(target.name, 'hitPoints') || playerStats.hitPoints || 0)
-                            : (getRuntimeValue(target.name, 'hitPoints') || 0);
-                        const currentHp = isTargetPlayer
-                            ? (getRuntimeValue(target.name, 'currentHitPoints') ?? maxHp)
-                            : (getRuntimeValue(target.name, 'currentHitPoints') ?? maxHp);
-                        const actualHeal = maxHp - currentHp;
-                        genericHealResult = { targetName: target.name, healAmount: Math.max(0, actualHeal), formula: 'max', rolls: [], rawTotal: Math.max(0, actualHeal), bonusHeal, bonusDetails };
-                        if (actualHeal > 0) {
-                            const combatSummary = await getCombatContext(campaignName);
-                            if (combatSummary) {
-                                applyHealingToTarget(combatSummary, target.name, actualHeal, campaignName);
-                            }
-                        }
-                        addEntry(campaignName, {
-                            type: 'hp_change', targetName: target.name, delta: actualHeal,
-                            currentHp: Math.min(maxHp, currentHp + Math.max(0, actualHeal)), maxHp,
-                            isHealing: true, sourceName: playerStats.name, note: spell.name, timestamp: Date.now(),
-                        }).catch((e) => { console.error("[spellCast] Error:", e); });
-                    } else {
-                        let resolvedExpression = expression.replace(/\bMOD\b/g, String(spellCastingMod));
-                        const maximize = hasHealingMaximizationForTarget(playerStats, target.name, campaignName);
-                        const rerollOnes = hasRerollHealingOnes(playerStats);
-                        const result = maximize ? rollExpressionMaximized(resolvedExpression) : rollExpression(resolvedExpression);
-                        let displayRolls = result?.rolls || null;
-                        let healingRerollOriginalRolls = null;
-                        if (result && rerollOnes && !maximize) {
-                            const { displayRolls: rerolled, originalRolls } = applyHealingRerollOnes(result.rolls, resolvedExpression);
-                            displayRolls = rerolled;
-                            healingRerollOriginalRolls = originalRolls;
-                        }
-                        if (result) {
-                            const isTargetPlayer = target.name === playerStats.name || (characters || []).some(c => c.name === target.name && c.type === 'player');
-                            const maxHp = isTargetPlayer
-                                ? (getRuntimeValue(target.name, 'hitPoints') || playerStats.hitPoints || 0)
-                                : (getRuntimeValue(target.name, 'hitPoints') || 0);
-                            const currentHp = isTargetPlayer
-                                ? (getRuntimeValue(target.name, 'currentHitPoints') ?? maxHp)
-                                : (getRuntimeValue(target.name, 'currentHitPoints') ?? maxHp);
-                            const healAmount = result.total + bonusHeal;
-                            const actualHeal = Math.min(Math.max(0, healAmount), Math.max(0, maxHp - currentHp));
-                            if (actualHeal > 0) {
-                                const combatSummary = await getCombatContext(campaignName);
-                                if (combatSummary) {
-                                    applyHealingToTarget(combatSummary, target.name, actualHeal, campaignName);
-                                }
-                            }
-                            genericHealResult = { targetName: target.name, healAmount: actualHeal, formula: resolvedExpression, rolls: displayRolls || result.rolls, rawTotal: result.total + bonusHeal, bonusHeal, bonusDetails, healingRerollOriginalRolls, healingRerollDisplayRolls: displayRolls };
-                            const formulaParts = [resolvedExpression];
-                            if (bonusDetails.length > 0) {
-                                const bonusParts = bonusDetails.map(d => `${d.amount} ${d.name}`).join(' + ');
-                                formulaParts.push(`(${bonusParts})`);
-                            }
-                            addEntry(campaignName, {
-                                type: 'hp_change', targetName: target.name, delta: actualHeal,
-                                currentHp: Math.min(maxHp, currentHp + actualHeal), maxHp,
-                                isHealing: true, sourceName: playerStats.name, note: spell.name,
-                                formula: formulaParts.join(' + '),
-                                bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
-                                timestamp: Date.now(),
-                            }).catch((e) => { console.error("[spellCast] Error:", e); });
-                        }
-                    }
-                }
-            }
-
-            triggerPostCastSelfHeals(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
-                console.error('[spellCast] Post-cast self-heal failed:', e);
-            });
-            const chaliceResult = await triggerPostCastAllyHeals(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
-                console.error('[spellCast] Post-cast ally-heal failed:', e);
-                return null;
-            });
-            if (chaliceResult?.needsModal) {
-                const pending = getRuntimeValue('campaign', 'pendingStarryChaliceHeal', campaignName);
-                return {
-                    type: 'modal', modalName: 'starryChaliceHeal',
-                    payload: { casterName: playerStats.name, campaignName, amount: chaliceResult.amount, targetNames: pending?.targetNames || [playerStats.name] },
-                };
-            }
-            return genericHealResult;
-        }
-
-        triggerHealingWord(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
-            console.error('[spellCast] Healing Word trigger failed:', e);
-        });
-
-        let protectionFromEnergyResult = await handleProtectionFromEnergy(spell, playerStats, campaignName, mapName, executeHandler);
-        if (protectionFromEnergyResult.handled) return;
-
-        let protectionFromPoisonResult = await handleProtectionFromPoison(spell, playerStats, campaignName, mapName, executeHandler);
-        if (protectionFromPoisonResult.handled) return;
-
-        let removeCurseResult = await handleRemoveCurseTrigger(spell, metaCtx, playerStats, campaignName, mapName);
-        if (removeCurseResult.handled) {
-            if (spell.name && spell.name.toLowerCase() === 'dispel magic') {
-                const dispelTarget = await getTargetInfo();
-                if (dispelTarget) {
-                    const dispelMetaCtx = { ...metaCtx, targetName: dispelTarget.name };
-                    await triggerDispelMagic(dispelMetaCtx, spell, playerStats, campaignName, mapName);
-                }
-            }
-            return;
-        }
-
+    const removeCurseResult = await handleRemoveCurseTrigger(spell, metaCtx, playerStats, campaignName, mapName);
+    if (removeCurseResult.handled) {
         if (spell.name && spell.name.toLowerCase() === 'dispel magic') {
             const dispelTarget = await getTargetInfo();
             if (dispelTarget) {
-                // CLA-322: ability check resolves inside triggerDispelMagic — it logs
-                // the check, dispatches `spell-result` with `checkFailed`, and refunds
-                // the slot inline (keyed by cast slot level) when Spell Breaker is held.
-                await triggerDispelMagic({ ...metaCtx, targetName: dispelTarget.name }, spell, playerStats, campaignName, mapName);
+                const dispelMetaCtx = { ...metaCtx, targetName: dispelTarget.name };
+                await triggerDispelMagic(dispelMetaCtx, spell, playerStats, campaignName, mapName);
             }
         }
-
-        let resistanceResult = await handleResistance(spell, playerStats, campaignName, mapName, characters, executeHandler, metaCtx);
-        if (resistanceResult.handled) return;
+        return { handled: true };
     }
 
-    // --- Hunter's Mark / Hex ---
-    if (spell.name === "Hunter's Mark") return;
-    if (spell.name === 'Hex') {
-        const ability = metaCtx?.hexAbility || 'STR';
-        const hexTarget = metaCtx?.targetName || (await getTargetInfo())?.name;
-        applyHexEffects(spell, playerStats, campaignName, hexTarget, ability);
-        const hasEldritchHex = playerStats.automation?.passives?.some(p => p.name === 'Eldritch Hex' && p.type === 'conditional_disadvantage');
-        const effects = hasEldritchHex ? 'ability check disadvantage + saving throw disadvantage' : 'ability check disadvantage';
-        addEntry(campaignName, { type: 'spell', characterName: playerStats.name, targetName: hexTarget, spellName: 'Hex', spellLevel: 1, castingTime: '1 bonus action', hexAbility: ability, effectsApplied: effects }).catch((e) => { console.error("[index:log-error]", e); });
-        return;
-    }
-
-    // --- Damage path ---
-    const rangeResult = computeRange(spell, metaCtx, attackerPos, targetPos, featEffects);
-    const { empEvocFormula } = computeEmpoweredEvocation(playerStats, spell, formula);
-    let finalFormula = computeBlessedStrikes(spell, empEvocFormula, playerStats, campaignName, getRuntimeValue);
-    finalFormula = computeRadiantSoul(spell, playerStats, campaignName, getRuntimeValue, finalFormula);
-    metaCtx = { ...metaCtx, finalFormula };
-    const { overchannelFormula, overchannelActive, overchannelUseCount } = computeOverchannel(spell, metaCtx, playerStats, campaignName, getRuntimeValue, empEvocFormula, finalFormula);
-
-    if (rangeResult.isAutoMiss) {
-        const context = {
-            targetName: (await getTargetInfo())?.name,
-            attackerName: playerStats.name,
-            ...metaCtx,
-            isAutoMiss: true,
-            rangeReason: rangeResult.rangeReason,
-            saveDc: spellSaveDc,
-            saveType: spell.dc?.dc_type || fullSpell.dc?.dc_type,
-            dcSuccess: spell.dc?.dc_success ?? fullSpell.dc?.dc_success,
-            metamagicHeighten: metaCtx?.metamagicHeighten,
-            isCantrip: spell.baseLevel === 0 || spell.level === 0,
-        };
-        rollDamage(spell.name, formula || '0', 0, [], 0, context);
-        if (spell.dc || fullSpell.dc) {
-            await handleSavePath(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters,
-                getTargetInfo, getRuntimeValue, innateSorceryActive, effectiveDamageType, spellSaveDc,
-                overchannelFormula, overchannelActive, overchannelUseCount, rollAttack, rollDamage, formula, hasInvisible);
+    if (spell.name && spell.name.toLowerCase() === 'dispel magic') {
+        const dispelTarget = await getTargetInfo();
+        if (dispelTarget) {
+            // CLA-322: ability check resolves inside triggerDispelMagic — it logs
+            // the check, dispatches `spell-result` with `checkFailed`, and refunds
+            // the slot inline (keyed by cast slot level) when Spell Breaker is held.
+            await triggerDispelMagic({ ...metaCtx, targetName: dispelTarget.name }, spell, playerStats, campaignName, mapName);
         }
+    }
+
+    const resistanceResult = await handleResistance(spell, playerStats, campaignName, mapName, characters, executeHandler, metaCtx);
+    if (resistanceResult.handled) return { handled: true };
+
+    return { handled: false };
+}
+
+// Generic healing path (spell.heal_at_slot_level) — returns genericHealResult.
+async function runGenericHealPath(spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, spellCastingMod) {
+    const explicitTarget = metaCtx?.targetName ? { name: metaCtx.targetName } : null;
+    const target = explicitTarget || await getTargetInfo();
+    let genericHealResult = null;
+    if (target?.name) {
+        if (metaCtx?.slotLevel == null && spell.level == null) {
+            console.error('[spellCast] executeSpellCast: slot level is missing (metaCtx.slotLevel and spell.level) for healing spell');
+            throw new Error('slot level is required for healing spell');
+        }
+        const slotLevel = metaCtx?.slotLevel || spell.level;
+        const healAtSlotLevel = spell.heal_at_slot_level;
+        let expression = healAtSlotLevel[slotLevel];
+        if (!expression) {
+            const levels = Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b);
+            const highestBelow = levels.filter(l => l <= slotLevel).pop();
+            if (highestBelow) {
+                expression = healAtSlotLevel[highestBelow];
+            }
+        }
+        if (expression) {
+            const targetChar = (characters || []).find(c => c.name === target.name);
+            const targetStats = targetChar?.computedStats || targetChar;
+            const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName, targetStats);
+            if (expression === 'max') {
+                const isTargetPlayer = target.name === playerStats.name || (characters || []).some(c => c.name === target.name && c.type === 'player');
+                const maxHp = isTargetPlayer
+                    ? (getRuntimeValue(target.name, 'hitPoints') || playerStats.hitPoints || 0)
+                    : (getRuntimeValue(target.name, 'hitPoints') || 0);
+                const currentHp = isTargetPlayer
+                    ? (getRuntimeValue(target.name, 'currentHitPoints') ?? maxHp)
+                    : (getRuntimeValue(target.name, 'currentHitPoints') ?? maxHp);
+                const actualHeal = maxHp - currentHp;
+                genericHealResult = { targetName: target.name, healAmount: Math.max(0, actualHeal), formula: 'max', rolls: [], rawTotal: Math.max(0, actualHeal), bonusHeal, bonusDetails };
+                if (actualHeal > 0) {
+                    const combatSummary = await getCombatContext(campaignName);
+                    if (combatSummary) {
+                        applyHealingToTarget(combatSummary, target.name, actualHeal, campaignName);
+                    }
+                }
+                addEntry(campaignName, {
+                    type: 'hp_change', targetName: target.name, delta: actualHeal,
+                    currentHp: Math.min(maxHp, currentHp + Math.max(0, actualHeal)), maxHp,
+                    isHealing: true, sourceName: playerStats.name, note: spell.name, timestamp: Date.now(),
+                }).catch((e) => { console.error("[spellCast] Error:", e); });
+            } else {
+                let resolvedExpression = expression.replace(/\bMOD\b/g, String(spellCastingMod));
+                const maximize = hasHealingMaximizationForTarget(playerStats, target.name, campaignName);
+                const rerollOnes = hasRerollHealingOnes(playerStats);
+                const result = maximize ? rollExpressionMaximized(resolvedExpression) : rollExpression(resolvedExpression);
+                let displayRolls = result?.rolls || null;
+                let healingRerollOriginalRolls = null;
+                if (result && rerollOnes && !maximize) {
+                    const { displayRolls: rerolled, originalRolls } = applyHealingRerollOnes(result.rolls, resolvedExpression);
+                    displayRolls = rerolled;
+                    healingRerollOriginalRolls = originalRolls;
+                }
+                if (result) {
+                    const isTargetPlayer = target.name === playerStats.name || (characters || []).some(c => c.name === target.name && c.type === 'player');
+                    const maxHp = isTargetPlayer
+                        ? (getRuntimeValue(target.name, 'hitPoints') || playerStats.hitPoints || 0)
+                        : (getRuntimeValue(target.name, 'hitPoints') || 0);
+                    const currentHp = isTargetPlayer
+                        ? (getRuntimeValue(target.name, 'currentHitPoints') ?? maxHp)
+                        : (getRuntimeValue(target.name, 'currentHitPoints') ?? maxHp);
+                    const healAmount = result.total + bonusHeal;
+                    const actualHeal = Math.min(Math.max(0, healAmount), Math.max(0, maxHp - currentHp));
+                    if (actualHeal > 0) {
+                        const combatSummary = await getCombatContext(campaignName);
+                        if (combatSummary) {
+                            applyHealingToTarget(combatSummary, target.name, actualHeal, campaignName);
+                        }
+                    }
+                    genericHealResult = { targetName: target.name, healAmount: actualHeal, formula: resolvedExpression, rolls: displayRolls || result.rolls, rawTotal: result.total + bonusHeal, bonusHeal, bonusDetails, healingRerollOriginalRolls, healingRerollDisplayRolls: displayRolls };
+                    const formulaParts = [resolvedExpression];
+                    if (bonusDetails.length > 0) {
+                        const bonusParts = bonusDetails.map(d => `${d.amount} ${d.name}`).join(' + ');
+                        formulaParts.push(`(${bonusParts})`);
+                    }
+                    addEntry(campaignName, {
+                        type: 'hp_change', targetName: target.name, delta: actualHeal,
+                        currentHp: Math.min(maxHp, currentHp + actualHeal), maxHp,
+                        isHealing: true, sourceName: playerStats.name, note: spell.name,
+                        formula: formulaParts.join(' + '),
+                        bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
+                        timestamp: Date.now(),
+                    }).catch((e) => { console.error("[spellCast] Error:", e); });
+                }
+            }
+        }
+    }
+
+    triggerPostCastSelfHeals(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+        console.error('[spellCast] Post-cast self-heal failed:', e);
+    });
+    const chaliceResult = await triggerPostCastAllyHeals(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+        console.error('[spellCast] Post-cast ally-heal failed:', e);
         return null;
+    });
+    if (chaliceResult?.needsModal) {
+        const pending = getRuntimeValue('campaign', 'pendingStarryChaliceHeal', campaignName);
+        return {
+            type: 'modal', modalName: 'starryChaliceHeal',
+            payload: { casterName: playerStats.name, campaignName, amount: chaliceResult.amount, targetNames: pending?.targetNames || [playerStats.name] },
+        };
     }
+    return genericHealResult;
+}
 
-    if (spell.dc || fullSpell.dc) {
-        const savePathResult = await handleSavePath(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters,
-            getTargetInfo, getRuntimeValue, innateSorceryActive, effectiveDamageType, spellSaveDc,
-            overchannelFormula, overchannelActive, overchannelUseCount, rollAttack, rollDamage, formula, hasInvisible);
-        if (savePathResult) return savePathResult;
-    } else {
-        // CLA-200: no-save spells (e.g. Divine Smite — no `dc` in spells.json) must fall
-        // through to the post-cast trigger block below instead of early-returning.
-        // handleNoSavePath only ever resolves null/undefined, and the dc/no-dc
-        // branches are mutually exclusive, so the gated post-cast triggers
-        // (Inspiring Smite, Wild Magic Surge, Sanctuary break, etc.) run exactly once.
-        await handleNoSavePath(spell, metaCtx, playerStats, campaignName, mapName, characters,
-            getTargetInfo, rollAttack, spellToHit, effectiveDamageType);
-    }
+// Hex: apply effects and log the cast.
+async function castHex(spell, metaCtx, playerStats, campaignName, getTargetInfo) {
+    const ability = metaCtx?.hexAbility || 'STR';
+    const hexTarget = metaCtx?.targetName || (await getTargetInfo())?.name;
+    applyHexEffects(spell, playerStats, campaignName, hexTarget, ability);
+    const hasEldritchHex = playerStats.automation?.passives?.some(p => p.name === 'Eldritch Hex' && p.type === 'conditional_disadvantage');
+    const effects = hasEldritchHex ? 'ability check disadvantage + saving throw disadvantage' : 'ability check disadvantage';
+    addEntry(campaignName, { type: 'spell', characterName: playerStats.name, targetName: hexTarget, spellName: 'Hex', spellLevel: 1, castingTime: '1 bonus action', hexAbility: ability, effectsApplied: effects }).catch((e) => { console.error("[index:log-error]", e); });
+}
 
-    // --- Post-cast triggers ---
+// --- Post-cast triggers — returns the Wild Magic Surge popup (if any).
+async function runPostCastTriggers(spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo) {
     triggerPostCastRiderSaves(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Post-cast rider save failed:', e);
     });
@@ -665,6 +512,149 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     }
 
     return triggerResult;
+}
+
+export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, featEffects, campaignName, mapName, characters }) {
+    // --- Block checks ---
+    const buffBlock = await checkBlockedBySpellcastingBuff(spell, playerStats, campaignName);
+    if (buffBlock) return buffBlock;
+
+    const globeTargetName = getTargetInfo ? (await getTargetInfo())?.name || null : null;
+    const globeBlock = await checkGlobeOfInvulnerability(spell, globeTargetName, playerStats, campaignName);
+    if (globeBlock) return globeBlock;
+
+    const forcecageBlock = await checkForcecageBlocked(spell, globeTargetName, playerStats, campaignName);
+    if (forcecageBlock) return forcecageBlock;
+
+    // Antimagic Field checks
+    const antimagicBlock = await checkAntimagicField(spell, playerStats, globeTargetName, campaignName);
+    if (antimagicBlock) return antimagicBlock;
+
+    // --- Spell resolution (inline) ---
+    const hasInvisible = resolveMagicalAmbushInvisible(playerStats, campaignName);
+
+    const silenceBlock = await checkSilenceBlock(spell, playerStats, campaignName);
+    if (silenceBlock) return silenceBlock;
+
+    const psychicSpellsConfig = getPsychicSpellsConfig(playerStats);
+    applyPsychicComponentReduction(spell, psychicSpellsConfig);
+
+    if (spell.name && spell.name.toLowerCase() !== 'friends') {
+        endFriendsOnHostileAction(playerStats.name, campaignName);
+    }
+    endInvisibilityOnHostileAction(playerStats.name, campaignName);
+
+    if (spell.casting_time === '1 action') {
+        setRuntimeValue(playerStats.name, 'lastActionSpellCast', 1, campaignName);
+    }
+
+    const fullSpell = await lookupFullSpell(spell, playerStats);
+
+    // Spell stats
+    const innateSorceryActive = isInnateSorceryActive(playerStats.name, campaignName);
+    const damageInfo = resolveSpellDamageWithTypes(spell, spell.level || 1);
+    const formula = damageInfo?.formula || null;
+    const damageType = damageInfo?.primaryType || spell.damage?.damage_type || '';
+    const effectiveDamageType = computePsychicDamageType(spell, psychicSpellsConfig, damageType);
+
+    const cantripSpellAbility = spell.spellCastingAbility || playerStats.spellAbilities?.spellCastingAbility;
+    const { spellToHit, spellSaveDc, spellCastingMod } = computeSpellStats(playerStats, cantripSpellAbility);
+
+    await logGenericSpellCast(spell, fullSpell, playerStats, campaignName, getTargetInfo, spellSaveDc, damageType, formula);
+
+    // --- Power Word Heal/Kill ---
+    const pwhResult = await handlePowerWordHeal(spell, metaCtx, getTargetInfo, playerStats, campaignName, applyPowerWordHealToTarget);
+    if (pwhResult.handled) return pwhResult.result;
+
+    const pwkResult = await handlePowerWordKill(spell, metaCtx, getTargetInfo, playerStats, campaignName, applyPowerWordKillToTarget);
+    if (pwkResult.handled) return pwkResult.result;
+
+    // --- Modal spells (early returns) ---
+    let massSuggestionResult = handleMassSuggestion(spell, spellSaveDc, playerStats, campaignName);
+    if (massSuggestionResult.handled) return massSuggestionResult.result;
+
+    let calmEmotionsResult = handleCalmEmotions(fullSpell, spellSaveDc, playerStats, campaignName, metaCtx);
+    if (calmEmotionsResult.handled) return calmEmotionsResult.result;
+
+    let hypnoticPatternEarlyResult = handleHypnoticPatternEarly(fullSpell, spellSaveDc, playerStats, campaignName, metaCtx, innateSorceryActive);
+    if (hypnoticPatternEarlyResult.handled) return hypnoticPatternEarlyResult.result;
+
+    let confusionEarlyResult = handleConfusionEarly(fullSpell, spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName, (s, m, p, c, mp) => triggerConfusion(s, m, p, c, mp));
+    if (confusionEarlyResult.handled) return confusionEarlyResult.result?.result;
+
+    let shapechangeResult = handleShapechange(fullSpell, metaCtx, playerStats, campaignName, mapName, characters);
+    if (shapechangeResult.handled) return shapechangeResult.result;
+
+    let sleepResult = handleSleep(fullSpell, spellSaveDc, playerStats, campaignName, metaCtx, characters);
+    if (sleepResult.handled) return sleepResult.result;
+
+    // --- Generic automation routing ---
+    let genericAutomationResult = await handleGenericAutomation(spell, executeHandler, (sp, mc, ps, cn) => triggerArcaneWard(sp, mc, ps, cn), playerStats, campaignName, mapName, characters, metaCtx);
+    if (genericAutomationResult.handled) {
+        if (genericAutomationResult.result) return genericAutomationResult.result;
+        return;
+    }
+
+    // --- NO DAMAGE PATH ---
+    if (!formula) {
+        const noDamage = await runNoDamagePath(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, spellSaveDc, innateSorceryActive, hasInvisible, spellCastingMod, rollDamage);
+        if (noDamage.handled) return noDamage.value;
+    }
+
+    // --- Hunter's Mark / Hex ---
+    if (spell.name === "Hunter's Mark") return;
+    if (spell.name === 'Hex') {
+        await castHex(spell, metaCtx, playerStats, campaignName, getTargetInfo);
+        return;
+    }
+
+    // --- Damage path ---
+    const rangeResult = computeRange(spell, metaCtx, attackerPos, targetPos, featEffects);
+    const { empEvocFormula } = computeEmpoweredEvocation(playerStats, spell, formula);
+    let finalFormula = computeBlessedStrikes(spell, empEvocFormula, playerStats, campaignName, getRuntimeValue);
+    finalFormula = computeRadiantSoul(spell, playerStats, campaignName, getRuntimeValue, finalFormula);
+    metaCtx = { ...metaCtx, finalFormula };
+    const { overchannelFormula, overchannelActive, overchannelUseCount } = computeOverchannel(spell, metaCtx, playerStats, campaignName, getRuntimeValue, empEvocFormula, finalFormula);
+
+    if (rangeResult.isAutoMiss) {
+        const context = {
+            targetName: (await getTargetInfo())?.name,
+            attackerName: playerStats.name,
+            ...metaCtx,
+            isAutoMiss: true,
+            rangeReason: rangeResult.rangeReason,
+            saveDc: spellSaveDc,
+            saveType: spell.dc?.dc_type || fullSpell.dc?.dc_type,
+            dcSuccess: spell.dc?.dc_success ?? fullSpell.dc?.dc_success,
+            metamagicHeighten: metaCtx?.metamagicHeighten,
+            isCantrip: spell.baseLevel === 0 || spell.level === 0,
+        };
+        rollDamage(spell.name, formula || '0', 0, [], 0, context);
+        if (spell.dc || fullSpell.dc) {
+            await handleSavePath(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters,
+                getTargetInfo, getRuntimeValue, innateSorceryActive, effectiveDamageType, spellSaveDc,
+                overchannelFormula, overchannelActive, overchannelUseCount, rollAttack, rollDamage, formula, hasInvisible);
+        }
+        return null;
+    }
+
+    if (spell.dc || fullSpell.dc) {
+        const savePathResult = await handleSavePath(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters,
+            getTargetInfo, getRuntimeValue, innateSorceryActive, effectiveDamageType, spellSaveDc,
+            overchannelFormula, overchannelActive, overchannelUseCount, rollAttack, rollDamage, formula, hasInvisible);
+        if (savePathResult) return savePathResult;
+    } else {
+        // CLA-200: no-save spells (e.g. Divine Smite — no `dc` in spells.json) must fall
+        // through to the post-cast trigger block below instead of early-returning.
+        // handleNoSavePath only ever resolves null/undefined, and the dc/no-dc
+        // branches are mutually exclusive, so the gated post-cast triggers
+        // (Inspiring Smite, Wild Magic Surge, Sanctuary break, etc.) run exactly once.
+        await handleNoSavePath(spell, metaCtx, playerStats, campaignName, mapName, characters,
+            getTargetInfo, rollAttack, spellToHit, effectiveDamageType);
+    }
+
+    // --- Post-cast triggers ---
+    return await runPostCastTriggers(spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo);
 }
 
 export { refundSpellBreakerSlot };

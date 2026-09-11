@@ -14,6 +14,139 @@ import { hasIgnoreResistance, evaluateAutoExpression } from '../../services/comb
 import utils from '../../services/ui/utils.js';
 import { isCircleOfPowerActive } from '../../services/automation/handlers/buffs/circleOfPowerHandler.js';
 
+function consumeSaveDisadvantage(targetEffects, pending, campaignName) {
+    let disadvantage = pending.metamagicHeighten || false;
+    const idx = targetEffects.findIndex(te => te.target === pending.targetName && te.effect === 'disadvantage_on_next_save');
+    if (idx !== -1) {
+        disadvantage = true;
+        targetEffects.splice(idx, 1);
+        setRuntimeValue('campaign', 'targetEffects', [...targetEffects], campaignName);
+    }
+    return disadvantage;
+}
+
+// Bane/Blade Ward: apply -1d4 penalty to saving throws
+function rollBaneSavePenalty(targetEffects, pending) {
+    const baneEffectsForSave = targetEffects.filter(te => te.target === pending.targetName && te.effect === 'bane_penalty');
+    if (baneEffectsForSave.length === 0) return { penalty: 0, roll: null, displayLabel: 'Bane' };
+    const r = rollExpression('1d4');
+    if (!r) return { penalty: 0, roll: null, displayLabel: 'Bane' };
+    return { penalty: -r.total, roll: r.total, displayLabel: baneEffectsForSave[0].displayLabel || 'Bane' };
+}
+
+// Bane/Blade Ward on attacker: grant +1d4 to the target's save when the attacker is cursed
+function rollBaneAttackerBonus(targetEffects, pending) {
+    if (!pending.attackerName) return { bonus: 0, roll: null, displayLabel: 'Bane' };
+    const baneOnAttacker = targetEffects.filter(te => te.target === pending.attackerName && te.effect === 'bane_penalty');
+    if (baneOnAttacker.length === 0) return { bonus: 0, roll: null, displayLabel: 'Bane' };
+    const r = rollExpression('1d4');
+    if (!r) return { bonus: 0, roll: null, displayLabel: 'Bane' };
+    return { bonus: r.total, roll: r.total, displayLabel: baneOnAttacker[0].displayLabel || 'Bane' };
+}
+
+// Bless: add 1d4 to saving throws
+function rollBlessSaveBonus(targetEffects, pending) {
+    const blessEffectsForSave = targetEffects.filter(te => te.target === pending.targetName && te.effect === 'bless_bonus');
+    if (blessEffectsForSave.length === 0) return 0;
+    const r = rollExpression('1d4');
+    return r ? r.total : 0;
+}
+
+function computeSaveAdvantage(pending, saveType, targetEffects, targetChar, campaignName) {
+    const targetSaveModifiers = targetChar?.saveModifiers || targetChar?.computedStats?.saveModifiers || [];
+    // CLA-324: against_spell advantage only on saves against spells — spell-origin is
+    // identifiable from the pending prompt flag or a spell-save-owned lastAttack stamp.
+    const hasAgainstSpellAdvantage = targetSaveModifiers.some(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');
+    const lastAttackOrigin = hasAgainstSpellAdvantage ? (getRuntimeValue('campaign', 'lastAttack', campaignName) || {}) : {};
+    const spellOrigin = pending.isSpellDamage === true ||
+      (lastAttackOrigin.rollType === 'spell-save' && (!pending.attackerName || lastAttackOrigin.attackerName === pending.attackerName));
+    const advantage = hasAgainstSpellAdvantage && spellOrigin;
+    const targetActiveBuffs = getRuntimeValue(pending.targetName, 'activeBuffs', campaignName) || [];
+    const isDodging = Array.isArray(targetActiveBuffs) && targetActiveBuffs.some(b => b.effect === 'dodge');
+    const isDexSave = saveType.toUpperCase() === 'DEX';
+    const dodgeAdvantage = isDodging && isDexSave;
+    const beaconWisAdvantage = targetEffects.some(te => te.effect === 'beacon_of_hope') && saveType.toUpperCase() === 'WIS';
+    const circleOfPowerAdvantage = isCircleOfPowerActive(pending.targetName, campaignName);
+    return {
+        saveAdvantage: advantage || dodgeAdvantage || beaconWisAdvantage || circleOfPowerAdvantage,
+        circleOfPowerAdvantage,
+        targetActiveBuffs,
+    };
+}
+
+function resolveEvasionFlags(pending, targetChar, normalizedSaveType, selectedAllies, circleOfPowerAdvantage, allCharacters, campaignName) {
+    const targetConditions = getRuntimeValue(pending.targetName, 'activeConditions', campaignName) || [];
+    const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
+
+    const ownEvasion = targetChar?.computedStats?.evasionEffects;
+    const hasOwnEvasion = !isIncapacitated && pending.dcSuccess === 'half' && ownEvasion?.some(ef => ef.saveType === normalizedSaveType);
+    const hasSelectedEvasion = selectedAllies?.has?.(pending.targetName) || false;
+    const hasSharedEvasion = !hasOwnEvasion && !hasSelectedEvasion && !isIncapacitated && pending.dcSuccess === 'half' &&
+        allCharacters.some(c => {
+            if (c.name === pending.targetName) return false;
+            const ev = c?.computedStats?.evasionEffects;
+            return ev?.some(ef => ef.saveType === normalizedSaveType && ef.shareable && ef.shareRange >= 5);
+        });
+    const hasEvasion = hasOwnEvasion || hasSelectedEvasion || hasSharedEvasion || isCircleOfPowerActive(pending.targetName, campaignName);
+    return { hasEvasion, hasOwnEvasion, hasSelectedEvasion, isIncapacitated };
+}
+
+function hasBlessedStrikesOptions(pending) {
+    return pending.context?.playerStats?.automation?.actions?.some(
+        a => a.type === 'damage_bonus' && a.options?.length > 0 && a.options.includes('Potent Spellcasting')
+    ) || false;
+}
+
+function collectCantripTempHpBonuses(playerStats) {
+    const allAutomation = [
+        ...(playerStats.automation.actions || []),
+        ...(playerStats.automation.passives || []),
+    ];
+    const cantripBonuses = playerStats.automation.actions.filter(
+        a => a.type === 'damage_bonus' && a.options?.length > 0 && a.tempHpExpression
+    );
+    const upgradedNames = new Set(allAutomation.filter(b => b.upgrades).map(b => b.upgrades));
+    return cantripBonuses.filter(b => !upgradedNames.has(b.name));
+}
+
+async function grantMissedCantripTempHp(pending, campaignName, characterName) {
+    const playerStats = pending.context?.playerStats;
+    if (!playerStats?.automation?.actions) return;
+    for (const bonus of collectCantripTempHpBonuses(playerStats)) {
+        const tempHp = evaluateAutoExpression(bonus.tempHpExpression, playerStats);
+        if (!tempHp || isNaN(tempHp) || !(tempHp > 0)) continue;
+        const combatSummaryForTargets = await loadCombatSummary(campaignName);
+        const allies = combatSummaryForTargets?.creatures?.filter(c =>
+            c.type === 'player' || c.type === 'npc' || c.type === 'monster'
+        ) || [];
+        if (allies.length === 0) continue;
+        const targets = allies.map(c => ({
+            name: c.name,
+            currentHp: c.currentHp,
+            maxHp: c.maxHp,
+            size: c.size,
+            type: c.type,
+        }));
+        window.dispatchEvent(new CustomEvent('potent-spellcasting-temp-hp', {
+            detail: {
+                title: 'Improved Blessed Strikes — Potent Spellcasting',
+                targets,
+                tempHp,
+                campaignName,
+                attackerName: characterName,
+                confirmLabel: 'Grant Temp HP',
+            },
+            bubbles: true,
+        }));
+    }
+}
+
+function isShieldBlockingMagicMissile(targetActiveBuffs, pending) {
+    const isShieldActive = Array.isArray(targetActiveBuffs) && targetActiveBuffs.some(b => b.effect === 'shield');
+    const isMagicMissile = pending.name && pending.name.toLowerCase() === 'magic missile';
+    return isShieldActive && !!isMagicMissile;
+}
+
 export function createSaves(deps) {
     const { characterName, campaignName, setPopupHtml, logEntry, logAndShow, pendingSaves, charactersRef } = deps;
 
@@ -139,87 +272,21 @@ export function createSaves(deps) {
         const target = combatSummary?.creatures?.find(c => c.name === pending.targetName);
         if (!target) return;
 
-        let disadvantage = pending.metamagicHeighten || false;
         const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
-        const idx = targetEffects.findIndex(te => te.target === pending.targetName && te.effect === 'disadvantage_on_next_save');
-        if (idx !== -1) {
-            disadvantage = true;
-            targetEffects.splice(idx, 1);
-            setRuntimeValue('campaign', 'targetEffects', [...targetEffects], campaignName);
-        }
+        const disadvantage = consumeSaveDisadvantage(targetEffects, pending, campaignName);
 
-        // Bane/Blade Ward: apply -1d4 penalty to saving throws
-        let baneSavePenalty = 0;
-        let baneSaveRoll = null;
-        let baneSaveDisplayLabel = 'Bane';
-        const baneEffectsForSave = targetEffects.filter(te => te.target === pending.targetName && te.effect === 'bane_penalty');
-        if (baneEffectsForSave.length > 0) {
-            const r = rollExpression('1d4');
-            if (r) {
-                baneSavePenalty = -r.total;
-                baneSaveRoll = r.total;
-                baneSaveDisplayLabel = baneEffectsForSave[0].displayLabel || 'Bane';
-            }
-        }
-
-        // Bane/Blade Ward on attacker: grant +1d4 to the target's save when the attacker is cursed
-        let baneAttackerBonus = 0;
-        let baneAttackerRoll = null;
-        let baneAttackerDisplayLabel = 'Bane';
-        if (pending.attackerName) {
-            const baneOnAttacker = targetEffects.filter(te => te.target === pending.attackerName && te.effect === 'bane_penalty');
-            if (baneOnAttacker.length > 0) {
-                const r = rollExpression('1d4');
-                if (r) {
-                    baneAttackerBonus += r.total;
-                    baneAttackerRoll = r.total;
-                    baneAttackerDisplayLabel = baneOnAttacker[0].displayLabel || 'Bane';
-                }
-            }
-        }
-
-        // Bless: add 1d4 to saving throws
-        let blessSaveBonus = 0;
-        const blessEffectsForSave = targetEffects.filter(te => te.target === pending.targetName && te.effect === 'bless_bonus');
-        if (blessEffectsForSave.length > 0) {
-            const r = rollExpression('1d4');
-            if (r) {
-                blessSaveBonus += r.total;
-            }
-        }
+        const baneSave = rollBaneSavePenalty(targetEffects, pending);
+        const baneAttacker = rollBaneAttackerBonus(targetEffects, pending);
+        const blessSaveBonus = rollBlessSaveBonus(targetEffects, pending);
 
         const targetChar = (charactersRef.current || []).find(c => c.name === pending.targetName);
-        const targetSaveModifiers = targetChar?.saveModifiers || targetChar?.computedStats?.saveModifiers || [];
-        // CLA-324: against_spell advantage only on saves against spells — spell-origin is
-        // identifiable from the pending prompt flag or a spell-save-owned lastAttack stamp.
-        const hasAgainstSpellAdvantage = targetSaveModifiers.some(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');
-        const lastAttackOrigin = hasAgainstSpellAdvantage ? (getRuntimeValue('campaign', 'lastAttack', campaignName) || {}) : {};
-        const spellOrigin = pending.isSpellDamage === true ||
-          (lastAttackOrigin.rollType === 'spell-save' && (!pending.attackerName || lastAttackOrigin.attackerName === pending.attackerName));
-        const advantage = hasAgainstSpellAdvantage && spellOrigin;
-        const targetActiveBuffs = getRuntimeValue(pending.targetName, 'activeBuffs', campaignName) || [];
-        const isDodging = Array.isArray(targetActiveBuffs) && targetActiveBuffs.some(b => b.effect === 'dodge');
-        const isDexSave = saveType.toUpperCase() === 'DEX';
-        const dodgeAdvantage = isDodging && isDexSave;
-        const beaconWisAdvantage = targetEffects.some(te => te.effect === 'beacon_of_hope') && saveType.toUpperCase() === 'WIS';
-        const circleOfPowerAdvantage = isCircleOfPowerActive(pending.targetName, campaignName);
-        const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage, advantage || dodgeAdvantage || beaconWisAdvantage || circleOfPowerAdvantage);
-        saveResult.total += baneSavePenalty + blessSaveBonus + baneAttackerBonus;
+        const { saveAdvantage, circleOfPowerAdvantage, targetActiveBuffs } = computeSaveAdvantage(pending, saveType, targetEffects, targetChar, campaignName);
+        const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage, saveAdvantage);
+        saveResult.total += baneSave.penalty + blessSaveBonus + baneAttacker.bonus;
 
         const normalizedSaveType = normalizeSaveType(saveType);
-        const targetConditions = getRuntimeValue(pending.targetName, 'activeConditions', campaignName) || [];
-        const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
-
-        const ownEvasion = targetChar?.computedStats?.evasionEffects;
-        const hasOwnEvasion = !isIncapacitated && pending.dcSuccess === 'half' && ownEvasion?.some(ef => ef.saveType === normalizedSaveType);
-        const hasSelectedEvasion = selectedAllies?.has?.(pending.targetName) || false;
-        const hasSharedEvasion = !hasOwnEvasion && !hasSelectedEvasion && !isIncapacitated && pending.dcSuccess === 'half' &&
-            (charactersRef.current || []).some(c => {
-                if (c.name === pending.targetName) return false;
-                const ev = c?.computedStats?.evasionEffects;
-                return ev?.some(ef => ef.saveType === normalizedSaveType && ef.shareable && ef.shareRange >= 5);
-            });
-        const hasEvasion = hasOwnEvasion || hasSelectedEvasion || hasSharedEvasion || isCircleOfPowerActive(pending.targetName, campaignName);
+        const evasionFlags = resolveEvasionFlags(pending, targetChar, normalizedSaveType, selectedAllies, circleOfPowerAdvantage, charactersRef.current || [], campaignName);
+        const { hasEvasion, hasOwnEvasion, hasSelectedEvasion } = evasionFlags;
         let finalDamage = computeDamageAfterEvasion(pending.rawDamage, saveResult.success, pending.dcSuccess, hasEvasion);
 
         if (hasEvasion) {
@@ -238,61 +305,16 @@ export function createSaves(deps) {
             });
         }
 
-        const isShieldActive = Array.isArray(targetActiveBuffs) && targetActiveBuffs.some(b => b.effect === 'shield');
-        const isMagicMissile = pending.name && pending.name.toLowerCase() === 'magic missile';
-        if (isShieldActive && isMagicMissile) {
+        if (isShieldBlockingMagicMissile(targetActiveBuffs, pending)) {
             finalDamage = 0;
         }
 
         const isCantripFlag = pending.isCantrip || false;
-        const hasBlessedStrikesOptions = pending.context?.playerStats?.automation?.actions?.some(
-            a => a.type === 'damage_bonus' && a.options?.length > 0 && a.options.includes('Potent Spellcasting')
-        ) || false;
-        if (hasBlessedStrikesOptions && isCantripFlag && saveResult.success && pending.dcSuccess === 'none') {
+        if (hasBlessedStrikesOptions(pending) && isCantripFlag && saveResult.success && pending.dcSuccess === 'none') {
             finalDamage = Math.floor(pending.rawDamage / 2);
         }
         if (isCantripFlag && !saveResult.success && pending.dcSuccess === 'none') {
-            const playerStats = pending.context?.playerStats;
-            if (playerStats?.automation?.actions) {
-                const allAutomation = [
-                    ...(playerStats.automation.actions || []),
-                    ...(playerStats.automation.passives || []),
-                ];
-                const cantripBonuses = playerStats.automation.actions.filter(
-                    a => a.type === 'damage_bonus' && a.options?.length > 0 && a.tempHpExpression
-                );
-                const upgradedNames = new Set(allAutomation.filter(b => b.upgrades).map(b => b.upgrades));
-                const filteredBonuses = cantripBonuses.filter(b => !upgradedNames.has(b.name));
-                for (const bonus of filteredBonuses) {
-                    const tempHp = evaluateAutoExpression(bonus.tempHpExpression, playerStats);
-                    if (tempHp && !isNaN(tempHp) && tempHp > 0) {
-                        const combatSummaryForTargets = await loadCombatSummary(campaignName);
-                        const allies = combatSummaryForTargets?.creatures?.filter(c =>
-                            c.type === 'player' || c.type === 'npc' || c.type === 'monster'
-                        ) || [];
-                        if (allies.length > 0) {
-                            const targets = allies.map(c => ({
-                                name: c.name,
-                                currentHp: c.currentHp,
-                                maxHp: c.maxHp,
-                                size: c.size,
-                                type: c.type,
-                            }));
-                            window.dispatchEvent(new CustomEvent('potent-spellcasting-temp-hp', {
-                                detail: {
-                                    title: 'Improved Blessed Strikes — Potent Spellcasting',
-                                    targets,
-                                    tempHp,
-                                    campaignName,
-                                    attackerName: characterName,
-                                    confirmLabel: 'Grant Temp HP',
-                                },
-                                bubbles: true,
-                            }));
-                        }
-                    }
-                }
-            }
+            await grantMissedCantripTempHp(pending, campaignName, characterName);
         }
         const ignoreResistance = (pending.playerStats && hasIgnoreResistance(pending.playerStats, pending.damageType)) || false;
         const allCharacters = charactersRef.current || [];
@@ -331,10 +353,10 @@ export function createSaves(deps) {
             finalDamage: applyResult?.finalDamage,
             damageApplied: true,
             damageReduced: applyResult?.damageReduced,
-            baneRoll: baneSaveRoll,
-            baneDisplayLabel: baneSaveDisplayLabel,
-            baneAttackerRoll: baneAttackerRoll,
-            baneAttackerDisplayLabel: baneAttackerDisplayLabel,
+            baneRoll: baneSave.roll,
+            baneDisplayLabel: baneSave.displayLabel,
+            baneAttackerRoll: baneAttacker.roll,
+            baneAttackerDisplayLabel: baneAttacker.displayLabel,
             blessRoll: null,
         });
     }

@@ -13,6 +13,102 @@ const INTERNAL_SKILL_CHECK_EVENT = 'internal-skill-check';
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
+const SKILL_TO_ABILITY = {
+    'Athletics': 'STR', 'Acrobatics': 'DEX', 'Sleight of Hand': 'DEX', 'Stealth': 'DEX',
+    'Arcana': 'INT', 'History': 'INT', 'Investigation': 'INT', 'Nature': 'INT', 'Religion': 'INT',
+    'Animal Handling': 'WIS', 'Insight': 'WIS', 'Medicine': 'WIS', 'Perception': 'WIS', 'Survival': 'WIS',
+    'Deception': 'CHA', 'Intimidation': 'CHA', 'Performance': 'CHA', 'Persuasion': 'CHA',
+    'Strength': 'STR', 'Dexterity': 'DEX', 'Constitution': 'CON', 'Intelligence': 'INT', 'Wisdom': 'WIS', 'Charisma': 'CHA',
+};
+
+function resolveCheckForcedMode(conditionEffects, checkName) {
+    let forcedMode = undefined;
+    if (conditionEffects?.abilityCheckDisadvantage) forcedMode = 'disadvantage';
+    if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === checkName)) {
+        forcedMode = forcedMode === 'disadvantage' ? undefined : 'advantage';
+    }
+    // Peerless Athlete: skill-specific advantage (like expertise uses .includes(skill.name))
+    if (!forcedMode && conditionEffects?.peerlessAthleteAdvantageSkills?.includes(checkName)) {
+        forcedMode = 'advantage';
+    }
+    // Check per-ability check advantage (e.g., Remarkable Athlete for STR)
+    const abilityForCheck = SKILL_TO_ABILITY[checkName];
+    if (!forcedMode && abilityForCheck && conditionEffects?.abilityCheckAdvantageAbilities?.includes(abilityForCheck)) {
+        forcedMode = 'advantage';
+    }
+    // Check skill-specific advantage (e.g., Actor feat for Deception/Performance)
+    if (!forcedMode && conditionEffects?.abilityCheckAdvantageSkills?.includes(checkName)) {
+        forcedMode = 'advantage';
+    }
+    // Powerful Build: advantage on STR checks to escape grapple
+    const abbr = checkName.substring(0, 3).toUpperCase();
+    if (!forcedMode && conditionEffects?.strCheckAdvantage && (abbr === 'STR' || checkName === 'Strength' || checkName === 'Athletics')) {
+        forcedMode = 'advantage';
+    }
+    // Ray of Enfeeblement: STR-based d20 tests have disadvantage
+    if (!forcedMode && conditionEffects?.strCheckDisadvantage && (abbr === 'STR' || checkName === 'Strength')) {
+        forcedMode = 'disadvantage';
+    }
+    // Hex: ability check disadvantage for chosen ability
+    if (!forcedMode && abilityForCheck && conditionEffects?.abilityCheckDisadvantageAbilities?.includes(abilityForCheck)) {
+        forcedMode = 'disadvantage';
+    }
+    return forcedMode;
+}
+
+function applyAbilityCheckReplacements(ctx, conditionEffects, playerStats) {
+    if (conditionEffects?.strCheckReplace) {
+        const strAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
+        ctx.strCheckReplace = true;
+        ctx.strScore = strAbility?.totalScore || 10;
+    }
+    if (conditionEffects?.wisCheckReplace) {
+        const wisAbility = playerStats?.abilities?.find(a => a.name === 'Wisdom');
+        const wisMod = wisAbility?.bonus || 0;
+        ctx.wisCheckReplace = true;
+        ctx.wisCheckMinBonus = Math.max(1, wisMod);
+    }
+}
+
+function applyCheckFeatureContext(ctx, conditionEffects, playerStats, checkName, luckyDisadvantageActive) {
+    if (conditionEffects?.tacticalMind) {
+        ctx.tacticalMind = true;
+        ctx.tacticalMindBonus = conditionEffects.tacticalMindBonus || null;
+    }
+    if (conditionEffects?.darkOnesLuck) {
+        ctx.darkOnesLuck = true;
+    }
+    // Reliable Talent floors ONLY proficient skill/tool checks (CLA-291) — raw ability checks excluded
+    if (conditionEffects?.reliableTalent && isProficientSkillOrToolCheck(playerStats, checkName)) {
+        ctx.reliableTalent = true;
+    }
+    if (conditionEffects?.strokeOfLuck) {
+        ctx.strokeOfLuck = true;
+    }
+    if (conditionEffects?.luckyAdvantage) {
+        ctx.luckyAdvantage = true; ctx.luckyAdvantageType = 'advantage';
+    }
+    if (conditionEffects?.luckyDisadvantage || luckyDisadvantageActive) {
+        ctx.luckyDisadvantage = true; ctx.luckyDisadvantageType = 'disadvantage';
+    }
+    if (conditionEffects?.d20Floor10) {
+        ctx.d20Floor10 = true;
+    }
+    if (conditionEffects?.autoRerollForChecks) {
+        ctx.autoReroll = true;
+        ctx.autoRerollCondition = conditionEffects.autoRerollCondition;
+        ctx.autoRerollBonus = conditionEffects.autoRerollBonus || null;
+    }
+    const isSoulknife = playerStats?.class?.name === 'Rogue' && (playerStats?.class?.major?.name || playerStats?.class?.subclass?.name) === 'Soulknife';
+    const hasPsiBolsteredKnack = isSoulknife && (playerStats?.level || 0) >= 3
+        && isProficientSkillOrToolCheck(playerStats, checkName);
+    if (hasPsiBolsteredKnack) {
+        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+        ctx.psiBolsteredKnack = true;
+        ctx.psiBolsteredKnackDieSize = classLevel?.energy?.energy_die_type || 6;
+    }
+}
+
 function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustionPenalty = 0, conditionEffects, isRaging = false, _onReroll, _onStrokeOfLuck, characters, luckyDisadvantageActive }) {
       const abilityDesc = buildAbilityDetailHtml(allAbilityScores);
       const { setPopupHtml } = useDiceRollPopup();
@@ -100,116 +196,12 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
         }, [exhaustionPenalty, isRaging, playerStats, conditionEffects?.passWithoutTraceBonus, conditionEffects?.wisCheckReplace]);
 
             const makeCheckContext = useCallback((checkName) => {
-               let forcedMode = undefined
-               if (conditionEffects?.abilityCheckDisadvantage) forcedMode = 'disadvantage'
-               if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === checkName)) {
-                 forcedMode = forcedMode === 'disadvantage' ? undefined : 'advantage'
-               }
-                  // Peerless Athlete: skill-specific advantage (like expertise uses .includes(skill.name))
-                  if (!forcedMode && conditionEffects?.peerlessAthleteAdvantageSkills) {
-                      if (conditionEffects.peerlessAthleteAdvantageSkills.includes(checkName)) {
-                          forcedMode = 'advantage'
-                      }
-                  }
-                  // Check per-ability check advantage (e.g., Remarkable Athlete for STR)
-                  if (!forcedMode && conditionEffects?.abilityCheckAdvantageAbilities) {
-                      const skillToAbility = {
-                          'Athletics': 'STR', 'Acrobatics': 'DEX', 'Sleight of Hand': 'DEX', 'Stealth': 'DEX',
-                          'Arcana': 'INT', 'History': 'INT', 'Investigation': 'INT', 'Nature': 'INT', 'Religion': 'INT',
-                          'Animal Handling': 'WIS', 'Insight': 'WIS', 'Medicine': 'WIS', 'Perception': 'WIS', 'Survival': 'WIS',
-                          'Deception': 'CHA', 'Intimidation': 'CHA', 'Performance': 'CHA', 'Persuasion': 'CHA',
-                          'Strength': 'STR', 'Dexterity': 'DEX', 'Constitution': 'CON', 'Intelligence': 'INT', 'Wisdom': 'WIS', 'Charisma': 'CHA',
-                      };
-                      const abilityForCheck = skillToAbility[checkName];
-                      if (abilityForCheck && conditionEffects.abilityCheckAdvantageAbilities.includes(abilityForCheck)) {
-                          forcedMode = 'advantage'
-                      }
-                  }
-                  // Check skill-specific advantage (e.g., Actor feat for Deception/Performance)
-                  if (!forcedMode && conditionEffects?.abilityCheckAdvantageSkills) {
-                      if (conditionEffects.abilityCheckAdvantageSkills.includes(checkName)) {
-                          forcedMode = 'advantage'
-                      }
-                  }
-              // Powerful Build: advantage on STR checks to escape grapple
-              if (!forcedMode && conditionEffects?.strCheckAdvantage) {
-                const abbr = checkName.substring(0, 3).toUpperCase();
-                if (abbr === 'STR' || checkName === 'Strength' || checkName === 'Athletics') {
-                  forcedMode = 'advantage'
-                }
-              }
-              // Ray of Enfeeblement: STR-based d20 tests have disadvantage
-              if (!forcedMode && conditionEffects?.strCheckDisadvantage) {
-                const abbr = checkName.substring(0, 3).toUpperCase();
-                if (abbr === 'STR' || checkName === 'Strength') {
-                  forcedMode = 'disadvantage'
-                }
-              }
-              // Hex: ability check disadvantage for chosen ability
-              if (!forcedMode && conditionEffects?.abilityCheckDisadvantageAbilities) {
-                const skillToAbility = {
-                  'Athletics': 'STR', 'Acrobatics': 'DEX', 'Sleight of Hand': 'DEX', 'Stealth': 'DEX',
-                  'Arcana': 'INT', 'History': 'INT', 'Investigation': 'INT', 'Nature': 'INT', 'Religion': 'INT',
-                  'Animal Handling': 'WIS', 'Insight': 'WIS', 'Medicine': 'WIS', 'Perception': 'WIS', 'Survival': 'WIS',
-                  'Deception': 'CHA', 'Intimidation': 'CHA', 'Performance': 'CHA', 'Persuasion': 'CHA',
-                  'Strength': 'STR', 'Dexterity': 'DEX', 'Constitution': 'CON', 'Intelligence': 'INT', 'Wisdom': 'WIS', 'Charisma': 'CHA',
-                };
-                const abilityForCheck = skillToAbility[checkName];
-                if (abilityForCheck && conditionEffects.abilityCheckDisadvantageAbilities.includes(abilityForCheck)) {
-                  forcedMode = 'disadvantage';
-                }
-              }
-             const ctx = forcedMode ? { forcedMode } : {}
-             if (conditionEffects?.strCheckReplace) {
-               const strAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
-               ctx.strCheckReplace = true;
-               ctx.strScore = strAbility?.totalScore || 10
-             }
-             if (conditionEffects?.wisCheckReplace) {
-               const wisAbility = playerStats?.abilities?.find(a => a.name === 'Wisdom');
-               const wisMod = wisAbility?.bonus || 0;
-               const minBonus = Math.max(1, wisMod);
-               ctx.wisCheckReplace = true;
-               ctx.wisCheckMinBonus = minBonus
-             }
-               if (conditionEffects?.tacticalMind) {
-                 ctx.tacticalMind = true;
-                 ctx.tacticalMindBonus = conditionEffects.tacticalMindBonus || null
-               }
-               if (conditionEffects?.darkOnesLuck) {
-                 ctx.darkOnesLuck = true;
-               }
-               // Reliable Talent floors ONLY proficient skill/tool checks (CLA-291) — raw ability checks excluded
-               if (conditionEffects?.reliableTalent && isProficientSkillOrToolCheck(playerStats, checkName)) {
-                 ctx.reliableTalent = true
-               }
-                if (conditionEffects?.strokeOfLuck) {
-                  ctx.strokeOfLuck = true
-                }
-                if (conditionEffects?.luckyAdvantage) {
-                  ctx.luckyAdvantage = true; ctx.luckyAdvantageType = 'advantage'
-                }
-                if (conditionEffects?.luckyDisadvantage || luckyDisadvantageActive) {
-                  ctx.luckyDisadvantage = true; ctx.luckyDisadvantageType = 'disadvantage'
-                }
-               if (conditionEffects?.d20Floor10) {
-                  ctx.d20Floor10 = true
-                }
-                if (conditionEffects?.autoRerollForChecks) {
-                   ctx.autoReroll = true;
-                   ctx.autoRerollCondition = conditionEffects.autoRerollCondition;
-                   ctx.autoRerollBonus = conditionEffects.autoRerollBonus || null;
-                 }
-                const isSoulknife = playerStats?.class?.name === 'Rogue' && (playerStats?.class?.major?.name || playerStats?.class?.subclass?.name) === 'Soulknife';
-                const hasPsiBolsteredKnack = isSoulknife && (playerStats?.level || 0) >= 3
-                  && isProficientSkillOrToolCheck(playerStats, checkName);
-                if (hasPsiBolsteredKnack) {
-                  const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-                  ctx.psiBolsteredKnack = true;
-                  ctx.psiBolsteredKnackDieSize = classLevel?.energy?.energy_die_type || 6;
-                }
-                 return Object.keys(ctx).length > 0 ? ctx : undefined
-           }, [conditionEffects, playerStats, luckyDisadvantageActive]);
+                const forcedMode = resolveCheckForcedMode(conditionEffects, checkName);
+                const ctx = forcedMode ? { forcedMode } : {};
+                applyAbilityCheckReplacements(ctx, conditionEffects, playerStats);
+                applyCheckFeatureContext(ctx, conditionEffects, playerStats, checkName, luckyDisadvantageActive);
+                return Object.keys(ctx).length > 0 ? ctx : undefined;
+            }, [conditionEffects, playerStats, luckyDisadvantageActive]);
 
         const makeSaveContext = (abilityName) => {
            const abbr = abilityName.substring(0, 3).toLowerCase()

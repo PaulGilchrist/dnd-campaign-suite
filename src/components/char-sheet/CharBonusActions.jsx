@@ -34,6 +34,124 @@ import { handleBond as handleWarBondBind, inventoryWeaponNames } from '../../ser
 import { loadWeapons } from './modals/weapon-kind-mastery-cache.js';
 import './CharActions.css'
 
+function SpellCastPopups({ selectedBonusSpell, setSelectedBonusSpell, playerStats, campaignName, buildUpcastLevels, handleBonusSpellCast, pendingMetamagic, handleConfirm, handleSkip }) {
+    return (
+        <>
+            {selectedBonusSpell && (
+                <Popup onClickOrKeyDown={() => setSelectedBonusSpell(null)}>
+                    <SpellDetailPopup
+                        spell={selectedBonusSpell}
+                        playerStats={playerStats}
+                        campaignName={campaignName}
+                        playerLevel={playerStats.level}
+                        upcastLevels={buildUpcastLevels(selectedBonusSpell)}
+                        onClose={() => setSelectedBonusSpell(null)}
+                        onCast={handleBonusSpellCast}
+                    />
+                </Popup>
+            )}
+            {pendingMetamagic && (
+                <div>
+                    <MetamagicPopup
+                        spell={{ name: pendingMetamagic.spellName, level: pendingMetamagic.spellLevel || 0 }}
+                        playerStats={{ ...playerStats, _metamagicCurrentSP: pendingMetamagic._currentSP }}
+                        campaignName={campaignName}
+                        onConfirm={handleConfirm}
+                        onSkip={handleSkip}
+                    />
+                </div>
+            )}
+        </>
+    );
+}
+
+function BonusActionTargetModals({ hordeBreakerTargets, setHordeBreakerTargets, hordeBreakerReady, hordeBreakerAttackItem, handleHordeBreakerTargetSelected, pendingHexSpell, handleHexAbilitySelected, handleHexCancel, pendingBarkskin, handleBarkskinConfirm, handleBarkskinSkip, pendingHealingWord, handleHealingWordConfirm, handleHealingWordSkip, pendingSanctuary, handleSanctuaryConfirm, handleSanctuarySkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip, pendingLesserRestorationTarget, setPendingLesserRestorationTarget, campaignName, modalState, setModalState, warBondBondModal, setWarBondBondModal, warBondMax, playerStats }) {
+    return (
+        <>
+            {hordeBreakerTargets && (
+                <SecondaryTargetModal
+                    title="Horde Breaker"
+                    targets={hordeBreakerTargets}
+                    description={`Choose a different creature within 5 feet of <b>${hordeBreakerReady?.targetName || 'the original target'}</b> to attack with your ${hordeBreakerAttackItem?.weaponName || 'weapon'}:`}
+                    onTargetSelected={handleHordeBreakerTargetSelected}
+                    onSkip={() => setHordeBreakerTargets(null)}
+                    confirmLabel="Attack Target"
+                    confirmIcon="fa-bolt"
+                    showSize={true}
+                />
+            )}
+            {pendingHexSpell && (
+                <HexAbilityModal
+                    onAbilitySelected={handleHexAbilitySelected}
+                    onCancel={handleHexCancel}
+                />
+            )}
+            {pendingBarkskin && (
+                <SecondaryTargetModal
+                    title="Barkskin"
+                    targets={pendingBarkskin.creatureTargets.map(name => ({ name, type: 'creature' }))}
+                    onTargetSelected={(targetName) => handleBarkskinConfirm([targetName])}
+                    onSkip={handleBarkskinSkip}
+                    description="Choose a willing creature within range. Target's AC becomes 17."
+                    confirmLabel="Cast Barkskin"
+                    confirmIcon="fa-tree"
+                />
+            )}
+            {pendingHealingWord && (
+                <SecondaryTargetModal
+                    title="Healing Word"
+                    targets={pendingHealingWord.creatureTargets.map(name => ({ name, type: 'creature' }))}
+                    onTargetSelected={(targetName) => handleHealingWordConfirm({ targetName })}
+                    onSkip={handleHealingWordSkip}
+                    description="Choose a creature within range. The target regains hit points equal to the roll of your dice plus your spellcasting ability modifier."
+                    confirmLabel="Cast Healing Word"
+                    confirmIcon="fa-heart"
+                />
+            )}
+            {pendingSanctuary && (
+                <SecondaryTargetModal
+                    title="Sanctuary"
+                    targets={pendingSanctuary.creatureTargets.map(name => ({ name, type: 'creature' }))}
+                    onTargetSelected={(targetName) => handleSanctuaryConfirm(targetName)}
+                    onSkip={handleSanctuarySkip}
+                    description="Choose a creature within range. Until the spell ends, any creature who targets the warded creature with an attack roll or a damaging spell must succeed on a WIS save or lose the attack or spell. Does not protect from areas of effect. Spell ends if the warded creature makes an attack roll, casts a spell, or deals damage."
+                    confirmLabel="Cast Sanctuary"
+                    confirmIcon="fa-shield-halved"
+                />
+            )}
+            {pendingLesserRestoration && (
+                <TargetSpellPopups
+                    campaignName={campaignName}
+                    pendingLesserRestoration={pendingLesserRestoration}
+                    handleLesserRestorationConfirm={handleLesserRestorationConfirm}
+                    handleLesserRestorationSkip={handleLesserRestorationSkip}
+                    pendingLesserRestorationTarget={pendingLesserRestorationTarget}
+                    setPendingLesserRestorationTarget={setPendingLesserRestorationTarget}
+                />
+            )}
+            {modalState?.arcaneVigorModal && (
+                <ArcaneVigorModal
+                    {...modalState.arcaneVigorModal}
+                    onClose={() => setModalState({ arcaneVigorModal: null })}
+                    onComplete={() => setModalState({ arcaneVigorModal: null })}
+                />
+            )}
+            {warBondBondModal && (
+                <WarBondChooserModal
+                    title="War Bond — Bond Weapons"
+                    icon="fa-link"
+                    options={warBondBondModal.options}
+                    maxChoices={warBondMax}
+                    existing={warBondBondModal.existing}
+                    confirmLabel="Bond"
+                    onConfirm={(selected) => handleWarBondBind(selected, playerStats, campaignName, warBondMax)}
+                    onClose={() => setWarBondBondModal(null)}
+                />
+            )}
+        </>
+    );
+}
+
 function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, characters, onAttackClick, onResolveSpellDamage, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo, setModalState, modalState }) {
     const { popupHtml, setPopupHtml } = useDiceRollPopup();
     const [selectedBonusSpell, setSelectedBonusSpell] = useState(null);
@@ -391,31 +509,18 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                       <div className='half-line'></div>
                   </div>
                ) : null}
-              {selectedBonusSpell && (
-                 <Popup onClickOrKeyDown={() => setSelectedBonusSpell(null)}>
-                     <SpellDetailPopup
-                        spell={selectedBonusSpell}
-                        playerStats={playerStats}
-                        campaignName={campaignName}
-                        playerLevel={playerStats.level}
-                        upcastLevels={buildUpcastLevels(selectedBonusSpell)}
-                        onClose={() => setSelectedBonusSpell(null)}
-                         onCast={handleBonusSpellCast}
-                     />
-                 </Popup>
-             )}
-                {pendingMetamagic && (
-                   <div>
-                       <MetamagicPopup
-                         spell={{ name: pendingMetamagic.spellName, level: pendingMetamagic.spellLevel || 0 }}
-                         playerStats={{ ...playerStats, _metamagicCurrentSP: pendingMetamagic._currentSP }}
-                         campaignName={campaignName}
-                         onConfirm={handleConfirm}
-                         onSkip={handleSkip}
-                      />
-                  </div>
-              )}
-             {(popupHtml && hasBonusActions) && <br />}
+              <SpellCastPopups
+                  selectedBonusSpell={selectedBonusSpell}
+                  setSelectedBonusSpell={setSelectedBonusSpell}
+                  playerStats={playerStats}
+                  campaignName={campaignName}
+                  buildUpcastLevels={buildUpcastLevels}
+                  handleBonusSpellCast={handleBonusSpellCast}
+                  pendingMetamagic={pendingMetamagic}
+                  handleConfirm={handleConfirm}
+                  handleSkip={handleSkip}
+              />
+               {(popupHtml && hasBonusActions) && <br />}
                {hasBonusActions && <div>
                   {((playerStats.bonusActions || []).filter(a => getCategories(playerStats.rules || '5e').featuresToIgnore.includes(a.name) === false)).map((bonusAction) => {
                          const isBonusClickable = bonusAction.details || hasAutomation(bonusAction);
@@ -569,92 +674,37 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                     </div>
                 )}
 
-                {hordeBreakerTargets && (
-                    <SecondaryTargetModal
-                        title="Horde Breaker"
-                        targets={hordeBreakerTargets}
-                        description={`Choose a different creature within 5 feet of <b>${hordeBreakerReady?.targetName || 'the original target'}</b> to attack with your ${hordeBreakerAttackItem?.weaponName || 'weapon'}:`}
-                        onTargetSelected={handleHordeBreakerTargetSelected}
-                        onSkip={() => setHordeBreakerTargets(null)}
-                        confirmLabel="Attack Target"
-                        confirmIcon="fa-bolt"
-                        showSize={true}
-                    />
-                )}
-
-                {pendingHexSpell && (
-                    <HexAbilityModal
-                        onAbilitySelected={handleHexAbilitySelected}
-                        onCancel={handleHexCancel}
-                    />
-                )}
-
-                {pendingBarkskin && (
-                    <SecondaryTargetModal
-                        title="Barkskin"
-                        targets={pendingBarkskin.creatureTargets.map(name => ({ name, type: 'creature' }))}
-                        onTargetSelected={(targetName) => handleBarkskinConfirm([targetName])}
-                        onSkip={handleBarkskinSkip}
-                        description="Choose a willing creature within range. Target's AC becomes 17."
-                        confirmLabel="Cast Barkskin"
-                        confirmIcon="fa-tree"
-                    />
-                )}
-
-                {pendingHealingWord && (
-                    <SecondaryTargetModal
-                        title="Healing Word"
-                        targets={pendingHealingWord.creatureTargets.map(name => ({ name, type: 'creature' }))}
-                        onTargetSelected={(targetName) => handleHealingWordConfirm({ targetName })}
-                        onSkip={handleHealingWordSkip}
-                        description="Choose a creature within range. The target regains hit points equal to the roll of your dice plus your spellcasting ability modifier."
-                        confirmLabel="Cast Healing Word"
-                        confirmIcon="fa-heart"
-                    />
-                )}
-                {pendingSanctuary && (
-                    <SecondaryTargetModal
-                        title="Sanctuary"
-                        targets={pendingSanctuary.creatureTargets.map(name => ({ name, type: 'creature' }))}
-                        onTargetSelected={(targetName) => handleSanctuaryConfirm(targetName)}
-                        onSkip={handleSanctuarySkip}
-                        description="Choose a creature within range. Until the spell ends, any creature who targets the warded creature with an attack roll or a damaging spell must succeed on a WIS save or lose the attack or spell. Does not protect from areas of effect. Spell ends if the warded creature makes an attack roll, casts a spell, or deals damage."
-                        confirmLabel="Cast Sanctuary"
-                        confirmIcon="fa-shield-halved"
-                    />
-                )}
-
-                {pendingLesserRestoration && (
-                    <TargetSpellPopups
-                        campaignName={campaignName}
-                        pendingLesserRestoration={pendingLesserRestoration}
-                        handleLesserRestorationConfirm={handleLesserRestorationConfirm}
-                        handleLesserRestorationSkip={handleLesserRestorationSkip}
-                        pendingLesserRestorationTarget={pendingLesserRestorationTarget}
-                        setPendingLesserRestorationTarget={setPendingLesserRestorationTarget}
-                    />
-                )}
-
-                {modalState?.arcaneVigorModal && (
-                    <ArcaneVigorModal
-                        {...modalState.arcaneVigorModal}
-                        onClose={() => setModalState({ arcaneVigorModal: null })}
-                        onComplete={() => setModalState({ arcaneVigorModal: null })}
-                    />
-                )}
-
-                {warBondBondModal && (
-                    <WarBondChooserModal
-                        title="War Bond — Bond Weapons"
-                        icon="fa-link"
-                        options={warBondBondModal.options}
-                        maxChoices={warBondMax}
-                        existing={warBondBondModal.existing}
-                        confirmLabel="Bond"
-                        onConfirm={(selected) => handleWarBondBind(selected, playerStats, campaignName, warBondMax)}
-                        onClose={() => setWarBondBondModal(null)}
-                    />
-                )}
+                <BonusActionTargetModals
+                    hordeBreakerTargets={hordeBreakerTargets}
+                    setHordeBreakerTargets={setHordeBreakerTargets}
+                    hordeBreakerReady={hordeBreakerReady}
+                    hordeBreakerAttackItem={hordeBreakerAttackItem}
+                    handleHordeBreakerTargetSelected={handleHordeBreakerTargetSelected}
+                    pendingHexSpell={pendingHexSpell}
+                    handleHexAbilitySelected={handleHexAbilitySelected}
+                    handleHexCancel={handleHexCancel}
+                    pendingBarkskin={pendingBarkskin}
+                    handleBarkskinConfirm={handleBarkskinConfirm}
+                    handleBarkskinSkip={handleBarkskinSkip}
+                    pendingHealingWord={pendingHealingWord}
+                    handleHealingWordConfirm={handleHealingWordConfirm}
+                    handleHealingWordSkip={handleHealingWordSkip}
+                    pendingSanctuary={pendingSanctuary}
+                    handleSanctuaryConfirm={handleSanctuaryConfirm}
+                    handleSanctuarySkip={handleSanctuarySkip}
+                    pendingLesserRestoration={pendingLesserRestoration}
+                    handleLesserRestorationConfirm={handleLesserRestorationConfirm}
+                    handleLesserRestorationSkip={handleLesserRestorationSkip}
+                    pendingLesserRestorationTarget={pendingLesserRestorationTarget}
+                    setPendingLesserRestorationTarget={setPendingLesserRestorationTarget}
+                    campaignName={campaignName}
+                    modalState={modalState}
+                    setModalState={setModalState}
+                    warBondBondModal={warBondBondModal}
+                    setWarBondBondModal={setWarBondBondModal}
+                    warBondMax={warBondMax}
+                    playerStats={playerStats}
+                />
 
             </div>
         );

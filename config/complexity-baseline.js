@@ -4,90 +4,51 @@
 // Complexity ratchet: per-directory thresholds equal each directory's current
 // worst metric (non-test code). New code must not exceed its directory baseline,
 // since npm run lint runs with --max-warnings 0.
+// NOTE: step mode — src/services/automation complexity temporarily dropped to 72.
+// Fix the reported violations, then run npm run lint:complexity-baseline to lock.
 export default [
   {
-    files: ['src/services/combat/**'],
+    files: ['src/components/initiative/**'],
     rules: {
-      'complexity': ['warn', 312],
+      'complexity': ['warn', 79],
       'max-depth': ['warn', 6],
-      'max-statements': ['warn', 238],
-      'max-params': ['warn', 18],
-    },
-  },
-  {
-    files: ['src/hooks/combat/**'],
-    rules: {
-      'complexity': ['warn', 286],
-      'max-depth': ['warn', 6],
-      'max-statements': ['warn', 228],
-      'max-params': ['warn', 15],
-    },
-  },
-  {
-    files: ['src/services/automation/**'],
-    rules: {
-      'complexity': ['warn', 285],
-      'max-depth': ['warn', 8],
-      'max-statements': ['warn', 329],
-      'max-params': ['warn', 10],
-    },
-  },
-  {
-    files: ['src/components/char-sheet/**'],
-    rules: {
-      'complexity': ['warn', 278],
-      'max-depth': ['warn', 7],
-      'max-statements': ['warn', 260],
-      'max-params': ['warn', 11],
+      'max-statements': ['warn', 72],
     },
   },
   {
     files: ['src/services/rules/**'],
     rules: {
-      'complexity': ['warn', 248],
-      'max-depth': ['warn', 8],
-      'max-statements': ['warn', 342],
+      'complexity': ['warn', 76],
+      'max-depth': ['warn', 6],
+      'max-statements': ['warn', 122],
       'max-params': ['warn', 19],
     },
   },
   {
-    files: ['src/components/initiative/**'],
+    files: ['src/services/combat/**'],
     rules: {
-      'complexity': ['warn', 187],
+      'complexity': ['warn', 73],
       'max-depth': ['warn', 6],
-      'max-statements': ['warn', 218],
+      'max-statements': ['warn', 103],
+      'max-params': ['warn', 18],
     },
   },
   {
-    files: ['src/components/encounter/**'],
+    files: ['src/components/char-sheet/**'],
     rules: {
-      'complexity': ['warn', 143],
-      'max-statements': ['warn', 116],
+      'complexity': ['warn', 72],
+      'max-depth': ['warn', 6],
+      'max-statements': ['warn', 98],
+      'max-params': ['warn', 11],
+    },
+  },
+  {
+    files: ['src/services/automation/**'],
+    rules: {
+      'complexity': ['warn', 72],
+      'max-depth': ['warn', 7],
+      'max-statements': ['warn', 127],
       'max-params': ['warn', 10],
-    },
-  },
-  {
-    files: ['src/components/log/**'],
-    rules: {
-      'complexity': ['warn', 140],
-    },
-  },
-  {
-    files: ['src/components/common/**'],
-    rules: {
-      'complexity': ['warn', 129],
-      'max-depth': ['warn', 5],
-      'max-statements': ['warn', 154],
-      'max-params': ['warn', 7],
-    },
-  },
-  {
-    files: ['src/services/maps/**'],
-    rules: {
-      'complexity': ['warn', 97],
-      'max-depth': ['warn', 5],
-      'max-statements': ['warn', 178],
-      'max-params': ['warn', 8],
     },
   },
   {
@@ -96,6 +57,37 @@ export default [
       'complexity': ['warn', 72],
       'max-depth': ['warn', 8],
       'max-statements': ['warn', 96],
+    },
+  },
+  {
+    files: ['src/hooks/combat/**'],
+    rules: {
+      'complexity': ['warn', 68],
+      'max-statements': ['warn', 96],
+      'max-params': ['warn', 15],
+    },
+  },
+  {
+    files: ['src/services/maps/**'],
+    rules: {
+      'complexity': ['warn', 46],
+      'max-depth': ['warn', 5],
+      'max-statements': ['warn', 116],
+      'max-params': ['warn', 8],
+    },
+  },
+  {
+    files: ['src/components/common/**'],
+    rules: {
+      'complexity': ['warn', 45],
+      'max-params': ['warn', 7],
+    },
+  },
+  {
+    files: ['src/components/encounter/**'],
+    rules: {
+      'complexity': ['warn', 40],
+      'max-params': ['warn', 10],
     },
   },
   {
@@ -134,6 +126,12 @@ export default [
     rules: {
       'complexity': ['warn', 33],
       'max-statements': ['warn', 61],
+    },
+  },
+  {
+    files: ['src/components/log/**'],
+    rules: {
+      'complexity': ['warn', 33],
     },
   },
   {

@@ -92,62 +92,671 @@ function TacticalMindAdjudicationPanel({ tacticalUsed, tacticalResult, tacticalD
     );
 }
 
+function headerIconClass(type, isSaveDamageType, isHealType) {
+    if (type === 'd20') return 'fa-dice-d20';
+    if (type === 'attack') return 'fa-crosshairs';
+    if (type === 'save' || isSaveDamageType) return 'fa-shield-halved';
+    if (type === 'initiative') return 'fa-gavel';
+    if (isHealType) return 'fa-heart';
+    return 'fa-bolt';
+}
+
+function RollHeader({ props, state }) {
+    if (props.type === 'damage_type_choice') return null;
+    return (
+        <div className="dice-roll-header">
+            <i className={`fa-solid ${headerIconClass(props.type, state.isSaveDamageType, state.isHealType)}`}></i>
+            {props.name}
+        </div>
+    );
+}
+
+function rollDiceSpan(props, state) {
+    const { luckyRerolled, luckyRerollValue } = props;
+    const { strokeResult, rerollResult, bardicInspirationResult, isD20, mode, safeRolls, finalRoll } = state;
+    if (strokeResult !== null) {
+        return <span className="dice-rolled">20 (Stroke of Luck)</span>;
+    }
+    if (luckyRerolled) {
+        return <span className="dice-rolled">{luckyRerollValue} (Lucky reroll)</span>;
+    }
+    if (rerollResult !== null) {
+        return <span className="dice-rolled">{rerollResult.roll} (reroll)</span>;
+    }
+    if (bardicInspirationResult !== null) {
+        return <span className="dice-rolled">{bardicInspirationResult.d20Roll}</span>;
+    }
+    if (isD20 && mode !== 'normal' && safeRolls.length === 2) {
+        return <span className="dice-rolled">{safeRolls[0]}, {safeRolls[1]} → {finalRoll}</span>;
+    }
+    const critDiceRolls = state.isCritDamage && props.rolls ? props.rolls.map((r, i) => {
+        const label = props.critLabels?.[i] || null;
+        return label ? `${r}*2 [${label}]` : `${r}*2`;
+    }) : null;
+    return (
+        <span className="dice-rolled">
+            {isD20
+                ? (mode === 'normal' ? safeRolls[0] || 0 : finalRoll)
+                : (critDiceRolls ? critDiceRolls.join(', ') : safeRolls.join(', '))
+            }
+        </span>
+    );
+}
+
+function rollModifierText(props, state) {
+    const { bonus = 0, bonusDetail, modifier = 0 } = props;
+    const { strokeResult, rerollResult, bardicInspirationResult, strReplaceApplied, finalDisplayTotal, isCritDamage } = state;
+    if (strokeResult !== null) return ` +${20 + bonus + modifier - 20}`;
+    if (rerollResult !== null) return ` +${rerollResult.total - rerollResult.roll}`;
+    if (bardicInspirationResult !== null) return ` +${bardicInspirationResult.total - bardicInspirationResult.d20Roll}`;
+    if (strReplaceApplied) return ` → ${finalDisplayTotal} (Indomitable Might)`;
+    if (isCritDamage) return ` +${modifier}${bonusDetail && bonus > 0 ? ' ' + bonusDetail : ''}`;
+    if ((bonus + modifier) >= 0 && (bonus + modifier) !== 0) return ` +${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}`;
+    if ((bonus + modifier) < 0) return ` ${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}`;
+    return '';
+}
+
+function RollSummary({ props, state }) {
+    const { type, rollType, formula = '', finalDamage } = props;
+    if (type === 'damage_type_choice') return null;
+    if ((state.isSaveDamageType || rollType === 'save-damage') && finalDamage !== undefined && finalDamage <= 0) return null;
+    return (
+        <>
+            <div className="dice-roll-total">{state.finalTotal}</div>
+            <div className="dice-roll-breakdown">
+                {formula ? `${formula}: ` : type === 'd20' ? 'd20 ' : ''}
+                {rollDiceSpan(props, state)}
+                {rollModifierText(props, state)}
+            </div>
+        </>
+    );
+}
+
+function FloorNotices({ props, state }) {
+    const { reliableTalent, rollType, d20Floor10, starryDragonFloor } = props;
+    const { safeRolls } = state;
+    return (
+        <>
+            {reliableTalent && (rollType === 'check' || rollType === 'skill') && safeRolls[0] <= 9 && (
+              <div className="dice-roll-reliable-talent">
+                <i className="fa-solid fa-star"></i> Reliable Talent: d20 {safeRolls[0]} → 10
+              </div>
+            )}
+            {d20Floor10 && safeRolls[0] <= 9 && (
+              <div className="dice-roll-reliable-talent">
+                <i className="fa-solid fa-clock"></i> Trance of Order: d20 {safeRolls[0]} → 10
+              </div>
+            )}
+            {starryDragonFloor && safeRolls[0] <= 9 && (
+              <div className="dice-roll-reliable-talent">
+                <i className="fa-solid fa-star"></i> Starry Form (Dragon): d20 {safeRolls[0]} → 10
+              </div>
+            )}
+        </>
+    );
+}
+
+function RollAdjustmentNotices({ props, state }) {
+    const { rayOfEnfeebleReduction, rayOfEnfeebleRoll, resistanceReduction, resistanceRoll,
+        healingRerollOriginalRolls, healingRerollDisplayRolls, elementalAdeptBonus, rolls,
+        gwfApplied, gwfOriginalRolls, gwfDisplayRolls, tavernBrawlerRerolls } = props;
+    const { safeRolls } = state;
+    return (
+        <>
+            {gwfApplied && gwfOriginalRolls && (
+              <div className="dice-roll-gwf">
+                <i className="fa-solid fa-shield-halved"></i> Great Weapon Fighting: {gwfOriginalRolls.join(', ')} → {(gwfDisplayRolls || safeRolls).join(', ')}
+              </div>
+            )}
+            {rayOfEnfeebleReduction > 0 && (
+              <div className="dice-roll-ray-enfeeblement">
+                <i className="fa-solid fa-hand-fist"></i> -1d8 [Enfeeblement]: -{rayOfEnfeebleRoll}
+              </div>
+            )}
+            {resistanceReduction > 0 && (
+              <div className="dice-roll-resistance">
+                <i className="fa-solid fa-shield-halved"></i> -1d4 [Resistance]: -{resistanceRoll}
+              </div>
+            )}
+            {healingRerollOriginalRolls && (
+              <div className="dice-roll-healing-reroll">
+                <i className="fa-solid fa-heart"></i> Healing Rerolls: {healingRerollOriginalRolls.join(', ')} → {(healingRerollDisplayRolls || safeRolls).join(', ')}
+              </div>
+            )}
+            {elementalAdeptBonus > 0 && rolls && Array.isArray(rolls) && (
+              <div className="dice-roll-elemental-adept">
+                <i className="fa-solid fa-fire"></i> Elemental Adept: {rolls.filter(r => r === 1).length}× 1 → 2 (+{elementalAdeptBonus})
+              </div>
+            )}
+            {tavernBrawlerRerolls && tavernBrawlerRerolls.length > 0 && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-fist-raised"></i> Tavern Brawler: {tavernBrawlerRerolls.map(r => r.original).join(', ')} → {tavernBrawlerRerolls.map(r => r.rerolled).join(', ')}
+              </div>
+            )}
+        </>
+    );
+}
+
+function RollModeToggles({ props, state }) {
+    const { forcedMode, advantageReason, rangeReason } = props;
+    const { isD20, mode, setMode } = state;
+    if (!isD20) return null;
+    return (
+        <div className="dice-roll-toggles">
+            <label className={`badge-toggle ${mode === 'advantage' ? 'active' : ''}`}>
+                <input
+                   type="checkbox"
+                   checked={mode === 'advantage'}
+                   onChange={() => setMode(mode === 'advantage' ? 'normal' : 'advantage')}
+                    style={{ display: 'none' }}
+                />
+                Advantage
+            </label>
+            <label className={`badge-toggle ${mode === 'disadvantage' ? 'active' : ''}`}>
+                <input
+                   type="checkbox"
+                   checked={mode === 'disadvantage'}
+                   onChange={() => setMode(mode === 'disadvantage' ? 'normal' : 'disadvantage')}
+                    style={{ display: 'none' }}
+                />
+                Disadvantage
+            </label>
+            {forcedMode && forcedMode !== 'normal' && (
+               <span className="badge-toggle forced-mode-badge" title={advantageReason || rangeReason || "Automatically set by active conditions"}>
+                 <i className="fa-solid fa-asterisk"></i> {forcedMode === 'advantage' ? 'Adv' : 'Disadv'} ({advantageReason || rangeReason || 'conditions'})
+               </span>
+             )}
+        </div>
+    );
+}
+
+function CritNotices({ props, state }) {
+    const { isCrit, isAutoCrit } = props;
+    const { isCritDamage, displayRoll, showFumble } = state;
+    return (
+        <>
+            {(isCritDamage || isCrit || isAutoCrit) && <div className="dice-roll-crit">Critical Hit! — damage dice doubled</div>}
+            {(state.isD20 && !isCrit && !isAutoCrit && displayRoll === 20) && <div className="dice-roll-crit">Natural 20!</div>}
+            {showFumble && <div className="dice-roll-crit dice-roll-crit-miss">Critical Miss!</div>}
+        </>
+    );
+}
+
+function HitMissLine({ props, state, acDisplay, hitMissTotal }) {
+    const { targetName, isAutoMiss, coverReason, rangeReason, rollType,
+        defensiveDuelistBonus, baitAndSwitchBonus } = props;
+    const { computedHit, isSaveDamageType } = state;
+    if (!targetName || computedHit === undefined || isSaveDamageType || rollType !== 'attack') return null;
+    const reactionBonus = (defensiveDuelistBonus > 0 || (baitAndSwitchBonus || 0) > 0)
+        ? ` + ${Math.max(0, defensiveDuelistBonus || 0) + Math.max(0, baitAndSwitchBonus || 0)} reaction`
+        : '';
+    const outcome = isAutoMiss
+        ? `✗ AUTO-MISS (${coverReason || rangeReason || 'out of range'})`
+        : `${computedHit ? '✓ HIT' : '✗ MISS'} (${hitMissTotal} vs AC ${acDisplay}${reactionBonus})`;
+    return (
+        <div className={`dice-roll-hit-miss ${computedHit ? 'hit' : 'miss'}`}>
+            {outcome}
+        </div>
+    );
+}
+
+function AttackOutcomeNotices({ props, state, acDisplay }) {
+    const { unerringStrikeApplied, homingStrikesUsed, homingStrikesBonus, coverAcBonus, coverLevel } = props;
+    if (!unerringStrikeApplied && !(state.homingStrikesApplied && homingStrikesUsed !== false) && !(coverAcBonus > 0)) return null;
+    return (
+        <>
+            {unerringStrikeApplied && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-shield-halved"></i> Unerring Strike: missed weapon attack turned into a hit
+              </div>
+            )}
+            {state.homingStrikesApplied && homingStrikesUsed !== false && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-brain"></i> Soul Blades (Homing Strikes): psionic die +{Number(homingStrikesBonus)} → {state.finalTotal} vs AC {acDisplay} — miss converted into a hit, 1 Psionic Energy expended
+              </div>
+            )}
+            {coverAcBonus > 0 && (
+              <div className="dice-roll-cover">
+                {coverLevel === 'threeQuarter' ? '3/4' : '1/2'} Cover (+{coverAcBonus} AC)
+              </div>
+            )}
+        </>
+    );
+}
+
+function SaveResultLine({ success, total, dc, roll, bonus, mode }) {
+    return (
+        <div className={`dice-roll-save-result ${success ? 'save-success' : 'save-failure'}`}>
+            {success ? '✓ SAVE SUCCESS' : '✗ SAVE FAILURE'} ({total} vs DC {dc})
+            <span className="dice-roll-save-detail"> (d20 {roll} + {bonus})</span>
+            {mode === 'disadvantage' && <span className="dice-roll-save-detail"> [Disadvantage]</span>}
+            {mode === 'advantage' && <span className="dice-roll-save-detail"> [Advantage]</span>}
+        </div>
+    );
+}
+
+function SaveRollNotices({ props, state }) {
+    const { waitingForPlayerSave, saveType, saveDc, onQuickRoll, saveResult, rollType,
+        dc, success, dcType, dcSuccess } = props;
+    const { finalTotal, safeRolls, mode } = state;
+    const saveAbilityLabel = saveType ? saveType.toUpperCase() : '';
+    return (
+        <>
+            {waitingForPlayerSave && (
+              <div className="dice-roll-save-waiting">
+                <i className="fa-solid fa-spinner fa-spin"></i> Waiting for <strong>{props.targetName}</strong> to roll {saveAbilityLabel} save (DC {saveDc})...
+                {onQuickRoll && (
+                  <button className="dice-roll-quick-roll" onClick={() => onQuickRoll()} type="button">
+                    <i className="fa-solid fa-dice-d20"></i> Quick Roll (Local)
+                  </button>
+                )}
+              </div>
+            )}
+            {saveResult !== undefined && saveResult !== null && (
+              <SaveResultLine success={saveResult.success} total={saveResult.total} dc={saveDc} roll={saveResult.roll} bonus={saveResult.bonus} mode={mode} />
+            )}
+            {rollType === 'save' && saveDc == null && (
+              <div className="dice-roll-save-info">
+                <i className="fa-solid fa-triangle-exclamation"></i> DC Unknown — no success or failure
+              </div>
+            )}
+            {dc !== undefined && success === undefined && !waitingForPlayerSave && !state.isSaveDamageType && (
+              <div className="dice-roll-save-info">
+                Save DC {dc} {dcType}: {dcSuccess === 'half' ? 'half damage on save' : 'no damage on save'}
+              </div>
+            )}
+            {rollType === 'condition-save' && success !== undefined && (
+              <SaveResultLine success={success} total={finalTotal} dc={dc} roll={safeRolls[0] || 0} bonus={props.bonus} mode={mode} />
+            )}
+        </>
+    );
+}
+
+function HitOutcomeDetails({ props, state }) {
+    const { resistanceNotice, hunterLoreNotice, finalDamage, damageApplied, damageReduced,
+        targetName, targetCurrentHp, interceptedFeature } = props;
+    return (
+        <>
+            {resistanceNotice && (
+              <div className="dice-roll-resistance">{resistanceNotice}</div>
+            )}
+            {hunterLoreNotice && (
+              <div className="dice-roll-hunter-lore">
+                <i className="fa-solid fa-eye"></i> {hunterLoreNotice.split('\n').map((line, i) => (
+                  <span key={i}>
+                    {i > 0 && <br />}
+                    {line}
+                  </span>
+                ))}
+              </div>
+            )}
+            {finalDamage !== undefined && damageApplied && (
+              <div className="dice-roll-damage-applied">
+                {damageReduced ? (
+                  <span><strong>{finalDamage}</strong> damage applied to <strong>{targetName}</strong> (reduced from {state.originalTotal}){targetCurrentHp !== undefined ? ` — HP: ${targetCurrentHp + finalDamage} → ${targetCurrentHp}` : ''}</span>
+                ) : (
+                  <span><strong>{finalDamage}</strong> damage applied to <strong>{targetName}</strong>{targetCurrentHp !== undefined ? ` — HP: ${targetCurrentHp + finalDamage} → ${targetCurrentHp}` : ''}</span>
+                )}
+              </div>
+            )}
+            {state.isDamageType && interceptedFeature && (
+              <div className="dice-roll-intercepted">
+                <i className="fa-solid fa-shield-halved"></i> {interceptedFeature}: damage intercepted, {targetName} survives!
+              </div>
+            )}
+        </>
+    );
+}
+
+function HealOutcomeNotice({ props, state }) {
+    const { finalHeal, healReduced, bonusHeal, bonusHealDetail, targetName, targetCurrentHp } = props;
+    if (!state.isHealType) return null;
+    const originalTotal = state.originalTotal;
+    return (
+        <div className="dice-roll-heal-applied">
+            {finalHeal <= 0 ? (
+              <span><strong>{targetName}</strong> is already at full HP</span>
+            ) : healReduced ? (
+              <span><strong>{finalHeal}</strong> healing applied to <strong>{targetName}</strong> (reduced from {originalTotal}){targetCurrentHp !== undefined ? ` — HP: ${targetCurrentHp + finalHeal} → ${targetCurrentHp}` : ''}</span>
+            ) : (
+              <span><strong>{finalHeal}</strong> healing applied to <strong>{targetName}</strong>{targetCurrentHp !== undefined ? ` — HP: ${targetCurrentHp + finalHeal} → ${targetCurrentHp}` : ''}</span>
+            )}
+            {bonusHeal > 0 && (
+              <div className="dice-roll-heal-bonus">
+                <i className="fa-solid fa-sparkles"></i> Bonus: +{bonusHeal} ({bonusHealDetail})
+              </div>
+            )}
+        </div>
+    );
+}
+
+function FeatureTriggerButtons({ props, state, handlers }) {
+    const { autoReroll, autoRerollBonus, autoRerollCondition, strokeOfLuck, autoRerollForAttack,
+        hit, isAutoMiss, bardicInspiration, bardicInspirationDie, rollType, luckyAdvantage,
+        luckyDisadvantage, tacticalMind, tacticalMindBonus, darkOnesLuck, availableSuperiorityManeuvers } = props;
+    const { rerollUsed, strokeUsed, boonUsed, isD20, d20TestFailed, displayRoll, tacticalUsed,
+        darkOnesLuckUsed, superiorityUsed } = state;
+    return (
+        <>
+            {autoReroll && !rerollUsed && (isD20 || props.type === 'save-damage') && autoRerollCondition !== 'roll_equals_1' && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={handlers.handleReroll} type="button">
+                  <i className="fa-solid fa-rotate"></i> Reroll{autoRerollBonus ? ` (+${autoRerollBonus})` : ''}
+                </button>
+              </div>
+            )}
+            {strokeOfLuck && !strokeUsed && isD20 && d20TestFailed && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={handlers.handleStrokeOfLuck} type="button">
+                  <i className="fa-solid fa-star"></i> Stroke of Luck
+                </button>
+              </div>
+            )}
+            {autoRerollForAttack && !boonUsed && isD20 && !hit && !isAutoMiss && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={handlers.handleBoonOfCombatProwess} type="button">
+                  <i className="fa-solid fa-shield-halved"></i> Boon of Combat Prowess
+                </button>
+              </div>
+            )}
+            {bardicInspiration && !state.bardicInspirationUsed && isD20 && (rollType === 'check' || rollType === 'skill' || rollType === 'save') && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={handlers.handleBardicInspiration} type="button">
+                  <i className="fa-solid fa-music"></i> Bardic Inspiration (d{bardicInspirationDie})
+                </button>
+              </div>
+            )}
+            {luckyAdvantage && isD20 && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={handlers.handleLuckyAdvantage} type="button">
+                  <i className="fa-solid fa-eye"></i> Lucky: Advantage (1 LP)
+                </button>
+              </div>
+            )}
+            {luckyDisadvantage && isD20 && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={handlers.handleLuckyDisadvantage} type="button">
+                  <i className="fa-solid fa-eye-slash"></i> Lucky: Disadvantage (1 LP)
+                </button>
+              </div>
+            )}
+            {tacticalMind && !tacticalUsed && isD20 && (rollType === 'check' || rollType === 'skill') && d20TestFailed && displayRoll !== 20 && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={handlers.handleTacticalMind} type="button">
+                  <i className="fa-solid fa-hand"></i> Tactical Mind{tacticalMindBonus ? ` (+${tacticalMindBonus})` : ''}
+                </button>
+              </div>
+            )}
+            {darkOnesLuck && !darkOnesLuckUsed && isD20 && (rollType === 'check' || rollType === 'skill' || rollType === 'save') && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={handlers.handleDarkOnesLuck} type="button">
+                  <i className="fa-solid fa-fire"></i> Dark One's Own Luck (1d10)
+                </button>
+              </div>
+            )}
+            {availableSuperiorityManeuvers && availableSuperiorityManeuvers.length > 0 && !superiorityUsed && (
+              <div className="dice-roll-reroll">
+                {availableSuperiorityManeuvers.map(m => (
+                  <button key={m.name} className="dice-roll-reroll-btn" onClick={() => handlers.handleSuperiorityManeuver(m)} type="button">
+                    <i className="fa-solid fa-bolt"></i> {m.name} (Superiority Die)
+                  </button>
+                ))}
+              </div>
+            )}
+        </>
+    );
+}
+
+function DamageFeatureTriggers({ props, state, handlers }) {
+    const { bardicInspirationDefense, bardicInspirationDefenseDieSize, bardicInspirationOffense,
+        bardicInspirationOffenseDieSize, empoweredSpell, piercerPuncture, savageAttacker } = props;
+    return (
+        <>
+            {bardicInspirationDefense && !state.bardicInspirationDefenseUsed && state.computedHit && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={handlers.handleBardicInspirationDefense} type="button">
+                  <i className="fa-solid fa-music"></i> Bardic Inspiration - Defense (d{bardicInspirationDefenseDieSize})
+                </button>
+              </div>
+            )}
+            {bardicInspirationOffense && !state.bardicInspirationOffenseUsed && state.isDamageType && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={() => handlers.handleBardicInspirationOffense()} type="button">
+                  <i className="fa-solid fa-music"></i> Bardic Inspiration - Offense (d{bardicInspirationOffenseDieSize})
+                </button>
+              </div>
+            )}
+            {empoweredSpell && !state.empoweredSpellUsed && state.isDamageType && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={handlers.handleEmpoweredSpell} type="button">
+                  <i className="fa-solid fa-wand-magic-sparkles"></i> Empowered Spell (1 SP)
+                </button>
+              </div>
+            )}
+            {piercerPuncture && !state.punctureUsed && state.isDamageType && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={handlers.handlePuncture} type="button">
+                  <i className="fa-solid fa-bolt"></i> Piercer - Puncture
+                </button>
+              </div>
+            )}
+            {savageAttacker && !state.savageAttackerUsed && state.isDamageType && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={handlers.handleSavageAttacker} type="button">
+                  <i className="fa-solid fa-arrows-spin"></i> Savage Attacker
+                </button>
+              </div>
+            )}
+        </>
+    );
+}
+
+function SavageAttackerResult({ savageAttackerResult, onKeep, onSavageAttackerChoice }) {
+    return (
+        <div className="dice-roll-reroll-result">
+            <i className="fa-solid fa-arrows-spin"></i> Savage Attacker: {savageAttackerResult.original} → {savageAttackerResult.rerolled}
+            {savageAttackerResult.awaitingChoice ? ` — choose which total to keep (${savageAttackerResult.originalTotal} or ${savageAttackerResult.newTotal})` : savageAttackerResult.kept === 'reroll' ? ` — Reroll kept (+${savageAttackerResult.newTotal - savageAttackerResult.originalTotal})` : ' — Original kept'}
+            {savageAttackerResult.awaitingChoice && onSavageAttackerChoice && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={() => onKeep('original')} type="button">
+                  <i className="fa-solid fa-check"></i> Keep First ({savageAttackerResult.originalTotal})
+                </button>
+                <button className="dice-roll-reroll-btn" onClick={() => onKeep('reroll')} type="button">
+                  <i className="fa-solid fa-dice"></i> Keep Reroll ({savageAttackerResult.newTotal})
+                </button>
+              </div>
+            )}
+        </div>
+    );
+}
+
+function FeatureResultSummary({ props, state, handlers }) {
+    const { rerollUsed, rerollResult, strokeUsed, strokeResult, boonUsed,
+        bardicInspirationUsed, bardicInspirationResult, bardicInspirationDefenseUsed,
+        bardicInspirationDefenseResult, bardicInspirationOffenseUsed, bardicInspirationOffenseResult,
+        empoweredSpellUsed, empoweredSpellResult, punctureUsed, punctureResult,
+        savageAttackerUsed, savageAttackerResult, darkOnesLuckUsed, darkOnesLuckResult,
+        superiorityUsed, superiorityResult } = state;
+    const autoRerollForAttack = props.autoRerollForAttack;
+    return (
+        <>
+            {rerollUsed && rerollResult !== null && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-rotate"></i> Rerolled: {rerollResult.roll} + {rerollResult.total - rerollResult.roll} = <strong>{rerollResult.total}</strong>
+              </div>
+            )}
+            {strokeUsed && strokeResult !== null && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-star"></i> Stroke of Luck: d20 → 20 + {strokeResult.total - 20} = <strong>{strokeResult.total}</strong>
+              </div>
+            )}
+            {boonUsed && autoRerollForAttack && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-shield-halved"></i> Boon of Combat Prowess: Miss converted to Hit
+              </div>
+            )}
+            {bardicInspirationUsed && bardicInspirationResult !== null && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-music"></i> Bardic Inspiration: 1d{bardicInspirationResult.dieSize} → {bardicInspirationResult.dieValue} + <strong>{bardicInspirationResult.total}</strong>
+              </div>
+            )}
+            {bardicInspirationDefenseUsed && bardicInspirationDefenseResult !== null && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-music"></i> Bardic Inspiration - Defense: 1d{bardicInspirationDefenseResult.dieSize} → {bardicInspirationDefenseResult.dieValue} → AC {bardicInspirationDefenseResult.newAc} ({bardicInspirationDefenseResult.willMiss ? 'Attack misses!' : 'Attack still hits'})
+              </div>
+            )}
+            {bardicInspirationOffenseUsed && bardicInspirationOffenseResult !== null && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-music"></i> Bardic Inspiration - Offense: 1d{bardicInspirationOffenseResult.dieSize} → +{bardicInspirationOffenseResult.dieValue} → <strong>{bardicInspirationOffenseResult.bonusTotal}</strong>
+              </div>
+            )}
+            {empoweredSpellUsed && empoweredSpellResult && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-wand-magic-sparkles"></i> Empowered Spell: rerolled {empoweredSpellResult.rerollCount} dice ({empoweredSpellResult.originalDice?.join(', ')} → {empoweredSpellResult.newDice?.join(', ')}) → <strong>{empoweredSpellResult.newTotal}</strong>{empoweredSpellResult.damageDifference > 0 ? ` (+${empoweredSpellResult.damageDifference})` : empoweredSpellResult.damageDifference < 0 ? ` (${empoweredSpellResult.damageDifference})` : ''}
+                {empoweredSpellResult.damageDifference === 0 && !empoweredSpellResult.message ? '' : empoweredSpellResult.message ? ` — ${empoweredSpellResult.message}` : ''}
+              </div>
+            )}
+            {punctureUsed && punctureResult && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-bolt"></i> Piercer - Puncture: {punctureResult.originalDice?.join(', ')} → {punctureResult.newDice?.join(', ')}
+              </div>
+            )}
+            {savageAttackerUsed && savageAttackerResult && (
+              <SavageAttackerResult savageAttackerResult={savageAttackerResult} onKeep={handlers.handleSavageAttackerKeep} onSavageAttackerChoice={props.onSavageAttackerChoice} />
+            )}
+            <TacticalMindAdjudicationPanel
+                tacticalUsed={state.tacticalUsed}
+                tacticalResult={state.tacticalResult}
+                tacticalDeclared={state.tacticalDeclared}
+                onDeclare={handlers.handleTacticalDeclare}
+            />
+            {darkOnesLuckUsed && darkOnesLuckResult !== null && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-fire"></i> Dark One's Own Luck: +{darkOnesLuckResult.dieValue} (d10) → <strong>{darkOnesLuckResult.total}</strong>
+              </div>
+            )}
+            {superiorityUsed && superiorityResult !== null && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-bolt"></i> {superiorityResult.maneuverName}: d12 {superiorityResult.dieValue} → <strong>{superiorityResult.total}</strong> (+{superiorityResult.dieValue})
+              </div>
+            )}
+        </>
+    );
+}
+
+function SecondaryDamageSection({ props }) {
+    const { secondaryFormula, secondaryRolls, secondaryModifier, secondaryTotal, secondarySaveResult,
+        saveDc, secondaryFinalDamage, finalDamage, damageType, secondaryDamageType,
+        damageApplied, targetName, targetCurrentHp } = props;
+    if (!secondaryFormula) return null;
+    return (
+        <div className="dice-roll-secondary-damage">
+            <div className="dice-roll-secondary-label">Secondary Damage:</div>
+            <div className="dice-roll-secondary-formula">
+              {secondaryFormula}: {secondaryRolls ? secondaryRolls.join(', ') : ''}{secondaryModifier !== undefined && secondaryModifier !== 0 ? ` +${secondaryModifier}` : ''} = {secondaryTotal}
+            </div>
+            {secondarySaveResult && (
+              <div className={`dice-roll-secondary-save-result ${secondarySaveResult.success ? 'save-success' : 'save-failure'}`}>
+                {secondarySaveResult.success ? '✓ SAVE SUCCESS' : '✗ SAVE FAILURE'} ({secondarySaveResult.total} vs DC {saveDc})
+              </div>
+            )}
+            {secondaryFinalDamage !== undefined && finalDamage !== undefined && (
+              <div className="dice-roll-secondary-total">
+                {finalDamage} {damageType || ''} damage + {secondaryFinalDamage} {secondaryDamageType || ''} damage = <strong>{finalDamage + secondaryFinalDamage} total damage</strong>
+              </div>
+            )}
+            {finalDamage !== undefined && damageApplied && secondaryFinalDamage !== undefined && (
+              <div className="dice-roll-damage-applied">
+                <span><strong>{finalDamage + secondaryFinalDamage}</strong> damage applied to <strong>{targetName}</strong>{targetCurrentHp !== undefined ? ` — HP: ${targetCurrentHp + finalDamage + secondaryFinalDamage} → ${targetCurrentHp}` : ''}</span>
+              </div>
+            )}
+        </div>
+    );
+}
+
+function DamageTypeChoiceSection({ props }) {
+    const { name, baseFormula, baseRolls, baseTotal, bonusFormula, bonusRolls, bonusTotal, types } = props;
+    if (props.type !== 'damage_type_choice') return null;
+    return (
+        <div className="dice-roll-damage-type-choice">
+            <div className="dice-roll-header">
+                <i className="fa-solid fa-bolt"></i> {name}
+            </div>
+            <p>Choose the damage type for this hit:</p>
+            <div style={{ textAlign: 'center', marginTop: '16px' }}>
+                <div className="dice-roll-breakdown">
+                    <strong>Weapon Damage:</strong> {baseFormula}: {baseRolls?.join(', ')} = {baseTotal}
+                </div>
+                <div className="dice-roll-breakdown">
+                    <strong>Divine Strike:</strong> {bonusFormula}: {bonusRolls?.join(', ')} = {bonusTotal}
+                </div>
+                <div style={{ marginTop: '12px' }}>
+                    <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>Choose bonus damage type:</div>
+                    {types?.map((typeChoice) => (
+                        <button
+                            key={typeChoice}
+                            className="sp-roll-btn"
+                            style={{ margin: '0 6px 8px 6px' }}
+                            onClick={() => {
+                                window.dispatchEvent(new CustomEvent('damage-type-choice', { detail: { chosenType: typeChoice } }));
+                            }}
+                        >
+                            {typeChoice}
+                        </button>
+                    ))}
+                </div>
+            </div>
+            <div className="sp-actions">
+                <button className="sp-dismiss-btn" onClick={() => {
+                    window.dispatchEvent(new CustomEvent('damage-type-skip'));
+                }}>Skip</button>
+            </div>
+        </div>
+    );
+}
+
+function HolyAuraSaveNotice({ props }) {
+    const holyAuraSaveResult = props.holyAuraSaveResult;
+    if (!holyAuraSaveResult) return null;
+    return (
+        <div className="dice-roll-holy-aura-save">
+            <i className="fa-solid fa-shield-halved"></i>
+            <strong>— Holy Aura Save:</strong>
+            <span className="dice-roll-save-detail">
+              d20 {holyAuraSaveResult.roll} + {holyAuraSaveResult.modifier} = {holyAuraSaveResult.total} vs DC {holyAuraSaveResult.dc}
+            </span>
+            <span className={`dice-roll-save-result ${holyAuraSaveResult.success ? 'save-success' : 'save-failure'}`}>
+              {holyAuraSaveResult.success ? 'SAVE SUCCESSFUL' : 'SAVE FAILED'}
+            </span>
+            {!holyAuraSaveResult.success && <span className="dice-roll-save-effect">Fiend/Undead blinded!</span>}
+        </div>
+    );
+}
+
 function DiceRollResult(props) {
     const {
-        name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0,
-        targetName, targetAc, hit, isAutoMiss, rangeReason, coverReason, coverLevel, coverAcBonus,
-        defensiveDuelistBonus, baitAndSwitchBonus, shieldAcBonus, shieldOfFaithAcBonus, wardingBondAcBonus, slowAcPenalty, unerringStrikeApplied, interceptedFeature,
-        isCrit, isAutoCrit,
-        dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, holyAuraSaveResult,
-        finalDamage, damageApplied, targetCurrentHp, damageReduced, damageType, autoDamage,
-        secondaryFormula, secondaryRolls, secondaryTotal, secondaryModifier, secondaryDamageType,
-        secondaryFinalDamage, secondarySaveResult,
-        finalHeal, healReduced, bonusHeal, bonusHealDetail, types,
-        baseFormula, baseTotal, baseRolls, bonusFormula, bonusTotal, bonusRolls,
-        rayOfEnfeebleReduction, rayOfEnfeebleRoll, resistanceReduction, resistanceRoll,
-        elementalAdeptBonus, isPotentCantrip,
-        reliableTalent, tacticalMind, tacticalMindBonus, darkOnesLuck, strokeOfLuck,
-        luckyAdvantage, luckyDisadvantage,
-        bardicInspiration, bardicInspirationDie, bardicInspirationDefense, bardicInspirationDefenseDieSize,
-        bardicInspirationOffense, bardicInspirationOffenseDieSize,
-        availableSuperiorityManeuvers, psiBolsteredKnack, psiBolsteredKnackDieSize,
-        empoweredSpell, savageAttacker, piercerPuncture,
-        autoReroll, autoRerollBonus, autoRerollCondition, autoRerollForAttack,
-        tavernBrawlerRerolls, d20Floor10, starryDragonFloor,
+        bonus = 0, modifier = 0,
+        targetAc,
+        shieldAcBonus, shieldOfFaithAcBonus, wardingBondAcBonus, slowAcPenalty,
+        success,
+        autoDamage,
         luckyRerolled, luckyRerollValue,
-        homingStrikesUsed, homingStrikesBonus,
-        healingRerollOriginalRolls, healingRerollDisplayRolls,
-        gwfApplied, gwfOriginalRolls, gwfDisplayRolls,
-        critLabels,
-        onQuickRoll, onStrokeOfLuck, onLuckyAdvantage, onLuckyDisadvantage,
+        isPotentCantrip,
+        psiBolsteredKnack, psiBolsteredKnackDieSize,
+        onStrokeOfLuck, onLuckyAdvantage, onLuckyDisadvantage,
         onPsiBolsteredKnack,
-        onSavageAttackerChoice,
         onDone,
-        resistanceNotice, hunterLoreNotice, advantageReason, forcedMode,
     } = props;
 
     const state = useDiceRollState(props);
     const handlers = createDiceRollHandlers(props, state);
     const {
-        mode, setMode,
-        rerollUsed, rerollResult,
-        tacticalUsed, tacticalResult, tacticalDeclared,
-        strokeUsed, strokeResult, setStrokeResult, setStrokeUsed,
-        bardicInspirationUsed, bardicInspirationResult,
-        bardicInspirationDefenseUsed, bardicInspirationDefenseResult,
-        bardicInspirationOffenseUsed, bardicInspirationOffenseResult,
-        superiorityUsed, superiorityResult,
+        setMode,
+        strokeResult, setStrokeResult, setStrokeUsed,
+        setBoonUsed,
         psiKnackClicked, psiKnackResult, psiKnackConsumed, setPsiKnackResult, setPsiKnackClicked, setPsiKnackConsumed,
-        empoweredSpellUsed, empoweredSpellResult,
-        darkOnesLuckUsed, darkOnesLuckResult,
-        boonUsed, setBoonUsed,
-        punctureUsed, punctureResult,
-        savageAttackerUsed, savageAttackerResult,
-        isD20, isDamageType, isHealType, isCritDamage, isSaveDamageType,
-        safeRolls, finalRoll, originalTotal, displayRoll, displayTotal,
-        strReplaceApplied, finalDisplayTotal,
-        finalTotal, showFumble,
-        computedHit, homingStrikesApplied, effectiveAc, d20TestFailed,
+        effectiveAc,
+        finalTotal, displayTotal, homingStrikesApplied, rerollResult,
     } = state;
 
     const hitMissTotal = homingStrikesApplied ? finalTotal : displayTotal;
@@ -158,23 +767,10 @@ function DiceRollResult(props) {
     if (slowAcPenalty > 0) acBuffLabels.push(`−${slowAcPenalty} Slow`);
     const acDisplay = `${effectiveAc ?? targetAc ?? '—'}${acBuffLabels.length ? ` (${acBuffLabels.join(', ')})` : ''}`;
 
-    const {
-        handleReroll, handleTacticalMind, handleTacticalDeclare, handleDarkOnesLuck,
-        handleBardicInspiration, handleBardicInspirationDefense, handleBardicInspirationOffense,
-        handleEmpoweredSpell, handlePuncture, handleSavageAttacker, handleSavageAttackerKeep, handleSuperiorityManeuver,
-    } = handlers;
-
-    const critDiceRolls = isCritDamage && rolls ? rolls.map((r, i) => {
-        const label = critLabels?.[i] || null;
-        return label ? `${r}*2 [${label}]` : `${r}*2`;
-    }) : null;
-    const displayFormula = formula;
-    const saveAbilityLabel = saveType ? saveType.toUpperCase() : '';
-
     const handlePsiKnackClick = () => {
         const dieSize = psiBolsteredKnackDieSize || 6;
         const dieValue = Math.floor(Math.random() * dieSize) + 1;
-        const currentTotal = strokeResult !== null ? 20 + bonus + modifier : (rerollResult !== null ? rerollResult.total : (finalRoll + bonus + modifier));
+        const currentTotal = strokeResult !== null ? 20 + bonus + modifier : (rerollResult !== null ? rerollResult.total : (state.finalRoll + bonus + modifier));
         setPsiKnackResult({ dieValue, dieSize, newTotal: currentTotal + dieValue });
         setPsiKnackClicked(true);
     };
@@ -189,13 +785,13 @@ function DiceRollResult(props) {
         if (onPsiBolsteredKnack) onPsiBolsteredKnack({ dieValue: psiKnackResult.dieValue, dieSize: psiKnackResult.dieSize, success: false });
     };
 
-    const handleStrokeOfLuck = () => {
+    const handleStrokeOfLuckClick = () => {
         setStrokeResult({ roll: 20, total: 20 + bonus + modifier });
         setStrokeUsed(true);
         if (onStrokeOfLuck) onStrokeOfLuck('strokeOfLuck');
     };
 
-    const handleBoonOfCombatProwess = () => {
+    const handleBoonOfCombatProwessClick = () => {
         setBoonUsed(true);
         if (onStrokeOfLuck) onStrokeOfLuck('boonOfCombatProwess');
     };
@@ -210,261 +806,33 @@ function DiceRollResult(props) {
         if (onLuckyDisadvantage) onLuckyDisadvantage();
     };
 
+    const triggerHandlers = {
+        ...handlers,
+        handleStrokeOfLuck: handleStrokeOfLuckClick,
+        handleBoonOfCombatProwess: handleBoonOfCombatProwessClick,
+        handleLuckyAdvantage,
+        handleLuckyDisadvantage,
+    };
+
     return (
         <div className="dice-roll-result">
-            {type !== 'damage_type_choice' && (
-                <div className="dice-roll-header">
-                    <i className={`fa-solid ${
-                        type === 'd20' ? 'fa-dice-d20' :
-                        type === 'attack' ? 'fa-crosshairs' :
-                        type === 'save' || isSaveDamageType ? 'fa-shield-halved' :
-                        type === 'initiative' ? 'fa-gavel' :
-                        isHealType ? 'fa-heart' : 'fa-bolt'
-                    }`}></i>
-                    {name}
-                </div>
-            )}
-            {type !== 'damage_type_choice' && !((isSaveDamageType || rollType === 'save-damage') && finalDamage !== undefined && finalDamage <= 0) && <div className="dice-roll-total">{finalTotal}</div>}
-            {type !== 'damage_type_choice' && !((isSaveDamageType || rollType === 'save-damage') && finalDamage !== undefined && finalDamage <= 0) && (
-                <div className="dice-roll-breakdown">
-                    {displayFormula ? `${displayFormula}: ` : type === 'd20' ? 'd20 ' : ''}
-                    {strokeResult !== null ? (
-                      <span className="dice-rolled">
-                        20 (Stroke of Luck)
-                      </span>
-                    ) : luckyRerolled ? (
-                      <span className="dice-rolled">
-                        {luckyRerollValue} (Lucky reroll)
-                      </span>
-                    ) : rerollResult !== null ? (
-                      <span className="dice-rolled">
-                        {rerollResult.roll} (reroll)
-                      </span>
-                    ) : bardicInspirationResult !== null ? (
-                      <span className="dice-rolled">
-                        {bardicInspirationResult.d20Roll}
-                      </span>
-                    ) : isD20 && mode !== 'normal' && safeRolls.length === 2 ? (
-                      <span className="dice-rolled">
-                        {safeRolls[0]}, {safeRolls[1]} → {finalRoll}
-                      </span>
-                    ) : (
-                      <span className="dice-rolled">
-                        {isD20
-                            ? (mode === 'normal' ? safeRolls[0] || 0 : finalRoll)
-                            : (critDiceRolls ? critDiceRolls.join(', ') : safeRolls.join(', '))
-                        }
-                      </span>
-                    )}
-                    {strokeResult !== null ? (
-                       ` +${20 + bonus + modifier - 20}`
-                    ) : rerollResult !== null ? (
-                       ` +${rerollResult.total - rerollResult.roll}`
-                    ) : bardicInspirationResult !== null ? (
-                       ` +${bardicInspirationResult.total - bardicInspirationResult.d20Roll}`
-                    ) : strReplaceApplied ? (
-                       ` → ${finalDisplayTotal} (Indomitable Might)`
-                    ) : isCritDamage ? ` +${modifier}${bonusDetail && bonus > 0 ? ' ' + bonusDetail : ''}` : (bonus + modifier) >= 0 && (bonus + modifier) !== 0 ? ` +${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` :
-                      (bonus + modifier) < 0 ? ` ${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` : ''}
-                </div>
-            )}
+            <RollHeader props={props} state={state} />
+            <RollSummary props={props} state={state} />
 
-            {reliableTalent && (rollType === 'check' || rollType === 'skill') && safeRolls[0] <= 9 && (
-              <div className="dice-roll-reliable-talent">
-                <i className="fa-solid fa-star"></i> Reliable Talent: d20 {safeRolls[0]} → 10
-              </div>
-            )}
+            <FloorNotices props={props} state={state} />
+            <RollAdjustmentNotices props={props} state={state} />
 
-            {d20Floor10 && safeRolls[0] <= 9 && (
-              <div className="dice-roll-reliable-talent">
-                <i className="fa-solid fa-clock"></i> Trance of Order: d20 {safeRolls[0]} → 10
-              </div>
-            )}
+            <RollModeToggles props={props} state={state} />
 
-            {starryDragonFloor && safeRolls[0] <= 9 && (
-              <div className="dice-roll-reliable-talent">
-                <i className="fa-solid fa-star"></i> Starry Form (Dragon): d20 {safeRolls[0]} → 10
-              </div>
-            )}
+            <CritNotices props={props} state={state} />
+            <HitMissLine props={props} state={state} acDisplay={acDisplay} hitMissTotal={hitMissTotal} />
+            <AttackOutcomeNotices props={props} state={state} acDisplay={acDisplay} />
 
-            {gwfApplied && gwfOriginalRolls && (
-              <div className="dice-roll-gwf">
-                <i className="fa-solid fa-shield-halved"></i> Great Weapon Fighting: {gwfOriginalRolls.join(', ')} → {(gwfDisplayRolls || safeRolls).join(', ')}
-              </div>
-            )}
+            <SaveRollNotices props={props} state={state} />
 
-            {rayOfEnfeebleReduction > 0 && (
-              <div className="dice-roll-ray-enfeeblement">
-                <i className="fa-solid fa-hand-fist"></i> -1d8 [Enfeeblement]: -{rayOfEnfeebleRoll}
-              </div>
-            )}
-            {resistanceReduction > 0 && (
-              <div className="dice-roll-resistance">
-                <i className="fa-solid fa-shield-halved"></i> -1d4 [Resistance]: -{resistanceRoll}
-              </div>
-            )}
+            <HitOutcomeDetails props={props} state={state} />
 
-            {healingRerollOriginalRolls && (
-              <div className="dice-roll-healing-reroll">
-                <i className="fa-solid fa-heart"></i> Healing Rerolls: {healingRerollOriginalRolls.join(', ')} → {(healingRerollDisplayRolls || safeRolls).join(', ')}
-              </div>
-            )}
-
-            {elementalAdeptBonus > 0 && rolls && Array.isArray(rolls) && (
-              <div className="dice-roll-elemental-adept">
-                <i className="fa-solid fa-fire"></i> Elemental Adept: {rolls.filter(r => r === 1).length}× 1 → 2 (+{elementalAdeptBonus})
-              </div>
-            )}
-
-            {tavernBrawlerRerolls && tavernBrawlerRerolls.length > 0 && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-fist-raised"></i> Tavern Brawler: {tavernBrawlerRerolls.map(r => r.original).join(', ')} → {tavernBrawlerRerolls.map(r => r.rerolled).join(', ')}
-              </div>
-            )}
-
-              {isD20 && (
-                  <div className="dice-roll-toggles">
-                      <label className={`badge-toggle ${mode === 'advantage' ? 'active' : ''}`}>
-                          <input
-                             type="checkbox"
-                             checked={mode === 'advantage'}
-                             onChange={() => setMode(mode === 'advantage' ? 'normal' : 'advantage')}
-                              style={{ display: 'none' }}
-                          />
-                          Advantage
-                      </label>
-                      <label className={`badge-toggle ${mode === 'disadvantage' ? 'active' : ''}`}>
-                          <input
-                             type="checkbox"
-                             checked={mode === 'disadvantage'}
-                             onChange={() => setMode(mode === 'disadvantage' ? 'normal' : 'disadvantage')}
-                              style={{ display: 'none' }}
-                          />
-                          Disadvantage
-                      </label>
-                        {forcedMode && forcedMode !== 'normal' && (
-                           <span className="badge-toggle forced-mode-badge" title={advantageReason || rangeReason || "Automatically set by active conditions"}>
-                             <i className="fa-solid fa-asterisk"></i> {forcedMode === 'advantage' ? 'Adv' : 'Disadv'} ({advantageReason || rangeReason || 'conditions'})
-                           </span>
-                         )}
-                  </div>
-              )}
-
-            {(isCritDamage || isCrit || isAutoCrit) && <div className="dice-roll-crit">Critical Hit! — damage dice doubled</div>}
-            {(isD20 && !isCrit && !isAutoCrit && displayRoll === 20) && <div className="dice-roll-crit">Natural 20!</div>}
-            {showFumble && <div className="dice-roll-crit dice-roll-crit-miss">Critical Miss!</div>}
-               {targetName && computedHit !== undefined && !isSaveDamageType && rollType === 'attack' && (
-                    <div className={`dice-roll-hit-miss ${computedHit ? 'hit' : 'miss'}`}>
-                       {isAutoMiss ? `✗ AUTO-MISS (${coverReason || rangeReason || 'out of range'})` : (computedHit ? `✓ HIT (${hitMissTotal} vs AC ${acDisplay}${(defensiveDuelistBonus > 0 || (baitAndSwitchBonus || 0) > 0) ? ` + ${Math.max(0, defensiveDuelistBonus || 0) + Math.max(0, baitAndSwitchBonus || 0)} reaction` : ''})` : `✗ MISS (${hitMissTotal} vs AC ${acDisplay}${(defensiveDuelistBonus > 0 || (baitAndSwitchBonus || 0) > 0) ? ` + ${Math.max(0, defensiveDuelistBonus || 0) + Math.max(0, baitAndSwitchBonus || 0)} reaction` : ''})`)}
-                    </div>
-                  )}
-
-            {unerringStrikeApplied && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-shield-halved"></i> Unerring Strike: missed weapon attack turned into a hit
-              </div>
-            )}
-
-            {homingStrikesApplied && homingStrikesUsed !== false && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-brain"></i> Soul Blades (Homing Strikes): psionic die +{Number(homingStrikesBonus)} → {finalTotal} vs AC {acDisplay} — miss converted into a hit, 1 Psionic Energy expended
-              </div>
-            )}
-
-            {coverAcBonus > 0 && (
-              <div className="dice-roll-cover">
-                {coverLevel === 'threeQuarter' ? '3/4' : '1/2'} Cover (+{coverAcBonus} AC)
-              </div>
-            )}
-
-            {waitingForPlayerSave && (
-              <div className="dice-roll-save-waiting">
-                <i className="fa-solid fa-spinner fa-spin"></i> Waiting for <strong>{targetName}</strong> to roll {saveAbilityLabel} save (DC {saveDc})...
-                {onQuickRoll && (
-                  <button className="dice-roll-quick-roll" onClick={() => onQuickRoll()} type="button">
-                    <i className="fa-solid fa-dice-d20"></i> Quick Roll (Local)
-                  </button>
-                )}
-              </div>
-            )}
-
-            {saveResult !== undefined && saveResult !== null && (
-              <div className={`dice-roll-save-result ${saveResult.success ? 'save-success' : 'save-failure'}`}>
-                {saveResult.success ? '✓ SAVE SUCCESS' : '✗ SAVE FAILURE'} ({saveResult.total} vs DC {saveDc})
-                <span className="dice-roll-save-detail"> (d20 {saveResult.roll} + {saveResult.bonus})</span>
-                {mode === 'disadvantage' && <span className="dice-roll-save-detail"> [Disadvantage]</span>}
-                {mode === 'advantage' && <span className="dice-roll-save-detail"> [Advantage]</span>}
-              </div>
-            )}
-
-            {rollType === 'save' && saveDc == null && (
-              <div className="dice-roll-save-info">
-                <i className="fa-solid fa-triangle-exclamation"></i> DC Unknown — no success or failure
-              </div>
-            )}
-
-            {dc !== undefined && success === undefined && !waitingForPlayerSave && !isSaveDamageType && (
-              <div className="dice-roll-save-info">
-                Save DC {dc} {dcType}: {dcSuccess === 'half' ? 'half damage on save' : 'no damage on save'}
-              </div>
-            )}
-
-            {rollType === 'condition-save' && success !== undefined && (
-              <div className={`dice-roll-save-result ${success ? 'save-success' : 'save-failure'}`}>
-                {success ? '✓ SAVE SUCCESS' : '✗ SAVE FAILURE'} ({finalTotal} vs DC {dc})
-                <span className="dice-roll-save-detail"> (d20 {safeRolls[0] || 0} + {bonus})</span>
-                {mode === 'disadvantage' && <span className="dice-roll-save-detail"> [Disadvantage]</span>}
-                {mode === 'advantage' && <span className="dice-roll-save-detail"> [Advantage]</span>}
-              </div>
-            )}
-
-            {resistanceNotice && (
-              <div className="dice-roll-resistance">{resistanceNotice}</div>
-            )}
-
-            {hunterLoreNotice && (
-              <div className="dice-roll-hunter-lore">
-                <i className="fa-solid fa-eye"></i> {hunterLoreNotice.split('\n').map((line, i) => (
-                  <span key={i}>
-                    {i > 0 && <br />}
-                    {line}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {finalDamage !== undefined && damageApplied && (
-              <div className="dice-roll-damage-applied">
-                {damageReduced ? (
-                  <span><strong>{finalDamage}</strong> damage applied to <strong>{targetName}</strong> (reduced from {originalTotal}){targetCurrentHp !== undefined ? ` — HP: ${targetCurrentHp + finalDamage} → ${targetCurrentHp}` : ''}</span>
-                ) : (
-                  <span><strong>{finalDamage}</strong> damage applied to <strong>{targetName}</strong>{targetCurrentHp !== undefined ? ` — HP: ${targetCurrentHp + finalDamage} → ${targetCurrentHp}` : ''}</span>
-                )}
-              </div>
-            )}
-
-            {isDamageType && interceptedFeature && (
-              <div className="dice-roll-intercepted">
-                <i className="fa-solid fa-shield-halved"></i> {interceptedFeature}: damage intercepted, {targetName} survives!
-              </div>
-            )}
-
-            {isHealType && (
-              <div className="dice-roll-heal-applied">
-                {finalHeal <= 0 ? (
-                  <span><strong>{targetName}</strong> is already at full HP</span>
-                ) : healReduced ? (
-                  <span><strong>{finalHeal}</strong> healing applied to <strong>{targetName}</strong> (reduced from {originalTotal}){targetCurrentHp !== undefined ? ` — HP: ${targetCurrentHp + finalHeal} → ${targetCurrentHp}` : ''}</span>
-                ) : (
-                  <span><strong>{finalHeal}</strong> healing applied to <strong>{targetName}</strong>{targetCurrentHp !== undefined ? ` — HP: ${targetCurrentHp + finalHeal} → ${targetCurrentHp}` : ''}</span>
-                )}
-                {bonusHeal > 0 && (
-                  <div className="dice-roll-heal-bonus">
-                    <i className="fa-solid fa-sparkles"></i> Bonus: +{bonusHeal} ({bonusHealDetail})
-                  </div>
-                )}
-              </div>
-            )}
+            <HealOutcomeNotice props={props} state={state} />
 
             {isPotentCantrip && (
               <div className="dice-roll-potent-cantrip">
@@ -478,85 +846,13 @@ function DiceRollResult(props) {
               </div>
             )}
 
-            {autoReroll && !rerollUsed && (isD20 || type === 'save-damage') && autoRerollCondition !== 'roll_equals_1' && (
-              <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={handleReroll} type="button">
-                  <i className="fa-solid fa-rotate"></i> Reroll{autoRerollBonus ? ` (+${autoRerollBonus})` : ''}
-                </button>
-              </div>
-            )}
-
-            {strokeOfLuck && !strokeUsed && isD20 && d20TestFailed && (
-              <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={handleStrokeOfLuck} type="button">
-                  <i className="fa-solid fa-star"></i> Stroke of Luck
-                </button>
-              </div>
-            )}
-
-            {autoRerollForAttack && !boonUsed && isD20 && !hit && !isAutoMiss && (
-              <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={handleBoonOfCombatProwess} type="button">
-                  <i className="fa-solid fa-shield-halved"></i> Boon of Combat Prowess
-                </button>
-              </div>
-            )}
-
-            {bardicInspiration && !bardicInspirationUsed && isD20 && (rollType === 'check' || rollType === 'skill' || rollType === 'save') && (
-              <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={handleBardicInspiration} type="button">
-                  <i className="fa-solid fa-music"></i> Bardic Inspiration (d{bardicInspirationDie})
-                </button>
-              </div>
-            )}
-
-            {luckyAdvantage && isD20 && (
-              <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={handleLuckyAdvantage} type="button">
-                  <i className="fa-solid fa-eye"></i> Lucky: Advantage (1 LP)
-                </button>
-              </div>
-            )}
-
-            {luckyDisadvantage && isD20 && (
-              <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={handleLuckyDisadvantage} type="button">
-                  <i className="fa-solid fa-eye-slash"></i> Lucky: Disadvantage (1 LP)
-                </button>
-              </div>
-            )}
-
-            {tacticalMind && !tacticalUsed && isD20 && (rollType === 'check' || rollType === 'skill') && d20TestFailed && displayRoll !== 20 && (
-              <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={handleTacticalMind} type="button">
-                  <i className="fa-solid fa-hand"></i> Tactical Mind{tacticalMindBonus ? ` (+${tacticalMindBonus})` : ''}
-                </button>
-              </div>
-            )}
-
-            {darkOnesLuck && !darkOnesLuckUsed && isD20 && (rollType === 'check' || rollType === 'skill' || rollType === 'save') && (
-              <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={handleDarkOnesLuck} type="button">
-                  <i className="fa-solid fa-fire"></i> Dark One's Own Luck (1d10)
-                </button>
-              </div>
-            )}
-
-            {availableSuperiorityManeuvers && availableSuperiorityManeuvers.length > 0 && !superiorityUsed && (
-              <div className="dice-roll-reroll">
-                {availableSuperiorityManeuvers.map(m => (
-                  <button key={m.name} className="dice-roll-reroll-btn" onClick={() => handleSuperiorityManeuver(m)} type="button">
-                    <i className="fa-solid fa-bolt"></i> {m.name} (Superiority Die)
-                  </button>
-                ))}
-              </div>
-            )}
+            <FeatureTriggerButtons props={props} state={state} handlers={triggerHandlers} />
 
             <PsiBolsteredKnackPanel
                 psiBolsteredKnack={psiBolsteredKnack}
                 psiBolsteredKnackDieSize={psiBolsteredKnackDieSize}
                 success={success}
-                rollType={rollType}
+                rollType={props.rollType}
                 psiKnackClicked={psiKnackClicked}
                 psiKnackConsumed={psiKnackConsumed}
                 psiKnackResult={psiKnackResult}
@@ -565,211 +861,21 @@ function DiceRollResult(props) {
                 onFailed={handlePsiKnackFailed}
             />
 
-            {bardicInspirationDefense && !bardicInspirationDefenseUsed && computedHit && (
+            <DamageFeatureTriggers props={props} state={state} handlers={handlers} />
+
+            <FeatureResultSummary props={props} state={state} handlers={handlers} />
+
+            <SecondaryDamageSection props={props} />
+
+            <DamageTypeChoiceSection props={props} />
+
+            {autoDamage && state.computedHit && (
               <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={handleBardicInspirationDefense} type="button">
-                  <i className="fa-solid fa-music"></i> Bardic Inspiration - Defense (d{bardicInspirationDefenseDieSize})
-                </button>
+                <AutoDamageActionButton autoDamage={autoDamage} computedHit={state.computedHit} onDone={onDone} />
               </div>
             )}
 
-            {bardicInspirationOffense && !bardicInspirationOffenseUsed && isDamageType && (
-              <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={() => handleBardicInspirationOffense()} type="button">
-                  <i className="fa-solid fa-music"></i> Bardic Inspiration - Offense (d{bardicInspirationOffenseDieSize})
-                </button>
-              </div>
-            )}
-
-            {empoweredSpell && !empoweredSpellUsed && isDamageType && (
-              <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={handleEmpoweredSpell} type="button">
-                  <i className="fa-solid fa-wand-magic-sparkles"></i> Empowered Spell (1 SP)
-                </button>
-              </div>
-            )}
-
-            {piercerPuncture && !punctureUsed && isDamageType && (
-              <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={handlePuncture} type="button">
-                  <i className="fa-solid fa-bolt"></i> Piercer - Puncture
-                </button>
-              </div>
-            )}
-
-            {savageAttacker && !savageAttackerUsed && isDamageType && (
-              <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={handleSavageAttacker} type="button">
-                  <i className="fa-solid fa-arrows-spin"></i> Savage Attacker
-                </button>
-              </div>
-            )}
-
-            {rerollUsed && rerollResult !== null && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-rotate"></i> Rerolled: {rerollResult.roll} + {rerollResult.total - rerollResult.roll} = <strong>{rerollResult.total}</strong>
-              </div>
-            )}
-
-            {strokeUsed && strokeResult !== null && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-star"></i> Stroke of Luck: d20 → 20 + {strokeResult.total - 20} = <strong>{strokeResult.total}</strong>
-              </div>
-            )}
-
-            {boonUsed && autoRerollForAttack && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-shield-halved"></i> Boon of Combat Prowess: Miss converted to Hit
-              </div>
-            )}
-
-            {bardicInspirationUsed && bardicInspirationResult !== null && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-music"></i> Bardic Inspiration: 1d{bardicInspirationResult.dieSize} → {bardicInspirationResult.dieValue} + <strong>{bardicInspirationResult.total}</strong>
-              </div>
-            )}
-
-            {bardicInspirationDefenseUsed && bardicInspirationDefenseResult !== null && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-music"></i> Bardic Inspiration - Defense: 1d{bardicInspirationDefenseResult.dieSize} → {bardicInspirationDefenseResult.dieValue} → AC {bardicInspirationDefenseResult.newAc} ({bardicInspirationDefenseResult.willMiss ? 'Attack misses!' : 'Attack still hits'})
-              </div>
-            )}
-
-            {bardicInspirationOffenseUsed && bardicInspirationOffenseResult !== null && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-music"></i> Bardic Inspiration - Offense: 1d{bardicInspirationOffenseResult.dieSize} → +{bardicInspirationOffenseResult.dieValue} → <strong>{bardicInspirationOffenseResult.bonusTotal}</strong>
-              </div>
-            )}
-
-            {empoweredSpellUsed && empoweredSpellResult && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-wand-magic-sparkles"></i> Empowered Spell: rerolled {empoweredSpellResult.rerollCount} dice ({empoweredSpellResult.originalDice?.join(', ')} → {empoweredSpellResult.newDice?.join(', ')}) → <strong>{empoweredSpellResult.newTotal}</strong>{empoweredSpellResult.damageDifference > 0 ? ` (+${empoweredSpellResult.damageDifference})` : empoweredSpellResult.damageDifference < 0 ? ` (${empoweredSpellResult.damageDifference})` : ''}
-                {empoweredSpellResult.damageDifference === 0 && !empoweredSpellResult.message ? '' : empoweredSpellResult.message ? ` — ${empoweredSpellResult.message}` : ''}
-              </div>
-            )}
-
-            {punctureUsed && punctureResult && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-bolt"></i> Piercer - Puncture: {punctureResult.originalDice?.join(', ')} → {punctureResult.newDice?.join(', ')}
-              </div>
-            )}
-
-            {savageAttackerUsed && savageAttackerResult && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-arrows-spin"></i> Savage Attacker: {savageAttackerResult.original} → {savageAttackerResult.rerolled}
-                {savageAttackerResult.awaitingChoice ? ` — choose which total to keep (${savageAttackerResult.originalTotal} or ${savageAttackerResult.newTotal})` : savageAttackerResult.kept === 'reroll' ? ` — Reroll kept (+${savageAttackerResult.newTotal - savageAttackerResult.originalTotal})` : ' — Original kept'}
-                {savageAttackerResult.awaitingChoice && onSavageAttackerChoice && (
-                  <div className="dice-roll-reroll">
-                    <button className="dice-roll-reroll-btn" onClick={() => handleSavageAttackerKeep('original')} type="button">
-                      <i className="fa-solid fa-check"></i> Keep First ({savageAttackerResult.originalTotal})
-                    </button>
-                    <button className="dice-roll-reroll-btn" onClick={() => handleSavageAttackerKeep('reroll')} type="button">
-                      <i className="fa-solid fa-dice"></i> Keep Reroll ({savageAttackerResult.newTotal})
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <TacticalMindAdjudicationPanel
-                tacticalUsed={tacticalUsed}
-                tacticalResult={tacticalResult}
-                tacticalDeclared={tacticalDeclared}
-                onDeclare={handleTacticalDeclare}
-            />
-
-            {darkOnesLuckUsed && darkOnesLuckResult !== null && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-fire"></i> Dark One's Own Luck: +{darkOnesLuckResult.dieValue} (d10) → <strong>{darkOnesLuckResult.total}</strong>
-              </div>
-            )}
-
-            {superiorityUsed && superiorityResult !== null && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-bolt"></i> {superiorityResult.maneuverName}: d12 {superiorityResult.dieValue} → <strong>{superiorityResult.total}</strong> (+{superiorityResult.dieValue})
-              </div>
-            )}
-
-            {secondaryFormula && (
-              <div className="dice-roll-secondary-damage">
-                <div className="dice-roll-secondary-label">Secondary Damage:</div>
-                <div className="dice-roll-secondary-formula">
-                  {secondaryFormula}: {secondaryRolls ? secondaryRolls.join(', ') : ''}{secondaryModifier !== undefined && secondaryModifier !== 0 ? ` +${secondaryModifier}` : ''} = {secondaryTotal}
-                </div>
-                {secondarySaveResult && (
-                  <div className={`dice-roll-secondary-save-result ${secondarySaveResult.success ? 'save-success' : 'save-failure'}`}>
-                    {secondarySaveResult.success ? '✓ SAVE SUCCESS' : '✗ SAVE FAILURE'} ({secondarySaveResult.total} vs DC {saveDc})
-                  </div>
-                )}
-                {secondaryFinalDamage !== undefined && finalDamage !== undefined && (
-                  <div className="dice-roll-secondary-total">
-                    {finalDamage} {damageType || ''} damage + {secondaryFinalDamage} {secondaryDamageType || ''} damage = <strong>{finalDamage + secondaryFinalDamage} total damage</strong>
-                  </div>
-                )}
-                {finalDamage !== undefined && damageApplied && secondaryFinalDamage !== undefined && (
-                  <div className="dice-roll-damage-applied">
-                    <span><strong>{finalDamage + secondaryFinalDamage}</strong> damage applied to <strong>{targetName}</strong>{targetCurrentHp !== undefined ? ` — HP: ${targetCurrentHp + finalDamage + secondaryFinalDamage} → ${targetCurrentHp}` : ''}</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {type === 'damage_type_choice' && (
-                <div className="dice-roll-damage-type-choice">
-                    <div className="dice-roll-header">
-                        <i className="fa-solid fa-bolt"></i> {name}
-                    </div>
-                    <p>Choose the damage type for this hit:</p>
-                    <div style={{ textAlign: 'center', marginTop: '16px' }}>
-                        <div className="dice-roll-breakdown">
-                            <strong>Weapon Damage:</strong> {baseFormula}: {baseRolls?.join(', ')} = {baseTotal}
-                        </div>
-                        <div className="dice-roll-breakdown">
-                            <strong>Divine Strike:</strong> {bonusFormula}: {bonusRolls?.join(', ')} = {bonusTotal}
-                        </div>
-                        <div style={{ marginTop: '12px' }}>
-                            <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>Choose bonus damage type:</div>
-                            {types?.map((typeChoice) => (
-                                <button
-                                    key={typeChoice}
-                                    className="sp-roll-btn"
-                                    style={{ margin: '0 6px 8px 6px' }}
-                                    onClick={() => {
-                                        window.dispatchEvent(new CustomEvent('damage-type-choice', { detail: { chosenType: typeChoice } }));
-                                    }}
-                                >
-                                    {typeChoice}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="sp-actions">
-                        <button className="sp-dismiss-btn" onClick={() => {
-                            window.dispatchEvent(new CustomEvent('damage-type-skip'));
-                        }}>Skip</button>
-                    </div>
-                </div>
-            )}
-
-            {autoDamage && computedHit && (
-              <div className="dice-roll-reroll">
-                <AutoDamageActionButton autoDamage={autoDamage} computedHit={computedHit} onDone={onDone} />
-              </div>
-            )}
-
-            {holyAuraSaveResult && (
-              <div className="dice-roll-holy-aura-save">
-                <i className="fa-solid fa-shield-halved"></i>
-                <strong>— Holy Aura Save:</strong>
-                <span className="dice-roll-breakdown">
-                  d20 {holyAuraSaveResult.roll} + {holyAuraSaveResult.modifier} = {holyAuraSaveResult.total} vs DC {holyAuraSaveResult.dc}
-                </span>
-                <span className={`dice-roll-save-result ${holyAuraSaveResult.success ? 'save-success' : 'save-failure'}`}>
-                  {holyAuraSaveResult.success ? 'SAVE SUCCESSFUL' : 'SAVE FAILED'}
-                </span>
-                {!holyAuraSaveResult.success && <span className="dice-roll-save-effect">Fiend/Undead blinded!</span>}
-              </div>
-            )}
+            <HolyAuraSaveNotice props={props} />
 
             <div className="dice-roll-hint">click to dismiss</div>
         </div>

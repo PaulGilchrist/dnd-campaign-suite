@@ -7,45 +7,92 @@ import { evaluateAutoExpression } from '../../services/combat/automation/automat
 import { isCreatureWarded } from '../../services/automation/handlers/buffs/protectionFromEvilAndGoodHandler.js'
 import { getHolyAuraTargets } from '../../services/automation/handlers/buffs/holyAuraHandler.js'
 
+// Merge save modifiers from active combat stances (e.g. Rage STR save advantage)
+function buildStanceSaveModifiers(activeBuffs) {
+    if (!Array.isArray(activeBuffs)) return [];
+    return activeBuffs.filter(b => b.advantages?.length).flatMap(b =>
+        b.advantages
+            .filter(a => a.toLowerCase().includes('saves'))
+            .map(a => {
+                const abilityMatch = a.match(/^(\w{3})\s+saves/);
+                return abilityMatch
+                    ? { source: b.name, target: 'saving_throw', condition: 'stance_active', effect: 'advantage', abilities: [abilityMatch[1].toUpperCase()] }
+                    : null;
+            })
+            .filter(Boolean)
+    );
+}
+
+// Protection from Evil and Good: if already charmed/frightened by a warded creature,
+// the target has Advantage on any new saving throw against the relevant effect
+function buildPfeagSaveAdvantage(activeConditions, pfeagActive, playerStats) {
+    if (!pfeagActive || !playerStats) return [];
+    const hasCharmed = activeConditions.includes('charmed');
+    const hasFrightened = activeConditions.includes('frightened');
+    if (!hasCharmed && !hasFrightened) return [];
+    return [{
+        source: 'Protection from Evil and Good',
+        target: 'saving_throw',
+        condition: 'pfeag_save_advantage',
+        effect: 'advantage',
+    }];
+}
+
+function applyRerollKillSwitches(conditionEffects, playerStats, campaignName) {
+    // Kill-switches for the once-per-rest reroll features must never disable the
+    // Halfling Lucky trait (autoRerollCondition 'roll_equals_1' — unlimited, passive).
+    const isHalflingLuckyReroll = conditionEffects.autoRerollCondition === 'roll_equals_1';
+    const fanaticalFocusUsed = getRuntimeValue(playerStats.name, 'fanaticalFocusUsed', campaignName);
+    if (fanaticalFocusUsed && conditionEffects.autoRerollForSaves && !isHalflingLuckyReroll) {
+        conditionEffects.autoRerollForSaves = false;
+        conditionEffects.autoRerollBonus = null;
+    }
+    const indomitableUses = Number(getRuntimeValue(playerStats.name, 'indomitableUses', campaignName) ?? 0);
+    const indomitableMax = playerStats.level >= 17 ? 3 : playerStats.level >= 13 ? 2 : 1;
+    if (indomitableUses >= indomitableMax && conditionEffects.autoRerollForSaves && !isHalflingLuckyReroll) {
+        conditionEffects.autoRerollForSaves = false;
+        conditionEffects.autoRerollBonus = null;
+    }
+    const strokeOfLuckUsed = getRuntimeValue(playerStats.name, 'strokeOfLuckUsed', campaignName);
+    if (strokeOfLuckUsed && conditionEffects.strokeOfLuck) {
+        conditionEffects.strokeOfLuck = false;
+    }
+}
+
+// Warding Bond: +1 AC and +1 to all saving throws (only if within 60 feet)
+function computeWardingBondBonuses(activeBuffs, playerSummary, playerStats, combatContext) {
+    let wardingBondAcBonus = 0;
+    let wardingBondSaveBonus = 0;
+    for (const buff of activeBuffs) {
+        if (buff.effect !== 'warding_bond' || !buff.sourceCharacter) continue;
+        const casterName = buff.sourceCharacter;
+        if (casterName === playerSummary?.name) continue;
+        const casterCreature = combatContext?.creatures?.find(c => c.name === casterName);
+        const targetCreature = combatContext?.creatures?.find(c => c.name === playerStats?.name);
+        const distance = casterCreature && targetCreature ? getDistanceFeet(casterCreature.position, targetCreature.position) : null;
+        if (distance === null || isDistanceInRange(distance, 60)) {
+            if (buff.acBonus) {
+                wardingBondAcBonus += buff.acBonus;
+            }
+            if (buff.saveBonus) {
+                wardingBondSaveBonus += buff.saveBonus;
+            }
+        }
+    }
+    return { wardingBondAcBonus, wardingBondSaveBonus };
+}
+
 export function computeCharConditionEffects(playerSummary, playerStats, campaignName, activeBuffs) {
     const storedConditions = getRuntimeValue(playerSummary?.name, 'activeConditions', campaignName);
     const storedExhaustion = getRuntimeValue(playerSummary?.name, 'exhaustionLevel', campaignName);
     const exhaustionLevel = typeof storedExhaustion === 'number' ? Math.min(6, Math.max(0, storedExhaustion)) : 0;
     const activeConditions = Array.isArray(storedConditions) ? storedConditions : [];
-    
-    // Merge save modifiers from active combat stances (e.g. Rage STR save advantage)
-    const stanceSaveModifiers = Array.isArray(activeBuffs)
-        ? activeBuffs.filter(b => b.advantages?.length).flatMap(b =>
-            b.advantages
-                .filter(a => a.toLowerCase().includes('saves'))
-                .map(a => {
-                    const abilityMatch = a.match(/^(\w{3})\s+saves/);
-                    return abilityMatch
-                        ? { source: b.name, target: 'saving_throw', condition: 'stance_active', effect: 'advantage', abilities: [abilityMatch[1].toUpperCase()] }
-                        : null;
-                })
-                .filter(Boolean)
-        )
-        : [];
+
+    const stanceSaveModifiers = buildStanceSaveModifiers(activeBuffs);
 
     // Protection from Evil and Good: check if spell is active
     const pfeagActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'protection_from_evil_and_good');
-
-    // Protection from Evil and Good: if already charmed/frightened by a warded creature,
-    // the target has Advantage on any new saving throw against the relevant effect
-    const pfeagSaveAdvantage = [];
-    if (pfeagActive && playerStats) {
-        const hasCharmed = activeConditions.includes('charmed');
-        const hasFrightened = activeConditions.includes('frightened');
-        if (hasCharmed || hasFrightened) {
-            pfeagSaveAdvantage.push({
-                source: 'Protection from Evil and Good',
-                target: 'saving_throw',
-                condition: 'pfeag_save_advantage',
-                effect: 'advantage',
-            });
-        }
-    }
+    const pfeagSaveAdvantage = buildPfeagSaveAdvantage(activeConditions, pfeagActive, playerStats);
     // CLA-218: Mage Hand Legerdemain — the conditional_advantage saveModifier
     // (target ability_check, abilities DEX, condition mage_hand_legerdemain)
     // only applies while the spectral hand is being controlled (bonus action;
@@ -79,24 +126,7 @@ export function computeCharConditionEffects(playerSummary, playerStats, campaign
         conditionEffects.autoRerollBonus = evaluateAutoExpression(conditionEffects.autoRerollBonus, playerStats);
     }
     if (playerStats) {
-        // Kill-switches for the once-per-rest reroll features must never disable the
-        // Halfling Lucky trait (autoRerollCondition 'roll_equals_1' — unlimited, passive).
-        const isHalflingLuckyReroll = conditionEffects.autoRerollCondition === 'roll_equals_1';
-        const fanaticalFocusUsed = getRuntimeValue(playerStats.name, 'fanaticalFocusUsed', campaignName);
-        if (fanaticalFocusUsed && conditionEffects.autoRerollForSaves && !isHalflingLuckyReroll) {
-            conditionEffects.autoRerollForSaves = false;
-            conditionEffects.autoRerollBonus = null;
-        }
-        const indomitableUses = Number(getRuntimeValue(playerStats.name, 'indomitableUses', campaignName) ?? 0);
-        const indomitableMax = playerStats.level >= 17 ? 3 : playerStats.level >= 13 ? 2 : 1;
-        if (indomitableUses >= indomitableMax && conditionEffects.autoRerollForSaves && !isHalflingLuckyReroll) {
-            conditionEffects.autoRerollForSaves = false;
-            conditionEffects.autoRerollBonus = null;
-        }
-        const strokeOfLuckUsed = getRuntimeValue(playerStats.name, 'strokeOfLuckUsed', campaignName);
-        if (strokeOfLuckUsed && conditionEffects.strokeOfLuck) {
-            conditionEffects.strokeOfLuck = false;
-        }
+        applyRerollKillSwitches(conditionEffects, playerStats, campaignName);
     }
     // Reckless Attack: enemies have Advantage on attack rolls against you
     if (Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'advantage_attacks_advantage_against')) {
@@ -131,26 +161,7 @@ export function computeCharConditionEffects(playerSummary, playerStats, campaign
         conditionEffects.magicMissileImmune = true;
     }
 
-    // Warding Bond: +1 AC and +1 to all saving throws (only if within 60 feet)
-    let wardingBondAcBonus = 0;
-    let wardingBondSaveBonus = 0;
-    for (const buff of activeBuffs) {
-        if (buff.effect === 'warding_bond' && buff.sourceCharacter) {
-            const casterName = buff.sourceCharacter;
-            if (casterName === playerSummary?.name) continue;
-            const casterCreature = combatContext?.creatures?.find(c => c.name === casterName);
-            const targetCreature = combatContext?.creatures?.find(c => c.name === playerSummary?.name);
-            const distance = casterCreature && targetCreature ? getDistanceFeet(casterCreature.position, targetCreature.position) : null;
-            if (distance === null || isDistanceInRange(distance, 60)) {
-                if (buff.acBonus) {
-                    wardingBondAcBonus += buff.acBonus;
-                }
-                if (buff.saveBonus) {
-                    wardingBondSaveBonus += buff.saveBonus;
-                }
-            }
-        }
-    }
+    const { wardingBondAcBonus, wardingBondSaveBonus } = computeWardingBondBonuses(activeBuffs, playerSummary, playerStats, combatContext);
     if (wardingBondAcBonus > 0) {
         conditionEffects.wardingBondAcBonus = wardingBondAcBonus;
     }

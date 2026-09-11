@@ -12,6 +12,86 @@ import { applyHealingToTarget } from '../../services/rules/combat/applyHealing.j
 import { loadSpellData } from '../../services/ui/dataLoader.js'
 import CreatureSelectionModal from './modals/shared/CreatureSelectionModal.jsx'
 
+function recoverArcaneSlots(playerStats, campaignName) {
+    const maxSlotsToRecover = Math.ceil(playerStats.level / 2);
+    let slotsRecovered = 0;
+    for (const level of [1, 2, 3, 4, 5]) {
+        if (slotsRecovered >= maxSlotsToRecover) break;
+        const slotKey = `spell_slots_level_${level}`;
+        const max = playerStats.spellAbilities?.[slotKey] || 0;
+        const current = Number(getRuntimeValue(playerStats.name, slotKey) ?? max);
+        const available = max - current;
+        if (available > 0) {
+            const remaining = maxSlotsToRecover - slotsRecovered;
+            const toRecover = Math.min(available, Math.floor(remaining / level));
+            setRuntimeValue(playerStats.name, slotKey, current + toRecover, campaignName);
+            slotsRecovered += level * toRecover;
+        }
+    }
+}
+
+function applyNaturalRecoverySelections(playerStats, campaignName, naturalRecoverySelections) {
+    for (const [levelStr, count] of Object.entries(naturalRecoverySelections)) {
+        if (count > 0) {
+            const slotKey = `spell_slots_level_${levelStr}`;
+            const max = playerStats.spellAbilities?.[slotKey] || 0;
+            const current = Number(getRuntimeValue(playerStats.name, slotKey) ?? max);
+            setRuntimeValue(playerStats.name, slotKey, Math.min(max, current + count), campaignName);
+        }
+    }
+}
+
+function collectRestoredResources(playerStats, campaignName, ctx) {
+    const { arcaneRecoveryRequested, restorationRequested, naturalRecoveryAvailable, naturalRecoverySelections, hasFontOfInspiration } = ctx;
+    const restoredResources = [];
+    const resourceLabels = getShortRestResourceLabels(playerStats);
+    SHORT_REST_RESOURCES.forEach(key => {
+        const label = resourceLabels.find(r => r.key === key);
+        if (label) restoredResources.push(label.label);
+    });
+    if (playerStats.class?.name === 'Fighter') {
+        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+        const maxSW = classLevel?.second_wind || 0;
+        const currentSW = Number(getRuntimeValue(playerStats.name, 'secondWindUses', campaignName) ?? 0);
+        if (currentSW < maxSW) restoredResources.push('Second Wind');
+    }
+    if (playerStats.class?.name === 'Barbarian' && playerStats.rules === '2024') {
+        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+        const maxRage = classLevel?.rages || 0;
+        const storedRage = getRuntimeValue(playerStats.name, 'ragePoints', campaignName);
+        const trackedRage = playerStats._trackedResources?.ragePoints;
+        const currentRage = storedRage != null ? Number(storedRage) : (trackedRage?.current ?? maxRage);
+        if (currentRage < maxRage) restoredResources.push('Rage (2024)');
+    }
+    const hasImprovedWardingFlare = playerStats.specialActions?.some(f => f.name === 'Improved Warding Flare');
+    if (hasImprovedWardingFlare) restoredResources.push('Warding Flare');
+    if (hasFontOfInspiration) restoredResources.push('Bardic Inspiration (Font of Inspiration)');
+    const hasArcaneRecovery = (playerStats.automation?.passives ?? []).some(p => p.type === 'resource_restoration' && p.resourceKey === 'arcaneRecoveryLevels');
+    if (hasArcaneRecovery && arcaneRecoveryRequested) restoredResources.push('Arcane Recovery');
+    const hasBolsteringTreats = (playerStats.automation?.passives ?? []).some(p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats');
+    if (hasBolsteringTreats) restoredResources.push('Bolstering Treats');
+    if (playerStats.class?.name === 'Warlock') restoredResources.push('Pact Magic (Warlock spell slots)');
+    const hasCelestialResilience = playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron';
+    if (hasCelestialResilience && playerStats.specialActions?.some(f => f.name === 'Celestial Resilience')) restoredResources.push('Celestial Resilience (temp HP)');
+    const hasTireless = playerStats.class?.name === 'Ranger' && playerStats.level >= 10;
+    if (hasTireless) {
+        const currentExhaustion = getRuntimeValue(playerStats.name, 'exhaustionLevel', campaignName);
+        if (typeof currentExhaustion === 'number' && currentExhaustion > 0) restoredResources.push('Tireless (exhaustion reduced)');
+    }
+    const hasSorcRestoration = (playerStats.automation?.passives ?? []).some(p => p.type === 'resource_restoration' && p.resourceKey === 'sorcerousRestorationUses');
+    if (hasSorcRestoration && restorationRequested) restoredResources.push('Sorcery Points (Sorcerous Restoration)');
+    let naturalRecoveryDetail = null;
+    const hasNaturalRecovery = (playerStats.automation?.passives ?? []).some(p => p.type === 'natural_recovery');
+    if (hasNaturalRecovery && naturalRecoveryAvailable && Object.keys(naturalRecoverySelections).some(k => naturalRecoverySelections[k] > 0)) {
+        naturalRecoveryDetail = Object.entries(naturalRecoverySelections)
+            .filter(([_, count]) => count > 0)
+            .map(([lvl, count]) => `${count}x level ${lvl}`)
+            .join(', ');
+        restoredResources.push(`Natural Recovery (${naturalRecoveryDetail})`);
+    }
+    return { restoredResources, naturalRecoveryDetail };
+}
+
 function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const [remainingHitDice, setRemainingHitDice] = React.useState(() => {
         const stored = getRuntimeValue(playerStats.name, 'shortRestHitDice');
@@ -296,33 +376,13 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
 
         // UI-driven: Arcane Recovery
         if (arcaneRecovery && arcaneRecoveryAvailable && arcaneRecoveryRequested) {
-            const maxSlotsToRecover = Math.ceil(playerStats.level / 2);
-            let slotsRecovered = 0;
-            for (const level of [1, 2, 3, 4, 5]) {
-                if (slotsRecovered >= maxSlotsToRecover) break;
-                const slotKey = `spell_slots_level_${level}`;
-                const max = playerStats.spellAbilities?.[slotKey] || 0;
-                const current = Number(getRuntimeValue(playerStats.name, slotKey) ?? max);
-                const available = max - current;
-                if (available > 0) {
-                    const remaining = maxSlotsToRecover - slotsRecovered;
-                    const toRecover = Math.min(available, Math.floor(remaining / level));
-                    setRuntimeValue(playerStats.name, slotKey, current + toRecover, campaignName);
-                    slotsRecovered += level * toRecover;
-                }
-            }
+            recoverArcaneSlots(playerStats, campaignName);
         }
 
         // UI-driven: Natural Recovery
-        if (naturalRecovery && naturalRecoveryAvailable && Object.keys(naturalRecoverySelections).some(k => naturalRecoverySelections[k] > 0)) {
-            for (const [levelStr, count] of Object.entries(naturalRecoverySelections)) {
-                if (count > 0) {
-                    const slotKey = `spell_slots_level_${levelStr}`;
-                    const max = playerStats.spellAbilities?.[slotKey] || 0;
-                    const current = Number(getRuntimeValue(playerStats.name, slotKey) ?? max);
-                    setRuntimeValue(playerStats.name, slotKey, Math.min(max, current + count), campaignName);
-                }
-            }
+        const hasNaturalRecoverySelections = Object.keys(naturalRecoverySelections).some(k => naturalRecoverySelections[k] > 0);
+        if (naturalRecovery && naturalRecoveryAvailable && hasNaturalRecoverySelections) {
+            applyNaturalRecoverySelections(playerStats, campaignName, naturalRecoverySelections);
         }
 
         const logEntries = [];
@@ -339,50 +399,11 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         } else {
             logEntries.push(`Hit Dice: 0 used`);
         }
-        const restoredResources = [];
-        SHORT_REST_RESOURCES.forEach(key => {
-            const label = getShortRestResourceLabels(playerStats).find(r => r.key === key);
-            if (label) restoredResources.push(label.label);
+        const { restoredResources, naturalRecoveryDetail } = collectRestoredResources(playerStats, campaignName, {
+            arcaneRecoveryRequested, restorationRequested, naturalRecovery, naturalRecoveryAvailable, naturalRecoverySelections, hasFontOfInspiration,
         });
-        if (playerStats.class?.name === 'Fighter') {
-            const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-            const maxSW = classLevel?.second_wind || 0;
-            const currentSW = Number(getRuntimeValue(playerStats.name, 'secondWindUses', campaignName) ?? 0);
-            if (currentSW < maxSW) restoredResources.push('Second Wind');
-        }
-        if (playerStats.class?.name === 'Barbarian' && playerStats.rules === '2024') {
-            const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-            const maxRage = classLevel?.rages || 0;
-            const storedRage = getRuntimeValue(playerStats.name, 'ragePoints', campaignName);
-            const trackedRage = playerStats._trackedResources?.ragePoints;
-            const currentRage = storedRage != null ? Number(storedRage) : (trackedRage?.current ?? maxRage);
-            if (currentRage < maxRage) restoredResources.push('Rage (2024)');
-        }
-        const hasImprovedWardingFlare = playerStats.specialActions?.some(f => f.name === 'Improved Warding Flare');
-        if (hasImprovedWardingFlare) restoredResources.push('Warding Flare');
-        if (hasFontOfInspiration) restoredResources.push('Bardic Inspiration (Font of Inspiration)');
-        const hasArcaneRecovery = (playerStats.automation?.passives ?? []).some(p => p.type === 'resource_restoration' && p.resourceKey === 'arcaneRecoveryLevels');
-        if (hasArcaneRecovery && arcaneRecoveryRequested) restoredResources.push('Arcane Recovery');
-        const hasBolsteringTreats = (playerStats.automation?.passives ?? []).some(p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats');
-        if (hasBolsteringTreats) restoredResources.push('Bolstering Treats');
-        if (playerStats.class?.name === 'Warlock') restoredResources.push('Pact Magic (Warlock spell slots)');
-        const hasCelestialResilience = playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron';
-        if (hasCelestialResilience && playerStats.specialActions?.some(f => f.name === 'Celestial Resilience')) restoredResources.push('Celestial Resilience (temp HP)');
-        const hasTireless = playerStats.class?.name === 'Ranger' && playerStats.level >= 10;
-        if (hasTireless) {
-            const currentExhaustion = getRuntimeValue(playerStats.name, 'exhaustionLevel', campaignName);
-            if (typeof currentExhaustion === 'number' && currentExhaustion > 0) restoredResources.push('Tireless (exhaustion reduced)');
-        }
-        const hasSorcRestoration = (playerStats.automation?.passives ?? []).some(p => p.type === 'resource_restoration' && p.resourceKey === 'sorcerousRestorationUses');
-        if (hasSorcRestoration && restorationRequested) restoredResources.push('Sorcery Points (Sorcerous Restoration)');
-        const hasNaturalRecovery = (playerStats.automation?.passives ?? []).some(p => p.type === 'natural_recovery');
-        if (hasNaturalRecovery && naturalRecoveryAvailable && Object.keys(naturalRecoverySelections).some(k => naturalRecoverySelections[k] > 0)) {
-            const slotDetails = Object.entries(naturalRecoverySelections)
-                .filter(([_, count]) => count > 0)
-                .map(([lvl, count]) => `${count}x level ${lvl}`)
-                .join(', ');
-            logEntries.push(`Natural Recovery: ${slotDetails}`);
-            restoredResources.push(`Natural Recovery (${slotDetails})`);
+        if (naturalRecoveryDetail) {
+            logEntries.push(`Natural Recovery: ${naturalRecoveryDetail}`);
         }
         if (mealConsumed) {
             logEntries.push('Replenishing Meal consumed: +1d8 HP');

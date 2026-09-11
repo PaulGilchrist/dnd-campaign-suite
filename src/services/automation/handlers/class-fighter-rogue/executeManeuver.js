@@ -64,45 +64,17 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
 
     let description = `${maneuver.name}: ${dieDescription}`;
 
-    if (targetName && maneuver.effect !== 'ac_bonus_disengage' && maneuver.effect !== 'ac_bonus_and_swap' && maneuver.effect !== 'damage_reduction' && maneuver.effect !== 'dash_and_damage') {
+    if (targetName && !NO_TARGET_SUFFIX_EFFECTS.has(maneuver.effect)) {
         description += ` Target: ${targetName}.`;
     }
 
     if (maneuver.damageBonus) {
         description += ` Added ${dieValue} to the damage roll.`;
-        // MN-012: attack riders used from the pending-prompt path
-        // ("Combat Superiority — Use Maneuver") have no pipeline consumer for
-        // the rolled die — apply it to the target directly (CLA-192 pattern:
-        // await applyDamageToTarget and let it log hp_change).
-        if (maneuver.actionType === 'attack_rider' && targetName) {
-            const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
-            if (lastAttack?.hit) {
-                const cs = await getCombatContext(campaignName);
-                const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-                const dmgType = lastAttack.damageType || maneuver.damageType || 'force';
-                const applyResult = await applyDamageToTarget(cs, targetName, dieValue, [dmgType], campaignName, characters, false, playerStats.name);
-                if (applyResult && applyResult.finalDamage > 0) {
-                    description += ` ${targetName} takes ${applyResult.finalDamage} ${dmgType} damage.`;
-                }
-            }
-        }
+        description += await applyDamageBonusRider(maneuver, auto, targetName, dieValue, playerStats, campaignName);
     }
 
     if (maneuver.saveType && targetName) {
-        const saveDc = buildSaveDc(auto, playerStats);
-        const { promise } = createSaveListener(campaignName, {
-            targetName,
-            saveType: maneuver.saveType,
-            saveDc,
-        });
-
-        const saveResult = await promise;
-        const success = saveResult.success;
-
-        description += ` Target made ${maneuver.saveType} save DC ${saveDc}: ${success ? 'Success' : 'Failure'}.`;
-
-        const saveEffectDesc = await processManeuverSaveResult(maneuver, targetName, saveDc, success, playerStats, campaignName);
-        description += saveEffectDesc;
+        description += await runManeuverSave(maneuver, auto, targetName, playerStats, campaignName);
     }
     else if (maneuver.saveType) {
         const saveDc = buildSaveDc(auto, playerStats);
@@ -130,72 +102,12 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
 
     if (maneuver.actionType === 'grant_attack') {
         description += ` Choose a willing ally to add ${dieValue} to their next attack's damage roll.`;
-        const cs = await getCombatContext(campaignName);
-        const allies = (cs?.creatures || []).filter(c => c.name !== playerStats.name);
-        const options = allies.map(a => ({ label: a.name, value: a.name }));
-
-        if (options.length === 0) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: maneuver.name,
-                    description: `${maneuver.name}: No allies available to receive the attack.`,
-                    automation: auto,
-                },
-            };
-        }
-
-        const logEntry = {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: maneuver.name,
-            description,
-        };
-        return {
-            type: 'modal',
-            modalName: 'commanderStrikeChoice',
-            payload: {
-                playerStats,
-                campaignName,
-                dieValue,
-                maneuverName: maneuver.name,
-                options,
-                description,
-            },
-            logEntries: [logEntry],
-        };
+        return buildGrantAttackModal(maneuver, auto, description, dieValue, playerStats, campaignName);
     }
 
     if (maneuver.effect === 'ac_bonus_and_swap') {
         description += ` You or an ally gains +${dieValue} AC until the start of your next turn.`;
-        const cs = await getCombatContext(campaignName);
-        const allies = cs?.creatures?.filter(c =>
-            c.name !== playerStats.name
-        ) || [];
-        const options = [
-            { label: `Myself (${playerStats.name})`, value: playerStats.name },
-            ...allies.map(a => ({ label: a.name, value: a.name })),
-        ];
-        const logEntry = {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: maneuver.name,
-            description,
-        };
-        return {
-            type: 'modal',
-            modalName: 'baitAndSwitchChoice',
-            payload: {
-                playerStats,
-                campaignName,
-                dieValue,
-                maneuverName: maneuver.name,
-                options,
-                description,
-            },
-            logEntries: [logEntry],
-        };
+        return buildBaitAndSwitchModal(maneuver, auto, description, dieValue, playerStats, campaignName);
     }
 
     if (maneuver.effect === 'ac_bonus_disengage') {
@@ -234,184 +146,19 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
     }
 
     if (maneuver.effect === 'temp_hp') {
-        const fighterLevel = playerStats.level || 1;
-        const extraHpRaw = maneuver.extraHpExpression
-            ? evaluateAutoExpression(maneuver.extraHpExpression, playerStats)
-            : Math.floor(fighterLevel / 2);
-        const extraHp = typeof extraHpRaw === 'number' ? Math.floor(extraHpRaw) : Math.floor(fighterLevel / 2);
-        const totalHp = dieValue + extraHp;
-        const cs = await getCombatContext(campaignName);
-        const allies = cs?.creatures?.filter(c => c.name !== playerStats.name) || [];
-        if (allies.length === 0) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: maneuver.name,
-                    description: `${maneuver.name}: No allies available to receive Rally.`,
-                },
-            };
-        }
-        const allyOptions = allies.map(a => ({ label: a.name, value: a.name }));
-        const logEntry = {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: maneuver.name,
-            description: `${maneuver.name}: Choose an ally to gain temporary hit points.`,
-        };
-        return {
-            type: 'modal',
-            modalName: 'rallyChoice',
-            payload: {
-                playerStats,
-                campaignName,
-                dieValue,
-                maneuverName: maneuver.name,
-                allyOptions,
-                totalHp,
-                extraHp,
-                description,
-            },
-            logEntries: [logEntry],
-        };
+        return buildRallyModal(maneuver, description, dieValue, playerStats, campaignName);
     }
 
     if (maneuver.effect === 'damage_reduction') {
-        const strMod = (playerStats.abilities || []).find(a => a.name === 'Strength')?.bonus || 0;
-        const dexMod = (playerStats.abilities || []).find(a => a.name === 'Dexterity')?.bonus || 0;
-        const mod = Math.max(strMod, dexMod);
-        const reduction = dieValue + mod;
-        description += ` Damage reduced by ${reduction} (${dieValue} + ${mod} from STR/DEX modifier).`;
-        const storedMaxHp = getRuntimeValue(playerStats.name, 'hitPoints', campaignName);
-        const storedCurrentHp = getRuntimeValue(playerStats.name, 'currentHitPoints', campaignName);
-        const maxHp = storedMaxHp != null ? Number(storedMaxHp) : (storedCurrentHp || 10);
-        const currentHp = storedCurrentHp != null ? Number(storedCurrentHp) : 10;
-        const newHp = Math.min(maxHp, currentHp + reduction);
-        if (newHp !== currentHp) {
-            await setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
-        }
-        description += ` HP restored: ${currentHp} → ${newHp}.`;
+        description += await runDamageReduction(maneuver, playerStats, dieValue, campaignName);
     }
 
     if (maneuver.effect === 'melee_attack_reaction') {
-        await setRuntimeValue(playerStats.name, 'pendingRiposteDieValue', dieValue, campaignName);
-
-        const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
-        const riposteTarget = lastAttack?.attackerName || targetName;
-
-        if (riposteTarget && riposteTarget !== targetName && maneuver.effect !== 'ac_bonus_disengage' && maneuver.effect !== 'ac_bonus_and_swap' && maneuver.effect !== 'damage_reduction') {
-            description = description.replace(`Target: ${targetName}.`, `Target: ${riposteTarget}.`);
-        }
-
-        const meleeAttacks = filterMeleeAttacks(playerStats.attacks);
-        const attack = meleeAttacks.length > 0 ? meleeAttacks[0] : (playerStats.attacks || [])[0];
-
-        if (!attack) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: maneuver.name,
-                    description: `${maneuver.name}: No melee attack available.`,
-                    automation: auto,
-                },
-            };
-        }
-
-        const logEntry = {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: maneuver.name,
-            description,
-        };
-        const popupPayload = {
-            type: 'automation_info',
-            name: maneuver.name,
-            description,
-            automation: auto,
-        };
-        return {
-            type: 'attack_roll',
-            payload: {
-                attack,
-                targetName: riposteTarget,
-            },
-            context: {
-                superiorityDieValue: dieValue,
-                superiorityDieSize: superiorityDieSize,
-                baseDamageFormula: attack.damage,
-                baseDamageType: attack.damageType,
-            },
-            logEntries: [logEntry],
-            popup: popupPayload,
-        };
+        return runRiposte(maneuver, auto, description, targetName, dieValue, superiorityDieSize, playerStats, campaignName);
     }
 
     if (maneuver.effect === 'secondary_damage') {
-        // MN-018: Sweeping Attack must offer a real chooser for a creature within
-        // 5 feet of the ORIGINAL target and re-use the ORIGINAL attack roll vs that
-        // creature's AC. The die is already expended above. Stash the pending
-        // payload (RAW combatants — CLA-326 crash lesson) so executeSweepingAttack
-        // can run the AC test + apply damage on confirm. No phantom damage claim.
-        const cs = await getCombatContext(campaignName);
-        const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
-        const damageType = lastAttack?.damageType || maneuver.damageType || (console.error('[MN-018] Sweeping Attack: no original attack damageType in lastAttack'), 'Slashing');
-        const attackBonus = lastAttack?.bonus || 0;
-        const originalTotal = lastAttack?.total ?? attackBonus;
-        const originalD20Roll = lastAttack?.d20Roll ?? (originalTotal - attackBonus);
-
-        const candidates = (cs?.creatures || []).filter(c =>
-            c.name !== targetName && c.name !== playerStats.name
-        );
-        const rawSecondary = [];
-        for (const c of candidates) {
-            // 5 ft of the original target gate (gridless resolves LENIENT per §7).
-            const ok = await isWithinRange(targetName, c.name, 5);
-            if (ok) rawSecondary.push(c);
-        }
-
-        if (rawSecondary.length === 0) {
-            const desc = `${maneuver.name}: ${dieDescription} No other creature is within 5 feet of ${targetName || 'the original target'}.`;
-            return {
-                type: 'popup',
-                payload: { type: 'automation_info', name: maneuver.name, description: desc, automation: auto },
-                logEntries: [{ type: 'ability_use', characterName: playerStats.name, abilityName: maneuver.name, description: desc }],
-            };
-        }
-
-        await setRuntimeValue(playerStats.name, 'pendingSweepingAttack', {
-            dieValue,
-            damageType,
-            primaryTarget: targetName,
-            targetName,
-            originalTotal,
-            originalD20Roll,
-            attackBonus,
-            secondaryTargets: rawSecondary,
-        }, campaignName);
-
-        const chooserDescription = `${maneuver.name}: ${dieDescription} Choose a creature within 5 feet of ${targetName || 'the original target'} — the original attack roll (${originalTotal}) is reused against its AC; if it would hit, it takes ${dieValue} ${damageType} damage.`;
-
-        return {
-            type: 'modal',
-            modalName: 'sweepingAttackTarget',
-            payload: {
-                playerStats,
-                campaignName,
-                dieValue,
-                damageType,
-                primaryTarget: targetName,
-                targetName,
-                secondaryTargets: rawSecondary,
-                description: chooserDescription,
-            },
-            logEntries: [{
-                type: 'ability_use',
-                characterName: playerStats.name,
-                abilityName: maneuver.name,
-                description: `${maneuver.name}: ${dieDescription} Expend 1 Superiority Die.`,
-            }],
-        };
+        return runSweepingAttack(maneuver, auto, dieDescription, dieValue, targetName, playerStats, campaignName);
     }
 
     if (maneuver.effect === 'attack_roll_bonus') {
@@ -440,6 +187,298 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
             automation: auto,
         },
         logEntries: [logEntry],
+    };
+}
+
+// Effects that carry no explicit target suffix in the maneuver description.
+const NO_TARGET_SUFFIX_EFFECTS = new Set([
+    'ac_bonus_disengage',
+    'ac_bonus_and_swap',
+    'damage_reduction',
+    'dash_and_damage',
+]);
+
+// MN-012: attack riders used from the pending-prompt path
+// ("Combat Superiority — Use Maneuver") have no pipeline consumer for
+// the rolled die — apply it to the target directly (CLA-192 pattern:
+// await applyDamageToTarget and let it log hp_change).
+async function applyDamageBonusRider(maneuver, auto, targetName, dieValue, playerStats, campaignName) {
+    if (!(maneuver.actionType === 'attack_rider' && targetName)) return '';
+    const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
+    if (!lastAttack?.hit) return '';
+    const cs = await getCombatContext(campaignName);
+    const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
+    const dmgType = lastAttack.damageType || maneuver.damageType || 'force';
+    const applyResult = await applyDamageToTarget(cs, targetName, dieValue, [dmgType], campaignName, characters, false, playerStats.name);
+    if (applyResult && applyResult.finalDamage > 0) {
+        return ` ${targetName} takes ${applyResult.finalDamage} ${dmgType} damage.`;
+    }
+    return '';
+}
+
+async function runManeuverSave(maneuver, auto, targetName, playerStats, campaignName) {
+    const saveDc = buildSaveDc(auto, playerStats);
+    const { promise } = createSaveListener(campaignName, {
+        targetName,
+        saveType: maneuver.saveType,
+        saveDc,
+    });
+
+    const saveResult = await promise;
+    const success = saveResult.success;
+
+    let description = ` Target made ${maneuver.saveType} save DC ${saveDc}: ${success ? 'Success' : 'Failure'}.`;
+    description += await processManeuverSaveResult(maneuver, targetName, saveDc, success, playerStats, campaignName);
+    return description;
+}
+
+async function buildGrantAttackModal(maneuver, auto, description, dieValue, playerStats, campaignName) {
+    const cs = await getCombatContext(campaignName);
+    const allies = (cs?.creatures || []).filter(c => c.name !== playerStats.name);
+    const options = allies.map(a => ({ label: a.name, value: a.name }));
+
+    if (options.length === 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: maneuver.name,
+                description: `${maneuver.name}: No allies available to receive the attack.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const logEntry = {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: maneuver.name,
+        description,
+    };
+    return {
+        type: 'modal',
+        modalName: 'commanderStrikeChoice',
+        payload: {
+            playerStats,
+            campaignName,
+            dieValue,
+            maneuverName: maneuver.name,
+            options,
+            description,
+        },
+        logEntries: [logEntry],
+    };
+}
+
+async function buildBaitAndSwitchModal(maneuver, auto, description, dieValue, playerStats, campaignName) {
+    const cs = await getCombatContext(campaignName);
+    const allies = cs?.creatures?.filter(c =>
+        c.name !== playerStats.name
+    ) || [];
+    const options = [
+        { label: `Myself (${playerStats.name})`, value: playerStats.name },
+        ...allies.map(a => ({ label: a.name, value: a.name })),
+    ];
+    const logEntry = {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: maneuver.name,
+        description,
+    };
+    return {
+        type: 'modal',
+        modalName: 'baitAndSwitchChoice',
+        payload: {
+            playerStats,
+            campaignName,
+            dieValue,
+            maneuverName: maneuver.name,
+            options,
+            description,
+        },
+        logEntries: [logEntry],
+    };
+}
+
+async function buildRallyModal(maneuver, description, dieValue, playerStats, campaignName) {
+    const fighterLevel = playerStats.level || 1;
+    const extraHpRaw = maneuver.extraHpExpression
+        ? evaluateAutoExpression(maneuver.extraHpExpression, playerStats)
+        : Math.floor(fighterLevel / 2);
+    const extraHp = typeof extraHpRaw === 'number' ? Math.floor(extraHpRaw) : Math.floor(fighterLevel / 2);
+    const totalHp = dieValue + extraHp;
+    const cs = await getCombatContext(campaignName);
+    const allies = cs?.creatures?.filter(c => c.name !== playerStats.name) || [];
+    if (allies.length === 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: maneuver.name,
+                description: `${maneuver.name}: No allies available to receive Rally.`,
+            },
+        };
+    }
+    const allyOptions = allies.map(a => ({ label: a.name, value: a.name }));
+    const logEntry = {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: maneuver.name,
+        description: `${maneuver.name}: Choose an ally to gain temporary hit points.`,
+    };
+    return {
+        type: 'modal',
+        modalName: 'rallyChoice',
+        payload: {
+            playerStats,
+            campaignName,
+            dieValue,
+            maneuverName: maneuver.name,
+            allyOptions,
+            totalHp,
+            extraHp,
+            description,
+        },
+        logEntries: [logEntry],
+    };
+}
+
+async function runDamageReduction(maneuver, playerStats, dieValue, campaignName) {
+    const strMod = (playerStats.abilities || []).find(a => a.name === 'Strength')?.bonus || 0;
+    const dexMod = (playerStats.abilities || []).find(a => a.name === 'Dexterity')?.bonus || 0;
+    const mod = Math.max(strMod, dexMod);
+    const reduction = dieValue + mod;
+    let description = ` Damage reduced by ${reduction} (${dieValue} + ${mod} from STR/DEX modifier).`;
+    const storedMaxHp = getRuntimeValue(playerStats.name, 'hitPoints', campaignName);
+    const storedCurrentHp = getRuntimeValue(playerStats.name, 'currentHitPoints', campaignName);
+    const maxHp = storedMaxHp != null ? Number(storedMaxHp) : (storedCurrentHp || 10);
+    const currentHp = storedCurrentHp != null ? Number(storedCurrentHp) : 10;
+    const newHp = Math.min(maxHp, currentHp + reduction);
+    if (newHp !== currentHp) {
+        await setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
+    }
+    description += ` HP restored: ${currentHp} → ${newHp}.`;
+    return description;
+}
+
+async function runRiposte(maneuver, auto, description, targetName, dieValue, superiorityDieSize, playerStats, campaignName) {
+    await setRuntimeValue(playerStats.name, 'pendingRiposteDieValue', dieValue, campaignName);
+
+    const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
+    const riposteTarget = lastAttack?.attackerName || targetName;
+
+    if (riposteTarget && riposteTarget !== targetName) {
+        description = description.replace(`Target: ${targetName}.`, `Target: ${riposteTarget}.`);
+    }
+
+    const meleeAttacks = filterMeleeAttacks(playerStats.attacks);
+    const attack = meleeAttacks.length > 0 ? meleeAttacks[0] : (playerStats.attacks || [])[0];
+
+    if (!attack) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: maneuver.name,
+                description: `${maneuver.name}: No melee attack available.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const logEntry = {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: maneuver.name,
+        description,
+    };
+    const popupPayload = {
+        type: 'automation_info',
+        name: maneuver.name,
+        description,
+        automation: auto,
+    };
+    return {
+        type: 'attack_roll',
+        payload: {
+            attack,
+            targetName: riposteTarget,
+        },
+        context: {
+            superiorityDieValue: dieValue,
+            superiorityDieSize: superiorityDieSize,
+            baseDamageFormula: attack.damage,
+            baseDamageType: attack.damageType,
+        },
+        logEntries: [logEntry],
+        popup: popupPayload,
+    };
+}
+
+// MN-018: Sweeping Attack must offer a real chooser for a creature within
+// 5 feet of the ORIGINAL target and re-use the ORIGINAL attack roll vs that
+// creature's AC. The die is already expended above. Stash the pending
+// payload (RAW combatants — CLA-326 crash lesson) so executeSweepingAttack
+// can run the AC test + apply damage on confirm. No phantom damage claim.
+async function runSweepingAttack(maneuver, auto, dieDescription, dieValue, targetName, playerStats, campaignName) {
+    const cs = await getCombatContext(campaignName);
+    const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
+    const damageType = lastAttack?.damageType || maneuver.damageType || (console.error('[MN-018] Sweeping Attack: no original attack damageType in lastAttack'), 'Slashing');
+    const attackBonus = lastAttack?.bonus || 0;
+    const originalTotal = lastAttack?.total ?? attackBonus;
+    const originalD20Roll = lastAttack?.d20Roll ?? (originalTotal - attackBonus);
+
+    const candidates = (cs?.creatures || []).filter(c =>
+        c.name !== targetName && c.name !== playerStats.name
+    );
+    const rawSecondary = [];
+    for (const c of candidates) {
+        // 5 ft of the original target gate (gridless resolves LENIENT per §7).
+        const ok = await isWithinRange(targetName, c.name, 5);
+        if (ok) rawSecondary.push(c);
+    }
+
+    if (rawSecondary.length === 0) {
+        const desc = `${maneuver.name}: ${dieDescription} No other creature is within 5 feet of ${targetName || 'the original target'}.`;
+        return {
+            type: 'popup',
+            payload: { type: 'automation_info', name: maneuver.name, description: desc, automation: auto },
+            logEntries: [{ type: 'ability_use', characterName: playerStats.name, abilityName: maneuver.name, description: desc }],
+        };
+    }
+
+    await setRuntimeValue(playerStats.name, 'pendingSweepingAttack', {
+        dieValue,
+        damageType,
+        primaryTarget: targetName,
+        targetName,
+        originalTotal,
+        originalD20Roll,
+        attackBonus,
+        secondaryTargets: rawSecondary,
+    }, campaignName);
+
+    const chooserDescription = `${maneuver.name}: ${dieDescription} Choose a creature within 5 feet of ${targetName || 'the original target'} — the original attack roll (${originalTotal}) is reused against its AC; if it would hit, it takes ${dieValue} ${damageType} damage.`;
+
+    return {
+        type: 'modal',
+        modalName: 'sweepingAttackTarget',
+        payload: {
+            playerStats,
+            campaignName,
+            dieValue,
+            damageType,
+            primaryTarget: targetName,
+            targetName,
+            secondaryTargets: rawSecondary,
+            description: chooserDescription,
+        },
+        logEntries: [{
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: maneuver.name,
+            description: `${maneuver.name}: ${dieDescription} Expend 1 Superiority Die.`,
+        }],
     };
 }
 

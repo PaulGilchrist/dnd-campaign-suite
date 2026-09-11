@@ -146,16 +146,9 @@ function hasRelentlessHunterExemption(creature, characters) {
   return rawClassLevels.some(cl => cl.level <= level && (cl.features || []).some(f => f.name === 'Relentless Hunter'));
 }
 
-export async function applyDamageToTarget(combatSummary, targetName, rawDamage, damageTypes, campaignName, characters, ignoreResistance = false, attackerName = null, suppressHpLog = false, options = {}) {
-  if (!combatSummary) return null;
-  const creature = combatSummary.creatures.find(c => c.name === targetName);
-  if (!creature) return null;
-  if (isNaN(rawDamage) || rawDamage === null || rawDamage === undefined) return null;
-
-  const existingAttack = getRuntimeValue('campaign', 'lastAttack') || null;
+function buildLastAttackUpdate(existingAttack, attackerName, targetName, rawDamage, damageTypes) {
   const isSecondary = existingAttack?.primaryDamage != null;
-  let holyAuraSaveResult = null;
-  const newLastAttack = {
+  return {
     ...existingAttack,
     attackerName: attackerName || existingAttack?.attackerName || null,
     targetName,
@@ -172,24 +165,391 @@ export async function applyDamageToTarget(combatSummary, targetName, rawDamage, 
     damageApplied: true,
     timestamp: Date.now(),
   };
-  setRuntimeValue('campaign', 'lastAttack', newLastAttack, campaignName);
+}
 
-  const isPlayer = creature.type === 'player';
-  if (!Array.isArray(characters)) { throw new Error('characters must be an array'); }
+// CLA-336: passive resistances are read LIVE at hit-resolution (name included so
+// runtime-key gates inside getDamageResistances resolve), because computedStats is
+// only recomputed on character-JSON serial changes — runtime toggles never refresh it.
+function getPlayerPassiveResistances(creature, playerComputed, playerStats) {
+  const statsForPassives = playerComputed?.automation || playerStats?.automation;
+  if (statsForPassives?.passives?.length) {
+    return getDamageResistances({ name: creature.name, automation: statsForPassives });
+  }
+  return [];
+}
+
+function addBuffResistances(resistances, activeBuffs) {
+  for (const buff of activeBuffs) {
+    if (buff.resistanceTypes?.length) {
+      resistances = [...new Set([...resistances, ...buff.resistanceTypes])];
+    }
+  }
+  return resistances;
+}
+
+// Silence — Thunder immunity for ANY creature (player or monster) inside the silence zone
+function applySilenceThunderImmunity(creature, activeBuffs, immunities, campaignName) {
+  for (const buff of activeBuffs) {
+    if (buff.effect === 'silence' && buff.sourceCharacter) {
+      if (isCreatureInSilenceZone(creature.name, buff.sourceCharacter, campaignName)) {
+        if (!immunities.some(i => String(i).toLowerCase() === 'thunder')) {
+          immunities = [...immunities, 'Thunder'];
+        }
+        return { immunities, silenceThunderImmunity: true };
+      }
+    }
+  }
+  return { immunities, silenceThunderImmunity: false };
+}
+
+function logSpellResistance(creature, rawDamage, finalDamage, campaignName) {
+  addEntry(campaignName, {
+    type: 'automation',
+    creatureName: creature.name,
+    name: 'Spell Resistance',
+    description: `${creature.name} has resistance to damage of spells — ${rawDamage} spell damage halved to ${finalDamage}.`,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error('[applyDamage] Spell Resistance log failed:', e); });
+}
+
+// CLA-336: concrete-type resistance from passive passives (e.g. Stormborn
+// Cold/Lightning/Thunder while Wrath of the Sea is active) halves damage — log it.
+function logPassiveResistance(creature, rawDamage, finalDamage, resistanceDetails, passiveResistances, campaignName) {
+  const matchedPassiveTypes = resistanceDetails
+    .filter(rd => rd.status === 'resistant' &&
+      passiveResistances.some(pr => String(pr).toLowerCase() === String(rd.damageType).toLowerCase()))
+    .map(rd => rd.damageType);
+  if (matchedPassiveTypes.length === 0) return;
+  addEntry(campaignName, {
+    type: 'automation',
+    creatureName: creature.name,
+    name: 'Damage Resistance',
+    description: `${creature.name} has resistance to ${matchedPassiveTypes.join(', ')} damage — ${rawDamage} damage halved to ${finalDamage}.`,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error('[applyDamage] Damage Resistance log failed:', e); });
+}
+
+function logSilenceImmunity(creature, rawDamage, campaignName) {
+  addEntry(campaignName, {
+    type: 'automation',
+    creatureName: creature.name,
+    name: 'Silence',
+    description: `${creature.name} is immune to Thunder damage inside the Silence zone — ${rawDamage} damage negated.`,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error('[applyDamage] Silence immunity log failed:', e); });
+}
+
+// Apply damage reduction from features (e.g., Heavy Armor Master)
+function applyFeatureDamageReduction(creature, playerComputed, playerStats, damageTypes, finalDamage, campaignName) {
+  let damageReducedByFeature = 0;
+  const allEquipment = (playerComputed?.equipment || playerStats?.equipment || []);
+  const equippedArmor = allEquipment.find(e => e.equipped);
+  const armorName = equippedArmor?.name;
+  let isWearingHeavyArmor = false;
+  if (armorName) {
+    const armor = allEquipment.find(e => e.name === armorName && e.equipped);
+    if (armor && ['Heavy', 'heavy'].includes(armor.armor_category)) {
+      isWearingHeavyArmor = true;
+    }
+  }
+  const reduction = getDamageReduction(playerComputed, damageTypes[0], isWearingHeavyArmor);
+  if (reduction !== null && reduction > 0) {
+    damageReducedByFeature = reduction;
+    finalDamage = Math.max(0, finalDamage - reduction);
+    const hasResistanceTrigger = (playerComputed.automation?.passives || []).some(
+      p => p.type === 'damage_reduction' && p.trigger === 'damage_taken_of_chosen_resistance_type'
+    );
+    if (hasResistanceTrigger) {
+      setRuntimeValue(creature.name, 'resistanceUsedThisTurn', true, campaignName);
+    }
+  }
+  return { finalDamage, damageReducedByFeature };
+}
+
+// Self-damage: Arcane Ward absorbs damage to the wizard themselves
+function absorbIntoArcaneWard(creature, wardDamage, campaignName) {
+  const wardActive = getRuntimeValue(creature.name, 'arcaneWardActive', campaignName);
+  if (!wardActive) return wardDamage;
+  const wardHp = Number(getRuntimeValue(creature.name, 'arcaneWardHp', campaignName) ?? 0);
+  if (wardHp <= 0) return wardDamage;
+  const wardAbsorbed = Math.min(wardDamage, wardHp);
+  const newWardHp = wardHp - wardAbsorbed;
+  setRuntimeValue(creature.name, 'arcaneWardHp', newWardHp, campaignName);
+  return wardDamage - wardAbsorbed;
+}
+
+// Temp HP absorbs damage first for all creatures
+function absorbWithTempHp(creature, damage, campaignName) {
+  let damageAfterTempHp = damage;
+  const currentTempHp = Number(getRuntimeValue(creature.name, 'tempHp', campaignName) || 0);
+  if (currentTempHp > 0) {
+    const absorbed = Math.min(damageAfterTempHp, currentTempHp);
+    damageAfterTempHp -= absorbed;
+    setRuntimeValue(creature.name, 'tempHp', currentTempHp - absorbed, campaignName);
+  }
+  return damageAfterTempHp;
+}
+
+// Polymorph: when the beast form's temp-HP buffer is depleted, the transformation ends
+async function revertPolymorphIfBufferDepleted(creature, campaignName) {
+  const polymorphBuffer = Number(getRuntimeValue(creature.name, 'polymorphTempHp', campaignName) || 0);
+  const tempHpAfterDrain = Number(getRuntimeValue(creature.name, 'tempHp', campaignName) || 0);
+  if (polymorphBuffer > 0 && tempHpAfterDrain <= 0) {
+    await revertPolymorph(creature.name, campaignName);
+  }
+}
+
+function applyPlayerHpDamage(creature, damageAfterTempHp, options, campaignName, rawDamage, finalDamage) {
+  const storedCurrentHp = getRuntimeValue(creature.name, 'currentHitPoints');
+  if (storedCurrentHp == null) {
+    const store = getStore(creature.name);
+    const storeKeys = [...store.keys()];
+    console.error(`[applyDamage] currentHitPoints not found for "${creature.name}"`, {
+      creatureNameChars: JSON.stringify(creature.name),
+      campaignName,
+      storeKeys,
+      creatureType: creature.type,
+      rawDamage,
+      finalDamage,
+    });
+    throw new Error(`currentHitPoints not found for ${JSON.stringify(creature.name)}`);
+  }
+
+  const oldHp = storedCurrentHp;
+  let newHp = Math.max(0, oldHp - damageAfterTempHp);
+  const actualDamageTaken = oldHp - newHp;
+  // If RE already fired in this damage sequence, don't let follow-up hits re-kill
+  if (options?.damageSequenceId && _reTriggeredSequenceIds.has(options.damageSequenceId) && newHp <= 0 && oldHp > 0) {
+    newHp = 1;
+  }
+  setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
+
+  if (creature.wildShapeSource && newHp <= 0 && oldHp > 0) {
+    cleanupWildShape(creature.name, campaignName);
+    setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName);
+    setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);
+  }
+  return { oldHp, newHp, actualDamageTaken };
+}
+
+function applyCreatureHpDamage(creature, damageAfterTempHp, options, campaignName) {
+  const oldHp = creature.currentHp;
+  let newHp = Math.max(0, oldHp - damageAfterTempHp);
+  const actualDamageTaken = oldHp - newHp;
+  if (options?.damageSequenceId && _reTriggeredSequenceIds.has(options.damageSequenceId) && newHp <= 0 && oldHp > 0) {
+    newHp = 1;
+  }
+  creature.currentHp = newHp;
+
+  if (creature.wildShapeSource && newHp <= 0 && oldHp > 0) {
+    const druidName = creature.wildShapeSource;
+    cleanupWildShape(druidName, campaignName);
+    setRuntimeValue(druidName, 'currentHitPoints', 0, campaignName);
+    setRuntimeValue(druidName, 'deathSaves', [false, false, false], campaignName);
+    setRuntimeValue(druidName, 'deathFailures', [false, false, false], campaignName);
+  }
+  return { oldHp, newHp, actualDamageTaken };
+}
+
+// Update lastAttack with actual HP damage dealt (after resistances, feature reduction, ward absorption)
+function recordActualDamageInLastAttack(isSecondary, wardDamage, campaignName) {
+  const existing = getRuntimeValue('campaign', 'lastAttack') || null;
+  if (!existing) return;
+  existing.actualDamage = isSecondary ? (existing.actualDamage || 0) + wardDamage : wardDamage;
+  setRuntimeValue('campaign', 'lastAttack', existing, campaignName);
+}
+
+// Projected Ward: record recent damage on the damaged player so an Abjurer's
+// reaction (arcaneWardHandler) can roll back-absorb it. Mirrors the
+// bastionOfLawLastAttackDamage record mechanism (campaign lastAttack).
+function recordProjectedWardDamage(creature, actualDamageTaken, isSecondary, attackerName, damageTypes, campaignName) {
+  const damagedIsWarden = getRuntimeValue(creature.name, 'arcaneWardActive', campaignName);
+  if (damagedIsWarden || actualDamageTaken <= 0) return;
+  const prevRecord = getRuntimeValue(creature.name, 'projectedWardDamage', campaignName);
+  const sameSequence = isSecondary && prevRecord && attackerName && prevRecord.attackerName === attackerName;
+  const recordedDamage = actualDamageTaken + (sameSequence ? Number(prevRecord.rawDamage || 0) : 0);
+  setRuntimeValue(creature.name, 'projectedWardDamage', {
+    rawDamage: recordedDamage,
+    damageType: damageTypes[0] || null,
+    attackerName: attackerName || null,
+    timestamp: Date.now(),
+  }, campaignName);
+}
+
+function removeConditionFromList(creature, conditions, conditionKey, displayName, reason, campaignName) {
+  if (!conditions.some(c => String(c).toLowerCase() === conditionKey)) return;
+  const filtered = conditions.filter(c => String(c).toLowerCase() !== conditionKey);
+  setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
+  addEntry(campaignName, {
+    type: 'condition',
+    action: 'removed',
+    characterName: creature.name,
+    condition: displayName,
+    reason,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error("[applyDamage] Error:", e); });
+}
+
+// Frightened always ends on damage; Charmed ends on damage unless the target is
+// dominated (dominated targets get a repeat save instead — see handleDominateRepeatSave).
+// Both removals filter the SAME single-read condition list, preserving the original
+// last-write-wins semantics when a creature holds both conditions at once.
+function removeCombatConditionsOnDamage(creature, domination, isPlayer, campaignName) {
+  const conditions = getRuntimeValue(creature.name, 'activeConditions') || [];
+  removeConditionFromList(creature, conditions, 'frightened', 'Frightened', 'took damage', campaignName);
+  if (!domination) {
+    const reason = isPlayer ? 'took damage (Friends)' : 'took damage (Charm)';
+    removeConditionFromList(creature, conditions, 'charmed', 'Charmed', reason, campaignName);
+  }
+}
+
+// Supreme Sneak: while Stealth Attack is active, an attacker that hits while Invisible
+// KEEPS the Invisible condition (no removal happens here; the stealthAttackCost is
+// cleared at the start of the attacker's next turn).
+function preserveInvisibleOnStealthAttack(attackerName, campaignName) {
+  const stealthAttackCost = getRuntimeValue(attackerName, 'stealthAttackCost', campaignName);
+  if (!stealthAttackCost || stealthAttackCost <= 0) return;
+  // Preserve Invisible condition — don't remove it
+}
+
+// Compelled Duel: the effect ends if the target takes damage from anyone other than the caster
+function endDuelIfDamagedByOther(creature, attackerName, campaignName) {
+  if (!attackerName || attackerName === creature.name) return;
+  const duelEffects = (getRuntimeValue('campaign', 'targetEffects') || []).filter(
+    te => te.effect === 'compelled_duel' && te.target === creature.name && te.source !== attackerName
+  );
+  if (duelEffects.length > 0) {
+    endCompelledDuel(duelEffects[0].source, creature.name, campaignName,
+      `${attackerName} damaged ${creature.name}, breaking the duel.`);
+  }
+}
+
+// Clean up Avenging Angel Frightful Aura tracking list when a creature takes damage
+function cleanupAvengingAngelAuras(creature, characters, campaignName) {
+  for (const char of characters) {
+    if (isAvengingAngelActive(char.name, campaignName)) {
+      cleanupAuraTargetOnDamage(char.name, creature.name, campaignName).catch(e => {
+        console.error('[applyDamage] Avenging Angel aura cleanup failed:', e);
+      });
+    }
+  }
+}
+
+// Dispatch order is rule-significant: features intercept drop-to-0 in this exact order,
+// each short-circuiting the rest. Relentless Endurance additionally marks the damage
+// sequence so follow-up hits in the same sequence don't re-kill.
+const ZERO_HP_INTERCEPTORS = [
+  { check: checkUndyingSentinel, name: 'Undying Sentinel' },
+  { check: checkBoonOfRecoveryLastStand, name: 'Boon of Recovery' },
+  { check: checkRelentlessEndurance, name: 'Relentless Endurance' },
+  { check: checkRelentlessRage, name: 'Relentless Rage' },
+  { check: checkDeathWard, name: 'Death Ward' },
+];
+
+function interceptZeroHitPoints(creature, playerComputed, options, finalDamage, oldHp, campaignName) {
+  for (const interceptor of ZERO_HP_INTERCEPTORS) {
+    const result = interceptor.check(creature, playerComputed, campaignName);
+    if (result.intercepted) {
+      if (interceptor.name === 'Relentless Endurance' && options?.damageSequenceId) {
+        _reTriggeredSequenceIds.add(options.damageSequenceId);
+      }
+      return { ...result, damageDealt: finalDamage, oldHp, interceptedFeature: interceptor.name };
+    }
+  }
+  return null;
+}
+
+// Player concentration: queue a CON save prompt (or log the Relentless Hunter exemption).
+// Returns true when the combat summary was marked changed (prompt queued).
+function promptPlayerConcentrationSave(creature, characters, attackerName, campaignName) {
+  if (hasRelentlessHunterExemption(creature, characters)) {
+    addEntry(campaignName, {
+      type: 'condition',
+      action: 'maintained',
+      characterName: creature.name,
+      condition: 'Concentration on Hunter\'s Mark',
+      sourceName: 'Relentless Hunter',
+    }).catch((e) => { console.error("[applyDamage] Error:", e); });
+    return false;
+  }
+  const promptId = utils.guid();
+  sendConcentrationPrompt(campaignName, {
+    promptId,
+    targetName: creature.name,
+    spellName: creature.concentration.spell,
+    dc: creature.concentration.dc,
+    attackerName,
+  });
+  return true;
+}
+
+// NPC concentration: auto-roll the CON save inline. Returns true when broken.
+function handleNpcConcentrationBreak(creature, characters, attackerName, combatSummary, campaignName) {
+  const saveBonus = creature?.saveBonuses?.['con'] ?? 0;
+  const rawActiveBuffs = getRuntimeValue(creature.name, 'activeBuffs');
+  const activeBuffs = Array.isArray(rawActiveBuffs) ? rawActiveBuffs : [];
+  const dragonConstellationActive = activeBuffs.some(b => b.name === 'Starry Form' && b.constellation === 'Dragon');
+
+  if (hasRelentlessHunterExemption(creature, characters)) {
+    addEntry(campaignName, {
+      type: 'condition',
+      action: 'maintained',
+      characterName: creature.name,
+      condition: 'Concentration on Hunter\'s Mark',
+      sourceName: 'Relentless Hunter',
+    }).catch((e) => { console.error("[applyDamage] Error:", e); });
+    return false;
+  }
+
+  const attacker = attackerName ? characters.find(c => c.name === attackerName || c.name.startsWith(attackerName + ' ')) : null;
+  const attackerModifiers = attacker?.saveModifiers || attacker?.computedStats?.saveModifiers;
+  const hasConcentrationBreaker = attackerModifiers?.some(mod =>
+    mod.condition === 'concentration_breaker' && mod.effect === 'disadvantage'
+  ) ?? false;
+  const { success, roll, total, rawRolls } = rollConcentrationSave(saveBonus, creature.concentration.dc, dragonConstellationActive, hasConcentrationBreaker);
+  if (!success) {
+    const spellName = creature.concentration.spell;
+    creature.concentration = null;
+    stripSummonedFromCombatSummary(combatSummary, creature.name);
+    addEntry(campaignName, {
+      type: 'condition',
+      action: 'removed',
+      characterName: creature.name,
+      condition: 'Concentrating on ' + spellName,
+      sourceName: 'Concentration broken by damage',
+    }).catch((e) => { console.error("[applyDamage] Error:", e); });
+    cleanupConcentrationEffects(creature.name, spellName, campaignName);
+    return true;
+  }
+  addEntry(campaignName, {
+    type: 'roll',
+    characterName: creature.name,
+    rollType: 'save',
+    name: 'Concentration Save',
+    targetName: creature.concentration.spell,
+    rolls: rawRolls || [roll],
+    mode: hasConcentrationBreaker ? 'disadvantage' : 'normal',
+    total: total,
+    bonus: total - roll,
+    saveType: 'CON',
+    saveDc: creature.concentration.dc,
+    saveResult: 'success',
+  }).catch((e) => { console.error("[applyDamage] Error:", e); });
+  return false;
+}
+
+// Resolve the defender's full resistance/immunity profile: computed stats (players),
+// passive passives (CLA-336, read LIVE), buff-granted resistances, Silence thunder
+// immunity, and aura-granted resistances.
+async function resolveCreatureDefenses(creature, targetName, isPlayer, characters, campaignName) {
   const playerStats = isPlayer ? characters.find(c => c.name === targetName || c.name.startsWith(targetName + ' ')) : null;
   const playerComputed = playerStats?.computedStats || playerStats;
   let resistances = isPlayer ? (playerComputed?.resistances || []) : (creature.resistances || []);
-  // CLA-336: passive resistances are read LIVE at hit-resolution (name included so
-  // runtime-key gates inside getDamageResistances resolve), because computedStats is
-  // only recomputed on character-JSON serial changes — runtime toggles never refresh it.
   let passiveResistances = [];
   if (isPlayer && playerStats) {
-    const statsForPassives = playerComputed?.automation || playerStats?.automation;
-    if (statsForPassives?.passives?.length) {
-      passiveResistances = getDamageResistances({ name: creature.name, automation: statsForPassives });
-      if (passiveResistances.length > 0) {
-        resistances = [...new Set([...resistances, ...passiveResistances])];
-      }
+    passiveResistances = getPlayerPassiveResistances(creature, playerComputed, playerStats);
+    if (passiveResistances.length > 0) {
+      resistances = [...new Set([...resistances, ...passiveResistances])];
     }
   }
   let immunities = isPlayer ? (playerComputed?.immunities || []) : (creature.immunities || []);
@@ -198,466 +558,198 @@ export async function applyDamageToTarget(combatSummary, targetName, rawDamage, 
   const activeBuffs = Array.isArray(rawBuffs) ? rawBuffs : [];
 
   if (isPlayer) {
-    for (const buff of activeBuffs) {
-       if (buff.resistanceTypes?.length) {
-           resistances = [...new Set([...resistances, ...buff.resistanceTypes])];
-       }
-   }
+    resistances = addBuffResistances(resistances, activeBuffs);
   }
-  // Silence — Thunder immunity for ANY creature (player or monster) inside the silence zone
-  let silenceThunderImmunity = false;
-  for (const buff of activeBuffs) {
-      if (buff.effect === 'silence' && buff.sourceCharacter) {
-          if (isCreatureInSilenceZone(creature.name, buff.sourceCharacter, campaignName)) {
-              if (!immunities.some(i => String(i).toLowerCase() === 'thunder')) {
-                  immunities = [...immunities, 'Thunder'];
-              }
-              silenceThunderImmunity = true;
-              break;
-          }
-      }
+  const silenceResult = applySilenceThunderImmunity(creature, activeBuffs, immunities, campaignName);
+  immunities = silenceResult.immunities;
+
+  // Aura-granted resistances (e.g., Aura of Warding) — computeAuraComboEffects self-filters
+  // to targets that are the source paladin or an ally within Aura of Protection range
+  const auraComboEffects = await computeAuraComboEffects({ targetName, characters });
+  if (auraComboEffects.resistances.length > 0) {
+    resistances = [...new Set([...resistances, ...auraComboEffects.resistances])];
   }
-// Aura-granted resistances (e.g., Aura of Warding) — computeAuraComboEffects self-filters
-// to targets that are the source paladin or an ally within Aura of Protection range
-const auraComboEffects = await computeAuraComboEffects({ targetName, characters });
-if (auraComboEffects.resistances.length > 0) {
-  resistances = [...new Set([...resistances, ...auraComboEffects.resistances])];
+
+  return { resistances, immunities, passiveResistances, silenceThunderImmunity: silenceResult.silenceThunderImmunity };
 }
-if (!Array.isArray(damageTypes)) { throw new Error('damageTypes must be an array'); }
-    let combatSummaryChanged = false;
-    // CLA-324: spell-origin is knowable from the damage payload (options.isSpellDamage) or
-    // the campaign lastAttack (spell-save stamps, monster-card save-attack stamps).
-    const spellOrigin = options?.isSpellDamage === true || existingAttack?.rollType === 'spell-save' || existingAttack?.isSpellDamage === true;
-    const resResult = computeDamageAfterResistancesWithDetails(rawDamage, damageTypes, resistances, immunities, ignoreResistance, spellOrigin);
-     let finalDamage = resResult.finalDamage;
-    let resistanceDetails = resResult.typeDetails;
 
-    if (spellOrigin && rawDamage > 0 && resistanceDetails.some(rd => rd.damageType === 'Spell' && rd.status === 'resistant')) {
-        addEntry(campaignName, {
-            type: 'automation',
-            creatureName: creature.name,
-            name: 'Spell Resistance',
-            description: `${creature.name} has resistance to damage of spells — ${rawDamage} spell damage halved to ${finalDamage}.`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error('[applyDamage] Spell Resistance log failed:', e); });
+// Post-computation resistance/immunity logs, in their original evaluation order.
+function logResistanceOutcomes(creature, rawDamage, finalDamage, damageTypes, resistanceDetails, passiveResistances, silenceThunderImmunity, spellOrigin, campaignName) {
+  if (spellOrigin && rawDamage > 0 && resistanceDetails.some(rd => rd.damageType === 'Spell' && rd.status === 'resistant')) {
+    logSpellResistance(creature, rawDamage, finalDamage, campaignName);
+  }
+
+  if (rawDamage > 0 && finalDamage < rawDamage) {
+    logPassiveResistance(creature, rawDamage, finalDamage, resistanceDetails, passiveResistances, campaignName);
+  }
+
+  if (silenceThunderImmunity && rawDamage > 0 && damageTypes.some(dt => String(dt).toLowerCase() === 'thunder')) {
+    logSilenceImmunity(creature, rawDamage, campaignName);
+  }
+}
+
+// Reaction/tracking events fired once damage actually lands (wardDamage > 0):
+// warding bond, dominate repeat saves, condition removal, psychic veil, holy aura,
+// compelled duel. Dispatch order is rule-significant — do not reorder.
+async function handleWardedDamageEvents(creature, combatSummary, characters, isPlayer, attackerName, wardDamage, campaignName) {
+  applyWardingBond(creature, combatSummary, campaignName, wardDamage);
+  let combatSummaryChanged = false;
+  // Dominate (Person/Monster/Beast): a dominated target repeats its WIS save
+  // on damage instead of the generic unconditional charm-strip.
+  const domination = findDomination(creature.name, combatSummary, campaignName);
+  if (domination) {
+    const summaryChanged = handleDominateRepeatSave(creature, isPlayer, domination, combatSummary, characters, campaignName, attackerName);
+    if (summaryChanged) combatSummaryChanged = true;
+  }
+  removeCombatConditionsOnDamage(creature, domination, isPlayer, campaignName);
+  if (attackerName && attackerName !== creature.name) {
+    checkPsychicVeil(attackerName, campaignName);
+    preserveInvisibleOnStealthAttack(attackerName, campaignName);
+  }
+
+  const holyAuraSaveResult = await checkHolyAuraDamage(creature, attackerName, combatSummary, campaignName, wardDamage);
+
+  endDuelIfDamagedByOther(creature, attackerName, campaignName);
+
+  return { combatSummaryChanged, holyAuraSaveResult };
+}
+
+// Concentration save is required when the target is concentrating and this hit
+// (or the sequence's accumulated total) counts as damage.
+function concentrationDamagePending(options, creature, damageTaken) {
+  return !options?.skipConcentration && creature.concentration && (damageTaken > 0 || options?.concentrationTotalDamage > 0);
+}
+
+// Player drop-to-0 interception + death-save prompt + concentration prompt.
+// Returns { interception, combatSummaryChanged } — the interception (when non-null)
+// must be returned verbatim from applyDamageToTarget.
+function handlePlayerZeroHpAndConcentration(creature, characters, playerComputed, options, wasAlive, isNowUnconscious, oldHp, finalDamage, actualDamageTaken, attackerName, campaignName) {
+  if (wasAlive && isNowUnconscious) {
+    const interception = interceptZeroHitPoints(creature, playerComputed, options, finalDamage, oldHp, campaignName);
+    if (interception) {
+      return { interception, combatSummaryChanged: false };
     }
 
-    // CLA-336: concrete-type resistance from passive passives (e.g. Stormborn
-    // Cold/Lightning/Thunder while Wrath of the Sea is active) halves damage — log it.
-    if (rawDamage > 0 && finalDamage < rawDamage) {
-        const matchedPassiveTypes = resistanceDetails
-            .filter(rd => rd.status === 'resistant' &&
-                passiveResistances.some(pr => String(pr).toLowerCase() === String(rd.damageType).toLowerCase()))
-            .map(rd => rd.damageType);
-        if (matchedPassiveTypes.length > 0) {
-            addEntry(campaignName, {
-                type: 'automation',
-                creatureName: creature.name,
-                name: 'Damage Resistance',
-                description: `${creature.name} has resistance to ${matchedPassiveTypes.join(', ')} damage — ${rawDamage} damage halved to ${finalDamage}.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[applyDamage] Damage Resistance log failed:', e); });
-        }
+    const promptId = utils.guid();
+    sendDeathSavePrompt(campaignName, {
+      promptId,
+      targetName: creature.name,
+    });
+  }
+
+  let combatSummaryChanged = false;
+  if (concentrationDamagePending(options, creature, actualDamageTaken)) {
+    if (promptPlayerConcentrationSave(creature, characters, attackerName, campaignName)) {
+      combatSummaryChanged = true;
     }
+  }
+  return { interception: null, combatSummaryChanged };
+}
 
-    if (silenceThunderImmunity && rawDamage > 0 && damageTypes.some(dt => String(dt).toLowerCase() === 'thunder')) {
-        addEntry(campaignName, {
-            type: 'automation',
-            creatureName: creature.name,
-            name: 'Silence',
-            description: `${creature.name} is immune to Thunder damage inside the Silence zone — ${rawDamage} damage negated.`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error('[applyDamage] Silence immunity log failed:', e); });
-    }
+export async function applyDamageToTarget(combatSummary, targetName, rawDamage, damageTypes, campaignName, characters, ignoreResistance = false, attackerName = null, suppressHpLog = false, options = {}) {
+  if (!combatSummary) return null;
+  const creature = combatSummary.creatures.find(c => c.name === targetName);
+  if (!creature) return null;
+  if (isNaN(rawDamage) || rawDamage === null || rawDamage === undefined) return null;
 
-    // Apply damage reduction from features (e.g., Heavy Armor Master)
-    let damageReducedByFeature = 0;
-    if (isPlayer) {
-        const allEquipment = (playerComputed?.equipment || playerStats?.equipment || []);
-        const equippedArmor = allEquipment.find(e => e.equipped);
-        const armorName = equippedArmor?.name;
-        let isWearingHeavyArmor = false;
-        if (armorName) {
-            const armor = allEquipment.find(e => e.name === armorName && e.equipped);
-            if (armor && ['Heavy', 'heavy'].includes(armor.armor_category)) {
-                isWearingHeavyArmor = true;
-            }
-        }
-        const reduction = getDamageReduction(playerComputed, damageTypes[0], isWearingHeavyArmor);
-        if (reduction !== null && reduction > 0) {
-            damageReducedByFeature = reduction;
-            finalDamage = Math.max(0, finalDamage - reduction);
-            const hasResistanceTrigger = (playerComputed.automation?.passives || []).some(
-                p => p.type === 'damage_reduction' && p.trigger === 'damage_taken_of_chosen_resistance_type'
-            );
-            if (hasResistanceTrigger) {
-                setRuntimeValue(creature.name, 'resistanceUsedThisTurn', true, campaignName);
-            }
-        }
-    }
+  const existingAttack = getRuntimeValue('campaign', 'lastAttack') || null;
+  const isSecondary = existingAttack?.primaryDamage != null;
+  let holyAuraSaveResult = null;
+  setRuntimeValue('campaign', 'lastAttack', buildLastAttackUpdate(existingAttack, attackerName, targetName, rawDamage, damageTypes), campaignName);
 
-    // Arcane Ward: absorb damage before it hits HP
-    let wardDamage = finalDamage;
-    let wardAbsorbed;
+  const isPlayer = creature.type === 'player';
+  const playerStats = isPlayer ? characters.find(c => c.name === targetName || c.name.startsWith(targetName + ' ')) : null;
+  const playerComputed = playerStats?.computedStats || playerStats;
 
-    // Self-damage: Arcane Ward absorbs damage to the wizard themselves
-    if (isPlayer) {
-        const wardActive = getRuntimeValue(creature.name, 'arcaneWardActive', campaignName);
-        if (wardActive) {
-            const wardHp = Number(getRuntimeValue(creature.name, 'arcaneWardHp', campaignName) ?? 0);
-            if (wardHp > 0) {
-                wardAbsorbed = Math.min(wardDamage, wardHp);
-                const newWardHp = wardHp - wardAbsorbed;
-                setRuntimeValue(creature.name, 'arcaneWardHp', newWardHp, campaignName);
-                wardDamage -= wardAbsorbed;
-            }
-        }
-    }
+  const defenses = await resolveCreatureDefenses(creature, targetName, isPlayer, characters, campaignName);
+  if (!Array.isArray(damageTypes)) { throw new Error('damageTypes must be an array'); }
+  let combatSummaryChanged = false;
+  // CLA-324: spell-origin is knowable from the damage payload (options.isSpellDamage) or
+  // the campaign lastAttack (spell-save stamps, monster-card save-attack stamps).
+  const spellOrigin = options?.isSpellDamage === true || existingAttack?.rollType === 'spell-save' || existingAttack?.isSpellDamage === true;
+  const resResult = computeDamageAfterResistancesWithDetails(rawDamage, damageTypes, defenses.resistances, defenses.immunities, ignoreResistance, spellOrigin);
+  let finalDamage = resResult.finalDamage;
+  const resistanceDetails = resResult.typeDetails;
 
-    let oldHp, newHp, actualDamageTaken;
+  logResistanceOutcomes(creature, rawDamage, finalDamage, damageTypes, resistanceDetails, defenses.passiveResistances, defenses.silenceThunderImmunity, spellOrigin, campaignName);
 
-    // Temp HP absorbs damage first for all creatures
-    let damageAfterTempHp = wardDamage;
-    const currentTempHp = Number(getRuntimeValue(creature.name, 'tempHp', campaignName) || 0);
-    if (currentTempHp > 0) {
-        const absorbed = Math.min(damageAfterTempHp, currentTempHp);
-        damageAfterTempHp -= absorbed;
-        setRuntimeValue(creature.name, 'tempHp', currentTempHp - absorbed, campaignName);
-    }
+  // Apply damage reduction from features (e.g., Heavy Armor Master)
+  let damageReducedByFeature = 0;
+  if (isPlayer) {
+    ({ finalDamage, damageReducedByFeature } = applyFeatureDamageReduction(creature, playerComputed, playerStats, damageTypes, finalDamage, campaignName));
+  }
 
-    // Polymorph: when the beast form's temp-HP buffer is depleted, the transformation ends
-    const polymorphBuffer = Number(getRuntimeValue(creature.name, 'polymorphTempHp', campaignName) || 0);
-    const tempHpAfterDrain = Number(getRuntimeValue(creature.name, 'tempHp', campaignName) || 0);
-    if (polymorphBuffer > 0 && tempHpAfterDrain <= 0) {
-        await revertPolymorph(creature.name, campaignName);
-    }
+  // Arcane Ward: absorb damage before it hits HP
+  let wardDamage = finalDamage;
 
-    if (isPlayer) {
-       const storedCurrentHp = getRuntimeValue(creature.name, 'currentHitPoints');
-       if (storedCurrentHp == null) {
-           const store = getStore(creature.name);
-           const storeKeys = [...store.keys()];
-           console.error(`[applyDamage] currentHitPoints not found for "${creature.name}"`, {
-               creatureNameChars: JSON.stringify(creature.name),
-               campaignName,
-               storeKeys,
-               creatureType: creature.type,
-               rawDamage,
-               finalDamage,
-           });
-           throw new Error(`currentHitPoints not found for ${JSON.stringify(creature.name)}`);
-       }
+  if (isPlayer) {
+    wardDamage = absorbIntoArcaneWard(creature, wardDamage, campaignName);
+  }
 
-       oldHp = storedCurrentHp;
-       newHp = Math.max(0, oldHp - damageAfterTempHp);
-       actualDamageTaken = oldHp - newHp;
-       // If RE already fired in this damage sequence, don't let follow-up hits re-kill
-       if (options?.damageSequenceId && _reTriggeredSequenceIds.has(options.damageSequenceId) && newHp <= 0 && oldHp > 0) {
-           newHp = 1;
-       }
-        setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
+  // Temp HP absorbs damage first for all creatures
+  const damageAfterTempHp = absorbWithTempHp(creature, wardDamage, campaignName);
 
-        if (creature.wildShapeSource && newHp <= 0 && oldHp > 0) {
-            cleanupWildShape(creature.name, campaignName);
-            setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName);
-            setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);
-        }
-      } else {
-        oldHp = creature.currentHp;
-        newHp = Math.max(0, oldHp - damageAfterTempHp);
-        actualDamageTaken = oldHp - newHp;
-        if (options?.damageSequenceId && _reTriggeredSequenceIds.has(options.damageSequenceId) && newHp <= 0 && oldHp > 0) {
-            newHp = 1;
-        }
-        creature.currentHp = newHp;
+  await revertPolymorphIfBufferDepleted(creature, campaignName);
 
-        if (creature.wildShapeSource && newHp <= 0 && oldHp > 0) {
-            const druidName = creature.wildShapeSource;
-            cleanupWildShape(druidName, campaignName);
-            setRuntimeValue(druidName, 'currentHitPoints', 0, campaignName);
-            setRuntimeValue(druidName, 'deathSaves', [false, false, false], campaignName);
-            setRuntimeValue(druidName, 'deathFailures', [false, false, false], campaignName);
-        }
-       }
+  let oldHp, newHp, actualDamageTaken;
+  if (isPlayer) {
+    ({ oldHp, newHp, actualDamageTaken } = applyPlayerHpDamage(creature, damageAfterTempHp, options, campaignName, rawDamage, finalDamage));
+  } else {
+    ({ oldHp, newHp, actualDamageTaken } = applyCreatureHpDamage(creature, damageAfterTempHp, options, campaignName));
+  }
 
-    // SP-107: Sleep ends on a target that takes damage (staged Incapacitated or Unconscious).
-    if (actualDamageTaken > 0) {
-        wakeSleepOnDamage(campaignName, creature.name, actualDamageTaken);
-    }
+  // SP-107: Sleep ends on a target that takes damage (staged Incapacitated or Unconscious).
+  if (actualDamageTaken > 0) {
+    wakeSleepOnDamage(campaignName, creature.name, actualDamageTaken);
+  }
 
-    // Update lastAttack with actual HP damage dealt (after resistances, feature reduction, ward absorption)
-    if (isSecondary) {
-        const existing = getRuntimeValue('campaign', 'lastAttack') || null;
-        if (existing) {
-            existing.actualDamage = (existing.actualDamage || 0) + wardDamage;
-            setRuntimeValue('campaign', 'lastAttack', existing, campaignName);
-        }
-    } else {
-        const existing = getRuntimeValue('campaign', 'lastAttack') || null;
-        if (existing) {
-            existing.actualDamage = wardDamage;
-            setRuntimeValue('campaign', 'lastAttack', existing, campaignName);
-        }
-    }
+  recordActualDamageInLastAttack(isSecondary, wardDamage, campaignName);
 
-    // Projected Ward: record recent damage on the damaged player so an Abjurer's
-    // reaction (arcaneWardHandler) can roll back-absorb it. Mirrors the
-    // bastionOfLawLastAttackDamage record mechanism (campaign lastAttack).
-    const damagedIsWarden = isPlayer && getRuntimeValue(creature.name, 'arcaneWardActive', campaignName);
-    if (isPlayer && actualDamageTaken > 0 && !damagedIsWarden) {
-        const prevRecord = getRuntimeValue(creature.name, 'projectedWardDamage', campaignName);
-        const sameSequence = isSecondary && prevRecord && attackerName && prevRecord.attackerName === attackerName;
-        const recordedDamage = actualDamageTaken + (sameSequence ? Number(prevRecord.rawDamage || 0) : 0);
-        setRuntimeValue(creature.name, 'projectedWardDamage', {
-            rawDamage: recordedDamage,
-            damageType: damageTypes[0] || null,
-            attackerName: attackerName || null,
-            timestamp: Date.now(),
-        }, campaignName);
-    }
+  // Projected Ward (Abjurer reaction roll-back record)
+  if (isPlayer) {
+    recordProjectedWardDamage(creature, actualDamageTaken, isSecondary, attackerName, damageTypes, campaignName);
+  }
 
-    if (wardDamage > 0) {
-        applyWardingBond(creature, combatSummary, campaignName, wardDamage);
-      // Dominate (Person/Monster/Beast): a dominated target repeats its WIS save
-      // on damage instead of the generic unconditional charm-strip.
-      const domination = findDomination(creature.name, combatSummary, campaignName);
-      if (domination) {
-        const summaryChanged = handleDominateRepeatSave(creature, isPlayer, domination, combatSummary, characters, campaignName, attackerName);
-        if (summaryChanged) combatSummaryChanged = true;
-      }
-      if (isPlayer) {
-        const rawConditions = getRuntimeValue(creature.name, 'activeConditions');
-        const conditions = rawConditions || [];
-        if (conditions.some(c => String(c).toLowerCase() === 'frightened')) {
-          const filtered = conditions.filter(c => String(c).toLowerCase() !== 'frightened');
-          setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
-          addEntry(campaignName, {
-            type: 'condition',
-            action: 'removed',
-            characterName: creature.name,
-            condition: 'Frightened',
-            reason: 'took damage',
-            timestamp: Date.now(),
-          }).catch((e) => { console.error("[applyDamage] Error:", e); });
-        }
-        if (!domination && conditions.some(c => String(c).toLowerCase() === 'charmed')) {
-          const filtered = conditions.filter(c => String(c).toLowerCase() !== 'charmed');
-          setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
-          addEntry(campaignName, {
-            type: 'condition',
-            action: 'removed',
-            characterName: creature.name,
-            condition: 'Charmed',
-            reason: 'took damage (Friends)',
-            timestamp: Date.now(),
-          }).catch((e) => { console.error("[applyDamage] Error:", e); });
-        }
-      } else {
-        const rawConditions = getRuntimeValue(creature.name, 'activeConditions') || [];
-        const hadFrightened = rawConditions.some(c => String(c).toLowerCase() === 'frightened');
-        if (hadFrightened) {
-          const filtered = rawConditions.filter(c => String(c).toLowerCase() !== 'frightened');
-          setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
-          addEntry(campaignName, {
-            type: 'condition',
-            action: 'removed',
-            characterName: creature.name,
-            condition: 'Frightened',
-            reason: 'took damage',
-            timestamp: Date.now(),
-          }).catch((e) => { console.error("[applyDamage] Error:", e); });
-        }
-        const hadCharmed = rawConditions.some(c => String(c).toLowerCase() === 'charmed');
-        if (!domination && hadCharmed) {
-          const filtered = rawConditions.filter(c => String(c).toLowerCase() !== 'charmed');
-          setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
-          addEntry(campaignName, {
-            type: 'condition',
-            action: 'removed',
-            characterName: creature.name,
-            condition: 'Charmed',
-            reason: 'took damage (Charm)',
-            timestamp: Date.now(),
-          }).catch((e) => { console.error("[applyDamage] Error:", e); });
-        }
-      }
-      if (attackerName && attackerName !== creature.name) {
-        checkPsychicVeil(attackerName, campaignName);
-        // Supreme Sneak: if Stealth Attack is active, don't remove Invisible condition
-        const stealthAttackCost = getRuntimeValue(attackerName, 'stealthAttackCost', campaignName);
-        if (stealthAttackCost && stealthAttackCost > 0) {
-          const rawAttackerConditions2 = getRuntimeValue(attackerName, 'activeConditions');
-          const attackerConditions2 = rawAttackerConditions2 || [];
-          const attackerCondArray2 = attackerConditions2;
-          const hasInvisible = attackerCondArray2.some(c => String(c).toLowerCase() === 'invisible');
-          if (hasInvisible) {
-            // Preserve Invisible condition — don't remove it
-            // The stealthAttackCost will be cleared at start of next turn
-          }
-        }
-      }
+  if (wardDamage > 0) {
+    const wardedEvents = await handleWardedDamageEvents(creature, combatSummary, characters, isPlayer, attackerName, wardDamage, campaignName);
+    if (wardedEvents.combatSummaryChanged) combatSummaryChanged = true;
+    holyAuraSaveResult = wardedEvents.holyAuraSaveResult;
+  }
 
-      holyAuraSaveResult = await checkHolyAuraDamage(creature, attackerName, combatSummary, campaignName, wardDamage);
+  if (wardDamage > 0 && characters?.length) {
+    cleanupAvengingAngelAuras(creature, characters, campaignName);
+  }
 
-       // Compelled Duel: the effect ends if the target takes damage from anyone other than the caster
-       if (attackerName && attackerName !== creature.name) {
-         const duelEffects = (getRuntimeValue('campaign', 'targetEffects') || []).filter(
-           te => te.effect === 'compelled_duel' && te.target === creature.name && te.source !== attackerName
-         );
-         if (duelEffects.length > 0) {
-           endCompelledDuel(duelEffects[0].source, creature.name, campaignName,
-             `${attackerName} damaged ${creature.name}, breaking the duel.`);
-         }
-        }
+  const wasAlive = oldHp > 0;
+  const isNowUnconscious = newHp <= 0;
 
-       }
+  // SP-114: summoned creatures disappear at 0 Hit Points (canonical "disappears
+  // when it drops to 0 Hit Points"). Mutates combatSummary in place — the
+  // combatSummaryChanged persist below writes the filtered roster.
+  if (!isPlayer && wasAlive && isNowUnconscious && creature.summonedBy && creature.summonSource === 'spell') {
+    vanishSummonAtZeroHp(creature, combatSummary, campaignName);
+  }
 
-      // Clean up Avenging Angel Frightful Aura tracking list when a creature takes damage
-     if (wardDamage > 0 && characters?.length) {
-         for (const char of characters) {
-             if (isAvengingAngelActive(char.name, campaignName)) {
-                 cleanupAuraTargetOnDamage(char.name, creature.name, campaignName).catch(e => {
-                     console.error('[applyDamage] Avenging Angel aura cleanup failed:', e);
-                 });
-             }
-         }
-     }
+  if (concentrationDamagePending(options, creature, actualDamageTaken)) {
+    const dcDamage = options?.concentrationTotalDamage ?? actualDamageTaken;
+    creature.concentration.dc = Math.max(10, Math.floor(dcDamage / 2));
+  }
 
-    const wasAlive = oldHp > 0;
-   const isNowUnconscious = newHp <= 0;
-
-   // SP-114: summoned creatures disappear at 0 Hit Points (canonical "disappears
-   // when it drops to 0 Hit Points"). Mutates combatSummary in place — the
-   // combatSummaryChanged persist below writes the filtered roster.
-   if (!isPlayer && wasAlive && isNowUnconscious && creature.summonedBy && creature.summonSource === 'spell') {
-     vanishSummonAtZeroHp(creature, combatSummary, campaignName);
-   }
-
-   if (!options?.skipConcentration && creature.concentration && (actualDamageTaken > 0 || options?.concentrationTotalDamage > 0)) {
-     const dcDamage = options?.concentrationTotalDamage ?? actualDamageTaken;
-     creature.concentration.dc = Math.max(10, Math.floor(dcDamage / 2));
-   }
-
-        checkDarkOnesBlessing(characters, creature, finalDamage, isPlayer, wasAlive, isNowUnconscious, campaignName, attackerName);
+  checkDarkOnesBlessing(characters, creature, finalDamage, isPlayer, wasAlive, isNowUnconscious, campaignName, attackerName);
 
   let npcConcentrationBroken = false;
-    if (creature.type === 'player') {
-    if (wasAlive && isNowUnconscious) {
-      // Check for Undying Sentinel (Oath of Glory level 15)
-      const undyingResult = checkUndyingSentinel(creature, playerComputed, campaignName);
-      if (undyingResult.intercepted) {
-        return { ...undyingResult, damageDealt: finalDamage, oldHp, interceptedFeature: 'Undying Sentinel' };
-      }
-
-      // Check for Boon of Recovery - Last Stand
-      const boonOfRecoveryResult = checkBoonOfRecoveryLastStand(creature, playerComputed, campaignName);
-      if (boonOfRecoveryResult.intercepted) {
-        return { ...boonOfRecoveryResult, damageDealt: finalDamage, oldHp, interceptedFeature: 'Boon of Recovery' };
-      }
-
-      // Check for Relentless Endurance (Orc race trait)
-      const relentlessEnduranceResult = checkRelentlessEndurance(creature, playerComputed, campaignName);
-      if (relentlessEnduranceResult.intercepted) {
-        if (options?.damageSequenceId) {
-          _reTriggeredSequenceIds.add(options.damageSequenceId);
-        }
-        return { ...relentlessEnduranceResult, damageDealt: finalDamage, oldHp, interceptedFeature: 'Relentless Endurance' };
-      }
-
-      // Check for Relentless Rage (Barbarian class feature)
-      const relentlessRageResult = checkRelentlessRage(creature, playerComputed, campaignName);
-      if (relentlessRageResult.intercepted) {
-        return { ...relentlessRageResult, damageDealt: finalDamage, oldHp, interceptedFeature: 'Relentless Rage' };
-      }
-
-      // Check for Death Ward (4th level abjuration spell)
-      const deathWardResult = checkDeathWard(creature, playerComputed, campaignName);
-      if (deathWardResult.intercepted) {
-        return { ...deathWardResult, damageDealt: finalDamage, oldHp, interceptedFeature: 'Death Ward' };
-      }
-
-      const promptId = utils.guid();
-      sendDeathSavePrompt(campaignName, {
-        promptId,
-        targetName: creature.name,
-      });
+  if (isPlayer) {
+    const playerOutcome = handlePlayerZeroHpAndConcentration(creature, characters, playerComputed, options, wasAlive, isNowUnconscious, oldHp, finalDamage, actualDamageTaken, attackerName, campaignName);
+    if (playerOutcome.interception) {
+      return playerOutcome.interception;
     }
-
-    if (!options?.skipConcentration && creature.concentration && (actualDamageTaken > 0 || options?.concentrationTotalDamage > 0)) {
-      if (hasRelentlessHunterExemption(creature, characters)) {
-        addEntry(campaignName, {
-          type: 'condition',
-          action: 'maintained',
-          characterName: creature.name,
-          condition: 'Concentration on Hunter\'s Mark',
-          sourceName: 'Relentless Hunter',
-        }).catch((e) => { console.error("[applyDamage] Error:", e); });
-      } else {
-        const promptId = utils.guid();
-        sendConcentrationPrompt(campaignName, {
-          promptId,
-          targetName: creature.name,
-          spellName: creature.concentration.spell,
-          dc: creature.concentration.dc,
-          attackerName,
-        });
-        combatSummaryChanged = true;
-      }
+    if (playerOutcome.combatSummaryChanged) {
+      combatSummaryChanged = true;
     }
   } else {
     combatSummaryChanged = true;
-    if (!options?.skipConcentration && creature.concentration && (finalDamage > 0 || options?.concentrationTotalDamage > 0)) {
-      const saveBonus = creature?.saveBonuses?.['con'] ?? 0;
-      const dragonConstellationActive = (() => {
-        const rawActiveBuffs = getRuntimeValue(creature.name, 'activeBuffs');
-        const activeBuffs = Array.isArray(rawActiveBuffs) ? rawActiveBuffs : [];
-        return activeBuffs.some(b => b.name === 'Starry Form' && b.constellation === 'Dragon');
-      })();
-      if (hasRelentlessHunterExemption(creature, characters)) {
-        addEntry(campaignName, {
-          type: 'condition',
-          action: 'maintained',
-          characterName: creature.name,
-          condition: 'Concentration on Hunter\'s Mark',
-          sourceName: 'Relentless Hunter',
-        }).catch((e) => { console.error("[applyDamage] Error:", e); });
-      } else {
-        const attacker = attackerName ? characters.find(c => c.name === attackerName || c.name.startsWith(attackerName + ' ')) : null;
-        const attackerModifiers = attacker?.saveModifiers || attacker?.computedStats?.saveModifiers;
-        const hasConcentrationBreaker = attackerModifiers?.some(mod =>
-          mod.condition === 'concentration_breaker' && mod.effect === 'disadvantage'
-        ) ?? false;
-        const { success, roll, total, rawRolls } = rollConcentrationSave(saveBonus, creature.concentration.dc, dragonConstellationActive, hasConcentrationBreaker);
-        if (!success) {
-          const spellName = creature.concentration.spell;
-          creature.concentration = null;
-          stripSummonedFromCombatSummary(combatSummary, creature.name);
-          npcConcentrationBroken = true;
-          addEntry(campaignName, {
-            type: 'condition',
-            action: 'removed',
-            characterName: creature.name,
-            condition: 'Concentrating on ' + spellName,
-            sourceName: 'Concentration broken by damage',
-          }).catch((e) => { console.error("[applyDamage] Error:", e); });
-          cleanupConcentrationEffects(creature.name, spellName, campaignName);
-        } else {
-          addEntry(campaignName, {
-            type: 'roll',
-            characterName: creature.name,
-            rollType: 'save',
-            name: 'Concentration Save',
-            targetName: creature.concentration.spell,
-            rolls: rawRolls || [roll],
-            mode: hasConcentrationBreaker ? 'disadvantage' : 'normal',
-            total: total,
-            bonus: total - roll,
-            saveType: 'CON',
-            saveDc: creature.concentration.dc,
-            saveResult: 'success',
-          }).catch((e) => { console.error("[applyDamage] Error:", e); });
-        }
-      }
+    if (concentrationDamagePending(options, creature, finalDamage)) {
+      npcConcentrationBroken = handleNpcConcentrationBreak(creature, characters, attackerName, combatSummary, campaignName);
     }
   }
 

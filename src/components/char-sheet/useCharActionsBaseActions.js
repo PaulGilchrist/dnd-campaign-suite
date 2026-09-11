@@ -186,6 +186,74 @@ export default function useCharActionsBaseActions({
         });
     }
 
+    function resolveGrappleCheckContext(isMonk, useAbility) {
+        let checkContext = {};
+        if (isMonk && conditionEffects?.peerlessAthleteAdvantageSkills && conditionEffects.peerlessAthleteAdvantageSkills.includes(useAbility)) {
+            checkContext.forcedMode = checkContext.forcedMode === 'disadvantage' ? undefined : 'advantage';
+        }
+        else if (conditionEffects?.strCheckDisadvantage) checkContext.forcedMode = 'disadvantage';
+        if (conditionEffects?.abilityCheckDisadvantage) checkContext.forcedMode = 'disadvantage';
+        if (!checkContext.forcedMode && conditionEffects?.hexAbilityCheckDisadvantage && conditionEffects?.hexAbilityCheckDisadvantageAbility === useAbility) checkContext.forcedMode = 'disadvantage';
+        if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === useAbility)) {
+            checkContext.forcedMode = checkContext.forcedMode === 'disadvantage' ? undefined : 'advantage';
+        }
+        return checkContext;
+    }
+
+    async function resolveTargetStrBonus(target, cs) {
+        let targetStrBonus = 0;
+        if (target.computedStats?.abilities) {
+            const targetStr = target.computedStats.abilities.find(a => a.name === 'Strength');
+            targetStrBonus = targetStr?.bonus || 0;
+        } else if (target.abilities) {
+            const targetStr = target.abilities.find(a => a.name === 'Strength');
+            targetStrBonus = targetStr?.bonus || 0;
+        } else if (target.ability_score_modifiers?.str != null) {
+            targetStrBonus = target.ability_score_modifiers.str;
+        } else if (target.type === 'player') {
+            const targetCharacter = cs?.creatures?.find(c => c.name === target.name);
+            const targetStr = targetCharacter?.computedStats?.abilities?.find(a => a.name === 'Strength') || targetCharacter?.abilities?.find(a => a.name === 'Strength');
+            targetStrBonus = targetStr?.bonus || 0;
+        } else {
+            const monsterData = await getMonsterData(target.name, cs?.creatures || []);
+            if (monsterData?.ability_score_modifiers?.str != null) {
+                targetStrBonus = monsterData.ability_score_modifiers.str;
+            }
+        }
+        return targetStrBonus;
+    }
+
+    async function applyGrappleSuccess(target, cs, useAbility, checkBonus, rollTotal, d20Val, targetStrBonus) {
+        const combatSummary = cs;
+        if (combatSummary?.creatures) {
+            const targetCreature = combatSummary.creatures.find(c => c.name === target.name);
+            if (targetCreature) {
+                const storedConditions = getRuntimeValue(targetCreature.name, 'activeConditions') || [];
+                const filtered = storedConditions.filter(c => String(c).toLowerCase() !== 'grappled');
+                await setRuntimeValue(targetCreature.name, 'activeConditions', [...filtered, 'grappled'], campaignName);
+            }
+        }
+        const signed = targetStrBonus >= 0 ? '+' : '';
+        setPopupHtml({ type: 'automation_info', name: 'Grapple', description: `Grapple successful! (d20: ${d20Val} + ${checkBonus} = ${rollTotal}) vs target STR (${signed}${targetStrBonus}). Target is now grappled.` });
+        await addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: 'Grapple',
+            description: `${useAbility} check: ${rollTotal} (d20: ${d20Val} + ${checkBonus}) vs target STR (${signed}${targetStrBonus}) — Success. Target is now grappled.`,
+        }).catch((e) => { console.error("[useCharActionsBaseActions:log-error]", e); });
+    }
+
+    async function reportGrappleFailure(useAbility, checkBonus, rollTotal, d20Val, targetStrBonus) {
+        const signed = targetStrBonus >= 0 ? '+' : '';
+        setPopupHtml({ type: 'automation_info', name: 'Grapple', description: `Grapple failed! (d20: ${d20Val} + ${checkBonus} = ${rollTotal}) vs target STR (${signed}${targetStrBonus}). Target is not grappled.` });
+        await addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: 'Grapple',
+            description: `${useAbility} check: ${rollTotal} (d20: ${d20Val} + ${checkBonus}) vs target STR (${signed}${targetStrBonus}) — Failure. Target is not grappled.`,
+        }).catch((e) => { console.error("[useCharActionsBaseActions:log-error]", e); });
+    }
+
     async function handleGrappleAction() {
         if (cannotAct) return;
         const cs = await loadCombatSummary(campaignName);
@@ -213,66 +281,18 @@ export default function useCharActionsBaseActions({
             const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
             checkBonus += Math.floor(proficiency / 2);
         }
-        let checkContext = {};
-        if (isMonk && conditionEffects?.peerlessAthleteAdvantageSkills && conditionEffects.peerlessAthleteAdvantageSkills.includes(useAbility)) {
-            checkContext.forcedMode = checkContext.forcedMode === 'disadvantage' ? undefined : 'advantage';
-        }
-        else if (conditionEffects?.strCheckDisadvantage) checkContext.forcedMode = 'disadvantage';
-        if (conditionEffects?.abilityCheckDisadvantage) checkContext.forcedMode = 'disadvantage';
-        if (!checkContext.forcedMode && conditionEffects?.hexAbilityCheckDisadvantage && conditionEffects?.hexAbilityCheckDisadvantageAbility === useAbility) checkContext.forcedMode = 'disadvantage';
-        if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === useAbility)) {
-            checkContext.forcedMode = checkContext.forcedMode === 'disadvantage' ? undefined : 'advantage';
-        }
+        const checkContext = resolveGrappleCheckContext(isMonk, useAbility);
         await rollAbilityCheck(useAbility, checkBonus, checkContext);
         await new Promise(resolve => setTimeout(resolve, 50));
         const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
         const rollTotal = lastAttack?.total;
         const d20Val = lastAttack?.d20 ?? '?';
-        let targetStrBonus = 0;
-        if (target.computedStats?.abilities) {
-            const targetStr = target.computedStats.abilities.find(a => a.name === 'Strength');
-            targetStrBonus = targetStr?.bonus || 0;
-        } else if (target.abilities) {
-            const targetStr = target.abilities.find(a => a.name === 'Strength');
-            targetStrBonus = targetStr?.bonus || 0;
-        } else if (target.ability_score_modifiers?.str != null) {
-            targetStrBonus = target.ability_score_modifiers.str;
-        } else if (target.type === 'player') {
-            const targetCharacter = cs?.creatures?.find(c => c.name === target.name);
-            const targetStr = targetCharacter?.computedStats?.abilities?.find(a => a.name === 'Strength') || targetCharacter?.abilities?.find(a => a.name === 'Strength');
-            targetStrBonus = targetStr?.bonus || 0;
-        } else {
-            const monsterData = await getMonsterData(target.name, cs?.creatures || []);
-            if (monsterData?.ability_score_modifiers?.str != null) {
-                targetStrBonus = monsterData.ability_score_modifiers.str;
-            }
-        }
+        const targetStrBonus = await resolveTargetStrBonus(target, cs);
         const success = rollTotal > targetStrBonus;
         if (success) {
-            const combatSummary = cs;
-            if (combatSummary?.creatures) {
-                const targetCreature = combatSummary.creatures.find(c => c.name === target.name);
-                if (targetCreature) {
-                    const storedConditions = getRuntimeValue(targetCreature.name, 'activeConditions') || [];
-                    const filtered = storedConditions.filter(c => String(c).toLowerCase() !== 'grappled');
-                    await setRuntimeValue(targetCreature.name, 'activeConditions', [...filtered, 'grappled'], campaignName);
-                }
-            }
-            setPopupHtml({ type: 'automation_info', name: 'Grapple', description: `Grapple successful! (d20: ${d20Val} + ${checkBonus} = ${rollTotal}) vs target STR (${targetStrBonus >= 0 ? '+' : ''}${targetStrBonus}). Target is now grappled.` });
-            await addEntry(campaignName, {
-                type: 'ability_use',
-                characterName: playerStats.name,
-                abilityName: 'Grapple',
-                description: `${useAbility} check: ${rollTotal} (d20: ${d20Val} + ${checkBonus}) vs target STR (${targetStrBonus >= 0 ? '+' : ''}${targetStrBonus}) — Success. Target is now grappled.`,
-            }).catch((e) => { console.error("[useCharActionsBaseActions:log-error]", e); });
+            await applyGrappleSuccess(target, cs, useAbility, checkBonus, rollTotal, d20Val, targetStrBonus);
         } else {
-            setPopupHtml({ type: 'automation_info', name: 'Grapple', description: `Grapple failed! (d20: ${d20Val} + ${checkBonus} = ${rollTotal}) vs target STR (${targetStrBonus >= 0 ? '+' : ''}${targetStrBonus}). Target is not grappled.` });
-            await addEntry(campaignName, {
-                type: 'ability_use',
-                characterName: playerStats.name,
-                abilityName: 'Grapple',
-                description: `${useAbility} check: ${rollTotal} (d20: ${d20Val} + ${checkBonus}) vs target STR (${targetStrBonus >= 0 ? '+' : ''}${targetStrBonus}) — Failure. Target is not grappled.`,
-            }).catch((e) => { console.error("[useCharActionsBaseActions:log-error]", e); });
+            await reportGrappleFailure(useAbility, checkBonus, rollTotal, d20Val, targetStrBonus);
         }
     }
 

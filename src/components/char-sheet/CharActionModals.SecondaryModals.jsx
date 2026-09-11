@@ -71,6 +71,147 @@ import { applyTelekineticMovement } from '../../services/automation/handlers/cla
 import { confirmCreateUndead } from '../../services/automation/handlers/spells/createUndeadHandler.js';
 import { confirmSummonSpirit } from '../../services/automation/handlers/spells/summonSpiritHandler.js';
 
+function SpellEffectModals({ mergedModalState, setModalState, setPopupHtml }) {
+    return (
+        <>
+            {mergedModalState.saveAttackHealModal && (
+                <SaveAttackHealModal
+                    {...mergedModalState.saveAttackHealModal}
+                    onClose={() => setModalState({ saveAttackHealModal: null })}
+                />
+            )}
+            {mergedModalState.saveAttackAoeModal && (
+                <SaveAttackAoeModal
+                    {...mergedModalState.saveAttackAoeModal}
+                    onClose={() => setModalState({ saveAttackAoeModal: null })}
+                />
+            )}
+            {mergedModalState.warpingImplosionModal && (
+                <WarpingImplosionModal
+                    {...mergedModalState.warpingImplosionModal}
+                    onClose={() => setModalState({ warpingImplosionModal: null })}
+                />
+            )}
+            {mergedModalState.aoeConditionModal && (
+                <AOEConditionModal
+                    {...mergedModalState.aoeConditionModal}
+                    onClose={() => setModalState({ aoeConditionModal: null })}
+                />
+            )}
+            {mergedModalState.fearModal && (
+                <FearModal
+                    {...mergedModalState.fearModal}
+                    onClose={() => setModalState({ fearModal: null })}
+                />
+            )}
+            {mergedModalState.sleepModal && (
+                <SleepModal
+                    {...mergedModalState.sleepModal}
+                    onClose={() => setModalState({ sleepModal: null })}
+                />
+            )}
+            {mergedModalState.hypnoticPatternModal && (
+                <HypnoticPatternModal
+                    {...mergedModalState.hypnoticPatternModal}
+                    onClose={() => setModalState({ hypnoticPatternModal: null })}
+                />
+            )}
+            {mergedModalState.tashasLaughterModal && (
+                <TashasLaughterModal
+                    {...mergedModalState.tashasLaughterModal}
+                    onClose={() => setModalState({ tashasLaughterModal: null })}
+                    setPopupHtml={setPopupHtml}
+                />
+            )}
+            {mergedModalState.silenceModal && (
+                <SilenceModal
+                    {...mergedModalState.silenceModal}
+                    onClose={() => setModalState({ silenceModal: null })}
+                />
+            )}
+            {mergedModalState.massSuggestionModal && (
+                <MassSuggestionModal
+                    {...mergedModalState.massSuggestionModal}
+                    onClose={() => setModalState({ massSuggestionModal: null })}
+                />
+            )}
+            {mergedModalState.calmEmotionsModal && (
+                <CalmEmotionsModal
+                    {...mergedModalState.calmEmotionsModal}
+                    onClose={() => setModalState({ calmEmotionsModal: null })}
+                />
+            )}
+            {mergedModalState.commandModal && (
+                <CommandModal
+                    {...mergedModalState.commandModal}
+                    onClose={() => setModalState({ commandModal: null })}
+                />
+            )}
+        </>
+    );
+}
+
+function SummonConfirmationModals({ mergedModalState, setModalState, setPopupHtml }) {
+    return (
+        <>
+            {mergedModalState.animateDeadModal && (
+                <AnimateDeadModal
+                    maxTargets={mergedModalState.animateDeadModal.maxTargets}
+                    onConfirm={async ({ zombieCount, skeletonCount }) => {
+                        setModalState({ animateDeadModal: null });
+                        const result = await confirmAnimateDead(
+                            mergedModalState.animateDeadModal.action,
+                            mergedModalState.animateDeadModal.playerStats,
+                            mergedModalState.animateDeadModal.campaignName,
+                            { zombieCount, skeletonCount }
+                        );
+                        if (result?.payload) {
+                            setPopupHtml(result.payload);
+                        }
+                    }}
+                    onClose={() => setModalState({ animateDeadModal: null })}
+                />
+            )}
+            {mergedModalState.createUndeadModal && (
+                <CreateUndeadModal
+                    maxTargets={mergedModalState.createUndeadModal.maxTargets}
+                    onConfirm={async ({ ghoulCount }) => {
+                        setModalState({ createUndeadModal: null });
+                        const result = await confirmCreateUndead(
+                            mergedModalState.createUndeadModal.action,
+                            mergedModalState.createUndeadModal.playerStats,
+                            mergedModalState.createUndeadModal.campaignName,
+                            { ghoulCount }
+                        );
+                        if (result?.payload) {
+                            setPopupHtml(result.payload);
+                        }
+                    }}
+                    onClose={() => setModalState({ createUndeadModal: null })}
+                />
+            )}
+            {mergedModalState.summonSpiritModal && (
+                <SummonSpiritModal
+                    action={mergedModalState.summonSpiritModal.action}
+                    onConfirm={async (variantName) => {
+                        setModalState({ summonSpiritModal: null });
+                        const result = await confirmSummonSpirit(
+                            mergedModalState.summonSpiritModal.action,
+                            mergedModalState.summonSpiritModal.playerStats,
+                            mergedModalState.summonSpiritModal.campaignName,
+                            variantName
+                        );
+                        if (result?.payload) {
+                            setPopupHtml(result.payload);
+                        }
+                    }}
+                    onClose={() => setModalState({ summonSpiritModal: null })}
+                />
+            )}
+        </>
+    );
+}
+
 function SecondaryModals({
     mergedModalState,
     setModalState,
@@ -175,79 +316,7 @@ function SecondaryModals({
                     onSkip={() => { setModalState({ invokeDuplicityModal: null }); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
                 />
             )}
-            {mergedModalState.saveAttackHealModal && (
-                <SaveAttackHealModal
-                    {...mergedModalState.saveAttackHealModal}
-                    onClose={() => setModalState({ saveAttackHealModal: null })}
-                />
-            )}
-            {mergedModalState.saveAttackAoeModal && (
-                <SaveAttackAoeModal
-                    {...mergedModalState.saveAttackAoeModal}
-                    onClose={() => setModalState({ saveAttackAoeModal: null })}
-                />
-            )}
-            {mergedModalState.warpingImplosionModal && (
-                <WarpingImplosionModal
-                    {...mergedModalState.warpingImplosionModal}
-                    onClose={() => setModalState({ warpingImplosionModal: null })}
-                />
-            )}
-            {mergedModalState.aoeConditionModal && (
-                <AOEConditionModal
-                    {...mergedModalState.aoeConditionModal}
-                    onClose={() => setModalState({ aoeConditionModal: null })}
-                />
-            )}
-            {mergedModalState.fearModal && (
-                <FearModal
-                    {...mergedModalState.fearModal}
-                    onClose={() => setModalState({ fearModal: null })}
-                />
-            )}
-            {mergedModalState.sleepModal && (
-                <SleepModal
-                    {...mergedModalState.sleepModal}
-                    onClose={() => setModalState({ sleepModal: null })}
-                />
-            )}
-            {mergedModalState.hypnoticPatternModal && (
-                <HypnoticPatternModal
-                    {...mergedModalState.hypnoticPatternModal}
-                    onClose={() => setModalState({ hypnoticPatternModal: null })}
-                />
-            )}
-            {mergedModalState.tashasLaughterModal && (
-                <TashasLaughterModal
-                    {...mergedModalState.tashasLaughterModal}
-                    onClose={() => setModalState({ tashasLaughterModal: null })}
-                    setPopupHtml={setPopupHtml}
-                />
-            )}
-            {mergedModalState.silenceModal && (
-                <SilenceModal
-                    {...mergedModalState.silenceModal}
-                    onClose={() => setModalState({ silenceModal: null })}
-                />
-            )}
-            {mergedModalState.massSuggestionModal && (
-                <MassSuggestionModal
-                    {...mergedModalState.massSuggestionModal}
-                    onClose={() => setModalState({ massSuggestionModal: null })}
-                />
-            )}
-            {mergedModalState.calmEmotionsModal && (
-                <CalmEmotionsModal
-                    {...mergedModalState.calmEmotionsModal}
-                    onClose={() => setModalState({ calmEmotionsModal: null })}
-                />
-            )}
-            {mergedModalState.commandModal && (
-                <CommandModal
-                    {...mergedModalState.commandModal}
-                    onClose={() => setModalState({ commandModal: null })}
-                />
-            )}
+            <SpellEffectModals mergedModalState={mergedModalState} setModalState={setModalState} setPopupHtml={setPopupHtml} />
             {mergedModalState.elementalAttunementModal && (
                 <ElementalAttunementModal
                     {...mergedModalState.elementalAttunementModal}
@@ -641,60 +710,7 @@ function SecondaryModals({
                     onClose={() => setModalState({ clockworkCavalcadeModal: null })}
                 />
             )}
-            {mergedModalState.animateDeadModal && (
-                <AnimateDeadModal
-                    maxTargets={mergedModalState.animateDeadModal.maxTargets}
-                    onConfirm={async ({ zombieCount, skeletonCount }) => {
-                        setModalState({ animateDeadModal: null });
-                        const result = await confirmAnimateDead(
-                            mergedModalState.animateDeadModal.action,
-                            mergedModalState.animateDeadModal.playerStats,
-                            mergedModalState.animateDeadModal.campaignName,
-                            { zombieCount, skeletonCount }
-                        );
-                        if (result?.payload) {
-                            setPopupHtml(result.payload);
-                        }
-                    }}
-                    onClose={() => setModalState({ animateDeadModal: null })}
-                />
-            )}
-            {mergedModalState.createUndeadModal && (
-                <CreateUndeadModal
-                    maxTargets={mergedModalState.createUndeadModal.maxTargets}
-                    onConfirm={async ({ ghoulCount }) => {
-                        setModalState({ createUndeadModal: null });
-                        const result = await confirmCreateUndead(
-                            mergedModalState.createUndeadModal.action,
-                            mergedModalState.createUndeadModal.playerStats,
-                            mergedModalState.createUndeadModal.campaignName,
-                            { ghoulCount }
-                        );
-                        if (result?.payload) {
-                            setPopupHtml(result.payload);
-                        }
-                    }}
-                    onClose={() => setModalState({ createUndeadModal: null })}
-                />
-            )}
-            {mergedModalState.summonSpiritModal && (
-                <SummonSpiritModal
-                    action={mergedModalState.summonSpiritModal.action}
-                    onConfirm={async (variantName) => {
-                        setModalState({ summonSpiritModal: null });
-                        const result = await confirmSummonSpirit(
-                            mergedModalState.summonSpiritModal.action,
-                            mergedModalState.summonSpiritModal.playerStats,
-                            mergedModalState.summonSpiritModal.campaignName,
-                            variantName
-                        );
-                        if (result?.payload) {
-                            setPopupHtml(result.payload);
-                        }
-                    }}
-                    onClose={() => setModalState({ summonSpiritModal: null })}
-                />
-            )}
+            <SummonConfirmationModals mergedModalState={mergedModalState} setModalState={setModalState} setPopupHtml={setPopupHtml} />
             {mergedModalState.flurryOfBlowsModal && (
                 <FlurryOfBlowsTargetPopup
                     totalAttacks={mergedModalState.flurryOfBlowsModal.numAttacks || 3}

@@ -9,6 +9,82 @@ import { DEBUG_FORCE_CRIT } from '../../../ui/utils.js';
 import { applyHealingDirectly } from '../../common/healingRoll.js';
 import { createSaveListener, buildSaveDc } from '../../common/savePrompt.js';
 
+async function applyHealingStrike({ featureName, playerName, playerStats, campaignName, healingTarget, handOfHarmAuto, flurryHealingHarmUses }) {
+    const healFormula = handOfHarmAuto?.healExpression || 'martial_arts_die + WIS modifier';
+    const martialArtsDie = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.martial_arts_die || 4;
+    const resolvedHealFormula = healFormula.replace(/martial_arts_die/gi, `1d${martialArtsDie}`);
+    const wisBonus = playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0;
+    const healResult = rollExpression(`${resolvedHealFormula} + ${wisBonus}`);
+    const healAmount = healResult?.total || 0;
+
+    const healTargetStats = getRuntimeValue('characters', 'characters', campaignName)
+        ?.find(c => c.name === healingTarget) || playerStats;
+
+    const { newHp, actualHeal } = applyHealingDirectly(healTargetStats, healingTarget, healAmount, campaignName);
+
+    addEntry(campaignName, {
+        type: 'hp_change',
+        targetName: healingTarget,
+        delta: actualHeal,
+        currentHp: newHp,
+        maxHp: healTargetStats.hitPoints || healTargetStats.maxHitPoints || newHp,
+        isHealing: true,
+        isUnconscious: false,
+        sourceName: playerName,
+        note: `${featureName} — Hand of Healing`,
+    }).catch((e) => { console.error("[bonusAttacksHandler:heal-error]", e); });
+
+    addEntry(campaignName, {
+        type: 'roll',
+        characterName: playerName,
+        rollType: 'damage',
+        name: 'Hand of Healing',
+        formula: `${resolvedHealFormula} + ${wisBonus}`,
+        rolls: healResult?.rolls || [],
+        total: healAmount,
+        modifier: wisBonus,
+        targetName: healingTarget,
+        finalDamage: -actualHeal,
+        isCrit: false,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[bonusAttacksHandler:heal-log-error]", e); });
+
+    const updatedUses = Math.max(0, flurryHealingHarmUses - 1);
+    await setRuntimeValue(playerStats.name, 'flurryHealingHarmUses', updatedUses, campaignName);
+
+    return {
+        flurryHealingHarmUses: updatedUses,
+        damageResult: {
+            rollResult: healResult,
+            rawDamage: healAmount,
+            finalDamage: 0,
+            isCrit: false,
+            isHealing: true,
+        },
+    };
+}
+
+function buildAttackResultLines(attackResults) {
+    let description = '';
+    for (const r of attackResults) {
+        const hitText = r.isCrit ? 'CRIT!' : r.hit ? 'Hit' : 'Miss';
+        const hitStyle = r.isCrit ? ' style="color: var(--color-crit, #ff4444)"' : r.hit ? ' style="color: var(--color-hit, #44bb44)"' : ' style="color: var(--color-miss, #bb4444)"';
+        description += `<div class="attack-result-line"><span${hitStyle}><b>${hitText}</b></span> — ${r.targetName} (AC ${r.ac})<br/>`;
+        description += `d20: ${r.d20Roll} + ${r.totalAttack - r.d20Roll} = ${r.totalAttack} | `;
+        if (r.hit && r.damageResult) {
+            const dr = r.damageResult;
+            const diceStr = dr.rollResult?.rolls?.join(' + ') || '0';
+            const mod = dr.rollResult?.modifier || 0;
+            const part = mod !== 0 ? ` [${diceStr} + ${mod} = ${dr.rawDamage}]` : ` [${diceStr} = ${dr.rawDamage}]`;
+            description += `Damage: ${part}${dr.isCrit ? ' (doubled dice)' : ''} → ${dr.finalDamage} ${r._damageType} damage`;
+        } else {
+            description += 'No damage';
+        }
+        description += `</div>`;
+    }
+    return description;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -135,55 +211,12 @@ export async function applyFlurryOfBlows(action, playerStats, campaignName, _map
                 const isHandOfHarmStrike = hasFlurryHealingHarm && !isHealingStrike && handOfHarmAuto;
 
                 if (isHealingStrike) {
-                    const healFormula = handOfHarmAuto?.healExpression || 'martial_arts_die + WIS modifier';
-                    const martialArtsDie = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.martial_arts_die || 4;
-                    const resolvedHealFormula = healFormula.replace(/martial_arts_die/gi, `1d${martialArtsDie}`);
-                    const wisBonus = playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0;
-                    const healResult = rollExpression(`${resolvedHealFormula} + ${wisBonus}`);
-                    const healAmount = healResult?.total || 0;
-
-                    const healTargetStats = getRuntimeValue('characters', 'characters', campaignName)
-                        ?.find(c => c.name === healingTarget) || playerStats;
-
-                    const { newHp, actualHeal } = applyHealingDirectly(healTargetStats, healingTarget, healAmount, campaignName);
-
-                    addEntry(campaignName, {
-                        type: 'hp_change',
-                        targetName: healingTarget,
-                        delta: actualHeal,
-                        currentHp: newHp,
-                        maxHp: healTargetStats.hitPoints || healTargetStats.maxHitPoints || newHp,
-                        isHealing: true,
-                        isUnconscious: false,
-                        sourceName: playerName,
-                        note: `${featureName} — Hand of Healing`,
-                    }).catch((e) => { console.error("[bonusAttacksHandler:heal-error]", e); });
-
-                    addEntry(campaignName, {
-                        type: 'roll',
-                        characterName: playerName,
-                        rollType: 'damage',
-                        name: 'Hand of Healing',
-                        formula: `${resolvedHealFormula} + ${wisBonus}`,
-                        rolls: healResult?.rolls || [],
-                        total: healAmount,
-                        modifier: wisBonus,
-                        targetName: healingTarget,
-                        finalDamage: -actualHeal,
-                        isCrit: false,
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error("[bonusAttacksHandler:heal-log-error]", e); });
-
-                    flurryHealingHarmUses = Math.max(0, flurryHealingHarmUses - 1);
-                    await setRuntimeValue(playerStats.name, 'flurryHealingHarmUses', flurryHealingHarmUses, campaignName);
-
-                    damageResult = {
-                        rollResult: healResult,
-                        rawDamage: healAmount,
-                        finalDamage: 0,
-                        isCrit: false,
-                        isHealing: true,
-                    };
+                    const outcome = await applyHealingStrike({
+                        featureName, playerName, playerStats, campaignName,
+                        healingTarget, handOfHarmAuto, flurryHealingHarmUses,
+                    });
+                    flurryHealingHarmUses = outcome.flurryHealingHarmUses;
+                    damageResult = outcome.damageResult;
                 } else {
                     const rollFn = isCrit ? rollExpressionDoubled : rollExpression;
                     const rollResult = rollFn(damageFormula);
@@ -393,23 +426,7 @@ export async function applyFlurryOfBlows(action, playerStats, campaignName, _map
     const critCount = attackResults.filter(r => r.isCrit).length;
 
     let description = `${hitCount}/${numAttacks} hits (${critCount} critical${critCount !== 1 ? 's' : ''}), ${totalDamage} damage<br/><br/>`;
-
-    for (const r of attackResults) {
-        const hitText = r.isCrit ? 'CRIT!' : r.hit ? 'Hit' : 'Miss';
-        const hitStyle = r.isCrit ? ' style="color: var(--color-crit, #ff4444)"' : r.hit ? ' style="color: var(--color-hit, #44bb44)"' : ' style="color: var(--color-miss, #bb4444)"';
-        description += `<div class="attack-result-line"><span${hitStyle}><b>${hitText}</b></span> — ${r.targetName} (AC ${r.ac})<br/>`;
-        description += `d20: ${r.d20Roll} + ${r.totalAttack - r.d20Roll} = ${r.totalAttack} | `;
-        if (r.hit && r.damageResult) {
-            const dr = r.damageResult;
-            const diceStr = dr.rollResult?.rolls?.join(' + ') || '0';
-            const mod = dr.rollResult?.modifier || 0;
-            const part = mod !== 0 ? ` [${diceStr} + ${mod} = ${dr.rawDamage}]` : ` [${diceStr} = ${dr.rawDamage}]`;
-            description += `Damage: ${part}${dr.isCrit ? ' (doubled dice)' : ''} → ${dr.finalDamage} ${r._damageType} damage`;
-        } else {
-            description += 'No damage';
-        }
-        description += `</div>`;
-    }
+    description += buildAttackResultLines(attackResults);
 
     const result = {
         type: 'popup',

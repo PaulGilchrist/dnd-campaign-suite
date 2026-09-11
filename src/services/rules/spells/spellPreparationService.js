@@ -5,6 +5,91 @@ import * as storageService from '../../../services/ui/storage.js';
 import { isPsionicSpell, hasPsionicSorcery } from './metamagicRules.js';
 import { addEntry } from '../../ui/logService.js';
 
+// One free_spell/fey_reinforcements/misty_wanderer/dragon_companion automation entry.
+// Returns true (authorized), false (explicitly not authorized — the caller must stop
+// scanning and deny), or undefined (entry not applicable — continue scanning).
+function checkFreeCastEntry(entry, playerName, spellName, spellLevel, campaignName) {
+  if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'misty_wanderer' && entry.type !== 'dragon_companion') return undefined;
+
+  if (entry.uses_expression && entry.usesMax) {
+    const spellField = Array.isArray(entry.spell) ? entry.spell[0] : entry.spell;
+    const levelMatch = spellField ? spellField.match(/level (\d+)/) : null;
+    const featureLevel = levelMatch ? parseInt(levelMatch[1], 10) : null;
+    if (featureLevel !== null) {
+      if (featureLevel === spellLevel) {
+        const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
+        const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.usesMax);
+        if (count > 0) return true;
+      }
+      return undefined;
+    }
+    const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
+    if (spells.includes(spellName)) {
+      const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
+      const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.usesMax);
+      if (count > 0) return true;
+    }
+  }
+
+  const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
+
+  // FT-070: per-spell-tracking free_spell entries (e.g. Shadow Touched's Shadow Magic:
+  // chosen spell + Invisibility) keep one free cast PER SPELL per Long Rest, keyed
+  // per spell (CLA-308 _Shadow_Arts_<Spell>_freeCastCount naming). Null = fresh.
+  // Checked BEFORE the generic uses/recharge branch so a multi-spell entry can never
+  // share one feature-keyed counter between its spells. A non-matching spell on such
+  // an entry continues scanning; a matching one decides the cast (spent or not).
+  if (entry.perSpellTracking) {
+    if (!spells.includes(spellName)) return undefined;
+    const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_${spellName.replace(/\s+/g, '_')}_freeCastCount`;
+    const stored = getRuntimeValue(playerName, freeCastCountKey, campaignName);
+    const count = stored != null ? Number(stored) : (entry.usesMax ?? entry.uses ?? 1);
+    return count > 0;
+  }
+
+  if (spells.includes(spellName) && entry.uses != null && entry.recharge && !entry.uses_expression) {
+    const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
+    const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.uses);
+    if (count > 0) return true;
+  }
+
+  const sharedKey = `_${entry.name.replace(/\s+/g, '_')}_freeCast`;
+  const stored = getRuntimeValue(playerName, sharedKey);
+  if (stored && Array.isArray(stored) && stored.includes(spellName)) return true;
+  return undefined;
+}
+
+// Scans an automation action list (actions/bonusActions/specialActions share the exact
+// same free-cast authorization semantics). Returns true/false when an entry made a
+// final decision, undefined when the scan is inconclusive and the caller continues.
+function scanFreeCastEntries(entries, playerName, spellName, spellLevel, campaignName) {
+  for (const entry of entries) {
+    const decision = checkFreeCastEntry(entry, playerName, spellName, spellLevel, campaignName);
+    if (decision !== undefined) return decision;
+  }
+  return undefined;
+}
+
+// Per-spell free-cast counters keyed by a feature prefix (CLA-252 Phantasmal Creatures,
+// CLA-308 Shadow Arts) — one free cast PER SPELL per Long Rest. Null counter means fresh
+// (usesMax available); Long Rest resets the keys to null to re-arm.
+function perSpellFreeCastAvailable(passive, playerName, spellName, keyPrefix, campaignName) {
+  if (!passive || !(passive.freeCastSpells || []).includes(spellName)) return false;
+  const freeCastCountKey = `_${keyPrefix}_${spellName.replace(/\s+/g, '_')}_freeCastCount`;
+  const usesMax = passive.usesMax ?? 1;
+  const stored = getRuntimeValue(playerName, freeCastCountKey, campaignName);
+  const count = stored != null ? Number(stored) : usesMax;
+  return count > 0;
+}
+
+// Concentration recast — free cast when already concentrating on the same spell.
+function isConcentrationRecastFreeCast(playerName, spellName, campaignName) {
+  const cs = getCombatSummary(campaignName);
+  if (!cs) return false;
+  const creature = cs.creatures.find(c => c.name === playerName);
+  return Boolean(creature && creature.concentration && creature.concentration.spell === spellName);
+}
+
 function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, campaignName) {
   const naturalRecoveryFreeCast = getRuntimeValue(playerName, 'naturalRecoveryFreeCast');
   if (naturalRecoveryFreeCast && Array.isArray(naturalRecoveryFreeCast) && naturalRecoveryFreeCast.includes(spellName)) return true;
@@ -51,190 +136,36 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
     return count > 0;
   }
 
-  // CLA-252: Phantasmal Creatures — one free cast PER SPELL per Long Rest. Keyed per spell;
-  // null counter means fresh (usesMax available); Long Rest resets the keys to null to re-arm.
+  // CLA-252: Phantasmal Creatures — one free cast PER SPELL per Long Rest.
   const phantasmalPassive = playerStats?.automation?.passives?.find(p => p.type === 'phantasmal_creatures');
-  if (phantasmalPassive && (phantasmalPassive.freeCastSpells || []).includes(spellName)) {
-    const freeCastCountKey = `_Phantasmal_Creatures_${spellName.replace(/\s+/g, '_')}_freeCastCount`;
-    const usesMax = phantasmalPassive.usesMax ?? 1;
-    const stored = getRuntimeValue(playerName, freeCastCountKey, campaignName);
-    const count = stored != null ? Number(stored) : usesMax;
-    if (count > 0) return true;
-  }
+  if (perSpellFreeCastAvailable(phantasmalPassive, playerName, spellName, 'Phantasmal_Creatures', campaignName)) return true;
 
   // CLA-308: Shadow Arts (2024 Warrior of Shadow lv3) — slotless free casts of the
   // major's spell list (Darkness, Darkvision, Pass Without Trace, Silence), one free
-  // cast PER SPELL per Long Rest. Counters keyed per spell; null = fresh/re-armed.
-  // No spell slot is ever consulted for these — they are always cast "without
-  // expending spell slots" and Wisdom (stamped by spellCalc2024) is the ability.
+  // cast PER SPELL per Long Rest. No spell slot is ever consulted for these — they are
+  // always cast "without expending spell slots" and Wisdom (stamped by spellCalc2024)
+  // is the ability.
   const shadowArtsPassive = playerStats?.automation?.passives?.find(p => p.type === 'shadow_arts');
-  if (shadowArtsPassive && (shadowArtsPassive.freeCastSpells || []).includes(spellName)) {
-    const freeCastCountKey = `_Shadow_Arts_${spellName.replace(/\s+/g, '_')}_freeCastCount`;
-    const usesMax = shadowArtsPassive.usesMax ?? 1;
-    const stored = getRuntimeValue(playerName, freeCastCountKey, campaignName);
-    const count = stored != null ? Number(stored) : usesMax;
-    if (count > 0) return true;
-  }
+  if (perSpellFreeCastAvailable(shadowArtsPassive, playerName, spellName, 'Shadow_Arts', campaignName)) return true;
 
-  const actions = playerStats?.automation?.actions || [];
-  for (const entry of actions) {
-    if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'misty_wanderer' && entry.type !== 'dragon_companion') continue;
-
-    if (entry.uses_expression && entry.usesMax) {
-      const spellField = Array.isArray(entry.spell) ? entry.spell[0] : entry.spell;
-      const levelMatch = spellField ? spellField.match(/level (\d+)/) : null;
-      const featureLevel = levelMatch ? parseInt(levelMatch[1], 10) : null;
-      if (featureLevel !== null && featureLevel === spellLevel) {
-        const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
-        const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.usesMax);
-        if (count > 0) return true;
-      }
-      else if (featureLevel === null) {
-        const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
-        if (spells.includes(spellName)) {
-          const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
-          const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.usesMax);
-          if (count > 0) return true;
-        }
-      }
-      if (featureLevel !== null) continue;
-    }
-
-    const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
-
-    // FT-070: per-spell-tracking free_spell entries (e.g. Shadow Touched's Shadow Magic:
-    // chosen spell + Invisibility) keep one free cast PER SPELL per Long Rest, keyed
-    // per spell (CLA-308 _Shadow_Arts_<Spell>_freeCastCount naming). Null = fresh.
-    // Checked BEFORE the generic uses/recharge branch so a multi-spell entry can never
-    // share one feature-keyed counter between its spells.
-    if (entry.perSpellTracking) {
-      if (!spells.includes(spellName)) continue;
-      const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_${spellName.replace(/\s+/g, '_')}_freeCastCount`;
-      const stored = getRuntimeValue(playerName, freeCastCountKey, campaignName);
-      const count = stored != null ? Number(stored) : (entry.usesMax ?? entry.uses ?? 1);
-      return count > 0;
-    }
-
-    if (spells.includes(spellName) && entry.uses != null && entry.recharge && !entry.uses_expression) {
-      const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
-      const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.uses);
-      if (count > 0) return true;
-    }
-
-    const sharedKey = `_${entry.name.replace(/\s+/g, '_')}_freeCast`;
-    const stored = getRuntimeValue(playerName, sharedKey);
-    if (stored && Array.isArray(stored) && stored.includes(spellName)) return true;
-  }
+  const actionsScan = scanFreeCastEntries(playerStats?.automation?.actions || [], playerName, spellName, spellLevel, campaignName);
+  if (actionsScan === true) return true;
+  if (actionsScan === false) return false;
 
   const wgbActive = getRuntimeValue(playerName, '_War_Gods_Blessing_active');
   if (wgbActive && ['Shield of Faith', 'Spiritual Weapon'].includes(spellName)) return true;
 
-  const bonusActions = playerStats?.automation?.bonusActions || [];
-  for (const entry of bonusActions) {
-    if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'misty_wanderer' && entry.type !== 'dragon_companion') continue;
-
-    if (entry.uses_expression && entry.usesMax) {
-      const spellField = Array.isArray(entry.spell) ? entry.spell[0] : entry.spell;
-      const levelMatch = spellField ? spellField.match(/level (\d+)/) : null;
-      const featureLevel = levelMatch ? parseInt(levelMatch[1], 10) : null;
-      if (featureLevel !== null && featureLevel === spellLevel) {
-        const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
-        const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.usesMax);
-        if (count > 0) return true;
-      }
-      else if (featureLevel === null) {
-        const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
-        if (spells.includes(spellName)) {
-          const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
-          const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.usesMax);
-          if (count > 0) return true;
-        }
-      }
-      if (featureLevel !== null) continue;
-    }
-
-    const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
-
-    // FT-070: per-spell free-cast counters (see actions scan above).
-    if (entry.perSpellTracking) {
-      if (!spells.includes(spellName)) continue;
-      const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_${spellName.replace(/\s+/g, '_')}_freeCastCount`;
-      const stored = getRuntimeValue(playerName, freeCastCountKey, campaignName);
-      const count = stored != null ? Number(stored) : (entry.usesMax ?? entry.uses ?? 1);
-      return count > 0;
-    }
-
-    if (spells.includes(spellName) && entry.uses != null && entry.recharge && !entry.uses_expression) {
-      const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
-      const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.uses);
-      if (count > 0) return true;
-    }
-
-    const sharedKey = `_${entry.name.replace(/\s+/g, '_')}_freeCast`;
-    const stored = getRuntimeValue(playerName, sharedKey);
-    if (stored && Array.isArray(stored) && stored.includes(spellName)) return true;
-  }
+  const bonusActionsScan = scanFreeCastEntries(playerStats?.automation?.bonusActions || [], playerName, spellName, spellLevel, campaignName);
+  if (bonusActionsScan === true) return true;
+  if (bonusActionsScan === false) return false;
 
   const mantleActive = getRuntimeValue(playerName, 'activeBuffs');
   const mantleBuffs = Array.isArray(mantleActive) ? mantleActive : [];
   if (mantleBuffs.some(b => b.name === 'Mantle of Majesty') && spellName === 'Command') return true;
 
-  const specialActions = playerStats?.automation?.specialActions || [];
-  for (const entry of specialActions) {
-    if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'misty_wanderer' && entry.type !== 'dragon_companion') continue;
-
-    if (entry.uses_expression && entry.usesMax) {
-      const spellField = Array.isArray(entry.spell) ? entry.spell[0] : entry.spell;
-      const levelMatch = spellField ? spellField.match(/level (\d+)/) : null;
-      const featureLevel = levelMatch ? parseInt(levelMatch[1], 10) : null;
-      if (featureLevel !== null && featureLevel === spellLevel) {
-        const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
-        const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.usesMax);
-        if (count > 0) return true;
-      }
-      else if (featureLevel === null) {
-        const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
-        if (spells.includes(spellName)) {
-          const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
-          const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.usesMax);
-          if (count > 0) return true;
-        }
-      }
-      if (featureLevel !== null) continue;
-    }
-
-    const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
-
-    // FT-070: per-spell free-cast counters (see actions scan above).
-    if (entry.perSpellTracking) {
-      if (!spells.includes(spellName)) continue;
-      const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_${spellName.replace(/\s+/g, '_')}_freeCastCount`;
-      const stored = getRuntimeValue(playerName, freeCastCountKey, campaignName);
-      const count = stored != null ? Number(stored) : (entry.usesMax ?? entry.uses ?? 1);
-      return count > 0;
-    }
-
-    if (spells.includes(spellName) && entry.uses != null && entry.recharge && !entry.uses_expression) {
-      const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
-      const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.uses);
-      if (count > 0) return true;
-    }
-
-    const sharedKey = `_${entry.name.replace(/\s+/g, '_')}_freeCast`;
-    const stored = getRuntimeValue(playerName, sharedKey);
-    if (stored && Array.isArray(stored) && stored.includes(spellName)) return true;
-  }
-
-  const miSpecialActions = playerStats?.automation?.specialActions || [];
-  for (const entry of miSpecialActions) {
-    if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'misty_wanderer' && entry.type !== 'dragon_companion') continue;
-    const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
-    if (spells.includes(spellName) && entry.uses != null && entry.recharge && !entry.uses_expression) {
-      const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
-      const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.uses);
-      if (count > 0) return true;
-    }
-  }
+  const specialActionsScan = scanFreeCastEntries(playerStats?.automation?.specialActions || [], playerName, spellName, spellLevel, campaignName);
+  if (specialActionsScan === true) return true;
+  if (specialActionsScan === false) return false;
 
   const isAuraOfVitality = (spellName || '').toLowerCase() === 'aura of vitality';
   if (isAuraOfVitality) {
@@ -244,107 +175,62 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
     }
   }
 
-  // Eyebite concentration recast — free cast when already concentrating on Eyebite
-  if (spellName === 'Eyebite') {
-    const cs = getCombatSummary(campaignName);
-    if (cs) {
-      const creature = cs.creatures.find(c => c.name === playerName);
-      if (creature && creature.concentration && creature.concentration.spell === 'Eyebite') {
-        return true;
-      }
-    }
-  }
-
-  // Spiritual Weapon concentration recast — free cast when already concentrating on Spiritual Weapon
-  if (spellName === 'Spiritual Weapon') {
-    const cs = getCombatSummary(campaignName);
-    if (cs) {
-      const creature = cs.creatures.find(c => c.name === playerName);
-      if (creature && creature.concentration && creature.concentration.spell === 'Spiritual Weapon') {
-        return true;
-      }
-    }
-  }
-
-  // Shapechange concentration recast — free cast when already concentrating on Shapechange
-  if (spellName === 'Shapechange') {
-    const cs = getCombatSummary(campaignName);
-    if (cs) {
-      const creature = cs.creatures.find(c => c.name === playerName);
-      if (creature && creature.concentration && creature.concentration.spell === 'Shapechange') {
-        return true;
-      }
-    }
-  }
+  // Concentration recasts — free cast when already concentrating on the same spell
+  // (Eyebite, Spiritual Weapon, Shapechange).
+  if (spellName === 'Eyebite' && isConcentrationRecastFreeCast(playerName, spellName, campaignName)) return true;
+  if (spellName === 'Spiritual Weapon' && isConcentrationRecastFreeCast(playerName, spellName, campaignName)) return true;
+  if (spellName === 'Shapechange' && isConcentrationRecastFreeCast(playerName, spellName, campaignName)) return true;
 
   return false;
 }
 
-function decrementFreeCastResource(playerName, spellName, spellLevel, playerStats, campaignName) {
-  // CLA-356: Telekinetic Master's Telekinesis is an UNLIMITED slotless free cast
-  // ("Cast without spell slot") — nothing to consume. Skip all counter decrements so the
-  // row never drains; concentration (not a use counter) is the gate for the bonus attack.
-  const telekineticMasterEntry = playerStats?.spellAbilities?.spells?.find(s => s.name === spellName);
-  if (telekineticMasterEntry?._telekineticMasterFreeCast) return;
+// Per-spell free-cast grants consumed on cast (CLA-252 phantasmal_creatures,
+// CLA-308 Shadow Arts) — same counter shape (one free cast PER SPELL per Long Rest),
+// different ability-name fallback and log note.
+const PER_SPELL_CAST_GRANTS = {
+  Phantasmal_Creatures: {
+    fallbackAbilityName: 'Phantasmal Creatures',
+    buildNote: (spellName, remaining) => `Phantasmal Creatures free cast of ${spellName} — spectral, half HP, no spell slot consumed. ${remaining} free cast${remaining === 1 ? '' : 's'} of ${spellName} remaining until your next Long Rest.`,
+  },
+  Shadow_Arts: {
+    fallbackAbilityName: 'Shadow Arts',
+    buildNote: (spellName) => `Shadow Arts free cast of ${spellName} — no spell slot consumed. ${spellName} is spent until your next Long Rest.`,
+  },
+};
 
-  // CLA-252: phantasmal_creatures lives in passives[] — consume the per-spell free-cast counter.
-  const phantasmalPassive = playerStats?.automation?.passives?.find(p => p.type === 'phantasmal_creatures');
-  if (phantasmalPassive && (phantasmalPassive.freeCastSpells || []).includes(spellName)) {
-    const freeCastCountKey = `_Phantasmal_Creatures_${spellName.replace(/\s+/g, '_')}_freeCastCount`;
-    const usesMax = phantasmalPassive.usesMax ?? 1;
-    const stored = getRuntimeValue(playerName, freeCastCountKey, campaignName);
-    const count = stored != null ? Number(stored) : usesMax;
-    if (count > 0) {
-      setRuntimeValue(playerName, freeCastCountKey, count - 1, campaignName);
-      addEntry(campaignName, {
-        type: 'ability_use',
-        characterName: playerName,
-        abilityName: phantasmalPassive.name || 'Phantasmal Creatures',
-        spellName: spellName,
-        note: `Phantasmal Creatures free cast of ${spellName} — spectral, half HP, no spell slot consumed. ${count - 1} free cast${count - 1 === 1 ? '' : 's'} of ${spellName} remaining until your next Long Rest.`,
-        timestamp: Date.now(),
-      }).catch((e) => { console.error('[spellPreparationService:log-error]', e); });
-    }
+function consumePerSpellFreeCastCounter(passive, playerName, spellName, keyPrefix, campaignName) {
+  if (!passive || !(passive.freeCastSpells || []).includes(spellName)) return;
+  const freeCastCountKey = `_${keyPrefix}_${spellName.replace(/\s+/g, '_')}_freeCastCount`;
+  const usesMax = passive.usesMax ?? 1;
+  const stored = getRuntimeValue(playerName, freeCastCountKey, campaignName);
+  const count = stored != null ? Number(stored) : usesMax;
+  if (count <= 0) return;
+  setRuntimeValue(playerName, freeCastCountKey, count - 1, campaignName);
+  const grant = PER_SPELL_CAST_GRANTS[keyPrefix];
+  addEntry(campaignName, {
+    type: 'ability_use',
+    characterName: playerName,
+    abilityName: passive.name || grant.fallbackAbilityName,
+    spellName: spellName,
+    note: grant.buildNote(spellName, count - 1),
+    timestamp: Date.now(),
+  }).catch((e) => { console.error('[spellPreparationService:log-error]', e); });
+}
+
+function restorePerSpellFreeCastCounter(passive, playerName, spellName, keyPrefix, campaignName) {
+  if (!passive || !(passive.freeCastSpells || []).includes(spellName)) return;
+  const freeCastCountKey = `_${keyPrefix}_${spellName.replace(/\s+/g, '_')}_freeCastCount`;
+  const usesMax = passive.usesMax ?? 1;
+  const stored = getRuntimeValue(playerName, freeCastCountKey, campaignName);
+  if (stored != null && Number(stored) < usesMax) {
+    setRuntimeValue(playerName, freeCastCountKey, Number(stored) + 1, campaignName);
   }
+}
 
-  // CLA-308: Shadow Arts — consume the per-spell free-cast counter (one per spell
-  // per Long Rest) and log the slotless cast with its source and resource note.
-  const shadowArtsPassive = playerStats?.automation?.passives?.find(p => p.type === 'shadow_arts');
-  if (shadowArtsPassive && (shadowArtsPassive.freeCastSpells || []).includes(spellName)) {
-    const freeCastCountKey = `_Shadow_Arts_${spellName.replace(/\s+/g, '_')}_freeCastCount`;
-    const usesMax = shadowArtsPassive.usesMax ?? 1;
-    const stored = getRuntimeValue(playerName, freeCastCountKey, campaignName);
-    const count = stored != null ? Number(stored) : usesMax;
-    if (count > 0) {
-      setRuntimeValue(playerName, freeCastCountKey, count - 1, campaignName);
-      addEntry(campaignName, {
-        type: 'ability_use',
-        characterName: playerName,
-        abilityName: shadowArtsPassive.name || 'Shadow Arts',
-        spellName: spellName,
-        note: `Shadow Arts free cast of ${spellName} — no spell slot consumed. ${spellName} is spent until your next Long Rest.`,
-        timestamp: Date.now(),
-      }).catch((e) => { console.error('[spellPreparationService:log-error]', e); });
-    }
-  }
-
-  const arcanums = playerStats?.class?.arcanums || [];
-  if (arcanums.includes(spellName)) {
-    // CLA-231: decrement the counter keyed by the cast spell's own level.
-    if (spellLevel >= 6 && spellLevel <= 9) {
-      const resourceKey = `mysticArcanumLevel${spellLevel}`;
-      const count = Number(getRuntimeValue(playerName, resourceKey) ?? 1);
-      if (count > 0) {
-        setRuntimeValue(playerName, resourceKey, count - 1, campaignName);
-      }
-    }
-  }
-
-  const allActions = [
-    ...(playerStats?.automation?.actions || []),
-    ...(playerStats?.automation?.bonusActions || []),
-    ...(playerStats?.automation?.specialActions || []),
-  ];
+// Consumes the feature-keyed free-cast counter for the first matching automation entry
+// (free_spell/fey_reinforcements/misty_wanderer/dragon_companion). Mirrors the scan
+// order in isFreeCastAuthorized/checkFreeCastEntry — break points are rule-significant.
+function consumeActionFreeCastCounters(allActions, playerName, spellName, spellLevel, campaignName) {
   for (const entry of allActions) {
     if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'misty_wanderer' && entry.type !== 'dragon_companion') continue;
     if (entry.uses_expression && entry.usesMax) {
@@ -405,7 +291,33 @@ function decrementFreeCastResource(playerName, spellName, spellLevel, playerStat
       break;
     }
   }
+}
 
+// CLA-388: Wild Companion (Druid lv2, 2024) — consume the PAID grant on cast so the
+// shared `_Wild_Companion_freeCast` array is no longer unlimited (Bewitching Magic
+// consume-shared-array precedent). Log the slotless cast as a summons row; the FEY
+// familiar is log-recorded (no familiar combatant entity architecture exists app-wide).
+function consumeWildCompanionGrant(allActions, playerName, spellName, campaignName) {
+  const wildCompanionGrant = allActions.some(e =>
+    e.type === 'free_spell' && e.resourceCost === 'wild_companion' &&
+    (Array.isArray(e.spell) ? e.spell : [e.spell]).includes(spellName));
+  if (!wildCompanionGrant) return;
+  const wildCompanionFreeCast = getRuntimeValue(playerName, '_Wild_Companion_freeCast', campaignName);
+  if (Array.isArray(wildCompanionFreeCast) && wildCompanionFreeCast.includes(spellName)) {
+    setRuntimeValue(playerName, '_Wild_Companion_freeCast', null, campaignName);
+    addEntry(campaignName, {
+      type: 'summons',
+      characterName: playerName,
+      summonName: 'Familiar',
+      description: `${playerName} casts ${spellName} via Wild Companion — no spell slot consumed, Material components waived. Familiar (FEY) appears; it disappears when you finish a Long Rest.`,
+      summonedCreatures: ['Familiar'],
+      timestamp: Date.now(),
+    }).catch((e) => { console.error('[spellPreparationService:log-error]', e); });
+  }
+}
+
+// Consume the named-feature free-cast flags after the counter scans (order preserved).
+function consumeSpecialFreeCastFlags(allActions, playerName, spellName, spellLevel, campaignName) {
   const favoredEnemyCount = getRuntimeValue(playerName, '_Favored_Enemy_freeCastCount');
   if (favoredEnemyCount != null) {
     const newCount = Number(favoredEnemyCount);
@@ -422,27 +334,7 @@ function decrementFreeCastResource(playerName, spellName, spellLevel, playerStat
     setRuntimeValue(playerName, '_Bewitching_Magic_freeCast', null, campaignName);
   }
 
-  // CLA-388: Wild Companion (Druid lv2, 2024) — consume the PAID grant on cast so the
-  // shared `_Wild_Companion_freeCast` array is no longer unlimited (Bewitching Magic
-  // consume-shared-array precedent). Log the slotless cast as a summons row; the FEY
-  // familiar is log-recorded (no familiar combatant entity architecture exists app-wide).
-  const wildCompanionGrant = allActions.some(e =>
-    e.type === 'free_spell' && e.resourceCost === 'wild_companion' &&
-    (Array.isArray(e.spell) ? e.spell : [e.spell]).includes(spellName));
-  if (wildCompanionGrant) {
-    const wildCompanionFreeCast = getRuntimeValue(playerName, '_Wild_Companion_freeCast', campaignName);
-    if (Array.isArray(wildCompanionFreeCast) && wildCompanionFreeCast.includes(spellName)) {
-      setRuntimeValue(playerName, '_Wild_Companion_freeCast', null, campaignName);
-      addEntry(campaignName, {
-        type: 'summons',
-        characterName: playerName,
-        summonName: 'Familiar',
-        description: `${playerName} casts ${spellName} via Wild Companion — no spell slot consumed, Material components waived. Familiar (FEY) appears; it disappears when you finish a Long Rest.`,
-        summonedCreatures: ['Familiar'],
-        timestamp: Date.now(),
-      }).catch((e) => { console.error('[spellPreparationService:log-error]', e); });
-    }
-  }
+  consumeWildCompanionGrant(allActions, playerName, spellName, campaignName);
 
   const sigSpells = getRuntimeValue(playerName, 'SignatureSpells_selection', campaignName);
   if (Array.isArray(sigSpells) && sigSpells.includes(spellName) && spellLevel === 3) {
@@ -457,38 +349,28 @@ function decrementFreeCastResource(playerName, spellName, spellLevel, playerStat
   }
 }
 
-function incrementFreeCastResource(playerName, spellName, spellLevel, playerStats, campaignName) {
-  // CLA-252: rollback half of the per-spell Phantasmal Creatures free-cast counter.
-  const phantasmalPassive = playerStats?.automation?.passives?.find(p => p.type === 'phantasmal_creatures');
-  if (phantasmalPassive && (phantasmalPassive.freeCastSpells || []).includes(spellName)) {
-    const freeCastCountKey = `_Phantasmal_Creatures_${spellName.replace(/\s+/g, '_')}_freeCastCount`;
-    const usesMax = phantasmalPassive.usesMax ?? 1;
-    const stored = getRuntimeValue(playerName, freeCastCountKey, campaignName);
-    if (stored != null && Number(stored) < usesMax) {
-      setRuntimeValue(playerName, freeCastCountKey, Number(stored) + 1, campaignName);
-    }
-  }
+function decrementFreeCastResource(playerName, spellName, spellLevel, playerStats, campaignName) {
+  // CLA-356: Telekinetic Master's Telekinesis is an UNLIMITED slotless free cast
+  // ("Cast without spell slot") — nothing to consume. Skip all counter decrements so the
+  // row never drains; concentration (not a use counter) is the gate for the bonus attack.
+  const telekineticMasterEntry = playerStats?.spellAbilities?.spells?.find(s => s.name === spellName);
+  if (telekineticMasterEntry?._telekineticMasterFreeCast) return;
 
-  // CLA-308: Shadow Arts — roll back the per-spell free-cast counter (one per spell
-  // per Long Rest) when a cast is cancelled/skipped.
-  const shadowArtsPassive = playerStats?.automation?.passives?.find(p => p.type === 'shadow_arts');
-  if (shadowArtsPassive && (shadowArtsPassive.freeCastSpells || []).includes(spellName)) {
-    const freeCastCountKey = `_Shadow_Arts_${spellName.replace(/\s+/g, '_')}_freeCastCount`;
-    const usesMax = shadowArtsPassive.usesMax ?? 1;
-    const stored = getRuntimeValue(playerName, freeCastCountKey, campaignName);
-    if (stored != null && Number(stored) < usesMax) {
-      setRuntimeValue(playerName, freeCastCountKey, Number(stored) + 1, campaignName);
-    }
-  }
+  // CLA-252: phantasmal_creatures lives in passives[] — consume the per-spell free-cast counter.
+  consumePerSpellFreeCastCounter(playerStats?.automation?.passives?.find(p => p.type === 'phantasmal_creatures'), playerName, spellName, 'Phantasmal_Creatures', campaignName);
+
+  // CLA-308: Shadow Arts — consume the per-spell free-cast counter (one per spell
+  // per Long Rest) and log the slotless cast with its source and resource note.
+  consumePerSpellFreeCastCounter(playerStats?.automation?.passives?.find(p => p.type === 'shadow_arts'), playerName, spellName, 'Shadow_Arts', campaignName);
 
   const arcanums = playerStats?.class?.arcanums || [];
   if (arcanums.includes(spellName)) {
-    // CLA-231: increment the counter keyed by the spell's own level.
+    // CLA-231: decrement the counter keyed by the cast spell's own level.
     if (spellLevel >= 6 && spellLevel <= 9) {
       const resourceKey = `mysticArcanumLevel${spellLevel}`;
       const count = Number(getRuntimeValue(playerName, resourceKey) ?? 1);
-      if (count < 1) {
-        setRuntimeValue(playerName, resourceKey, count + 1, campaignName);
+      if (count > 0) {
+        setRuntimeValue(playerName, resourceKey, count - 1, campaignName);
       }
     }
   }
@@ -498,6 +380,13 @@ function incrementFreeCastResource(playerName, spellName, spellLevel, playerStat
     ...(playerStats?.automation?.bonusActions || []),
     ...(playerStats?.automation?.specialActions || []),
   ];
+  consumeActionFreeCastCounters(allActions, playerName, spellName, spellLevel, campaignName);
+  consumeSpecialFreeCastFlags(allActions, playerName, spellName, spellLevel, campaignName);
+}
+
+// Roll back the feature-keyed free-cast counter for the first matching automation entry
+// (cancelled/skipped cast). Mirrors consumeActionFreeCastCounters scan order exactly.
+function restoreActionFreeCastCounters(allActions, playerName, spellName, spellLevel, campaignName) {
   for (const entry of allActions) {
     if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'misty_wanderer' && entry.type !== 'dragon_companion') continue;
     if (entry.uses_expression && entry.usesMax) {
@@ -549,7 +438,10 @@ function incrementFreeCastResource(playerName, spellName, spellLevel, playerStat
       break;
     }
   }
+}
 
+// Roll back the named-feature free-cast flags after the counter scans (order preserved).
+function restoreSpecialFreeCastFlags(playerName, spellName, spellLevel, campaignName) {
   const favoredEnemyCount = getRuntimeValue(playerName, '_Favored_Enemy_freeCastCount');
   if (favoredEnemyCount != null) {
     const newCount = Number(favoredEnemyCount);
@@ -579,6 +471,35 @@ function incrementFreeCastResource(playerName, spellName, spellLevel, playerStat
   }
 }
 
+function incrementFreeCastResource(playerName, spellName, spellLevel, playerStats, campaignName) {
+  // CLA-252: rollback half of the per-spell Phantasmal Creatures free-cast counter.
+  restorePerSpellFreeCastCounter(playerStats?.automation?.passives?.find(p => p.type === 'phantasmal_creatures'), playerName, spellName, 'Phantasmal_Creatures', campaignName);
+
+  // CLA-308: Shadow Arts — roll back the per-spell free-cast counter (one per spell
+  // per Long Rest) when a cast is cancelled/skipped.
+  restorePerSpellFreeCastCounter(playerStats?.automation?.passives?.find(p => p.type === 'shadow_arts'), playerName, spellName, 'Shadow_Arts', campaignName);
+
+  const arcanums = playerStats?.class?.arcanums || [];
+  if (arcanums.includes(spellName)) {
+    // CLA-231: increment the counter keyed by the spell's own level.
+    if (spellLevel >= 6 && spellLevel <= 9) {
+      const resourceKey = `mysticArcanumLevel${spellLevel}`;
+      const count = Number(getRuntimeValue(playerName, resourceKey) ?? 1);
+      if (count < 1) {
+        setRuntimeValue(playerName, resourceKey, count + 1, campaignName);
+      }
+    }
+  }
+
+  const allActions = [
+    ...(playerStats?.automation?.actions || []),
+    ...(playerStats?.automation?.bonusActions || []),
+    ...(playerStats?.automation?.specialActions || []),
+  ];
+  restoreActionFreeCastCounters(allActions, playerName, spellName, spellLevel, campaignName);
+  restoreSpecialFreeCastFlags(playerName, spellName, spellLevel, campaignName);
+}
+
 function cleanupBuffsByName(casterName, buffName, campaignName) {
   const cs = getCombatSummary(campaignName);
   if (!cs || !cs.creatures) return;
@@ -603,6 +524,152 @@ function getWarlockSlotLevel(playerName, playerStats, minLevel) {
     if (available > 0) return lv;
   }
   return null;
+}
+
+// Concentration management for an incoming cast: detect a replaced concentration
+// (breaks it + persists), a fresh concentration, or an Eyebite recast.
+function resolveConcentrationChange(spell, playerName, playerStats, campaignName, isWgbSpell) {
+  let shouldSetConcentration = false;
+  let oldConcentrationSpell = null;
+  let isEyebiteRecast = false;
+
+  if (!isWgbSpell && spell.concentration && spell.name !== 'Summon Aberration') {
+    const cs = getCombatSummary(campaignName);
+    if (cs) {
+      const creature = cs.creatures.find(c => c.name === playerStats.name);
+      if (creature && creature.concentration && creature.concentration.spell !== spell.name) {
+        oldConcentrationSpell = creature.concentration.spell;
+        breakConcentration(cs, playerName);
+        storageService.default.set('combatSummary', cs, campaignName);
+        shouldSetConcentration = true;
+      } else if (!creature?.concentration) {
+        shouldSetConcentration = true;
+      } else if (spell.name === 'Eyebite' && creature.concentration.spell === spell.name) {
+        isEyebiteRecast = true;
+      }
+    }
+  }
+  return { shouldSetConcentration, oldConcentrationSpell, isEyebiteRecast };
+}
+
+// Psionic Sorcery payment — SPs cover the spell level, components waived.
+// Returns true when the payment was made (metaCtx stamps applied).
+function applyPsionicSorceryPayment(spell, playerName, effectiveSpellLevel, campaignName, metaCtx) {
+  const currentSP = Number(getRuntimeValue(playerName, 'sorceryPoints') ?? 0);
+  if (currentSP < effectiveSpellLevel) return false;
+  setRuntimeValue(playerName, 'sorceryPoints', currentSP - effectiveSpellLevel, campaignName);
+  metaCtx.psionicSorcery = 'sorceryPoints';
+  metaCtx.psionicCost = effectiveSpellLevel;
+  metaCtx._psionicUsed = true;
+  addEntry(campaignName, {
+    type: 'psionic_sorcery',
+    characterName: playerName,
+    spellName: spell.name,
+    spellLevel: effectiveSpellLevel,
+    sorceryPointsSpent: effectiveSpellLevel,
+    componentsWaived: ['V', 'S'],
+    note: 'Cast without Verbal or Somatic components. No Material components unless consumed or have cost.',
+    timestamp: Date.now(),
+  });
+  return true;
+}
+
+function consumeUpcastSlot(spell, playerName, playerStats, effectiveSpellLevel, campaignName) {
+  const slotKey = `spell_slots_level_${effectiveSpellLevel}`;
+  const currentSlots = getRuntimeValue(playerName, slotKey);
+  const maxSlots = (playerStats.spellAbilities && playerStats.spellAbilities[slotKey]) || 0;
+  const availableSlots = currentSlots != null ? currentSlots : maxSlots;
+  if (availableSlots <= 0) return false;
+  setRuntimeValue(playerName, slotKey, availableSlots - 1, campaignName);
+  return true;
+}
+
+// FT-068: Ritual Master Quick Ritual — consume the once-per-Long-Rest slotless cast.
+function consumeQuickRitual(spell, playerName, campaignName) {
+  setRuntimeValue(playerName, '_Ritual_Master_quickRitualUsed', Date.now(), campaignName);
+  addEntry(campaignName, {
+    type: 'ability_use',
+    characterName: playerName,
+    abilityName: 'Ritual Master (Quick Ritual)',
+    spellName: spell.name,
+    note: `Quick Ritual: cast ${spell.name} using its regular casting time — no spell slot consumed. You can't use Quick Ritual again until you finish a Long Rest.`,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error('[spellPreparationService:log-error]', e); });
+}
+
+function consumeFreeCast(spell, playerName, playerStats, campaignName) {
+  decrementFreeCastResource(playerName, spell.name, spell.level, playerStats, campaignName);
+  // CLA-234: record ritual casts (Nature Speaker / Animal Speaker) explicitly —
+  // cast as a Ritual, no spell slot consumed.
+  if (spell._ritualOnly) {
+    addEntry(campaignName, {
+      type: 'ability_use',
+      characterName: playerName,
+      abilityName: spell._ritualFeature || 'Ritual Casting',
+      spellName: spell.name,
+      note: `Cast ${spell.name} as a Ritual — no spell slot consumed.`,
+      timestamp: Date.now(),
+    }).catch((e) => { console.error('[spellPreparationService:log-error]', e); });
+  }
+}
+
+function consumeBaseSlot(spell, playerName, playerStats, isWarlock, campaignName) {
+  const baseSlotKey = `spell_slots_level_${spell.level}`;
+  let availableSlots = getRuntimeValue(playerName, baseSlotKey);
+  const maxSlots = (playerStats.spellAbilities && playerStats.spellAbilities[baseSlotKey]) || 0;
+  availableSlots = availableSlots != null ? availableSlots : maxSlots;
+
+  if (isWarlock && availableSlots <= 0) {
+    const warlockSlotLevel = getWarlockSlotLevel(playerName, playerStats, spell.level);
+    if (warlockSlotLevel === null) return false;
+    const slotKey = `spell_slots_level_${warlockSlotLevel}`;
+    const currentSlots = getRuntimeValue(playerName, slotKey);
+    const slotMax = (playerStats.spellAbilities && playerStats.spellAbilities[slotKey]) || 0;
+    const warlockAvailable = currentSlots != null ? currentSlots : slotMax;
+    if (warlockAvailable > 0) {
+      setRuntimeValue(playerName, slotKey, warlockAvailable - 1, campaignName);
+      return true;
+    }
+    return false;
+  }
+  if (availableSlots > 0) {
+    setRuntimeValue(playerName, baseSlotKey, availableSlots - 1, campaignName);
+    return true;
+  }
+  return false;
+}
+
+// Hunter's Mark / Hex concentration buff rows (array-guarded append).
+const CONCENTRATION_BUFF_EFFECTS = {
+  "Hunter's Mark": 'hunters_mark_concentration',
+  'Hex': 'hex_concentration',
+};
+
+function trackConcentrationBuff(spellName, playerName, campaignName) {
+  const effect = CONCENTRATION_BUFF_EFFECTS[spellName];
+  if (!effect) return;
+  const existingBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName) || [];
+  const buff = { name: spellName, effect, duration: 'concentration' };
+  const newBuffs = Array.isArray(existingBuffs) ? [...existingBuffs, buff] : [buff];
+  setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
+}
+
+// CLA-252: free (spectral) casts change the school to Illusion and record the summoned
+// creature so the summon path halves its HP. Pass campaignName so the list read/write
+// targets the live campaign store (missing it silently no-oped later appends).
+function stampPhantasmalCast(modifiedSpell, spellName, phantasmalPassive, playerName, campaignName) {
+  modifiedSpell.school = 'Illusion';
+  modifiedSpell._phantasmalCreatures = true;
+  modifiedSpell._phantasmalHalvesHp = !!phantasmalPassive.halvesHp;
+  const summonCreatureName = spellName === 'Summon Beast' ? 'Bestial Spirit' : 'Fey Spirit';
+  const existingCreatures = getRuntimeValue(playerName, '_phantasmalCreatures_list', campaignName);
+  // Copy before mutating: setRuntimeValue short-circuits identical references, so mutating
+  // the store array in place would never POST the append.
+  const creatureList = Array.isArray(existingCreatures) ? [...existingCreatures] : [];
+  if (!creatureList.includes(summonCreatureName)) {
+    creatureList.push(summonCreatureName);
+    setRuntimeValue(playerName, '_phantasmalCreatures_list', creatureList, campaignName);
+  }
 }
 
 export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats, campaignName, isUpcast, upcastLevel, usePsionicPayment, usePsychicDamage, freeCastAuthorized }) {
@@ -630,26 +697,10 @@ export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats
   const isWgbActive = getRuntimeValue(playerName, '_War_Gods_Blessing_active');
   const isWgbSpell = isWgbActive && ['Shield of Faith', 'Spiritual Weapon'].includes(spell.name);
 
-  let shouldSetConcentration = false;
-  let oldConcentrationSpell = null;
-  let isEyebiteRecast = false;
-
-  if (!isWgbSpell && spell.concentration && spell.name !== 'Summon Aberration') {
-    const cs = getCombatSummary(campaignName);
-    if (cs) {
-      const creature = cs.creatures.find(c => c.name === playerStats.name);
-      if (creature && creature.concentration && creature.concentration.spell !== spell.name) {
-        oldConcentrationSpell = creature.concentration.spell;
-        breakConcentration(cs, playerName);
-        storageService.default.set('combatSummary', cs, campaignName);
-        shouldSetConcentration = true;
-      } else if (!creature?.concentration) {
-        shouldSetConcentration = true;
-      } else if (spell.name === 'Eyebite' && creature.concentration.spell === spell.name) {
-        isEyebiteRecast = true;
-      }
-    }
-  }
+  const concentration = resolveConcentrationChange(spell, playerName, playerStats, campaignName, isWgbSpell);
+  const shouldSetConcentration = concentration.shouldSetConcentration;
+  const oldConcentrationSpell = concentration.oldConcentrationSpell;
+  const isEyebiteRecast = concentration.isEyebiteRecast;
 
   result.metaCtx.oldConcentrationSpell = oldConcentrationSpell;
   result.metaCtx.shouldSetConcentration = shouldSetConcentration;
@@ -657,23 +708,7 @@ export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats
   // Psionic Sorcery payment
   const isFreeCast = freeCastAuthorized;
   if (isPsionic && hasPsionic && !isFreeCast && usePsionicPayment) {
-    const currentSP = Number(getRuntimeValue(playerName, 'sorceryPoints') ?? 0);
-    if (currentSP >= effectiveSpellLevel) {
-      setRuntimeValue(playerName, 'sorceryPoints', currentSP - effectiveSpellLevel, campaignName);
-      result.metaCtx.psionicSorcery = 'sorceryPoints';
-      result.metaCtx.psionicCost = effectiveSpellLevel;
-      result.metaCtx._psionicUsed = true;
-      addEntry(campaignName, {
-        type: 'psionic_sorcery',
-        characterName: playerName,
-        spellName: spell.name,
-        spellLevel: effectiveSpellLevel,
-        sorceryPointsSpent: effectiveSpellLevel,
-        componentsWaived: ['V', 'S'],
-        note: 'Cast without Verbal or Somatic components. No Material components unless consumed or have cost.',
-        timestamp: Date.now(),
-      });
-    }
+    applyPsionicSorceryPayment(spell, playerName, effectiveSpellLevel, campaignName, result.metaCtx);
   }
 
   // FT-068: Ritual Master Quick Ritual — a prepared ritual spell granted by the feat is
@@ -691,64 +726,17 @@ export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats
   } else if (isEyebiteRecast) {
     // Recasting Eyebite while already concentrating on it — no slot consumed, no buff updated
   } else if (isUpcast && !isFreeCast && !result.metaCtx._psionicUsed && effectiveSpellLevel !== spell.level) {
-    const slotKey = `spell_slots_level_${effectiveSpellLevel}`;
-    const currentSlots = getRuntimeValue(playerName, slotKey);
-    const maxSlots = (playerStats.spellAbilities && playerStats.spellAbilities[slotKey]) || 0;
-    const availableSlots = currentSlots != null ? currentSlots : maxSlots;
-    if (availableSlots > 0) {
-      setRuntimeValue(playerName, slotKey, availableSlots - 1, campaignName);
-      result.slotConsumed = true;
-    }
+    result.slotConsumed = consumeUpcastSlot(spell, playerName, playerStats, effectiveSpellLevel, campaignName);
   } else if (isQuickRitualCast) {
-    setRuntimeValue(playerName, '_Ritual_Master_quickRitualUsed', Date.now(), campaignName);
+    consumeQuickRitual(spell, playerName, campaignName);
     result.freeCastUsed = true;
     result.metaCtx.quickRitualUsed = true;
-    addEntry(campaignName, {
-      type: 'ability_use',
-      characterName: playerName,
-      abilityName: 'Ritual Master (Quick Ritual)',
-      spellName: spell.name,
-      note: `Quick Ritual: cast ${spell.name} using its regular casting time — no spell slot consumed. You can't use Quick Ritual again until you finish a Long Rest.`,
-      timestamp: Date.now(),
-    }).catch((e) => { console.error('[spellPreparationService:log-error]', e); });
   } else if (isFreeCast) {
-    decrementFreeCastResource(playerName, spell.name, spell.level, playerStats, campaignName);
+    consumeFreeCast(spell, playerName, playerStats, campaignName);
     result.freeCastUsed = true;
     result.metaCtx.freeCastUsed = true;
-    // CLA-234: record ritual casts (Nature Speaker / Animal Speaker) explicitly —
-    // cast as a Ritual, no spell slot consumed.
-    if (spell._ritualOnly) {
-      addEntry(campaignName, {
-        type: 'ability_use',
-        characterName: playerName,
-        abilityName: spell._ritualFeature || 'Ritual Casting',
-        spellName: spell.name,
-        note: `Cast ${spell.name} as a Ritual — no spell slot consumed.`,
-        timestamp: Date.now(),
-      }).catch((e) => { console.error('[spellPreparationService:log-error]', e); });
-    }
   } else if (!result.metaCtx._psionicUsed) {
-    const baseSlotKey = `spell_slots_level_${spell.level}`;
-    let availableSlots = getRuntimeValue(playerName, baseSlotKey);
-    const maxSlots = (playerStats.spellAbilities && playerStats.spellAbilities[baseSlotKey]) || 0;
-    availableSlots = availableSlots != null ? availableSlots : maxSlots;
-
-    if (isWarlock && availableSlots <= 0) {
-      const warlockSlotLevel = getWarlockSlotLevel(playerName, playerStats, spell.level);
-      if (warlockSlotLevel !== null) {
-        const slotKey = `spell_slots_level_${warlockSlotLevel}`;
-        const currentSlots = getRuntimeValue(playerName, slotKey);
-        const slotMax = (playerStats.spellAbilities && playerStats.spellAbilities[slotKey]) || 0;
-        availableSlots = currentSlots != null ? currentSlots : slotMax;
-        if (availableSlots > 0) {
-          setRuntimeValue(playerName, slotKey, availableSlots - 1, campaignName);
-          result.slotConsumed = true;
-        }
-      }
-    } else if (availableSlots > 0) {
-      setRuntimeValue(playerName, baseSlotKey, availableSlots - 1, campaignName);
-      result.slotConsumed = true;
-    }
+    result.slotConsumed = consumeBaseSlot(spell, playerName, playerStats, isWarlock, campaignName);
   }
 
   // Cleanup old concentration effects
@@ -769,16 +757,8 @@ export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats
   }
 
   // Hunter's Mark / Hex buff tracking
-  if (shouldSetConcentration && spell.name === "Hunter's Mark") {
-    const existingBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName) || [];
-    const newBuffs = Array.isArray(existingBuffs) ? [...existingBuffs, { name: "Hunter's Mark", effect: 'hunters_mark_concentration', duration: 'concentration' }] : [{ name: "Hunter's Mark", effect: 'hunters_mark_concentration', duration: 'concentration' }];
-    setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
-  }
-
-  if (shouldSetConcentration && spell.name === 'Hex') {
-    const existingBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName) || [];
-    const newBuffs = Array.isArray(existingBuffs) ? [...existingBuffs, { name: 'Hex', effect: 'hex_concentration', duration: 'concentration' }] : [{ name: 'Hex', effect: 'hex_concentration', duration: 'concentration' }];
-    setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
+  if (shouldSetConcentration) {
+    trackConcentrationBuff(spell.name, playerName, campaignName);
   }
 
   if (shouldSetConcentration && spell.name === 'Eyebite') {
@@ -804,23 +784,9 @@ export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats
     modifiedSpell.casting_time = '1 bonus action';
   }
 
-  // CLA-252: free (spectral) casts change the school to Illusion and record the summoned
-  // creature so the summon path halves its HP. Pass campaignName so the list read/write
-  // targets the live campaign store (missing it silently no-oped later appends).
   const phantasmalPassiveForStamp = playerStats.automation?.passives?.find(p => p.type === 'phantasmal_creatures');
   if (phantasmalPassiveForStamp && freeCastAuthorized && (phantasmalPassiveForStamp.freeCastSpells || []).includes(spell.name)) {
-    modifiedSpell.school = 'Illusion';
-    modifiedSpell._phantasmalCreatures = true;
-    modifiedSpell._phantasmalHalvesHp = !!phantasmalPassiveForStamp.halvesHp;
-    const summonCreatureName = spell.name === 'Summon Beast' ? 'Bestial Spirit' : 'Fey Spirit';
-    const existingCreatures = getRuntimeValue(playerName, '_phantasmalCreatures_list', campaignName);
-    // Copy before mutating: setRuntimeValue short-circuits identical references, so mutating
-    // the store array in place would never POST the append.
-    const creatureList = Array.isArray(existingCreatures) ? [...existingCreatures] : [];
-    if (!creatureList.includes(summonCreatureName)) {
-      creatureList.push(summonCreatureName);
-      setRuntimeValue(playerName, '_phantasmalCreatures_list', creatureList, campaignName);
-    }
+    stampPhantasmalCast(modifiedSpell, spell.name, phantasmalPassiveForStamp, playerName, campaignName);
   }
 
   result.modifiedSpell = modifiedSpell;

@@ -5,6 +5,119 @@ import { addEntry } from '../../services/ui/logService.js';
 import { rollExpression } from '../../services/dice/diceRoller.js';
 import { executeManeuver, onCombatSuperioritySelected } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 
+const CHOICE_MODAL_EVENTS = {
+    baitAndSwitchChoice: 'bait-and-switch-modal-show',
+    commanderStrikeChoice: 'commander-strike-modal-show',
+    rallyChoice: 'rally-choice-modal-show',
+    sweepingAttackTarget: 'sweeping-attack-modal-show',
+};
+
+const SINGLE_USE_CHOICE_MODALS = ['baitAndSwitchChoice', 'commanderStrikeChoice', 'rallyChoice', 'sweepingAttackTarget'];
+const MULTI_USE_CHOICE_MODALS = ['rallyChoice', 'sweepingAttackTarget'];
+
+async function logResultEntries(campaignName, result) {
+    if (!result?.logEntries) return;
+    for (const entry of result.logEntries) {
+        await addEntry(campaignName, entry).catch((e) => { console.error("[useCombatSuperiorityModal:log-error]", e); });
+    }
+}
+
+function dispatchChoiceModal(result, allowedModalNames) {
+    if (result?.type !== 'modal') return false;
+    const eventName = allowedModalNames.includes(result.modalName) ? CHOICE_MODAL_EVENTS[result.modalName] : undefined;
+    if (!eventName) return false;
+    window.dispatchEvent(new CustomEvent(eventName, { detail: result.payload }));
+    return true;
+}
+
+function buildResultPopupHtml(payload) {
+    return typeof payload === 'string'
+        ? payload
+        : `<b><i class="fa-solid fa-bolt"></i> ${payload.name || 'Combat Superiority'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+}
+
+function showResultPopup(payload, showPopup) {
+    showPopup(buildResultPopupHtml(payload));
+}
+
+function dispatchAttackRollResult(result, rollAttack, extraOptions) {
+    if (result?.type !== 'attack_roll' || !rollAttack) return;
+    const { attack, targetName } = result.payload;
+    const superiorityDieValue = result.context?.superiorityDieValue || 0;
+    const totalHitBonus = attack.hitBonus + superiorityDieValue;
+    const baseFormula = result.context?.baseDamageFormula || attack.damageFormula;
+    const combinedFormula = superiorityDieValue > 0 && baseFormula ? `${baseFormula} + ${superiorityDieValue} [Superiority]` : (baseFormula || null);
+    rollAttack(attack.name, totalHitBonus, {
+        targetName,
+        forcedMode: undefined,
+        isOpportunityAttack: true,
+        autoDamageFormula: combinedFormula,
+        autoDamageName: `${attack.name} (Riposte)`,
+        damageType: attack.damageType || 'Slashing',
+        autoDamageRollResult: null,
+        superiorityDieValue,
+        ...extraOptions,
+    });
+}
+
+// Precision Attack: add the superiority die to the last attack roll, re-resolve hit/miss,
+// and trigger damage when the amended roll now hits. Returns true when handled.
+async function handlePrecisionAttack(result, playerStats, campaignName, rollAttack, rollDamage, showPopup) {
+    if (!(result?.effect === 'attack_roll_bonus' && result?.dieValue && rollAttack)) return false;
+    const lastAttackRoll = await getRuntimeValue(playerStats.name, 'lastAttackRoll', campaignName);
+    const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
+    if (!(lastAttackRoll?.d20 != null && lastAttackRoll?.targetAc != null && lastAttack?.damageFormula)) return false;
+
+    const dieValue = result.dieValue;
+    const origTotal = lastAttackRoll.d20 + (lastAttackRoll.bonus || 0);
+    const newTotal = origTotal + dieValue;
+    const newHit = newTotal >= lastAttackRoll.targetAc;
+    const isNatural20 = lastAttackRoll.d20 === 20;
+    const wasCrit = lastAttackRoll.isCrit || isNatural20;
+
+    const updatedRoll = {
+        ...lastAttackRoll,
+        bonus: (lastAttackRoll.bonus || 0) + dieValue,
+        total: newTotal,
+        hit: newHit,
+        isCrit: wasCrit,
+    };
+    await setRuntimeValue(playerStats.name, 'lastAttackRoll', updatedRoll, campaignName);
+
+    const updatedLastAttack = { ...lastAttack, total: newTotal, hit: newHit, isCrit: wasCrit };
+    await setRuntimeValue('campaign', 'lastAttack', updatedLastAttack, campaignName);
+
+    const desc = `Precision Attack: Added ${dieValue} to the attack roll (${lastAttackRoll.d20} + ${lastAttackRoll.bonus || 0} + ${dieValue} = ${newTotal}). ${newHit ? 'The attack now hits!' : 'The attack still misses.'}`;
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: 'Precision Attack',
+        description: desc,
+    }).catch((e) => { console.error("[useCombatSuperiorityModal:log-error]", e); });
+
+    if (newHit && rollDamage) {
+        const la = await getRuntimeValue('campaign', 'lastAttack', campaignName);
+        if (la?.damageFormula) {
+            const damageType = la.damageType || 'Slashing';
+            const damageName = la.damageName || la.attackName;
+            const damageResult = rollExpression(la.damageFormula);
+            if (damageResult) {
+                const context = {
+                    damageType,
+                    targetName: la.targetName,
+                    attackerName: playerStats.name,
+                };
+                rollDamage(damageName, la.damageFormula, damageResult.total, damageResult.rolls, damageResult.modifier, context);
+            }
+        }
+        setRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt', null, campaignName);
+        return true;
+    }
+    showPopup({ type: 'automation_info', name: 'Precision Attack', description: desc });
+    return true;
+}
+
 export function useCombatSuperiorityModal(playerStats, campaignName, rollAttack, rollDamage, onPopupHtml) {
     const [combatSuperiorityModal, setCombatSuperiorityModal] = useState(null);
     const popupHtmlRef = useRef(null);
@@ -17,163 +130,25 @@ export function useCombatSuperiorityModal(playerStats, campaignName, rollAttack,
 
     const handleCombatSuperiorityConfirm = useCallback(async (selectedManeuverNames, singleUseManeuverName) => {
         if (!combatSuperiorityModal) return;
+        const modalAction = combatSuperiorityModal.action;
         setCombatSuperiorityModal(null);
 
-        let result;
         if (singleUseManeuverName) {
-            result = await executeManeuver(combatSuperiorityModal.action, playerStats, campaignName, singleUseManeuverName);
-            if (result?.logEntries) {
-                for (const entry of result.logEntries) {
-                    await addEntry(campaignName, entry).catch((e) => { console.error("[useCombatSuperiorityModal:log-error]", e); });
-                }
-            }
-            if (result?.type === 'modal' && result.modalName === 'baitAndSwitchChoice') {
-                window.dispatchEvent(new CustomEvent('bait-and-switch-modal-show', { detail: result.payload }));
-                return;
-            }
-            if (result?.type === 'modal' && result.modalName === 'commanderStrikeChoice') {
-                window.dispatchEvent(new CustomEvent('commander-strike-modal-show', { detail: result.payload }));
-                return;
-            }
-            if (result?.type === 'modal' && result.modalName === 'rallyChoice') {
-                window.dispatchEvent(new CustomEvent('rally-choice-modal-show', { detail: result.payload }));
-                return;
-            }
-            // MN-018: route the Sweeping Attack secondary-target chooser to the
-            // existing sweeping-attack-modal-show listener (SecondaryTargetModals)
-            // instead of letting the generic popup below claim phantom damage.
-            if (result?.type === 'modal' && result.modalName === 'sweepingAttackTarget') {
-                window.dispatchEvent(new CustomEvent('sweeping-attack-modal-show', { detail: result.payload }));
-                return;
-            }
-            if (result?.effect === 'attack_roll_bonus' && result?.dieValue && rollAttack) {
-                const lastAttackRoll = await getRuntimeValue(playerStats.name, 'lastAttackRoll', campaignName);
-                const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
-                if (lastAttackRoll?.d20 != null && lastAttackRoll?.targetAc != null && lastAttack?.damageFormula) {
-                    const dieValue = result.dieValue;
-                    const origTotal = lastAttackRoll.d20 + (lastAttackRoll.bonus || 0);
-                    const newTotal = origTotal + dieValue;
-                    const newHit = newTotal >= lastAttackRoll.targetAc;
-                    const isNatural20 = lastAttackRoll.d20 === 20;
-                    const wasCrit = lastAttackRoll.isCrit || isNatural20;
-
-                    const updatedRoll = {
-                        ...lastAttackRoll,
-                        bonus: (lastAttackRoll.bonus || 0) + dieValue,
-                        total: newTotal,
-                        hit: newHit,
-                        isCrit: wasCrit,
-                    };
-                    await setRuntimeValue(playerStats.name, 'lastAttackRoll', updatedRoll, campaignName);
-
-                    const updatedLastAttack = { ...lastAttack, total: newTotal, hit: newHit, isCrit: wasCrit };
-                    await setRuntimeValue('campaign', 'lastAttack', updatedLastAttack, campaignName);
-
-                    const desc = `Precision Attack: Added ${dieValue} to the attack roll (${lastAttackRoll.d20} + ${lastAttackRoll.bonus || 0} + ${dieValue} = ${newTotal}). ${newHit ? 'The attack now hits!' : 'The attack still misses.'}`;
-
-                    await addEntry(campaignName, {
-                        type: 'ability_use',
-                        characterName: playerStats.name,
-                        abilityName: 'Precision Attack',
-                        description: desc,
-                    }).catch((e) => { console.error("[useCombatSuperiorityModal:log-error]", e); });
-
-                    if (newHit && rollDamage) {
-                        const la = await getRuntimeValue('campaign', 'lastAttack', campaignName);
-                        if (la?.damageFormula) {
-                            const damageType = la.damageType || 'Slashing';
-                            const damageName = la.damageName || la.attackName;
-                            const damageResult = rollExpression(la.damageFormula);
-                            if (damageResult) {
-                                const context = {
-                                    damageType,
-                                    targetName: la.targetName,
-                                    attackerName: playerStats.name,
-                                };
-                                rollDamage(damageName, la.damageFormula, damageResult.total, damageResult.rolls, damageResult.modifier, context);
-                            }
-                        }
-                        setRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt', null, campaignName);
-                        return;
-                    }
-                    showPopup({ type: 'automation_info', name: 'Precision Attack', description: desc });
-                    return;
-                }
-            }
-            if (result?.type === 'popup') {
-                const payload = result.payload;
-                const html = typeof payload === 'string'
-                    ? payload
-                    : `<b><i class="fa-solid fa-bolt"></i> ${payload.name || 'Combat Superiority'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-                showPopup(html);
-            }
-            if (result?.type === 'attack_roll' && rollAttack) {
-                const { attack, targetName } = result.payload;
-                const superiorityDieValue = result.context?.superiorityDieValue || 0;
-                const totalHitBonus = attack.hitBonus + superiorityDieValue;
-                const baseFormula = result.context?.baseDamageFormula || attack.damageFormula;
-                const combinedFormula = superiorityDieValue > 0 && baseFormula ? `${baseFormula} + ${superiorityDieValue} [Superiority]` : (baseFormula || null);
-                rollAttack(attack.name, totalHitBonus, {
-                    targetName,
-                    forcedMode: undefined,
-                    isOpportunityAttack: true,
-                    autoDamageFormula: combinedFormula,
-                    autoDamageName: `${attack.name} (Riposte)`,
-                    damageType: attack.damageType || 'Slashing',
-                    autoDamageRollResult: null,
-                    superiorityDieValue,
-                    ripostePopup: result.popup,
-                });
-            }
+            const result = await executeManeuver(modalAction, playerStats, campaignName, singleUseManeuverName);
+            await logResultEntries(campaignName, result);
+            if (dispatchChoiceModal(result, SINGLE_USE_CHOICE_MODALS)) return;
+            if (await handlePrecisionAttack(result, playerStats, campaignName, rollAttack, rollDamage, showPopup)) return;
+            if (result?.type === 'popup') showResultPopup(result.payload, showPopup);
+            dispatchAttackRollResult(result, rollAttack, { ripostePopup: result.popup });
             return;
         }
 
-        result = await onCombatSuperioritySelected(combatSuperiorityModal.action, playerStats, campaignName, selectedManeuverNames, singleUseManeuverName);
-        if (result?.logEntries) {
-            for (const entry of result.logEntries) {
-                await addEntry(campaignName, entry).catch((e) => { console.error("[useCombatSuperiorityModal:log-error]", e); });
-            }
-        }
-        if (result?.type === 'modal' && result.modalName === 'rallyChoice') {
-            window.dispatchEvent(new CustomEvent('rally-choice-modal-show', { detail: result.payload }));
-            return;
-        }
-        // MN-018: route Sweeping Attack chooser (mirrors the single-use branch).
-        if (result?.type === 'modal' && result.modalName === 'sweepingAttackTarget') {
-            window.dispatchEvent(new CustomEvent('sweeping-attack-modal-show', { detail: result.payload }));
-            return;
-        }
-        if (result?.type === 'popup') {
-            const payload = result.payload;
-            const html = typeof payload === 'string'
-                ? payload
-                : `<b><i class="fa-solid fa-bolt"></i> ${payload.name || 'Combat Superiority'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-            showPopup(html);
-        }
-        if (result?.popup) {
-            const payload = result.popup;
-            const html = typeof payload === 'string'
-                ? payload
-                : `<b><i class="fa-solid fa-bolt"></i> ${payload.name || 'Combat Superiority'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-            showPopup(html);
-        }
-        if (result?.type === 'attack_roll' && rollAttack) {
-            const { attack, targetName } = result.payload;
-            const superiorityDieValue = result.context?.superiorityDieValue || 0;
-            const totalHitBonus = attack.hitBonus + superiorityDieValue;
-            const baseFormula = result.context?.baseDamageFormula || attack.damageFormula;
-            const combinedFormula = superiorityDieValue > 0 && baseFormula ? `${baseFormula} + ${superiorityDieValue} [Superiority]` : (baseFormula || null);
-            rollAttack(attack.name, totalHitBonus, {
-                targetName,
-                forcedMode: undefined,
-                isOpportunityAttack: true,
-                autoDamageFormula: combinedFormula,
-                autoDamageName: `${attack.name} (Riposte)`,
-                damageType: attack.damageType || 'Slashing',
-                autoDamageRollResult: null,
-                superiorityDieValue,
-            });
-        }
+        const result = await onCombatSuperioritySelected(modalAction, playerStats, campaignName, selectedManeuverNames, singleUseManeuverName);
+        await logResultEntries(campaignName, result);
+        if (dispatchChoiceModal(result, MULTI_USE_CHOICE_MODALS)) return;
+        if (result?.type === 'popup') showResultPopup(result.payload, showPopup);
+        if (result?.popup) showResultPopup(result.popup, showPopup);
+        dispatchAttackRollResult(result, rollAttack, {});
     }, [combatSuperiorityModal, playerStats, campaignName, rollAttack, rollDamage, showPopup]);
 
     const handleCombatSuperiorityReopenSelection = useCallback(async () => {

@@ -19,6 +19,347 @@ import { hasBuffEffect } from '../../services/automation/common/buffToggle.js';
 import { createFanaticalFocusHandler, createDisciplinedSurvivorHandler, createGuardedMindHandler, createLivingLegendHandler, createIndomitableHandler } from './savePromptHandlers.js';
 import { evaluateAutoExpression } from '../../services/combat/automation/automationService.js';
 
+const GUARDED_MIND_SAVE_TYPES = ['Intelligence', 'Wisdom', 'Charisma', 'INT', 'WIS', 'CHA'];
+
+function hasShareableEvasionFor(current, characters) {
+  if (current.dcSuccess !== 'half') return false;
+  const normalizedSaveType = normalizeSaveType(current.saveType);
+  return (characters || []).some(c => {
+    if (utils.getName(c.name) === utils.getName(current.targetName)) return false;
+    const ev = c?.computedStats?.evasionEffects;
+    return ev?.some(ef => ef.saveType === normalizedSaveType && ef.shareable && ef.shareRange >= 5);
+  });
+}
+
+// Reads active conditions once and answers whether the target (or its own
+// feature) grants evasion for this save. Shared by roll logic and the note UI.
+function getEvasionContext(current, characters, campaignName) {
+  const targetConditions = getRuntimeValue(current.targetName, 'activeConditions', campaignName) || [];
+  const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
+  const targetChar = (characters || []).find(c => utils.getName(c.name) === utils.getName(current.targetName));
+  const ownEvasion = targetChar?.computedStats?.evasionEffects;
+  const normalizedSaveType = normalizeSaveType(current.saveType);
+  const hasOwnEvasion = !isIncapacitated && ownEvasion?.some(ef => ef.saveType === normalizedSaveType);
+  return { isIncapacitated, hasOwnEvasion };
+}
+
+function resolveTargetSaveBonus(current, characters, campaignName) {
+  let saveBonus = 0;
+  let saveModifiers = null;
+  let activeConditions = [];
+  let character = null;
+  try {
+    character = (characters || []).find(c => {
+      const name = typeof c === 'string' ? c : c.name;
+      return name && utils.getName(name) === utils.getName(current.targetName);
+    });
+    if (character && typeof character !== 'string') {
+      saveBonus = getAbilitySaveBonus(character.computedStats || character, current.saveType);
+      saveModifiers = character.saveModifiers || character.computedStats?.saveModifiers;
+      activeConditions = getRuntimeValue(current.targetName, 'activeConditions') || [];
+    }
+  } catch { /* ignore */ }
+
+  if (!character) {
+    const combatSummary = getCombatSummary(campaignName);
+    const creature = combatSummary?.creatures?.find(
+      c => utils.getName(c.name) === utils.getName(current.targetName)
+    );
+    if (creature) {
+      saveBonus = creature.saveBonuses?.[current.saveType?.toLowerCase()] ?? 0;
+    }
+  }
+
+  return { saveBonus, saveModifiers, activeConditions };
+}
+
+function modifierListGrantsAdvantage(current, saveModifiers, activeConditions, campaignName) {
+  const conditionSet = new Set(activeConditions);
+  for (const mod of saveModifiers) {
+    if (mod.target !== 'saving_throw' || mod.effect !== 'advantage') continue;
+    if (mod.condition === 'against_spell') {
+      // CLA-324: against_spell advantage only on saves against spells — spell-origin is
+      // identifiable from the prompt flag (monster-card save attacks, spell save-damage
+      // prompts) or a spell-save-owned campaign lastAttack from the spell pipeline.
+      const lastAttackOrigin = getRuntimeValue('campaign', 'lastAttack', campaignName) || {};
+      const spellOrigin = current.isSpellDamage === true ||
+        (lastAttackOrigin.rollType === 'spell-save' && (!current.attackerName || lastAttackOrigin.attackerName === current.attackerName));
+      if (spellOrigin) return true;
+    }
+    if (mod.condition && conditionSet.has(mod.condition)) return true;
+    if (mod.saveType && current.condition && mod.condition === current.condition) return true;
+  }
+  return false;
+}
+
+function isDodgeDexAdvantage(current, campaignName) {
+  const targetActiveBuffs = getRuntimeValue(current?.targetName, 'activeBuffs', campaignName) || [];
+  const isDodgeActive = Array.isArray(targetActiveBuffs) && targetActiveBuffs.some(b => b.effect === 'dodge');
+  const isDexSave = (current.saveType || '').toUpperCase() === 'DEX';
+  return isDodgeActive && isDexSave;
+}
+
+function isBeaconOfHopeAdvantage(current, characters) {
+  const targetCharForBeacon = (characters || []).find(c => utils.getName(c.name) === utils.getName(current.targetName));
+  return !!targetCharForBeacon?.targetEffects?.some(te => te.effect === 'beacon_of_hope') && (current.saveType || '').toUpperCase() === 'WIS';
+}
+
+function computeSaveAdvantage({ current, campaignName, hasDisadvantage, saveModifiers, activeConditions, characters }) {
+  if (current.advantage) return true;
+  if (hasDisadvantage) return false;
+  if (saveModifiers && saveModifiers.length > 0 && modifierListGrantsAdvantage(current, saveModifiers, activeConditions, campaignName)) return true;
+  // Dodge: advantage on Dexterity saving throws only
+  if (isDodgeDexAdvantage(current, campaignName)) return true;
+  // CLA-394 Zealous Presence: blanket advantage on saving throws (buff effect
+  // advantage_attacks_and_saves) — mirrors the Dodge block shape.
+  if (hasBuffEffect(current?.targetName, 'advantage_attacks_and_saves', campaignName)) return true;
+  // Beacon of Hope: advantage on Wisdom saving throws
+  if (isBeaconOfHopeAdvantage(current, characters)) return true;
+  // Circle of Power: blanket advantage on saving throws
+  if (isCircleOfPowerActive(current.targetName, campaignName)) return true;
+  // Holy Aura: advantage on all saving throws for warded targets
+  if (getHolyAuraSaveAdvantage(current, campaignName)) return true;
+  // Source-restricted save advantage (e.g. Holy Nimbus: advantage against Fiends/Undead for allies)
+  return !!getHolyNimbusSaveAdvantage(current, characters, campaignName);
+}
+
+function consumeCosmicOmen(campaignName) {
+  const cosmicOmenPendingRaw = getRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus');
+  if (cosmicOmenPendingRaw) {
+    try {
+      const pending = JSON.parse(cosmicOmenPendingRaw);
+      if (pending && typeof pending.value === 'number' && pending.value > 0) {
+        const isWeal = pending.type === 'Weal';
+        const bonus = isWeal ? pending.value : -pending.value;
+        const detail = `(${bonus} from ${pending.type})`;
+        setRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus', null, campaignName, true);
+        return { bonus, detail };
+      }
+    } catch (_e) { /* ignore */ }
+  }
+  return { bonus: 0, detail: '' };
+}
+
+// Rolls 1d4 only when at least one matching targetEffect exists for the target.
+function rollEffectDie(allTargetEffects, targetName, effect) {
+  if (!targetName) return null;
+  if (allTargetEffects.filter(te => te.target === targetName && te.effect === effect).length === 0) return null;
+  return rollExpression('1d4');
+}
+
+function findWardingBondSaveBonus(current, campaignName) {
+  const targetBuffs = getRuntimeValue(current.targetName, 'activeBuffs', campaignName);
+  const targetActiveBuffs = Array.isArray(targetBuffs) ? targetBuffs : [];
+  const wardingBondBuff = targetActiveBuffs.find(b => b.effect === 'warding_bond' && b.saveBonus);
+  return wardingBondBuff ? wardingBondBuff.saveBonus : 0;
+}
+
+function buildBonusDetail({ auraBonusStr, cosmicOmenDetail, baneSaveRoll, baneAttackerRoll, blessSaveRoll, wardingBondSaveBonus }) {
+  const bonusDetailParts = [auraBonusStr, cosmicOmenDetail];
+  if (baneSaveRoll) {
+    bonusDetailParts.push(`-${baneSaveRoll} [Bane]`);
+  }
+  if (baneAttackerRoll) {
+    bonusDetailParts.push(`+${baneAttackerRoll} [Bane]`);
+  }
+  if (blessSaveRoll) {
+    bonusDetailParts.push(`+${blessSaveRoll} [Bless]`);
+  }
+  if (wardingBondSaveBonus > 0) {
+    bonusDetailParts.push(`+${wardingBondSaveBonus} [Warding Bond]`);
+  }
+  return bonusDetailParts.filter(Boolean).join(' ') || undefined;
+}
+
+function buildLastAttackData(current, { finalRoll, roll1, roll2, saveBonus, auraBonus, cosmicOmenAppliedBonus, total, success }) {
+  return {
+    attackerName: current.attackerName || current.targetName,
+    targetName: current.targetName,
+    d20: finalRoll,
+    d20Rolls: [roll1, roll2],
+    bonus: saveBonus + auraBonus + cosmicOmenAppliedBonus,
+    total,
+    rollType: 'save',
+    saveType: current.saveType || null,
+    saveDc: current.saveDc,
+    saveResult: success ? 'success' : 'failure',
+    saveConditions: current.condition ? [current.condition] : [],
+    damageFormula: current.damageFormula || null,
+    attackName: current.sourceName || current.name || null,
+    damageType: current.damageType || null,
+    rawDamage: current.rawDamage || 0,
+    primaryDamage: current.rawDamage || 0,
+    primaryDamageType: current.damageType || null,
+    actualDamage: current.rawDamage || 0,
+    damageApplied: (current.rawDamage || 0) > 0,
+    ...(current.secondaryFormula ? {
+      secondaryFormula: current.secondaryFormula,
+      secondaryDamageType: current.secondaryDamageType || null,
+      secondaryRawDamage: current.secondaryRawDamage || 0,
+      secondaryTotal: current.secondaryRawDamage || 0,
+    } : {}),
+    timestamp: Date.now(),
+  };
+}
+
+function computeRerollAvailability(current, targetCharacter, campaignName) {
+  const fanaticalFocusUsed = current ? getRuntimeValue(current.targetName, 'fanaticalFocusUsed', campaignName) : false;
+  const activeBuffsForSave = getRuntimeValue(current?.targetName, 'activeBuffs', campaignName) || [];
+  const isRagingForSave = Array.isArray(activeBuffsForSave) && activeBuffsForSave.some(b => b.damageBonusExpression);
+  const livingLegendActive = current ? getRuntimeValue(current.targetName, 'livingLegendActive', campaignName) === true : false;
+  const indomitableUses = current ? Number(getRuntimeValue(current?.targetName, 'indomitableUses', campaignName) ?? 0) : 0;
+  const indomitableMax = 1;
+  const targetClassLevel = targetCharacter?.class?.class_levels?.[(targetCharacter.level || 1) - 1] || {};
+  const maxFocusPoints = targetClassLevel.focus_points || 0;
+  const currentFocusPoints = current ? Number(getRuntimeValue(current.targetName, 'focusPoints', campaignName) ?? maxFocusPoints) : 0;
+
+  const guardedMindUsed = current ? getRuntimeValue(current.targetName, '_guardedMind_usedRest', campaignName) : false;
+  const guardedMindSpecialAction = (targetCharacter?.computedStats?.automation?.specialActions || []).find(
+    a => a.type === 'auto_reroll' && a.effect === 'override_fail_to_success' && a.oncePer === 'short_or_long_rest'
+  );
+  const isValidSaveType = current && GUARDED_MIND_SAVE_TYPES.includes(current.saveType);
+
+  // Indomitable (Fighter lv9+): reroll a failed save with a +fighter level bonus,
+  // tracked via runtime `indomitableUses` (recharged on a Long Rest).
+  const targetSaveModifiersForIndomitable = targetCharacter?.saveModifiers || targetCharacter?.computedStats?.saveModifiers || [];
+  const indomitableModifier = targetSaveModifiersForIndomitable.find(
+    m => m.effect === 'reroll' && m.target === 'saving_throw' && (m.source === 'Indomitable' || /fighter_level/i.test(m.bonusExpression || ''))
+  );
+  const indomitableFeatureLevel = targetCharacter?.level ?? targetCharacter?.computedStats?.level ?? 0;
+  const indomitableMaxUses = indomitableFeatureLevel >= 17 ? 3 : indomitableFeatureLevel >= 13 ? 2 : 1;
+  const indomitableRerollBonus = indomitableModifier
+    ? (evaluateAutoExpression(indomitableModifier.bonusExpression || '0', { level: indomitableFeatureLevel }) || indomitableFeatureLevel)
+    : 0;
+
+  return {
+    fanaticalFocusAvailable: isRagingForSave && !fanaticalFocusUsed,
+    currentFocusPoints,
+    disciplinedSurvivorAvailable: !fanaticalFocusUsed && currentFocusPoints > 0,
+    livingLegendAvailable: livingLegendActive && !fanaticalFocusUsed && indomitableUses < indomitableMax,
+    guardedMindAvailable: !guardedMindUsed && !!guardedMindSpecialAction && !!isValidSaveType,
+    indomitableAvailable: !!indomitableModifier && indomitableUses < indomitableMaxUses,
+    indomitableUses,
+    indomitableMaxUses,
+    indomitableRerollBonus,
+  };
+}
+
+function EvasionNote({ current, characters, campaignName }) {
+  const { isIncapacitated, hasOwnEvasion } = getEvasionContext(current, characters, campaignName);
+  const hasSharedEvasion = !hasOwnEvasion && !isIncapacitated && hasShareableEvasionFor(current, characters);
+  const hasEvasion = hasOwnEvasion || hasSharedEvasion || isCircleOfPowerActive(current.targetName, campaignName);
+  return hasEvasion
+    ? <p className="sp-note sp-evasion">Evasion: No damage on success, half damage on failure</p>
+    : <p className="sp-note">Half damage on successful save</p>;
+}
+
+function SaveResultPanel({ current, rerollUsedForSave, availability, handlers }) {
+  const result = current.result;
+  const showReroll = !result.success && !rerollUsedForSave;
+  return (
+    <div className={`sp-result ${result.success ? 'sp-result-success' : 'sp-result-fail'}`}>
+      <p className="sp-result-label">{result.success ? 'SAVE SUCCESS' : 'SAVE FAILURE'}</p>
+      <p className="sp-result-total">Total: <strong>{result.total}</strong> vs DC {current.saveDc}</p>
+      <p className="sp-result-breakdown">d20 ({result.mode !== 'normal' && Array.isArray(result.rawRolls) && result.rawRolls.length === 2 ? `${result.rawRolls[0]}, ${result.rawRolls[1]}` : result.roll}) + {result.saveBonus}{result.bonusDetail ? ' ' + result.bonusDetail : ''}{result.mode === 'advantage' ? ' (Advantage)' : result.mode === 'disadvantage' ? ' (Disadvantage)' : ''}</p>
+      {showReroll && availability.fanaticalFocusAvailable && (
+        <button className="sp-stroke-btn" onClick={handlers.fanaticalFocus} type="button">
+          <i className="fa-solid fa-rotate"></i> Reroll Save (+{availability.rageDamageBonus})
+        </button>
+      )}
+      {showReroll && availability.indomitableAvailable && (
+        <button className="sp-stroke-btn" onClick={handlers.indomitable} type="button">
+          <i className="fa-solid fa-rotate"></i> Indomitable (+{availability.indomitableRerollBonus})
+        </button>
+      )}
+      {showReroll && availability.disciplinedSurvivorAvailable && (
+        <button className="sp-stroke-btn" onClick={handlers.disciplinedSurvivor} type="button">
+          <i className="fa-solid fa-rotate"></i> Reroll Save (1 Focus Point)
+        </button>
+      )}
+      {showReroll && availability.livingLegendAvailable && (
+        <button className="sp-stroke-btn" onClick={handlers.livingLegend} type="button">
+          <i className="fa-solid fa-rotate"></i> Reroll Save
+        </button>
+      )}
+      {showReroll && availability.guardedMindAvailable && (
+        <button className="sp-stroke-btn" onClick={handlers.guardedMind} type="button">
+          <i className="fa-solid fa-shield-halved"></i> Guarded Mind
+        </button>
+      )}
+    </div>
+  );
+}
+
+function withToggledAlly(selection, targetName) {
+  const currentSelection = selection?.selectedAllies || [];
+  return {
+    selectedAllies: currentSelection.includes(targetName)
+      ? currentSelection.filter(n => n !== targetName)
+      : [...currentSelection, targetName],
+  };
+}
+
+function EvasionSelectionOverlay({ prompts, evasionSelection, onSelectionChange, onConfirm, onSkip }) {
+  const selected = evasionSelection?.selectedAllies || [];
+  return (
+    <div className="sp-overlay sp-overlay--evasion" onClick={(e) => {
+      if (e.target.closest('.sp-modal')) return;
+      onSkip?.();
+    }}>
+      <div className="sp-modal">
+        <div className="sp-header">
+          <i className="fa-solid fa-shield-halved"></i> Leading Evasion — Choose Allies
+        </div>
+        <div className="sp-body">
+          <p>Which of the following creatures making this save should benefit from <strong>Leading Evasion</strong>?</p>
+          <p className="sp-note">Select all allies within 5 feet of the Bard. On a successful save, selected allies take no damage. On a failure, they take half damage.</p>
+          <div className="secondary-target-list">
+            {prompts.map((prompt, i) => (
+              <label
+                key={i}
+                className={`secondary-target-row ${selected.includes(prompt.targetName) ? 'secondary-target-selected' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectionChange(withToggledAlly(evasionSelection, prompt.targetName));
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.includes(prompt.targetName)}
+                  onChange={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <span className="secondary-target-name">
+                  <strong>{prompt.targetName}</strong>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="sp-actions">
+          <button
+            className="sp-roll-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onConfirm(selected);
+            }}
+            disabled={selected.length === 0}
+            type="button"
+          >
+            <i className="fa-solid fa-shield-halved"></i> Apply Evasion ({selected.length})
+          </button>
+          <button className="sp-dismiss-btn" onClick={(e) => {
+            e.stopPropagation();
+            onSkip();
+          }} type="button">
+            Skip
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SavePromptModal({ campaignName, characters, activeMapName }) {
   const [prompts, setPrompts] = useState([]);
   const [evasionSelection, setEvasionSelection] = useState(null);
@@ -29,15 +370,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
 
   const current = prompts.length > 0 ? prompts[0] : null;
 
-  const hasShareableEvasion = !current ? false : (() => {
-    const normalizedSaveType = normalizeSaveType(current.saveType);
-    if (current.dcSuccess !== 'half') return false;
-    return (characters || []).some(c => {
-      if (utils.getName(c.name) === utils.getName(current.targetName)) return false;
-      const ev = c?.computedStats?.evasionEffects;
-      return ev?.some(ef => ef.saveType === normalizedSaveType && ef.shareable && ef.shareRange >= 5);
-    });
-  })();
+  const hasShareableEvasion = !current ? false : hasShareableEvasionFor(current, characters);
 
   const evasionTriggeredIdsRef = useRef(new Set());
 
@@ -126,236 +459,54 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
   const handleRollSave = useCallback(async () => {
     if (!current) return;
 
-    let saveBonus = 0;
-    let saveModifiers = null;
-    let activeConditions = [];
-    let character = null;
-    try {
-      character = (characters || []).find(c => {
-        const name = typeof c === 'string' ? c : c.name;
-        return name && utils.getName(name) === utils.getName(current.targetName);
-      });
-      if (character && typeof character !== 'string') {
-        saveBonus = getAbilitySaveBonus(character.computedStats || character, current.saveType);
-        saveModifiers = character.saveModifiers || character.computedStats?.saveModifiers;
-        activeConditions = getRuntimeValue(current.targetName, 'activeConditions') || [];
-      }
-    } catch { /* ignore */ }
-
-    if (!character) {
-      const combatSummary = getCombatSummary(campaignName);
-      const creature = combatSummary?.creatures?.find(
-        c => utils.getName(c.name) === utils.getName(current.targetName)
-      );
-      if (creature) {
-        saveBonus = creature.saveBonuses?.[current.saveType?.toLowerCase()] ?? 0;
-      }
-    }
+    const { saveBonus, saveModifiers, activeConditions } = resolveTargetSaveBonus(current, characters, campaignName);
 
     const aura = await computeAuraBonus({ targetName: current.targetName, characters, campaignName, activeMapName, allCreatures: getCombatSummary(campaignName)?.creatures });
     const auraBonus = aura.bonus;
 
-    const targetConditions = getRuntimeValue(current.targetName, 'activeConditions', campaignName) || [];
-    const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
-    const targetCharForEvasion = (characters || []).find(c => utils.getName(c.name) === utils.getName(current.targetName));
-    const ownEvasion = targetCharForEvasion?.computedStats?.evasionEffects;
-    const normalizedSaveType = normalizeSaveType(current.saveType);
-    const hasOwnEvasion = !isIncapacitated && ownEvasion?.some(ef => ef.saveType === normalizedSaveType);
+    const { isIncapacitated, hasOwnEvasion } = getEvasionContext(current, characters, campaignName);
     const hasSelectedEvasion = !hasOwnEvasion && !isIncapacitated && selectedAlliesRef.current.has(current.targetName);
     const hasEvasion = hasOwnEvasion || hasSelectedEvasion || isCircleOfPowerActive(current.targetName, campaignName);
     setLastEvasionState(hasEvasion);
 
     const hasDisadvantage = getSaveDisadvantage(current, campaignName);
-
-    let hasAdvantage = false;
-    if (current.advantage) {
-      hasAdvantage = true;
-    } else if (!hasDisadvantage && saveModifiers && saveModifiers.length > 0) {
-      const conditionSet = new Set(activeConditions);
-      for (const mod of saveModifiers) {
-        if (mod.target === 'saving_throw' && mod.effect === 'advantage') {
-          if (mod.condition === 'against_spell') {
-            // CLA-324: against_spell advantage only on saves against spells — spell-origin is
-            // identifiable from the prompt flag (monster-card save attacks, spell save-damage
-            // prompts) or a spell-save-owned campaign lastAttack from the spell pipeline.
-            const lastAttackOrigin = getRuntimeValue('campaign', 'lastAttack', campaignName) || {};
-            const spellOrigin = current.isSpellDamage === true ||
-              (lastAttackOrigin.rollType === 'spell-save' && (!current.attackerName || lastAttackOrigin.attackerName === current.attackerName));
-            if (spellOrigin) {
-              hasAdvantage = true;
-              break;
-            }
-          }
-          if (mod.condition && conditionSet.has(mod.condition)) {
-            hasAdvantage = true;
-            break;
-          }
-          if (mod.saveType && current.condition && mod.condition === current.condition) {
-            hasAdvantage = true;
-            break;
-          }
-        }
-      }
-    }
-
-      // Dodge: advantage on Dexterity saving throws only
-    if (!hasAdvantage && !hasDisadvantage) {
-      const targetActiveBuffs = getRuntimeValue(current?.targetName, 'activeBuffs', campaignName) || [];
-      const isDodgeActive = Array.isArray(targetActiveBuffs) && targetActiveBuffs.some(b => b.effect === 'dodge');
-      const isDexSave = (current.saveType || '').toUpperCase() === 'DEX';
-      if (isDodgeActive && isDexSave) {
-        hasAdvantage = true;
-      }
-    }
-
-    // CLA-394 Zealous Presence: blanket advantage on saving throws (buff effect
-    // advantage_attacks_and_saves) — mirrors the Dodge block shape.
-    if (!hasAdvantage && !hasDisadvantage && hasBuffEffect(current?.targetName, 'advantage_attacks_and_saves', campaignName)) {
-      hasAdvantage = true;
-    }
-
-    // Beacon of Hope: advantage on Wisdom saving throws
-    if (!hasAdvantage && !hasDisadvantage) {
-      const targetCharForBeacon = (characters || []).find(c => utils.getName(c.name) === utils.getName(current.targetName));
-      if (targetCharForBeacon?.targetEffects?.some(te => te.effect === 'beacon_of_hope') && (current.saveType || '').toUpperCase() === 'WIS') {
-        hasAdvantage = true;
-      }
-    }
-
-    // Circle of Power: blanket advantage on saving throws
-    if (!hasAdvantage && !hasDisadvantage) {
-      if (isCircleOfPowerActive(current.targetName, campaignName)) {
-        hasAdvantage = true;
-      }
-    }
-
-    // Holy Aura: advantage on all saving throws for warded targets
-    if (!hasAdvantage && !hasDisadvantage && getHolyAuraSaveAdvantage(current, campaignName)) {
-      hasAdvantage = true;
-    }
-
-    // Source-restricted save advantage (e.g. Holy Nimbus: advantage against Fiends/Undead for allies)
-    if (!hasAdvantage && !hasDisadvantage && getHolyNimbusSaveAdvantage(current, characters, campaignName)) {
-      hasAdvantage = true;
-    }
+    const hasAdvantage = computeSaveAdvantage({ current, campaignName, hasDisadvantage, saveModifiers, activeConditions, characters });
 
     const roll1 = forceRollTo20Ref.current ? 20 : rollD20();
     const roll2 = (hasDisadvantage || hasAdvantage) ? rollD20() : roll1;
     const finalRoll = hasDisadvantage ? Math.min(roll1, roll2) : hasAdvantage ? Math.max(roll1, roll2) : roll1;
-    let cosmicOmenAppliedBonus = 0;
-    let cosmicOmenDetail = '';
-    const cosmicOmenPendingRaw = getRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus');
-    if (cosmicOmenPendingRaw) {
-      try {
-        const pending = JSON.parse(cosmicOmenPendingRaw);
-        if (pending && typeof pending.value === 'number' && pending.value > 0) {
-          const isWeal = pending.type === 'Weal';
-          cosmicOmenAppliedBonus = isWeal ? pending.value : -pending.value;
-          cosmicOmenDetail = `(${cosmicOmenAppliedBonus} from ${pending.type})`;
-          setRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus', null, campaignName, true);
-        }
-      } catch (_e) { /* ignore */ }
-    }
+    const { bonus: cosmicOmenAppliedBonus, detail: cosmicOmenDetail } = consumeCosmicOmen(campaignName);
+
+    const allTargetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
 
     // Bane: apply -1d4 penalty to saving throws for cursed targets
-    let baneSavePenalty = 0;
-    let baneSaveRoll = null;
-    const allTargetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-    const baneEffects = allTargetEffects.filter(te => te.target === current.targetName && te.effect === 'bane_penalty');
-    if (baneEffects.length > 0) {
-      const r = rollExpression('1d4');
-      if (r) {
-        baneSavePenalty = -r.total;
-        baneSaveRoll = r.total;
-      }
-    }
+    const baneSaveDie = rollEffectDie(allTargetEffects, current.targetName, 'bane_penalty');
+    const baneSaveRoll = baneSaveDie ? baneSaveDie.total : null;
+    const baneSavePenalty = baneSaveDie ? -baneSaveDie.total : 0;
 
     // Bane on attacker: grant +1d4 to the target's save when the attacker is cursed by Bane
-    let baneAttackerBonus = 0;
-    let baneAttackerRoll = null;
-    if (current.attackerName) {
-      const baneOnAttacker = allTargetEffects.filter(te => te.target === current.attackerName && te.effect === 'bane_penalty');
-      if (baneOnAttacker.length > 0) {
-        const r = rollExpression('1d4');
-        if (r) {
-          baneAttackerBonus = r.total;
-          baneAttackerRoll = r.total;
-        }
-      }
-    }
+    const baneAttackerDie = current.attackerName ? rollEffectDie(allTargetEffects, current.attackerName, 'bane_penalty') : null;
+    const baneAttackerBonus = baneAttackerDie ? baneAttackerDie.total : 0;
+    const baneAttackerRoll = baneAttackerDie ? baneAttackerDie.total : null;
 
     // Bless: add 1d4 to saving throws
-    let blessSaveBonus = 0;
-    let blessSaveRoll = null;
-    const blessEffects = allTargetEffects.filter(te => te.target === current.targetName && te.effect === 'bless_bonus');
-    if (blessEffects.length > 0) {
-      const r = rollExpression('1d4');
-      if (r) {
-        blessSaveBonus += r.total;
-        blessSaveRoll = r.total;
-      }
-    }
+    const blessSaveDie = rollEffectDie(allTargetEffects, current.targetName, 'bless_bonus');
+    const blessSaveBonus = blessSaveDie ? blessSaveDie.total : 0;
+    const blessSaveRoll = blessSaveDie ? blessSaveDie.total : null;
 
     // Warding Bond: +1 flat bonus to saving throws
-    let wardingBondSaveBonus = 0;
-    const targetBuffs = getRuntimeValue(current.targetName, 'activeBuffs', campaignName);
-    const targetActiveBuffs = Array.isArray(targetBuffs) ? targetBuffs : [];
-    const wardingBondBuff = targetActiveBuffs.find(b => b.effect === 'warding_bond' && b.saveBonus);
-    if (wardingBondBuff) {
-      wardingBondSaveBonus = wardingBondBuff.saveBonus;
-    }
+    const wardingBondSaveBonus = findWardingBondSaveBonus(current, campaignName);
 
     const total = finalRoll + saveBonus + auraBonus + cosmicOmenAppliedBonus + baneSavePenalty + blessSaveBonus + baneAttackerBonus + wardingBondSaveBonus;
     const success = total >= current.saveDc;
     const auraBonusStr = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined;
-    const bonusDetailParts = [auraBonusStr, cosmicOmenDetail];
-    if (baneSaveRoll) {
-      bonusDetailParts.push(`-${baneSaveRoll} [Bane]`);
-    }
-    if (baneAttackerRoll) {
-      bonusDetailParts.push(`+${baneAttackerRoll} [Bane]`);
-    }
-    if (blessSaveRoll) {
-      bonusDetailParts.push(`+${blessSaveRoll} [Bless]`);
-    }
-    if (wardingBondSaveBonus > 0) {
-      bonusDetailParts.push(`+${wardingBondSaveBonus} [Warding Bond]`);
-    }
-    const bonusDetail = bonusDetailParts.filter(Boolean).join(' ') || undefined;
+    const bonusDetail = buildBonusDetail({ auraBonusStr, cosmicOmenDetail, baneSaveRoll, baneAttackerRoll, blessSaveRoll, wardingBondSaveBonus });
 
     const rollMode = hasDisadvantage ? 'disadvantage' : hasAdvantage ? 'advantage' : 'normal';
 
     const cs = getCombatSummary(campaignName);
     if (cs) {
-      const lastAttackData = {
-        attackerName: current.attackerName || current.targetName,
-        targetName: current.targetName,
-        d20: finalRoll,
-        d20Rolls: [roll1, roll2],
-        bonus: saveBonus + auraBonus + cosmicOmenAppliedBonus,
-        total,
-        rollType: 'save',
-        saveType: current.saveType || null,
-        saveDc: current.saveDc,
-        saveResult: success ? 'success' : 'failure',
-        saveConditions: current.condition ? [current.condition] : [],
-        damageFormula: current.damageFormula || null,
-        attackName: current.sourceName || current.name || null,
-        damageType: current.damageType || null,
-        rawDamage: current.rawDamage || 0,
-        primaryDamage: current.rawDamage || 0,
-        primaryDamageType: current.damageType || null,
-        actualDamage: current.rawDamage || 0,
-        damageApplied: (current.rawDamage || 0) > 0,
-        ...(current.secondaryFormula ? {
-          secondaryFormula: current.secondaryFormula,
-          secondaryDamageType: current.secondaryDamageType || null,
-          secondaryRawDamage: current.secondaryRawDamage || 0,
-          secondaryTotal: current.secondaryRawDamage || 0,
-        } : {}),
-        timestamp: Date.now(),
-      };
-      storage.set('lastAttack', lastAttackData, campaignName);
+      storage.set('lastAttack', buildLastAttackData(current, { finalRoll, roll1, roll2, saveBonus, auraBonus, cosmicOmenAppliedBonus, total, success }), campaignName);
     }
 
     setPrompts(prev => prev.map((p, i) =>
@@ -440,40 +591,11 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
   });
 
   const rageDamageBonus = targetCharacter?.class?.class_levels?.[(targetCharacter.level || 1) - 1]?.rage_damage ?? 2;
-  const fanaticalFocusUsed = current ? getRuntimeValue(current.targetName, 'fanaticalFocusUsed', campaignName) : false;
-  const activeBuffsForSave = getRuntimeValue(current?.targetName, 'activeBuffs', campaignName) || [];
-  const isRagingForSave = Array.isArray(activeBuffsForSave) && activeBuffsForSave.some(b => b.damageBonusExpression);
-  const fanaticalFocusAvailable = isRagingForSave && !fanaticalFocusUsed;
-
-  const livingLegendActive = current ? getRuntimeValue(current.targetName, 'livingLegendActive', campaignName) === true : false;
-  const indomitableUses = current ? Number(getRuntimeValue(current?.targetName, 'indomitableUses', campaignName) ?? 0) : 0;
-  const indomitableMax = 1;
-  const targetClassLevel = targetCharacter?.class?.class_levels?.[(targetCharacter.level || 1) - 1] || {};
-  const maxFocusPoints = targetClassLevel.focus_points || 0;
-  const currentFocusPoints = current ? Number(getRuntimeValue(current.targetName, 'focusPoints', campaignName) ?? maxFocusPoints) : 0;
-  const disciplinedSurvivorAvailable = !fanaticalFocusUsed && currentFocusPoints > 0;
-  const livingLegendAvailable = livingLegendActive && !fanaticalFocusUsed && indomitableUses < indomitableMax;
-
-  const guardedMindUsed = current ? getRuntimeValue(current.targetName, '_guardedMind_usedRest', campaignName) : false;
-  const guardedMindSpecialAction = (targetCharacter?.computedStats?.automation?.specialActions || []).find(
-    a => a.type === 'auto_reroll' && a.effect === 'override_fail_to_success' && a.oncePer === 'short_or_long_rest'
-  );
-  const validSaveTypes = ['Intelligence', 'Wisdom', 'Charisma', 'INT', 'WIS', 'CHA'];
-  const isValidSaveType = current && validSaveTypes.includes(current.saveType);
-  const guardedMindAvailable = !guardedMindUsed && guardedMindSpecialAction && isValidSaveType;
-
-  // Indomitable (Fighter lv9+): reroll a failed save with a +fighter level bonus,
-  // tracked via runtime `indomitableUses` (recharged on a Long Rest).
-  const targetSaveModifiersForIndomitable = targetCharacter?.saveModifiers || targetCharacter?.computedStats?.saveModifiers || [];
-  const indomitableModifier = targetSaveModifiersForIndomitable.find(
-    m => m.effect === 'reroll' && m.target === 'saving_throw' && (m.source === 'Indomitable' || /fighter_level/i.test(m.bonusExpression || ''))
-  );
-  const indomitableFeatureLevel = targetCharacter?.level ?? targetCharacter?.computedStats?.level ?? 0;
-  const indomitableMaxUses = indomitableFeatureLevel >= 17 ? 3 : indomitableFeatureLevel >= 13 ? 2 : 1;
-  const indomitableAvailable = !!indomitableModifier && indomitableUses < indomitableMaxUses;
-  const indomitableRerollBonus = indomitableModifier
-    ? (evaluateAutoExpression(indomitableModifier.bonusExpression || '0', { level: indomitableFeatureLevel }) || indomitableFeatureLevel)
-    : 0;
+  const {
+    fanaticalFocusAvailable, currentFocusPoints, disciplinedSurvivorAvailable,
+    livingLegendAvailable, guardedMindAvailable, indomitableAvailable,
+    indomitableUses, indomitableMaxUses, indomitableRerollBonus,
+  } = computeRerollAvailability(current, targetCharacter, campaignName);
 
   const submitSaveResult = useCallback((saveData) => {
     const {
@@ -558,6 +680,11 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
     await handler();
   }, [indomitableAvailable, indomitableUses, indomitableMaxUses, indomitableRerollBonus, current, campaignName, characters, activeMapName, submitSaveResult]);
 
+  const handleLivingLegend = useCallback(async () => {
+    const handler = createLivingLegendHandler({ campaignName, characters, activeMapName, current, livingLegendAvailable, setRerollUsedForSave, submitSaveResult });
+    await handler();
+  }, [campaignName, characters, activeMapName, current, livingLegendAvailable, submitSaveResult]);
+
   const handleGuardedMind = useCallback(async () => {
     if (!guardedMindAvailable || !current) return;
     setRerollUsedForSave(true);
@@ -592,60 +719,32 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
             <div className="sp-body">
               <p><strong>{current.targetName}</strong> must make a <strong>{abilityLabel}</strong> saving throw.{promptHasAdvantage ? <span className="sp-advantage-badge"> (Advantage)</span> : ''}{promptHasDisadvantage ? <span className="sp-disadvantage-badge"> (Disadvantage)</span> : ''}</p>
               <p className="sp-dc">DC {current.saveDc}</p>
-              {current.dcSuccess === 'half' && (() => {
-                const normalizedSaveType = normalizeSaveType(current.saveType);
-                const targetChar = (characters || []).find(c => utils.getName(c.name) === utils.getName(current.targetName));
-                const targetConditions = getRuntimeValue(current.targetName, 'activeConditions', campaignName) || [];
-                const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
-                const ownEvasion = targetChar?.computedStats?.evasionEffects;
-                const hasOwnEvasion = !isIncapacitated && ownEvasion?.some(ef => ef.saveType === normalizedSaveType);
-                const hasSharedEvasion = !hasOwnEvasion && !isIncapacitated &&
-                  (characters || []).some(c => {
-                    if (utils.getName(c.name) === utils.getName(current.targetName)) return false;
-                    const ev = c?.computedStats?.evasionEffects;
-                    return ev?.some(ef => ef.saveType === normalizedSaveType && ef.shareable && ef.shareRange >= 5);
-                  });
-                const hasEvasion = hasOwnEvasion || hasSharedEvasion || isCircleOfPowerActive(current.targetName, campaignName);
-                return hasEvasion
-                  ? <p className="sp-note sp-evasion">Evasion: No damage on success, half damage on failure</p>
-                  : <p className="sp-note">Half damage on successful save</p>;
-              })()}
+              {current.dcSuccess === 'half' && (
+                <EvasionNote current={current} characters={characters} campaignName={campaignName} />
+              )}
               {current.dcSuccess === 'none' && <p className="sp-note">No damage on successful save</p>}
               {current.sourceName && <p className="sp-source">Source: {current.sourceName}</p>}
               {hasResult && (
-                <div className={`sp-result ${current.result.success ? 'sp-result-success' : 'sp-result-fail'}`}>
-                  <p className="sp-result-label">{current.result.success ? 'SAVE SUCCESS' : 'SAVE FAILURE'}</p>
-                  <p className="sp-result-total">Total: <strong>{current.result.total}</strong> vs DC {current.saveDc}</p>
-                  <p className="sp-result-breakdown">d20 ({current.result.mode !== 'normal' && Array.isArray(current.result.rawRolls) && current.result.rawRolls.length === 2 ? `${current.result.rawRolls[0]}, ${current.result.rawRolls[1]}` : current.result.roll}) + {current.result.saveBonus}{current.result.bonusDetail ? ' ' + current.result.bonusDetail : ''}{current.result.mode === 'advantage' ? ' (Advantage)' : current.result.mode === 'disadvantage' ? ' (Disadvantage)' : ''}</p>
-                  {!current.result.success && !rerollUsedForSave && fanaticalFocusAvailable && (
-                    <button className="sp-stroke-btn" onClick={handleFanaticalFocus} type="button">
-                      <i className="fa-solid fa-rotate"></i> Reroll Save (+{rageDamageBonus})
-                    </button>
-                  )}
-                  {!current.result.success && !rerollUsedForSave && indomitableAvailable && (
-                    <button className="sp-stroke-btn" onClick={handleIndomitable} type="button">
-                      <i className="fa-solid fa-rotate"></i> Indomitable (+{indomitableRerollBonus})
-                    </button>
-                  )}
-                  {!current.result.success && !rerollUsedForSave && disciplinedSurvivorAvailable && (
-                    <button className="sp-stroke-btn" onClick={handleDisciplinedSurvivor} type="button">
-                      <i className="fa-solid fa-rotate"></i> Reroll Save (1 Focus Point)
-                    </button>
-                  )}
-                  {!current.result.success && !rerollUsedForSave && livingLegendAvailable && (
-                    <button className="sp-stroke-btn" onClick={async () => {
-                      const handler = createLivingLegendHandler({ campaignName, characters, activeMapName, current, livingLegendAvailable, setRerollUsedForSave, submitSaveResult });
-                      await handler();
-                    }} type="button">
-                      <i className="fa-solid fa-rotate"></i> Reroll Save
-                    </button>
-                  )}
-                  {!current.result.success && !rerollUsedForSave && guardedMindAvailable && (
-                    <button className="sp-stroke-btn" onClick={handleGuardedMind} type="button">
-                      <i className="fa-solid fa-shield-halved"></i> Guarded Mind
-                    </button>
-                  )}
-                </div>
+                <SaveResultPanel
+                  current={current}
+                  rerollUsedForSave={rerollUsedForSave}
+                  availability={{
+                    fanaticalFocusAvailable,
+                    rageDamageBonus,
+                    indomitableAvailable,
+                    indomitableRerollBonus,
+                    disciplinedSurvivorAvailable,
+                    livingLegendAvailable,
+                    guardedMindAvailable,
+                  }}
+                  handlers={{
+                    fanaticalFocus: handleFanaticalFocus,
+                    indomitable: handleIndomitable,
+                    disciplinedSurvivor: handleDisciplinedSurvivor,
+                    livingLegend: handleLivingLegend,
+                    guardedMind: handleGuardedMind,
+                  }}
+                />
               )}
             </div>
             <div className="sp-actions">
@@ -668,67 +767,13 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
         </div>
       )}
       {evasionSelection !== null && (
-        <div className="sp-overlay sp-overlay--evasion" onClick={(e) => {
-          if (e.target.closest('.sp-modal')) return;
-          handleEvasionSkip?.();
-        }}>
-          <div className="sp-modal">
-            <div className="sp-header">
-              <i className="fa-solid fa-shield-halved"></i> Leading Evasion — Choose Allies
-            </div>
-            <div className="sp-body">
-              <p>Which of the following creatures making this save should benefit from <strong>Leading Evasion</strong>?</p>
-              <p className="sp-note">Select all allies within 5 feet of the Bard. On a successful save, selected allies take no damage. On a failure, they take half damage.</p>
-              <div className="secondary-target-list">
-                {prompts.map((prompt, i) => (
-                  <label
-                    key={i}
-                    className={`secondary-target-row ${evasionSelection?.selectedAllies?.includes(prompt.targetName) ? 'secondary-target-selected' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const currentSelection = evasionSelection?.selectedAllies || [];
-                      const isSelected = currentSelection.includes(prompt.targetName);
-                      setEvasionSelection({
-                        selectedAllies: isSelected
-                          ? currentSelection.filter(n => n !== prompt.targetName)
-                          : [...currentSelection, prompt.targetName],
-                      });
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={(evasionSelection?.selectedAllies || []).includes(prompt.targetName)}
-                      onChange={(e) => e.stopPropagation()}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                    <span className="secondary-target-name">
-                      <strong>{prompt.targetName}</strong>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className="sp-actions">
-              <button
-                className="sp-roll-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleEvasionConfirm(evasionSelection?.selectedAllies || []);
-                }}
-                disabled={(evasionSelection?.selectedAllies || []).length === 0}
-                type="button"
-              >
-                <i className="fa-solid fa-shield-halved"></i> Apply Evasion ({(evasionSelection?.selectedAllies || []).length})
-              </button>
-              <button className="sp-dismiss-btn" onClick={(e) => {
-                e.stopPropagation();
-                handleEvasionSkip();
-              }} type="button">
-                Skip
-              </button>
-            </div>
-          </div>
-        </div>
+        <EvasionSelectionOverlay
+          prompts={prompts}
+          evasionSelection={evasionSelection}
+          onSelectionChange={setEvasionSelection}
+          onConfirm={handleEvasionConfirm}
+          onSkip={handleEvasionSkip}
+        />
       )}
     </>
   );

@@ -120,7 +120,7 @@ export default [
     files: ['src/**/*.js', 'src/**/*.jsx', 'server/**/*.js', 'server/**/*.jsx'],
     ignores: ['**/*.test.js', '**/*.test.jsx'],
     rules: {
-      complexity: ['warn', 15],
+      'complexity': ['warn', 15],
       'max-depth': ['warn', 4],
       'max-statements': ['warn', 60],
       'max-params': ['warn', 5],

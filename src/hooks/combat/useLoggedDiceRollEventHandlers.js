@@ -21,6 +21,199 @@ import { isCircleOfPowerActive } from '../../services/automation/handlers/buffs/
 import { cleanupConcentrationEffects } from '../../services/combat/concentration/concentrationService.js';
 import { isResilientSphereActive } from '../../services/combat/automation/automationPassives.js';
 import { triggerViciousMockeryForGeneric } from '../../services/rules/features/viciousMockeryService.js';
+import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry } from './handlers/damageHandlerUtils.js';
+
+const SECONDARY_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage'];
+
+function syncListenerPromptFilters(detail, pending, campaignName) {
+    const listenerPrompts = getRuntimeValue('campaign', 'pendingSaveListenerPrompts');
+    const prompts = Array.isArray(listenerPrompts) ? listenerPrompts : [];
+    const filteredPrompts = prompts.filter(id => id !== detail.promptId);
+    if (filteredPrompts.length === prompts.length) return;
+    // createSaveListener prompts are not in the pendingSaveRegistry — read campaignName from the runtime store.
+    const pendingSavesStore = getRuntimeValue('campaign', 'pendingSavePrompts') || {};
+    const saveCampaignName = pending?.campaignName || pendingSavesStore[detail.promptId]?.campaignName || campaignName;
+    setRuntimeValue('campaign', 'pendingSaveListenerPrompts', filteredPrompts, saveCampaignName);
+}
+
+function determineEvasion({ detail, pending, targetChar, charactersRef, isIncapacitated, normalizedSaveType }) {
+    const ownEvasion = targetChar?.computedStats?.evasionEffects;
+    const hasOwnEvasion = !isIncapacitated && pending.dcSuccess === 'half' && ownEvasion?.some(ef => ef.saveType === normalizedSaveType);
+    const hasSharedEvasion = !hasOwnEvasion && !isIncapacitated && pending.dcSuccess === 'half' &&
+        (charactersRef.current || []).some(c => {
+            if (c.name === detail.targetName) return false;
+            const ev = c?.computedStats?.evasionEffects;
+            return ev?.some(ef => ef.saveType === normalizedSaveType && ef.shareable && ef.shareRange >= 5);
+        });
+    const hasEvasion = detail.evasionActive ?? (hasOwnEvasion || hasSharedEvasion || isCircleOfPowerActive(detail.targetName, pending.campaignName));
+    return { hasEvasion, hasOwnEvasion };
+}
+
+function computeSecondaryRoll(pending) {
+    if (!pending.autoDamageSecondaryFormula) return null;
+    const secondaryFormula = pending.autoDamageSecondaryFormula;
+    const secondaryName = pending.autoDamageSecondaryName || pending.name;
+    const secondaryDamageType = pending.autoDamageSecondaryDamageType;
+    const isAutoCrit = pending.isAutoCrit || false;
+    const secondaryRollResult = isAutoCrit ? rollExpressionDoubled(secondaryFormula) : rollExpression(secondaryFormula);
+    if (!secondaryRollResult) return null;
+    return {
+        formula: secondaryFormula,
+        name: secondaryName,
+        damageType: secondaryDamageType,
+        total: secondaryRollResult.total,
+        modifier: secondaryRollResult.modifier,
+        rolls: secondaryRollResult.rolls,
+        ignoreResistance: (pending.playerStats && hasIgnoreResistance(pending.playerStats, secondaryDamageType)) || false,
+    };
+}
+
+async function applySecondaryDamage({ combatSummary, pendingTargetName, secondaryData, campaignName, charactersRef, attacker }) {
+    const secondaryApplyResultData = await applyDamageToTarget(combatSummary, pendingTargetName, secondaryData.total, [secondaryData.damageType], campaignName, charactersRef.current, secondaryData.ignoreResistance, attacker, true, { skipConcentration: true });
+    const secondaryFinalDamage = secondaryApplyResultData?.finalDamage ?? secondaryData.total;
+    if (secondaryApplyResultData && secondaryApplyResultData.finalDamage > 0) {
+        endInvisibilityOnHostileAction(attacker, campaignName);
+    }
+    return {
+        name: secondaryData.name,
+        formula: secondaryData.formula,
+        rolls: secondaryData.rolls,
+        total: secondaryData.total,
+        modifier: secondaryData.modifier,
+        damageType: secondaryData.damageType,
+        finalDamage: secondaryFinalDamage,
+        resistanceDetails: secondaryApplyResultData?.resistanceDetails || [],
+    };
+}
+
+function applyFailedSaveStatusEffects({ detail, pending, combatSummary, charactersRef, characterName }) {
+    const targetName = pending.targetName;
+    const targetCreature = combatSummary?.creatures?.find(c => c.name === targetName);
+    const targetCharacter = (charactersRef.current || []).find(c => utils.getName(c.name) === targetName);
+    const targetStats = targetCharacter?.computedStats || targetCharacter;
+    const effectsToExpire = [];
+    for (const effect of pending.statusEffects) {
+        const condKey = String(effect).toLowerCase();
+        const attackerName = pending.attackerName || pending.sourceAttackerName || null;
+        if (!attackerName) {
+            console.error('[save-result-handler] Status effect missing attacker for', condKey, ':', { promptId: detail.promptId, pendingKeys: Object.keys(pending), characterName });
+        }
+        const attackerCreature = combatSummary?.creatures?.find(c => c.name === attackerName);
+        if (targetStats && playerIsImmuneToCondition({
+            conditionKey: condKey,
+            playerStats: targetStats,
+            getRuntimeValue: getRuntimeValue,
+            campaignName: pending.campaignName,
+            sourceCreatureType: resolveCreatureType(attackerCreature),
+        })) {
+            continue;
+        }
+        if (targetCreature) {
+            const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+            const filtered = conditions.filter(c => String(c).toLowerCase() !== condKey);
+            setRuntimeValue(targetName, 'activeConditions', [...filtered, condKey], pending.campaignName);
+            effectsToExpire.push({ type: 'condition', condition: condKey });
+        }
+    }
+    if (effectsToExpire.length > 0) {
+        addExpiration(characterName, targetName, effectsToExpire, pending.campaignName, 2);
+    }
+}
+
+async function applyOverchannelSelfDamage({ pending, characterName, campaignName, charactersRef, logEntry }) {
+    if (!pending.overchannelActive || !(pending.overchannelUseCount > 1)) return;
+    const overchannelSpellLevel = pending.overchannelSpellLevel || 1;
+    const dicePerLevel = 2 + (pending.overchannelUseCount - 1);
+    const totalDice = dicePerLevel * overchannelSpellLevel;
+    const necroticFormula = `${totalDice}d12`;
+    const necroticResult = rollExpression(necroticFormula);
+    if (!necroticResult) return;
+    const casterCombatSummary = getCombatSummary(campaignName);
+    const casterApplyResult = await applyDamageToTarget(casterCombatSummary, characterName, necroticResult.total, ['Necrotic'], campaignName, charactersRef.current, true, characterName);
+    logEntry({
+        type: 'roll',
+        characterName,
+        rollType: 'overchannel-damage',
+        name: 'Overchannel',
+        formula: necroticFormula,
+        rolls: necroticResult.rolls,
+        total: necroticResult.total,
+        modifier: necroticResult.modifier,
+        damageType: 'Necrotic',
+        targetName: characterName,
+        finalDamage: casterApplyResult?.finalDamage,
+        note: 'Overchannel self-damage (ignores resistance/immunity)',
+    });
+}
+
+async function triggerViciousMockeryOnFail({ detail, pending }) {
+    if (detail.success || !pending.viciousMockerySpell) return;
+    try {
+        await triggerViciousMockeryForGeneric(
+            pending.viciousMockerySpell,
+            { spellSaveDc: detail.saveDc, targetName: pending.targetName },
+            pending.playerStats,
+            pending.campaignName,
+            pending.viciousMockeryMapName
+        );
+    } catch (err) {
+        console.error('[save-result-handler] Vicious Mockery trigger failed:', err);
+    }
+}
+
+function buildSaveLastAttackData({ detail, pending, characterName, appliedDamage, finalDamage }) {
+    return {
+        attackerName: pending.attackerName || pending.sourceAttackerName || characterName,
+        targetName: detail.targetName,
+        d20: detail.roll,
+        d20Rolls: detail.rawRolls || [detail.roll],
+        bonus: detail.saveBonus,
+        total: detail.total,
+        rollType: 'attack',
+        saveType: detail.saveType,
+        saveDc: detail.saveDc,
+        saveResult: detail.success ? 'success' : 'failure',
+        damageFormula: pending.formula || null,
+        attackName: pending.name || pending.sourceName || null,
+        damageType: pending.damageType || null,
+        rawDamage: pending.rawDamage || 0,
+        primaryDamage: pending.rawDamage || 0,
+        primaryDamageType: pending.damageType || null,
+        actualDamage: appliedDamage || finalDamage,
+        damageApplied: (appliedDamage || finalDamage) > 0,
+        statusEffects: pending.statusEffects || null,
+        affectedTargets: pending.statusEffects ? [detail.targetName] : undefined,
+        timestamp: Date.now(),
+    };
+}
+
+function buildSavePopupData({ detail, pending, applyResult, newHp, maxHp, appliedDamage, finalDamage, secondaryResult }) {
+    const popupData = {
+        type: 'save-damage',
+        name: pending.name,
+        formula: pending.formula,
+        rolls: pending.rolls,
+        total: appliedDamage || finalDamage,
+        bonus: 0,
+        modifier: pending.modifier,
+        damageType: pending.damageType,
+        targetName: detail.targetName,
+        targetCurrentHp: applyResult?.newHp ?? newHp,
+        targetMaxHp: maxHp,
+        saveDc: detail.saveDc,
+        saveType: detail.saveType,
+        dcSuccess: detail.dcSuccess,
+        saveResult: { roll: detail.roll, total: detail.total, bonus: detail.saveBonus, success: detail.success },
+        finalDamage: appliedDamage || finalDamage,
+        damageApplied: true,
+        damageReduced: applyResult?.damageReduced,
+    };
+    if (applyResult?.interceptedFeature) {
+        popupData.interceptedFeature = applyResult.interceptedFeature;
+    }
+    assignSecondaryFields(popupData, secondaryResult, SECONDARY_SUFFIXES);
+    return popupData;
+}
 
 export function setupEventListeners(deps) {
     const { characterName, campaignName, logEntry, charactersRef } = deps;
@@ -29,23 +222,12 @@ export function setupEventListeners(deps) {
         window.__pendingResultHandlersInstalled = true;
 
         window.addEventListener('save-result', async (e) => {
-            const pending = getPendingSavePrompt(e.detail.promptId);
-            const listenerPrompts = getRuntimeValue('campaign', 'pendingSaveListenerPrompts');
-            const prompts = Array.isArray(listenerPrompts) ? listenerPrompts : [];
-            const filteredPrompts = prompts.filter(id => id !== e.detail.promptId);
-            if (filteredPrompts.length !== prompts.length) {
-                // createSaveListener prompts are not in the pendingSaveRegistry — read campaignName from the runtime store.
-                const pendingSavesStore = getRuntimeValue('campaign', 'pendingSavePrompts') || {};
-                const saveCampaignName = pending?.campaignName || pendingSavesStore[e.detail.promptId]?.campaignName || campaignName;
-                setRuntimeValue('campaign', 'pendingSaveListenerPrompts', filteredPrompts, saveCampaignName);
-            }
+            const detail = e.detail;
+            const pending = getPendingSavePrompt(detail.promptId);
+            syncListenerPromptFilters(detail, pending, campaignName);
 
             if (!pending) {
                 // createSaveListener resolves its own save via its internal promise — nothing more to do here.
-                return;
-            }
-
-            if (!pending) {
                 return;
             }
 
@@ -56,42 +238,34 @@ export function setupEventListeners(deps) {
                 return;
             }
 
-            const normalizedSaveType = normalizeSaveType(e.detail.saveType || pending.saveType);
-            const targetChar = (charactersRef.current || []).find(c => c.name === e.detail.targetName);
-            const targetConditions = getRuntimeValue(e.detail.targetName, 'activeConditions', pending.campaignName) || [];
+            const normalizedSaveType = normalizeSaveType(detail.saveType || pending.saveType);
+            const targetChar = (charactersRef.current || []).find(c => c.name === detail.targetName);
+            const targetConditions = getRuntimeValue(detail.targetName, 'activeConditions', pending.campaignName) || [];
             const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
 
-            const isSoulstitchProtected = hasSoulstitchProtection(e.detail.targetName, characterName, pending.campaignName);
+            const isSoulstitchProtected = hasSoulstitchProtection(detail.targetName, characterName, pending.campaignName);
 
-            const targetActiveBuffs = getRuntimeValue(e.detail.targetName, 'activeBuffs', pending.campaignName) || [];
+            const targetActiveBuffs = getRuntimeValue(detail.targetName, 'activeBuffs', pending.campaignName) || [];
             const isShieldActive = Array.isArray(targetActiveBuffs) && targetActiveBuffs.some(b => b.effect === 'shield');
             const isMagicMissile = pending.name && pending.name.toLowerCase() === 'magic missile';
 
-    const ownEvasion = targetChar?.computedStats?.evasionEffects;
-    const hasOwnEvasion = !isIncapacitated && pending.dcSuccess === 'half' && ownEvasion?.some(ef => ef.saveType === normalizedSaveType);
-    const hasSharedEvasion = !hasOwnEvasion && !isIncapacitated && pending.dcSuccess === 'half' &&
-        (charactersRef.current || []).some(c => {
-            if (c.name === e.detail.targetName) return false;
-            const ev = c?.computedStats?.evasionEffects;
-            return ev?.some(ef => ef.saveType === normalizedSaveType && ef.shareable && ef.shareRange >= 5);
-        });
-    const hasEvasion = e.detail.evasionActive ?? (hasOwnEvasion || hasSharedEvasion || isCircleOfPowerActive(e.detail.targetName, pending.campaignName));
+            const { hasEvasion, hasOwnEvasion } = determineEvasion({ detail, pending, targetChar, charactersRef, isIncapacitated, normalizedSaveType });
             let finalDamage = isSoulstitchProtected || (isShieldActive && isMagicMissile) ? 0 : computeDamageAfterEvasion(
-                e.detail.rawDamage ?? pending.rawDamage, e.detail.success, e.detail.dcSuccess, hasEvasion
+                detail.rawDamage ?? pending.rawDamage, detail.success, detail.dcSuccess, hasEvasion
             );
 
             if (hasEvasion) {
                 const evasionName = hasOwnEvasion ? 'Evasion' : 'Leading Evasion';
                 logEntry({
                     type: 'roll',
-                    characterName: e.detail.targetName,
+                    characterName: detail.targetName,
                     rollType: 'evasion',
                     name: evasionName,
-                    targetName: e.detail.targetName,
+                    targetName: detail.targetName,
                     saveType: normalizedSaveType,
-                    saveDc: e.detail.saveDc,
-                    saveResult: e.detail.success ? 'success' : 'failure',
-                    dcSuccess: e.detail.dcSuccess,
+                    saveDc: detail.saveDc,
+                    saveResult: detail.success ? 'success' : 'failure',
+                    dcSuccess: detail.dcSuccess,
                     timestamp: Date.now(),
                     id: utils.guid(),
                 });
@@ -109,34 +283,14 @@ export function setupEventListeners(deps) {
 
             // Compute secondary damage info first (dice rolls only, no damage application)
             // so we can use the combined total for the concentration DC
-            let secondaryData = null;
-            if (pending.autoDamageSecondaryFormula) {
-                const secondaryFormula = pending.autoDamageSecondaryFormula;
-                const secondaryName = pending.autoDamageSecondaryName || pending.name;
-                const secondaryDamageType = pending.autoDamageSecondaryDamageType;
-                const isAutoCrit = pending.isAutoCrit || false;
-                const secondaryRollResult = isAutoCrit ? rollExpressionDoubled(secondaryFormula) : rollExpression(secondaryFormula);
-                if (secondaryRollResult) {
-                    const secondaryTotal = secondaryRollResult.total;
-                    const secondaryIgnoreResistance = (pending.playerStats && hasIgnoreResistance(pending.playerStats, secondaryDamageType)) || false;
-                    secondaryData = {
-                        formula: secondaryFormula,
-                        name: secondaryName,
-                        damageType: secondaryDamageType,
-                        total: secondaryTotal,
-                        modifier: secondaryRollResult.modifier,
-                        rolls: secondaryRollResult.rolls,
-                        ignoreResistance: secondaryIgnoreResistance,
-                    };
-                }
-            }
+            const secondaryData = computeSecondaryRoll(pending);
 
             // Apply primary damage with combined concentration total (if secondary exists).
             // CLA-324: carry spell-origin from the pending prompt flag.
             const isSpellDamage = pending.isSpellDamage === true;
-            const applyResult = secondaryData
-                ? await applyDamageToTarget(combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, charactersRef.current, ignoreResistance, attacker, true, { concentrationTotalDamage: finalDamage + secondaryData.total, isSpellDamage })
-                : await applyDamageToTarget(combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, charactersRef.current, ignoreResistance, attacker, true, { isSpellDamage });
+            const applyResult = await applyDamageToTarget(combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, charactersRef.current, ignoreResistance, attacker, true, secondaryData
+                ? { concentrationTotalDamage: finalDamage + secondaryData.total, isSpellDamage }
+                : { isSpellDamage });
 
             const isIntercepted = applyResult?.intercepted;
             const appliedDamage = isIntercepted ? (applyResult.damageDealt ?? 0) : (applyResult?.finalDamage ?? 0);
@@ -145,26 +299,10 @@ export function setupEventListeners(deps) {
                 endInvisibilityOnHostileAction(attacker, pending.campaignName);
             }
 
-            let secondaryResult = null;
-            let secondaryFinalDamage = 0;
-            let secondaryApplyResultData = null;
-            if (secondaryData) {
-                secondaryApplyResultData = await applyDamageToTarget(combatSummary, pendingTargetName, secondaryData.total, [secondaryData.damageType], pending.campaignName, charactersRef.current, secondaryData.ignoreResistance, attacker, true, { skipConcentration: true });
-                secondaryFinalDamage = secondaryApplyResultData?.finalDamage ?? secondaryData.total;
-                if (secondaryApplyResultData && secondaryApplyResultData.finalDamage > 0) {
-                    endInvisibilityOnHostileAction(attacker, pending.campaignName);
-                }
-                secondaryResult = {
-                    name: secondaryData.name,
-                    formula: secondaryData.formula,
-                    rolls: secondaryData.rolls,
-                    total: secondaryData.total,
-                    modifier: secondaryData.modifier,
-                    damageType: secondaryData.damageType,
-                    finalDamage: secondaryFinalDamage,
-                    resistanceDetails: secondaryApplyResultData?.resistanceDetails || [],
-                };
-            }
+            const secondaryResult = secondaryData
+                ? await applySecondaryDamage({ combatSummary, pendingTargetName, secondaryData, campaignName: pending.campaignName, charactersRef, attacker })
+                : null;
+            const secondaryFinalDamage = secondaryResult ? secondaryResult.finalDamage : 0;
 
             const totalDamageDealt = appliedDamage + secondaryFinalDamage;
             const newHp = applyResult?.newHp ?? (combatSummary?.creatures?.find(c => c.name === pendingTargetName)?.currentHp ?? 0);
@@ -172,27 +310,11 @@ export function setupEventListeners(deps) {
             const hpAfterDamage = isIntercepted ? 0 : newHp;
             const oldHp = isIntercepted ? applyResult.oldHp : (newHp + totalDamageDealt);
             const isUnconscious = hpAfterDamage <= 0;
-            const wasAlive = oldHp > 0;
-            const wasBloodied = oldHp > 0 && oldHp <= Math.floor(maxHp / 2);
-            const isBloodied = newHp > 0 && newHp <= Math.floor(maxHp / 2);
-            let threshold;
-            if (!wasAlive && isUnconscious) threshold = 'dead';
-            else if (!wasBloodied && isBloodied) threshold = 'bloodied';
-            else if (wasBloodied && !isBloodied && newHp > 0) threshold = 'recovering';
+            const threshold = getHpThreshold({ oldHp, newHp, maxHp, deadHp: hpAfterDamage });
 
-            const damageBreakdown = [{
-                damageType: pending.damageType,
-                amount: appliedDamage || finalDamage,
-                resisted: applyResult?.resistanceDetails?.some(rd => rd.status === 'resistant') ?? false,
-                status: applyResult?.resistanceDetails?.[0]?.status || null,
-            }];
+            const damageBreakdown = [buildDamageBreakdownEntry(applyResult, pending.damageType, appliedDamage || finalDamage)];
             if (secondaryResult) {
-                damageBreakdown.push({
-                    damageType: secondaryResult.damageType,
-                    amount: secondaryResult.finalDamage,
-                    resisted: secondaryResult.resistanceDetails?.some(rd => rd.status === 'resistant') ?? false,
-                    status: secondaryResult.resistanceDetails?.[0]?.status || null,
-                });
+                damageBreakdown.push(buildDamageBreakdownEntry(secondaryResult, secondaryResult.damageType, secondaryResult.finalDamage));
             }
 
             if (totalDamageDealt > 0) {
@@ -220,21 +342,21 @@ export function setupEventListeners(deps) {
 
             logEntry({
                 type: 'roll',
-                characterName: e.detail.targetName,
+                characterName: detail.targetName,
                 rollType: 'save',
                 name: pending.name,
-                rolls: [e.detail.roll],
-                mode: e.detail.mode || 'normal',
-                total: e.detail.total,
-                bonus: e.detail.saveBonus,
-                isNatural20: e.detail.roll === 20,
-                isNatural1: e.detail.roll === 1,
-                targetName: e.detail.targetName,
-                saveType: e.detail.saveType,
-                saveDc: e.detail.saveDc,
-                saveResult: e.detail.success ? 'success' : 'failure',
+                rolls: [detail.roll],
+                mode: detail.mode || 'normal',
+                total: detail.total,
+                bonus: detail.saveBonus,
+                isNatural20: detail.roll === 20,
+                isNatural1: detail.roll === 1,
+                targetName: detail.targetName,
+                saveType: detail.saveType,
+                saveDc: detail.saveDc,
+                saveResult: detail.success ? 'success' : 'failure',
                 attackerName: attacker,
-                dcSuccess: e.detail.dcSuccess,
+                dcSuccess: detail.dcSuccess,
                 timestamp: Date.now(),
                 id: utils.guid(),
             });
@@ -249,113 +371,34 @@ export function setupEventListeners(deps) {
                 total: pending.rawDamage,
                 modifier: pending.modifier,
                 damageType: pending.damageType,
-                targetName: e.detail.targetName,
-                saveType: e.detail.saveType,
-                saveDc: e.detail.saveDc,
-                dcSuccess: e.detail.dcSuccess,
-                saveResult: isSoulstitchProtected ? 'soulstitch_auto_success' : (e.detail.success ? 'success' : 'failure'),
-                saveRoll: e.detail.roll,
-                saveBonus: e.detail.saveBonus,
-                saveRawRolls: e.detail.rawRolls,
+                targetName: detail.targetName,
+                saveType: detail.saveType,
+                saveDc: detail.saveDc,
+                dcSuccess: detail.dcSuccess,
+                saveResult: isSoulstitchProtected ? 'soulstitch_auto_success' : (detail.success ? 'success' : 'failure'),
+                saveRoll: detail.roll,
+                saveBonus: detail.saveBonus,
+                saveRawRolls: detail.rawRolls,
                 forcedMode: pending.metamagicHeighten ? 'disadvantage' : 'normal',
-                bonusDetail: e.detail.bonusDetail,
+                bonusDetail: detail.bonusDetail,
                 finalDamage: appliedDamage || finalDamage,
                 isAoe: pending.isAoe || false,
-                aoeAffectedCount: pending.isAoe ? (e.detail.aoeAffectedCount || null) : null,
+                aoeAffectedCount: pending.isAoe ? (detail.aoeAffectedCount || null) : null,
                 soulstitchProtected: isSoulstitchProtected,
                 note: 'combined_save_damage_roll',
             };
-            if (secondaryResult) {
-                logEntryData.secondaryName = secondaryResult.name;
-                logEntryData.secondaryFormula = secondaryResult.formula;
-                logEntryData.secondaryRolls = secondaryResult.rolls;
-                logEntryData.secondaryTotal = secondaryResult.total;
-                logEntryData.secondaryModifier = secondaryResult.modifier;
-                logEntryData.secondaryDamageType = secondaryResult.damageType;
-                logEntryData.secondaryFinalDamage = secondaryResult.finalDamage;
-            }
+            assignSecondaryFields(logEntryData, secondaryResult, SECONDARY_SUFFIXES);
             logEntry(logEntryData);
 
-            if (pending.overchannelActive && pending.overchannelUseCount > 1) {
-                const overchannelSpellLevel = pending.overchannelSpellLevel || 1;
-                const dicePerLevel = 2 + (pending.overchannelUseCount - 1);
-                const totalDice = dicePerLevel * overchannelSpellLevel;
-                const necroticFormula = `${totalDice}d12`;
-                const necroticResult = rollExpression(necroticFormula);
-                if (necroticResult) {
-                    const casterCombatSummary = getCombatSummary(campaignName);
-                    const casterApplyResult = await applyDamageToTarget(casterCombatSummary, characterName, necroticResult.total, ['Necrotic'], campaignName, charactersRef.current, true, characterName);
-                    logEntry({
-                        type: 'roll',
-                        characterName,
-                        rollType: 'overchannel-damage',
-                        name: 'Overchannel',
-                        formula: necroticFormula,
-                        rolls: necroticResult.rolls,
-                        total: necroticResult.total,
-                        modifier: necroticResult.modifier,
-                        damageType: 'Necrotic',
-                        targetName: characterName,
-                        finalDamage: casterApplyResult?.finalDamage,
-                        note: 'Overchannel self-damage (ignores resistance/immunity)',
-                    });
-                }
-            }
+            await applyOverchannelSelfDamage({ pending, characterName, campaignName, charactersRef, logEntry });
 
-            if (!e.detail.success && pending.statusEffects?.length > 0) {
-                const targetName = pending.targetName;
-                const targetCreature = combatSummary?.creatures?.find(c => c.name === targetName);
-                const targetCharacter = (charactersRef.current || []).find(c => utils.getName(c.name) === targetName);
-                const targetStats = targetCharacter?.computedStats || targetCharacter;
-                const effectsToExpire = [];
-                for (const effect of pending.statusEffects) {
-                    const condKey = String(effect).toLowerCase();
-                    const attackerName = pending.attackerName || pending.sourceAttackerName || null;
-                    if (!attackerName) {
-                        console.error('[save-result-handler] Status effect missing attacker for', condKey, ':', { promptId: e.detail.promptId, pendingKeys: Object.keys(pending), characterName });
-                    }
-                    const attackerCreature = combatSummary?.creatures?.find(c => c.name === attackerName);
-                    if (targetStats && playerIsImmuneToCondition({
-                        conditionKey: condKey,
-                        playerStats: targetStats,
-                        getRuntimeValue: getRuntimeValue,
-                        campaignName: pending.campaignName,
-                        sourceCreatureType: resolveCreatureType(attackerCreature),
-                    })) {
-                        continue;
-                    }
-                    if (targetCreature?.type === 'player') {
-                        const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
-                        const filtered = conditions.filter(c => String(c).toLowerCase() !== condKey);
-                        setRuntimeValue(targetName, 'activeConditions', [...filtered, condKey], pending.campaignName);
-                        effectsToExpire.push({ type: 'condition', condition: condKey });
-                    } else if (targetCreature) {
-                        const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
-                        const filtered = conditions.filter(c => String(c).toLowerCase() !== condKey);
-                        setRuntimeValue(targetName, 'activeConditions', [...filtered, condKey], pending.campaignName);
-                        effectsToExpire.push({ type: 'condition', condition: condKey });
-                    }
-                }
-                if (effectsToExpire.length > 0) {
-                    addExpiration(characterName, targetName, effectsToExpire, pending.campaignName, 2);
-                }
+            if (!detail.success && pending.statusEffects?.length > 0) {
+                applyFailedSaveStatusEffects({ detail, pending, combatSummary, charactersRef, characterName });
             }
 
             // CLA-377: Vicious Mockery disadvantage is applied on the FAILED save only,
             // after the save resolves (mirrors the statusEffects-on-fail leg above).
-            if (!e.detail.success && pending.viciousMockerySpell) {
-                try {
-                    await triggerViciousMockeryForGeneric(
-                        pending.viciousMockerySpell,
-                        { spellSaveDc: e.detail.saveDc, targetName: pending.targetName },
-                        pending.playerStats,
-                        pending.campaignName,
-                        pending.viciousMockeryMapName
-                    );
-                } catch (err) {
-                    console.error('[save-result-handler] Vicious Mockery trigger failed:', err);
-                }
-            }
+            await triggerViciousMockeryOnFail({ detail, pending });
 
             // Always write lastAttack for save-based damage (player targets) — counterspell needs this
             // But first, check if a spell handler/modal already owns lastAttack (spell-save) — skip if so
@@ -363,64 +406,11 @@ export function setupEventListeners(deps) {
             if (checkLastAttack?.rollType === 'spell-save' && (pending.name || pending.sourceName) === checkLastAttack.attackName) {
                 return;
             }
-            const saveLastAttackData = {
-                attackerName: pending.attackerName || pending.sourceAttackerName || characterName,
-                targetName: e.detail.targetName,
-                d20: e.detail.roll,
-                d20Rolls: e.detail.rawRolls || [e.detail.roll],
-                bonus: e.detail.saveBonus,
-                total: e.detail.total,
-                rollType: 'attack',
-                saveType: e.detail.saveType,
-                saveDc: e.detail.saveDc,
-                saveResult: e.detail.success ? 'success' : 'failure',
-                damageFormula: pending.formula || null,
-                attackName: pending.name || pending.sourceName || null,
-                damageType: pending.damageType || null,
-                rawDamage: pending.rawDamage || 0,
-                primaryDamage: pending.rawDamage || 0,
-                primaryDamageType: pending.damageType || null,
-                actualDamage: appliedDamage || finalDamage,
-                damageApplied: (appliedDamage || finalDamage) > 0,
-                statusEffects: pending.statusEffects || null,
-                affectedTargets: pending.statusEffects ? [e.detail.targetName] : undefined,
-                timestamp: Date.now(),
-            };
+            const saveLastAttackData = buildSaveLastAttackData({ detail, pending, characterName, appliedDamage, finalDamage });
             setRuntimeValue('campaign', 'lastAttack', saveLastAttackData, pending.campaignName);
 
-            const popupData = {
-                type: 'save-damage',
-                name: pending.name,
-                formula: pending.formula,
-                rolls: pending.rolls,
-                total: appliedDamage || finalDamage,
-                bonus: 0,
-                modifier: pending.modifier,
-                damageType: pending.damageType,
-                targetName: e.detail.targetName,
-                targetCurrentHp: applyResult?.newHp ?? newHp,
-                targetMaxHp,
-                saveDc: e.detail.saveDc,
-                saveType: e.detail.saveType,
-                dcSuccess: e.detail.dcSuccess,
-                saveResult: { roll: e.detail.roll, total: e.detail.total, bonus: e.detail.saveBonus, success: e.detail.success },
-                finalDamage: appliedDamage || finalDamage,
-                damageApplied: true,
-                damageReduced: applyResult?.damageReduced,
-            };
-            if (applyResult?.interceptedFeature) {
-                popupData.interceptedFeature = applyResult.interceptedFeature;
-            }
-            if (secondaryResult) {
-                popupData.secondaryName = secondaryResult.name;
-                popupData.secondaryFormula = secondaryResult.formula;
-                popupData.secondaryRolls = secondaryResult.rolls;
-                popupData.secondaryTotal = secondaryResult.total;
-                popupData.secondaryModifier = secondaryResult.modifier;
-                popupData.secondaryDamageType = secondaryResult.damageType;
-                popupData.secondaryFinalDamage = secondaryResult.finalDamage;
-            }
-            const setPopupHtml = getPendingPopupSetter(e.detail.promptId);
+            const popupData = buildSavePopupData({ detail, pending, applyResult, newHp, maxHp, appliedDamage, finalDamage, secondaryResult });
+            const setPopupHtml = getPendingPopupSetter(detail.promptId);
             if (setPopupHtml) {
                 setPopupHtml(popupData);
             }

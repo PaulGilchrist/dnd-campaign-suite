@@ -25,11 +25,236 @@ import { handleSanctuarySave } from './sanctuarySave.js';
 import { computeD20Roll } from './d20RollComputation.js';
 import { resolveTarget } from './targetResolution.js';
 import { resolveHit } from './hitResolution.js';
+import { computeTargetAc } from './targetAcComputation.js';
 import { processAttackAfterResult, processPotentCantrip } from './attackPostProcessing.js';
 import { processSaveRoll } from './saveProcessing.js';
 import { processInitiativeRoll } from './initiativeProcessing.js';
 import { consumeFeatsOfChaos } from './globalFeats.js';
 import { consumeArmedRestoreBalance } from '../../services/combat/restoreBalanceState.js';
+
+// Sanctuary / blocker pre-phase for attack rolls. Returns true when the roll
+// must be aborted (blocked attacker or unresolved sanctuary save).
+async function runAttackPrePhase({ attackerName, targetName, campaignName, setPopupHtml, logEntry }) {
+    // Sanctuary: ends when the warded creature makes an attack
+    const attackerSanctuary = (getRuntimeValue('campaign', 'targetEffects') || []).find(
+        te => te.effect === 'sanctuary' && te.target === attackerName
+    );
+    if (attackerSanctuary) {
+        endSanctuary(attackerSanctuary.source, attackerName, campaignName,
+            `${attackerName} made an attack, ending Sanctuary.`);
+    }
+
+    if (attackerName && targetName && checkAttackBlockers(attackerName, targetName, campaignName, setPopupHtml, addEntry)) {
+        return true;
+    }
+
+    // Sanctuary: if target is warded, attacker must succeed on WIS save before attack roll
+    if (attackerName && targetName) {
+        const proceed = await handleSanctuarySave(attackerName, targetName, campaignName, setPopupHtml, logEntry);
+        if (!proceed) return true;
+    }
+    return false;
+}
+
+function logLuckyReroll(characterName, campaignName, name, rollType, ctx) {
+    if (!ctx.luckyRerolled) return;
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName,
+        abilityName: 'Lucky (Halfling)',
+        description: `${characterName} used Lucky (Halfling trait): rerolled natural 1 on ${name} ${rollType} → ${ctx.luckyRerollValue}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[Lucky] Log error:', e); });
+}
+
+function logIndomitableMight(characterName, campaignName, name, rollType, bonus, context, ctx) {
+    const strReplaceApplied = (context?.strSaveReplace && rollType === 'save') || (context?.strCheckReplace && (rollType === 'check' || rollType === 'skill'));
+    const originalTotal = ctx.effectiveD20Roll + bonus + ctx.cosmicOmenAppliedBonus + ctx.sunderingBlowBonus;
+    if (!(strReplaceApplied && originalTotal < (context?.strScore || 10))) return;
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName,
+        abilityName: 'Indomitable Might',
+        description: `${characterName} used Indomitable Might on ${name} ${rollType}: d20 ${ctx.effectiveD20Roll} + ${bonus} = ${originalTotal} → replaced by Strength ${context?.strScore}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[Indomitable Might] Log error:', e); });
+}
+
+function buildRollLogEntry({ characterName, rollType, name, ctx, context, target, targetAc }) {
+    return {
+        type: 'roll',
+        characterName,
+        rollType,
+        name,
+        rolls: [ctx.r1, ctx.r2],
+        mode: ctx.forcedMode || 'normal',
+        total: ctx.effectiveD20Roll,
+        bonus: ctx.effectiveBonus,
+        bonusDetail: ctx.finalBonusDetail,
+        baneRoll: ctx.baneAttackRoll,
+        baneDisplayLabel: ctx.baneDisplayLabel,
+        blessRoll: ctx.blessAttackRoll,
+        isNatural20: ctx.effectiveD20Roll === 20,
+        isNatural1: ctx.effectiveD20Roll === 1,
+        targetName: (rollType === 'attack' || rollType === 'save') ? (target?.name || context?.targetName) : undefined,
+        targetAc,
+        effectiveAc: ctx.effectiveAc,
+        shieldAcBonus: ctx._shieldAcBonus || 0,
+        shieldOfFaithAcBonus: ctx._shieldOfFaithAcBonus || 0,
+        wardingBondAcBonus: ctx._wardingBondAcBonus || 0,
+        slowAcPenalty: ctx._slowAcPenalty || 0,
+        damageType: context?.damageType,
+        hit: ctx.hit,
+        isAutoMiss: ctx.isAutoMiss,
+        isCrit: ctx.isCrit,
+        rangeReason: context?.rangeReason,
+        resistanceNotice: context?.resistanceNotice,
+        hunterLoreNotice: context?.hunterLoreNotice,
+        coverLevel: context?.coverLevel,
+        coverAcBonus: context?.coverAcBonus,
+        coverReason: context?.coverReason,
+        advantageReason: context?.advantageReason,
+    };
+}
+
+function buildAutoDamage({ context, name, characterName, ctx, autoDamageSourceRef, targetName }) {
+    if (!context?.autoDamageFormula) return undefined;
+    return {
+        name: context.autoDamageName || name,
+        formula: context.autoDamageFormula,
+        autoDamageSchool: context.autoDamageSchool,
+        damageType: context.damageType,
+        damageTypeChoices: context.damageTypeChoices,
+        targetName: targetName,
+        attackerName: context.attackerName || characterName,
+        saveDc: context.saveDc,
+        saveType: context.saveType,
+        dcSuccess: context.dcSuccess,
+        metamagicTwinTarget: context.metamagicTwinTarget,
+        metamagicHeighten: context.metamagicHeighten,
+        isCantrip: context.isCantrip,
+        overchannelActive: context.overchannelActive,
+        overchannelUseCount: context.overchannelUseCount,
+        overchannelSpellLevel: context.overchannelSpellLevel,
+        secondaryFormula: context.autoDamageSecondaryFormula,
+        secondaryDamageType: context.autoDamageSecondaryDamageType,
+        ripostePopup: context.ripostePopup,
+        source: autoDamageSourceRef?.current || characterName,
+        isAutoCrit: ctx.isCrit,
+        sneakAttackDice: context?.sneakAttackDice || 0,
+        d20Roll: ctx.effectiveD20Roll,
+    };
+}
+
+function buildPopupData({ ctx, context, name, rollType, targetAc, targetName, characterName, campaignName, autoDamage, availableSuperiorityManeuvers }) {
+    return {
+        type: 'd20',
+        rollType,
+        name,
+        rolls: ctx.luckyRerolled ? [ctx.luckyRerollValue] : [ctx.r1, ctx.r2],
+        bonus: ctx.effectiveBonus,
+        bonusDetail: ctx.finalBonusDetail,
+        baneRoll: ctx.baneAttackRoll,
+        baneDisplayLabel: ctx.baneDisplayLabel,
+        blessRoll: ctx.blessAttackRoll,
+        targetName,
+        targetAc,
+        effectiveAc: ctx.effectiveAc,
+        shieldAcBonus: ctx._shieldAcBonus || 0,
+        shieldOfFaithAcBonus: ctx._shieldOfFaithAcBonus || 0,
+        wardingBondAcBonus: ctx._wardingBondAcBonus || 0,
+        slowAcPenalty: ctx._slowAcPenalty || 0,
+        hit: ctx.hit,
+        isAutoMiss: ctx.isAutoMiss,
+        rangeReason: context?.rangeReason,
+        resistanceNotice: context?.resistanceNotice,
+        hunterLoreNotice: context?.hunterLoreNotice,
+        coverLevel: context?.coverLevel,
+        coverAcBonus: context?.coverAcBonus,
+        coverReason: context?.coverReason,
+        forcedMode: ctx.forcedMode,
+        advantageReason: context?.advantageReason,
+        isAutoCrit: context?.isAutoCrit,
+        isCrit: ctx.isCrit,
+        isNatural20: ctx.effectiveD20Roll === 20,
+        isNatural1: ctx.effectiveD20Roll === 1,
+        autoDamage,
+        autoReroll: context?.autoReroll,
+        autoRerollBonus: context?.autoRerollBonus,
+        autoRerollCondition: context?.autoRerollCondition,
+        autoRerollForAttack: context?.autoRerollForAttack || context?.boonOfCombatProwess,
+        strSaveReplace: context?.strSaveReplace,
+        strScore: context?.strScore,
+        strCheckReplace: context?.strCheckReplace,
+        reliableTalent: context?.reliableTalent,
+        wisCheckReplace: context?.wisCheckReplace,
+        wisCheckMinBonus: context?.wisCheckMinBonus,
+        defensiveDuelistBonus: context?.defensiveDuelistBonus || 0,
+        baitAndSwitchBonus: context?.baitAndSwitchBonus || 0,
+        d20Floor10: context?.d20Floor10,
+        starryDragonFloor: ctx.starryDragonFloor,
+        tacticalMind: context?.tacticalMind,
+        tacticalMindBonus: context?.tacticalMindBonus,
+        darkOnesLuck: context?.darkOnesLuck,
+        strokeOfLuck: context?.strokeOfLuck,
+        psiBolsteredKnack: context?.psiBolsteredKnack,
+        psiBolsteredKnackDieSize: context?.psiBolsteredKnackDieSize,
+        bardicInspiration: context?.bardicInspiration,
+        bardicInspirationDie: context?.bardicInspirationDie,
+        bardicInspirationDefense: ctx.bardicInspirationDefense,
+        bardicInspirationDefenseDieSize: ctx.bardicInspirationDefenseDieSize,
+        bardicInspirationDefenseTargetName: ctx.bardicInspirationDefenseTargetName,
+        bardicInspirationOffense: context?.bardicInspirationOffense || (context?.playerStats ? hasBardicInspirationOffense(context.playerStats, campaignName) : false),
+        bardicInspirationOffenseDieSize: context?.bardicInspirationOffenseDieSize || getBardicInspirationDieSize(characterName, campaignName) || (context?.playerStats ? getBardicInspirationDieSizeFromClass(context.playerStats) : null),
+        empoweredSpell: context?.empoweredSpell || (context?.playerStats ? hasEmpoweredSpell(context.playerStats) : false),
+        empoweredSpellChaMod: context?.empoweredSpellChaMod || getChaModifier(context?.playerStats),
+        cosmicOmenAppliedBonus: ctx.cosmicOmenAppliedBonus,
+        cosmicOmenDetail: ctx.cosmicOmenDetail,
+        pendingSkillCheckAppliedBonus: ctx.pendingSkillCheckAppliedBonus,
+        pendingSkillCheckDetail: ctx.pendingSkillCheckDetail,
+        luckyRerolled: ctx.luckyRerolled,
+        luckyRerollValue: ctx.luckyRerollValue,
+        unerringStrikeApplied: ctx.unerringStrikeApplied,
+        homingStrikesUsed: ctx.homingStrikesUsed === true,
+        homingStrikesBonus: ctx.homingStrikesBonus || 0,
+        characterName,
+        campaignName,
+        availableSuperiorityManeuvers,
+    };
+}
+
+function storeCheckResults({ characterName, campaignName, ctx, context, name, rollType, bonus, targetName, combatSummary }) {
+    const effectiveD20 = (context?.d20Floor10 && ctx.r1 <= 9) ? 10 : ctx.r1;
+    const reliableD20 = context?.reliableTalent && effectiveD20 <= 9 ? 10 : effectiveD20;
+    setRuntimeValue(characterName, 'lastAbilityCheck', {
+        d20: reliableD20,
+        bonus,
+        checkName: name,
+        targetName,
+        timestamp: Date.now(),
+    }, campaignName);
+
+    if (combatSummary) {
+        setRuntimeValue('campaign', 'lastAttack', {
+            attackerName: characterName,
+            targetName,
+            d20: reliableD20,
+            d20Rolls: [ctx.r1, ctx.r2],
+            bonus,
+            total: reliableD20 + bonus,
+            checkName: name,
+            rollType,
+            timestamp: Date.now(),
+        }, campaignName);
+    }
+
+    setRuntimeValue(characterName, '_lastRollContext', {
+        type: 'check',
+        checkName: name,
+        oldTotal: reliableD20 + bonus,
+        timestamp: Date.now(),
+    }, campaignName);
+}
 
 export function createLogAndShow(deps) {
     const { characterName, campaignName, characters, setPopupHtml, logEntry, autoDamageSourceRef } = deps;
@@ -40,26 +265,8 @@ export function createLogAndShow(deps) {
 
         if (rollType === 'attack') {
             const attackerName = ctx.attackerName || characterName;
-            const targetName = ctx.targetName;
-
-            // Sanctuary: ends when the warded creature makes an attack
-            const attackerSanctuary = (getRuntimeValue('campaign', 'targetEffects') || []).find(
-                te => te.effect === 'sanctuary' && te.target === attackerName
-            );
-            if (attackerSanctuary) {
-                endSanctuary(attackerSanctuary.source, attackerName, campaignName,
-                    `${attackerName} made an attack, ending Sanctuary.`);
-            }
-
-            if (attackerName && targetName && checkAttackBlockers(attackerName, targetName, campaignName, setPopupHtml, addEntry)) {
-                return;
-            }
-
-            // Sanctuary: if target is warded, attacker must succeed on WIS save before attack roll
-            if (attackerName && targetName) {
-                const proceed = await handleSanctuarySave(attackerName, targetName, campaignName, setPopupHtml, logEntry);
-                if (!proceed) return;
-            }
+            const blocked = await runAttackPrePhase({ attackerName, targetName: ctx.targetName, campaignName, setPopupHtml, logEntry });
+            if (blocked) return;
         }
 
         // Load combat summary early (needed for maneuver loading, target resolution)
@@ -95,19 +302,7 @@ export function createLogAndShow(deps) {
         }
 
         // AC computation (attack-only)
-        let targetAc;
-        if (rollType === 'attack' && target) {
-            if (target?.type === 'player') {
-                const playerChar = (characters || []).find(c => c.name === target.name);
-                const playerComputed = playerChar?.computedStats || playerChar;
-                targetAc = playerComputed?.armorClass ?? playerChar?.armorClass;
-            } else {
-                targetAc = target?.ac;
-            }
-            if (typeof targetAc !== 'number') {
-                throw new Error(`[AC] Target "${target.name}" has no AC defined.`);
-            }
-        }
+        const targetAc = computeTargetAc(ctx, target, characters);
 
         ctx._shieldAcBonus = getShieldAcBonus(target?.name, campaignName);
         ctx._shieldOfFaithAcBonus = getShieldOfFaithAcBonus(target?.name, campaignName);
@@ -144,63 +339,12 @@ export function createLogAndShow(deps) {
         }
 
         // Log Lucky reroll to campaign log
-        if (ctx.luckyRerolled) {
-            addEntry(campaignName, {
-                type: 'ability_use',
-                characterName,
-                abilityName: 'Lucky (Halfling)',
-                description: `${characterName} used Lucky (Halfling trait): rerolled natural 1 on ${name} ${rollType} → ${ctx.luckyRerollValue}`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[Lucky] Log error:', e); });
-        }
+        logLuckyReroll(characterName, campaignName, name, rollType, ctx);
 
         // Log Indomitable Might to campaign log
-        const strReplaceApplied = (context?.strSaveReplace && rollType === 'save') || (context?.strCheckReplace && (rollType === 'check' || rollType === 'skill'));
-        const originalTotal = ctx.effectiveD20Roll + bonus + ctx.cosmicOmenAppliedBonus + ctx.sunderingBlowBonus;
-        if (strReplaceApplied && originalTotal < (context?.strScore || 10)) {
-            addEntry(campaignName, {
-                type: 'ability_use',
-                characterName,
-                abilityName: 'Indomitable Might',
-                description: `${characterName} used Indomitable Might on ${name} ${rollType}: d20 ${ctx.effectiveD20Roll} + ${bonus} = ${originalTotal} → replaced by Strength ${context?.strScore}`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[Indomitable Might] Log error:', e); });
-        }
+        logIndomitableMight(characterName, campaignName, name, rollType, bonus, context, ctx);
 
-        logEntry({
-            type: 'roll',
-            characterName,
-            rollType,
-            name,
-            rolls: [ctx.r1, ctx.r2],
-            mode: ctx.forcedMode || 'normal',
-            total: ctx.effectiveD20Roll,
-            bonus: ctx.effectiveBonus,
-            bonusDetail: ctx.finalBonusDetail,
-            baneRoll: ctx.baneAttackRoll,
-            baneDisplayLabel: ctx.baneDisplayLabel,
-            blessRoll: ctx.blessAttackRoll,
-            isNatural20: ctx.effectiveD20Roll === 20,
-            isNatural1: ctx.effectiveD20Roll === 1,
-            targetName: (rollType === 'attack' || rollType === 'save') ? (target?.name || context?.targetName) : undefined,
-            targetAc,
-            effectiveAc: ctx.effectiveAc,
-            shieldAcBonus: ctx._shieldAcBonus || 0,
-            shieldOfFaithAcBonus: ctx._shieldOfFaithAcBonus || 0,
-            wardingBondAcBonus: ctx._wardingBondAcBonus || 0,
-            slowAcPenalty: ctx._slowAcPenalty || 0,
-            damageType: context?.damageType,
-            hit: ctx.hit,
-            isAutoMiss: ctx.isAutoMiss,
-            isCrit: ctx.isCrit,
-            rangeReason: context?.rangeReason,
-            resistanceNotice: context?.resistanceNotice,
-            hunterLoreNotice: context?.hunterLoreNotice,
-            coverLevel: context?.coverLevel,
-            coverAcBonus: context?.coverAcBonus,
-            coverReason: context?.coverReason,
-            advantageReason: context?.advantageReason,
-        });
+        logEntry(buildRollLogEntry({ characterName, rollType, name, ctx, context, target, targetAc }));
 
         const targetName = (rollType === 'attack' || rollType === 'save') ? (target?.name || context?.targetName) : undefined;
 
@@ -208,108 +352,11 @@ export function createLogAndShow(deps) {
             console.error('[useLoggedDiceRollAttack] Save roll missing context.attackerName:', { characterName, targetName, name, context });
         }
 
-        const autoDamage = context?.autoDamageFormula ? {
-            name: context.autoDamageName || name,
-            formula: context.autoDamageFormula,
-            autoDamageSchool: context.autoDamageSchool,
-            damageType: context.damageType,
-            damageTypeChoices: context.damageTypeChoices,
-            targetName: targetName,
-            attackerName: context.attackerName || characterName,
-            saveDc: context.saveDc,
-            saveType: context.saveType,
-            dcSuccess: context.dcSuccess,
-            metamagicTwinTarget: context.metamagicTwinTarget,
-            metamagicHeighten: context.metamagicHeighten,
-            isCantrip: context.isCantrip,
-            overchannelActive: context.overchannelActive,
-            overchannelUseCount: context.overchannelUseCount,
-            overchannelSpellLevel: context.overchannelSpellLevel,
-            secondaryFormula: context.autoDamageSecondaryFormula,
-            secondaryDamageType: context.autoDamageSecondaryDamageType,
-            ripostePopup: context.ripostePopup,
-            source: autoDamageSourceRef?.current || characterName,
-            isAutoCrit: ctx.isCrit,
-            sneakAttackDice: context?.sneakAttackDice || 0,
-            d20Roll: ctx.effectiveD20Roll,
-        } : undefined;
+        const autoDamage = buildAutoDamage({ context, name, characterName, ctx, autoDamageSourceRef, targetName });
 
         const shouldSkipPopup = rollType === 'save' && target?.type === 'player' && context?.saveDc != null;
         if (!shouldSkipPopup) {
-            setPopupHtml({
-                type: 'd20',
-                rollType,
-                name,
-                rolls: ctx.luckyRerolled ? [ctx.luckyRerollValue] : [ctx.r1, ctx.r2],
-                bonus: ctx.effectiveBonus,
-                bonusDetail: ctx.finalBonusDetail,
-                baneRoll: ctx.baneAttackRoll,
-                baneDisplayLabel: ctx.baneDisplayLabel,
-                blessRoll: ctx.blessAttackRoll,
-                targetName,
-                targetAc,
-                effectiveAc: ctx.effectiveAc,
-                shieldAcBonus: ctx._shieldAcBonus || 0,
-                shieldOfFaithAcBonus: ctx._shieldOfFaithAcBonus || 0,
-                wardingBondAcBonus: ctx._wardingBondAcBonus || 0,
-                slowAcPenalty: ctx._slowAcPenalty || 0,
-                hit: ctx.hit,
-                isAutoMiss: ctx.isAutoMiss,
-                rangeReason: context?.rangeReason,
-                resistanceNotice: context?.resistanceNotice,
-                hunterLoreNotice: context?.hunterLoreNotice,
-                coverLevel: context?.coverLevel,
-                coverAcBonus: context?.coverAcBonus,
-                coverReason: context?.coverReason,
-                forcedMode: ctx.forcedMode,
-                advantageReason: context?.advantageReason,
-                isAutoCrit: context?.isAutoCrit,
-                isCrit: ctx.isCrit,
-                isNatural20: ctx.effectiveD20Roll === 20,
-                isNatural1: ctx.effectiveD20Roll === 1,
-                autoDamage,
-                autoReroll: context?.autoReroll,
-                autoRerollBonus: context?.autoRerollBonus,
-                autoRerollCondition: context?.autoRerollCondition,
-                autoRerollForAttack: context?.autoRerollForAttack || context?.boonOfCombatProwess,
-                strSaveReplace: context?.strSaveReplace,
-                strScore: context?.strScore,
-                strCheckReplace: context?.strCheckReplace,
-                reliableTalent: context?.reliableTalent,
-                wisCheckReplace: context?.wisCheckReplace,
-                wisCheckMinBonus: context?.wisCheckMinBonus,
-                defensiveDuelistBonus: context?.defensiveDuelistBonus || 0,
-                baitAndSwitchBonus: context?.baitAndSwitchBonus || 0,
-                d20Floor10: context?.d20Floor10,
-                starryDragonFloor: ctx.starryDragonFloor,
-                tacticalMind: context?.tacticalMind,
-                tacticalMindBonus: context?.tacticalMindBonus,
-                darkOnesLuck: context?.darkOnesLuck,
-                strokeOfLuck: context?.strokeOfLuck,
-                psiBolsteredKnack: context?.psiBolsteredKnack,
-                psiBolsteredKnackDieSize: context?.psiBolsteredKnackDieSize,
-                bardicInspiration: context?.bardicInspiration,
-                bardicInspirationDie: context?.bardicInspirationDie,
-                bardicInspirationDefense: ctx.bardicInspirationDefense,
-                bardicInspirationDefenseDieSize: ctx.bardicInspirationDefenseDieSize,
-                bardicInspirationDefenseTargetName: ctx.bardicInspirationDefenseTargetName,
-                bardicInspirationOffense: context?.bardicInspirationOffense || (context?.playerStats ? hasBardicInspirationOffense(context.playerStats, campaignName) : false),
-                bardicInspirationOffenseDieSize: context?.bardicInspirationOffenseDieSize || getBardicInspirationDieSize(characterName, campaignName) || (context?.playerStats ? getBardicInspirationDieSizeFromClass(context.playerStats) : null),
-                empoweredSpell: context?.empoweredSpell || (context?.playerStats ? hasEmpoweredSpell(context.playerStats) : false),
-                empoweredSpellChaMod: context?.empoweredSpellChaMod || getChaModifier(context?.playerStats),
-                cosmicOmenAppliedBonus: ctx.cosmicOmenAppliedBonus,
-                cosmicOmenDetail: ctx.cosmicOmenDetail,
-                pendingSkillCheckAppliedBonus: ctx.pendingSkillCheckAppliedBonus,
-                pendingSkillCheckDetail: ctx.pendingSkillCheckDetail,
-                luckyRerolled: ctx.luckyRerolled,
-                luckyRerollValue: ctx.luckyRerollValue,
-                unerringStrikeApplied: ctx.unerringStrikeApplied,
-                homingStrikesUsed: ctx.homingStrikesUsed === true,
-                homingStrikesBonus: ctx.homingStrikesBonus || 0,
-                characterName,
-                campaignName,
-                availableSuperiorityManeuvers,
-            });
+            setPopupHtml(buildPopupData({ ctx, context, name, rollType, targetAc, targetName, characterName, campaignName, autoDamage, availableSuperiorityManeuvers }));
 
             const luckyActive = getRuntimeValue(characterName, 'luckyAdvantageActive');
             if (luckyActive) {
@@ -325,36 +372,7 @@ export function createLogAndShow(deps) {
 
         // Check/Skill handling
         if (rollType === 'check' || rollType === 'skill') {
-            const effectiveD20 = (context?.d20Floor10 && ctx.r1 <= 9) ? 10 : ctx.r1;
-            const reliableD20 = context?.reliableTalent && effectiveD20 <= 9 ? 10 : effectiveD20;
-            setRuntimeValue(characterName, 'lastAbilityCheck', {
-                d20: reliableD20,
-                bonus,
-                checkName: name,
-                targetName,
-                timestamp: Date.now(),
-            }, campaignName);
-
-            if (combatSummary) {
-                setRuntimeValue('campaign', 'lastAttack', {
-                    attackerName: characterName,
-                    targetName,
-                    d20: reliableD20,
-                    d20Rolls: [ctx.r1, ctx.r2],
-                    bonus,
-                    total: reliableD20 + bonus,
-                    checkName: name,
-                    rollType,
-                    timestamp: Date.now(),
-                }, campaignName);
-            }
-
-            setRuntimeValue(characterName, '_lastRollContext', {
-                type: 'check',
-                checkName: name,
-                oldTotal: reliableD20 + bonus,
-                timestamp: Date.now(),
-            }, campaignName);
+            storeCheckResults({ characterName, campaignName, ctx, context, name, rollType, bonus, targetName, combatSummary });
         }
 
         // Save handling

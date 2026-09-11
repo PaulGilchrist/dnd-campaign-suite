@@ -16,6 +16,30 @@ const ADRENALINE_RUSH_USES_KEY = 'adrenalineRushUses';
 const PSYCHIC_WHISPERS_FREE_KEY = 'psychicWhispersFreeUsed';
 const PSYCHIC_WHISPERS_TARGETS_KEY = 'psychicWhispersTargets';
 
+const TELEPORT_EFFECTS = new Set([
+    'teleport_on_rage',
+    'teleport_swap_with_illusion',
+    'shadow_step_teleport',
+    'moonlight_step_teleport',
+    'bonus_teleport',
+]);
+
+// Effect → dedicated handler delegations performed before generic buff handling.
+const EFFECT_DELEGATES = {
+    // Vow of Enmity: delegate to dedicated handler
+    vow_of_enmity: handleVowOfEnmity,
+    // Sacred Weapon (CLA-301): delegate to dedicated Channel Divinity spend +
+    // damage-type picker handler — the generic temp_buff path granted the buff
+    // for free and dropped the options picker.
+    sacred_weapon: handleSacredWeapon,
+    // Adrenaline Rush: bonus action dash with temp HP, uses = proficiency_bonus, short_rest recharge
+    bonus_action_dash: handleBonusActionDash,
+    // Blessing of the Trickster: defer to modal for ally selection
+    advantage_on_stealth: handleTricksterBlessing,
+    // Corona of Light: defer to modal for enemy selection
+    sunlight_aura: handleCoronaOfLight,
+};
+
 function getPsionicEnergy(playerStats, campaignName) {
     const stored = getRuntimeValue(playerStats.name, 'psionicEnergy', campaignName);
     const defaultMax = playerStats._trackedResources?.psionicEnergy?.max || 0;
@@ -25,48 +49,15 @@ function getPsionicEnergy(playerStats, campaignName) {
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
 
-    // Vow of Enmity: delegate to dedicated handler
-    if (auto?.effect === 'vow_of_enmity') {
-        return handleVowOfEnmity(action, playerStats, campaignName, _mapName);
+    const delegate = auto?.effect ? EFFECT_DELEGATES[auto.effect] : null;
+    if (delegate) {
+        return delegate(action, playerStats, campaignName, _mapName);
     }
 
-    // Sacred Weapon (CLA-301): delegate to dedicated Channel Divinity spend +
-    // damage-type picker handler — the generic temp_buff path granted the buff
-    // for free and dropped the options picker.
-    if (auto?.effect === 'sacred_weapon') {
-        return handleSacredWeapon(action, playerStats, campaignName, _mapName);
-    }
-
-    // Handle Adrenaline Rush: bonus action dash with temp HP, uses = proficiency_bonus, short_rest recharge
-    if (auto?.effect === 'bonus_action_dash') {
-        return handleBonusActionDash(action, playerStats, campaignName, _mapName);
-    }
-
-    // Handle dash_action trigger: apply speed bonus temporarily
+    // dash_action trigger: temporary speed bonus
     if (auto?.trigger === 'dash_action' && auto?.effect === 'speed_bonus') {
-        const bonusMatch = String(auto.bonus || '0 ft').match(/(\d+)/);
-        const bonusAmount = bonusMatch ? parseInt(bonusMatch[1], 10) : 0;
-        if (bonusAmount > 0) {
-            const storedBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
-            const buffs = Array.isArray(storedBuffs) ? storedBuffs : [];
-            const dashBuff = buffs.find(b => b.name === action.name && b.tempBuff);
-            if (!dashBuff) {
-                setRuntimeValue(playerStats.name, 'activeBuffs', [
-                    ...buffs,
-                    { name: action.name, tempBuff: true, speedBonus: bonusAmount, duration: auto.duration || 'same_action' },
-                ], campaignName);
-            }
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    automationType: auto.type,
-                    description: `${action.name}: +${bonusAmount} ft Speed for this Dash action.`,
-                    automation: auto,
-                },
-            };
-        }
+        const dashPopup = handleDashSpeedBonus(action, auto, playerStats, campaignName);
+        if (dashPopup) return dashPopup;
     }
 
     // Check requiredLevel before allowing the buff (e.g., Draconic Flight at level 5)
@@ -100,22 +91,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         }
     }
 
-    if (auto?.effect === 'teleport_on_rage' || auto?.effect === 'teleport_swap_with_illusion' || auto?.effect === 'shadow_step_teleport' || auto?.effect === 'moonlight_step_teleport' || auto?.effect === 'bonus_teleport') {
+    if (TELEPORT_EFFECTS.has(auto?.effect)) {
         return handleTeleport(action, playerStats, campaignName, _mapName);
-    }
-
-    if (auto?.effect === 'vow_of_enmity') {
-        return handleVowOfEnmity(action, playerStats, campaignName, _mapName);
-    }
-
-    // Blessing of the Trickster: defer to modal for ally selection
-    if (auto?.effect === 'advantage_on_stealth') {
-        return handleTricksterBlessing(action, playerStats, campaignName, _mapName);
-    }
-
-    // Corona of Light: defer to modal for enemy selection
-    if (auto?.effect === 'sunlight_aura') {
-        return handleCoronaOfLight(action, playerStats, campaignName, _mapName);
     }
 
     // Telepathic Speech: defer to modal for target selection
@@ -142,123 +119,18 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // Wild Shape: uses gate applies to the ON leg only — toggling OFF must
     // always be able to end the form, even at 0 uses (CLA-391).
     if (auto?.effect === 'shape_shift') {
-        const storedWSBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
-        const formActive = (Array.isArray(storedWSBuffs) ? storedWSBuffs : []).some(b => b.name === action.name);
-        if (!formActive) {
-            const maxWS = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0;
-            const currentWS = Number(getRuntimeValue(playerStats.name, 'wildShapeUses', campaignName) ?? maxWS);
-            if (currentWS <= 0) {
-                addEntry(campaignName, {
-                    type: 'automation',
-                    automationType: 'wild_shape_refused',
-                    characterName: playerStats.name,
-                    creatureName: playerStats.name,
-                    name: action.name,
-                    description: `${action.name}: No Wild Shape uses remaining.`,
-                    timestamp: Date.now(),
-                }).catch((e) => { console.error('[buffHandler] Wild Shape refusal log error:', e); });
-                return {
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: action.name,
-                        description: `${action.name}: No Wild Shape uses remaining.`,
-                        automation: auto,
-                    },
-                };
-            }
-        }
-
-        const { wasActive } = toggleBuff(
-            playerStats.name,
-            action.name,
-            auto,
-            campaignName,
-            targetName
-        );
-
-        if (!wasActive) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'wild_shape_select',
-                    action: action,
-                    playerStats: playerStats,
-                    campaignName: campaignName,
-                },
-            };
-        } else {
-            cleanupWildShape(playerStats.name, campaignName);
-
-            addEntry(campaignName, {
-                type: 'ability_use',
-                characterName: playerStats.name,
-                abilityName: action.name,
-                description: `${playerStats.name} deactivated Wild Shape.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[buffHandler] Wild Shape log error:', e); });
-
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    automationType: auto.type,
-                    description: `${action.name} toggled OFF`,
-                    automation: auto,
-                },
-            };
-        }
+        return handleShapeShift(action, auto, playerStats, campaignName, targetName);
     }
 
     // Tracked uses consumption for temp_buff features that declare uses (e.g., Psychic Veil: 1 use per Long Rest)
     let usesKey = null;
-    let usesMax = null;
     let usesRemaining = null;
     if (auto?.uses != null || auto?.usesMax != null) {
-        if (typeof auto.usesMax === 'number') {
-            usesMax = auto.usesMax;
-        } else if (typeof auto.uses === 'number') {
-            usesMax = auto.uses;
-        } else if (typeof auto.uses === 'string' && /^\d+$/.test(auto.uses)) {
-            usesMax = parseInt(auto.uses, 10);
-        } else if (auto.uses === 'proficiency_bonus') {
-            usesMax = playerStats.proficiency || 0;
-        } else {
-            usesMax = 1;
-        }
+        const usesMax = resolveBuffUsesMax(auto, playerStats);
         usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
-
-        const storedUses = getRuntimeValue(playerStats.name, usesKey, campaignName);
-        usesRemaining = storedUses != null ? Number(storedUses) : usesMax;
-
-        const storedBuffsBefore = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
-        const buffActiveBefore = (Array.isArray(storedBuffsBefore) ? storedBuffsBefore : []).some(b => b.name === action.name);
-
-        if (usesRemaining <= 0 && !buffActiveBefore) {
-            if (auto.resourceCost === 'psionic_energy' && getPsionicEnergy(playerStats, campaignName) > 0) {
-                const psionicCurrent = getPsionicEnergy(playerStats, campaignName);
-                await setRuntimeValue(playerStats.name, 'psionicEnergy', psionicCurrent - 1, campaignName);
-                addEntry(campaignName, {
-                    type: 'ability_use',
-                    characterName: playerStats.name,
-                    abilityName: action.name,
-                    description: `${playerStats.name} expended 1 Psionic Energy Die to restore a use of ${action.name}. Psionic Energy: ${psionicCurrent - 1}.`,
-                    timestamp: Date.now(),
-                }).catch((e) => { console.error('[buffHandler] Psionic restore log error:', e); });
-            } else {
-                return {
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: action.name,
-                        automationType: auto.type,
-                        description: `${action.name} has been used and cannot be used again until a Long Rest.`,
-                        automation: auto,
-                    },
-                };
-            }
-        }
+        const gate = await gateBuffUses(action, auto, playerStats, campaignName, usesMax, usesKey);
+        if (gate.popup) return gate.popup;
+        usesRemaining = gate.usesRemaining;
     }
 
     const { wasActive } = toggleBuff(
@@ -287,66 +159,16 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     if (auto?.effect === 'invisible') {
-        const storedConditions = getRuntimeValue(targetName, 'activeConditions') || [];
-        const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-        if (!wasActive) {
-            if (!conditions.some(c => String(c).toLowerCase() === 'invisible')) {
-                setRuntimeValue(targetName, 'activeConditions', [...conditions, 'invisible'], campaignName);
-            }
-        } else {
-            const filtered = conditions.filter(c => String(c).toLowerCase() !== 'invisible');
-            if (filtered.length !== conditions.length) {
-                setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
-            }
-        }
-        if (!wasActive) {
-            const invisKey = `_activeInvisibility_${targetName}`;
-            setRuntimeValue('campaign', invisKey, playerStats.name, campaignName);
-        } else {
-            const invisKey = `_activeInvisibility_${targetName}`;
-            setRuntimeValue('campaign', invisKey, null, campaignName);
-        }
+        applyInvisibilityToggle(targetName, playerStats, campaignName, wasActive);
     }
 
     if (auto?.effect === 'see_invisibility') {
-        if (!wasActive) {
-            addEntry(campaignName, {
-                type: 'ability_use',
-                characterName: playerStats.name,
-                abilityName: action.name,
-                description: `See Invisibility activated for 1 hour. You can see invisible creatures and objects within 30 feet.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[buffHandler] See Invisibility log error:', e); });
-        } else {
-            addEntry(campaignName, {
-                type: 'ability_use',
-                characterName: playerStats.name,
-                abilityName: action.name,
-                description: `${playerStats.name} deactivated See Invisibility.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[buffHandler] See Invisibility log error:', e); });
-        }
-    }
-
-    if (auto?.effect === 'fly_speed_equals_walk_speed' && wasActive) {
-        // No longer tracking rest timestamps
+        logSeeInvisibilityToggle(action, playerStats, campaignName, wasActive);
     }
 
     if (auto?.effect === 'haste') {
-        if (!wasActive) {
-            addExpiration(playerStats.name, targetName, [
-                { type: 'remove_active_buff', buffName: action.name }
-            ], campaignName);
-        } else {
-            const storedConditions = getRuntimeValue(targetName, 'activeConditions') || [];
-            const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-            const filtered = conditions.filter(c => String(c).toLowerCase() !== 'speed_zero');
-            if (filtered.length !== conditions.length) {
-                await setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
-            }
-        }
+        await handleHasteToggle(action, playerStats, targetName, campaignName, wasActive);
     }
-
 
     if (!wasActive && auto?.tempHpExpression) {
         const amount = evaluateAutoExpression(auto.tempHpExpression, playerStats);
@@ -376,6 +198,195 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             automation: auto,
         },
     };
+}
+
+function handleDashSpeedBonus(action, auto, playerStats, campaignName) {
+    const bonusMatch = String(auto.bonus || '0 ft').match(/(\d+)/);
+    const bonusAmount = bonusMatch ? parseInt(bonusMatch[1], 10) : 0;
+    if (bonusAmount <= 0) return null;
+
+    const storedBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+    const buffs = Array.isArray(storedBuffs) ? storedBuffs : [];
+    const dashBuff = buffs.find(b => b.name === action.name && b.tempBuff);
+    if (!dashBuff) {
+        setRuntimeValue(playerStats.name, 'activeBuffs', [
+            ...buffs,
+            { name: action.name, tempBuff: true, speedBonus: bonusAmount, duration: auto.duration || 'same_action' },
+        ], campaignName);
+    }
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            automationType: auto.type,
+            description: `${action.name}: +${bonusAmount} ft Speed for this Dash action.`,
+            automation: auto,
+        },
+    };
+}
+
+// Wild Shape ON leg consumes a use, shows the form chooser; OFF leg cleans up (CLA-391).
+async function handleShapeShift(action, auto, playerStats, campaignName, targetName) {
+    const storedWSBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+    const formActive = (Array.isArray(storedWSBuffs) ? storedWSBuffs : []).some(b => b.name === action.name);
+    if (!formActive) {
+        const maxWS = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0;
+        const currentWS = Number(getRuntimeValue(playerStats.name, 'wildShapeUses', campaignName) ?? maxWS);
+        if (currentWS <= 0) {
+            addEntry(campaignName, {
+                type: 'automation',
+                automationType: 'wild_shape_refused',
+                characterName: playerStats.name,
+                creatureName: playerStats.name,
+                name: action.name,
+                description: `${action.name}: No Wild Shape uses remaining.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[buffHandler] Wild Shape refusal log error:', e); });
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    description: `${action.name}: No Wild Shape uses remaining.`,
+                    automation: auto,
+                },
+            };
+        }
+    }
+
+    const { wasActive } = toggleBuff(
+        playerStats.name,
+        action.name,
+        auto,
+        campaignName,
+        targetName
+    );
+
+    if (!wasActive) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'wild_shape_select',
+                action: action,
+                playerStats: playerStats,
+                campaignName: campaignName,
+            },
+        };
+    }
+
+    cleanupWildShape(playerStats.name, campaignName);
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: action.name,
+        description: `${playerStats.name} deactivated Wild Shape.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[buffHandler] Wild Shape log error:', e); });
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            automationType: auto.type,
+            description: `${action.name} toggled OFF`,
+            automation: auto,
+        },
+    };
+}
+
+function resolveBuffUsesMax(auto, playerStats) {
+    if (typeof auto.usesMax === 'number') return auto.usesMax;
+    if (typeof auto.uses === 'number') return auto.uses;
+    if (typeof auto.uses === 'string' && /^\d+$/.test(auto.uses)) return parseInt(auto.uses, 10);
+    if (auto.uses === 'proficiency_bonus') return playerStats.proficiency || 0;
+    return 1;
+}
+
+async function gateBuffUses(action, auto, playerStats, campaignName, usesMax, usesKey) {
+    const storedUses = getRuntimeValue(playerStats.name, usesKey, campaignName);
+    const usesRemaining = storedUses != null ? Number(storedUses) : usesMax;
+
+    const storedBuffsBefore = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+    const buffActiveBefore = (Array.isArray(storedBuffsBefore) ? storedBuffsBefore : []).some(b => b.name === action.name);
+
+    if (usesRemaining > 0 || buffActiveBefore) {
+        return { popup: null, usesRemaining };
+    }
+
+    if (auto.resourceCost === 'psionic_energy' && getPsionicEnergy(playerStats, campaignName) > 0) {
+        const psionicCurrent = getPsionicEnergy(playerStats, campaignName);
+        await setRuntimeValue(playerStats.name, 'psionicEnergy', psionicCurrent - 1, campaignName);
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: action.name,
+            description: `${playerStats.name} expended 1 Psionic Energy Die to restore a use of ${action.name}. Psionic Energy: ${psionicCurrent - 1}.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[buffHandler] Psionic restore log error:', e); });
+        return { popup: null, usesRemaining };
+    }
+
+    return {
+        popup: {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description: `${action.name} has been used and cannot be used again until a Long Rest.`,
+                automation: auto,
+            },
+        },
+    };
+}
+
+function applyInvisibilityToggle(targetName, playerStats, campaignName, wasActive) {
+    const storedConditions = getRuntimeValue(targetName, 'activeConditions') || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const invisKey = `_activeInvisibility_${targetName}`;
+    if (!wasActive) {
+        if (!conditions.some(c => String(c).toLowerCase() === 'invisible')) {
+            setRuntimeValue(targetName, 'activeConditions', [...conditions, 'invisible'], campaignName);
+        }
+        setRuntimeValue('campaign', invisKey, playerStats.name, campaignName);
+    } else {
+        const filtered = conditions.filter(c => String(c).toLowerCase() !== 'invisible');
+        if (filtered.length !== conditions.length) {
+            setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
+        }
+        setRuntimeValue('campaign', invisKey, null, campaignName);
+    }
+}
+
+function logSeeInvisibilityToggle(action, playerStats, campaignName, wasActive) {
+    const description = wasActive
+        ? `${playerStats.name} deactivated See Invisibility.`
+        : `See Invisibility activated for 1 hour. You can see invisible creatures and objects within 30 feet.`;
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: action.name,
+        description,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[buffHandler] See Invisibility log error:', e); });
+}
+
+async function handleHasteToggle(action, playerStats, targetName, campaignName, wasActive) {
+    if (!wasActive) {
+        addExpiration(playerStats.name, targetName, [
+            { type: 'remove_active_buff', buffName: action.name }
+        ], campaignName);
+        return;
+    }
+    const storedConditions = getRuntimeValue(targetName, 'activeConditions') || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'speed_zero');
+    if (filtered.length !== conditions.length) {
+        await setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
+    }
 }
 
 async function handleCoronaOfLight(action, playerStats, campaignName, _mapName) {

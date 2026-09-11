@@ -8,326 +8,269 @@ import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import storage from '../../../ui/storage.js';
 
-export async function handle(action, playerStats, campaignName, _mapName) {
-    const auto = action.automation;
+function castLabels(auto) {
+    const noConcLabel = auto.noConcentration ? ' Does not require Concentration.' : '';
+    const durLabel = auto.duration ? ` Duration: ${auto.duration.replace('_', ' ')}.` : '';
+    return { noConcLabel, durLabel };
+}
 
-    let spellName = auto.spell || action.name;
-
-    // CLA-388: Wild Companion (Druid lv2, 2024) — "expend a spell slot or a use of
-    // Wild Shape to cast Find Familiar without Material components". Route to the
-    // WildCompanion chooser modal (registered in useCharActionsAutomation modalMap +
-    // CharActionModals render) so payment happens BEFORE the free-cast grant stamp.
-    // Refuse at both-zero with popup + wild_companion_refused log (CLA-359 shape).
-    if (auto.resourceCost === 'wild_companion') {
-        const playerName = playerStats.name;
-        let anySlotAvailable = false;
-        for (let lvl = 1; lvl <= 9; lvl++) {
-            const slotKey = `spell_slots_level_${lvl}`;
-            const max = playerStats.spellAbilities?.[slotKey] || 0;
-            const stored = getRuntimeValue(playerName, slotKey, campaignName);
-            const available = stored != null ? Number(stored) : max;
-            if (available > 0) { anySlotAvailable = true; break; }
-        }
-        const maxWS = playerStats._trackedResources?.wildShapeUses?.max
-            || playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape
-            || 0;
-        const storedWS = getRuntimeValue(playerName, 'wildShapeUses', campaignName);
-        const currentWS = storedWS != null ? Number(storedWS) : maxWS;
-
-        if (!anySlotAvailable && currentWS <= 0) {
-            const reason = 'Wild Companion requires expending a spell slot or a use of Wild Shape — none remaining.';
-            addEntry(campaignName, {
-                type: 'automation',
-                characterName: playerName,
-                automationType: 'wild_companion_refused',
-                name: action.name,
-                description: `${action.name} refused — ${reason}`,
-            }).catch((e) => { console.error('[spellCastHandler:log-error]', e); });
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    automationType: auto.type,
-                    description: reason,
-                    automation: auto,
-                },
-            };
-        }
-
-        return {
-            type: 'modal',
-            modalName: 'wildCompanion',
-            payload: { action, playerStats, campaignName },
-        };
+// CLA-388: Wild Companion (Druid lv2, 2024) — "expend a spell slot or a use of
+// Wild Shape to cast Find Familiar without Material components". Route to the
+// WildCompanion chooser modal (registered in useCharActionsAutomation modalMap +
+// CharActionModals render) so payment happens BEFORE the free-cast grant stamp.
+// Refuse at both-zero with popup + wild_companion_refused log (CLA-359 shape).
+async function handleWildCompanion(action, auto, playerStats, campaignName) {
+    const playerName = playerStats.name;
+    let anySlotAvailable = false;
+    for (let lvl = 1; lvl <= 9; lvl++) {
+        const slotKey = `spell_slots_level_${lvl}`;
+        const max = playerStats.spellAbilities?.[slotKey] || 0;
+        const stored = getRuntimeValue(playerName, slotKey, campaignName);
+        const available = stored != null ? Number(stored) : max;
+        if (available > 0) { anySlotAvailable = true; break; }
     }
+    const maxWS = playerStats._trackedResources?.wildShapeUses?.max
+        || playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape
+        || 0;
+    const storedWS = getRuntimeValue(playerName, 'wildShapeUses', campaignName);
+    const currentWS = storedWS != null ? Number(storedWS) : maxWS;
 
-    // Mantle of Majesty: set activeBuffs for concentration-gated free cast
-    if (action.name === 'Mantle of Majesty' && auto.type === 'free_spell' && auto.concentration) {
-        const activeBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
-        const buffsArray = Array.isArray(activeBuffs) ? activeBuffs : [];
-        if (buffsArray.some(b => b.name === 'Mantle of Majesty')) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: `${action.name} is already active.`,
-                    automation: auto,
-                },
-            };
-        }
-        const newBuffs = [...buffsArray, { name: 'Mantle of Majesty', effect: 'mantle_of_majesty', duration: '1_minute' }];
-        await setRuntimeValue(playerStats.name, 'activeBuffs', newBuffs, campaignName);
-        addExpiration(playerStats.name, playerStats.name, [
-            { type: 'remove_active_buff', buffName: 'Mantle of Majesty' }
-        ], campaignName);
-
-        // Set concentration on combat summary so initiative tracker shows it
-        const combatSummary = getCombatSummary(campaignName);
-        if (combatSummary) {
-            const dc = playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
-            addConcentration(combatSummary, playerStats.name, 'Mantle of Majesty', dc);
-            storage.set('combatSummary', combatSummary, campaignName);
-            window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-        }
-
-        await addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: action.name,
-            description: `${playerStats.name} activated Mantle of Majesty. Command is now available as a free bonus action for 1 minute or until concentration ends.`,
-        }).catch((e) => { console.error("[spellCast] Error:", e); });
+    if (!anySlotAvailable && currentWS <= 0) {
+        const reason = 'Wild Companion requires expending a spell slot or a use of Wild Shape — none remaining.';
+        addEntry(campaignName, {
+            type: 'automation',
+            characterName: playerName,
+            automationType: 'wild_companion_refused',
+            name: action.name,
+            description: `${action.name} refused — ${reason}`,
+        }).catch((e) => { console.error('[spellCastHandler:log-error]', e); });
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: `${action.name} activated! Command is now available as a free bonus action for 1 minute or until concentration ends.`,
+                automationType: auto.type,
+                description: reason,
                 automation: auto,
             },
         };
     }
 
-    if (auto.resourceCost === 'channel_divinity') {
-        const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
-        const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
-        const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
-        const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
+    return {
+        type: 'modal',
+        modalName: 'wildCompanion',
+        payload: { action, playerStats, campaignName },
+    };
+}
 
-        if (currentCharges <= 0) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: 'No Channel Divinity charges remaining.',
-                    automation: auto,
-                },
-            };
+// Mantle of Majesty: set activeBuffs for concentration-gated free cast
+async function handleMantleOfMajesty(action, auto, playerStats, campaignName) {
+    const activeBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+    const buffsArray = Array.isArray(activeBuffs) ? activeBuffs : [];
+    if (buffsArray.some(b => b.name === 'Mantle of Majesty')) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${action.name} is already active.`,
+                automation: auto,
+            },
+        };
+    }
+    const newBuffs = [...buffsArray, { name: 'Mantle of Majesty', effect: 'mantle_of_majesty', duration: '1_minute' }];
+    await setRuntimeValue(playerStats.name, 'activeBuffs', newBuffs, campaignName);
+    addExpiration(playerStats.name, playerStats.name, [
+        { type: 'remove_active_buff', buffName: 'Mantle of Majesty' }
+    ], campaignName);
+
+    // Set concentration on combat summary so initiative tracker shows it
+    const combatSummary = getCombatSummary(campaignName);
+    if (combatSummary) {
+        const dc = playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
+        addConcentration(combatSummary, playerStats.name, 'Mantle of Majesty', dc);
+        storage.set('combatSummary', combatSummary, campaignName);
+        window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+    }
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: action.name,
+        description: `${playerStats.name} activated Mantle of Majesty. Command is now available as a free bonus action for 1 minute or until concentration ends.`,
+    }).catch((e) => { console.error("[spellCast] Error:", e); });
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            description: `${action.name} activated! Command is now available as a free bonus action for 1 minute or until concentration ends.`,
+            automation: auto,
+        },
+    };
+}
+
+// Returns a popup response to return from handle, or null to continue the cast flow.
+async function handleChannelDivinity(action, auto, playerStats, campaignName) {
+    const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
+    const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
+    const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
+    const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
+
+    if (currentCharges <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: 'No Channel Divinity charges remaining.',
+                automation: auto,
+            },
+        };
+    }
+
+    const newCharges = currentCharges - 1;
+    await setRuntimeValue(playerStats.name, 'channelDivinityCharges', newCharges, campaignName);
+
+    // War God's Blessing: state-based activation, not per-spell tracking
+    if (auto.noConcentration && auto.spell && Array.isArray(auto.spell) && auto.spell.length > 1) {
+        await setRuntimeValue(playerStats.name, '_War_Gods_Blessing_active', true, campaignName);
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: action.name,
+            description: `${playerStats.name} activated ${action.name} for 1 minute. ${auto.spell.join(' and ')} can be cast without expending a spell slot or requiring Concentration.`,
+        }).catch((e) => { console.error("[spellCast] Error:", e); });
+        return {
+            type: 'popup',
+            payload: {
+                html: `<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Channel Divinity expended.</b><br/>For 1 minute, you can cast <b>${auto.spell.join(' and ')}</b> without expending a spell slot. The spells do not require Concentration.<br/><br/><em>Open your spell sheet and cast them normally — no spell slot will be consumed.</em>`,
+            },
+        };
+    }
+
+    // Reset per-spell used flags when activating a channel divinity free_spell
+    if (auto.perSpellTracking && auto.spell) {
+        const spells = Array.isArray(auto.spell) ? auto.spell : [auto.spell];
+        for (const sn of spells) {
+            const usedKey = `_${action.name.replace(/\s+/g, '_')}_${sn.replace(/\s+/g, '_')}_used`;
+            const freeKey = `_${action.name.replace(/\s+/g, '_')}_${sn.replace(/\s+/g, '_')}_freeCast`;
+            await setRuntimeValue(playerStats.name, usedKey, null, campaignName);
+            await setRuntimeValue(playerStats.name, freeKey, null, campaignName);
         }
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: action.name,
+            description: `${playerStats.name} activated ${action.name}, gaining free casts of ${spells.join(' or ')}. Channel Divinity charges: ${newCharges}.`,
+        }).catch((e) => { console.error("[spellCast] Error:", e); });
+    }
 
-        const newCharges = currentCharges - 1;
-        await setRuntimeValue(playerStats.name, 'channelDivinityCharges', newCharges, campaignName);
+    return null;
+}
 
-        // War God's Blessing: state-based activation, not per-spell tracking
-        if (auto.noConcentration && auto.spell && Array.isArray(auto.spell) && auto.spell.length > 1) {
-            await setRuntimeValue(playerStats.name, '_War_Gods_Blessing_active', true, campaignName);
-            addEntry(campaignName, {
-                type: 'ability_use',
-                characterName: playerStats.name,
-                abilityName: action.name,
-                description: `${playerStats.name} activated ${action.name} for 1 minute. ${auto.spell.join(' and ')} can be cast without expending a spell slot or requiring Concentration.`,
-            }).catch((e) => { console.error("[spellCast] Error:", e); });
-            return {
-                type: 'popup',
-                payload: {
-                    html: `<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Channel Divinity expended.</b><br/>For 1 minute, you can cast <b>${auto.spell.join(' and ')}</b> without expending a spell slot. The spells do not require Concentration.<br/><br/><em>Open your spell sheet and cast them normally — no spell slot will be consumed.</em>`,
-                },
-            };
-        }
+async function handleUsesExpressionFreeCast(action, auto, playerStats, campaignName, spellName) {
+    const { noConcLabel, durLabel } = castLabels(auto);
+    const freeCastKey = `_${action.name.replace(/\s+/g, '_')}_freeCastCount`;
+    const currentCount = Number(getRuntimeValue(playerStats.name, freeCastKey, campaignName) ?? auto.usesMax);
 
-        // Reset per-spell used flags when activating a channel divinity free_spell
-        if (auto.perSpellTracking && auto.spell) {
-            const spells = Array.isArray(auto.spell) ? auto.spell : [auto.spell];
-            for (const sn of spells) {
-                const usedKey = `_${action.name.replace(/\s+/g, '_')}_${sn.replace(/\s+/g, '_')}_used`;
+    if (currentCount <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: 'No free casts remaining. Finish a Long Rest to regain them.',
+                automation: auto,
+            },
+        };
+    }
+
+    const newCount = currentCount - 1;
+    await setRuntimeValue(playerStats.name, freeCastKey, newCount, campaignName);
+
+    return {
+        type: 'popup',
+        payload: {
+            html: `<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Free cast of:</b> ${spellName} (${newCount} remaining).${noConcLabel}${durLabel}<br/><br/><em>Open your spell sheet and cast ${spellName} normally — no spell slot will be consumed.</em>`,
+        },
+    };
+}
+
+function rechargeTextFor(auto, fallback) {
+    if (auto.recharge === 'short_rest') return 'Finish a Short Rest to regain them.';
+    if (auto.recharge === 'short_or_long_rest') return 'Finish a Short or Long Rest to regain them.';
+    return fallback;
+}
+
+async function handleUsesRechargeFreeCast(action, auto, playerStats, campaignName, spellName) {
+    const { noConcLabel, durLabel } = castLabels(auto);
+    const freeCastKey = `_${action.name.replace(/\s+/g, '_')}_freeCastCount`;
+    const currentCount = Number(getRuntimeValue(playerStats.name, freeCastKey, campaignName) ?? auto.uses);
+
+    if (currentCount <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `No free casts remaining. ${rechargeTextFor(auto, 'Finish a Long Rest to regain them.')}`,
+                automation: auto,
+            },
+        };
+    }
+
+    const newCount = currentCount - 1;
+    await setRuntimeValue(playerStats.name, freeCastKey, newCount, campaignName);
+
+    return {
+        type: 'popup',
+        payload: {
+            html: `<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Free cast of:</b> ${spellName} (${newCount} remaining).${noConcLabel}${durLabel}<br/><br/><em>Open your spell sheet and cast ${spellName} normally — no spell slot will be consumed.</em>`,
+        },
+    };
+}
+
+async function handleMultiSpellFreeCast(action, auto, playerStats, campaignName, spellNames, spellLabel) {
+    const { noConcLabel, durLabel } = castLabels(auto);
+
+    if (auto.perSpellTracking) {
+        const availableSpells = [];
+        for (const sn of spellNames) {
+            const usedKey = `_${action.name.replace(/\s+/g, '_')}_${sn.replace(/\s+/g, '_')}_used`;
+            const used = getRuntimeValue(playerStats.name, usedKey, campaignName);
+            if (!used) {
                 const freeKey = `_${action.name.replace(/\s+/g, '_')}_${sn.replace(/\s+/g, '_')}_freeCast`;
-                await setRuntimeValue(playerStats.name, usedKey, null, campaignName);
-                await setRuntimeValue(playerStats.name, freeKey, null, campaignName);
+                const stored = getRuntimeValue(playerStats.name, freeKey, campaignName);
+                if (!stored) {
+                    await setRuntimeValue(playerStats.name, freeKey, true, campaignName);
+                }
+                availableSpells.push(sn);
             }
-            addEntry(campaignName, {
-                type: 'ability_use',
-                characterName: playerStats.name,
-                abilityName: action.name,
-                description: `${playerStats.name} activated ${action.name}, gaining free casts of ${spells.join(' or ')}. Channel Divinity charges: ${newCharges}.`,
-            }).catch((e) => { console.error("[spellCast] Error:", e); });
         }
-    }
 
-    // For multi-spell automation, use auto.spell array directly; otherwise use resolved spellName
-    const spellNames = Array.isArray(auto.spell) ? auto.spell : [spellName];
-    const spellLabel = spellNames.join(' or ');
-
-    const noConcLabel = auto.noConcentration ? ' Does not require Concentration.' : '';
-    const durLabel = auto.duration ? ` Duration: ${auto.duration.replace('_', ' ')}.` : '';
-
-    // Handle uses_expression (counter-based free casts, e.g. "WIS modifier_min_1")
-    if (auto.uses_expression && auto.usesMax) {
-        const freeCastKey = `_${action.name.replace(/\s+/g, '_')}_freeCastCount`;
-        const currentCount = Number(getRuntimeValue(playerStats.name, freeCastKey, campaignName) ?? auto.usesMax);
-
-        if (currentCount <= 0) {
+        if (availableSpells.length === 0) {
+            const rechargeText = auto.recharge === 'short_or_long_rest'
+                ? 'Finish a Short or Long Rest to regain them.'
+                : 'Finish a Long Rest to regain them.';
             return {
                 type: 'popup',
                 payload: {
                     type: 'automation_info',
                     name: action.name,
-                    description: 'No free casts remaining. Finish a Long Rest to regain them.',
+                    description: `All spells from this feature have been used. ${rechargeText}`,
                     automation: auto,
                 },
             };
         }
 
-        const newCount = currentCount - 1;
-        await setRuntimeValue(playerStats.name, freeCastKey, newCount, campaignName);
-
         return {
             type: 'popup',
             payload: {
-                html: `<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Free cast of:</b> ${spellName} (${newCount} remaining).${noConcLabel}${durLabel}<br/><br/><em>Open your spell sheet and cast ${spellName} normally — no spell slot will be consumed.</em>`,
+                html: `<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Available free casts:</b> ${availableSpells.join(', ')}<br/><br/><em>Open your spell sheet and cast one — no spell slot will be consumed.</em>`,
             },
         };
     }
-
-    // Handle plain uses + recharge (fixed counter-based free casts, e.g. Paladin's Smite uses: 1, recharge: long_rest)
-    if (auto.uses != null && auto.recharge && !auto.uses_expression) {
-        const freeCastKey = `_${action.name.replace(/\s+/g, '_')}_freeCastCount`;
-        const currentCount = Number(getRuntimeValue(playerStats.name, freeCastKey, campaignName) ?? auto.uses);
-
-        if (currentCount <= 0) {
-            const rechargeText = auto.recharge === 'short_rest'
-                ? 'Finish a Short Rest to regain them.'
-                : auto.recharge === 'short_or_long_rest'
-                    ? 'Finish a Short or Long Rest to regain them.'
-                    : 'Finish a Long Rest to regain them.';
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: `No free casts remaining. ${rechargeText}`,
-                    automation: auto,
-                },
-            };
-        }
-
-        const newCount = currentCount - 1;
-        await setRuntimeValue(playerStats.name, freeCastKey, newCount, campaignName);
-
-        return {
-            type: 'popup',
-            payload: {
-                html: `<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Free cast of:</b> ${spellName} (${newCount} remaining).${noConcLabel}${durLabel}<br/><br/><em>Open your spell sheet and cast ${spellName} normally — no spell slot will be consumed.</em>`,
-            },
-        };
-    }
-
-    if (spellNames.length > 1) {
-        if (auto.perSpellTracking) {
-            const availableSpells = [];
-            for (const sn of spellNames) {
-                const usedKey = `_${action.name.replace(/\s+/g, '_')}_${sn.replace(/\s+/g, '_')}_used`;
-                const used = getRuntimeValue(playerStats.name, usedKey, campaignName);
-                if (!used) {
-                    const freeKey = `_${action.name.replace(/\s+/g, '_')}_${sn.replace(/\s+/g, '_')}_freeCast`;
-                    const stored = getRuntimeValue(playerStats.name, freeKey, campaignName);
-                    if (!stored) {
-                        await setRuntimeValue(playerStats.name, freeKey, true, campaignName);
-                    }
-                    availableSpells.push(sn);
-                }
-            }
-
-            if (availableSpells.length === 0) {
-                const rechargeText = auto.recharge === 'short_or_long_rest'
-                    ? 'Finish a Short or Long Rest to regain them.'
-                    : 'Finish a Long Rest to regain them.';
-                return {
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: action.name,
-                        description: `All spells from this feature have been used. ${rechargeText}`,
-                        automation: auto,
-                    },
-                };
-            }
-
-            return {
-                type: 'popup',
-                payload: {
-                    html: `<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Available free casts:</b> ${availableSpells.join(', ')}<br/><br/><em>Open your spell sheet and cast one — no spell slot will be consumed.</em>`,
-                },
-            };
-        }
-
-        const freeCastKey = `_${action.name.replace(/\s+/g, '_')}_freeCast`;
-        const storedSpells = getRuntimeValue(playerStats.name, freeCastKey, campaignName);
-        if (!storedSpells) {
-            await setRuntimeValue(playerStats.name, freeCastKey, spellNames, campaignName);
-        }
-
-        return {
-            type: 'popup',
-            payload: {
-                html: `<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Channel Divinity expended.</b><br/>You can now cast <b>${spellLabel}</b> without expending a spell slot.${noConcLabel}${durLabel}<br/><br/><em>Open your spell sheet and cast ${spellLabel} normally — no spell slot will be consumed.</em>`,
-            },
-        };
-    }
-
-    let spellData = (playerStats.spellAbilities?.spells || []).find(s => s.name === spellName);
-    if (!spellData) {
-        try {
-            const spellsUrl = playerStats.rules === '2024' ? '/data/2024/spells.json' : '/data/spells.json';
-            const response = await fetch(spellsUrl);
-            const allSpells = await response.json();
-            spellData = allSpells.find(s => s.name === spellName);
-         } catch (error) { console.warn('[spellCastHandler] Spell not found in spell data:', error); }
-        }
-
-    if (spellData?.damage) {
-        const slotDmg = spellData.damage.damage_at_slot_level;
-        let formula = slotDmg?.[Object.keys(slotDmg)[0]];
-        if (formula) {
-            const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(playerStats).length > 0;
-            const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
-            const spellSchool = (spellData.school || '').toLowerCase();
-            const isEvocation = spellSchool === 'evocation';
-            const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
-            if (shouldApplyEmpoweredEvoc) {
-                formula = `${formula} + ${empEvocIntMod} [Empowered Evocation]`;
-            }
-            const result = rollExpression(formula);
-            if (result) {
-                return {
-                    type: 'roll',
-                    payload: {
-                        rollType: 'damage',
-                        name: spellName,
-                        formula,
-                        total: result.total,
-                        rolls: result.rolls,
-                        modifier: result.modifier,
-                        contextConfig: {
-                            damageType: spellData.damage.damage_type || 'Radiant',
-                            attackerName: playerStats.name,
-                             },
-                            },
-                        };
-                    }
-                 }
-                }
 
     const freeCastKey = `_${action.name.replace(/\s+/g, '_')}_freeCast`;
     const storedSpells = getRuntimeValue(playerStats.name, freeCastKey, campaignName);
@@ -338,7 +281,113 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     return {
         type: 'popup',
         payload: {
-            html: `<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Free cast of:</b> ${spellName}${noConcLabel}${durLabel}`,
+            html: `<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Channel Divinity expended.</b><br/>You can now cast <b>${spellLabel}</b> without expending a spell slot.${noConcLabel}${durLabel}<br/><br/><em>Open your spell sheet and cast ${spellLabel} normally — no spell slot will be consumed.</em>`,
+        },
+    };
+}
+
+async function lookupSpellData(playerStats, spellName) {
+    const knownSpell = (playerStats.spellAbilities?.spells || []).find(s => s.name === spellName);
+    if (knownSpell) return knownSpell;
+    try {
+        const spellsUrl = playerStats.rules === '2024' ? '/data/2024/spells.json' : '/data/spells.json';
+        const response = await fetch(spellsUrl);
+        const allSpells = await response.json();
+        return allSpells.find(s => s.name === spellName);
+    } catch (error) { console.warn('[spellCastHandler] Spell not found in spell data:', error); }
+    return null;
+}
+
+function buildSpellDamageRoll(spellName, spellData, playerStats) {
+    if (!spellData?.damage) return null;
+    const slotDmg = spellData.damage.damage_at_slot_level;
+    const formula = slotDmg?.[Object.keys(slotDmg)[0]];
+    if (!formula) return null;
+
+    const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(playerStats).length > 0;
+    const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
+    const spellSchool = (spellData.school || '').toLowerCase();
+    const isEvocation = spellSchool === 'evocation';
+    const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
+
+    const resolvedFormula = shouldApplyEmpoweredEvoc
+        ? `${formula} + ${empEvocIntMod} [Empowered Evocation]`
+        : formula;
+    const result = rollExpression(resolvedFormula);
+    if (!result) return null;
+
+    return {
+        type: 'roll',
+        payload: {
+            rollType: 'damage',
+            name: spellName,
+            formula: resolvedFormula,
+            total: result.total,
+            rolls: result.rolls,
+            modifier: result.modifier,
+            contextConfig: {
+                damageType: spellData.damage.damage_type || 'Radiant',
+                attackerName: playerStats.name,
             },
-          };
- }
+        },
+    };
+}
+
+async function grantFreeCastPopup(action, auto, playerStats, campaignName, spellName, spellNames) {
+    const { noConcLabel, durLabel } = castLabels(auto);
+    const freeCastKey = `_${action.name.replace(/\s+/g, '_')}_freeCast`;
+    const storedSpells = getRuntimeValue(playerStats.name, freeCastKey, campaignName);
+    if (!storedSpells) {
+        await setRuntimeValue(playerStats.name, freeCastKey, spellNames, campaignName);
+    }
+
+    return {
+        type: 'popup',
+        payload: {
+            html: `<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Free cast of:</b> ${spellName}${noConcLabel}${durLabel}`,
+        },
+    };
+}
+
+export async function handle(action, playerStats, campaignName, _mapName) {
+    const auto = action.automation;
+
+    const spellName = auto.spell || action.name;
+
+    if (auto.resourceCost === 'wild_companion') {
+        return handleWildCompanion(action, auto, playerStats, campaignName);
+    }
+
+    if (action.name === 'Mantle of Majesty' && auto.type === 'free_spell' && auto.concentration) {
+        return handleMantleOfMajesty(action, auto, playerStats, campaignName);
+    }
+
+    if (auto.resourceCost === 'channel_divinity') {
+        const channelResult = await handleChannelDivinity(action, auto, playerStats, campaignName);
+        if (channelResult) return channelResult;
+    }
+
+    // For multi-spell automation, use auto.spell array directly; otherwise use resolved spellName
+    const spellNames = Array.isArray(auto.spell) ? auto.spell : [spellName];
+    const spellLabel = spellNames.join(' or ');
+
+    // Handle uses_expression (counter-based free casts, e.g. "WIS modifier_min_1")
+    if (auto.uses_expression && auto.usesMax) {
+        return handleUsesExpressionFreeCast(action, auto, playerStats, campaignName, spellName);
+    }
+
+    // Handle plain uses + recharge (fixed counter-based free casts, e.g. Paladin's Smite uses: 1, recharge: long_rest)
+    if (auto.uses != null && auto.recharge && !auto.uses_expression) {
+        return handleUsesRechargeFreeCast(action, auto, playerStats, campaignName, spellName);
+    }
+
+    if (spellNames.length > 1) {
+        return handleMultiSpellFreeCast(action, auto, playerStats, campaignName, spellNames, spellLabel);
+    }
+
+    const spellData = await lookupSpellData(playerStats, spellName);
+    const damageRoll = buildSpellDamageRoll(spellName, spellData, playerStats);
+    if (damageRoll) return damageRoll;
+
+    return grantFreeCastPopup(action, auto, playerStats, campaignName, spellName, spellNames);
+}

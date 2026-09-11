@@ -143,6 +143,83 @@ export function normalizeAutoDamage(autoDamage, isCrit, playerStats) {
     return { attack, ctx };
 }
 
+async function handlePrecisionAttackMiss({ popupHtml, maneuver, currentFormula, currentTotal, currentRolls, playerStats, resumeRef, setModalState, setPopupHtml, resumeAttackPipeline }) {
+    const dieRoll = rollExpression(maneuver.dieExpression || 'superiority_die');
+    const dieValue = dieRoll?.total || evaluateAutoExpression(maneuver.dieExpression || 'superiority_die', playerStats);
+    const origD20 = (popupHtml.rolls?.[0] != null && popupHtml.rolls[0] !== 20) ? popupHtml.rolls[0] : (popupHtml.rolls?.[0] || 0);
+    const origBonus = popupHtml.bonus || 0;
+    const origTotal = origD20 + origBonus;
+    const newTotal = origTotal + dieValue;
+    const targetAC = popupHtml.targetAc || 10;
+    const newHit = newTotal >= targetAC;
+    const isNatural20 = origD20 === 20;
+    const wasCrit = popupHtml.isCrit;
+
+    const updatedPopup = {
+        ...popupHtml,
+        total: newTotal,
+        hit: newHit,
+        isCrit: isNatural20 || wasCrit,
+        isNatural20: isNatural20,
+        superiorityDieAdded: dieValue,
+        originalTotal: origTotal,
+        originalD20: origD20,
+    };
+
+    const dieDesc = `Precision Attack: Added ${dieValue} to the attack roll (${origD20} + ${origBonus} + ${dieValue} = ${newTotal}). ${newHit ? 'The attack now hits!' : 'The attack still misses.'}`;
+
+    const stash = resumeRef.current?.pipelineStash;
+    if (stash?.ctx) {
+        stash.ctx.hit = newHit;
+        stash.ctx.popupHtml = updatedPopup;
+    }
+
+    setModalState({ attackRiderManeuverPrompt: null });
+    setPopupHtml(updatedPopup);
+
+    if (newHit) {
+        await resumeAttackPipeline();
+    }
+
+    return {
+        formula: currentFormula,
+        total: currentTotal,
+        rolls: currentRolls,
+        isMissResult: true,
+        hit: newHit,
+        description: dieDesc,
+    };
+}
+
+async function openManeuveringAllyModal({ result, popupHtmlData, attackInfo, playerStats, campaignName, setModalState, setPopupHtml }) {
+    const grantTargetName = popupHtmlData?.targetName || attackInfo.targetName || null;
+    const cs = await getCombatContext(campaignName);
+    const allies = (cs?.creatures || [])
+        .filter(c => c.name !== playerStats.name && c.type === 'player')
+        .map(c => ({ name: c.name, currentHp: c.currentHp, maxHp: c.maxHp, type: c.type }));
+    if (allies.length > 0) {
+        setModalState({ secondaryTargetModal: {
+            title: 'Maneuvering Attack — Choose Ally',
+            icon: 'fa-person-walking',
+            targets: allies,
+            confirmLabel: 'Grant Movement',
+            confirmIcon: 'fa-person-walking',
+            description: `Choose a willing creature within 30 feet who can see or hear you. That creature can use its Reaction to move up to half its Speed without provoking Opportunity Attacks from ${grantTargetName || 'the target'}.`,
+            onTargetSelected: async (allyName) => {
+                setModalState({ secondaryTargetModal: null });
+                const grant = await applyManeuveringAllyGrant(allyName, playerStats.name, grantTargetName, campaignName);
+                setPopupHtml({ type: 'automation_info', name: 'Maneuvering Attack', description: grant.description });
+            },
+            onSkip: () => {
+                setModalState({ secondaryTargetModal: null });
+                setPopupHtml({ ...result.payload, description: `${result.payload.description || ''} No ally received the movement grant.` });
+            },
+        } });
+    } else {
+        setPopupHtml({ ...result.payload, description: `${result.payload.description || ''} No willing allies are within range to receive the movement grant.` });
+    }
+}
+
 export default function useAttackDamageResolution({
     playerStats, campaignName, mapName,
     popupHtml, setPopupHtml, rollDamage, buildCtx, buildCtxSync,
@@ -341,51 +418,7 @@ export default function useAttackDamageResolution({
 
         if (popupHtmlData?.isMiss && popupHtml) {
             if (maneuver && maneuver.effect === 'attack_roll_bonus') {
-                const dieRoll = rollExpression(maneuver.dieExpression || 'superiority_die');
-                const dieValue = dieRoll?.total || evaluateAutoExpression(maneuver.dieExpression || 'superiority_die', playerStats);
-                const origD20 = (popupHtml.rolls?.[0] != null && popupHtml.rolls[0] !== 20) ? popupHtml.rolls[0] : (popupHtml.rolls?.[0] || 0);
-                const origBonus = popupHtml.bonus || 0;
-                const origTotal = origD20 + origBonus;
-                const newTotal = origTotal + dieValue;
-                const targetAC = popupHtml.targetAc || 10;
-                const newHit = newTotal >= targetAC;
-                const isNatural20 = origD20 === 20;
-                const wasCrit = popupHtml.isCrit;
-
-                const updatedPopup = {
-                    ...popupHtml,
-                    total: newTotal,
-                    hit: newHit,
-                    isCrit: isNatural20 || wasCrit,
-                    isNatural20: isNatural20,
-                    superiorityDieAdded: dieValue,
-                    originalTotal: origTotal,
-                    originalD20: origD20,
-                };
-
-                const dieDesc = `Precision Attack: Added ${dieValue} to the attack roll (${origD20} + ${origBonus} + ${dieValue} = ${newTotal}). ${newHit ? 'The attack now hits!' : 'The attack still misses.'}`;
-
-                const stash = resumeRef.current?.pipelineStash;
-                if (stash?.ctx) {
-                    stash.ctx.hit = newHit;
-                    stash.ctx.popupHtml = updatedPopup;
-                }
-
-                setModalState({ attackRiderManeuverPrompt: null });
-                setPopupHtml(updatedPopup);
-
-                if (newHit) {
-                    await resumeAttackPipeline();
-                }
-
-                return {
-                    formula: updatedFormula,
-                    total: updatedTotal,
-                    rolls: updatedRolls,
-                    isMissResult: true,
-                    hit: newHit,
-                    description: dieDesc,
-                };
+                return await handlePrecisionAttackMiss({ popupHtml, maneuver, currentFormula: updatedFormula, currentTotal: updatedTotal, currentRolls: updatedRolls, playerStats, resumeRef, setModalState, setPopupHtml, resumeAttackPipeline });
             }
         } else {
             if (result?.type === 'modal' && result.modalName === 'attackRiderOptions') {
@@ -414,32 +447,7 @@ export default function useAttackDamageResolution({
                 }
             }
             if (result?.type === 'popup' && maneuver?.effect === 'ally_movement') {
-                const grantTargetName = popupHtmlData?.targetName || attackInfo.targetName || null;
-                const cs = await getCombatContext(campaignName);
-                const allies = (cs?.creatures || [])
-                    .filter(c => c.name !== playerStats.name && c.type === 'player')
-                    .map(c => ({ name: c.name, currentHp: c.currentHp, maxHp: c.maxHp, type: c.type }));
-                if (allies.length > 0) {
-                    setModalState({ secondaryTargetModal: {
-                        title: 'Maneuvering Attack — Choose Ally',
-                        icon: 'fa-person-walking',
-                        targets: allies,
-                        confirmLabel: 'Grant Movement',
-                        confirmIcon: 'fa-person-walking',
-                        description: `Choose a willing creature within 30 feet who can see or hear you. That creature can use its Reaction to move up to half its Speed without provoking Opportunity Attacks from ${grantTargetName || 'the target'}.`,
-                        onTargetSelected: async (allyName) => {
-                            setModalState({ secondaryTargetModal: null });
-                            const grant = await applyManeuveringAllyGrant(allyName, playerStats.name, grantTargetName, campaignName);
-                            setPopupHtml({ type: 'automation_info', name: 'Maneuvering Attack', description: grant.description });
-                        },
-                        onSkip: () => {
-                            setModalState({ secondaryTargetModal: null });
-                            setPopupHtml({ ...result.payload, description: `${result.payload.description || ''} No ally received the movement grant.` });
-                        },
-                    } });
-                } else {
-                    setPopupHtml({ ...result.payload, description: `${result.payload.description || ''} No willing allies are within range to receive the movement grant.` });
-                }
+                await openManeuveringAllyModal({ result, popupHtmlData, attackInfo, playerStats, campaignName, setModalState, setPopupHtml });
             } else if (result?.type === 'popup') {
                 setPopupHtml(result.payload);
             }
