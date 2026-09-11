@@ -215,6 +215,250 @@ function buildSavePopupData({ detail, pending, applyResult, newHp, maxHp, applie
     return popupData;
 }
 
+function logEvasionIfNeeded({ detail, targetName, normalizedSaveType, hasEvasion, hasOwnEvasion, logEntry }) {
+    if (!hasEvasion) return;
+    const evasionName = hasOwnEvasion ? 'Evasion' : 'Leading Evasion';
+    logEntry({
+        type: 'roll',
+        characterName: targetName,
+        rollType: 'evasion',
+        name: evasionName,
+        targetName,
+        saveType: normalizedSaveType,
+        saveDc: detail.saveDc,
+        saveResult: detail.success ? 'success' : 'failure',
+        dcSuccess: detail.dcSuccess,
+        timestamp: Date.now(),
+        id: utils.guid(),
+    });
+}
+
+function computeSaveDamageOutcome({ applyResult, isIntercepted, appliedDamage, secondaryFinalDamage, combatSummary, pendingTargetName, targetMaxHp }) {
+    const totalDamageDealt = appliedDamage + secondaryFinalDamage;
+    const newHp = applyResult?.newHp ?? (combatSummary?.creatures?.find(c => c.name === pendingTargetName)?.currentHp ?? 0);
+    const maxHp = targetMaxHp;
+    const hpAfterDamage = isIntercepted ? 0 : newHp;
+    const oldHp = isIntercepted ? applyResult.oldHp : (newHp + totalDamageDealt);
+    const isUnconscious = hpAfterDamage <= 0;
+    const threshold = getHpThreshold({ oldHp, newHp, maxHp, deadHp: hpAfterDamage });
+    return { totalDamageDealt, newHp, maxHp, hpAfterDamage, oldHp, isUnconscious, threshold };
+}
+
+function postSaveHpChange({ pendingTargetName, campaignName, totalDamageDealt, hpAfterDamage, maxHp, isUnconscious, damageBreakdown, threshold }) {
+    if (totalDamageDealt <= 0) return;
+    const hpEntry = {
+        type: 'hp_change',
+        targetName: pendingTargetName,
+        delta: -(totalDamageDealt),
+        currentHp: hpAfterDamage,
+        maxHp,
+        isHealing: false,
+        isUnconscious: isUnconscious,
+        damageBreakdown,
+    };
+    if (threshold) hpEntry.threshold = threshold;
+    addEntry(campaignName, hpEntry).catch((e) => { console.error("[useLoggedDiceRollEventHandlers] Error:", e); });
+}
+
+function syncPlayerHpRuntime({ pendingTargetName, campaignName, newHp, oldHp, isUnconscious }) {
+    if (!pendingTargetName.startsWith('player-')) return;
+    setRuntimeValue(pendingTargetName, 'currentHitPoints', newHp, campaignName);
+    if (oldHp > 0 && isUnconscious) {
+        setRuntimeValue(pendingTargetName, 'deathSaves', [false, false, false], campaignName);
+        setRuntimeValue(pendingTargetName, 'deathFailures', [false, false, false], campaignName);
+    }
+}
+
+function buildSaveDamageLogData({ detail, pending, attacker, isSoulstitchProtected, appliedDamage, finalDamage, secondaryResult }) {
+    const logEntryData = {
+        type: 'roll',
+        characterName: attacker,
+        rollType: 'save-damage',
+        name: pending.name,
+        formula: pending.formula,
+        rolls: pending.rolls,
+        total: pending.rawDamage,
+        modifier: pending.modifier,
+        damageType: pending.damageType,
+        targetName: detail.targetName,
+        saveType: detail.saveType,
+        saveDc: detail.saveDc,
+        dcSuccess: detail.dcSuccess,
+        saveResult: isSoulstitchProtected ? 'soulstitch_auto_success' : (detail.success ? 'success' : 'failure'),
+        saveRoll: detail.roll,
+        saveBonus: detail.saveBonus,
+        saveRawRolls: detail.rawRolls,
+        forcedMode: pending.metamagicHeighten ? 'disadvantage' : 'normal',
+        bonusDetail: detail.bonusDetail,
+        finalDamage: appliedDamage || finalDamage,
+        isAoe: pending.isAoe || false,
+        aoeAffectedCount: pending.isAoe ? (detail.aoeAffectedCount || null) : null,
+        soulstitchProtected: isSoulstitchProtected,
+        note: 'combined_save_damage_roll',
+    };
+    assignSecondaryFields(logEntryData, secondaryResult, SECONDARY_SUFFIXES);
+    return logEntryData;
+}
+
+function isBlockedByResilientSphere(pending) {
+    const rsAttackerSphere = pending.attackerName ? isResilientSphereActive(pending.attackerName, pending.campaignName) : false;
+    const rsTargetSphere = pending.targetName ? isResilientSphereActive(pending.targetName, pending.campaignName) : false;
+    return rsAttackerSphere || rsTargetSphere;
+}
+
+function resolveShieldVsMagicMissile(detail, pending) {
+    const targetActiveBuffs = getRuntimeValue(detail.targetName, 'activeBuffs', pending.campaignName) || [];
+    const isShieldActive = Array.isArray(targetActiveBuffs) && targetActiveBuffs.some(b => b.effect === 'shield');
+    const isMagicMissile = pending.name && pending.name.toLowerCase() === 'magic missile';
+    return { isShieldActive, isMagicMissile };
+}
+
+function computeInitialSaveDamage({ isSoulstitchProtected, isShieldActive, isMagicMissile, detail, pending, hasEvasion }) {
+    if (isSoulstitchProtected || (isShieldActive && isMagicMissile)) return 0;
+    return computeDamageAfterEvasion(detail.rawDamage ?? pending.rawDamage, detail.success, detail.dcSuccess, hasEvasion);
+}
+
+function resolvePendingTargetMaxHp(combatSummary, pendingTargetName) {
+    if (!combatSummary) return 0;
+    const t = combatSummary.creatures.find(c => c.name === pendingTargetName);
+    if (!t) return 0;
+    return t.type === 'player' ? (getRuntimeValue(t.name, 'hitPoints') ?? 0) : t.maxHp;
+}
+
+function buildApplyDamageOptions(secondaryData, finalDamage, isSpellDamage) {
+    return secondaryData
+        ? { concentrationTotalDamage: finalDamage + secondaryData.total, isSpellDamage }
+        : { isSpellDamage };
+}
+
+function buildSaveDamageBreakdown(applyResult, pending, appliedDamage, finalDamage, secondaryResult) {
+    const damageBreakdown = [buildDamageBreakdownEntry(applyResult, pending.damageType, appliedDamage || finalDamage)];
+    if (secondaryResult) {
+        damageBreakdown.push(buildDamageBreakdownEntry(secondaryResult, secondaryResult.damageType, secondaryResult.finalDamage));
+    }
+    return damageBreakdown;
+}
+
+function buildSaveRollLogData({ detail, pending, attacker }) {
+    return {
+        type: 'roll',
+        characterName: detail.targetName,
+        rollType: 'save',
+        name: pending.name,
+        rolls: [detail.roll],
+        mode: detail.mode || 'normal',
+        total: detail.total,
+        bonus: detail.saveBonus,
+        isNatural20: detail.roll === 20,
+        isNatural1: detail.roll === 1,
+        targetName: detail.targetName,
+        saveType: detail.saveType,
+        saveDc: detail.saveDc,
+        saveResult: detail.success ? 'success' : 'failure',
+        attackerName: attacker,
+        dcSuccess: detail.dcSuccess,
+        timestamp: Date.now(),
+        id: utils.guid(),
+    };
+}
+
+// A spell handler/modal may already own lastAttack (spell-save) — skip if so.
+function spellHandlerOwnsLastAttack(checkLastAttack, pending) {
+    return checkLastAttack?.rollType === 'spell-save' && (pending.name || pending.sourceName) === checkLastAttack.attackName;
+}
+
+async function handleSaveResult(detail, { characterName, campaignName, logEntry, charactersRef }) {
+    const pending = getPendingSavePrompt(detail.promptId);
+    syncListenerPromptFilters(detail, pending, campaignName);
+
+    if (!pending) {
+        // createSaveListener resolves its own save via its internal promise — nothing more to do here.
+        return;
+    }
+
+    // Resilient Sphere — block save-based attacks when attacker or target is enclosed
+    if (isBlockedByResilientSphere(pending)) {
+        return;
+    }
+
+    const normalizedSaveType = normalizeSaveType(detail.saveType || pending.saveType);
+    const targetChar = (charactersRef.current || []).find(c => c.name === detail.targetName);
+    const targetConditions = getRuntimeValue(detail.targetName, 'activeConditions', pending.campaignName) || [];
+    const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
+
+    const isSoulstitchProtected = hasSoulstitchProtection(detail.targetName, characterName, pending.campaignName);
+
+    const { isShieldActive, isMagicMissile } = resolveShieldVsMagicMissile(detail, pending);
+
+    const { hasEvasion, hasOwnEvasion } = determineEvasion({ detail, pending, targetChar, charactersRef, isIncapacitated, normalizedSaveType });
+    const finalDamage = computeInitialSaveDamage({ isSoulstitchProtected, isShieldActive, isMagicMissile, detail, pending, hasEvasion });
+
+    logEvasionIfNeeded({ detail, targetName: detail.targetName, normalizedSaveType, hasEvasion, hasOwnEvasion, logEntry });
+
+    const pendingTargetName = pending.targetName;
+    const combatSummary = getCombatSummary(campaignName);
+    const targetMaxHp = resolvePendingTargetMaxHp(combatSummary, pendingTargetName);
+    const ignoreResistance = (pending.playerStats && hasIgnoreResistance(pending.playerStats, pending.damageType)) || false;
+    const attacker = pending.attackerName || pending.sourceAttackerName || null;
+
+    // Compute secondary damage info first (dice rolls only, no damage application)
+    // so we can use the combined total for the concentration DC
+    const secondaryData = computeSecondaryRoll(pending);
+
+    // Apply primary damage with combined concentration total (if secondary exists).
+    // CLA-324: carry spell-origin from the pending prompt flag.
+    const isSpellDamage = pending.isSpellDamage === true;
+    const applyResult = await applyDamageToTarget(combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, charactersRef.current, ignoreResistance, attacker, true, buildApplyDamageOptions(secondaryData, finalDamage, isSpellDamage));
+
+    const isIntercepted = applyResult?.intercepted;
+    const appliedDamage = isIntercepted ? (applyResult.damageDealt ?? 0) : (applyResult?.finalDamage ?? 0);
+
+    if (appliedDamage > 0) {
+        endInvisibilityOnHostileAction(attacker, pending.campaignName);
+    }
+
+    const secondaryResult = secondaryData
+        ? await applySecondaryDamage({ combatSummary, pendingTargetName, secondaryData, campaignName: pending.campaignName, charactersRef, attacker })
+        : null;
+    const secondaryFinalDamage = secondaryResult ? secondaryResult.finalDamage : 0;
+
+    const { totalDamageDealt, newHp, maxHp, hpAfterDamage, oldHp, isUnconscious, threshold } = computeSaveDamageOutcome({ applyResult, isIntercepted, appliedDamage, secondaryFinalDamage, combatSummary, pendingTargetName, targetMaxHp });
+
+    const damageBreakdown = buildSaveDamageBreakdown(applyResult, pending, appliedDamage, finalDamage, secondaryResult);
+
+    postSaveHpChange({ pendingTargetName, campaignName: pending.campaignName, totalDamageDealt, hpAfterDamage, maxHp, isUnconscious, damageBreakdown, threshold });
+
+    syncPlayerHpRuntime({ pendingTargetName, campaignName: pending.campaignName, newHp, oldHp, isUnconscious });
+
+    logEntry(buildSaveRollLogData({ detail, pending, attacker }));
+
+    logEntry(buildSaveDamageLogData({ detail, pending, attacker, isSoulstitchProtected, appliedDamage, finalDamage, secondaryResult }));
+
+    await applyOverchannelSelfDamage({ pending, characterName, campaignName, charactersRef, logEntry });
+
+    if (!detail.success && pending.statusEffects?.length > 0) {
+        applyFailedSaveStatusEffects({ detail, pending, combatSummary, charactersRef, characterName });
+    }
+
+    // CLA-377: Vicious Mockery disadvantage is applied on the FAILED save only,
+    // after the save resolves (mirrors the statusEffects-on-fail leg above).
+    await triggerViciousMockeryOnFail({ detail, pending });
+
+    // Always write lastAttack for save-based damage (player targets) — counterspell needs this
+    const checkLastAttack = await getRuntimeValue('campaign', 'lastAttack', pending.campaignName);
+    if (spellHandlerOwnsLastAttack(checkLastAttack, pending)) {
+        return;
+    }
+    const saveLastAttackData = buildSaveLastAttackData({ detail, pending, characterName, appliedDamage, finalDamage });
+    setRuntimeValue('campaign', 'lastAttack', saveLastAttackData, pending.campaignName);
+
+    const popupData = buildSavePopupData({ detail, pending, applyResult, newHp, maxHp, appliedDamage, finalDamage, secondaryResult });
+    const setPopupHtml = getPendingPopupSetter(detail.promptId);
+    if (setPopupHtml) {
+        setPopupHtml(popupData);
+    }
+}
+
 export function setupEventListeners(deps) {
     const { characterName, campaignName, logEntry, charactersRef } = deps;
 
@@ -222,198 +466,7 @@ export function setupEventListeners(deps) {
         window.__pendingResultHandlersInstalled = true;
 
         window.addEventListener('save-result', async (e) => {
-            const detail = e.detail;
-            const pending = getPendingSavePrompt(detail.promptId);
-            syncListenerPromptFilters(detail, pending, campaignName);
-
-            if (!pending) {
-                // createSaveListener resolves its own save via its internal promise — nothing more to do here.
-                return;
-            }
-
-            // Resilient Sphere — block save-based attacks when attacker or target is enclosed
-            const rsAttackerSphere = pending.attackerName ? isResilientSphereActive(pending.attackerName, pending.campaignName) : false;
-            const rsTargetSphere = pending.targetName ? isResilientSphereActive(pending.targetName, pending.campaignName) : false;
-            if (rsAttackerSphere || rsTargetSphere) {
-                return;
-            }
-
-            const normalizedSaveType = normalizeSaveType(detail.saveType || pending.saveType);
-            const targetChar = (charactersRef.current || []).find(c => c.name === detail.targetName);
-            const targetConditions = getRuntimeValue(detail.targetName, 'activeConditions', pending.campaignName) || [];
-            const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
-
-            const isSoulstitchProtected = hasSoulstitchProtection(detail.targetName, characterName, pending.campaignName);
-
-            const targetActiveBuffs = getRuntimeValue(detail.targetName, 'activeBuffs', pending.campaignName) || [];
-            const isShieldActive = Array.isArray(targetActiveBuffs) && targetActiveBuffs.some(b => b.effect === 'shield');
-            const isMagicMissile = pending.name && pending.name.toLowerCase() === 'magic missile';
-
-            const { hasEvasion, hasOwnEvasion } = determineEvasion({ detail, pending, targetChar, charactersRef, isIncapacitated, normalizedSaveType });
-            let finalDamage = isSoulstitchProtected || (isShieldActive && isMagicMissile) ? 0 : computeDamageAfterEvasion(
-                detail.rawDamage ?? pending.rawDamage, detail.success, detail.dcSuccess, hasEvasion
-            );
-
-            if (hasEvasion) {
-                const evasionName = hasOwnEvasion ? 'Evasion' : 'Leading Evasion';
-                logEntry({
-                    type: 'roll',
-                    characterName: detail.targetName,
-                    rollType: 'evasion',
-                    name: evasionName,
-                    targetName: detail.targetName,
-                    saveType: normalizedSaveType,
-                    saveDc: detail.saveDc,
-                    saveResult: detail.success ? 'success' : 'failure',
-                    dcSuccess: detail.dcSuccess,
-                    timestamp: Date.now(),
-                    id: utils.guid(),
-                });
-            }
-
-            const pendingTargetName = pending.targetName;
-            let targetMaxHp = 0;
-            const combatSummary = getCombatSummary(campaignName);
-            if (combatSummary) {
-                const t = combatSummary.creatures.find(c => c.name === pendingTargetName);
-                if (t) targetMaxHp = t.type === 'player' ? (getRuntimeValue(t.name, 'hitPoints') ?? 0) : t.maxHp;
-            }
-            const ignoreResistance = (pending.playerStats && hasIgnoreResistance(pending.playerStats, pending.damageType)) || false;
-            const attacker = pending.attackerName || pending.sourceAttackerName || null;
-
-            // Compute secondary damage info first (dice rolls only, no damage application)
-            // so we can use the combined total for the concentration DC
-            const secondaryData = computeSecondaryRoll(pending);
-
-            // Apply primary damage with combined concentration total (if secondary exists).
-            // CLA-324: carry spell-origin from the pending prompt flag.
-            const isSpellDamage = pending.isSpellDamage === true;
-            const applyResult = await applyDamageToTarget(combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, charactersRef.current, ignoreResistance, attacker, true, secondaryData
-                ? { concentrationTotalDamage: finalDamage + secondaryData.total, isSpellDamage }
-                : { isSpellDamage });
-
-            const isIntercepted = applyResult?.intercepted;
-            const appliedDamage = isIntercepted ? (applyResult.damageDealt ?? 0) : (applyResult?.finalDamage ?? 0);
-
-            if (appliedDamage > 0) {
-                endInvisibilityOnHostileAction(attacker, pending.campaignName);
-            }
-
-            const secondaryResult = secondaryData
-                ? await applySecondaryDamage({ combatSummary, pendingTargetName, secondaryData, campaignName: pending.campaignName, charactersRef, attacker })
-                : null;
-            const secondaryFinalDamage = secondaryResult ? secondaryResult.finalDamage : 0;
-
-            const totalDamageDealt = appliedDamage + secondaryFinalDamage;
-            const newHp = applyResult?.newHp ?? (combatSummary?.creatures?.find(c => c.name === pendingTargetName)?.currentHp ?? 0);
-            const maxHp = targetMaxHp;
-            const hpAfterDamage = isIntercepted ? 0 : newHp;
-            const oldHp = isIntercepted ? applyResult.oldHp : (newHp + totalDamageDealt);
-            const isUnconscious = hpAfterDamage <= 0;
-            const threshold = getHpThreshold({ oldHp, newHp, maxHp, deadHp: hpAfterDamage });
-
-            const damageBreakdown = [buildDamageBreakdownEntry(applyResult, pending.damageType, appliedDamage || finalDamage)];
-            if (secondaryResult) {
-                damageBreakdown.push(buildDamageBreakdownEntry(secondaryResult, secondaryResult.damageType, secondaryResult.finalDamage));
-            }
-
-            if (totalDamageDealt > 0) {
-                const hpEntry = {
-                    type: 'hp_change',
-                    targetName: pendingTargetName,
-                    delta: -(totalDamageDealt),
-                    currentHp: hpAfterDamage,
-                    maxHp,
-                    isHealing: false,
-                    isUnconscious: isUnconscious,
-                    damageBreakdown,
-                };
-                if (threshold) hpEntry.threshold = threshold;
-                addEntry(pending.campaignName, hpEntry).catch((e) => { console.error("[useLoggedDiceRollEventHandlers] Error:", e); });
-            }
-
-            if (pendingTargetName.startsWith('player-')) {
-                setRuntimeValue(pendingTargetName, 'currentHitPoints', newHp, pending.campaignName);
-                if (oldHp > 0 && isUnconscious) {
-                    setRuntimeValue(pendingTargetName, 'deathSaves', [false, false, false], pending.campaignName);
-                    setRuntimeValue(pendingTargetName, 'deathFailures', [false, false, false], pending.campaignName);
-                }
-            }
-
-            logEntry({
-                type: 'roll',
-                characterName: detail.targetName,
-                rollType: 'save',
-                name: pending.name,
-                rolls: [detail.roll],
-                mode: detail.mode || 'normal',
-                total: detail.total,
-                bonus: detail.saveBonus,
-                isNatural20: detail.roll === 20,
-                isNatural1: detail.roll === 1,
-                targetName: detail.targetName,
-                saveType: detail.saveType,
-                saveDc: detail.saveDc,
-                saveResult: detail.success ? 'success' : 'failure',
-                attackerName: attacker,
-                dcSuccess: detail.dcSuccess,
-                timestamp: Date.now(),
-                id: utils.guid(),
-            });
-
-            const logEntryData = {
-                type: 'roll',
-                characterName: attacker,
-                rollType: 'save-damage',
-                name: pending.name,
-                formula: pending.formula,
-                rolls: pending.rolls,
-                total: pending.rawDamage,
-                modifier: pending.modifier,
-                damageType: pending.damageType,
-                targetName: detail.targetName,
-                saveType: detail.saveType,
-                saveDc: detail.saveDc,
-                dcSuccess: detail.dcSuccess,
-                saveResult: isSoulstitchProtected ? 'soulstitch_auto_success' : (detail.success ? 'success' : 'failure'),
-                saveRoll: detail.roll,
-                saveBonus: detail.saveBonus,
-                saveRawRolls: detail.rawRolls,
-                forcedMode: pending.metamagicHeighten ? 'disadvantage' : 'normal',
-                bonusDetail: detail.bonusDetail,
-                finalDamage: appliedDamage || finalDamage,
-                isAoe: pending.isAoe || false,
-                aoeAffectedCount: pending.isAoe ? (detail.aoeAffectedCount || null) : null,
-                soulstitchProtected: isSoulstitchProtected,
-                note: 'combined_save_damage_roll',
-            };
-            assignSecondaryFields(logEntryData, secondaryResult, SECONDARY_SUFFIXES);
-            logEntry(logEntryData);
-
-            await applyOverchannelSelfDamage({ pending, characterName, campaignName, charactersRef, logEntry });
-
-            if (!detail.success && pending.statusEffects?.length > 0) {
-                applyFailedSaveStatusEffects({ detail, pending, combatSummary, charactersRef, characterName });
-            }
-
-            // CLA-377: Vicious Mockery disadvantage is applied on the FAILED save only,
-            // after the save resolves (mirrors the statusEffects-on-fail leg above).
-            await triggerViciousMockeryOnFail({ detail, pending });
-
-            // Always write lastAttack for save-based damage (player targets) — counterspell needs this
-            // But first, check if a spell handler/modal already owns lastAttack (spell-save) — skip if so
-            const checkLastAttack = await getRuntimeValue('campaign', 'lastAttack', pending.campaignName);
-            if (checkLastAttack?.rollType === 'spell-save' && (pending.name || pending.sourceName) === checkLastAttack.attackName) {
-                return;
-            }
-            const saveLastAttackData = buildSaveLastAttackData({ detail, pending, characterName, appliedDamage, finalDamage });
-            setRuntimeValue('campaign', 'lastAttack', saveLastAttackData, pending.campaignName);
-
-            const popupData = buildSavePopupData({ detail, pending, applyResult, newHp, maxHp, appliedDamage, finalDamage, secondaryResult });
-            const setPopupHtml = getPendingPopupSetter(detail.promptId);
-            if (setPopupHtml) {
-                setPopupHtml(popupData);
-            }
+            await handleSaveResult(e.detail, { characterName, campaignName, logEntry, charactersRef });
         });
 
         window.addEventListener('death-save-result', (e) => {

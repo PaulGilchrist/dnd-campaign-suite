@@ -134,36 +134,7 @@ export const renderPopup = (popupHtml, setPopupHtml, isLocalhost, playerStats, c
         );
     }
     if (popupHtml.type === 'heal_multi') {
-        const healResults = popupHtml.results || [];
-        const totalHealed = healResults.reduce((sum, r) => sum + r.healAmount, 0);
-        return (
-            <Popup onClickOrKeyDown={() => setPopupHtml(null)}>
-                <div className="dice-roll-result">
-                    <div className="dice-roll-header">
-                        <i className="fa-solid fa-heart"></i> {popupHtml.name}
-                    </div>
-                    <div className="dice-roll-total">{totalHealed}</div>
-                    <div className="dice-roll-breakdown">
-                        {popupHtml.formula}: <span className="dice-rolled">{popupHtml.rolls.join(', ')}</span>
-                    </div>
-                    {popupHtml.bonusHeal > 0 && (
-                        <div className="dice-roll-heal-bonus">
-                            <i className="fa-solid fa-sparkles"></i> Bonus: +{popupHtml.bonusHeal} ({popupHtml.bonusHealDetail})
-                        </div>
-                    )}
-                    {healResults.length > 0 && (
-                        <div className="dice-roll-heal-multi">
-                            {healResults.map((r, i) => (
-                                <div key={i} className="dice-roll-heal-multi-target">
-                                    <strong>{r.targetName}</strong>: +{r.healAmount} HP ({r.rolls.join(', ')})
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                    <div className="dice-roll-hint">click to dismiss</div>
-                </div>
-            </Popup>
-        );
+        return <HealMultiPopup popupHtml={popupHtml} setPopupHtml={setPopupHtml} />;
     }
     return <AttackResultPopup
         popupHtml={popupHtml}
@@ -175,18 +146,64 @@ export const renderPopup = (popupHtml, setPopupHtml, isLocalhost, playerStats, c
         attackerName={playerStats?.name}
         playerStats={playerStats}
         setPopupHtml={setPopupHtml}
-        onSuperiorityManeuver={popupHtml?.availableSuperiorityManeuvers ? popupHandlers.onSuperiorityManeuver : undefined}
-        onTacticalMind={popupHtml?.tacticalMind ? popupHandlers.onTacticalMind : undefined}
-        onDarkOnesLuck={popupHtml?.darkOnesLuck ? popupHandlers.onDarkOnesLuck : undefined}
-        onPsiBolsteredKnack={popupHtml?.psiBolsteredKnack ? popupHandlers.onPsiBolsteredKnack : undefined}
-        onBardicInspiration={popupHtml?.bardicInspiration ? popupHandlers.onBardicInspiration : undefined}
-        onBardicInspirationOffense={popupHtml?.bardicInspirationOffense ? popupHandlers.onBardicInspirationOffense : undefined}
-        onEmpoweredSpell={popupHtml?.empoweredSpell ? popupHandlers.onEmpoweredSpell : undefined}
-        onPuncture={popupHtml?.piercerPuncture ? popupHandlers.onPuncture : undefined}
-        onSavageAttacker={popupHtml?.savageAttacker ? popupHandlers.onSavageAttacker : undefined}
-        onSavageAttackerChoice={popupHtml?.savageAttacker ? popupHandlers.onSavageAttackerChoice : undefined}
-        onAfterBiDefense={popupHandlers.onBiDefenseCombatSummary}
-        onStrokeOfLuck={popupHandlers.onStrokeOfLuck}
-        onReroll={popupHtml?.autoReroll ? popupHandlers.onReroll : undefined}
+        {...buildAttackResultHandlers(popupHtml, popupHandlers)}
     />;
+}
+
+const HealMultiPopup = ({ popupHtml, setPopupHtml }) => {
+    const healResults = popupHtml.results || [];
+    const totalHealed = healResults.reduce((sum, r) => sum + r.healAmount, 0);
+    return (
+        <Popup onClickOrKeyDown={() => setPopupHtml(null)}>
+            <div className="dice-roll-result">
+                <div className="dice-roll-header">
+                    <i className="fa-solid fa-heart"></i> {popupHtml.name}
+                </div>
+                <div className="dice-roll-total">{totalHealed}</div>
+                <div className="dice-roll-breakdown">
+                    {popupHtml.formula}: <span className="dice-rolled">{popupHtml.rolls.join(', ')}</span>
+                </div>
+                {popupHtml.bonusHeal > 0 && (
+                    <div className="dice-roll-heal-bonus">
+                        <i className="fa-solid fa-sparkles"></i> Bonus: +{popupHtml.bonusHeal} ({popupHtml.bonusHealDetail})
+                    </div>
+                )}
+                {healResults.length > 0 && (
+                    <div className="dice-roll-heal-multi">
+                        {healResults.map((r, i) => (
+                            <div key={i} className="dice-roll-heal-multi-target">
+                                <strong>{r.targetName}</strong>: +{r.healAmount} HP ({r.rolls.join(', ')})
+                            </div>
+                        ))}
+                    </div>
+                )}
+                <div className="dice-roll-hint">click to dismiss</div>
+            </div>
+        </Popup>
+    );
+};
+
+const ATTACK_RESULT_CONDITIONAL_HANDLERS = [
+    ['onSuperiorityManeuver', 'availableSuperiorityManeuvers'],
+    ['onTacticalMind', 'tacticalMind'],
+    ['onDarkOnesLuck', 'darkOnesLuck'],
+    ['onPsiBolsteredKnack', 'psiBolsteredKnack'],
+    ['onBardicInspiration', 'bardicInspiration'],
+    ['onBardicInspirationOffense', 'bardicInspirationOffense'],
+    ['onEmpoweredSpell', 'empoweredSpell'],
+    ['onPuncture', 'piercerPuncture'],
+    ['onSavageAttacker', 'savageAttacker'],
+    ['onSavageAttackerChoice', 'savageAttacker'],
+    ['onReroll', 'autoReroll'],
+];
+
+function buildAttackResultHandlers(popupHtml, popupHandlers) {
+    const handlers = {
+        onAfterBiDefense: popupHandlers.onBiDefenseCombatSummary,
+        onStrokeOfLuck: popupHandlers.onStrokeOfLuck,
+    };
+    for (const [prop, flag] of ATTACK_RESULT_CONDITIONAL_HANDLERS) {
+        handlers[prop] = popupHtml?.[flag] ? popupHandlers[prop] : undefined;
+    }
+    return handlers;
 }

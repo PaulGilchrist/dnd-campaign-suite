@@ -170,13 +170,17 @@ function addMartialResources(resources, { playerStats, classLevel, is2024 }) {
   resources.adrenalineRushUses = { current: adrenalineRushMax, max: adrenalineRushMax }
 }
 
-function addWarlockResources(resources, { playerStats, features, classLevel, is2024, charisma }) {
-  const isWarlock = playerStats.class?.name === 'Warlock'
+function matchesPatron(playerStats, names) {
+  return names.includes(playerStats.class?.major?.name) || names.includes(playerStats.class?.subclass?.name)
+}
 
-  const isFiendPatron = isWarlock && (playerStats.class?.major?.name === 'Fiend' || playerStats.class?.subclass?.name === 'Fiend' || playerStats.class?.major?.name === 'Fiend Patron' || playerStats.class?.subclass?.name === 'Fiend Patron')
+function addFiendBlessing(resources, { playerStats, isWarlock, charisma }) {
+  const isFiendPatron = isWarlock && matchesPatron(playerStats, ['Fiend', 'Fiend Patron'])
   const maxDOL = isFiendPatron ? Math.max(1, charisma?.bonus || 0) : 0
   resources.darkOnesLuckUses = { current: maxDOL, max: maxDOL }
+}
 
+function addPactAndArcanum(resources, { features, classLevel, is2024, isWarlock }) {
   let maxPM = 0
   if (isWarlock) {
     maxPM = is2024
@@ -192,16 +196,26 @@ function addWarlockResources(resources, { playerStats, features, classLevel, is2
     resources.mysticArcanumLevel8 = { current: features.arcanumLevels.level8 || 0, max: features.arcanumLevels.level8 || 0 }
     resources.mysticArcanumLevel9 = { current: features.arcanumLevels.level9 || 0, max: features.arcanumLevels.level9 || 0 }
   }
+}
 
+function addPatronPoolResources(resources, { playerStats, isWarlock, charisma }) {
   // Healing Light: Celestial Patron dice pool (1 + warlock level dice)
-  const isCelestialPatron = isWarlock && (playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron')
+  const isCelestialPatron = isWarlock && matchesPatron(playerStats, ['Celestial Patron'])
   const maxHealingLight = isCelestialPatron ? (1 + (playerStats.level || 0)) : 0
   resources.healinglightPool = { current: maxHealingLight, max: maxHealingLight }
 
-  const isWarlockArchfey = isWarlock && (playerStats.class?.subclass?.name === 'Archfey Patron' || playerStats.class?.major?.name === 'Archfey Patron')
+  const isWarlockArchfey = isWarlock && matchesPatron(playerStats, ['Archfey Patron'])
   const hasStepsOfTheFey = (playerStats.automation?.bonusActions ?? []).some(a => a.type === 'steps_of_the_fey')
   const maxStepsOfTheFey = isWarlockArchfey && hasStepsOfTheFey ? Math.max(charisma?.bonus || 0, 1) : 0
   resources._Steps_of_the_Fey_freeCastCount = { current: maxStepsOfTheFey, max: maxStepsOfTheFey }
+}
+
+function addWarlockResources(resources, ctx) {
+  const isWarlock = ctx.playerStats.class?.name === 'Warlock'
+  const scoped = { ...ctx, isWarlock }
+  addFiendBlessing(resources, scoped)
+  addPactAndArcanum(resources, scoped)
+  addPatronPoolResources(resources, scoped)
 }
 
 function addDivineResources(resources, { playerStats, features, charisma }) {
@@ -232,14 +246,7 @@ function addDivineResources(resources, { playerStats, features, charisma }) {
   resources.warPriestUses = { current: maxWP, max: maxWP }
 }
 
-function addPrimalResources(resources, { playerStats, features, wis }) {
-  const maxWS = features?.maxWildShapeUses || 0
-  resources.wildShapeUses = { current: maxWS, max: maxWS }
-
-  const isDruid = playerStats.class?.name === 'Druid'
-  const maxNR = isDruid ? Math.floor(playerStats.level / 2) : 0
-  resources.naturalRecoverySlots = { current: maxNR, max: maxNR }
-
+function addRangerPrimalResources(resources, { playerStats, wis }) {
   const isRanger = playerStats.class?.name === 'Ranger'
   const maxNV = isRanger && playerStats.level >= 14 ? Math.max(wis?.bonus || 0, 1) : 0
   resources.naturesVeilUses = { current: maxNV, max: maxNV }
@@ -250,30 +257,49 @@ function addPrimalResources(resources, { playerStats, features, wis }) {
 
   const maxTU = isRanger && playerStats.level >= 10 ? Math.max(wis?.bonus || 0, 1) : 0
   resources.tirelessUses = { current: maxTU, max: maxTU }
+}
 
-  const moonlightSubclass = playerStats.class?.major?.name === 'Circle of the Moon' || playerStats.class?.subclass?.name === 'Circle of the Moon'
+function addDruidPrimalResources(resources, { playerStats, features, wis }) {
+  const maxWS = features?.maxWildShapeUses || 0
+  resources.wildShapeUses = { current: maxWS, max: maxWS }
+
+  const isDruid = playerStats.class?.name === 'Druid'
+  const maxNR = isDruid ? Math.floor(playerStats.level / 2) : 0
+  resources.naturalRecoverySlots = { current: maxNR, max: maxNR }
+
+  const moonlightSubclass = matchesPatron(playerStats, ['Circle of the Moon'])
   const maxMoonlightStep = isDruid && moonlightSubclass ? Math.max(wis?.bonus || 0, 1) : 0
   resources.moonlightStepUses = { current: maxMoonlightStep, max: maxMoonlightStep }
 
-  const isCircleOfTheStars = playerStats.class?.major?.name === 'Circle of the Stars' || playerStats.class?.subclass?.name === 'Circle of the Stars'
+  const isCircleOfTheStars = matchesPatron(playerStats, ['Circle of the Stars'])
   const maxCosmicOmen = isDruid && isCircleOfTheStars && playerStats.level >= 6 ? Math.max(wis?.bonus || 0, 1) : 0
   resources.cosmicomenUses = { current: maxCosmicOmen, max: maxCosmicOmen }
 
   const isDruidStars = isDruid && isCircleOfTheStars
   const maxStarMap = isDruidStars && playerStats.level >= 3 ? Math.max(wis?.bonus || 0, 1) : 0
   resources._Star_Map_freeCastCount = { current: maxStarMap, max: maxStarMap }
+}
 
-  const hasStonecunning = (playerStats.race?.traits || []).some(t => t.name === 'Stonecunning' && t.automation)
-  const maxSC = hasStonecunning ? (playerStats.proficiency || 0) : 0
+function hasAncestralTrait(playerStats, traitName, fromSubrace) {
+  const traits = (fromSubrace ? playerStats.race?.subrace?.traits : playerStats.race?.traits) || []
+  return traits.some(t => t.name === traitName && t.automation)
+}
+
+function addAncestralPrimalResources(resources, { playerStats }) {
+  const maxSC = hasAncestralTrait(playerStats, 'Stonecunning', false) ? (playerStats.proficiency || 0) : 0
   resources.stonecunningUses = { current: maxSC, max: maxSC }
 
-  const hasStonesEndurance = (playerStats.race?.subrace?.traits || []).some(t => t.name === "Stone's Endurance" && t.automation)
-  const maxSE = hasStonesEndurance ? (playerStats.proficiency || 0) : 0
+  const maxSE = hasAncestralTrait(playerStats, "Stone's Endurance", true) ? (playerStats.proficiency || 0) : 0
   resources.stonesEnduranceUses = { current: maxSE, max: maxSE }
 
-  const hasStormsThunder = (playerStats.race?.subrace?.traits || []).some(t => t.name === "Storm's Thunder" && t.automation)
-  const maxST = hasStormsThunder ? (playerStats.proficiency || 0) : 0
+  const maxST = hasAncestralTrait(playerStats, "Storm's Thunder", true) ? (playerStats.proficiency || 0) : 0
   resources.stormsThunderUses = { current: maxST, max: maxST }
+}
+
+function addPrimalResources(resources, ctx) {
+  addDruidPrimalResources(resources, ctx)
+  addRangerPrimalResources(resources, ctx)
+  addAncestralPrimalResources(resources, ctx)
 }
 
 function addMiscResources(resources, { playerStats, features, is2024 }) {

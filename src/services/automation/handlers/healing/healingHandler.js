@@ -236,14 +236,14 @@ async function triggerTacticalShift(playerStats, campaignName) {
     }).catch((e) => { console.error('[healingHandler:Tactical Shift] Error logging:', e); });
 }
 
-async function handleSelfHealing(action, auto, playerStats, campaignName, slotLevel) {
-    const hitDiceCost = auto.hitDiceCost || 0;
-    const isHitDieRoll = auto.healExpression === 'hit_die_roll';
-
+// Refusal gates for self-healing: hit dice cost, bloodied-only, tracked uses,
+// and current-HP preconditions. Returns { popup } to refuse, or the resolved
+// uses bookkeeping to continue.
+function gateSelfHealing(action, auto, playerStats, campaignName, isHitDieRoll, hitDiceCost) {
     if (isHitDieRoll && hitDiceCost > 0) {
         const storedHitDice = Number(getRuntimeValue(playerStats.name, 'shortRestHitDice', campaignName) ?? playerStats.level);
         if (storedHitDice < hitDiceCost) {
-            return infoPopup(action, `${action.name} requires ${hitDiceCost} hit die(s) to use. You have ${storedHitDice} remaining.`);
+            return { popup: infoPopup(action, `${action.name} requires ${hitDiceCost} hit die(s) to use. You have ${storedHitDice} remaining.`) };
         }
     }
 
@@ -252,7 +252,7 @@ async function handleSelfHealing(action, auto, playerStats, campaignName, slotLe
         const maxHp = playerStats.maxHitPoints ?? 0;
         const isBloodied = currentHp > 0 && currentHp <= Math.floor(maxHp / 2);
         if (!isBloodied) {
-            return infoPopup(action, `${action.name} can only be used when Bloodied (at half HP or less).`);
+            return { popup: infoPopup(action, `${action.name} can only be used when Bloodied (at half HP or less).`) };
         }
     }
 
@@ -266,7 +266,7 @@ async function handleSelfHealing(action, auto, playerStats, campaignName, slotLe
         currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? maxUses);
 
         if (currentUses <= 0) {
-            return infoPopup(action, `${action.name} has no uses remaining. Recharges on a ${auto.recharge === 'long_rest' ? 'Long Rest' : 'Short Rest'}.`);
+            return { popup: infoPopup(action, `${action.name} has no uses remaining. Recharges on a ${auto.recharge === 'long_rest' ? 'Long Rest' : 'Short Rest'}.`) };
         }
     }
 
@@ -276,13 +276,24 @@ async function handleSelfHealing(action, auto, playerStats, campaignName, slotLe
     const hasHpTruth = gateMaxHp > 0 && !Number.isNaN(gateCurrentHp);
 
     if (hasHpTruth && gateCurrentHp <= 0) {
-        return infoPopup(action, `${action.name} can't be used while unconscious at 0 Hit Points.`);
+        return { popup: infoPopup(action, `${action.name} can't be used while unconscious at 0 Hit Points.`) };
     }
 
     if (hasHpTruth && gateCurrentHp >= gateMaxHp) {
         const refusalUses = isHitDieRoll ? undefined : ` (${currentUses} use${currentUses === 1 ? '' : 's'} remaining)`;
-        return infoPopup(action, `${action.name}: Already at full HP${refusalUses ?? ''}. No use spent.`);
+        return { popup: infoPopup(action, `${action.name}: Already at full HP${refusalUses ?? ''}. No use spent.`) };
     }
+
+    return { popup: null, usesKey, maxUses, currentUses };
+}
+
+async function handleSelfHealing(action, auto, playerStats, campaignName, slotLevel) {
+    const hitDiceCost = auto.hitDiceCost || 0;
+    const isHitDieRoll = auto.healExpression === 'hit_die_roll';
+
+    const gate = gateSelfHealing(action, auto, playerStats, campaignName, isHitDieRoll, hitDiceCost);
+    if (gate.popup) return gate.popup;
+    const { usesKey, maxUses, currentUses } = gate;
 
     let resolvedExpression = resolveDiceExpression(auto.healExpression, playerStats, slotLevel)
         .replace(/\bfighter level\b/gi, String(playerStats.level || 1));

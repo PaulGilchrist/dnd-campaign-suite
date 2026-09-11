@@ -70,43 +70,91 @@ function applyAbilityCheckReplacements(ctx, conditionEffects, playerStats) {
     }
 }
 
+function applyPsiBolsteredKnack(ctx, playerStats, cls, checkName) {
+    const isSoulknife = cls.name === 'Rogue'
+        && ((cls.major || {}).name || (cls.subclass || {}).name) === 'Soulknife';
+    const level = playerStats?.level || 0;
+    if (!isSoulknife || level < 3 || !isProficientSkillOrToolCheck(playerStats, checkName)) return;
+    const classLevel = (cls.class_levels || []).find(cl => cl.level === playerStats.level);
+    const energy = classLevel?.energy || {};
+    ctx.psiBolsteredKnack = true;
+    ctx.psiBolsteredKnackDieSize = energy.energy_die_type || 6;
+}
+
 function applyCheckFeatureContext(ctx, conditionEffects, playerStats, checkName, luckyDisadvantageActive) {
-    if (conditionEffects?.tacticalMind) {
+    const ce = conditionEffects || {};
+    if (ce.tacticalMind) {
         ctx.tacticalMind = true;
-        ctx.tacticalMindBonus = conditionEffects.tacticalMindBonus || null;
+        ctx.tacticalMindBonus = ce.tacticalMindBonus || null;
     }
-    if (conditionEffects?.darkOnesLuck) {
+    if (ce.darkOnesLuck) {
         ctx.darkOnesLuck = true;
     }
     // Reliable Talent floors ONLY proficient skill/tool checks (CLA-291) — raw ability checks excluded
-    if (conditionEffects?.reliableTalent && isProficientSkillOrToolCheck(playerStats, checkName)) {
+    if (ce.reliableTalent && isProficientSkillOrToolCheck(playerStats, checkName)) {
         ctx.reliableTalent = true;
     }
-    if (conditionEffects?.strokeOfLuck) {
+    if (ce.strokeOfLuck) {
         ctx.strokeOfLuck = true;
     }
-    if (conditionEffects?.luckyAdvantage) {
+    if (ce.luckyAdvantage) {
         ctx.luckyAdvantage = true; ctx.luckyAdvantageType = 'advantage';
     }
-    if (conditionEffects?.luckyDisadvantage || luckyDisadvantageActive) {
+    if (ce.luckyDisadvantage || luckyDisadvantageActive) {
         ctx.luckyDisadvantage = true; ctx.luckyDisadvantageType = 'disadvantage';
     }
-    if (conditionEffects?.d20Floor10) {
+    if (ce.d20Floor10) {
         ctx.d20Floor10 = true;
     }
-    if (conditionEffects?.autoRerollForChecks) {
+    if (ce.autoRerollForChecks) {
         ctx.autoReroll = true;
-        ctx.autoRerollCondition = conditionEffects.autoRerollCondition;
-        ctx.autoRerollBonus = conditionEffects.autoRerollBonus || null;
+        ctx.autoRerollCondition = ce.autoRerollCondition;
+        ctx.autoRerollBonus = ce.autoRerollBonus || null;
     }
-    const isSoulknife = playerStats?.class?.name === 'Rogue' && (playerStats?.class?.major?.name || playerStats?.class?.subclass?.name) === 'Soulknife';
-    const hasPsiBolsteredKnack = isSoulknife && (playerStats?.level || 0) >= 3
-        && isProficientSkillOrToolCheck(playerStats, checkName);
-    if (hasPsiBolsteredKnack) {
-        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-        ctx.psiBolsteredKnack = true;
-        ctx.psiBolsteredKnackDieSize = classLevel?.energy?.energy_die_type || 6;
+    applyPsiBolsteredKnack(ctx, playerStats, playerStats?.class || {}, checkName);
+}
+
+function resolveSaveForcedMode(conditionEffects, abbr, autoFail) {
+    let forcedMode = undefined;
+    const restoreBalance = conditionEffects?.restoreBalance;
+    if (restoreBalance) {
+        forcedMode = 'normal';
+    } else if (!autoFail && conditionEffects?.saveDisadvantage?.includes(abbr)) {
+        forcedMode = 'disadvantage';
     }
+    if (!autoFail && !restoreBalance && !forcedMode && (conditionEffects?.saveAdvantageCount || 0) > 0) {
+        forcedMode = 'advantage';
+    }
+    if (!autoFail && !restoreBalance && !forcedMode && conditionEffects?.saveAdvantageAbilities?.includes(abbr.toUpperCase())) {
+        forcedMode = 'advantage';
+    }
+    return forcedMode;
+}
+
+function buildSaveFeatureExtras(conditionEffects, playerStats, luckyDisadvantageActive) {
+    if (conditionEffects?.autoRerollForSaves) {
+        return { autoReroll: true, autoRerollCondition: conditionEffects.autoRerollCondition, autoRerollBonus: conditionEffects.autoRerollBonus || null };
+    }
+    if (conditionEffects?.strokeOfLuck) {
+        return { strokeOfLuck: true };
+    }
+    if (conditionEffects?.luckyAdvantage) {
+        return { luckyAdvantage: true };
+    }
+    if (conditionEffects?.luckyDisadvantage || luckyDisadvantageActive) {
+        return { luckyDisadvantage: true };
+    }
+    if (conditionEffects?.strSaveReplace) {
+        const strAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
+        return { strSaveReplace: true, strScore: strAbility?.totalScore || 10 };
+    }
+    if (conditionEffects?.d20Floor10) {
+        return { d20Floor10: true };
+    }
+    if (conditionEffects?.darkOnesLuck) {
+        return { darkOnesLuck: true };
+    }
+    return {};
 }
 
 function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustionPenalty = 0, conditionEffects, isRaging = false, _onReroll, _onStrokeOfLuck, characters, luckyDisadvantageActive }) {
@@ -206,43 +254,10 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
         const makeSaveContext = (abilityName) => {
            const abbr = abilityName.substring(0, 3).toLowerCase()
            const autoFail = conditionEffects?.autoFailSaves?.includes(abbr)
-           let forcedMode = undefined
-            const restoreBalance = conditionEffects?.restoreBalance
-            if (restoreBalance) {
-              forcedMode = 'normal'
-            } else if (!autoFail && conditionEffects?.saveDisadvantage?.includes(abbr)) {
-              forcedMode = 'disadvantage'
-            }
-             if (!autoFail && !restoreBalance && !forcedMode && (conditionEffects?.saveAdvantageCount || 0) > 0) {
-              forcedMode = 'advantage'
-               }
-             if (!autoFail && !restoreBalance && !forcedMode && conditionEffects?.saveAdvantageAbilities?.includes(abilityName.substring(0, 3).toUpperCase())) {
-              forcedMode = 'advantage'
-             }
-            if (conditionEffects?.autoRerollForSaves) {
-              return { forcedMode, autoFail: autoFail || undefined, autoReroll: true, autoRerollCondition: conditionEffects.autoRerollCondition, autoRerollBonus: conditionEffects.autoRerollBonus || null }
-            }
-             if (conditionEffects?.strokeOfLuck) {
-               return { forcedMode, autoFail: autoFail || undefined, strokeOfLuck: true }
-             }
-             if (conditionEffects?.luckyAdvantage) {
-               return { forcedMode, autoFail: autoFail || undefined, luckyAdvantage: true }
-             }
-             if (conditionEffects?.luckyDisadvantage || luckyDisadvantageActive) {
-               return { forcedMode, autoFail: autoFail || undefined, luckyDisadvantage: true }
-            }
-           if (conditionEffects?.strSaveReplace) {
-             const strAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
-             return { forcedMode, autoFail: autoFail || undefined, strSaveReplace: true, strScore: strAbility?.totalScore || 10 }
-           }
-           if (conditionEffects?.d20Floor10) {
-             return { forcedMode, autoFail: autoFail || undefined, d20Floor10: true }
-           }
-           if (conditionEffects?.darkOnesLuck) {
-             return { forcedMode, autoFail: autoFail || undefined, darkOnesLuck: true }
-           }
-            return { forcedMode, autoFail: autoFail || undefined }
-       }
+           const forcedMode = resolveSaveForcedMode(conditionEffects, abbr, autoFail)
+           const featureExtras = buildSaveFeatureExtras(conditionEffects, playerStats, luckyDisadvantageActive)
+           return { forcedMode, autoFail: autoFail || undefined, ...featureExtras }
+        }
 
          const [toolEntries, setToolEntries] = useState([]);
          const [equipmentLoaded, setEquipmentLoaded] = useState(false);

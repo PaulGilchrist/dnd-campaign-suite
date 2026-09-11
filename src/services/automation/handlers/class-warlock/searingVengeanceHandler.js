@@ -199,53 +199,17 @@ export async function confirmSearingVengeance(automation, playerStats, campaignN
 
     // Apply damage and blinded condition to each selected creature
     for (const creatureName of selectedTargets) {
-        applyDamageToTarget(cs, creatureName, damageAmount, ['Radiant'], campaignName, characters || [], false, playerName);
-
-        const storedConditions = getRuntimeValue(creatureName, 'activeConditions', campaignName) || [];
-        const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-        const hasBlinded = conditions.some(c => String(c).toLowerCase() === 'blinded');
-        if (!hasBlinded) {
-            await setRuntimeValue(creatureName, 'activeConditions', [...conditions, 'blinded'], campaignName);
-        }
-
-        // Blinded lasts until end of the current turn (expires next round) per conditionDuration: until_end_of_current_turn
-        await addExpiration(playerName, creatureName, [
-            { type: 'condition', condition: 'blinded' },
-        ], campaignName, 1);
-
-        // Log damage roll
-        await addEntry(campaignName, {
-            type: 'roll',
-            characterName: playerName,
-            rollType: 'damage',
-            name: name + ' Damage',
-            targetName: creatureName,
-            damageType: automation.damageType || 'Radiant',
-            total: damageAmount,
-            formula: damageExpr,
-            rolls: damageResult?.rolls,
-            description: `${name} dealt ${damageAmount} radiant damage to ${creatureName}.`,
-        }).catch((e) => { console.error("[searingVengeance] Error:", e); });
-
-        // Log hp change
-        await addEntry(campaignName, {
-            type: 'hp_change',
-            characterName: playerName,
-            targetName: creatureName,
-            delta: -damageAmount,
-            currentHp: cs.creatures.find(c => c.name === creatureName)?.currentHp ?? 0,
-            maxHp: cs.creatures.find(c => c.name === creatureName)?.maxHp ?? 0,
-            isHealing: false,
-        }).catch((e) => { console.error("[searingVengeance] Error:", e); });
-
-        // Log blinded condition
-        await addEntry(campaignName, {
-            type: 'condition',
-            characterName: creatureName,
-            condition: 'blinded',
-            source: name,
-            description: `${creatureName} is Blinded until end of the current turn.`,
-        }).catch((e) => { console.error("[searingVengeance] Error:", e); });
+        await applySearingVengeanceToCreature(cs, {
+            creatureName,
+            damageAmount,
+            damageResult,
+            damageExpr,
+            campaignName,
+            characters,
+            playerName,
+            name,
+            automation,
+        });
     }
 
     // Log healing
@@ -277,6 +241,56 @@ export async function confirmSearingVengeance(automation, playerStats, campaignN
             automation,
         },
     };
+}
+
+async function applySearingVengeanceToCreature(cs, { creatureName, damageAmount, damageResult, damageExpr, campaignName, characters, playerName, name, automation }) {
+    applyDamageToTarget(cs, creatureName, damageAmount, ['Radiant'], campaignName, characters || [], false, playerName);
+
+    const storedConditions = getRuntimeValue(creatureName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const hasBlinded = conditions.some(c => String(c).toLowerCase() === 'blinded');
+    if (!hasBlinded) {
+        await setRuntimeValue(creatureName, 'activeConditions', [...conditions, 'blinded'], campaignName);
+    }
+
+    // Blinded lasts until end of the current turn (expires next round) per conditionDuration: until_end_of_current_turn
+    await addExpiration(playerName, creatureName, [
+        { type: 'condition', condition: 'blinded' },
+    ], campaignName, 1);
+
+    // Log damage roll
+    await addEntry(campaignName, {
+        type: 'roll',
+        characterName: playerName,
+        rollType: 'damage',
+        name: name + ' Damage',
+        targetName: creatureName,
+        damageType: automation.damageType || 'Radiant',
+        total: damageAmount,
+        formula: damageExpr,
+        rolls: damageResult?.rolls,
+        description: `${name} dealt ${damageAmount} radiant damage to ${creatureName}.`,
+    }).catch((e) => { console.error("[searingVengeance] Error:", e); });
+
+    // Log hp change
+    await addEntry(campaignName, {
+        type: 'hp_change',
+        characterName: playerName,
+        targetName: creatureName,
+        delta: -damageAmount,
+        currentHp: cs.creatures.find(c => c.name === creatureName)?.currentHp ?? 0,
+        maxHp: cs.creatures.find(c => c.name === creatureName)?.maxHp ?? 0,
+        isHealing: false,
+    }).catch((e) => { console.error("[searingVengeance] Error:", e); });
+
+    // Log blinded condition
+    await addEntry(campaignName, {
+        type: 'condition',
+        characterName: creatureName,
+        condition: 'blinded',
+        source: name,
+        description: `${creatureName} is Blinded until end of the current turn.`,
+    }).catch((e) => { console.error("[searingVengeance] Error:", e); });
 }
 
 export async function skipSearingVengeance(automation, playerStats, campaignName, payload) {

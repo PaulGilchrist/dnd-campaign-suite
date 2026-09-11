@@ -90,6 +90,90 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
+async function resolveSaveOutcome({ campaignName, action, playerStats, playerName, targetName, spell, formula }) {
+    const { promise } = createSaveListener(campaignName, {
+        targetName,
+        attackerName: playerName,
+        saveType: spell.dc.dc_type,
+        saveDc: playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 0),
+        sourceName: `${action.name} — ${spell.name}`,
+    });
+    let spellDamage = 0;
+    let spellRolls = [];
+    let outcomeLine = '';
+    try {
+        const saveResult = await promise;
+        const success = saveResult?.success ?? false;
+        if (!success) {
+            const result = rollExpression(formula);
+            spellRolls = result?.rolls || [];
+            spellDamage = result?.total || 0;
+            if (spell.dc.dc_success === 'half') {
+                spellDamage = Math.floor(spellDamage / 2);
+            }
+        }
+        outcomeLine = success ? `${targetName} saved — no damage.` : `${targetName} failed the save.`;
+    } catch {
+        outcomeLine = 'Save prompt dismissed.';
+    }
+    return { spellDamage, spellRolls, outcomeLine };
+}
+
+async function resolveSpellAttackOutcome({ campaignName, playerStats, playerName, targetName, targetAc, spell, formula, spellDamageType }) {
+    const toHit = playerStats.spellAbilities?.toHit ?? 0;
+    const d20 = rollD20();
+    const totalAttack = d20 + toHit;
+    const hit = d20 === 1 ? false : totalAttack >= targetAc;
+    let spellDamage = 0;
+    let spellRolls = [];
+    if (hit) {
+        const result = rollExpression(formula);
+        spellRolls = result?.rolls || [];
+        spellDamage = result?.total || 0;
+    }
+    addEntry(campaignName, {
+        type: 'roll',
+        characterName: playerName,
+        rollType: 'attack',
+        name: `${spell.name} (${targetName})`,
+        rolls: [d20],
+        total: totalAttack,
+        bonus: toHit,
+        isNatural20: d20 === 20,
+        isNatural1: d20 === 1,
+        targetName,
+        targetAc,
+        damageType: spellDamageType,
+        hit,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[warMagicCantripHandler:attack-roll-log-error]", e); });
+    const outcomeLine = `${d20} + ${toHit} = ${totalAttack} vs AC ${targetAc} — ${hit ? 'HIT' : 'MISS'}.`;
+    return { spellDamage, spellRolls, outcomeLine };
+}
+
+async function applyCantripDamage({ cs, campaignName, playerName, targetName, spellDamage, spellRolls, spellDamageType, formula, characters, selectedSpellName }) {
+    if (spellDamage <= 0) return spellDamage;
+    const applyResult = await applyDamageToTarget(cs, targetName, spellDamage, [spellDamageType], campaignName, characters, false, playerName);
+    const finalDamage = applyResult?.finalDamage ?? spellDamage;
+    if (finalDamage > 0) {
+        endInvisibilityOnHostileAction(playerName, campaignName);
+        addEntry(campaignName, {
+            type: 'roll',
+            characterName: playerName,
+            rollType: 'damage',
+            name: `${selectedSpellName} (${targetName})`,
+            formula,
+            rolls: spellRolls,
+            total: finalDamage,
+            damageType: spellDamageType,
+            targetName,
+            finalDamage,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[warMagicCantripHandler:damage-log-error]", e); });
+    }
+    return finalDamage;
+}
+
 // CLA-381: mirrors warMagicSpellHandler.confirmWarMagicSpell minus the spell
 // slot payment — arms the card target, range-checks, rolls the cantrip
 // (spell attack or save), applies damage (lastAttack + hp_change via
@@ -166,78 +250,19 @@ export async function confirmWarMagicCantrip(action, playerStats, campaignName, 
 
     if (spell.damage && formula) {
         if (spell.dc?.dc_type) {
-            const { promise } = createSaveListener(campaignName, {
-                targetName,
-                attackerName: playerName,
-                saveType: spell.dc.dc_type,
-                saveDc: playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 0),
-                sourceName: `${action.name} — ${selectedSpellName}`,
-            });
-            try {
-                const saveResult = await promise;
-                const success = saveResult?.success ?? false;
-                if (!success) {
-                    const result = rollExpression(formula);
-                    spellRolls = result?.rolls || [];
-                    spellDamage = result?.total || 0;
-                    if (spell.dc.dc_success === 'half') {
-                        spellDamage = Math.floor(spellDamage / 2);
-                    }
-                }
-                outcomeLine = success ? `${targetName} saved — no damage.` : `${targetName} failed the save.`;
-            } catch {
-                outcomeLine = 'Save prompt dismissed.';
-            }
+            const outcome = await resolveSaveOutcome({ campaignName, action, playerStats, playerName, targetName, spell, formula });
+            spellDamage = outcome.spellDamage;
+            spellRolls = outcome.spellRolls;
+            outcomeLine = outcome.outcomeLine;
         } else {
             // Spell attack roll against the target's AC.
-            const toHit = playerStats.spellAbilities?.toHit ?? 0;
-            const d20 = rollD20();
-            const totalAttack = d20 + toHit;
-            const hit = d20 === 1 ? false : totalAttack >= targetAc;
-            if (hit) {
-                const result = rollExpression(formula);
-                spellRolls = result?.rolls || [];
-                spellDamage = result?.total || 0;
-            }
-            addEntry(campaignName, {
-                type: 'roll',
-                characterName: playerName,
-                rollType: 'attack',
-                name: `${selectedSpellName} (${targetName})`,
-                rolls: [d20],
-                total: totalAttack,
-                bonus: toHit,
-                isNatural20: d20 === 20,
-                isNatural1: d20 === 1,
-                targetName,
-                targetAc,
-                damageType: spellDamageType,
-                hit,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[warMagicCantripHandler:attack-roll-log-error]", e); });
-            outcomeLine = `${d20} + ${toHit} = ${totalAttack} vs AC ${targetAc} — ${hit ? 'HIT' : 'MISS'}.`;
+            const outcome = await resolveSpellAttackOutcome({ campaignName, playerStats, playerName, targetName, targetAc, spell, formula, spellDamageType });
+            spellDamage = outcome.spellDamage;
+            spellRolls = outcome.spellRolls;
+            outcomeLine = outcome.outcomeLine;
         }
 
-        if (spellDamage > 0) {
-            const applyResult = await applyDamageToTarget(cs, targetName, spellDamage, [spellDamageType], campaignName, characters, false, playerName);
-            spellDamage = applyResult?.finalDamage ?? spellDamage;
-            if (spellDamage > 0) {
-                endInvisibilityOnHostileAction(playerName, campaignName);
-                addEntry(campaignName, {
-                    type: 'roll',
-                    characterName: playerName,
-                    rollType: 'damage',
-                    name: `${selectedSpellName} (${targetName})`,
-                    formula,
-                    rolls: spellRolls,
-                    total: spellDamage,
-                    damageType: spellDamageType,
-                    targetName,
-                    finalDamage: spellDamage,
-                    timestamp: Date.now(),
-                }).catch((e) => { console.error("[warMagicCantripHandler:damage-log-error]", e); });
-            }
-        }
+        spellDamage = await applyCantripDamage({ cs, campaignName, playerName, targetName, spellDamage, spellRolls, spellDamageType, formula, characters, selectedSpellName });
     }
 
     const popupDescription =

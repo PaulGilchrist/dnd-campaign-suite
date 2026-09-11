@@ -79,6 +79,70 @@ async function spendMonkFocusPoint({ action, auto, playerStats, playerName, camp
     return true;
 }
 
+function gateFeatureOptionChoice({ auto, action, playerStats, campaignName, getRuntimeValue, setModalState }) {
+    // If feature has options that need choosing (e.g. Blessed Strikes), present choice
+    if (auto?.type === 'damage_bonus' && auto?.options?.length > 0) {
+        const optionKey = `_${action.name.replace(/\s+/g, '_')}_option`;
+        const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
+        if (!chosenOption) {
+            setModalState({ featureChoice: { action, options: auto.options, optionKey } });
+            return true;
+        }
+    }
+    // Defensive Tactics: present choice between Escape the Horde and Multiattack Defense
+    if (auto?.type === 'defensive_tactics') {
+        const optionKey = `_${action.name.replace(/\s+/g, '_')}_choice`;
+        const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
+        if (!chosenOption) {
+            setModalState({ featureChoice: { action, options: ['Escape the Horde', 'Multiattack Defense'], optionKey } });
+            return true;
+        }
+    }
+    return false;
+}
+
+// Check trigger conditions for gated actions
+async function gateTriggerRequirement({ auto, action, playerStats, campaignName, getRuntimeValue, setRuntimeValue, setPopupHtml }) {
+    if (auto?.trigger && auto.trigger !== '' && auto.trigger === 'after_casting_action_spell') {
+        const lastCast = getRuntimeValue(playerStats.name, 'lastActionSpellCast', campaignName);
+        if (!lastCast) {
+            setPopupHtml(`<b>${action.name}</b><br/>You must cast a spell with a casting time of an action first.`);
+            return false;
+        }
+        await setRuntimeValue(playerStats.name, 'lastActionSpellCast', 0, campaignName);
+    }
+    return true;
+}
+
+function dispatchRollResult(payload, rollDamage) {
+    if (payload.rollType !== 'damage') return;
+    rollDamage(
+        payload.name,
+        payload.formula,
+        payload.total,
+        payload.rolls,
+        payload.modifier,
+        payload.contextConfig || {}
+    );
+}
+
+function dispatchAttackRollResult(payload, rollAttack) {
+    const { attack, targetName } = payload;
+    const autoDamageFormula = attack?.autoDamageFormula || null;
+    const autoDamageName = attack?.autoDamageName || attack?.name;
+    const damageType = attack?.damageType || 'Slashing';
+    rollAttack(attack.name, attack.hitBonus, { targetName, forcedMode: undefined, isOpportunityAttack: false, autoDamageFormula, autoDamageName, damageType });
+}
+
+function finalizeAutomationOutcome(result, auto, addEntry, campaignName, onBuffsChange) {
+    if (result.logEntries) {
+        result.logEntries.forEach(entry => addEntry(campaignName, entry).catch((e) => { console.error("[useCharActionsAutomation:log-error]", e); }));
+    }
+    if (result.type === 'popup' && (auto?.type === 'temp_buff' || auto?.type === 'combat_stance')) {
+        if (onBuffsChange) onBuffsChange();
+    }
+}
+
 export default function useCharActionsAutomation({
     cannotAct,
     playerStats,
@@ -236,40 +300,13 @@ export default function useCharActionsAutomation({
         const stunningStrikeArmed = ssGate.armed;
         const stunningStrikeRound = ssGate.round;
 
-        // If feature has options that need choosing (e.g. Blessed Strikes), present choice
-        if (auto?.type === 'damage_bonus' && auto?.options?.length > 0) {
-            const optionKey = `_${action.name.replace(/\s+/g, '_')}_option`;
-            const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
-            if (!chosenOption) {
-                setModalState({ featureChoice: { action, options: auto.options, optionKey } });
-                return;
-            }
-        }
-
-        // Defensive Tactics: present choice between Escape the Horde and Multiattack Defense
-        if (auto?.type === 'defensive_tactics') {
-            const optionKey = `_${action.name.replace(/\s+/g, '_')}_choice`;
-            const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
-            if (!chosenOption) {
-                setModalState({ featureChoice: { action, options: ['Escape the Horde', 'Multiattack Defense'], optionKey } });
-                return;
-            }
-        }
+        if (gateFeatureOptionChoice({ auto, action, playerStats, campaignName, getRuntimeValue, setModalState })) return;
 
         const fpProceed = await spendMonkFocusPoint({ action, auto, playerStats, playerName, campaignName, cloakActive, hasFlurryHealingHarm: HAS_FLURRY_HEALING_HARM, stunningStrikeArmed, stunningStrikeRound, getRuntimeValue, setRuntimeValue, setPopupHtml, addEntry });
         if (!fpProceed) return;
 
-        // Check trigger conditions for gated actions
-        if (auto?.trigger && auto.trigger !== '') {
-            if (auto.trigger === 'after_casting_action_spell') {
-                const lastCast = getRuntimeValue(playerStats.name, 'lastActionSpellCast', campaignName);
-                if (!lastCast) {
-                    setPopupHtml(`<b>${action.name}</b><br/>You must cast a spell with a casting time of an action first.`);
-                    return;
-                }
-                await setRuntimeValue(playerStats.name, 'lastActionSpellCast', 0, campaignName);
-            }
-        }
+        const triggerProceed = await gateTriggerRequirement({ auto, action, playerStats, campaignName, getRuntimeValue, setRuntimeValue, setPopupHtml });
+        if (!triggerProceed) return;
 
         const result = await executeHandler(action, playerStats, campaignName, mapName, characters);
         if (!result) return;
@@ -286,38 +323,17 @@ export default function useCharActionsAutomation({
                 break;
             }
             case 'roll':
-                if (result.payload.rollType === 'damage') {
-                    rollDamage(
-                        result.payload.name,
-                        result.payload.formula,
-                        result.payload.total,
-                        result.payload.rolls,
-                        result.payload.modifier,
-                        result.payload.contextConfig || {}
-                    );
-                }
+                dispatchRollResult(result.payload, rollDamage);
                 break;
             case 'attack_roll':
-                {
-                    const { attack, targetName } = result.payload;
-                    const autoDamageFormula = attack?.autoDamageFormula || null;
-                    const autoDamageName = attack?.autoDamageName || attack?.name;
-                    const damageType = attack?.damageType || 'Slashing';
-                    rollAttack(attack.name, attack.hitBonus, { targetName, forcedMode: undefined, isOpportunityAttack: false, autoDamageFormula, autoDamageName, damageType });
-                }
+                dispatchAttackRollResult(result.payload, rollAttack);
                 break;
             case 'notify_buffs_changed':
                 if (onBuffsChange) onBuffsChange();
                 break;
         }
 
-        if (result.logEntries) {
-            result.logEntries.forEach(entry => addEntry(campaignName, entry).catch((e) => { console.error("[useCharActionsAutomation:log-error]", e); }));
-        }
-
-        if (result.type === 'popup' && (auto?.type === 'temp_buff' || auto?.type === 'combat_stance')) {
-            if (onBuffsChange) onBuffsChange();
-        }
+        finalizeAutomationOutcome(result, auto, addEntry, campaignName, onBuffsChange);
     }
 
     async function handleDivineInterventionCast(selectedSpell) {

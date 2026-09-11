@@ -9,9 +9,9 @@ import {
     normalizeSaveType,
 } from '../../../services/rules/combat/applyDamage.js';
 import { getRuntimeValue, setRuntimeValue } from '../../runtime/useRuntimeState.js';
-import { hasIgnoreResistance, playerIsImmuneToCondition, hasGreatWeaponFighting, applyGreatWeaponFightingToDamage, evaluateAutoExpression } from '../../../services/combat/automation/automationService.js';
+import { hasIgnoreResistance, playerIsImmuneToCondition, evaluateAutoExpression } from '../../../services/combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../../../services/rules/features/invisibilityService.js';
-import { hasPotentCantrip, hasSoulstitchProtection, applyMinDamageAdjustment, clearSoulstitchStamp } from '../loggedDiceRollUtils.js';
+import { hasPotentCantrip, hasSoulstitchProtection, clearSoulstitchStamp } from '../loggedDiceRollUtils.js';
 import { getCoronaSaveDisadvantage } from '../../../services/combat/auras/coronaAuraUtils.js';
 import { getElderChampionSaveDisadvantage } from '../../../services/combat/auras/elderChampionAuraUtils.js';
 import { resolveCreatureType } from '../../../services/combat/creatureTypeResolver.js';
@@ -19,7 +19,7 @@ import { isCircleOfPowerActive } from '../../../services/automation/handlers/buf
 import { hasBuffEffect } from '../../../services/automation/common/buffToggle.js';
 import { handleOverchannelSelfDamage } from './handleOverchannelSelfDamage.js';
 import { triggerViciousMockeryForGeneric } from '../../../services/rules/features/viciousMockeryService.js';
-import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry } from './damageHandlerUtils.js';
+import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry, computeGwfAdjustedSecondaryTotal } from './damageHandlerUtils.js';
 
 const SECONDARY_LOG_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage', 'SaveResult', 'SaveRoll', 'SaveBonus', 'SaveRawRolls', 'DcSuccess'];
 const SECONDARY_POPUP_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage'];
@@ -151,15 +151,7 @@ async function rollAndApplySecondarySaveDamage({ context, combatSummary, target,
     const secondaryRollResult = context?.isAutoCrit ? rollExpressionDoubled(secondaryFormula) : rollExpression(secondaryFormula);
     if (!secondaryRollResult) return { secondaryResult: null, secondaryFinalDamage: 0 };
 
-    let secondaryTotal = applyMinDamageAdjustment(secondaryRollResult.total, secondaryRollResult.rolls, context?.playerStats, secondaryDamageType);
-    if (hasGreatWeaponFighting(context?.playerStats)) {
-        const gwfSecondaryRolls = applyGreatWeaponFightingToDamage(secondaryRollResult.rolls, context?.playerStats);
-        const hasSecondaryChanges = gwfSecondaryRolls.some((r, i) => r !== secondaryRollResult.rolls[i]);
-        if (hasSecondaryChanges) {
-            const gwfSecondaryTotal = gwfSecondaryRolls.reduce((sum, r) => sum + r, 0) + secondaryRollResult.modifier;
-            secondaryTotal = applyMinDamageAdjustment(gwfSecondaryTotal, gwfSecondaryRolls, context?.playerStats, secondaryDamageType);
-        }
-    }
+    const secondaryTotal = computeGwfAdjustedSecondaryTotal(secondaryRollResult, context?.playerStats, secondaryDamageType);
     let secondarySaveResult = saveResult;
     if (context.saveDc && context.saveType) {
         const secondaryDisadvantage = await resolveSaveDisadvantage({
@@ -516,6 +508,91 @@ function storeSaveLastAttack({ context, campaignName, target, saveResult, saveTy
     }, campaignName);
 }
 
+// CLA-394: Zealous Presence buff (advantage_attacks_and_saves) grants blanket save advantage.
+function resolveSaveAdvantage(target, targetSaveModifiers, context, campaignName) {
+    return hasSpellOrigin(targetSaveModifiers, context, campaignName) || isCircleOfPowerActive(target.name, campaignName) || hasBuffEffect(target.name, 'advantage_attacks_and_saves', campaignName);
+}
+
+function logEvasionRoll({ target, hasOwnEvasion, saveResult, saveType, saveDc, dcSuccess, logEntry }) {
+    logEntry({
+        type: 'roll',
+        characterName: target.name,
+        rollType: 'evasion',
+        name: hasOwnEvasion ? 'Evasion' : 'Leading Evasion',
+        targetName: target.name,
+        saveType,
+        saveDc,
+        saveResult: saveResult.success ? 'success' : 'failure',
+        dcSuccess,
+        timestamp: Date.now(),
+        id: utils.guid(),
+    });
+}
+
+function writeNpcDamageOutcome({ target, primaryApplyResult, secondaryResult, secondaryFinalDamage, damageType, primaryFinalDamage, campaignName }) {
+    const totalDamageDealt = (primaryApplyResult?.finalDamage ?? 0) + secondaryFinalDamage;
+    const newHp = primaryApplyResult?.newHp ?? target.currentHp;
+    const oldHp = newHp + totalDamageDealt;
+    const isDead = newHp <= 0;
+    const maxHp = target.type === 'player'
+        ? (getRuntimeValue(target.name, 'hitPoints') ?? newHp)
+        : target.maxHp;
+    const threshold = getHpThreshold({ oldHp, newHp, maxHp });
+
+    const damageBreakdown = [buildDamageBreakdownEntry(primaryApplyResult, damageType, primaryFinalDamage)];
+    if (secondaryResult) {
+        damageBreakdown.push(buildDamageBreakdownEntry(secondaryResult, secondaryResult.damageType, secondaryResult.finalDamage));
+    }
+
+    writeDamageResults({ campaignName, target, totalDamageDealt, newHp, oldHp, isDead, maxHp, threshold, damageBreakdown });
+    return { newHp };
+}
+
+function resolveSaveTargetMaxHp(target) {
+    return target?.type === 'player' ? (getRuntimeValue(target.name, 'hitPoints') ?? 0) : target?.maxHp ?? 0;
+}
+
+// Roll the target's save and derive evasion/potent-cantrip damage, in the
+// original read/log order (evasion log fires mid-block, before damage adjust).
+function rollTargetSaveDamage({ context, target, characters, combatSummary, campaignName, characterName, disadvantage, saveType, saveDc, dcSuccess, adjustedTotal, logEntry }) {
+    const isSoulstitchProtected = hasSoulstitchProtection(target.name, characterName, campaignName);
+    const targetCharacter = (characters || []).find(c => utils.getName(c.name) === target.name);
+    const targetSaveModifiers = targetCharacter?.saveModifiers || targetCharacter?.computedStats?.saveModifiers || [];
+    const advantage = resolveSaveAdvantage(target, targetSaveModifiers, context, campaignName);
+    const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage, advantage);
+    const normalizedSaveType = normalizeSaveType(saveType);
+    const targetConditions = getRuntimeValue(target.name, 'activeConditions', campaignName) || [];
+    const { hasOwnEvasion, hasEvasion } = computeEvasionFlags({ target, targetCharacter, characters, targetConditions, normalizedSaveType, dcSuccess, campaignName });
+    let finalDamage = isSoulstitchProtected ? 0 : computeDamageAfterEvasion(adjustedTotal, saveResult.success, dcSuccess, hasEvasion);
+
+    if (hasEvasion) {
+        logEvasionRoll({ target, hasOwnEvasion, saveResult, saveType, saveDc, dcSuccess, logEntry });
+    }
+
+    const isCantripFlag = context?.isCantrip || false;
+    const hasPotentFlag = hasPotentCantrip(context?.playerStats);
+    finalDamage = applyPotentCantripHalfDamage(finalDamage, { isSoulstitchProtected, hasPotentFlag, isCantripFlag, saveSuccess: saveResult.success, dcSuccess, adjustedTotal });
+    maybeGrantBlessedStrikesOnFailedSave(context, { isSoulstitchProtected, isCantripFlag, saveSuccess: saveResult.success, dcSuccess, combatSummary, campaignName, characterName });
+    return { targetCharacter, saveResult, advantage, finalDamage, isCantripFlag, hasPotentFlag, isSoulstitchProtected };
+}
+
+async function runNpcSaveDamageTail({ context, name, modifier, rolls, total, combatSummary, target, characters, campaignName, characterName, saveType, saveDc, dcSuccess, damageType, adjustedTotal, formula, displayRolls, gwfBaseRolls, gwfDisplayRolls, hasPotentFlag, isCantripFlag, setPopupHtml, logEntry }) {
+    handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);
+
+    // CLA-321: Soulstitch protection lasts only for the cast that wrote the stamp.
+    if (context?.soulstitchCast) {
+        clearSoulstitchStamp(characterName, campaignName);
+    }
+
+    if (context?.metamagicTwinTarget) {
+        await handleTwinSaveTarget({ context, combatSummary, target, campaignName, characterName, characters, saveType, saveDc, dcSuccess, damageType, adjustedTotal, formula, displayRolls, gwfBaseRolls, gwfDisplayRolls, hasPotentFlag, isCantripFlag, setPopupHtml, logEntry, name, modifier });
+    }
+
+    if (context?.multiTarget) {
+        await handleMultiSaveTarget({ context, combatSummary, target, campaignName, characterName, characters, saveType, saveDc, dcSuccess, damageType, adjustedTotal, total, formula, rolls, displayRolls, gwfBaseRolls, gwfDisplayRolls, hasPotentFlag, isCantripFlag, setPopupHtml, logEntry, name, modifier });
+    }
+}
+
 export function createNpcSaveDamageHandler(deps) {
     const { characterName, campaignName, characters, setPopupHtml, logEntry } = deps;
 
@@ -523,9 +600,7 @@ export function createNpcSaveDamageHandler(deps) {
         const { saveDc, saveType, dcSuccess, damageType } = context || {};
         const target = combatSummary?.creatures?.find(c => c.name === context?.targetName) || null;
         if (!target) return;
-        const targetMaxHp = target?.type === 'player'
-            ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
-            : target?.maxHp ?? 0;
+        const targetMaxHp = resolveSaveTargetMaxHp(target);
 
         const disadvantage = await resolveSaveDisadvantage({
             targetName: target.name,
@@ -536,37 +611,9 @@ export function createNpcSaveDamageHandler(deps) {
             forceDisadvantage: context?.metamagicHeighten || false,
             consumeTargetEffect: true,
         });
-        const isSoulstitchProtected = hasSoulstitchProtection(target.name, characterName, campaignName);
-        const targetCharacter = (characters || []).find(c => utils.getName(c.name) === target.name);
-        const targetSaveModifiers = targetCharacter?.saveModifiers || targetCharacter?.computedStats?.saveModifiers || [];
-        // CLA-394: Zealous Presence buff (advantage_attacks_and_saves) grants blanket save advantage.
-        const advantage = hasSpellOrigin(targetSaveModifiers, context, campaignName) || isCircleOfPowerActive(target.name, campaignName) || hasBuffEffect(target.name, 'advantage_attacks_and_saves', campaignName);
-        const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage, advantage);
-        const normalizedSaveType = normalizeSaveType(saveType);
-        const targetConditions = getRuntimeValue(target.name, 'activeConditions', campaignName) || [];
-        const { hasOwnEvasion, hasEvasion } = computeEvasionFlags({ target, targetCharacter, characters, targetConditions, normalizedSaveType, dcSuccess, campaignName });
-        let finalDamage = isSoulstitchProtected ? 0 : computeDamageAfterEvasion(adjustedTotal, saveResult.success, dcSuccess, hasEvasion);
-
-        if (hasEvasion) {
-            logEntry({
-                type: 'roll',
-                characterName: target.name,
-                rollType: 'evasion',
-                name: hasOwnEvasion ? 'Evasion' : 'Leading Evasion',
-                targetName: target.name,
-                saveType,
-                saveDc,
-                saveResult: saveResult.success ? 'success' : 'failure',
-                dcSuccess,
-                timestamp: Date.now(),
-                id: utils.guid(),
-            });
-        }
-
-        const isCantripFlag = context?.isCantrip || false;
-        const hasPotentFlag = hasPotentCantrip(context?.playerStats);
-        finalDamage = applyPotentCantripHalfDamage(finalDamage, { isSoulstitchProtected, hasPotentFlag, isCantripFlag, saveSuccess: saveResult.success, dcSuccess, adjustedTotal });
-        maybeGrantBlessedStrikesOnFailedSave(context, { isSoulstitchProtected, isCantripFlag, saveSuccess: saveResult.success, dcSuccess, combatSummary, campaignName, characterName });
+        const { targetCharacter, saveResult, advantage, finalDamage, isCantripFlag, hasPotentFlag, isSoulstitchProtected } = rollTargetSaveDamage({
+            context, target, characters, combatSummary, campaignName, characterName, disadvantage, saveType, saveDc, dcSuccess, adjustedTotal, logEntry,
+        });
         const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
 
         const { secondaryResult, secondaryFinalDamage } = await rollAndApplySecondarySaveDamage({
@@ -585,21 +632,7 @@ export function createNpcSaveDamageHandler(deps) {
         assignSecondaryFields(logEntryData, secondaryResult, SECONDARY_LOG_SUFFIXES);
         logEntry(logEntryData);
 
-        const totalDamageDealt = (primaryApplyResult?.finalDamage ?? 0) + secondaryFinalDamage;
-        const newHp = primaryApplyResult?.newHp ?? target.currentHp;
-        const oldHp = newHp + totalDamageDealt;
-        const isDead = newHp <= 0;
-        const maxHp = target.type === 'player'
-            ? (getRuntimeValue(target.name, 'hitPoints') ?? newHp)
-            : target.maxHp;
-        const threshold = getHpThreshold({ oldHp, newHp, maxHp });
-
-        const damageBreakdown = [buildDamageBreakdownEntry(primaryApplyResult, damageType, primaryFinalDamage)];
-        if (secondaryResult) {
-            damageBreakdown.push(buildDamageBreakdownEntry(secondaryResult, secondaryResult.damageType, secondaryResult.finalDamage));
-        }
-
-        writeDamageResults({ campaignName, target, totalDamageDealt, newHp, oldHp, isDead, maxHp, threshold, damageBreakdown });
+        const { newHp } = writeNpcDamageOutcome({ target, primaryApplyResult, secondaryResult, secondaryFinalDamage, damageType, primaryFinalDamage, campaignName });
 
         if (!saveResult.success && context?.statusEffects?.length > 0) {
             applyFailedSaveConditions(context, target, targetCharacter, combatSummary, characterName, campaignName);
@@ -614,19 +647,6 @@ export function createNpcSaveDamageHandler(deps) {
 
         setPopupHtml(popupData);
 
-        handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);
-
-        // CLA-321: Soulstitch protection lasts only for the cast that wrote the stamp.
-        if (context?.soulstitchCast) {
-            clearSoulstitchStamp(characterName, campaignName);
-        }
-
-        if (context?.metamagicTwinTarget) {
-            await handleTwinSaveTarget({ context, combatSummary, target, campaignName, characterName, characters, saveType, saveDc, dcSuccess, damageType, adjustedTotal, formula, displayRolls, gwfBaseRolls, gwfDisplayRolls, hasPotentFlag, isCantripFlag, setPopupHtml, logEntry, name, modifier });
-        }
-
-        if (context?.multiTarget) {
-            await handleMultiSaveTarget({ context, combatSummary, target, campaignName, characterName, characters, saveType, saveDc, dcSuccess, damageType, adjustedTotal, total, formula, rolls, displayRolls, gwfBaseRolls, gwfDisplayRolls, hasPotentFlag, isCantripFlag, setPopupHtml, logEntry, name, modifier });
-        }
+        await runNpcSaveDamageTail({ context, name, modifier, rolls, total, combatSummary, target, characters, campaignName, characterName, saveType, saveDc, dcSuccess, damageType, adjustedTotal, formula, displayRolls, gwfBaseRolls, gwfDisplayRolls, hasPotentFlag, isCantripFlag, setPopupHtml, logEntry });
     };
 }

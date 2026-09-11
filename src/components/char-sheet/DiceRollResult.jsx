@@ -430,70 +430,80 @@ function HealOutcomeNotice({ props, state }) {
     );
 }
 
+const TRIGGER_BUTTON_SPECS = [
+    {
+        key: 'reroll',
+        show: (p, s) => p.autoReroll && !s.rerollUsed && (s.isD20 || p.type === 'save-damage') && p.autoRerollCondition !== 'roll_equals_1',
+        icon: 'fa-rotate',
+        handler: 'handleReroll',
+        label: (p) => `Reroll${p.autoRerollBonus ? ` (+${p.autoRerollBonus})` : ''}`,
+    },
+    {
+        key: 'strokeOfLuck',
+        show: (p, s) => p.strokeOfLuck && !s.strokeUsed && s.isD20 && s.d20TestFailed,
+        icon: 'fa-star',
+        handler: 'handleStrokeOfLuck',
+        label: () => 'Stroke of Luck',
+    },
+    {
+        key: 'boonOfCombatProwess',
+        show: (p, s) => p.autoRerollForAttack && !s.boonUsed && s.isD20 && !p.hit && !p.isAutoMiss,
+        icon: 'fa-shield-halved',
+        handler: 'handleBoonOfCombatProwess',
+        label: () => 'Boon of Combat Prowess',
+    },
+    {
+        key: 'bardicInspiration',
+        show: (p, s) => p.bardicInspiration && !s.bardicInspirationUsed && s.isD20 && (p.rollType === 'check' || p.rollType === 'skill' || p.rollType === 'save'),
+        icon: 'fa-music',
+        handler: 'handleBardicInspiration',
+        label: (p) => `Bardic Inspiration (d${p.bardicInspirationDie})`,
+    },
+    {
+        key: 'luckyAdvantage',
+        show: (p, s) => p.luckyAdvantage && s.isD20,
+        icon: 'fa-eye',
+        handler: 'handleLuckyAdvantage',
+        label: () => 'Lucky: Advantage (1 LP)',
+    },
+    {
+        key: 'luckyDisadvantage',
+        show: (p, s) => p.luckyDisadvantage && s.isD20,
+        icon: 'fa-eye-slash',
+        handler: 'handleLuckyDisadvantage',
+        label: () => 'Lucky: Disadvantage (1 LP)',
+    },
+    {
+        key: 'tacticalMind',
+        show: (p, s) => p.tacticalMind && !s.tacticalUsed && s.isD20 && (p.rollType === 'check' || p.rollType === 'skill') && s.d20TestFailed && s.displayRoll !== 20,
+        icon: 'fa-hand',
+        handler: 'handleTacticalMind',
+        label: (p) => `Tactical Mind${p.tacticalMindBonus ? ` (+${p.tacticalMindBonus})` : ''}`,
+    },
+    {
+        key: 'darkOnesLuck',
+        show: (p, s) => p.darkOnesLuck && !s.darkOnesLuckUsed && s.isD20 && (p.rollType === 'check' || p.rollType === 'skill' || p.rollType === 'save'),
+        icon: 'fa-fire',
+        handler: 'handleDarkOnesLuck',
+        label: () => 'Dark One\'s Own Luck (1d10)',
+    },
+];
+
 function FeatureTriggerButtons({ props, state, handlers }) {
-    const { autoReroll, autoRerollBonus, autoRerollCondition, strokeOfLuck, autoRerollForAttack,
-        hit, isAutoMiss, bardicInspiration, bardicInspirationDie, rollType, luckyAdvantage,
-        luckyDisadvantage, tacticalMind, tacticalMindBonus, darkOnesLuck, availableSuperiorityManeuvers } = props;
-    const { rerollUsed, strokeUsed, boonUsed, isD20, d20TestFailed, displayRoll, tacticalUsed,
-        darkOnesLuckUsed, superiorityUsed } = state;
+    const { availableSuperiorityManeuvers } = props;
+    const { superiorityUsed } = state;
     return (
         <>
-            {autoReroll && !rerollUsed && (isD20 || props.type === 'save-damage') && autoRerollCondition !== 'roll_equals_1' && (
-              <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={handlers.handleReroll} type="button">
-                  <i className="fa-solid fa-rotate"></i> Reroll{autoRerollBonus ? ` (+${autoRerollBonus})` : ''}
-                </button>
-              </div>
-            )}
-            {strokeOfLuck && !strokeUsed && isD20 && d20TestFailed && (
-              <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={handlers.handleStrokeOfLuck} type="button">
-                  <i className="fa-solid fa-star"></i> Stroke of Luck
-                </button>
-              </div>
-            )}
-            {autoRerollForAttack && !boonUsed && isD20 && !hit && !isAutoMiss && (
-              <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={handlers.handleBoonOfCombatProwess} type="button">
-                  <i className="fa-solid fa-shield-halved"></i> Boon of Combat Prowess
-                </button>
-              </div>
-            )}
-            {bardicInspiration && !state.bardicInspirationUsed && isD20 && (rollType === 'check' || rollType === 'skill' || rollType === 'save') && (
-              <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={handlers.handleBardicInspiration} type="button">
-                  <i className="fa-solid fa-music"></i> Bardic Inspiration (d{bardicInspirationDie})
-                </button>
-              </div>
-            )}
-            {luckyAdvantage && isD20 && (
-              <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={handlers.handleLuckyAdvantage} type="button">
-                  <i className="fa-solid fa-eye"></i> Lucky: Advantage (1 LP)
-                </button>
-              </div>
-            )}
-            {luckyDisadvantage && isD20 && (
-              <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={handlers.handleLuckyDisadvantage} type="button">
-                  <i className="fa-solid fa-eye-slash"></i> Lucky: Disadvantage (1 LP)
-                </button>
-              </div>
-            )}
-            {tacticalMind && !tacticalUsed && isD20 && (rollType === 'check' || rollType === 'skill') && d20TestFailed && displayRoll !== 20 && (
-              <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={handlers.handleTacticalMind} type="button">
-                  <i className="fa-solid fa-hand"></i> Tactical Mind{tacticalMindBonus ? ` (+${tacticalMindBonus})` : ''}
-                </button>
-              </div>
-            )}
-            {darkOnesLuck && !darkOnesLuckUsed && isD20 && (rollType === 'check' || rollType === 'skill' || rollType === 'save') && (
-              <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={handlers.handleDarkOnesLuck} type="button">
-                  <i className="fa-solid fa-fire"></i> Dark One's Own Luck (1d10)
-                </button>
-              </div>
-            )}
+            {TRIGGER_BUTTON_SPECS.map((spec) => {
+                if (!spec.show(props, state)) return null;
+                return (
+                  <div key={spec.key} className="dice-roll-reroll">
+                    <button className="dice-roll-reroll-btn" onClick={handlers[spec.handler]} type="button">
+                      <i className={`fa-solid ${spec.icon}`}></i> {spec.label(props)}
+                    </button>
+                  </div>
+                );
+            })}
             {availableSuperiorityManeuvers && availableSuperiorityManeuvers.length > 0 && !superiorityUsed && (
               <div className="dice-roll-reroll">
                 {availableSuperiorityManeuvers.map(m => (

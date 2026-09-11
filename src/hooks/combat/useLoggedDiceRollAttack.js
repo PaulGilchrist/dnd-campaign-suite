@@ -146,6 +146,52 @@ function buildAutoDamage({ context, name, characterName, ctx, autoDamageSourceRe
     };
 }
 
+function buildRerollAndReplacementFlags(context) {
+    return {
+        autoReroll: context?.autoReroll,
+        autoRerollBonus: context?.autoRerollBonus,
+        autoRerollCondition: context?.autoRerollCondition,
+        autoRerollForAttack: context?.autoRerollForAttack || context?.boonOfCombatProwess,
+        strSaveReplace: context?.strSaveReplace,
+        strScore: context?.strScore,
+        strCheckReplace: context?.strCheckReplace,
+        reliableTalent: context?.reliableTalent,
+        wisCheckReplace: context?.wisCheckReplace,
+        wisCheckMinBonus: context?.wisCheckMinBonus,
+        defensiveDuelistBonus: context?.defensiveDuelistBonus || 0,
+        baitAndSwitchBonus: context?.baitAndSwitchBonus || 0,
+        d20Floor10: context?.d20Floor10,
+    };
+}
+
+function buildLuckInspirationEmpoweredFlags(context, ctx, characterName, campaignName) {
+    return {
+        tacticalMind: context?.tacticalMind,
+        tacticalMindBonus: context?.tacticalMindBonus,
+        darkOnesLuck: context?.darkOnesLuck,
+        strokeOfLuck: context?.strokeOfLuck,
+        psiBolsteredKnack: context?.psiBolsteredKnack,
+        psiBolsteredKnackDieSize: context?.psiBolsteredKnackDieSize,
+        bardicInspiration: context?.bardicInspiration,
+        bardicInspirationDie: context?.bardicInspirationDie,
+        bardicInspirationDefense: ctx.bardicInspirationDefense,
+        bardicInspirationDefenseDieSize: ctx.bardicInspirationDefenseDieSize,
+        bardicInspirationDefenseTargetName: ctx.bardicInspirationDefenseTargetName,
+        bardicInspirationOffense: context?.bardicInspirationOffense || (context?.playerStats ? hasBardicInspirationOffense(context.playerStats, campaignName) : false),
+        bardicInspirationOffenseDieSize: context?.bardicInspirationOffenseDieSize || getBardicInspirationDieSize(characterName, campaignName) || (context?.playerStats ? getBardicInspirationDieSizeFromClass(context.playerStats) : null),
+        empoweredSpell: context?.empoweredSpell || (context?.playerStats ? hasEmpoweredSpell(context.playerStats) : false),
+        empoweredSpellChaMod: context?.empoweredSpellChaMod || getChaModifier(context?.playerStats),
+    };
+}
+
+function buildAttackFeatureFlags({ ctx, context, characterName, campaignName }) {
+    return {
+        ...buildRerollAndReplacementFlags(context),
+        starryDragonFloor: ctx.starryDragonFloor,
+        ...buildLuckInspirationEmpoweredFlags(context, ctx, characterName, campaignName),
+    };
+}
+
 function buildPopupData({ ctx, context, name, rollType, targetAc, targetName, characterName, campaignName, autoDamage, availableSuperiorityManeuvers }) {
     return {
         type: 'd20',
@@ -179,35 +225,7 @@ function buildPopupData({ ctx, context, name, rollType, targetAc, targetName, ch
         isNatural20: ctx.effectiveD20Roll === 20,
         isNatural1: ctx.effectiveD20Roll === 1,
         autoDamage,
-        autoReroll: context?.autoReroll,
-        autoRerollBonus: context?.autoRerollBonus,
-        autoRerollCondition: context?.autoRerollCondition,
-        autoRerollForAttack: context?.autoRerollForAttack || context?.boonOfCombatProwess,
-        strSaveReplace: context?.strSaveReplace,
-        strScore: context?.strScore,
-        strCheckReplace: context?.strCheckReplace,
-        reliableTalent: context?.reliableTalent,
-        wisCheckReplace: context?.wisCheckReplace,
-        wisCheckMinBonus: context?.wisCheckMinBonus,
-        defensiveDuelistBonus: context?.defensiveDuelistBonus || 0,
-        baitAndSwitchBonus: context?.baitAndSwitchBonus || 0,
-        d20Floor10: context?.d20Floor10,
-        starryDragonFloor: ctx.starryDragonFloor,
-        tacticalMind: context?.tacticalMind,
-        tacticalMindBonus: context?.tacticalMindBonus,
-        darkOnesLuck: context?.darkOnesLuck,
-        strokeOfLuck: context?.strokeOfLuck,
-        psiBolsteredKnack: context?.psiBolsteredKnack,
-        psiBolsteredKnackDieSize: context?.psiBolsteredKnackDieSize,
-        bardicInspiration: context?.bardicInspiration,
-        bardicInspirationDie: context?.bardicInspirationDie,
-        bardicInspirationDefense: ctx.bardicInspirationDefense,
-        bardicInspirationDefenseDieSize: ctx.bardicInspirationDefenseDieSize,
-        bardicInspirationDefenseTargetName: ctx.bardicInspirationDefenseTargetName,
-        bardicInspirationOffense: context?.bardicInspirationOffense || (context?.playerStats ? hasBardicInspirationOffense(context.playerStats, campaignName) : false),
-        bardicInspirationOffenseDieSize: context?.bardicInspirationOffenseDieSize || getBardicInspirationDieSize(characterName, campaignName) || (context?.playerStats ? getBardicInspirationDieSizeFromClass(context.playerStats) : null),
-        empoweredSpell: context?.empoweredSpell || (context?.playerStats ? hasEmpoweredSpell(context.playerStats) : false),
-        empoweredSpellChaMod: context?.empoweredSpellChaMod || getChaModifier(context?.playerStats),
+        ...buildAttackFeatureFlags({ ctx, context, characterName, campaignName }),
         cosmicOmenAppliedBonus: ctx.cosmicOmenAppliedBonus,
         cosmicOmenDetail: ctx.cosmicOmenDetail,
         pendingSkillCheckAppliedBonus: ctx.pendingSkillCheckAppliedBonus,
@@ -256,6 +274,67 @@ function storeCheckResults({ characterName, campaignName, ctx, context, name, ro
     }, campaignName);
 }
 
+// Restore Balance (CLA-295): an armed holder within 60 ft who can see the
+// roller cancels this roll's Advantage/Disadvantage to a normal d20.
+async function maybeCancelForcedMode({ ctx, rollType, characterName, campaignName, combatSummary, name }) {
+    if (!(ctx.forcedMode === 'advantage' || ctx.forcedMode === 'disadvantage')) return;
+    const rollerName = rollType === 'attack' ? (ctx.attackerName || characterName) : characterName;
+    const cancelledBy = await consumeArmedRestoreBalance(campaignName, combatSummary, rollerName, name, rollType);
+    if (cancelledBy) {
+        ctx.forcedMode = 'normal';
+    }
+}
+
+// Bi die size for bardic inspiration defense (attack-only)
+function resolveBiDieSize(rollType, target, campaignName, characters) {
+    if (!(rollType === 'attack' && target)) return null;
+    return getBardicInspirationDieSize(target.name, campaignName) || getBardicInspirationDieSizeFromClass(characters.find(c => c.name === target.name)?.computedStats);
+}
+
+// Propagate context mutations back to original context object
+function propagateContextMutations(ctx, context) {
+    const contextKeys = ['notice', 'bardicInspirationDefense', 'bardicInspirationDefenseDieSize', 'bardicInspirationDefenseTargetName', 'bardicInspirationDefenseAttackRoll', 'bardicInspirationDefenseBonus', 'bardicInspirationDefenseEffectiveAc', 'forcedMode'];
+    for (const key of contextKeys) {
+        if (ctx[key] !== undefined) {
+            context[key] = ctx[key];
+        }
+    }
+    if (ctx._duelPopup) {
+        context._duelPopup = ctx._duelPopup;
+    }
+}
+
+function resolvePopupTargetName(rollType, target, context) {
+    return (rollType === 'attack' || rollType === 'save') ? (target?.name || context?.targetName) : undefined;
+}
+
+function warnIfSaveMissingAttacker({ rollType, context, characterName, targetName, name }) {
+    if (rollType === 'save' && !context?.attackerName && context?.saveDc) {
+        console.error('[useLoggedDiceRollAttack] Save roll missing context.attackerName:', { characterName, targetName, name, context });
+    }
+}
+
+// Player saves are resolved via the save-prompt seam — popup is set by the
+// save-result handler instead.
+function shouldSkipSavePopup(rollType, target, context) {
+    return rollType === 'save' && target?.type === 'player' && context?.saveDc != null;
+}
+
+// Roll-type tail processing (check/skill storage, save resolution, initiative).
+async function processRollTypeTail({ rollType, target, targetName, combatSummary, characterName, campaignName, ctx, bonus, logEntry, setPopupHtml, availableSuperiorityManeuvers }) {
+    if (rollType === 'check' || rollType === 'skill') {
+        storeCheckResults({ characterName, campaignName, ctx, context: ctx, name: ctx.name, rollType, bonus, targetName, combatSummary });
+    }
+
+    if (rollType === 'save') {
+        await processSaveRoll(rollType, target, characterName, campaignName, ctx, bonus, ctx.r1, ctx.r2, logEntry, setPopupHtml);
+    }
+
+    if (rollType === 'initiative') {
+        await processInitiativeRoll(characterName, campaignName, ctx, bonus, ctx.effectiveD20Roll, ctx.r1, ctx.r2, setPopupHtml, availableSuperiorityManeuvers, ctx.cosmicOmenAppliedBonus, ctx._characters);
+    }
+}
+
 export function createLogAndShow(deps) {
     const { characterName, campaignName, characters, setPopupHtml, logEntry, autoDamageSourceRef } = deps;
 
@@ -281,15 +360,7 @@ export function createLogAndShow(deps) {
             setPopupHtml(ctx._duelPopup);
         }
 
-        // Restore Balance (CLA-295): an armed holder within 60 ft who can see the
-        // roller cancels this roll's Advantage/Disadvantage to a normal d20.
-        if (ctx.forcedMode === 'advantage' || ctx.forcedMode === 'disadvantage') {
-            const rollerName = rollType === 'attack' ? (ctx.attackerName || characterName) : characterName;
-            const cancelledBy = await consumeArmedRestoreBalance(campaignName, combatSummary, rollerName, name, rollType);
-            if (cancelledBy) {
-                ctx.forcedMode = 'normal';
-            }
-        }
+        await maybeCancelForcedMode({ ctx, rollType, characterName, campaignName, combatSummary, name });
 
         // Compute d20 roll with all modifiers
         const d20Result = computeD20Roll(characterName, campaignName, name, rollType, ctx, bonus, isResilientSphereActive);
@@ -310,7 +381,7 @@ export function createLogAndShow(deps) {
         ctx._slowAcPenalty = getSlowAcPenalty(target?.name, campaignName);
 
         // Bi die size for bardic inspiration defense (attack-only)
-        ctx._biDieSize = (rollType === 'attack' && target) ? (getBardicInspirationDieSize(target.name, campaignName) || getBardicInspirationDieSizeFromClass(characters.find(c => c.name === target.name)?.computedStats)) : null;
+        ctx._biDieSize = resolveBiDieSize(rollType, target, campaignName, characters);
 
         // _characters for save processing
         ctx._characters = characters;
@@ -328,15 +399,7 @@ export function createLogAndShow(deps) {
         }
 
         // Propagate context mutations back to original context object
-        const contextKeys = ['notice', 'bardicInspirationDefense', 'bardicInspirationDefenseDieSize', 'bardicInspirationDefenseTargetName', 'bardicInspirationDefenseAttackRoll', 'bardicInspirationDefenseBonus', 'bardicInspirationDefenseEffectiveAc', 'forcedMode'];
-        for (const key of contextKeys) {
-            if (ctx[key] !== undefined) {
-                context[key] = ctx[key];
-            }
-        }
-        if (ctx._duelPopup) {
-            context._duelPopup = ctx._duelPopup;
-        }
+        propagateContextMutations(ctx, context);
 
         // Log Lucky reroll to campaign log
         logLuckyReroll(characterName, campaignName, name, rollType, ctx);
@@ -346,15 +409,13 @@ export function createLogAndShow(deps) {
 
         logEntry(buildRollLogEntry({ characterName, rollType, name, ctx, context, target, targetAc }));
 
-        const targetName = (rollType === 'attack' || rollType === 'save') ? (target?.name || context?.targetName) : undefined;
+        const targetName = resolvePopupTargetName(rollType, target, context);
 
-        if (rollType === 'save' && !context?.attackerName && context?.saveDc) {
-            console.error('[useLoggedDiceRollAttack] Save roll missing context.attackerName:', { characterName, targetName, name, context });
-        }
+        warnIfSaveMissingAttacker({ rollType, context, characterName, targetName, name });
 
         const autoDamage = buildAutoDamage({ context, name, characterName, ctx, autoDamageSourceRef, targetName });
 
-        const shouldSkipPopup = rollType === 'save' && target?.type === 'player' && context?.saveDc != null;
+        const shouldSkipPopup = shouldSkipSavePopup(rollType, target, context);
         if (!shouldSkipPopup) {
             setPopupHtml(buildPopupData({ ctx, context, name, rollType, targetAc, targetName, characterName, campaignName, autoDamage, availableSuperiorityManeuvers }));
 
@@ -370,20 +431,7 @@ export function createLogAndShow(deps) {
         // Potent cantrip half-damage on miss
         await processPotentCantrip(ctx.hit, ctx.isAutoMiss, targetName, characterName, campaignName, ctx, combatSummary, characters, logEntry, setPopupHtml);
 
-        // Check/Skill handling
-        if (rollType === 'check' || rollType === 'skill') {
-            storeCheckResults({ characterName, campaignName, ctx, context, name, rollType, bonus, targetName, combatSummary });
-        }
-
-        // Save handling
-        if (rollType === 'save') {
-            await processSaveRoll(rollType, target, characterName, campaignName, ctx, bonus, ctx.r1, ctx.r2, logEntry, setPopupHtml);
-        }
-
-        // Initiative handling
-        if (rollType === 'initiative') {
-            await processInitiativeRoll(characterName, campaignName, ctx, bonus, ctx.effectiveD20Roll, ctx.r1, ctx.r2, setPopupHtml, availableSuperiorityManeuvers, ctx.cosmicOmenAppliedBonus, characters);
-        }
+        await processRollTypeTail({ rollType, target, targetName, combatSummary, characterName, campaignName, ctx, bonus, logEntry, setPopupHtml, availableSuperiorityManeuvers });
 
         // Consume Feats of Chaos after one d20 roll
         consumeFeatsOfChaos(characterName, campaignName);

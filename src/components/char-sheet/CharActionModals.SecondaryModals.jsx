@@ -280,6 +280,174 @@ function AllySelectionModals({ mergedModalState, setModalState, handleMantleOfIn
     );
 }
 
+function WarMagicFeatureModals({ mergedModalState, setModalState, campaignName }) {
+    return (
+        <>
+            {mergedModalState.warMagicCantripModal && (
+                <WarMagicCantripModal
+                    {...mergedModalState.warMagicCantripModal}
+                    onClose={() => setModalState({ warMagicCantripModal: null })}
+                />
+            )}
+            {mergedModalState.warMagicSpellModal && (
+                <WarMagicSpellModal
+                    {...mergedModalState.warMagicSpellModal}
+                    onClose={() => setModalState({ warMagicSpellModal: null })}
+                />
+            )}
+            {mergedModalState.warBondSummonModal && (
+                <WarBondChooserModal
+                    title="War Bond — Summon Bonded Weapon"
+                    icon="fa-link"
+                    options={mergedModalState.warBondSummonModal.bondedWeapons}
+                    maxChoices={1}
+                    confirmLabel="Summon"
+                    onConfirm={(selected) => handleWarBondSummon(mergedModalState.warBondSummonModal.action, mergedModalState.warBondSummonModal.playerStats, campaignName, selected[0])}
+                    onClose={() => setModalState({ warBondSummonModal: null })}
+                />
+            )}
+        </>
+    );
+}
+
+function ArcaneFeatureModals({ mergedModalState, setModalState }) {
+    return (
+        <>
+            {mergedModalState.thirdEyeModal && (
+                <ThirdEyeModal
+                    action={mergedModalState.thirdEyeModal.action}
+                    playerStats={mergedModalState.thirdEyeModal.playerStats}
+                    campaignName={mergedModalState.thirdEyeModal.campaignName}
+                    onClose={() => setModalState({ thirdEyeModal: null })}
+                />
+            )}
+            {mergedModalState.soulstitchSpellsModal && (
+                <SoulstitchSpellsModal
+                    {...mergedModalState.soulstitchSpellsModal}
+                    onClose={() => setModalState({ soulstitchSpellsModal: null })}
+                />
+            )}
+            {mergedModalState.illusoryRealityModal && (
+                <IllusoryRealityModal
+                    {...mergedModalState.illusoryRealityModal}
+                    onClose={() => setModalState({ illusoryRealityModal: null })}
+                />
+            )}
+        </>
+    );
+}
+
+function DivineSparkFeatureModals({ mergedModalState, setModalState, playerStats, campaignName, handleDivineInterventionCast }) {
+    return (
+        <>
+            {mergedModalState.elementalAttunementModal && (
+                <ElementalAttunementModal
+                    {...mergedModalState.elementalAttunementModal}
+                    onClose={() => setModalState({ elementalAttunementModal: null })}
+                />
+            )}
+            {mergedModalState.elementalBurstModal && (
+                <ElementalBurstModal
+                    {...mergedModalState.elementalBurstModal}
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    onClose={() => setModalState({ elementalBurstModal: null })}
+                />
+            )}
+            {mergedModalState.divineSparkModal && (
+                <DivineSparkModal
+                    {...mergedModalState.divineSparkModal}
+                    playerStats={playerStats}
+                    onClose={() => setModalState({ divineSparkModal: null })}
+                />
+            )}
+            {mergedModalState.divineInterventionModal && (
+                <DivineInterventionModal
+                    {...mergedModalState.divineInterventionModal}
+                    onSelect={handleDivineInterventionCast}
+                    onClose={() => {
+                        setModalState({ divineInterventionModal: null, divineInterventionAction: null });
+                    }}
+                />
+            )}
+            {mergedModalState.arcaneChargeModal && (
+                <ArcaneChargeModal
+                    {...mergedModalState.arcaneChargeModal}
+                    onClose={() => setModalState({ arcaneChargeModal: null })}
+                />
+            )}
+        </>
+    );
+}
+
+function FeyCompanionModals({ mergedModalState, setModalState }) {
+    return (
+        <>
+            {mergedModalState.primalCompanionBonusActionModal && (
+                <PrimalCompanionBonusActionModal
+                    {...mergedModalState.primalCompanionBonusActionModal}
+                    onClose={() => setModalState({ primalCompanionBonusActionModal: null })}
+                />
+            )}
+            {mergedModalState.primalCompanionSummonModal && (
+                <PrimalCompanionSummonModal
+                    {...mergedModalState.primalCompanionSummonModal}
+                    onClose={() => setModalState({ primalCompanionSummonModal: null })}
+                />
+            )}
+            {mergedModalState.mistyWandererModal && (
+                <MistyWandererModal
+                    {...mergedModalState.mistyWandererModal}
+                    onClose={() => setModalState({ mistyWandererModal: null })}
+                />
+            )}
+            {mergedModalState.feyReinforcementsModal && (
+                <FeyReinforcementsModal
+                    {...mergedModalState.feyReinforcementsModal}
+                    onClose={() => setModalState({ feyReinforcementsModal: null })}
+                />
+            )}
+            {mergedModalState.stepsOfTheFeyTauntModal && (
+                <StepsOfTheFeyTauntModal
+                    {...mergedModalState.stepsOfTheFeyTauntModal}
+                    onClose={() => setModalState({ stepsOfTheFeyTauntModal: null })}
+                />
+            )}
+        </>
+    );
+}
+
+function StealthDragonModals({ mergedModalState, setModalState }) {
+    return (
+        <>
+            {mergedModalState.stealthAttackModal && (
+                <StealthAttackModal
+                    {...mergedModalState.stealthAttackModal}
+                    onClose={() => setModalState({ stealthAttackModal: null })}
+                />
+            )}
+            {mergedModalState.elementalAffinityModal && (
+                <ElementalAffinityModal
+                    {...mergedModalState.elementalAffinityModal}
+                    onClose={() => setModalState({ elementalAffinityModal: null })}
+                />
+            )}
+            {mergedModalState.fiendishResilienceModal && (
+                <SingleResistanceSelectionModal
+                    {...mergedModalState.fiendishResilienceModal}
+                    onClose={() => setModalState({ fiendishResilienceModal: null })}
+                />
+            )}
+            {mergedModalState.dragonCompanionModal && (
+                <DragonCompanionModal
+                    {...mergedModalState.dragonCompanionModal}
+                    onClose={() => setModalState({ dragonCompanionModal: null })}
+                />
+            )}
+        </>
+    );
+}
+
 function SecondaryModals({
     mergedModalState,
     setModalState,
@@ -385,65 +553,8 @@ function SecondaryModals({
                 />
             )}
             <SpellEffectModals mergedModalState={mergedModalState} setModalState={setModalState} setPopupHtml={setPopupHtml} />
-            {mergedModalState.elementalAttunementModal && (
-                <ElementalAttunementModal
-                    {...mergedModalState.elementalAttunementModal}
-                    onClose={() => setModalState({ elementalAttunementModal: null })}
-                />
-            )}
-            {mergedModalState.elementalBurstModal && (
-                <ElementalBurstModal
-                    {...mergedModalState.elementalBurstModal}
-                    playerStats={playerStats}
-                    campaignName={campaignName}
-                    onClose={() => setModalState({ elementalBurstModal: null })}
-                />
-            )}
-            {mergedModalState.divineSparkModal && (
-                <DivineSparkModal
-                    {...mergedModalState.divineSparkModal}
-                    playerStats={playerStats}
-                    onClose={() => setModalState({ divineSparkModal: null })}
-                />
-            )}
-            {mergedModalState.divineInterventionModal && (
-                <DivineInterventionModal
-                    {...mergedModalState.divineInterventionModal}
-                    onSelect={handleDivineInterventionCast}
-                    onClose={() => {
-                        setModalState({ divineInterventionModal: null, divineInterventionAction: null });
-                    }}
-                />
-            )}
-            {mergedModalState.arcaneChargeModal && (
-                <ArcaneChargeModal
-                    {...mergedModalState.arcaneChargeModal}
-                    onClose={() => setModalState({ arcaneChargeModal: null })}
-                />
-            )}
-            {mergedModalState.warMagicCantripModal && (
-                <WarMagicCantripModal
-                    {...mergedModalState.warMagicCantripModal}
-                    onClose={() => setModalState({ warMagicCantripModal: null })}
-                />
-            )}
-            {mergedModalState.warMagicSpellModal && (
-                <WarMagicSpellModal
-                    {...mergedModalState.warMagicSpellModal}
-                    onClose={() => setModalState({ warMagicSpellModal: null })}
-                />
-            )}
-            {mergedModalState.warBondSummonModal && (
-                <WarBondChooserModal
-                    title="War Bond — Summon Bonded Weapon"
-                    icon="fa-link"
-                    options={mergedModalState.warBondSummonModal.bondedWeapons}
-                    maxChoices={1}
-                    confirmLabel="Summon"
-                    onConfirm={(selected) => handleWarBondSummon(mergedModalState.warBondSummonModal.action, mergedModalState.warBondSummonModal.playerStats, campaignName, selected[0])}
-                    onClose={() => setModalState({ warBondSummonModal: null })}
-                />
-            )}
+            <DivineSparkFeatureModals mergedModalState={mergedModalState} setModalState={setModalState} playerStats={playerStats} campaignName={campaignName} handleDivineInterventionCast={handleDivineInterventionCast} />
+            <WarMagicFeatureModals mergedModalState={mergedModalState} setModalState={setModalState} campaignName={campaignName} />
             {mergedModalState.sacredWeaponModal && (
                 <SacredWeaponModal
                     {...mergedModalState.sacredWeaponModal}
@@ -456,36 +567,7 @@ function SecondaryModals({
                     }}
                 />
             )}
-            {mergedModalState.primalCompanionBonusActionModal && (
-                <PrimalCompanionBonusActionModal
-                    {...mergedModalState.primalCompanionBonusActionModal}
-                    onClose={() => setModalState({ primalCompanionBonusActionModal: null })}
-                />
-            )}
-            {mergedModalState.primalCompanionSummonModal && (
-                <PrimalCompanionSummonModal
-                    {...mergedModalState.primalCompanionSummonModal}
-                    onClose={() => setModalState({ primalCompanionSummonModal: null })}
-                />
-            )}
-            {mergedModalState.mistyWandererModal && (
-                <MistyWandererModal
-                    {...mergedModalState.mistyWandererModal}
-                    onClose={() => setModalState({ mistyWandererModal: null })}
-                />
-            )}
-            {mergedModalState.feyReinforcementsModal && (
-                <FeyReinforcementsModal
-                    {...mergedModalState.feyReinforcementsModal}
-                    onClose={() => setModalState({ feyReinforcementsModal: null })}
-                />
-            )}
-            {mergedModalState.stepsOfTheFeyTauntModal && (
-                <StepsOfTheFeyTauntModal
-                    {...mergedModalState.stepsOfTheFeyTauntModal}
-                    onClose={() => setModalState({ stepsOfTheFeyTauntModal: null })}
-                />
-            )}
+            <FeyCompanionModals mergedModalState={mergedModalState} setModalState={setModalState} />
             {mergedModalState.telekineticMovementModal && (
                 <CreatureSelectionModal
                     title="Telekinetic Movement — Choose Target"
@@ -516,30 +598,7 @@ function SecondaryModals({
                     onClose={() => setModalState({ bonusActionChoiceModal: null })}
                 />
             )}
-            {mergedModalState.stealthAttackModal && (
-                <StealthAttackModal
-                    {...mergedModalState.stealthAttackModal}
-                    onClose={() => setModalState({ stealthAttackModal: null })}
-                />
-            )}
-            {mergedModalState.elementalAffinityModal && (
-                <ElementalAffinityModal
-                    {...mergedModalState.elementalAffinityModal}
-                    onClose={() => setModalState({ elementalAffinityModal: null })}
-                />
-            )}
-            {mergedModalState.fiendishResilienceModal && (
-                <SingleResistanceSelectionModal
-                    {...mergedModalState.fiendishResilienceModal}
-                    onClose={() => setModalState({ fiendishResilienceModal: null })}
-                />
-            )}
-            {mergedModalState.dragonCompanionModal && (
-                <DragonCompanionModal
-                    {...mergedModalState.dragonCompanionModal}
-                    onClose={() => setModalState({ dragonCompanionModal: null })}
-                />
-            )}
+            <StealthDragonModals mergedModalState={mergedModalState} setModalState={setModalState} />
             {mergedModalState.wildMagicSurgeModal && (
                 <WildMagicSurgeModal
                     {...mergedModalState.wildMagicSurgeModal}
@@ -557,26 +616,7 @@ function SecondaryModals({
                     onClose={() => setModalState({ bendFateModal: null })}
                 />
             )}
-            {mergedModalState.thirdEyeModal && (
-                <ThirdEyeModal
-                    action={mergedModalState.thirdEyeModal.action}
-                    playerStats={mergedModalState.thirdEyeModal.playerStats}
-                    campaignName={mergedModalState.thirdEyeModal.campaignName}
-                    onClose={() => setModalState({ thirdEyeModal: null })}
-                />
-            )}
-            {mergedModalState.soulstitchSpellsModal && (
-                <SoulstitchSpellsModal
-                    {...mergedModalState.soulstitchSpellsModal}
-                    onClose={() => setModalState({ soulstitchSpellsModal: null })}
-                />
-            )}
-            {mergedModalState.illusoryRealityModal && (
-                <IllusoryRealityModal
-                    {...mergedModalState.illusoryRealityModal}
-                    onClose={() => setModalState({ illusoryRealityModal: null })}
-                />
-            )}
+            <ArcaneFeatureModals mergedModalState={mergedModalState} setModalState={setModalState} />
             {mergedModalState.celestialRevelationModal && (
                 <CelestialRevelationModal
                     {...mergedModalState.celestialRevelationModal}

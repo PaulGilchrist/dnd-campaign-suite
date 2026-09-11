@@ -6,6 +6,143 @@
 
 import { loadFeatData, fetchClassData, fetchRaceData, fetchBackgroundData, fetchSubraceData } from '../ui/dataLoader.js';
 
+function fightingStyleFeatureCount(f) {
+    return f.feature_specific?.fighting_style?.count || 1;
+}
+
+function isFightingStyleName(name) {
+    return name?.includes('Fighting Style') || false;
+}
+
+function isAdditionalFightingStyleName(name) {
+    return name?.includes('Additional Fighting Style') || (isFightingStyleName(name) && name !== 'Fighting Style');
+}
+
+// 2024: class_levels grants Fighting Style plus any additional style features
+function countFightingStylesFrom2024ClassLevels(classLevels, level) {
+    let allowed = 0;
+    for (const classLevel of classLevels) {
+        if (classLevel.level > level || !classLevel.features) {
+            continue;
+        }
+        const fightingStyleFeature = classLevel.features.find(f =>
+            f.name === 'Fighting Style' || isFightingStyleName(f.name)
+        );
+        if (fightingStyleFeature) {
+            allowed += fightingStyleFeatureCount(fightingStyleFeature);
+        }
+        allowed += classLevel.features.filter(f => isAdditionalFightingStyleName(f.name)).length;
+    }
+    return allowed;
+}
+
+// 2024: top-level class features (in case some classes have them)
+function countFightingStylesFromTopLevelFeatures(features, level) {
+    const fightingStyleFeature = features.find(f => f.name === 'Fighting Style' && f.level <= level);
+    let allowed = fightingStyleFeature ? fightingStyleFeatureCount(fightingStyleFeature) : 0;
+    allowed += features.filter(f => isAdditionalFightingStyleName(f.name) && f.level <= level).length;
+    return allowed;
+}
+
+// 2024: subclass/major features granting additional fighting styles
+function countFightingStylesFromMajors(majors, subclass, level) {
+    const subclassData = majors.find(s => s.name === subclass);
+    if (!subclassData?.features) {
+        return 0;
+    }
+    return subclassData.features.filter(f => isFightingStyleName(f.name) && f.level <= level).length;
+}
+
+// 2024: pre-select fighting style feats the character has already chosen
+async function collectFightingStyleFeatSelections(selectedFeats, ruleset) {
+    const preSelected = [];
+    if (selectedFeats.length === 0) {
+        return preSelected;
+    }
+    const feats = await loadFeatData(ruleset);
+    const fightingStyleFeats = feats.filter(f =>
+        f.prerequisites && f.prerequisites.feature === 'Fighting Style'
+    );
+    selectedFeats.forEach(featName => {
+        if (fightingStyleFeats.some(f => f.name === featName) && !preSelected.includes(featName)) {
+            preSelected.push(featName);
+        }
+    });
+    return preSelected;
+}
+
+async function getFightingStyleLimits2024(formData, classData) {
+    const className = formData.class?.name || '';
+    const level = formData.level || 1;
+    const subclass = formData.class?.subclass?.name || '';
+
+    let allowed = classData.class_levels
+        ? countFightingStylesFrom2024ClassLevels(classData.class_levels, level)
+        : 0;
+    if (classData.features) {
+        allowed += countFightingStylesFromTopLevelFeatures(classData.features, level);
+    }
+    if (classData.majors && subclass) {
+        allowed += countFightingStylesFromMajors(classData.majors, subclass, level);
+    }
+
+    const preSelected = await collectFightingStyleFeatSelections(formData.feats || [], '2024');
+
+    const details = `In 2024 rules, ${className}${className ? ' ' : ''}characters may get fighting styles from class features or feats.`;
+    return { allowed, preSelected, details };
+}
+
+// 5e: class_levels Fighting Style feature
+function countFightingStylesFrom5eClassLevels(classLevels, level) {
+    let allowed = 0;
+    for (const classLevel of classLevels) {
+        if (classLevel.level > level || !classLevel.features) {
+            continue;
+        }
+        const fightingStyleFeature = classLevel.features.find(f => f.name === 'Fighting Style');
+        if (fightingStyleFeature) {
+            allowed += fightingStyleFeatureCount(fightingStyleFeature);
+        }
+    }
+    return allowed;
+}
+
+// 5e: subclass class_levels and top-level features granting additional styles
+function countFightingStylesFrom5eSubclass(subclassData, level) {
+    let allowed = 0;
+    if (subclassData.class_levels) {
+        for (const classLevel of subclassData.class_levels) {
+            if (classLevel.level <= level && classLevel.features?.find(f => f.name === 'Additional Fighting Style')) {
+                allowed += 1;
+            }
+        }
+    }
+    if (subclassData.features) {
+        allowed += subclassData.features.filter(f => isAdditionalFightingStyleName(f.name) && f.level <= level).length;
+    }
+    return allowed;
+}
+
+async function getFightingStyleLimits5e(formData, classData) {
+    const className = formData.class?.name || '';
+    const level = formData.level || 1;
+    const subclass = formData.class?.subclass?.name || '';
+
+    let allowed = classData.class_levels
+        ? countFightingStylesFrom5eClassLevels(classData.class_levels, level)
+        : 0;
+
+    if (subclass && classData.subclasses) {
+        const subclassData = classData.subclasses.find(s => s.name === subclass);
+        if (subclassData) {
+            allowed += countFightingStylesFrom5eSubclass(subclassData, level);
+        }
+    }
+
+    const details = `${className} may get fighting styles from class features. ${subclass ? `${subclass} ` : ''}may grant additional styles at higher levels.`;
+    return { allowed, preSelected: [], details };
+}
+
 /**
  * Determines fighting styles allowed based on class features from JSON
  * @param {object} formData - The character form data
@@ -14,277 +151,173 @@ import { loadFeatData, fetchClassData, fetchRaceData, fetchBackgroundData, fetch
 export async function getFightingStyleLimits(formData) {
     const ruleset = formData.rules || '5e';
     const className = formData.class?.name || '';
-    const level = formData.level || 1;
-    const subclass = formData.class?.subclass?.name || '';
-    
+
     const classData = className ? await fetchClassData(className, ruleset) : null;
-    
-    let allowed = 0;
-    let preSelected = [];
-    let details;
-    
+
     if (!classData) {
         return { allowed: 0, preSelected: [], details: 'No class selected' };
-        }
-    
-    if (ruleset === '2024') {
-           // 2024 rules: Fighting styles can be chosen as feats or from class features
-            // Check if class grants fighting style from class_levels
-        if (classData.class_levels) {
-            for (const classLevel of classData.class_levels) {
-                if (classLevel.level <= level && classLevel.features) {
-                    const fightingStyleFeature = classLevel.features.find(f =>
-                        f.name === 'Fighting Style' || f.name?.includes('Fighting Style')
-                 );
-            if (fightingStyleFeature) {
-                // Check for count in feature_specific or default to 1
-                allowed += fightingStyleFeature.feature_specific?.fighting_style?.count || 1;
-                 }
-          
-                     // Check for additional fighting styles at higher levels in class_levels
-                    const additionalFeatures = classLevel.features.filter(f =>
-                        f.name?.includes('Additional Fighting Style') || (f.name?.includes('Fighting Style') && f.name !== 'Fighting Style')
-             );
-        allowed += additionalFeatures.length;
-          }
-               }
-           }
-  
-           // Also check top-level class features (in case some classes have them)
-        if (classData.features) {
-            const fightingStyleFeature = classData.features.find(f =>
-                f.name === 'Fighting Style' && f.level <= level
-            );
-            if (fightingStyleFeature) {
-                allowed += fightingStyleFeature.feature_specific?.fighting_style?.count || 1;
-            }
+    }
 
-            const additionalFeatures = classData.features.filter(f =>
-                                f.name?.includes('Fighting Style') && f.name !== 'Fighting Style' && f.level <= level
-                               );
-            allowed += additionalFeatures.length;
-                         }
-
-           // Check subclass/major features for additional fighting styles
-        if (classData.majors && subclass) {
-            const subclassData = classData.majors.find(s => s.name === subclass);
-            if (subclassData && subclassData.features) {
-                const subclassAdditionalFeatures = subclassData.features.filter(f =>
-                    f.name?.includes('Fighting Style') && f.level <= level
-             );
-                allowed += subclassAdditionalFeatures.length;
-          }
-           }
-      
-          // Check for fighting style feats already selected
-        const selectedFeats = formData.feats || [];
-        if (selectedFeats.length > 0) {
-            const feats = await loadFeatData(ruleset);
-            const fightingStyleFeats = feats.filter(f =>
-                f.prerequisites && f.prerequisites.feature === 'Fighting Style'
-              );
-
-            selectedFeats.forEach(featName => {
-                const feat = fightingStyleFeats.find(f => f.name === featName);
-                if (feat && !preSelected.includes(featName)) {
-                    preSelected.push(featName);
-          }
-               });
-           }
-  
-        details = `In 2024 rules, ${className}${className ? ' ' : ''}characters may get fighting styles from class features or feats.`;
-              } else {
-           // 5e rules - read from class JSON data
-        if (classData.class_levels) {
-            for (const classLevel of classData.class_levels) {
-                if (classLevel.level <= level && classLevel.features) {
-                    const fightingStyleFeature = classLevel.features.find(f =>
-                        f.name === 'Fighting Style'
-                 );
-            if (fightingStyleFeature) {
-                allowed += fightingStyleFeature.feature_specific?.fighting_style?.count || 1;
-          }
-               }
-             }
-           }
-  
-           // Check subclass features for additional fighting styles
-        if (subclass && classData.subclasses) {
-            const subclassData = classData.subclasses.find(s => s.name === subclass);
-            if (subclassData) {
-                  // Check class_levels for Additional Fighting Style feature
-                if (subclassData.class_levels) {
-                    for (const classLevel of subclassData.class_levels) {
-                        if (classLevel.level <= level) {
-                            const additionalStyleFeature = classLevel.features?.find(f =>
-                                f.name === 'Additional Fighting Style'
-                               );
-                            if (additionalStyleFeature) {
-                allowed += 1;
-              }
-                                    }
-                                }
-                            }
-                            // Also check top-level subclass features
-                        if (subclassData.features) {
-                            const subclassAdditionalFeatures = subclassData.features.filter(f =>
-                                f.name?.includes('Fighting Style') && f.name !== 'Fighting Style' && f.level <= level
-                               );
-                            allowed += subclassAdditionalFeatures.length;
-                   }
-          }
-                    }
-  
-        details = `${className} may get fighting styles from class features. ${subclass ? `${subclass} ` : ''}may grant additional styles at higher levels.`;
-         }
-
-    return { allowed, preSelected, details };
-   }
+    return ruleset === '2024'
+        ? getFightingStyleLimits2024(formData, classData)
+        : getFightingStyleLimits5e(formData, classData);
+}
 
 /**
  * Determines languages allowed based on race, class, and background from JSON
  * @param {object} formData - The character form data
  * @returns {Promise<object>} - { allowed: number, preSelected: string[], details: string }
  */
-export async function getLanguageLimits(formData) {
-    const ruleset = formData.rules || '5e';
+const LANGUAGE_NUMBER_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5 };
+
+function countLanguagesFrom2024Feature(feature) {
+    // Try to match digit first, then spelled-out numbers
+    const match = feature.description.match(/(?:know|gain|learn)\s+(\d+)\s+language/i)
+        || feature.description.match(/(?:know|gain|learn)\s+(one|two|three|four|five)\s+language/i);
+    if (!match) {
+        return 0;
+    }
+    const count = parseInt(match[1], 10);
+    if (!isNaN(count)) {
+        return count;
+    }
+    return LANGUAGE_NUMBER_WORDS[match[1].toLowerCase()] || 0;
+}
+
+function countLanguagesFrom5eClassLevelFeature(feature) {
+    if (feature.name?.includes('Language') || feature.name === 'Extra Language') {
+        // Parse description for language count
+        const match = feature.description?.match(/(?:gain|learn)\s+(\d+)\s+language/i);
+        return match ? parseInt(match[1], 10) : 0;
+    }
+    // Also check feature descriptions for language grants (e.g., Ranger "Deft Explorer")
+    if (feature.description?.match(/\blanguages?\b/i) && feature.description.match(/(?:know|gain|learn)\s+(\d+)\s+language/i)) {
+        return parseInt(feature.description.match(/(?:know|gain|learn)\s+(\d+)\s+language/i)[1], 10);
+    }
+    return 0;
+}
+
+function addLanguageSource(preSelected, langs) {
+    preSelected.push(...langs);
+    return langs.length;
+}
+
+async function getLanguageLimits2024(formData) {
     const className = formData.class?.name || '';
     const raceName = formData.race?.name || '';
-    const subraceName = formData.race?.subrace?.name || '';
     const backgroundName = formData.background || '';
     const level = formData.level || 1;
-    
+
+    const raceData = raceName ? await fetchRaceData(raceName, '2024') : null;
+    const classData = className ? await fetchClassData(className, '2024') : null;
+    const backgroundData = backgroundName ? await fetchBackgroundData(backgroundName, '2024') : null;
+
     let allowed = 0;
-    let preSelected = [];
-    let details;
-    
-    if (ruleset === '2024') {
-        // 2024 rules: Languages come from race, class, and background
-        const raceData = raceName ? await fetchRaceData(raceName, '2024') : null;
-        const classData = className ? await fetchClassData(className, '2024') : null;
-        const backgroundData = backgroundName ? await fetchBackgroundData(backgroundName, '2024') : null;
-        // Race languages
-        if (raceData) {
-            const raceLangs = raceData.languages || [];
-            preSelected.push(...raceLangs);
-            allowed += raceLangs.length;
-            }
+    const preSelected = [];
 
-         // Class languages
-        if (classData) {
-            const classLangs = classData.languages || [];
-            preSelected.push(...classLangs);
-            allowed += classLangs.length;
-            }
+    // Race languages
+    if (raceData) {
+        allowed += addLanguageSource(preSelected, raceData.languages || []);
+    }
 
-          // Background languages (2024: from background JSON)
-        if (backgroundData) {
-            const bgLangs = backgroundData.languages || [];
-            preSelected.push(...bgLangs);
-            allowed += bgLangs.length;
-               } else {
-                // Default background languages for 2024
-            allowed += 2;
-            }
+    // Class languages
+    if (classData) {
+        allowed += addLanguageSource(preSelected, classData.languages || []);
+    }
 
-        // Also check class_levels for language features (e.g., Ranger "Deft Explorer")
-        if (classData?.class_levels) {
-            for (const classLevel of classData.class_levels) {
-                if (classLevel.level <= level && classLevel.features) {
-                    for (const feature of classLevel.features) {
-                        if (feature.description?.match(/\blanguages?\b/i)) {
-                            // Try to match digit first, then spelled-out numbers
-                            const match = feature.description.match(/(?:know|gain|learn)\s+(\d+)\s+language/i)
-                                || feature.description.match(/(?:know|gain|learn)\s+(one|two|three|four|five)\s+language/i);
-                            if (match) {
-                                const count = parseInt(match[1], 10);
-                                if (!isNaN(count)) {
-                                    allowed += count;
-                                } else {
-                                    const wordToNum = { one: 1, two: 2, three: 3, four: 4, five: 5 };
-                                    allowed += wordToNum[match[1].toLowerCase()] || 0;
-                                }
-                            }
-                        }
+    // Background languages (2024: from background JSON)
+    if (backgroundData) {
+        allowed += addLanguageSource(preSelected, backgroundData.languages || []);
+    } else {
+        // Default background languages for 2024
+        allowed += 2;
+    }
+
+    // Also check class_levels for language features (e.g., Ranger "Deft Explorer")
+    if (classData?.class_levels) {
+        for (const classLevel of classData.class_levels) {
+            if (classLevel.level <= level && classLevel.features) {
+                for (const feature of classLevel.features) {
+                    if (feature.description?.match(/\blanguages?\b/i)) {
+                        allowed += countLanguagesFrom2024Feature(feature);
                     }
                 }
             }
         }
+    }
 
-        details = `In 2024 rules, languages come from your race, class, and background.`;
-           } else {
-            // 5e rules
-        const raceData = raceName ? await fetchRaceData(raceName, '5e') : null;
-        const classData = className ? await fetchClassData(className, '5e') : null;
+    return { allowed, preSelected, details: `In 2024 rules, languages come from your race, class, and background.` };
+}
 
-         // Race languages
-        if (raceData) {
-            const raceLangs = raceData.languages || [];
-            preSelected.push(...raceLangs);
-            allowed += raceLangs.length;
-            }
+async function getLanguageLimits5e(formData) {
+    const ruleset = formData.rules || '5e';
+    const className = formData.class?.name || '';
+    const raceName = formData.race?.name || '';
+    const subraceName = formData.race?.subrace?.name || '';
+    const level = formData.level || 1;
 
-          // Racial language bonuses from JSON
-        if (raceData?.language_options) {
-            const chooseCount = raceData.language_options.choose || 1;
-            allowed += chooseCount;
-             }
+    const raceData = raceName ? await fetchRaceData(raceName, '5e') : null;
+    const classData = className ? await fetchClassData(className, '5e') : null;
 
-          // Subrace languages
-        if (subraceName) {
-            const subraceData = subraceName ? await fetchSubraceData(subraceName, ruleset) : null;
-            if (subraceData && subraceData.languages && subraceData.languages.length > 0) {
-                const subraceLangs = subraceData.languages;
-                preSelected.push(...subraceLangs);
-                   // Don't add to allowed count if already counted in race
-             }
-            if (subraceData?.language_options) {
-                allowed += subraceData.language_options.choose || 0;
-             }
-              }
+    let allowed = 0;
+    const preSelected = [];
 
-          // Class languages from JSON
-        if (classData) {
-            const classLangs = classData.languages || [];
-            preSelected.push(...classLangs);
-            allowed += classLangs.length;
-             }
-  
-           // Check class_levels for language features
-        if (classData?.class_levels) {
-            for (const classLevel of classData.class_levels) {
-                if (classLevel.level <= level && classLevel.features) {
-                    for (const feature of classLevel.features) {
-                        if (feature.name?.includes('Language') || feature.name === 'Extra Language') {
-                            // Parse description for language count
-                             const match = feature.description?.match(/(?:gain|learn)\s+(\d+)\s+language/i);
-                            if (match) {
-                                allowed += parseInt(match[1], 10);
-            }
-                             }
-                             // Also check feature descriptions for language grants (e.g., Ranger "Deft Explorer")
-                         else if (feature.description?.match(/\blanguages?\b/i) && feature.description.match(/(?:know|gain|learn)\s+(\d+)\s+language/i)) {
-                             const match = feature.description.match(/(?:know|gain|learn)\s+(\d+)\s+language/i);
-                             if (match) {
-                                 allowed += parseInt(match[1], 10);
-                             }
-                         }
-                         }
-                     }
-                 }
-             }
-         
-          // Background languages (5e: typically 2 from backstory)
-        allowed += 2;
-        
-        details = `In 5e rules, languages come from your race, class, and background (2 additional from backstory).`;
+    // Race languages
+    if (raceData) {
+        allowed += addLanguageSource(preSelected, raceData.languages || []);
+    }
+
+    // Racial language bonuses from JSON
+    if (raceData?.language_options) {
+        allowed += raceData.language_options.choose || 1;
+    }
+
+    // Subrace languages
+    if (subraceName) {
+        const subraceData = subraceName ? await fetchSubraceData(subraceName, ruleset) : null;
+        if (subraceData && subraceData.languages && subraceData.languages.length > 0) {
+            preSelected.push(...subraceData.languages);
+            // Don't add to allowed count if already counted in race
         }
+        if (subraceData?.language_options) {
+            allowed += subraceData.language_options.choose || 0;
+        }
+    }
 
-     // Remove duplicates from preSelected
-    preSelected = [...new Set(preSelected)];
-    
-    return { allowed, preSelected, details };
-   }
+    // Class languages from JSON
+    if (classData) {
+        allowed += addLanguageSource(preSelected, classData.languages || []);
+    }
+
+    // Check class_levels for language features
+    if (classData?.class_levels) {
+        for (const classLevel of classData.class_levels) {
+            if (classLevel.level <= level && classLevel.features) {
+                for (const feature of classLevel.features) {
+                    allowed += countLanguagesFrom5eClassLevelFeature(feature);
+                }
+            }
+        }
+    }
+
+    // Background languages (5e: typically 2 from backstory)
+    allowed += 2;
+
+    return { allowed, preSelected, details: `In 5e rules, languages come from your race, class, and background (2 additional from backstory).` };
+}
+
+export async function getLanguageLimits(formData) {
+    const ruleset = formData.rules || '5e';
+
+    const limits = ruleset === '2024'
+        ? await getLanguageLimits2024(formData)
+        : await getLanguageLimits5e(formData);
+
+    // Remove duplicates from preSelected
+    limits.preSelected = [...new Set(limits.preSelected)];
+
+    return limits;
+}
 
 /**
  * Validates language and fighting style selections and returns warnings

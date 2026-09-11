@@ -33,8 +33,172 @@ const PRISMATIC_RAYS = {
     7: { name: 'Violet', type: 'banished', saveType: 'DEX' },
 };
 
+const DAMAGE_RAY_TYPES = new Set(['fire', 'acid', 'lightning', 'poison', 'cold']);
+
+const STATUS_RAY_META = {
+    restrained: { label: 'Indigo', outcome: 'Restrained', type: 'indigo' },
+    banished: { label: 'Violet', outcome: 'Blinded', type: 'violet' },
+};
+
 function rollD7() {
     return Math.floor(Math.random() * 7) + 1;
+}
+
+// Roll 1d8 — if 8, re-roll 2d7 for two separate rays
+function pickRays() {
+    const firstRoll = Math.floor(Math.random() * 8) + 1;
+    if (firstRoll === 8) {
+        const rayRolls = [rollD7(), rollD7()];
+        return {
+            rays: rayRolls.map(r => PRISMATIC_RAYS[r]),
+            rollDescription: `rolled 8, then 2d7 (${rayRolls.join(',')})`,
+        };
+    }
+    return {
+        rays: [PRISMATIC_RAYS[firstRoll]],
+        rollDescription: `rolled ${firstRoll}`,
+    };
+}
+
+// Use selected targets from CreatureSelectionModal if provided, otherwise all creatures except caster
+function selectSprayTargets(action, cs, casterName) {
+    const selected = action.metaCtx?.selectedTargets;
+    if (Array.isArray(selected) && selected.length > 0) return selected;
+    return cs.creatures.filter(c => c.name !== casterName).map(c => c.name);
+}
+
+function queueRaySave(ctx) {
+    const { action, auto, campaignName, casterName, targetName, ray, rollDescription, immunityList, disadvantage, dc, savePromises, saveResults } = ctx;
+    const damageFormula = auto.damage || '10d6';
+
+    if (DAMAGE_RAY_TYPES.has(ray.type)) {
+        // Check elemental immunity for damage rays (1-5)
+        if (immunityList.includes(ray.type)) return true;
+
+        // DEX save for half damage
+        const { promptId, promise } = createSaveListener(campaignName, {
+            targetName,
+            saveType: 'DEX',
+            saveDc: dc,
+            dcSuccess: 'half',
+            disadvantage,
+            damageFormula,
+            damageType: ray.type,
+        });
+
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: casterName,
+            abilityName: action.name,
+            description: `${casterName} casts Prismatic Spray! ${targetName} hit by ${ray.name} ray (${rollDescription}) — DEX save (DC ${dc}) or take ${damageFormula} ${ray.type} damage.`,
+            promptId,
+        }).catch((e) => { console.error(`[prismaticSpray] Error:`, e); });
+
+        savePromises.push(promise);
+        saveResults.push({ targetName, ray, dc, type: 'damage', damageFormula });
+        return false;
+    }
+
+    const statusMeta = STATUS_RAY_META[ray.type];
+    if (statusMeta) {
+        const { promptId, promise } = createSaveListener(campaignName, {
+            targetName,
+            saveType: 'DEX',
+            saveDc: dc,
+            dcSuccess: 'none',
+            disadvantage,
+        });
+
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: casterName,
+            abilityName: action.name,
+            description: `${casterName} casts Prismatic Spray! ${targetName} hit by ${statusMeta.label} ray (${rollDescription}) — DEX save (DC ${dc}) or become ${statusMeta.outcome}.`,
+            promptId,
+        }).catch((e) => { console.error(`[prismaticSpray] Error:`, e); });
+
+        savePromises.push(promise);
+        saveResults.push({ targetName, ray, dc, type: statusMeta.type });
+    }
+    return false;
+}
+
+async function applyRayDamage(cs, campaignName, characters, casterName, targetName, ray, damageFormula, succeeded) {
+    const dmgResult = rollExpression(damageFormula);
+    if (!dmgResult) return;
+    const finalDamage = computeDamageAfterSave(dmgResult.total, succeeded, 'half');
+    if (finalDamage > 0) {
+        await applyDamageToTarget(cs, targetName, finalDamage, [ray.type], campaignName, characters, false, casterName);
+    }
+}
+
+async function resolveSpraySaveOutcome(ctx) {
+    const { campaignName, casterName, cs, characters, dc, info, saveResult, results } = ctx;
+    const { targetName, ray, type, damageFormula } = info;
+
+    if (saveResult.success) {
+        await addTargetResult(campaignName, {
+            targetName,
+            saveResult: 'success',
+            roll: saveResult.roll ?? 0,
+            total: saveResult.total ?? 0,
+            conditions: [],
+            appliedDamage: saveResult.appliedDamage || 0,
+        });
+        addEntry(campaignName, {
+            type: 'save_result',
+            characterName: casterName,
+            rollType: 'save-prismatic-spray',
+            targetName,
+            saveDc: dc,
+            saveType: 'DEX',
+            success: true,
+            description: `${targetName} succeeded on DEX save against ${ray.name} ray, taking half damage.`,
+        }).catch((e) => { console.error(`[prismaticSpray] Error:`, e); });
+
+        // Apply half damage for damage rays
+        if (type === 'damage' && cs) {
+            await applyRayDamage(cs, campaignName, characters, casterName, targetName, ray, damageFormula, true);
+        }
+
+        results.push(`${targetName}: ${ray.name} ray (saved DEX save).`);
+        return;
+    }
+
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'failure',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: [],
+        appliedDamage: saveResult.appliedDamage || 0,
+    });
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-prismatic-spray',
+        targetName,
+        saveDc: dc,
+        saveType: 'DEX',
+        success: false,
+        description: `${targetName} failed DEX save against ${ray.name} ray, taking full ${damageFormula} ${ray.type} damage.`,
+    }).catch((e) => { console.error(`[prismaticSpray] Error:`, e); });
+
+    // Apply full damage for damage rays
+    if (type === 'damage' && cs) {
+        await applyRayDamage(cs, campaignName, characters, casterName, targetName, ray, damageFormula, false);
+    }
+
+    // Apply ray-specific effects on save failure
+    if (type === 'indigo') {
+        await applyIndigoEffect(targetName, dc, casterName, campaignName);
+        results.push(`${targetName}: ${ray.name} ray (failed DEX save, Restrained).`);
+    } else if (type === 'violet') {
+        await applyVioletEffect(targetName, dc, casterName, campaignName);
+        results.push(`${targetName}: ${ray.name} ray (failed DEX save, Blinded).`);
+    } else {
+        results.push(`${targetName}: ${ray.name} ray (failed DEX save, full damage).`);
+    }
 }
 
 async function applyIndigoEffect(targetName, dc, casterName, campaignName) {
@@ -201,13 +365,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         attackScope: 'aoe',
     });
 
-    // Use selected targets from CreatureSelectionModal if provided, otherwise all creatures except caster
-    let targetNames;
-    if (action.metaCtx?.selectedTargets && Array.isArray(action.metaCtx.selectedTargets) && action.metaCtx.selectedTargets.length > 0) {
-        targetNames = action.metaCtx.selectedTargets;
-    } else {
-        targetNames = cs.creatures.filter(c => c.name !== casterName).map(c => c.name);
-    }
+    const targetNames = selectSprayTargets(action, cs, casterName);
 
     if (targetNames.length === 0) {
         return {
@@ -233,91 +391,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         const immunityList = Array.isArray(targetImmunities) ? targetImmunities.map(i => String(i).toLowerCase()) : [];
         const disadvantage = action.metaCtx?.heightenTarget === targetName;
 
-        // Roll 1d8 — if 8, re-roll 2d7 for two separate rays
-        const firstRoll = Math.floor(Math.random() * 8) + 1;
-        let rays;
-        let rollDescription;
-        if (firstRoll === 8) {
-            const rayRolls = [rollD7(), rollD7()];
-            rays = rayRolls.map(r => PRISMATIC_RAYS[r]);
-            rollDescription = `rolled 8, then 2d7 (${rayRolls.join(',')})`;
-        } else {
-            rays = [PRISMATIC_RAYS[firstRoll]];
-            rollDescription = `rolled ${firstRoll}`;
-        }
+        const { rays, rollDescription } = pickRays();
 
         for (const ray of rays) {
-            // Check elemental immunity for damage rays (1-5)
-            if (ray.type === 'fire' || ray.type === 'acid' || ray.type === 'lightning' || ray.type === 'poison' || ray.type === 'cold') {
-                if (immunityList.includes(ray.type)) {
-                    immuneCount++;
-                    results.push(`${targetName} is immune to ${ray.name} ray (${ray.type.charAt(0).toUpperCase() + ray.type.slice(1)} immunity).`);
-                    continue;
-                }
-
-                // DEX save for half damage
-                const { promptId, promise } = createSaveListener(campaignName, {
-                    targetName,
-                    saveType: 'DEX',
-                    saveDc: dc,
-                    dcSuccess: 'half',
-                    disadvantage,
-                    damageFormula: auto.damage || '10d6',
-                    damageType: ray.type,
-                });
-
-                addEntry(campaignName, {
-                    type: 'ability_use',
-                    characterName: casterName,
-                    abilityName: action.name,
-                    description: `${casterName} casts Prismatic Spray! ${targetName} hit by ${ray.name} ray (${rollDescription}) — DEX save (DC ${dc}) or take ${auto.damage || '10d6'} ${ray.type} damage.`,
-                    promptId,
-                }).catch((e) => { console.error(`[prismaticSpray] Error:`, e); });
-
-                savePromises.push(promise);
-                saveResults.push({ targetName, ray, dc, type: 'damage', damageFormula: auto.damage || '10d6' });
-            }
-            // Handle Indigo ray (6) — Restrained + recurring CON saves
-            else if (ray.type === 'restrained') {
-                const { promptId, promise } = createSaveListener(campaignName, {
-                    targetName,
-                    saveType: 'DEX',
-                    saveDc: dc,
-                    dcSuccess: 'none',
-                    disadvantage,
-                });
-
-                addEntry(campaignName, {
-                    type: 'ability_use',
-                    characterName: casterName,
-                    abilityName: action.name,
-                    description: `${casterName} casts Prismatic Spray! ${targetName} hit by Indigo ray (${rollDescription}) — DEX save (DC ${dc}) or become Restrained.`,
-                    promptId,
-                }).catch((e) => { console.error(`[prismaticSpray] Error:`, e); });
-
-                savePromises.push(promise);
-                saveResults.push({ targetName, ray, dc, type: 'indigo' });
-            }
-            // Handle Violet ray (7) — Blinded on DEX save fail, WIS save at start of caster's next turn, fail = banished
-            else if (ray.type === 'banished') {
-                const { promptId, promise } = createSaveListener(campaignName, {
-                    targetName,
-                    saveType: 'DEX',
-                    saveDc: dc,
-                    dcSuccess: 'none',
-                    disadvantage,
-                });
-
-                addEntry(campaignName, {
-                    type: 'ability_use',
-                    characterName: casterName,
-                    abilityName: action.name,
-                    description: `${casterName} casts Prismatic Spray! ${targetName} hit by Violet ray (${rollDescription}) — DEX save (DC ${dc}) or become Blinded.`,
-                    promptId,
-                }).catch((e) => { console.error(`[prismaticSpray] Error:`, e); });
-
-                savePromises.push(promise);
-                saveResults.push({ targetName, ray, dc, type: 'violet' });
+            const immune = queueRaySave({ action, auto, campaignName, casterName, targetName, ray, rollDescription, immunityList, disadvantage, dc, savePromises, saveResults });
+            if (immune) {
+                immuneCount++;
+                results.push(`${targetName} is immune to ${ray.name} ray (${ray.type.charAt(0).toUpperCase() + ray.type.slice(1)} immunity).`);
             }
         }
     }
@@ -327,85 +407,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     for (const promise of savePromises) {
         const saveResult = await promise;
         const info = saveResults[saveIndex];
-        const { targetName, ray, type, damageFormula } = info;
-
         if (saveResult.success) {
-            creaturesThatSaved.add(targetName);
-            await addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'success',
-                roll: saveResult.roll ?? 0,
-                total: saveResult.total ?? 0,
-                conditions: [],
-                appliedDamage: saveResult.appliedDamage || 0,
-            });
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                rollType: 'save-prismatic-spray',
-                targetName,
-                saveDc: dc,
-                saveType: 'DEX',
-                success: true,
-                description: `${targetName} succeeded on DEX save against ${ray.name} ray, taking half damage.`,
-            }).catch((e) => { console.error(`[prismaticSpray] Error:`, e); });
-
-            // Apply half damage for damage rays
-            if (type === 'damage' && cs) {
-                const dmgResult = rollExpression(damageFormula);
-                if (dmgResult) {
-                    const finalDamage = computeDamageAfterSave(dmgResult.total, true, 'half');
-                    if (finalDamage > 0) {
-                        await applyDamageToTarget(cs, targetName, finalDamage, [ray.type], campaignName, characters, false, casterName);
-                    }
-                }
-            }
-
-            results.push(`${targetName}: ${ray.name} ray (saved DEX save).`);
+            creaturesThatSaved.add(info.targetName);
         } else {
-            creaturesThatFailed.add(targetName);
-            await addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'failure',
-                roll: saveResult.roll ?? 0,
-                total: saveResult.total ?? 0,
-                conditions: [],
-                appliedDamage: saveResult.appliedDamage || 0,
-            });
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                rollType: 'save-prismatic-spray',
-                targetName,
-                saveDc: dc,
-                saveType: 'DEX',
-                success: false,
-                description: `${targetName} failed DEX save against ${ray.name} ray, taking full ${damageFormula} ${ray.type} damage.`,
-            }).catch((e) => { console.error(`[prismaticSpray] Error:`, e); });
-
-            // Apply full damage for damage rays
-            if (type === 'damage' && cs) {
-                const dmgResult = rollExpression(damageFormula);
-                if (dmgResult) {
-                    const finalDamage = computeDamageAfterSave(dmgResult.total, false, 'half');
-                    if (finalDamage > 0) {
-                        await applyDamageToTarget(cs, targetName, finalDamage, [ray.type], campaignName, characters, false, casterName);
-                    }
-                }
-            }
-
-            // Apply ray-specific effects on save failure
-            if (type === 'indigo') {
-                await applyIndigoEffect(targetName, dc, casterName, campaignName);
-                results.push(`${targetName}: ${ray.name} ray (failed DEX save, Restrained).`);
-            } else if (type === 'violet') {
-                await applyVioletEffect(targetName, dc, casterName, campaignName);
-                results.push(`${targetName}: ${ray.name} ray (failed DEX save, Blinded).`);
-            } else {
-                results.push(`${targetName}: ${ray.name} ray (failed DEX save, full damage).`);
-            }
+            creaturesThatFailed.add(info.targetName);
         }
-
+        await resolveSpraySaveOutcome({ campaignName, casterName, cs, characters, dc, info, saveResult, results });
         saveIndex++;
     }
 

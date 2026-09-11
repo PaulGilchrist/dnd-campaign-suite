@@ -179,6 +179,381 @@ function parse5eBenefitText(text) {
   return buffs;
 }
 
+const WORD_TO_NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+const NUM_WORD_PATTERN = '(?:one|two|three|four|five|six|seven|eight|nine|ten|1|2|3|4|5|6|7|8|9|10)';
+const ALL_SKILLS_LIST = 'Acrobatics, Animal Handling, Arcana, Athletics, Deception, History, Insight, Intimidation, Investigation, Medicine, Nature, Perception, Performance, Persuasion, Religion, Sleight of Hand, Stealth, Survival';
+
+function parse2024AbilityScoreIncrease(benefit, feat, buffs) {
+  const asi = feat.ability_score_increase;
+  if (!asi || !asi.scores) return;
+  const maxVal = asi.max_value || 20;
+
+  if (asi.amount === 'variable') {
+    buffs.abilityScoreIncreases.push({
+      name: 'any',
+      amount: [1, 2],
+      isChoice: true,
+      description: benefit.description,
+      max_value: maxVal,
+    });
+    return;
+  }
+
+  if (asi.scores.length > 2) {
+    buffs.abilityScoreIncreases.push({
+      name: 'any',
+      amount: Array.isArray(asi.amount) ? asi.amount : [asi.amount],
+      isChoice: true,
+      description: benefit.description,
+      max_value: maxVal,
+    });
+    return;
+  }
+
+  if (asi.scores.length === 2) {
+    buffs.abilityScoreIncreases.push({
+      name: 'any',
+      amount: typeof asi.amount === 'number' ? asi.amount : 1,
+      isChoice: true,
+      scores: asi.scores,
+      description: benefit.description,
+      max_value: maxVal,
+    });
+    return;
+  }
+
+  const amount = typeof asi.amount === 'number' ? asi.amount : 1;
+  asi.scores.forEach(score => {
+    buffs.abilityScoreIncreases.push({
+      name: score,
+      amount,
+      isChoice: false,
+      description: benefit.description,
+      max_value: maxVal,
+    });
+  });
+}
+
+function parse2024ExpertiseBenefit(benefit, desc, buffs) {
+  const skillMatch = desc.match(/(?:Choose one of the following skills:\s*|Choose one skill:\s*)(.+?)\.\s*(?:If|You|This|When)/i);
+  if (skillMatch) {
+    const skillList = skillMatch[1].split(/,\s*|,\s*(?:and\s+|\bor\s+)|(?:and\s+|\bor\s+)/).map(s => s.trim()).filter(s => s.length > 0);
+    if (skillList.length > 0) {
+      buffs.proficiencies.push({
+        name: benefit.name,
+        type: 'proficiency',
+        isChoice: true,
+        choose: 1,
+        from: [skillList.join(', ')],
+        grantsExpertise: true,
+      });
+    } else {
+      buffs.features.push({
+        name: benefit.name,
+        description: desc,
+        type: 'expertise',
+      });
+    }
+    return;
+  }
+
+  if (/choose.*skill.*proficiency.*expertise/i.test(desc)) {
+    buffs.proficiencies.push({
+      name: benefit.name,
+      type: 'proficiency',
+      isChoice: true,
+      choose: 1,
+      from: [ALL_SKILLS_LIST],
+      grantsExpertise: true,
+    });
+    return;
+  }
+
+  buffs.features.push({
+    name: benefit.name,
+    description: desc,
+    type: 'expertise',
+  });
+}
+
+function parse2024ProficiencyChoice(benefit, desc, buffs) {
+  const chooseMatch = desc.match(new RegExp(NUM_WORD_PATTERN + '\\s+(?:different\\s+)?(.+?)\\s+of\\s+your\\s+choice', 'i'));
+  if (chooseMatch) {
+    const firstWord = chooseMatch[0].split(' ')[0].toLowerCase();
+    let count = WORD_TO_NUM[firstWord] || 1;
+    if (!WORD_TO_NUM[firstWord]) {
+      const numMatch = firstWord.match(/^(\d+)/);
+      if (numMatch) count = parseInt(numMatch[1], 10);
+    }
+    buffs.proficiencies.push({
+      name: benefit.name,
+      type: 'proficiency',
+      isChoice: true,
+      choose: count,
+      from: [chooseMatch[1].trim()],
+    });
+    return;
+  }
+
+  const armorTrainingMatch = desc.match(/training with (\w+(?:\s+(?:and\s+)?\w+)*)\s*armor(?:\s+and\s+shields)?/i);
+  if (armorTrainingMatch) {
+    const armorType = armorTrainingMatch[1];
+    const formattedArmor = armorType.charAt(0).toUpperCase() + armorType.slice(1) + ' Armor';
+    buffs.proficiencies.push({ name: formattedArmor, type: 'proficiency' });
+    if (/shields/i.test(armorTrainingMatch[0])) {
+      buffs.proficiencies.push({ name: 'Shields', type: 'proficiency' });
+    }
+    return;
+  }
+
+  const weaponMatch = desc.match(/proficiency with (Martial|Simple|Light Martial|Finesse Martial|Heavy Martial) weapons?/i);
+  if (weaponMatch) {
+    const weaponType = weaponMatch[1].charAt(0).toUpperCase() + weaponMatch[1].slice(1);
+    buffs.proficiencies.push({ name: `${weaponType} Weapons`, type: 'proficiency' });
+    return;
+  }
+
+  buffs.proficiencies.push({ name: benefit.name, type: 'proficiency' });
+}
+
+function parse2024Proficiency(benefit, feat, buffs) {
+  const desc = benefit.description;
+  if (desc.includes('improvised')) {
+    buffs.proficiencies.push({ name: 'Improvised Weapons', type: 'proficiency' });
+    return;
+  }
+  if (desc.includes('all skills')) {
+    buffs.proficiencies.push({ name: 'all_skills', type: 'skill' });
+    return;
+  }
+  if (desc.includes('Expertise')) {
+    parse2024ExpertiseBenefit(benefit, desc, buffs);
+    return;
+  }
+  parse2024ProficiencyChoice(benefit, desc, buffs);
+}
+
+function parse2024Resistance(benefit, feat, buffs) {
+  const auto = benefit.automation;
+  if (!auto) {
+    buffs.features.push({
+      name: benefit.name,
+      description: benefit.description,
+      type: 'resistance',
+    });
+    return;
+  }
+
+  const validTypes = auto.validTypes || [];
+  if (validTypes.length === 0) {
+    buffs.features.push({
+      name: benefit.name,
+      description: benefit.description,
+      type: 'resistance',
+      automation: auto,
+    });
+    return;
+  }
+
+  const numChoice = Array.isArray(auto.resistanceType)
+    ? auto.resistanceType[0]?.replace('player_choice_', '').replace('_from_list', '') || '2'
+    : '2';
+  buffs.features.push({
+    name: benefit.name,
+    description: benefit.description,
+    type: 'resistance_choice',
+    automation: {
+      ...auto,
+      count: parseInt(numChoice, 10) || 2,
+      validTypes,
+    },
+  });
+}
+
+function parse2024SavingThrow(benefit, feat, buffs) {
+  const auto = benefit.automation;
+  if (!auto) return;
+  buffs.features.push({
+    name: benefit.name,
+    description: benefit.description,
+    type: 'saving_throw',
+    automation: auto,
+  });
+}
+
+function parse2024Damage(benefit, feat, buffs) {
+  const name = benefit.name;
+  if (benefit.automation?.type === 'reroll_damage_once_per_turn') {
+    buffs.features.push({
+      name: 'Savage Attacker',
+      description: benefit.description,
+      type: 'reroll_damage_once_per_turn',
+      automation: { type: 'reroll_damage_once_per_turn' },
+    });
+    return;
+  }
+  if (name && (name.includes('Great Weapon Fighting') || name.includes('Damage Die Reroll'))) {
+    buffs.features.push({
+      name: 'Great Weapon Fighting',
+      description: benefit.description,
+      type: 'great_weapon_fighting',
+      automation: { type: 'great_weapon_fighting' },
+    });
+    return;
+  }
+  if (name && name.includes('Enhanced Unarmed')) {
+    buffs.features.push({
+      name: 'Enhanced Unarmed Strike',
+      description: benefit.description,
+      type: 'damage',
+      automation: benefit.automation,
+    });
+    return;
+  }
+  if (name && name.includes('Extra Attack Damage')) {
+    buffs.features.push({
+      name: 'Two Weapon Fighting',
+      description: benefit.description,
+      type: 'two_weapon_fighting',
+      automation: { type: 'two_weapon_fighting' },
+    });
+    return;
+  }
+  if (name && name.includes('Dual Wielding')) {
+    buffs.features.push({
+      name: benefit.name,
+      description: benefit.description,
+      type: 'two_weapon_fighting',
+      automation: { type: 'two_weapon_fighting' },
+    });
+    return;
+  }
+  buffs.features.push({
+    name: benefit.name,
+    description: benefit.description,
+    type: benefit.type,
+    automation: benefit.automation,
+  });
+}
+
+function parse2024Spell(benefit, feat, buffs) {
+  const automationType = benefit.automation?.type;
+  if (automationType === 'free_spell') {
+    buffs.features.push({
+      name: benefit.name,
+      description: benefit.description,
+      type: 'free_spell',
+      automation: benefit.automation,
+    });
+    return;
+  }
+  if (benefit.name && benefit.name.toLowerCase().includes('level 1') && benefit.automation) {
+    buffs.features.push({
+      name: benefit.name,
+      description: benefit.description,
+      type: 'free_spell',
+      automation: benefit.automation,
+    });
+    return;
+  }
+  if (benefit.name && benefit.name.includes('Minor Telekinesis')) {
+    buffs.features.push({
+      name: 'Minor Telekinesis',
+      description: benefit.description,
+      type: 'spell',
+      automation: {
+        type: 'minor_telekinesis_spell',
+        spell: 'Mage Hand',
+      },
+    });
+    return;
+  }
+  buffs.features.push({
+    name: benefit.name,
+    description: benefit.description,
+    type: 'spell',
+    automation: benefit.automation,
+  });
+}
+
+function parse2024OtherBenefit(benefit, feat, buffs) {
+  const benefitName = benefit.name || '';
+  if (benefitName.includes('Great Weapon Fighting') || benefitName.includes('Damage Die Reroll')) {
+    buffs.features.push({
+      name: 'Great Weapon Fighting',
+      description: benefit.description,
+      type: 'great_weapon_fighting',
+      automation: { type: 'great_weapon_fighting' },
+    });
+    return;
+  }
+  if (benefitName.includes('Savage Strike') || benefitName === 'Savage Attacker') {
+    buffs.features.push({
+      name: 'Savage Attacker',
+      description: benefit.description,
+      type: 'reroll_damage_once_per_turn',
+      automation: { type: 'reroll_damage_once_per_turn' },
+    });
+    return;
+  }
+  if (benefitName.includes('Damage Reroll') || benefitName.includes('reroll.*1', 'i')) {
+    buffs.features.push({
+      name: 'Tavern Brawler Damage Reroll',
+      description: benefit.description,
+      type: 'passive',
+      automation: { type: 'tavern_brawler_reroll_ones' },
+    });
+    return;
+  }
+  if (benefitName.includes('Push') && benefit.type === 'action') {
+    buffs.features.push({
+      name: 'Tavern Brawler Push',
+      description: benefit.description,
+      type: 'action',
+      automation: { type: 'tavern_brawler_push', oncePerTurn: true },
+    });
+    return;
+  }
+  if (benefit.automation?.type === 'weapon_mastery_choice') {
+    buffs.features.push({
+      name: benefit.name || 'Mastery Property',
+      description: benefit.description,
+      type: 'passive',
+      automation: benefit.automation,
+    });
+    return;
+  }
+  if (benefit.type === 'bonus_action') {
+    const profMatch = (benefit.description || '').match(PROFICIENCY_PATTERN);
+    if (profMatch) {
+      buffs.proficiencies.push({ name: profMatch[1].trim() });
+    }
+    buffs.features.push({
+      name: benefit.name,
+      description: benefit.description,
+      type: 'bonus_action',
+      automation: benefit.automation,
+      isBonusAction: true,
+    });
+    return;
+  }
+  buffs.features.push({
+    name: benefit.name,
+    description: benefit.description,
+    type: benefit.type,
+    automation: benefit.automation || feat.automation,
+  });
+}
+
+const BENEFIT_PARSERS_2024 = {
+  ability_score_increase: parse2024AbilityScoreIncrease,
+  proficiency: parse2024Proficiency,
+  resistance: parse2024Resistance,
+  saving_throw: parse2024SavingThrow,
+  damage: parse2024Damage,
+  spell: parse2024Spell,
+};
+
 function parse2024Benefit(benefit, feat) {
   const buffs = {
     abilityScoreIncreases: [],
@@ -187,335 +562,10 @@ function parse2024Benefit(benefit, feat) {
     features: [],
   };
 
-  switch (benefit.type) {
-    case 'ability_score_increase': {
-      const asi = feat.ability_score_increase;
-      const maxVal = asi?.max_value || 20;
-      if (asi && asi.scores) {
-        if (asi.amount === 'variable') {
-          buffs.abilityScoreIncreases.push({
-            name: 'any',
-            amount: [1, 2],
-            isChoice: true,
-            description: benefit.description,
-            max_value: maxVal,
-          });
-        } else if (asi.scores.length > 2) {
-          buffs.abilityScoreIncreases.push({
-            name: 'any',
-            amount: Array.isArray(asi.amount) ? asi.amount : [asi.amount],
-            isChoice: true,
-            description: benefit.description,
-            max_value: maxVal,
-          });
-        } else if (asi.scores.length === 2) {
-          const amount = typeof asi.amount === 'number' ? asi.amount : 1;
-          buffs.abilityScoreIncreases.push({
-            name: 'any',
-            amount,
-            isChoice: true,
-            scores: asi.scores,
-            description: benefit.description,
-            max_value: maxVal,
-          });
-        } else {
-          const amount = typeof asi.amount === 'number' ? asi.amount : 1;
-          asi.scores.forEach(score => {
-            buffs.abilityScoreIncreases.push({
-              name: score,
-              amount,
-              isChoice: false,
-              description: benefit.description,
-              max_value: maxVal,
-            });
-          });
-        }
-      }
-      break;
-    }
-
-    case 'proficiency': {
-      const desc = benefit.description;
-      if (desc.includes('improvised')) {
-        buffs.proficiencies.push({ name: 'Improvised Weapons', type: 'proficiency' });
-        break;
-      }
-      if (desc.includes('all skills')) {
-        buffs.proficiencies.push({ name: 'all_skills', type: 'skill' });
-      } else if (desc.includes('Expertise')) {
-        const skillMatch = desc.match(/(?:Choose one of the following skills:\s*|Choose one skill:\s*)(.+?)\.\s*(?:If|You|This|When)/i);
-        if (skillMatch) {
-          const skillList = skillMatch[1].split(/,\s*|,\s*(?:and\s+|\bor\s+)|(?:and\s+|\bor\s+)/).map(s => s.trim()).filter(s => s.length > 0);
-          if (skillList.length > 0) {
-            buffs.proficiencies.push({
-              name: benefit.name,
-              type: 'proficiency',
-              isChoice: true,
-              choose: 1,
-              from: [skillList.join(', ')],
-              grantsExpertise: true,
-            });
-          } else {
-            buffs.features.push({
-              name: benefit.name,
-              description: desc,
-              type: 'expertise',
-            });
-          }
-        } else if (/choose.*skill.*proficiency.*expertise/i.test(desc)) {
-          const allSkills = 'Acrobatics, Animal Handling, Arcana, Athletics, Deception, History, Insight, Intimidation, Investigation, Medicine, Nature, Perception, Performance, Persuasion, Religion, Sleight of Hand, Stealth, Survival';
-          buffs.proficiencies.push({
-            name: benefit.name,
-            type: 'proficiency',
-            isChoice: true,
-            choose: 1,
-            from: [allSkills],
-            grantsExpertise: true,
-          });
-        } else {
-          buffs.features.push({
-            name: benefit.name,
-            description: desc,
-            type: 'expertise',
-          });
-        }
-      } else {
-        const numWords = '(?:one|two|three|four|five|six|seven|eight|nine|ten|1|2|3|4|5|6|7|8|9|10)';
-        const chooseMatch = desc.match(new RegExp(numWords + '\\s+(?:different\\s+)?(.+?)\\s+of\\s+your\\s+choice', 'i'));
-        if (chooseMatch) {
-          const firstWord = chooseMatch[0].split(' ')[0].toLowerCase();
-          const wordToNum = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
-          let count = wordToNum[firstWord] || 1;
-          if (!wordToNum[firstWord]) {
-            const numMatch = firstWord.match(/^(\d+)/);
-            if (numMatch) count = parseInt(numMatch[1], 10);
-          }
-          const fromList = chooseMatch[1].trim();
-          buffs.proficiencies.push({
-            name: benefit.name,
-            type: 'proficiency',
-            isChoice: true,
-            choose: count,
-            from: [fromList],
-          });
-        } else {
-          const armorTrainingMatch = desc.match(/training with (\w+(?:\s+(?:and\s+)?\w+)*)\s*armor(?:\s+and\s+shields)?/i);
-          if (armorTrainingMatch) {
-            const armorType = armorTrainingMatch[1];
-            const formattedArmor = armorType.charAt(0).toUpperCase() + armorType.slice(1) + ' Armor';
-            buffs.proficiencies.push({ name: formattedArmor, type: 'proficiency' });
-            if (/shields/i.test(armorTrainingMatch[0])) {
-              buffs.proficiencies.push({ name: 'Shields', type: 'proficiency' });
-            }
-          } else {
-            const weaponMatch = desc.match(/proficiency with (Martial|Simple|Light Martial|Finesse Martial|Heavy Martial) weapons?/i);
-            if (weaponMatch) {
-              const weaponType = weaponMatch[1].charAt(0).toUpperCase() + weaponMatch[1].slice(1);
-              buffs.proficiencies.push({ name: `${weaponType} Weapons`, type: 'proficiency' });
-            } else {
-              buffs.proficiencies.push({ name: benefit.name, type: 'proficiency' });
-            }
-          }
-        }
-      }
-      break;
-    }
-
-    case 'resistance': {
-      const auto = benefit.automation;
-      if (auto) {
-        const validTypes = auto.validTypes || [];
-        if (validTypes.length > 0) {
-          const numChoice = Array.isArray(auto.resistanceType)
-            ? auto.resistanceType[0]?.replace('player_choice_', '').replace('_from_list', '') || '2'
-            : '2';
-          const count = parseInt(numChoice, 10) || 2;
-          buffs.features.push({
-            name: benefit.name,
-            description: benefit.description,
-            type: 'resistance_choice',
-            automation: {
-              ...auto,
-              count,
-              validTypes,
-            },
-          });
-        } else {
-          buffs.features.push({
-            name: benefit.name,
-            description: benefit.description,
-            type: 'resistance',
-            automation: auto,
-          });
-        }
-      } else {
-        buffs.features.push({
-          name: benefit.name,
-          description: benefit.description,
-          type: 'resistance',
-        });
-      }
-      break;
-    }
-
-    case 'saving_throw': {
-      const auto = benefit.automation;
-      if (auto) {
-        buffs.features.push({
-          name: benefit.name,
-          description: benefit.description,
-          type: 'saving_throw',
-          automation: auto,
-        });
-      }
-      break;
-    }
-
-    case 'damage': {
-      if (benefit.automation?.type === 'reroll_damage_once_per_turn') {
-        buffs.features.push({
-          name: 'Savage Attacker',
-          description: benefit.description,
-          type: 'reroll_damage_once_per_turn',
-          automation: { type: 'reroll_damage_once_per_turn' },
-        });
-      } else if (benefit.name && (benefit.name.includes('Great Weapon Fighting') || benefit.name.includes('Damage Die Reroll'))) {
-        buffs.features.push({
-          name: 'Great Weapon Fighting',
-          description: benefit.description,
-          type: 'great_weapon_fighting',
-          automation: { type: 'great_weapon_fighting' },
-        });
-      } else if (benefit.name && benefit.name.includes('Enhanced Unarmed')) {
-        buffs.features.push({
-          name: 'Enhanced Unarmed Strike',
-          description: benefit.description,
-          type: 'damage',
-          automation: benefit.automation,
-        });
-      } else if (benefit.name && benefit.name.includes('Extra Attack Damage')) {
-        buffs.features.push({
-          name: 'Two Weapon Fighting',
-          description: benefit.description,
-          type: 'two_weapon_fighting',
-          automation: { type: 'two_weapon_fighting' },
-        });
-      } else if (benefit.name && benefit.name.includes('Dual Wielding')) {
-        buffs.features.push({
-          name: benefit.name,
-          description: benefit.description,
-          type: 'two_weapon_fighting',
-          automation: { type: 'two_weapon_fighting' },
-        });
-      } else {
-        buffs.features.push({
-          name: benefit.name,
-          description: benefit.description,
-          type: benefit.type,
-          automation: benefit.automation,
-        });
-      }
-      break;
-    }
-
-    case 'spell': {
-      const automationType = benefit.automation?.type;
-      if (automationType === 'free_spell') {
-        buffs.features.push({
-          name: benefit.name,
-          description: benefit.description,
-          type: 'free_spell',
-          automation: benefit.automation,
-        });
-      } else if (benefit.name && benefit.name.toLowerCase().includes('level 1') && benefit.automation) {
-        buffs.features.push({
-          name: benefit.name,
-          description: benefit.description,
-          type: 'free_spell',
-          automation: benefit.automation,
-        });
-      } else if (benefit.name && benefit.name.includes('Minor Telekinesis')) {
-        buffs.features.push({
-          name: 'Minor Telekinesis',
-          description: benefit.description,
-          type: 'spell',
-          automation: {
-            type: 'minor_telekinesis_spell',
-            spell: 'Mage Hand',
-          },
-        });
-      } else {
-        buffs.features.push({
-          name: benefit.name,
-          description: benefit.description,
-          type: 'spell',
-          automation: benefit.automation,
-        });
-      }
-      break;
-    }
-
-    default: {
-      const benefitName = benefit.name || '';
-      if (benefitName.includes('Great Weapon Fighting') || benefitName.includes('Damage Die Reroll')) {
-        buffs.features.push({
-          name: 'Great Weapon Fighting',
-          description: benefit.description,
-          type: 'great_weapon_fighting',
-          automation: { type: 'great_weapon_fighting' },
-        });
-      } else if (benefitName.includes('Savage Strike') || benefitName === 'Savage Attacker') {
-        buffs.features.push({
-          name: 'Savage Attacker',
-          description: benefit.description,
-          type: 'reroll_damage_once_per_turn',
-          automation: { type: 'reroll_damage_once_per_turn' },
-        });
-      } else if (benefitName.includes('Damage Reroll') || benefitName.includes('reroll.*1', 'i')) {
-        buffs.features.push({
-          name: 'Tavern Brawler Damage Reroll',
-          description: benefit.description,
-          type: 'passive',
-          automation: { type: 'tavern_brawler_reroll_ones' },
-        });
-      } else if (benefitName.includes('Push') && benefit.type === 'action') {
-        buffs.features.push({
-          name: 'Tavern Brawler Push',
-          description: benefit.description,
-          type: 'action',
-          automation: { type: 'tavern_brawler_push', oncePerTurn: true },
-        });
-      } else if (benefit.automation?.type === 'weapon_mastery_choice') {
-        buffs.features.push({
-          name: benefit.name || 'Mastery Property',
-          description: benefit.description,
-          type: 'passive',
-          automation: benefit.automation,
-        });
-      } else if (benefit.type === 'bonus_action') {
-        const desc = benefit.description || '';
-        const profMatch = desc.match(PROFICIENCY_PATTERN);
-        if (profMatch) {
-          buffs.proficiencies.push({ name: profMatch[1].trim() });
-        }
-        buffs.features.push({
-          name: benefit.name,
-          description: benefit.description,
-          type: 'bonus_action',
-          automation: benefit.automation,
-          isBonusAction: true,
-        });
-      } else {
-        buffs.features.push({
-          name: benefit.name,
-          description: benefit.description,
-          type: benefit.type,
-          automation: benefit.automation || feat.automation,
-        });
-      }
-      break;
-    }
-  }
+  const parse = Object.prototype.hasOwnProperty.call(BENEFIT_PARSERS_2024, benefit.type)
+    ? BENEFIT_PARSERS_2024[benefit.type]
+    : parse2024OtherBenefit;
+  parse(benefit, feat, buffs);
 
   return buffs;
 }

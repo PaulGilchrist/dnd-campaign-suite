@@ -330,6 +330,100 @@ function SaveAttackAoeModal({
         return { results, prompts };
     }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess]);
 
+    function logSoulstitchAutoSave({ campaignName, playerStats, actionName, targetName, detail, saveBonus }) {
+        addEntry(campaignName, {
+            type: 'roll',
+            rollType: 'save-damage',
+            characterName: playerStats.name,
+            name: `${actionName} (Soulstitch)`,
+            targetName,
+            saveType: detail.saveType,
+            saveDc: detail.saveDc,
+            dcSuccess: detail.dcSuccess,
+            saveResult: 'soulstitch_auto_success',
+            saveRoll: detail.roll ?? 0,
+            saveBonus,
+            finalDamage: 0,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging soulstitch auto-save:', e); });
+    }
+
+    function applyPlayerSaveDamage({ campaignName, combatSummary, playerStats, actionName, targetName, detail, success, saveBonus, saveDc, saveType, dcSuccess, damageType, rawDamage, targetDamageFormula, damageRoll, finalDamage, isRadiantSoulTarget, radiantSoulChaMod, radiantSoulFlagKey }) {
+        addEntry(campaignName, {
+            type: 'roll',
+            characterName: playerStats.name,
+            rollType: 'save-damage',
+            name: actionName,
+            targetName,
+            saveDc: saveDc,
+            saveType: saveType,
+            saveResult: success ? 'success' : 'failure',
+            total: detail.total ?? 0,
+            rolls: [detail.roll ?? 0],
+            bonus: saveBonus,
+            formula: `1d20${saveBonus !== 0 ? '+' + saveBonus : ''}`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging player save:', e); });
+
+        const characters = combatSummary?.creatures?.filter(c => c.type === 'player') || [];
+        applyDamageToTarget(
+            combatSummary, targetName, finalDamage, [damageType],
+            campaignName, characters, false, playerStats.name, false
+        );
+
+        if (isRadiantSoulTarget) {
+            setRuntimeValue(playerStats.name, radiantSoulFlagKey, true, campaignName);
+            setRuntimeValue(playerStats.name, 'pendingRadiantSoulTarget', null, campaignName);
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName: playerStats.name,
+                abilityName: 'Radiant Soul',
+                description: `Radiant Soul: +${radiantSoulChaMod} ${damageType} damage added to ${targetName}'s damage roll (once per turn).`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging Radiant Soul:', e); });
+        }
+
+        addEntry(campaignName, {
+            type: 'roll',
+            characterName: playerStats.name,
+            rollType: 'save-damage',
+            name: actionName,
+            formula: targetDamageFormula,
+            rolls: damageRoll?.rolls ?? [],
+            total: rawDamage,
+            modifier: damageRoll?.modifier ?? 0,
+            damageType: damageType,
+            targetName,
+            saveType: saveType,
+            saveDc: saveDc,
+            dcSuccess: dcSuccess,
+            saveResult: success ? 'success' : 'failure',
+            saveRoll: detail.roll ?? 0,
+            saveBonus,
+            saveRawRolls: [detail.roll ?? 0, detail.roll ?? 0],
+            finalDamage: finalDamage,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging player damage:', e); });
+    }
+
+    function logPlayerSaveSuccess({ campaignName, playerStats, actionName, targetName, detail, saveBonus }) {
+        addEntry(campaignName, {
+            type: 'roll',
+            rollType: 'save-damage',
+            characterName: playerStats.name,
+            name: actionName,
+            targetName,
+            saveType: detail.saveType,
+            saveDc: detail.saveDc,
+            dcSuccess: detail.dcSuccess,
+            saveResult: 'success',
+            saveRoll: detail.roll ?? 0,
+            saveBonus,
+            finalDamage: 0,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging player save success:', e); });
+    }
+
     const handleSaveResult = useCallback(async (event, ctx) => {
         const detail = event.detail;
         if (!detail || !detail.promptId) return;
@@ -353,21 +447,7 @@ function SaveAttackAoeModal({
         const finalDamage = computeDamageAfterEvasion(rawDamage, success, dcSuccess, evasionActive);
 
         if (isSoulstitchProtected) {
-            addEntry(campaignName, {
-                type: 'roll',
-                rollType: 'save-damage',
-                characterName: playerStats.name,
-                name: `${action.name} (Soulstitch)`,
-                targetName,
-                saveType: detail.saveType,
-                saveDc: detail.saveDc,
-                dcSuccess: detail.dcSuccess,
-                saveResult: 'soulstitch_auto_success',
-                saveRoll: detail.roll ?? 0,
-                saveBonus,
-                finalDamage: 0,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging soulstitch auto-save:', e); });
+            logSoulstitchAutoSave({ campaignName, playerStats, actionName: action.name, targetName, detail, saveBonus });
         }
 
         const scalingEntry = resolveScaling(playerStats, action.automation?.scaling);
@@ -380,61 +460,7 @@ function SaveAttackAoeModal({
         const damageRoll = overchannelActive ? rollExpressionMaximized(targetDamageFormula) : rollExpression(targetDamageFormula);
 
         if (finalDamage > 0) {
-            addEntry(campaignName, {
-                type: 'roll',
-                characterName: playerStats.name,
-                rollType: 'save-damage',
-                name: action.name,
-                targetName,
-                saveDc: saveDc,
-                saveType: saveType,
-                saveResult: success ? 'success' : 'failure',
-                total: detail.total ?? 0,
-                rolls: [detail.roll ?? 0],
-                bonus: saveBonus,
-                formula: `1d20${saveBonus !== 0 ? '+' + saveBonus : ''}`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging player save:', e); });
-
-            const characters = combatSummary?.creatures?.filter(c => c.type === 'player') || [];
-            applyDamageToTarget(
-                combatSummary, targetName, finalDamage, [damageType],
-                campaignName, characters, false, playerStats.name, false
-            );
-
-            if (isRadiantSoulTarget) {
-                setRuntimeValue(playerStats.name, radiantSoulFlagKey, true, campaignName);
-                setRuntimeValue(playerStats.name, 'pendingRadiantSoulTarget', null, campaignName);
-                addEntry(campaignName, {
-                    type: 'ability_use',
-                    characterName: playerStats.name,
-                    abilityName: 'Radiant Soul',
-                    description: `Radiant Soul: +${radiantSoulChaMod} ${damageType} damage added to ${targetName}'s damage roll (once per turn).`,
-                    timestamp: Date.now(),
-                }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging Radiant Soul:', e); });
-            }
-
-            addEntry(campaignName, {
-                type: 'roll',
-                characterName: playerStats.name,
-                rollType: 'save-damage',
-                name: action.name,
-                formula: targetDamageFormula,
-                rolls: damageRoll?.rolls ?? [],
-                total: rawDamage,
-                modifier: damageRoll?.modifier ?? 0,
-                damageType: damageType,
-                targetName,
-                saveType: saveType,
-                saveDc: saveDc,
-                dcSuccess: dcSuccess,
-                saveResult: success ? 'success' : 'failure',
-                saveRoll: detail.roll ?? 0,
-                saveBonus,
-                saveRawRolls: [detail.roll ?? 0, detail.roll ?? 0],
-                finalDamage: finalDamage,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging player damage:', e); });
+            applyPlayerSaveDamage({ campaignName, combatSummary, playerStats, actionName: action.name, targetName, detail, success, saveBonus, saveDc, saveType, dcSuccess, damageType, rawDamage, targetDamageFormula, damageRoll, finalDamage, isRadiantSoulTarget, radiantSoulChaMod, radiantSoulFlagKey });
         }
 
         if (!success && pullMarkerEffect) {
@@ -442,21 +468,7 @@ function SaveAttackAoeModal({
             registerTargetEffect(campaignName, targetName, pullMarkerEffect, action.name, { duration: 'instant' });
         }
         if (success && logSaveSuccess) {
-            addEntry(campaignName, {
-                type: 'roll',
-                rollType: 'save-damage',
-                characterName: playerStats.name,
-                name: action.name,
-                targetName,
-                saveType: detail.saveType,
-                saveDc: detail.saveDc,
-                dcSuccess: detail.dcSuccess,
-                saveResult: 'success',
-                saveRoll: detail.roll ?? 0,
-                saveBonus,
-                finalDamage: 0,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging player save success:', e); });
+            logPlayerSaveSuccess({ campaignName, playerStats, actionName: action.name, targetName, detail, saveBonus });
         }
 
         addTargetResult(campaignName, {

@@ -14,6 +14,54 @@ const LATCH_KEY = '_Telekinetic_Master_attack_usedRound';
 // (spending nothing) when not concentrating, latches once per turn, and routes a real
 // weapon attack through the damage pipeline (roll → damage → applyDamage → logs),
 // mirroring bonusAttacksHandler's single-strike model.
+function hitLabel(isCrit, hit) {
+    return isCrit ? 'CRIT' : hit ? 'HIT' : 'MISS';
+}
+
+function resolveMeleeWeapon(playerStats) {
+    const weapon = (playerStats.attacks || []).find(a => (a.weaponType || a.attackType) === 'melee')
+        || playerStats.attacks?.[0];
+    return {
+        attackBonus: weapon?.hitBonus ?? 0,
+        damageFormula: weapon?.damage || '1d4+0',
+        damageType: weapon?.damageType || 'Bludgeoning',
+        weaponName: weapon?.name || 'weapon',
+        weaponType: weapon?.weaponType || weapon?.attackType || 'melee',
+    };
+}
+
+async function resolveConcentrationDamage(cs, campaignName, playerName, targetName, damageFormula, damageType, isCrit, actionName) {
+    let finalDamage = 0;
+    let damageRolls = [];
+    const rollResult = (isCrit ? rollExpressionDoubled : rollExpression)(damageFormula);
+    const rawDamage = rollResult?.total || 0;
+    damageRolls = rollResult?.rolls || [];
+    const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
+    // applyDamageToTarget writes lastAttack + logs hp_change canonically.
+    const applyResult = await applyDamageToTarget(
+        cs, targetName, rawDamage, [damageType], campaignName, characters, false, playerName
+    );
+    finalDamage = applyResult?.finalDamage || 0;
+    if (finalDamage > 0) endInvisibilityOnHostileAction(playerName, campaignName);
+
+    await addEntry(campaignName, {
+        type: 'roll',
+        characterName: playerName,
+        rollType: 'damage',
+        name: actionName,
+        formula: damageFormula,
+        rolls: damageRolls,
+        total: rawDamage,
+        damageType,
+        targetName,
+        finalDamage,
+        isCrit,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[concentrationBonusAttackHandler:log-error]", e); });
+
+    return { finalDamage, rawDamage, damageRolls };
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -81,14 +129,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return refusal(reason);
     }
 
-    const weapon = (playerStats.attacks || []).find(a => (a.weaponType || a.attackType) === 'melee')
-        || playerStats.attacks?.[0];
-    const attackBonus = weapon?.hitBonus ?? 0;
-    const damageFormula = weapon?.damage || '1d4+0';
-    const damageType = weapon?.damageType || 'Bludgeoning';
-    const weaponName = weapon?.name || 'weapon';
+    const { attackBonus, damageFormula, damageType, weaponName, weaponType } = resolveMeleeWeapon(playerStats);
     const ac = target.ac ?? 10;
-    const weaponType = weapon?.weaponType || weapon?.attackType || 'melee';
 
     const d20Roll = rollD20();
     const total = d20Roll + attackBonus;
@@ -121,33 +163,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }, campaignName);
 
     let finalDamage = 0;
-    let damageRolls = [];
     if (hit) {
-        const rollResult = (isCrit ? rollExpressionDoubled : rollExpression)(damageFormula);
-        const rawDamage = rollResult?.total || 0;
-        damageRolls = rollResult?.rolls || [];
-        const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-        // applyDamageToTarget writes lastAttack + logs hp_change canonically.
-        const applyResult = await applyDamageToTarget(
-            cs, targetName, rawDamage, [damageType], campaignName, characters, false, playerName
-        );
-        finalDamage = applyResult?.finalDamage || 0;
-        if (finalDamage > 0) endInvisibilityOnHostileAction(playerName, campaignName);
-
-        await addEntry(campaignName, {
-            type: 'roll',
-            characterName: playerName,
-            rollType: 'damage',
-            name: action.name,
-            formula: damageFormula,
-            rolls: damageRolls,
-            total: rawDamage,
-            damageType,
-            targetName,
-            finalDamage,
-            isCrit,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[concentrationBonusAttackHandler:log-error]", e); });
+        const outcome = await resolveConcentrationDamage(cs, campaignName, playerName, targetName, damageFormula, damageType, isCrit, action.name);
+        finalDamage = outcome.finalDamage;
     }
 
     await addEntry(campaignName, {
@@ -172,7 +190,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         type: 'ability_use',
         characterName: playerName,
         abilityName: action.name,
-        description: `${playerName} used ${action.name} — bonus-action ${weaponName} attack on ${targetName}: ${isCrit ? 'CRIT' : hit ? 'HIT' : 'MISS'} (${d20Roll}+${attackBonus}=${total} vs AC ${ac})${hit ? `, ${finalDamage} ${damageType} damage` : ''}.`,
+        description: `${playerName} used ${action.name} — bonus-action ${weaponName} attack on ${targetName}: ${hitLabel(isCrit, hit)} (${d20Roll}+${attackBonus}=${total} vs AC ${ac})${hit ? `, ${finalDamage} ${damageType} damage` : ''}.`,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[concentrationBonusAttackHandler:log-error]", e); });
 

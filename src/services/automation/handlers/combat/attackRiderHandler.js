@@ -13,6 +13,197 @@ import { restoreBaseAttackAfterBash } from '../../../combat/steps/features/shiel
 import { resolveMassFear } from './massFearHandler.js';
 import { validateCunningStrikeOption, getCombatContextSync, applyCunningStrikeCost } from './cunningStrikeUtils.js';
 
+// Slashing damage hit validation (used by Slasher feat Hamstring)
+async function validateSlashingHit(action, playerStats, campaignName) {
+    const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
+
+    if (!lastAttack) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: 'No attack hit recorded. Hamstring requires a recent attack hit.',
+            },
+        };
+    }
+
+    if (!lastAttack.hit) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: 'Hamstring requires a hit. Your last attack missed.',
+            },
+        };
+    }
+
+    if (lastAttack.attackerName !== playerStats.name) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: 'Hamstring only works on your own attacks.',
+            },
+        };
+    }
+
+    const damageType = (lastAttack.damageType || '').toLowerCase();
+    if (damageType !== 'slashing') {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `Hamstring requires Slashing damage. Your last attack dealt ${lastAttack.damageType || 'unknown'} damage.`,
+            },
+        };
+    }
+
+    return null;
+}
+
+function infoPopup(name, description) {
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name,
+            description,
+        },
+    };
+}
+
+function hasEquippedShield(playerStats) {
+    const equipped = playerStats.inventory?.equipped || [];
+    const equipment = playerStats.equipment || [];
+    return equipped.some(itemName => {
+        const { baseName } = parseMagicItemName(itemName);
+        const match = equipment.find(e => e.name === baseName);
+        return match && (match.armor_category === 'Shield' || match.equipment_category === 'Shield');
+    });
+}
+
+function resolveShieldBashSaveDc(auto, playerStats) {
+    if (auto.saveDc === 'ability') return buildSaveDc(auto, playerStats);
+    return auto.saveDc || (8 + (playerStats.abilities?.find(a => a.name === 'Strength')?.bonus || 0) + (playerStats.proficiency || 0));
+}
+
+// Shield Bash with push_or_prone: validate prerequisites and do save first
+async function handleShieldBash(action, auto, options, playerStats, campaignName) {
+    if (!hasEquippedShield(playerStats)) {
+        return infoPopup(action.name, 'Shield Bash requires an equipped shield.');
+    }
+
+    // Check lastAttack is player's melee weapon attack
+    const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
+    if (!lastAttack?.hit) {
+        return infoPopup(action.name, 'Shield Bash requires a hit with a melee weapon attack.');
+    }
+    if (lastAttack.attackerName !== playerStats.name) {
+        return infoPopup(action.name, 'Shield Bash requires your own melee weapon attack.');
+    }
+    if (lastAttack.weaponType !== 'melee') {
+        return infoPopup(action.name, 'Shield Bash requires a melee weapon attack.');
+    }
+
+    const targetName = lastAttack.targetName;
+    if (!targetName) {
+        return infoPopup(action.name, 'Shield Bash: no target found.');
+    }
+
+    // Check oncePerTurn with skip
+    const skipResult = await checkOncePerTurnWithSkip(action.name, `_${action.name.replace(/\s+/g, '_')}_usedRound`, `_${action.name.replace(/\s+/g, '_')}_skippedRound`, playerStats, campaignName);
+    if (skipResult) return skipResult;
+
+    // Build save DC
+    const saveDc = resolveShieldBashSaveDc(auto, playerStats);
+
+    // FT-082 collateral: stash the base weapon attack; the save
+    // resolution clobbers campaign lastAttack, which would falsely block
+    // same-turn Slasher Hamstring. Restored on success / applyShieldBashEffect.
+    await setRuntimeValue(playerStats.name, '_shieldBashBaseAttack', lastAttack, campaignName);
+
+    // Create save prompt
+
+    const { promise } = createSaveListener(campaignName, {
+        targetName,
+        saveType: 'STR',
+        saveDc,
+        dcSuccess: false,
+        sourceName: action.name,
+    });
+
+    addEntry(campaignName, {
+        type: 'roll',
+        name: action.name,
+        characterName: playerStats.name,
+        rollType: 'save-damage',
+        targetName,
+        saveDc,
+        saveType: 'STR',
+        description: `${action.name}: ${targetName} must make a STR saving throw (DC ${saveDc}).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[attackRiderHandler:log-error]", e); });
+
+    const saveResult = await promise;
+    const success = saveResult.success;
+
+    addEntry(campaignName, {
+        type: 'roll',
+        name: action.name,
+        characterName: playerStats.name,
+        rollType: 'save-damage',
+        targetName,
+        saveDc,
+        saveType: 'STR',
+        saveResult: success ? 'success' : 'failure',
+        total: saveResult.total ?? 0,
+        rolls: [saveResult.roll ?? 0],
+        bonus: saveResult.saveBonus ?? 0,
+        formula: `1d20${saveResult.saveBonus !== 0 ? '+' + saveResult.saveBonus : ''}`,
+        description: `${targetName} ${success ? 'succeeded' : 'failed'} the STR save (DC ${saveDc}).${!success ? ' Shield Bash effect applied.' : ''}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[attackRiderHandler:log-error]", e); });
+
+    if (success) {
+        await restoreBaseAttackAfterBash(playerStats, campaignName);
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${targetName} succeeded on STR save (DC ${saveDc}). Shield Bash has no effect.`,
+                automation: auto,
+            },
+        };
+    }
+
+    // On failed save — show shieldBash modal
+    return {
+        type: 'modal',
+        modalName: 'shieldBash',
+        payload: {
+            action: {
+                name: action.name,
+                options: options,
+                automation: auto,
+            },
+            playerStats,
+            campaignName,
+            targetName,
+            saveDc,
+        },
+    };
+}
+
+function oncePerTurnUsedKey(action) {
+    const isCsFeature = ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].includes(action.name);
+    return isCsFeature ? '_CunningStrike_usedRound' : `_${action.name.replace(/\s+/g, '_')}_usedRound`;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || action;
     let options = auto.options || [];
@@ -30,207 +221,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         ];
     }
 
-    // Slashing damage hit validation (used by Slasher feat Hamstring)
     if (auto.trigger === 'slashing_damage_hit') {
-        const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
-
-        if (!lastAttack) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: 'No attack hit recorded. Hamstring requires a recent attack hit.',
-                },
-            };
-        }
-
-        if (!lastAttack.hit) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: 'Hamstring requires a hit. Your last attack missed.',
-                },
-            };
-        }
-
-        if (lastAttack.attackerName !== playerStats.name) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: 'Hamstring only works on your own attacks.',
-                },
-            };
-        }
-
-        const damageType = (lastAttack.damageType || '').toLowerCase();
-        if (damageType !== 'slashing') {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: `Hamstring requires Slashing damage. Your last attack dealt ${lastAttack.damageType || 'unknown'} damage.`,
-                },
-            };
-        }
+        const invalid = await validateSlashingHit(action, playerStats, campaignName);
+        if (invalid) return invalid;
     }
 
-    // Shield Bash with push_or_prone: validate prerequisites and do save first
     if (auto.effect === 'push_or_prone' && auto.oncePerTurn && auto.trigger) {
-        // Check shield equipped
-        const equipped = playerStats.inventory?.equipped || [];
-        const equipment = playerStats.equipment || [];
-        const hasShield = equipped.some(itemName => {
-            const { baseName } = parseMagicItemName(itemName);
-            const match = equipment.find(e => e.name === baseName);
-            return match && (match.armor_category === 'Shield' || match.equipment_category === 'Shield');
-        });
-        if (!hasShield) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: 'Shield Bash requires an equipped shield.',
-                },
-            };
-        }
-
-        // Check lastAttack is player's melee weapon attack
-        const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
-        if (!lastAttack?.hit) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: 'Shield Bash requires a hit with a melee weapon attack.',
-                },
-            };
-        }
-        if (lastAttack.attackerName !== playerStats.name) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: 'Shield Bash requires your own melee weapon attack.',
-                },
-            };
-        }
-        if (lastAttack.weaponType !== 'melee') {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: 'Shield Bash requires a melee weapon attack.',
-                },
-            };
-        }
-
-        const targetName = lastAttack.targetName;
-        if (!targetName) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: 'Shield Bash: no target found.',
-                },
-            };
-        }
-
-        // Check oncePerTurn with skip
-        const skipResult = await checkOncePerTurnWithSkip(action.name, `_${action.name.replace(/\s+/g, '_')}_usedRound`, `_${action.name.replace(/\s+/g, '_')}_skippedRound`, playerStats, campaignName);
-        if (skipResult) return skipResult;
-
-        // Build save DC
-        const saveDc = auto.saveDc === 'ability'
-            ? buildSaveDc(auto, playerStats)
-            : (auto.saveDc || (8 + (playerStats.abilities?.find(a => a.name === 'Strength')?.bonus || 0) + (playerStats.proficiency || 0)));
-
-        // FT-082 collateral: stash the base weapon attack; the save
-        // resolution clobbers campaign lastAttack, which would falsely block
-        // same-turn Slasher Hamstring. Restored on success / applyShieldBashEffect.
-        await setRuntimeValue(playerStats.name, '_shieldBashBaseAttack', lastAttack, campaignName);
-
-        // Create save prompt
-
-        const { promise } = createSaveListener(campaignName, {
-            targetName,
-            saveType: 'STR',
-            saveDc,
-            dcSuccess: false,
-            sourceName: action.name,
-        });
-
-        addEntry(campaignName, {
-            type: 'roll',
-            name: action.name,
-            characterName: playerStats.name,
-            rollType: 'save-damage',
-            targetName,
-            saveDc,
-            saveType: 'STR',
-            description: `${action.name}: ${targetName} must make a STR saving throw (DC ${saveDc}).`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[attackRiderHandler:log-error]", e); });
-
-        const saveResult = await promise;
-        const success = saveResult.success;
-
-        addEntry(campaignName, {
-            type: 'roll',
-            name: action.name,
-            characterName: playerStats.name,
-            rollType: 'save-damage',
-            targetName,
-            saveDc,
-            saveType: 'STR',
-            saveResult: success ? 'success' : 'failure',
-            total: saveResult.total ?? 0,
-            rolls: [saveResult.roll ?? 0],
-            bonus: saveResult.saveBonus ?? 0,
-            formula: `1d20${saveResult.saveBonus !== 0 ? '+' + saveResult.saveBonus : ''}`,
-            description: `${targetName} ${success ? 'succeeded' : 'failed'} the STR save (DC ${saveDc}).${!success ? ' Shield Bash effect applied.' : ''}`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[attackRiderHandler:log-error]", e); });
-
-        if (success) {
-            await restoreBaseAttackAfterBash(playerStats, campaignName);
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: `${targetName} succeeded on STR save (DC ${saveDc}). Shield Bash has no effect.`,
-                    automation: auto,
-                },
-            };
-        }
-
-        // On failed save — show shieldBash modal
-        return {
-            type: 'modal',
-            modalName: 'shieldBash',
-            payload: {
-                action: {
-                    name: action.name,
-                    options: options,
-                    automation: auto,
-                },
-                playerStats,
-                campaignName,
-                targetName,
-                saveDc,
-            },
-        };
+        return handleShieldBash(action, auto, options, playerStats, campaignName);
     }
 
     const cs = await getCombatContext(campaignName);
@@ -245,8 +242,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }).catch((e) => { console.error("[attackRiderHandler:log-error]", e); });
 
     if (auto.oncePerTurn) {
-        const isCsFeature = ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].includes(action.name);
-        const usedKey = isCsFeature ? '_CunningStrike_usedRound' : `_${action.name.replace(/\s+/g, '_')}_usedRound`;
+        const usedKey = oncePerTurnUsedKey(action);
         const skip = await checkOncePerTurn(action.name, usedKey, playerStats.name, campaignName);
         if (skip) return skip;
     }
@@ -267,8 +263,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // Single option — apply immediately
     if (options.length === 1) {
         if (auto.oncePerTurn) {
-            const isCsFeature = ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].includes(action.name);
-            const usedKey = isCsFeature ? '_CunningStrike_usedRound' : `_${action.name.replace(/\s+/g, '_')}_usedRound`;
+            const usedKey = oncePerTurnUsedKey(action);
             await markOncePerTurn(action.name, usedKey, playerStats, campaignName);
         }
         const chosen = options[0];
@@ -305,8 +300,7 @@ export async function applyRiderOption(action, playerStats, campaignName, target
 
     // Check oncePerTurn for Charger feat
     if (auto.oncePerTurn) {
-        const isCsFeature = ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].includes(action.name);
-        const usedKey = isCsFeature ? '_CunningStrike_usedRound' : `_${action.name.replace(/\s+/g, '_')}_usedRound`;
+        const usedKey = oncePerTurnUsedKey(action);
         const skip = await checkOncePerTurn(action.name, usedKey, playerStats.name, campaignName);
         if (skip) return skip;
     }
@@ -339,8 +333,7 @@ export async function applyRiderOption(action, playerStats, campaignName, target
 
     // Mark oncePerTurn as used
     if (auto.oncePerTurn) {
-        const isCsFeature = ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].includes(action.name);
-        const usedKey = isCsFeature ? '_CunningStrike_usedRound' : `_${action.name.replace(/\s+/g, '_')}_usedRound`;
+        const usedKey = oncePerTurnUsedKey(action);
         await markOncePerTurn(action.name, usedKey, playerStats, campaignName);
     }
 
@@ -371,17 +364,9 @@ export async function applyRiderOption(action, playerStats, campaignName, target
         // If Trip was applied and Versatile Trickster is available, find secondary targets
         if (chosen.effect === 'prone' && hasVersatileTricksterPassive && targetName) {
             hasVersatileTrickster = true;
-            const cs = await getCombatContext(campaignName);
-            if (cs?.creatures) {
-                const secondaryTargets = [];
-                for (const c of cs.creatures) {
-                    if (c.name === targetName) continue;
-                    const inRange = await isWithinRange(targetName, c.name, 5);
-                    if (inRange) secondaryTargets.push(c);
-                }
-                if (secondaryTargets.length > 0) {
-                    versatileTricksterSecondaryTarget = secondaryTargets;
-                }
+            const secondaryTargets = await scanNearbySecondaryTargets(campaignName, targetName);
+            if (secondaryTargets.length > 0) {
+                versatileTricksterSecondaryTarget = secondaryTargets;
             }
         }
     }
@@ -397,15 +382,7 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     const hasStalkersFlurry = chosenOptions.some(o => o.effect === 'sudden_strike');
     let stalkersFlurrySecondaryTarget = null;
     if (hasStalkersFlurry && targetName) {
-        const cs = await getCombatContext(campaignName);
-        if (cs?.creatures) {
-            stalkersFlurrySecondaryTarget = [];
-            for (const c of cs.creatures) {
-                if (c.name === targetName) continue;
-                const inRange = await isWithinRange(targetName, c.name, 5);
-                if (inRange) stalkersFlurrySecondaryTarget.push(c);
-            }
-        }
+        stalkersFlurrySecondaryTarget = await scanNearbySecondaryTargets(campaignName, targetName);
     }
 
     if (stalkersFlurrySecondaryTarget && stalkersFlurrySecondaryTarget.length > 0) {
@@ -455,6 +432,17 @@ export async function applyRiderOption(action, playerStats, campaignName, target
             automation: auto,
         },
     };
+}
+
+async function scanNearbySecondaryTargets(campaignName, targetName) {
+    const cs = await getCombatContext(campaignName);
+    if (!cs?.creatures) return [];
+    const secondaryTargets = [];
+    for (const c of cs.creatures) {
+        if (c.name === targetName) continue;
+        if (await isWithinRange(targetName, c.name, 5)) secondaryTargets.push(c);
+    }
+    return secondaryTargets;
 }
 
 function riderNotice(name, auto, description) {

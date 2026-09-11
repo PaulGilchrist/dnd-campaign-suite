@@ -240,29 +240,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     if (healedAmount > 0) {
-        const currentHp = getRuntimeValue(playerName, 'currentHitPoints', campaignName) ?? playerStats.computedStats?.currentHp ?? 0;
-        const maxHp = getRuntimeValue(playerName, 'hitPoints', campaignName) ?? playerStats.computedStats?.maxHp ?? 0;
-        await addEntry(campaignName, {
-            type: 'hp_change',
-            targetName: playerName,
-            delta: healedAmount,
-            currentHp,
-            maxHp,
-            isHealing: true,
-            sourceName: featureName,
-            note: `${reductionRoll.display} HP from ${totalDamage} damage reduced by ${featureName}`,
-        }).catch((e) => { console.error("[damageReduction] Error logging heal:", e); });
+        await logDeflectHeal(playerName, campaignName, playerStats, featureName, healedAmount, reductionRoll, totalDamage);
     }
 
-    const attackEvent = lastAttack.attackEvent;
-    const attackDetailsHTML = attackEvent ? `
-        <br/><br/><b>Last Attack:</b> ${attackEvent.attackerName || 'Unknown'} → ${playerName}<br/>
-        <b>Original damage:</b> ${totalDamage} (${primaryDamage} primary + ${secondaryDamage} secondary)<br/>
-        <b>Damage types:</b> ${(lastAttack.damageTypes || []).join(', ') || 'None'}<br/>
-        <b>Deflect roll:</b> ${reductionRoll.display}<br/>
-        <b>Damage reduced to:</b> <strong>${damageAfterReduction}</strong><br/>
-        ${healedAmount > 0 ? `<b>Healed:</b> ${healedAmount} HP` : '<b>Healed:</b> 0 HP (already at max or no damage to reduce)'}
-    ` : '';
+    const attackDetailsHTML = buildAttackDetailsHTML(lastAttack, playerName, totalDamage, primaryDamage, secondaryDamage, reductionRoll, healedAmount, damageAfterReduction);
 
     if (damageAfterReduction === 0 && auto.redirect) {
         const popupResult = {
@@ -300,6 +281,34 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             automation: auto,
         },
     };
+}
+
+async function logDeflectHeal(playerName, campaignName, playerStats, featureName, healedAmount, reductionRoll, totalDamage) {
+    const currentHp = getRuntimeValue(playerName, 'currentHitPoints', campaignName) ?? playerStats.computedStats?.currentHp ?? 0;
+    const maxHp = getRuntimeValue(playerName, 'hitPoints', campaignName) ?? playerStats.computedStats?.maxHp ?? 0;
+    await addEntry(campaignName, {
+        type: 'hp_change',
+        targetName: playerName,
+        delta: healedAmount,
+        currentHp,
+        maxHp,
+        isHealing: true,
+        sourceName: featureName,
+        note: `${reductionRoll.display} HP from ${totalDamage} damage reduced by ${featureName}`,
+    }).catch((e) => { console.error("[damageReduction] Error logging heal:", e); });
+}
+
+function buildAttackDetailsHTML(lastAttack, playerName, totalDamage, primaryDamage, secondaryDamage, reductionRoll, healedAmount, damageAfterReduction) {
+    const attackEvent = lastAttack.attackEvent;
+    if (!attackEvent) return '';
+    return `
+        <br/><br/><b>Last Attack:</b> ${attackEvent.attackerName || 'Unknown'} → ${playerName}<br/>
+        <b>Original damage:</b> ${totalDamage} (${primaryDamage} primary + ${secondaryDamage} secondary)<br/>
+        <b>Damage types:</b> ${(lastAttack.damageTypes || []).join(', ') || 'None'}<br/>
+        <b>Deflect roll:</b> ${reductionRoll.display}<br/>
+        <b>Damage reduced to:</b> <strong>${damageAfterReduction}</strong><br/>
+        ${healedAmount > 0 ? `<b>Healed:</b> ${healedAmount} HP` : '<b>Healed:</b> 0 HP (already at max or no damage to reduce)'}
+    `;
 }
 
 async function handleRedirect(action, auto, playerStats, campaignName, featureName) {

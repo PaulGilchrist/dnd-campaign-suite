@@ -646,6 +646,79 @@ function handlePlayerZeroHpAndConcentration(creature, characters, playerComputed
   return { interception: null, combatSummaryChanged };
 }
 
+// Feature damage reduction → Arcane Ward → Temp HP absorption, in order.
+function absorbThroughFeaturesAndWards(creature, isPlayer, playerComputed, playerStats, damageTypes, finalDamage, campaignName) {
+  let damageReducedByFeature = 0;
+  if (isPlayer) {
+    ({ finalDamage, damageReducedByFeature } = applyFeatureDamageReduction(creature, playerComputed, playerStats, damageTypes, finalDamage, campaignName));
+  }
+  // Arcane Ward: absorb damage before it hits HP
+  let wardDamage = finalDamage;
+  if (isPlayer) {
+    wardDamage = absorbIntoArcaneWard(creature, wardDamage, campaignName);
+  }
+  // Temp HP absorbs damage first for all creatures
+  const damageAfterTempHp = absorbWithTempHp(creature, wardDamage, campaignName);
+  return { finalDamage, damageReducedByFeature, wardDamage, damageAfterTempHp };
+}
+
+// Post-HP events for damage that landed on the ward: projected-ward record,
+// reaction/tracking events, avenging-angel aura cleanup. Dispatch order is rule-significant.
+async function emitWardDamageEvents(creature, combatSummary, characters, isPlayer, attackerName, isSecondary, actualDamageTaken, damageTypes, wardDamage, campaignName) {
+  let combatSummaryChanged = false;
+  let holyAuraSaveResult = null;
+  // Projected Ward (Abjurer reaction roll-back record)
+  if (isPlayer) {
+    recordProjectedWardDamage(creature, actualDamageTaken, isSecondary, attackerName, damageTypes, campaignName);
+  }
+  if (wardDamage > 0) {
+    const wardedEvents = await handleWardedDamageEvents(creature, combatSummary, characters, isPlayer, attackerName, wardDamage, campaignName);
+    if (wardedEvents.combatSummaryChanged) combatSummaryChanged = true;
+    holyAuraSaveResult = wardedEvents.holyAuraSaveResult;
+  }
+  if (wardDamage > 0 && characters?.length) {
+    cleanupAvengingAngelAuras(creature, characters, campaignName);
+  }
+  return { combatSummaryChanged, holyAuraSaveResult };
+}
+
+// SP-114: summoned creatures disappear at 0 Hit Points (canonical "disappears
+// when it drops to 0 Hit Points"). Mutates combatSummary in place — the
+// combatSummaryChanged persist below writes the filtered roster.
+function handleSummonVanishAndConcentrationDc(creature, combatSummary, isPlayer, wasAlive, isNowUnconscious, options, actualDamageTaken, campaignName) {
+  if (!isPlayer && wasAlive && isNowUnconscious && creature.summonedBy && creature.summonSource === 'spell') {
+    vanishSummonAtZeroHp(creature, combatSummary, campaignName);
+  }
+  if (concentrationDamagePending(options, creature, actualDamageTaken)) {
+    const dcDamage = options?.concentrationTotalDamage ?? actualDamageTaken;
+    creature.concentration.dc = Math.max(10, Math.floor(dcDamage / 2));
+  }
+}
+
+// Zero-HP/concentration outcomes, player vs NPC. A player interception is
+// returned verbatim by applyDamageToTarget; NPC concentration breaks fold
+// into combatSummaryChanged (both only ever feed the summary persist).
+function resolveTargetDamageOutcome(creature, combatSummary, characters, isPlayer, playerComputed, options, wasAlive, isNowUnconscious, oldHp, finalDamage, actualDamageTaken, attackerName, campaignName) {
+  if (isPlayer) {
+    return handlePlayerZeroHpAndConcentration(creature, characters, playerComputed, options, wasAlive, isNowUnconscious, oldHp, finalDamage, actualDamageTaken, attackerName, campaignName);
+  }
+  if (concentrationDamagePending(options, creature, finalDamage)) {
+    handleNpcConcentrationBreak(creature, characters, attackerName, combatSummary, campaignName);
+  }
+  return { interception: null, combatSummaryChanged: true };
+}
+
+// Persist the (possibly mutated) combat summary, broadcast, and log the HP change.
+function persistAndLogDamageOutcome(combatSummary, combatSummaryChanged, existingAttack, creature, finalDamage, oldHp, newHp, suppressHpLog, campaignName) {
+  if (combatSummaryChanged || existingAttack) {
+    storage.set('combatSummary', combatSummary, campaignName);
+  }
+  window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+  if (!suppressHpLog) {
+    logDamageApplication(creature, finalDamage, oldHp, newHp, campaignName);
+  }
+}
+
 export async function applyDamageToTarget(combatSummary, targetName, rawDamage, damageTypes, campaignName, characters, ignoreResistance = false, attackerName = null, suppressHpLog = false, options = {}) {
   if (!combatSummary) return null;
   const creature = combatSummary.creatures.find(c => c.name === targetName);
@@ -654,7 +727,6 @@ export async function applyDamageToTarget(combatSummary, targetName, rawDamage, 
 
   const existingAttack = getRuntimeValue('campaign', 'lastAttack') || null;
   const isSecondary = existingAttack?.primaryDamage != null;
-  let holyAuraSaveResult = null;
   setRuntimeValue('campaign', 'lastAttack', buildLastAttackUpdate(existingAttack, attackerName, targetName, rawDamage, damageTypes), campaignName);
 
   const isPlayer = creature.type === 'player';
@@ -663,31 +735,15 @@ export async function applyDamageToTarget(combatSummary, targetName, rawDamage, 
 
   const defenses = await resolveCreatureDefenses(creature, targetName, isPlayer, characters, campaignName);
   if (!Array.isArray(damageTypes)) { throw new Error('damageTypes must be an array'); }
-  let combatSummaryChanged = false;
   // CLA-324: spell-origin is knowable from the damage payload (options.isSpellDamage) or
   // the campaign lastAttack (spell-save stamps, monster-card save-attack stamps).
   const spellOrigin = options?.isSpellDamage === true || existingAttack?.rollType === 'spell-save' || existingAttack?.isSpellDamage === true;
   const resResult = computeDamageAfterResistancesWithDetails(rawDamage, damageTypes, defenses.resistances, defenses.immunities, ignoreResistance, spellOrigin);
-  let finalDamage = resResult.finalDamage;
-  const resistanceDetails = resResult.typeDetails;
 
-  logResistanceOutcomes(creature, rawDamage, finalDamage, damageTypes, resistanceDetails, defenses.passiveResistances, defenses.silenceThunderImmunity, spellOrigin, campaignName);
+  logResistanceOutcomes(creature, rawDamage, resResult.finalDamage, damageTypes, resResult.typeDetails, defenses.passiveResistances, defenses.silenceThunderImmunity, spellOrigin, campaignName);
 
-  // Apply damage reduction from features (e.g., Heavy Armor Master)
-  let damageReducedByFeature = 0;
-  if (isPlayer) {
-    ({ finalDamage, damageReducedByFeature } = applyFeatureDamageReduction(creature, playerComputed, playerStats, damageTypes, finalDamage, campaignName));
-  }
-
-  // Arcane Ward: absorb damage before it hits HP
-  let wardDamage = finalDamage;
-
-  if (isPlayer) {
-    wardDamage = absorbIntoArcaneWard(creature, wardDamage, campaignName);
-  }
-
-  // Temp HP absorbs damage first for all creatures
-  const damageAfterTempHp = absorbWithTempHp(creature, wardDamage, campaignName);
+  const absorbed = absorbThroughFeaturesAndWards(creature, isPlayer, playerComputed, playerStats, damageTypes, resResult.finalDamage, campaignName);
+  const { finalDamage, damageReducedByFeature, wardDamage, damageAfterTempHp } = absorbed;
 
   await revertPolymorphIfBufferDepleted(creature, campaignName);
 
@@ -705,65 +761,27 @@ export async function applyDamageToTarget(combatSummary, targetName, rawDamage, 
 
   recordActualDamageInLastAttack(isSecondary, wardDamage, campaignName);
 
-  // Projected Ward (Abjurer reaction roll-back record)
-  if (isPlayer) {
-    recordProjectedWardDamage(creature, actualDamageTaken, isSecondary, attackerName, damageTypes, campaignName);
-  }
-
-  if (wardDamage > 0) {
-    const wardedEvents = await handleWardedDamageEvents(creature, combatSummary, characters, isPlayer, attackerName, wardDamage, campaignName);
-    if (wardedEvents.combatSummaryChanged) combatSummaryChanged = true;
-    holyAuraSaveResult = wardedEvents.holyAuraSaveResult;
-  }
-
-  if (wardDamage > 0 && characters?.length) {
-    cleanupAvengingAngelAuras(creature, characters, campaignName);
-  }
+  const wardEvents = await emitWardDamageEvents(creature, combatSummary, characters, isPlayer, attackerName, isSecondary, actualDamageTaken, damageTypes, wardDamage, campaignName);
+  let combatSummaryChanged = wardEvents.combatSummaryChanged;
 
   const wasAlive = oldHp > 0;
   const isNowUnconscious = newHp <= 0;
 
-  // SP-114: summoned creatures disappear at 0 Hit Points (canonical "disappears
-  // when it drops to 0 Hit Points"). Mutates combatSummary in place — the
-  // combatSummaryChanged persist below writes the filtered roster.
-  if (!isPlayer && wasAlive && isNowUnconscious && creature.summonedBy && creature.summonSource === 'spell') {
-    vanishSummonAtZeroHp(creature, combatSummary, campaignName);
-  }
-
-  if (concentrationDamagePending(options, creature, actualDamageTaken)) {
-    const dcDamage = options?.concentrationTotalDamage ?? actualDamageTaken;
-    creature.concentration.dc = Math.max(10, Math.floor(dcDamage / 2));
-  }
+  handleSummonVanishAndConcentrationDc(creature, combatSummary, isPlayer, wasAlive, isNowUnconscious, options, actualDamageTaken, campaignName);
 
   checkDarkOnesBlessing(characters, creature, finalDamage, isPlayer, wasAlive, isNowUnconscious, campaignName, attackerName);
 
-  let npcConcentrationBroken = false;
-  if (isPlayer) {
-    const playerOutcome = handlePlayerZeroHpAndConcentration(creature, characters, playerComputed, options, wasAlive, isNowUnconscious, oldHp, finalDamage, actualDamageTaken, attackerName, campaignName);
-    if (playerOutcome.interception) {
-      return playerOutcome.interception;
-    }
-    if (playerOutcome.combatSummaryChanged) {
-      combatSummaryChanged = true;
-    }
-  } else {
+  const outcome = resolveTargetDamageOutcome(creature, combatSummary, characters, isPlayer, playerComputed, options, wasAlive, isNowUnconscious, oldHp, finalDamage, actualDamageTaken, attackerName, campaignName);
+  if (outcome.interception) {
+    return outcome.interception;
+  }
+  if (outcome.combatSummaryChanged) {
     combatSummaryChanged = true;
-    if (concentrationDamagePending(options, creature, finalDamage)) {
-      npcConcentrationBroken = handleNpcConcentrationBreak(creature, characters, attackerName, combatSummary, campaignName);
-    }
   }
 
-  if (combatSummaryChanged || npcConcentrationBroken || existingAttack) {
-    storage.set('combatSummary', combatSummary, campaignName);
-  }
+  persistAndLogDamageOutcome(combatSummary, combatSummaryChanged, existingAttack, creature, finalDamage, oldHp, newHp, suppressHpLog, campaignName);
 
-  window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-
-  if (!suppressHpLog) {
-    logDamageApplication(creature, finalDamage, oldHp, newHp, campaignName);
-  }
-
-  return { finalDamage, oldHp, newHp, damageReduced: finalDamage < rawDamage, damageReducedByFeature: damageReducedByFeature, resistanceDetails, holyAuraSaveResult };
+  return { finalDamage, oldHp, newHp, damageReduced: finalDamage < rawDamage, damageReducedByFeature: damageReducedByFeature, resistanceDetails: resResult.typeDetails, holyAuraSaveResult: wardEvents.holyAuraSaveResult };
 }
 
 // Identifies a Dominate (Person/Monster/Beast) target: Charmed condition + a caster

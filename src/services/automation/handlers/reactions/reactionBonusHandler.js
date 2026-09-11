@@ -112,6 +112,136 @@ async function handleBendFate(action, playerStats, campaignName, _mapName) {
     };
 }
 
+async function shiftAttackOutcome(action, cs, lastAttack, playerName, attackerName, shift, campaignName) {
+    const { originalTotal, newTotal, modifier, diceValue, mode } = shift;
+    const targetAc = lastAttack.targetAc || lastAttack.effectiveAc;
+    const oldHit = lastAttack.hit ?? (targetAc != null ? originalTotal >= targetAc : null);
+    const newHit = targetAc != null ? newTotal >= targetAc : null;
+
+    const updatedLastAttack = {
+        ...lastAttack,
+        total: newTotal,
+        hit: newHit,
+        bendFateApplied: true,
+        bendFateModifier: modifier,
+        bendFateD4: diceValue,
+        bendFateMode: mode,
+        timestamp: Date.now(),
+    };
+    await setRuntimeValue('campaign', 'lastAttack', updatedLastAttack, campaignName);
+
+    if (oldHit && !newHit) {
+        const rawDamage = lastAttack.primaryDamage || lastAttack.rawDamage || 0;
+        if (rawDamage > 0) {
+            const healResult = applyHealingToTarget(cs, lastAttack.targetName, rawDamage, campaignName);
+            if (healResult) {
+                return ` → The attack now misses! Undid ${healResult.actualHeal} damage.`;
+            }
+        }
+        return ' → The attack now misses!';
+    }
+
+    if (!oldHit && newHit) {
+        const damageFormula = lastAttack.damageFormula;
+        let outcomeNote = ' → The attack now hits!';
+        if (damageFormula) {
+            const dmgResult = rollExpression(damageFormula);
+            if (dmgResult && dmgResult.total > 0) {
+                const characters = [action._playerStats || { name: playerName }];
+                const appliedDmg = applyDamageToTarget(cs, lastAttack.targetName, dmgResult.total, [lastAttack.damageType || 'unknown'], campaignName, characters, false, attackerName);
+                if (appliedDmg) {
+                    outcomeNote += ` Rolled ${appliedDmg.finalDamage} damage.`;
+                }
+            }
+        }
+        return outcomeNote;
+    }
+
+    if (oldHit && newHit) return ' → The attack still hits.';
+    if (oldHit !== null && newHit !== null) return ' → The attack still misses.';
+    return ' → No change in outcome.';
+}
+
+async function shiftSaveOutcome(lastAttack, shift, campaignName) {
+    const { originalTotal, newTotal, modifier, diceValue, mode } = shift;
+    const saveDc = lastAttack.saveDc;
+    const oldSuccess = (originalTotal >= saveDc);
+    const newSuccess = (newTotal >= saveDc);
+
+    const updatedLastAttack = {
+        ...lastAttack,
+        total: newTotal,
+        saveResult: newSuccess ? 'success' : 'failure',
+        bendFateApplied: true,
+        bendFateModifier: modifier,
+        bendFateD4: diceValue,
+        bendFateMode: mode,
+        timestamp: Date.now(),
+    };
+    await setRuntimeValue('campaign', 'lastAttack', updatedLastAttack, campaignName);
+
+    const targetName = lastAttack.targetName;
+    const saveConditions = lastAttack.saveConditions || [];
+    let outcomeNote = '';
+    const conditionsAdded = [];
+    const conditionsRemoved = [];
+
+    if (oldSuccess && !newSuccess) {
+        outcomeNote = ' → The save now fails!';
+        for (const condKey of saveConditions) {
+            const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+            const filtered = conditions.filter(c => String(c).toLowerCase() !== String(condKey).toLowerCase());
+            setRuntimeValue(targetName, 'activeConditions', [...filtered, condKey], campaignName);
+            conditionsAdded.push(condKey);
+        }
+    } else if (!oldSuccess && newSuccess) {
+        outcomeNote = ' → The save now succeeds!';
+        for (const condKey of saveConditions) {
+            const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+            const filtered = conditions.filter(c => String(c).toLowerCase() !== String(condKey).toLowerCase());
+            setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
+            conditionsRemoved.push(condKey);
+        }
+    } else if (oldSuccess && newSuccess) {
+        outcomeNote = ' → The save still succeeds.';
+    } else {
+        outcomeNote = ' → The save still fails.';
+    }
+
+    return { outcomeNote, conditionsAdded, conditionsRemoved };
+}
+
+function buildD20ModifierDescription(lastAttack, rollInfo, outcomeNote, conditionsAdded, conditionsRemoved, isAttack, isSave) {
+    const { diceValue, mode, modifierLabel, newTotal, d20, bonus } = rollInfo;
+    let description = `Target: ${lastAttack.attackerName}<br/>`;
+    description += `Rolled <b>${diceValue}</b><br/>`;
+    description += `Applied as <b>${mode}</b>: <b>${modifierLabel}</b><br/><br/>`;
+
+    if (isAttack) {
+        const ac = lastAttack.targetAc || lastAttack.effectiveAc || '—';
+        const hitStatus = (newTotal >= (lastAttack.targetAc || lastAttack.effectiveAc)) ? 'HIT' : 'MISS';
+        description += `Attack: d20(${d20}) + ${bonus}${modifierLabel} = <strong>${newTotal}</strong> vs AC ${ac} → ${hitStatus}${outcomeNote}`;
+        if (lastAttack.targetAc == null && lastAttack.effectiveAc == null && lastAttack.hit) {
+            description += ` (Original was a hit)`;
+        }
+    } else if (isSave) {
+        const saveLabel = lastAttack.saveType ? lastAttack.saveType.toUpperCase() : 'Save';
+        const dc = lastAttack.saveDc || '—';
+        const saveStatus = (newTotal >= (lastAttack.saveDc || 0)) ? 'Success' : 'Failure';
+        description += `${saveLabel}: d20(${d20}) + ${bonus}${modifierLabel} = <strong>${newTotal}</strong> vs DC ${dc} → ${saveStatus}${outcomeNote}`;
+        if (conditionsAdded.length > 0) {
+            description += `<br/><i>Conditions applied: ${conditionsAdded.join(', ')}</i>`;
+        }
+        if (conditionsRemoved.length > 0) {
+            description += `<br/><i>Conditions removed: ${conditionsRemoved.join(', ')}</i>`;
+        }
+    } else {
+        description += `${lastAttack.checkName || 'Check'}: d20(${d20}) + ${bonus}${modifierLabel} = <strong>${newTotal}</strong>${outcomeNote}`;
+    }
+
+    return description;
+}
+
 export async function applyD20Modifier(action, playerName, campaignName, diceValue, lastAttack, mode, options) {
     const featureName = options.featureName || 'Modify D20';
     const auto = action.automation;
@@ -124,7 +254,6 @@ export async function applyD20Modifier(action, playerName, campaignName, diceVal
 
     const cs = await getCombatContext(campaignName);
     const attackerName = lastAttack.attackerName;
-    const targetName = lastAttack.targetName;
     const rollType = lastAttack.rollType || 'attack';
     const isAttack = rollType === 'attack';
     const isSave = rollType === 'save' || (rollType === 'attack' && lastAttack.saveDc != null && lastAttack.saveResult != null);
@@ -135,92 +264,15 @@ export async function applyD20Modifier(action, playerName, campaignName, diceVal
     let conditionsAdded = [];
     let conditionsRemoved = [];
 
+    const shift = { originalTotal, newTotal, modifier, diceValue, mode };
+
     if (isAttack && cs) {
-        const targetAc = lastAttack.targetAc || lastAttack.effectiveAc;
-        const oldHit = lastAttack.hit ?? (targetAc != null ? originalTotal >= targetAc : null);
-        const newHit = targetAc != null ? newTotal >= targetAc : null;
-
-        const updatedLastAttack = {
-            ...lastAttack,
-            total: newTotal,
-            hit: newHit,
-            bendFateApplied: true,
-            bendFateModifier: modifier,
-            bendFateD4: diceValue,
-            bendFateMode: mode,
-            timestamp: Date.now(),
-        };
-        await setRuntimeValue('campaign', 'lastAttack', updatedLastAttack, campaignName);
-
-        if (oldHit && !newHit) {
-            outcomeNote = ' → The attack now misses!';
-            const rawDamage = lastAttack.primaryDamage || lastAttack.rawDamage || 0;
-            if (rawDamage > 0) {
-                const healResult = applyHealingToTarget(cs, targetName, rawDamage, campaignName);
-                if (healResult) {
-                    outcomeNote += ` Undid ${healResult.actualHeal} damage.`;
-                }
-            }
-        } else if (!oldHit && newHit) {
-            outcomeNote = ' → The attack now hits!';
-            const damageFormula = lastAttack.damageFormula;
-            if (damageFormula) {
-                const dmgResult = rollExpression(damageFormula);
-                if (dmgResult && dmgResult.total > 0) {
-                    const characters = [action._playerStats || { name: playerName }];
-                    const appliedDmg = applyDamageToTarget(cs, targetName, dmgResult.total, [lastAttack.damageType || 'unknown'], campaignName, characters, false, attackerName);
-                    if (appliedDmg) {
-                        outcomeNote += ` Rolled ${appliedDmg.finalDamage} damage.`;
-                    }
-                }
-            }
-        } else if (oldHit && newHit) {
-            outcomeNote = ' → The attack still hits.';
-        } else if (oldHit !== null && newHit !== null) {
-            outcomeNote = ' → The attack still misses.';
-        } else {
-            outcomeNote = ' → No change in outcome.';
-        }
+        outcomeNote = await shiftAttackOutcome(action, cs, lastAttack, playerName, attackerName, shift, campaignName);
     } else if (isSave && cs) {
-        const saveDc = lastAttack.saveDc;
-        const oldSuccess = (originalTotal >= saveDc);
-        const newSuccess = (newTotal >= saveDc);
-
-        const updatedLastAttack = {
-            ...lastAttack,
-            total: newTotal,
-            saveResult: newSuccess ? 'success' : 'failure',
-            bendFateApplied: true,
-            bendFateModifier: modifier,
-            bendFateD4: diceValue,
-            bendFateMode: mode,
-            timestamp: Date.now(),
-        };
-        await setRuntimeValue('campaign', 'lastAttack', updatedLastAttack, campaignName);
-
-        if (oldSuccess && !newSuccess) {
-            outcomeNote = ' → The save now fails!';
-            const saveConditions = lastAttack.saveConditions || [];
-            for (const condKey of saveConditions) {
-                const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
-                const filtered = conditions.filter(c => String(c).toLowerCase() !== String(condKey).toLowerCase());
-                setRuntimeValue(targetName, 'activeConditions', [...filtered, condKey], campaignName);
-                conditionsAdded.push(condKey);
-            }
-        } else if (!oldSuccess && newSuccess) {
-            outcomeNote = ' → The save now succeeds!';
-            const saveConditions = lastAttack.saveConditions || [];
-            for (const condKey of saveConditions) {
-                const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
-                const filtered = conditions.filter(c => String(c).toLowerCase() !== String(condKey).toLowerCase());
-                setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
-                conditionsRemoved.push(condKey);
-            }
-        } else if (oldSuccess && newSuccess) {
-            outcomeNote = ' → The save still succeeds.';
-        } else {
-            outcomeNote = ' → The save still fails.';
-        }
+        const saveShift = await shiftSaveOutcome(lastAttack, shift, campaignName);
+        outcomeNote = saveShift.outcomeNote;
+        conditionsAdded = saveShift.conditionsAdded;
+        conditionsRemoved = saveShift.conditionsRemoved;
     } else if (isCheck) {
         const updatedLastAttack = {
             ...lastAttack,
@@ -252,31 +304,8 @@ export async function applyD20Modifier(action, playerName, campaignName, diceVal
         timestamp: Date.now(),
     }).catch((e) => { console.error(`[${featureName}] Error:`, e); });
 
-    let description = `Target: ${attackerName}<br/>`;
-    description += `Rolled <b>${diceValue}</b><br/>`;
-    description += `Applied as <b>${mode}</b>: <b>${modifierLabel}</b><br/><br/>`;
-
-    if (isAttack) {
-        const ac = lastAttack.targetAc || lastAttack.effectiveAc || '—';
-        const hitStatus = (newTotal >= (lastAttack.targetAc || lastAttack.effectiveAc)) ? 'HIT' : 'MISS';
-        description += `Attack: d20(${d20}) + ${bonus}${modifierLabel} = <strong>${newTotal}</strong> vs AC ${ac} → ${hitStatus}${outcomeNote}`;
-        if (lastAttack.targetAc == null && lastAttack.effectiveAc == null && lastAttack.hit) {
-            description += ` (Original was a hit)`;
-        }
-    } else if (isSave) {
-        const saveLabel = lastAttack.saveType ? lastAttack.saveType.toUpperCase() : 'Save';
-        const dc = lastAttack.saveDc || '—';
-        const saveStatus = (newTotal >= (lastAttack.saveDc || 0)) ? 'Success' : 'Failure';
-        description += `${saveLabel}: d20(${d20}) + ${bonus}${modifierLabel} = <strong>${newTotal}</strong> vs DC ${dc} → ${saveStatus}${outcomeNote}`;
-        if (conditionsAdded.length > 0) {
-            description += `<br/><i>Conditions applied: ${conditionsAdded.join(', ')}</i>`;
-        }
-        if (conditionsRemoved.length > 0) {
-            description += `<br/><i>Conditions removed: ${conditionsRemoved.join(', ')}</i>`;
-        }
-    } else {
-        description += `${lastAttack.checkName || 'Check'}: d20(${d20}) + ${bonus}${modifierLabel} = <strong>${newTotal}</strong>${outcomeNote}`;
-    }
+    const rollInfo = { diceValue, mode, modifierLabel, newTotal, d20, bonus };
+    const description = buildD20ModifierDescription(lastAttack, rollInfo, outcomeNote, conditionsAdded, conditionsRemoved, isAttack, isSave);
 
     return infoPopup(featureName, description, auto);
 }

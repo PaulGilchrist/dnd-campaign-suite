@@ -126,26 +126,35 @@ export function collectWeaponMastery(weaponName, playerStats) {
     };
 }
 
+function describeHealingBonus(passive, bonus, requirePositive) {
+    if (typeof bonus !== 'number' || isNaN(bonus)) return null;
+    if (requirePositive && !(bonus > 0)) return null;
+    return { name: passive.name, amount: bonus };
+}
+
+// Effects 'bonus_healing' and 'max_hp_increase'/'fortified_health' are mutually
+// exclusive on a single passive, so the branches never both fire for one entry.
+function healingPassiveContribution(passive, stats, prof, level, slotLevel, campaignName, requirePositive) {
+    if (passive.type !== 'passive_rule') return null;
+    if (passive.effect === 'bonus_healing' && passive.bonusExpression) {
+        return describeHealingBonus(passive, evaluateAutoExpression(passive.bonusExpression, stats, prof, level, slotLevel), requirePositive);
+    }
+    if ((passive.effect === 'max_hp_increase' || passive.effect === 'fortified_health') && passive.alsoSelfHealing?.extraHealingExpression) {
+        if (passive.alsoSelfHealing.oncePerTurn && campaignName) {
+            const stored = getRuntimeValue(stats.name, '_fortifiedHealth_usedRound');
+            if (stored) return null;
+        }
+        return describeHealingBonus(passive, evaluateAutoExpression(passive.alsoSelfHealing.extraHealingExpression, stats, prof, level, slotLevel), requirePositive);
+    }
+    return null;
+}
+
 export function resolveHealingBonuses(playerStats, prof, level, slotLevel, campaignName) {
     const passives = playerStats.automation?.passives || [];
     let totalBonus = 0;
     for (const passive of passives) {
-        if (passive.type === 'passive_rule' && passive.effect === 'bonus_healing' && passive.bonusExpression) {
-            const bonus = evaluateAutoExpression(passive.bonusExpression, playerStats, prof, level, slotLevel);
-            if (typeof bonus === 'number' && !isNaN(bonus)) {
-                totalBonus += bonus;
-            }
-        }
-        if (passive.type === 'passive_rule' && (passive.effect === 'max_hp_increase' || passive.effect === 'fortified_health') && passive.alsoSelfHealing?.extraHealingExpression) {
-            if (passive.alsoSelfHealing.oncePerTurn && campaignName) {
-                const stored = getRuntimeValue(playerStats.name, '_fortifiedHealth_usedRound');
-                if (stored) continue;
-            }
-            const bonus = evaluateAutoExpression(passive.alsoSelfHealing.extraHealingExpression, playerStats, prof, level, slotLevel);
-            if (typeof bonus === 'number' && !isNaN(bonus)) {
-                totalBonus += bonus;
-            }
-        }
+        const contribution = healingPassiveContribution(passive, playerStats, prof, level, slotLevel, campaignName, false);
+        if (contribution) totalBonus += contribution.amount;
     }
     return totalBonus;
 }
@@ -154,51 +163,19 @@ export function resolveHealingBonusesWithDetails(playerStats, prof, level, slotL
     const passives = playerStats.automation?.passives || [];
     let totalBonus = 0;
     const details = [];
+    const applyContribution = (stats, passive) => {
+        const contribution = healingPassiveContribution(passive, stats, prof, level, slotLevel, campaignName, true);
+        if (!contribution) return;
+        totalBonus += contribution.amount;
+        details.push(contribution);
+    };
     for (const passive of passives) {
-        if (passive.type === 'passive_rule' && passive.effect === 'bonus_healing' && passive.bonusExpression) {
-            const bonus = evaluateAutoExpression(passive.bonusExpression, playerStats, prof, level, slotLevel);
-            if (typeof bonus === 'number' && !isNaN(bonus) && bonus > 0) {
-                totalBonus += bonus;
-                details.push({ name: passive.name, amount: bonus });
-            }
-        }
-        if (passive.type === 'passive_rule' && (passive.effect === 'max_hp_increase' || passive.effect === 'fortified_health') && passive.alsoSelfHealing?.extraHealingExpression) {
-            if (passive.alsoSelfHealing.oncePerTurn && campaignName) {
-                const stored = getRuntimeValue(playerStats.name, '_fortifiedHealth_usedRound');
-                if (stored) {
-                    continue;
-                }
-            }
-            const bonus = evaluateAutoExpression(passive.alsoSelfHealing.extraHealingExpression, playerStats, prof, level, slotLevel);
-            if (typeof bonus === 'number' && !isNaN(bonus) && bonus > 0) {
-                totalBonus += bonus;
-                details.push({ name: passive.name, amount: bonus });
-            }
-        }
+        applyContribution(playerStats, passive);
     }
     if (targetStats && targetStats !== playerStats) {
         const targetPassives = targetStats.automation?.passives || [];
         for (const passive of targetPassives) {
-            if (passive.type === 'passive_rule' && passive.effect === 'bonus_healing' && passive.bonusExpression) {
-                const bonus = evaluateAutoExpression(passive.bonusExpression, targetStats, prof, level, slotLevel);
-                if (typeof bonus === 'number' && !isNaN(bonus) && bonus > 0) {
-                    totalBonus += bonus;
-                    details.push({ name: passive.name, amount: bonus });
-                }
-            }
-            if (passive.type === 'passive_rule' && (passive.effect === 'max_hp_increase' || passive.effect === 'fortified_health') && passive.alsoSelfHealing?.extraHealingExpression) {
-                if (passive.alsoSelfHealing.oncePerTurn && campaignName) {
-                    const stored = getRuntimeValue(targetStats.name, '_fortifiedHealth_usedRound');
-                    if (stored) {
-                        continue;
-                    }
-                }
-                const bonus = evaluateAutoExpression(passive.alsoSelfHealing.extraHealingExpression, targetStats, prof, level, slotLevel);
-                if (typeof bonus === 'number' && !isNaN(bonus) && bonus > 0) {
-                    totalBonus += bonus;
-                    details.push({ name: passive.name, amount: bonus });
-                }
-            }
+            applyContribution(targetStats, passive);
         }
     }
     return { totalBonus, details };

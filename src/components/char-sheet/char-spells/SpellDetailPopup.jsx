@@ -90,6 +90,27 @@ function SpellMeta({ isCantrip, spell, isPhantasmalFreeCast, isDispelMagicAsBonu
   );
 }
 
+function computeSpellDetailPassiveFlags(playerStats, spell, isWarlock) {
+  const hasPsychicSpells = playerStats.automation?.passives?.some(p => p.type === 'psychic_spells');
+  const hasImprovedIllusions = playerStats.automation?.passives?.some(p => p.type === 'improved_illusions');
+  const hasOverchannelPassive = playerStats?.automation?.passives?.some(p => p.type === 'overchannel');
+  const hasDamage = !!spell.damage;
+  const isEnchantmentOrIllusion = () => {
+    const school = (spell.school || '').toLowerCase();
+    return school === 'enchantment' || school === 'illusion';
+  };
+  const isIllusionSpell = () => {
+    const school = (spell.school || '').toLowerCase();
+    return school === 'illusion';
+  };
+  return {
+    canChangeDamageType: isWarlock && hasPsychicSpells && hasDamage,
+    noVSComponents: isWarlock && hasPsychicSpells && isEnchantmentOrIllusion(),
+    noVComponents: hasImprovedIllusions && isIllusionSpell(),
+    isOverchannelApplicable: hasOverchannelPassive && hasDamage && spell.level >= 1 && spell.level <= 5,
+  };
+}
+
 function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, upcastLevels = [], playerLevel = 1 }) {
   const isCantrip = spell.level === 0;
   const slotDmg = spell.damage?.damage_at_slot_level;
@@ -153,27 +174,15 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
   const warlockSlotLevel = getWarlockSlotLevel(spell.level);
   const hasAnySlots = isCantrip || freeCastAuthorized || upcastLevels.some(l => l.availableSlots > 0) || (isWarlock && warlockSlotLevel !== null) || _psionicSorceryAvailable > 0;
 
-  const hasPsychicSpells = playerStats.automation?.passives?.some(p => p.type === 'psychic_spells');
-  const hasImprovedIllusions = playerStats.automation?.passives?.some(p => p.type === 'improved_illusions');
-  const hasDamage = !!spell.damage;
-  const isEnchantmentOrIllusion = () => {
-    const school = (spell.school || '').toLowerCase();
-    return school === 'enchantment' || school === 'illusion';
-  };
-  const isIllusionSpell = () => {
-    const school = (spell.school || '').toLowerCase();
-    return school === 'illusion';
-  };
-  const canChangeDamageType = isWarlock && hasPsychicSpells && hasDamage;
   // CLA-322: Spell Breaker bonus-action conversion is registry-driven (bonusActionSpells)
   const isDispelMagicAsBonusAction = isSpellBreakerBonusActionSpell(playerStats, spell.name);
+  const passiveFlags = computeSpellDetailPassiveFlags(playerStats, spell, isWarlock);
+  const { canChangeDamageType, isOverchannelApplicable } = passiveFlags;
   const [usePsychicDamage, setUsePsychicDamage] = useState(false);
-  const [noVSComponents] = useState(isWarlock && hasPsychicSpells && isEnchantmentOrIllusion());
-  const [noVComponents] = useState(hasImprovedIllusions && isIllusionSpell());
+  const [noVSComponents] = useState(passiveFlags.noVSComponents);
+  const [noVComponents] = useState(passiveFlags.noVComponents);
 
   const [usePsionicPayment, setUsePsionicPayment] = useState(false);
-   const hasOverchannelPassive = playerStats?.automation?.passives?.some(p => p.type === 'overchannel');
-   const isOverchannelApplicable = hasOverchannelPassive && hasDamage && spell.level >= 1 && spell.level <= 5;
    const [useOverchannel, setUseOverchannel] = useState(false);
     const overchannelUseTrigger = useRuntimeValue(playerStats.name, 'Overchannel_useCount', campaignName);
     const overchannelUseCount = useMemo(() => {

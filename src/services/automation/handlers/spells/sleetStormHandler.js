@@ -107,22 +107,16 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         const targetName = target.name;
 
         // Check for prone immunity on each target individually
-        const targetImmunities = target.weaknessesAndResistivities?.immunities || [];
-        if (Array.isArray(targetImmunities) && targetImmunities.length > 0) {
-            const hasProneImmunity = targetImmunities.some(
-                imm => String(imm).toLowerCase() === 'prone'
-            );
-            if (hasProneImmunity) {
-                addEntry(campaignName, {
-                    type: 'ability_use',
-                    characterName: casterName,
-                    abilityName: action.name,
-                    description: `${targetName} is immune to Sleet Storm (Prone immunity).`,
-                }).catch((e) => { console.error("[sleetStorm] Error:", e); });
-                results.push(`${targetName} is immune.`);
-                savedCount++;
-                continue;
-            }
+        if (isProneImmune(target)) {
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName: casterName,
+                abilityName: action.name,
+                description: `${targetName} is immune to Sleet Storm (Prone immunity).`,
+            }).catch((e) => { console.error("[sleetStorm] Error:", e); });
+            results.push(`${targetName} is immune.`);
+            savedCount++;
+            continue;
         }
 
         const { promptId, promise } = createSaveListener(campaignName, {
@@ -165,109 +159,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             }).catch((e) => { console.error("[sleetStorm] Error:", e); });
         } else {
             affectedCount++;
-
-            // Apply Prone condition
-            const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-            const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-            const filtered = conditions.filter(c => String(c).toLowerCase() !== 'prone');
-            setRuntimeValue(targetName, 'activeConditions', [...filtered, 'prone'], campaignName);
-
-            // Store condition metadata with DC and ability for recurring DEX save
-            const existingMeta = getRuntimeValue(targetName, 'activeConditionMeta', campaignName) || {};
-            setRuntimeValue(targetName, 'activeConditionMeta', {
-                ...existingMeta,
-                prone: {
-                    ...(existingMeta.prone || {}),
-                    dc,
-                    ability: 'dex',
-                    source: 'sleet_storm',
-                },
-            }, campaignName);
-
-            await addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'failure',
-                roll: saveResult.roll ?? 0,
-                total: saveResult.total ?? 0,
-                conditions: ['prone'],
-                appliedDamage: 0,
-            });
-
-            // Add expiration for concentration — Prone removed when concentration breaks
-            addExpiration(casterName, targetName, [
-                { type: 'condition', condition: 'prone' },
-            ], campaignName);
-
-            // Actually break concentration for this creature if they have one
-            const combatSummary = getCombatSummary(campaignName);
-            if (combatSummary) {
-                const brokenSpell = breakConcentration(combatSummary, targetName);
-                if (brokenSpell) {
-                    storage.set('combatSummary', combatSummary, campaignName);
-                    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-                    addEntry(campaignName, {
-                        type: 'concentration_lost',
-                        characterName: targetName,
-                        spellName: brokenSpell,
-                        reason: 'Sleet Storm spell',
-                        note: `${targetName} lost concentration on ${brokenSpell} due to Sleet Storm.`,
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error("[sleetStorm] Error:", e); });
-                }
-            }
-
-            // Track concentration loss for this creature
-            const casterConcentrationKey = `_sleetStorm_concentration_${casterName.replace(/\s+/g, '_')}`;
-            const existingConcentration = getRuntimeValue(casterName, casterConcentrationKey, campaignName) || [];
-            const concentrationList = Array.isArray(existingConcentration) ? [...existingConcentration] : [];
-            if (!concentrationList.includes(targetName)) {
-                concentrationList.push(targetName);
-                setRuntimeValue(casterName, casterConcentrationKey, concentrationList, campaignName);
-            }
-
-            addEntry(campaignName, {
-                type: 'condition',
-                action: 'applied',
-                characterName: targetName,
-                condition: 'Prone',
-                reason: 'Sleet Storm spell',
-                note: `${targetName} is Prone by Sleet Storm and loses Concentration.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[sleetStorm] Error:", e); });
-
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                rollType: 'save-sleet-storm',
-                targetName,
-                saveDc: dc,
-                saveType: 'DEX',
-                success: false,
-                description: `${targetName} failed DEX save against Sleet Storm. Becomes Prone and loses Concentration.`,
-            }).catch((e) => { console.error("[sleetStorm] Error:", e); });
-
-            // Track Sleet Storm effect with concentration duration for cleanup
-            const targetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-            const effects = Array.isArray(targetEffects) ? [...targetEffects] : [];
-            const sleetEffect = {
-                target: targetName,
-                effect: 'sleet_storm',
-                source: casterName,
-                conditions: ['prone'],
-                dc: dc,
-                duration: 'concentration',
-                lostConcentration: true,
-            };
-            const existingIdx = effects.findIndex(
-                te => te.target === targetName && te.effect === 'sleet_storm'
-            );
-            if (existingIdx >= 0) {
-                effects[existingIdx] = sleetEffect;
-            } else {
-                effects.push(sleetEffect);
-            }
-            setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
-
+            await applySleetStormProneTarget(campaignName, casterName, targetName, dc, saveResult);
             results.push(`${targetName} is Prone and loses Concentration.`);
         }
     }
@@ -284,6 +176,117 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             description: summary,
         },
     };
+}
+
+function isProneImmune(target) {
+    const targetImmunities = target.weaknessesAndResistivities?.immunities || [];
+    return Array.isArray(targetImmunities) && targetImmunities.some(
+        imm => String(imm).toLowerCase() === 'prone'
+    );
+}
+
+async function applySleetStormProneTarget(campaignName, casterName, targetName, dc, saveResult) {
+    // Apply Prone condition
+    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'prone');
+    setRuntimeValue(targetName, 'activeConditions', [...filtered, 'prone'], campaignName);
+
+    // Store condition metadata with DC and ability for recurring DEX save
+    const existingMeta = getRuntimeValue(targetName, 'activeConditionMeta', campaignName) || {};
+    setRuntimeValue(targetName, 'activeConditionMeta', {
+        ...existingMeta,
+        prone: {
+            ...(existingMeta.prone || {}),
+            dc,
+            ability: 'dex',
+            source: 'sleet_storm',
+        },
+    }, campaignName);
+
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'failure',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: ['prone'],
+        appliedDamage: 0,
+    });
+
+    // Add expiration for concentration — Prone removed when concentration breaks
+    addExpiration(casterName, targetName, [
+        { type: 'condition', condition: 'prone' },
+    ], campaignName);
+
+    // Actually break concentration for this creature if they have one
+    const combatSummary = getCombatSummary(campaignName);
+    if (combatSummary) {
+        const brokenSpell = breakConcentration(combatSummary, targetName);
+        if (brokenSpell) {
+            storage.set('combatSummary', combatSummary, campaignName);
+            window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+            addEntry(campaignName, {
+                type: 'concentration_lost',
+                characterName: targetName,
+                spellName: brokenSpell,
+                reason: 'Sleet Storm spell',
+                note: `${targetName} lost concentration on ${brokenSpell} due to Sleet Storm.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error("[sleetStorm] Error:", e); });
+        }
+    }
+
+    // Track concentration loss for this creature
+    const casterConcentrationKey = `_sleetStorm_concentration_${casterName.replace(/\s+/g, '_')}`;
+    const existingConcentration = getRuntimeValue(casterName, casterConcentrationKey, campaignName) || [];
+    const concentrationList = Array.isArray(existingConcentration) ? [...existingConcentration] : [];
+    if (!concentrationList.includes(targetName)) {
+        concentrationList.push(targetName);
+        setRuntimeValue(casterName, casterConcentrationKey, concentrationList, campaignName);
+    }
+
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: 'Prone',
+        reason: 'Sleet Storm spell',
+        note: `${targetName} is Prone by Sleet Storm and loses Concentration.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[sleetStorm] Error:", e); });
+
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-sleet-storm',
+        targetName,
+        saveDc: dc,
+        saveType: 'DEX',
+        success: false,
+        description: `${targetName} failed DEX save against Sleet Storm. Becomes Prone and loses Concentration.`,
+    }).catch((e) => { console.error("[sleetStorm] Error:", e); });
+
+    // Track Sleet Storm effect with concentration duration for cleanup
+    const targetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const effects = Array.isArray(targetEffects) ? [...targetEffects] : [];
+    const sleetEffect = {
+        target: targetName,
+        effect: 'sleet_storm',
+        source: casterName,
+        conditions: ['prone'],
+        dc: dc,
+        duration: 'concentration',
+        lostConcentration: true,
+    };
+    const existingIdx = effects.findIndex(
+        te => te.target === targetName && te.effect === 'sleet_storm'
+    );
+    if (existingIdx >= 0) {
+        effects[existingIdx] = sleetEffect;
+    } else {
+        effects.push(sleetEffect);
+    }
+    setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
 }
 
 export async function processSleetStormAreaSave(casterName, targetName, campaignName, _mapName) {

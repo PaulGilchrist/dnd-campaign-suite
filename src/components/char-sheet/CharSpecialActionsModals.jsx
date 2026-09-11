@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { applyTypeChoice as applyBoonOfEnergyResistance } from '../../services/automation/handlers/reactions/boonOfEnergyResistanceHandler.js';
 import { isInteractive } from '../../services/ui/modalDismissUtils.js';
 import TeleportModal from './modals/TeleportModal.jsx';
@@ -42,6 +43,102 @@ function getEventDisplayLabel(eventType, eventData) {
     }
     return eventData.saveType ? eventData.saveType.toUpperCase() : 'Save';
 }
+
+const TeleportBlock = ({ modal, onClose }) => (
+    <TeleportModal
+        action={modal.action}
+        playerStats={modal.playerStats}
+        campaignName={modal.campaignName}
+        onClose={onClose}
+        isMoonlightStep={modal.action?.automation?.effect === 'moonlight_step_teleport'}
+    />
+);
+
+const MoonlightStepFallbackBlock = ({ fallback, onConfirm, onDismiss }) => (
+    <div className="sp-overlay" onClick={(e) => {
+        if (e.target.closest('.sp-modal')) return;
+        onDismiss();
+    }}>
+        <div className="sp-modal">
+            <div className="sp-header">
+                <i className="fa-solid fa-moon"></i> {fallback.action.name}
+            </div>
+            <div className="sp-body">
+                <p>No Moonlight Step uses remaining. Consume a level {fallback.slotLevel} spell slot to use Moonlight Step?</p>
+            </div>
+            <div className="sp-actions">
+                <button className="sp-roll-btn" onClick={onConfirm}>
+                    <i className="fa-solid fa-check"></i> Yes, Consume Slot
+                </button>
+                <button className="sp-dismiss-btn" onClick={onDismiss}>
+                    <i className="fa-solid fa-times"></i> No
+                </button>
+            </div>
+        </div>
+    </div>
+);
+
+const PortentBlock = ({ portentModal, handlePortentModalClose, handlePortentDieChoice }) => (
+    <div className="portent-modal-overlay" onClick={(e) => {
+        if (e.target.closest('.portent-modal')) return;
+        handlePortentModalClose?.();
+    }}>
+        <div className="portent-modal" onClick={(e) => {
+            if (isInteractive(e.target)) return;
+            handlePortentModalClose?.();
+        }}>
+            <h3>Portent</h3>
+            <div className="portent-modal-section">
+                <div className="portent-modal-label">Creature: <span className="portent-modal-target">{portentModal.targetName}</span></div>
+                <div className="portent-modal-label">{getEventDisplayLabel(portentModal.eventType, portentModal.eventData)}</div>
+                <div className="portent-modal-original">
+                    d20({portentModal.eventData.d20}) + {portentModal.eventData.bonus} = {portentModal.eventData.d20 + portentModal.eventData.bonus}
+                    {portentModal.eventType === 'attack' && ` (${portentModal.eventData.hit ? 'Hit' : 'Miss'})`}
+                </div>
+            </div>
+            <div className="portent-modal-section">
+                <div className="portent-modal-label">Choose a foretelling roll:</div>
+                <div className="portent-dice-options">
+                    {portentModal.diceOptions.map(die => (
+                        <button key={die} className="portent-die-btn" onClick={() => handlePortentDieChoice(die)}>
+                            {die}
+                        </button>
+                    ))}
+                </div>
+            </div>
+            <div className="portent-modal-actions">
+                <button className="portent-cancel-btn" onClick={handlePortentModalClose}>Cancel</button>
+            </div>
+        </div>
+    </div>
+);
+
+const MultiResistanceBlock = ({ multiResistanceModal, setMultiResistanceModal, setPopupHtml }) => {
+    const handleConfirm = async (selected) => {
+        const payload = multiResistanceModal;
+        setMultiResistanceModal(null);
+        const res = await applyBoonOfEnergyResistance(payload.action, payload.playerStats, payload.campaignName, selected);
+        if (res?.type === 'popup') {
+            const html = `<b>${res.payload?.name || payload.action?.name}</b><br/>${res.payload?.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+            setPopupHtml(html);
+        }
+        return res;
+    };
+    return (
+        <MultiResistanceSelectionModal
+            title={multiResistanceModal.action?.name || 'Energy Resistances'}
+            icon="fa-shield-halved"
+            damageTypes={multiResistanceModal.damageTypes}
+            existingTypes={multiResistanceModal.existingTypes}
+            maxSelections={multiResistanceModal.maxSelections || 2}
+            action={multiResistanceModal.action}
+            playerStats={multiResistanceModal.playerStats}
+            campaignName={multiResistanceModal.campaignName}
+            onConfirm={handleConfirm}
+            onClose={() => setMultiResistanceModal(null)}
+        />
+    );
+};
 
 function CharSpecialActionsModals({
     teleportModal, setTeleportModal,
@@ -112,78 +209,55 @@ function CharSpecialActionsModals({
     handleGnomishLineageConfirm,
     setPopupHtml,
 }) {
-    return (
-        <>
-            {teleportModal && (
-                <TeleportModal
-                    action={teleportModal.action}
-                    playerStats={teleportModal.playerStats}
-                    campaignName={teleportModal.campaignName}
-                    onClose={() => setTeleportModal(null)}
-                    isMoonlightStep={teleportModal.action?.automation?.effect === 'moonlight_step_teleport'}
+    const MODAL_BLOCKS = [
+            [teleportModal, () => (
+                <TeleportBlock modal={teleportModal} onClose={() => setTeleportModal(null)} />
+            )],
+            [moonlightStepFallback, () => (
+                <MoonlightStepFallbackBlock
+                    fallback={moonlightStepFallback}
+                    onConfirm={handleMoonlightStepFallbackConfirm}
+                    onDismiss={() => setMoonlightStepFallback(null)}
                 />
-            )}
-            {moonlightStepFallback && (
-                <div className="sp-overlay" onClick={(e) => {
-                    if (e.target.closest('.sp-modal')) return;
-                    setMoonlightStepFallback(null);
-                }}>
-                    <div className="sp-modal">
-                        <div className="sp-header">
-                            <i className="fa-solid fa-moon"></i> {moonlightStepFallback.action.name}
-                        </div>
-                        <div className="sp-body">
-                            <p>No Moonlight Step uses remaining. Consume a level {moonlightStepFallback.slotLevel} spell slot to use Moonlight Step?</p>
-                        </div>
-                        <div className="sp-actions">
-                            <button className="sp-roll-btn" onClick={handleMoonlightStepFallbackConfirm}>
-                                <i className="fa-solid fa-check"></i> Yes, Consume Slot
-                            </button>
-                            <button className="sp-dismiss-btn" onClick={() => setMoonlightStepFallback(null)}>
-                                <i className="fa-solid fa-times"></i> No
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {signatureSpellsModal && (
+            )],
+            [signatureSpellsModal, () => (
                 <SignatureSpellsModal
                     payload={signatureSpellsModal}
                     onConfirm={handleSignatureSpellsConfirm}
                     onClose={() => setSignatureSpellsModal(null)}
                 />
-            )}
-            {spellMasteryModal && (
+            )],
+            [spellMasteryModal, () => (
                 <SpellMasteryModal
                     payload={spellMasteryModal}
                     onConfirm={handleSpellMasteryConfirm}
                     onClose={() => setSpellMasteryModal(null)}
                 />
-            )}
-            {savantModal && (
+            )],
+            [savantModal, () => (
                 <SavantModal
                     payload={savantModal}
                     onConfirm={handleSavantConfirm}
                     onClose={() => setSavantModal(null)}
                 />
-            )}
-            {combatSuperiorityModal && (
+            )],
+            [combatSuperiorityModal, () => (
                 <CombatSuperiorityModal
                     payload={combatSuperiorityModal}
                     onConfirm={handleCombatSuperiorityConfirm}
                     onReopenSelection={handleCombatSuperiorityReopenSelection}
                     onClose={() => setCombatSuperiorityModal(null)}
                 />
-            )}
-            {weaponKindMasteryModal && (
+            )],
+            [weaponKindMasteryModal, () => (
                 <WeaponKindMasteryModal
                     {...weaponKindMasteryModal}
                     playerStats={playerStats}
                     campaignName={campaignName}
                     onClose={() => setWeaponKindMasteryModal(null)}
                 />
-            )}
-            {weaponMasteryChoiceModal && (
+            )],
+            [weaponMasteryChoiceModal, () => (
                 <WeaponMasteryChoiceModal
                     {...weaponMasteryChoiceModal}
                     playerStats={playerStats}
@@ -191,44 +265,44 @@ function CharSpecialActionsModals({
                     onClose={() => setWeaponMasteryChoiceModal(null)}
                     onConfirm={() => setWeaponMasteryChoiceModal(null)}
                 />
-            )}
-            {resourcePoolModal && (
+            )],
+            [resourcePoolModal, () => (
                 <ResourcePoolModal
                     playerStats={playerStats}
                     campaignName={campaignName}
                     automation={resourcePoolModal.automation}
                     onClose={() => setResourcePoolModal(null)}
                 />
-            )}
-            {naturalRecoveryModal && (
+            )],
+            [naturalRecoveryModal, () => (
                 <NaturalRecoveryModal
                     playerStats={playerStats}
                     campaignName={campaignName}
                     onClose={() => setNaturalRecoveryModal(null)}
                 />
-            )}
-            {circleOfTheLandSpellsModal && (
+            )],
+            [circleOfTheLandSpellsModal, () => (
                 <CircleOfTheLandSpellsModal
                     playerStats={playerStats}
                     campaignName={campaignName}
                     onClose={() => setCircleOfTheLandSpellsModal(null)}
                 />
-            )}
-            {elementalAffinityModal && (
+            )],
+            [elementalAffinityModal, () => (
                 <ElementalAffinityModal
                     action={elementalAffinityModal.action}
                     playerStats={elementalAffinityModal.playerStats}
                     campaignName={elementalAffinityModal.campaignName}
                     onClose={() => setElementalAffinityModal(null)}
                 />
-            )}
-            {wildMagicSurgeModal && (
+            )],
+            [wildMagicSurgeModal, () => (
                 <WildMagicSurgeModal
                     {...wildMagicSurgeModal}
                     onClose={() => setWildMagicSurgeModal(null)}
                 />
-            )}
-            {strideModal && (
+            )],
+            [strideModal, () => (
                 <StrideOfTheElementsModal
                     action={strideModal.action}
                     playerStats={strideModal.playerStats}
@@ -236,8 +310,8 @@ function CharSpecialActionsModals({
                     onConfirm={handleStrideConfirm}
                     onClose={() => setStrideModal(null)}
                 />
-            )}
-            {epitomeModal && (
+            )],
+            [epitomeModal, () => (
                 <ElementalEpitomeModal
                     action={epitomeModal.action}
                     playerStats={epitomeModal.playerStats}
@@ -246,8 +320,8 @@ function CharSpecialActionsModals({
                     onConfirm={handleEpitomeConfirm}
                     onClose={handleEpitomeClose}
                 />
-            )}
-            {destructiveStrideModal && (
+            )],
+            [destructiveStrideModal, () => (
                 <DestructiveStrideModal
                     action={destructiveStrideModal.action}
                     playerStats={destructiveStrideModal.playerStats}
@@ -255,8 +329,8 @@ function CharSpecialActionsModals({
                     onConfirm={handleDestructiveStrideConfirm}
                     onClose={() => setDestructiveStrideModal(null)}
                 />
-            )}
-            {destructiveStrideTargetModal && (
+            )],
+            [destructiveStrideTargetModal, () => (
                 <SecondaryTargetModal
                     title="Destructive Stride"
                     icon="fa-person-running"
@@ -267,26 +341,26 @@ function CharSpecialActionsModals({
                     onTargetSelected={handleDestructiveStrideTargetConfirm}
                     onSkip={handleDestructiveStrideTargetSkip}
                 />
-            )}
-            {quiveringPalmModal && (
+            )],
+            [quiveringPalmModal, () => (
                 <QuiveringPalmModal
                     {...quiveringPalmModal}
                     onClose={() => setQuiveringPalmModal(null)}
                 />
-            )}
-            {stepsOfTheFeyTauntModal && (
+            )],
+            [stepsOfTheFeyTauntModal, () => (
                 <StepsOfTheFeyTauntModal
                     {...stepsOfTheFeyTauntModal}
                     onClose={() => setStepsOfTheFeyTauntModal(null)}
                 />
-            )}
-            {mistyWandererModal && (
+            )],
+            [mistyWandererModal, () => (
                 <MistyWandererModal
                     {...mistyWandererModal}
                     onClose={() => setMistyWandererModal(null)}
                 />
-            )}
-            {twinklingConstellationModal && (
+            )],
+            [twinklingConstellationModal, () => (
                 <ConstellationSelectionModal
                     action={twinklingConstellationModal.action}
                     playerStats={twinklingConstellationModal.playerStats}
@@ -296,54 +370,23 @@ function CharSpecialActionsModals({
                     onConfirm={() => {}}
                     onClose={() => setTwinklingConstellationModal(null)}
                 />
-            )}
-            {hurlThroughHellModal && (
+            )],
+            [hurlThroughHellModal, () => (
                 <HurlThroughHellModal
                     {...hurlThroughHellModal}
                     onClose={() => setHurlThroughHellModal(null)}
                 />
-            )}
-            {clairvoyantCombatantModal && (
+            )],
+            [clairvoyantCombatantModal, () => (
                 <ClairvoyantCombatantModal
                     {...clairvoyantCombatantModal}
                     onClose={() => setClairvoyantCombatantModal(null)}
                 />
-            )}
-            {portentModal && (
-                <div className="portent-modal-overlay" onClick={(e) => {
-                    if (e.target.closest('.portent-modal')) return;
-                    handlePortentModalClose?.();
-                }}>
-                    <div className="portent-modal" onClick={(e) => {
-                        if (isInteractive(e.target)) return;
-                        handlePortentModalClose?.();
-                    }}>
-                        <h3>Portent</h3>
-                        <div className="portent-modal-section">
-                            <div className="portent-modal-label">Creature: <span className="portent-modal-target">{portentModal.targetName}</span></div>
-                            <div className="portent-modal-label">{getEventDisplayLabel(portentModal.eventType, portentModal.eventData)}</div>
-                            <div className="portent-modal-original">
-                                d20({portentModal.eventData.d20}) + {portentModal.eventData.bonus} = {portentModal.eventData.d20 + portentModal.eventData.bonus}
-                                {portentModal.eventType === 'attack' && ` (${portentModal.eventData.hit ? 'Hit' : 'Miss'})`}
-                            </div>
-                        </div>
-                        <div className="portent-modal-section">
-                            <div className="portent-modal-label">Choose a foretelling roll:</div>
-                            <div className="portent-dice-options">
-                                {portentModal.diceOptions.map(die => (
-                                    <button key={die} className="portent-die-btn" onClick={() => handlePortentDieChoice(die)}>
-                                        {die}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="portent-modal-actions">
-                            <button className="portent-cancel-btn" onClick={handlePortentModalClose}>Cancel</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {celestialResilienceModal && (
+            )],
+            [portentModal, () => (
+                <PortentBlock portentModal={portentModal} handlePortentModalClose={handlePortentModalClose} handlePortentDieChoice={handlePortentDieChoice} />
+            )],
+            [celestialResilienceModal, () => (
                 <CreatureSelectionModal
                     title="Celestial Resilience"
                     icon="fa-shield-hart"
@@ -356,51 +399,31 @@ function CharSpecialActionsModals({
                     onConfirm={handleCelestialResilienceConfirm}
                     onSkip={handleCelestialResilienceSkip}
                 />
-            )}
-            {fiendishResilienceModal && (
+            )],
+            [fiendishResilienceModal, () => (
                 <SingleResistanceSelectionModal
                     {...fiendishResilienceModal}
                     onClose={() => setFiendishResilienceModal(null)}
                 />
-            )}
-            {multiResistanceModal && (
-                <MultiResistanceSelectionModal
-                    title={multiResistanceModal.action?.name || 'Energy Resistances'}
-                    icon="fa-shield-halved"
-                    damageTypes={multiResistanceModal.damageTypes}
-                    existingTypes={multiResistanceModal.existingTypes}
-                    maxSelections={multiResistanceModal.maxSelections || 2}
-                    action={multiResistanceModal.action}
-                    playerStats={multiResistanceModal.playerStats}
-                    campaignName={multiResistanceModal.campaignName}
-                    onConfirm={async (selected) => {
-                        const payload = multiResistanceModal;
-                        setMultiResistanceModal(null);
-                        const res = await applyBoonOfEnergyResistance(payload.action, payload.playerStats, payload.campaignName, selected);
-                        if (res?.type === 'popup') {
-                            const html = `<b>${res.payload?.name || payload.action?.name}</b><br/>${res.payload?.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-                            setPopupHtml(html);
-                        }
-                        return res;
-                    }}
-                    onClose={() => setMultiResistanceModal(null)}
-                />
-            )}
-            {featureChoiceModal && (
+            )],
+            [multiResistanceModal, () => (
+                <MultiResistanceBlock multiResistanceModal={multiResistanceModal} setMultiResistanceModal={setMultiResistanceModal} setPopupHtml={setPopupHtml} />
+            )],
+            [featureChoiceModal, () => (
                 <FeatureChoiceModal
                     featureChoiceModal={featureChoiceModal}
                     handleFeatureChoiceConfirm={handleFeatureChoiceConfirm}
                     handleFeatureChoiceSkip={handleFeatureChoiceSkip}
                 />
-            )}
-            {aspectOfTheWildsModal && (
+            )],
+            [aspectOfTheWildsModal, () => (
                 <AspectOfTheWildsModal
                     aspectOfTheWildsModal={aspectOfTheWildsModal}
                     handleAspectOfTheWildsConfirm={handleAspectOfTheWildsConfirm}
                     handleAspectOfTheWildsSkip={handleAspectOfTheWildsSkip}
                 />
-            )}
-            {replenishingMealModal && (
+            )],
+            [replenishingMealModal, () => (
                 <CreatureSelectionModal
                     title="Replenishing Meal"
                     icon="fa-utensils"
@@ -413,8 +436,8 @@ function CharSpecialActionsModals({
                     onConfirm={handleReplenishingMealConfirm}
                     onSkip={() => setReplenishingMealModal(null)}
                 />
-            )}
-            {bolsteringTreatsModal && (
+            )],
+            [bolsteringTreatsModal, () => (
                 <CreatureSelectionModal
                     title="Bolstering Treats"
                     icon="fa-cookie-bite"
@@ -427,8 +450,8 @@ function CharSpecialActionsModals({
                     onConfirm={handleBolsteringTreatsConfirm}
                     onSkip={() => setBolsteringTreatsModal(null)}
                 />
-            )}
-            {bolsteringPerformanceModal && (
+            )],
+            [bolsteringPerformanceModal, () => (
                 <CreatureSelectionModal
                     title="Bolstering Performance"
                     icon="fa-bullhorn"
@@ -441,8 +464,8 @@ function CharSpecialActionsModals({
                     onConfirm={handleBolsteringPerformanceConfirm}
                     onSkip={() => setBolsteringPerformanceModal(null)}
                 />
-            )}
-            {encouragingSongModal && (
+            )],
+            [encouragingSongModal, () => (
                 <CreatureSelectionModal
                     title="Encouraging Song"
                     icon="fa-music"
@@ -454,35 +477,35 @@ function CharSpecialActionsModals({
                     onConfirm={handleEncouragingSongConfirm}
                     onSkip={handleEncouragingSongSkip}
                 />
-            )}
-            {elfishLineageModal && (
+            )],
+            [elfishLineageModal, () => (
                 <ElfisLineageModal
                     elfishLineageModal={elfishLineageModal}
                     handleElfisLineageConfirm={handleElfisLineageConfirm}
                     handleElfisLineageSkip={() => setElfisLineageModal(null)}
                 />
-            )}
-            {gnomishLineageModal && (
+            )],
+            [gnomishLineageModal, () => (
                 <GnomishLineageModal
                     gnomishLineageModal={gnomishLineageModal}
                     handleGnomishLineageConfirm={handleGnomishLineageConfirm}
                     handleGnomishLineageSkip={() => setGnomishLineageModal(null)}
                 />
-            )}
-            {feyReinforcementsModal && (
+            )],
+            [feyReinforcementsModal, () => (
                 <FeyReinforcementsModal
                     {...feyReinforcementsModal}
                     onClose={() => setFeyReinforcementsModal(null)}
                 />
-            )}
-            {fiendishLegacyModal && (
+            )],
+            [fiendishLegacyModal, () => (
                 <FiendishLegacyModal
                     {...fiendishLegacyModal}
                     onClose={() => setFiendishLegacyModal(null)}
                 />
-            )}
-        </>
-    );
+            )],
+    ];
+    return <>{MODAL_BLOCKS.map(([flag, render], i) => (flag ? <Fragment key={i}>{render()}</Fragment> : null))}</>;
 }
 
 export default CharSpecialActionsModals;

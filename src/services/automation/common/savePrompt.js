@@ -111,23 +111,11 @@ export function createSaveListener(campaignName, config) {
         const damageType = promptData?.damageType;
         const rawDamage = promptData?.rawDamage;
 
-        let rollDetail = `rolled ${roll}${saveBonus !== 0 ? ' +' + saveBonus : ''} = ${total}`;
-        if (advantage && disadvantage) {
-            rollDetail += ' (advantage & disadvantage cancel)';
-        } else if (advantage) {
-            rollDetail += ' (advantage)';
-        } else if (disadvantage) {
-            rollDetail += ' (disadvantage)';
-        }
-        if (success && dcSuccess !== undefined && dcSuccess !== null) {
-            const successLabel = dcSuccess === 0 ? 'none' : (dcSuccess === 0.5 ? 'half' : 'full');
-            rollDetail += ` — ${successLabel} success`;
-        }
+        const rollDetail = describeSaveRoll({ roll, saveBonus, total, advantage, disadvantage, success, dcSuccess });
 
         const description = `${targetName} ${success ? 'succeeded' : 'failed'} ${saveType} save (DC ${saveDc}, ${rollDetail})`;
 
-        const entry = {
-            type: 'save_result',
+        const entry = buildSaveResultEntry({
             characterName: attackerName,
             targetName,
             saveDc,
@@ -137,23 +125,12 @@ export function createSaveListener(campaignName, config) {
             total,
             saveBonus,
             description,
-        };
-
-        if (sourceName && sourceName !== attackerName) {
-            entry.sourceName = sourceName;
-        }
-        if (condition) {
-            entry.condition = condition;
-        }
-        if (damageFormula) {
-            entry.damageFormula = damageFormula;
-        }
-        if (damageType) {
-            entry.damageType = damageType;
-        }
-        if (rawDamage) {
-            entry.rawDamage = rawDamage;
-        }
+            sourceName,
+            condition,
+            damageFormula,
+            damageType,
+            rawDamage,
+        });
 
         await addEntry(campaignName, entry).catch((e) => { console.error('[savePrompt] Error logging save result:', e); });
         return detail;
@@ -166,4 +143,53 @@ export function createSaveListener(campaignName, config) {
     });
 
     return { promptId, promise: saveResultPromise };
+}
+
+function describeSaveRoll({ roll, saveBonus, total, advantage, disadvantage, success, dcSuccess }) {
+    let rollDetail = `rolled ${roll}${saveBonus !== 0 ? ' +' + saveBonus : ''} = ${total}`;
+    if (advantage && disadvantage) {
+        rollDetail += ' (advantage & disadvantage cancel)';
+    } else if (advantage) {
+        rollDetail += ' (advantage)';
+    } else if (disadvantage) {
+        rollDetail += ' (disadvantage)';
+    }
+    if (success && dcSuccess !== undefined && dcSuccess !== null) {
+        const successLabel = dcSuccess === 0 ? 'none' : (dcSuccess === 0.5 ? 'half' : 'full');
+        rollDetail += ` — ${successLabel} success`;
+    }
+    return rollDetail;
+}
+
+function buildSaveResultEntry({ characterName, targetName, saveDc, saveType, success, roll, total, saveBonus, description, sourceName, condition, damageFormula, damageType, rawDamage }) {
+    const entry = {
+        type: 'save_result',
+        characterName,
+        targetName,
+        saveDc,
+        saveType,
+        success,
+        roll,
+        total,
+        saveBonus,
+        description,
+    };
+
+    if (sourceName && sourceName !== characterName) {
+        entry.sourceName = sourceName;
+    }
+    if (condition) {
+        entry.condition = condition;
+    }
+    if (damageFormula) {
+        entry.damageFormula = damageFormula;
+    }
+    if (damageType) {
+        entry.damageType = damageType;
+    }
+    if (rawDamage) {
+        entry.rawDamage = rawDamage;
+    }
+
+    return entry;
 }

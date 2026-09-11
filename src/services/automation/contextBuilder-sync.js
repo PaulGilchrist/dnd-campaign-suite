@@ -486,6 +486,67 @@ async function computeSneakAttackDice(playerStats, attack, targetName, forcedMod
     return 0;
 }
 
+// Ordered forced-mode resolvers — first match wins, mirroring original guard order.
+async function resolveAttackModeResolvers(playerName, playerStats, targetName, attack, activeBuffs, consumeAttackTe, avengingAngelActive, campaignName) {
+    const modeResolvers = [
+        // Vow of Enmity: Advantage on attack rolls against the vowed creature
+        () => (targetName && hasVowOfEnmity(targetName, campaignName) ? { mode: 'advantage' } : undefined),
+        () => (targetName && resolveClairvoyantCombatant(playerName, targetName, activeBuffs, campaignName)),
+        // Avenging Angel: Advantage on attack rolls against Frightened creatures in the aura
+        () => (targetName && avengingAngelActive && isAuraTarget(playerName, targetName, campaignName) ? { mode: 'advantage' } : undefined),
+        // Invoke Duplicity: Distract grants Advantage on attack rolls while the illusion is active
+        () => (activeBuffs.some(b => b.effect === 'create_illusion') ? { mode: 'advantage' } : undefined),
+        () => resolvePreciseHunter(playerName, targetName, playerStats, campaignName),
+        () => resolveWolfAura(playerName, campaignName),
+        () => resolveDuplicityAura(playerName, campaignName),
+        () => resolveLionAura(playerName, campaignName),
+        // WM-008 one-shot te consumption (attack roll only)
+        () => {
+            if (!targetName || !consumeAttackTe) return undefined;
+            const mode = consumeOneShotAdvantageTe(
+                playerName,
+                targetName,
+                campaignName,
+                (te, pn, tn) => te.effect === 'distracting_strike_advantage' && te.target === tn && te.source !== pn
+            );
+            return mode ? { mode } : undefined;
+        },
+        () => {
+            if (!targetName || !consumeAttackTe) return undefined;
+            const mode = consumeOneShotAdvantageTe(
+                playerName,
+                targetName,
+                campaignName,
+                (te, pn, tn) => te.effect === 'next_attack_advantage' && te.target === pn && te.vexTarget === tn,
+                true
+            );
+            return mode ? { mode } : undefined;
+        },
+        () => (targetName && campaignTargetEffects().some(te => te.effect === 'protection' && te.target === targetName) ? { mode: 'disadvantage' } : undefined),
+        () => (targetName ? resolveCoronaAura(targetName, campaignName, attack.damageType) : undefined),
+    ];
+
+    for (const resolveMode of modeResolvers) {
+        const outcome = await resolveMode();
+        if (outcome) return outcome;
+    }
+    return undefined;
+}
+
+// Accumulate target-condition-driven adv/dis (ordered) onto the running counts.
+async function accumulateTargetAdvDis(adv, dis, playerName, playerStats, targetName, buffScanAdv, campaignName) {
+    adv += buffScanAdv;
+    if (targetName) {
+        adv += countTargetConditionAdvantage(targetName, campaignName);
+        adv += countGrapplerAdvantage(playerStats, targetName, campaignName);
+        dis += countDodgeDisadvantage(targetName, campaignName);
+        dis += await countProtectionFromEvilAndGoodDisadvantage(playerName, targetName, campaignName);
+        // Death Ward: attackers have disadvantage on attack rolls against the target
+        if (isDeathWardActive(targetName, campaignName)) dis++;
+    }
+    return { adv, dis };
+}
+
 export async function buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, _featRangeEffects, opts = {}) {
     // WM-008: one-shot attack te (vex/distracting) is consumed by the NEXT attack ROLL
     // only. Damage-phase ctx rebuilds (proceedWithDamage / buildContext / cunningStrike)
@@ -524,49 +585,13 @@ export async function buildAttackContextSync(attack, playerStats, campaignName, 
         const buffScan = scanBuffsForAdvantage(activeBuffs);
         const ramActive = buffScan.ramActive;
         if (forcedMode === undefined) {
-            adv += buffScan.adv;
-        }
-
-        if (forcedMode === undefined && targetName) {
-            adv += countTargetConditionAdvantage(targetName, campaignName);
-        }
-        if (forcedMode === undefined && targetName) {
-            adv += countGrapplerAdvantage(playerStats, targetName, campaignName);
-        }
-        if (forcedMode === undefined && targetName) {
-            dis += countDodgeDisadvantage(targetName, campaignName);
-        }
-        if (forcedMode === undefined && targetName) {
-            dis += await countProtectionFromEvilAndGoodDisadvantage(playerName, targetName, campaignName);
-        }
-        // Death Ward: attackers have disadvantage on attack rolls against the target
-        if (forcedMode === undefined && targetName && isDeathWardActive(targetName, campaignName)) {
-            dis++;
-        }
-
-        // Resolve accumulated adv/dis to forcedMode (they cancel per rules)
-        if (forcedMode === undefined) {
+            ({ adv, dis } = await accumulateTargetAdvDis(adv, dis, playerName, playerStats, targetName, buffScan.adv, campaignName));
+            // Resolve accumulated adv/dis to forcedMode (they cancel per rules)
             forcedMode = resolveAdvantageMode(adv, dis);
         }
 
-        // Antimagic Field — allow only weapon attacks when either attacker or target is affected
-        if (targetName && campaignTargetEffects().some(te => (te.effect === 'antimagic_field') && (te.target === playerName || te.target === targetName)) && isAntimagicBlockedAttack(attack)) {
-            return buildBlockedAttackContext(attack, playerName, targetName, playerStats,
-                'Antimagic Field blocks non-weapon attacks',
-                'Attack blocked by Antimagic Field — only weapon attacks are allowed.');
-        }
-
-        // Resilient Sphere — block all attacks when attacker or target is enclosed
-        if (targetName && isResilientSphereActive(playerName, campaignName)) {
-            return buildBlockedAttackContext(attack, playerName, targetName, playerStats,
-                'Resilient Sphere blocks attacks — nothing passes through the barrier',
-                'Attack blocked by Resilient Sphere — nothing can pass through the barrier.');
-        }
-        if (targetName && isResilientSphereActive(targetName, campaignName)) {
-            return buildBlockedAttackContext(attack, playerName, targetName, playerStats,
-                'Resilient Sphere blocks attacks — nothing passes through the barrier',
-                'Attack blocked by Resilient Sphere — nothing can pass through the barrier.');
-        }
+        const blockedContext = resolveBlockedAttackContext(attack, playerName, targetName, playerStats, campaignName);
+        if (blockedContext) return blockedContext;
 
         // Brutal Strike: override to normal when chosen
         if (getRuntimeValue(playerStats.name, '_brutalStrikeNoAdvantage', campaignName)) {
@@ -581,49 +606,9 @@ export async function buildAttackContextSync(attack, playerStats, campaignName, 
 
         const avengingAngelActive = isAvengingAngelActive(playerName, campaignName);
 
-        // Ordered forced-mode resolvers — first match wins, mirroring original guard order.
-        const modeResolvers = [
-            // Vow of Enmity: Advantage on attack rolls against the vowed creature
-            () => (targetName && hasVowOfEnmity(targetName, campaignName) ? { mode: 'advantage' } : undefined),
-            () => (targetName && resolveClairvoyantCombatant(playerName, targetName, activeBuffs, campaignName)),
-            // Avenging Angel: Advantage on attack rolls against Frightened creatures in the aura
-            () => (targetName && avengingAngelActive && isAuraTarget(playerName, targetName, campaignName) ? { mode: 'advantage' } : undefined),
-            // Invoke Duplicity: Distract grants Advantage on attack rolls while the illusion is active
-            () => (activeBuffs.some(b => b.effect === 'create_illusion') ? { mode: 'advantage' } : undefined),
-            () => resolvePreciseHunter(playerName, targetName, playerStats, campaignName),
-            () => resolveWolfAura(playerName, campaignName),
-            () => resolveDuplicityAura(playerName, campaignName),
-            () => resolveLionAura(playerName, campaignName),
-            // WM-008 one-shot te consumption (attack roll only)
-            () => {
-                if (!targetName || !consumeAttackTe) return undefined;
-                const mode = consumeOneShotAdvantageTe(
-                    playerName,
-                    targetName,
-                    campaignName,
-                    (te, pn, tn) => te.effect === 'distracting_strike_advantage' && te.target === tn && te.source !== pn
-                );
-                return mode ? { mode } : undefined;
-            },
-            () => {
-                if (!targetName || !consumeAttackTe) return undefined;
-                const mode = consumeOneShotAdvantageTe(
-                    playerName,
-                    targetName,
-                    campaignName,
-                    (te, pn, tn) => te.effect === 'next_attack_advantage' && te.target === pn && te.vexTarget === tn,
-                    true
-                );
-                return mode ? { mode } : undefined;
-            },
-            () => (targetName && campaignTargetEffects().some(te => te.effect === 'protection' && te.target === targetName) ? { mode: 'disadvantage' } : undefined),
-            () => (targetName ? resolveCoronaAura(targetName, campaignName, attack.damageType) : undefined),
-        ];
-
         let advantageReason = undefined;
-        for (const resolveMode of modeResolvers) {
-            if (forcedMode !== undefined) break;
-            const outcome = await resolveMode();
+        if (forcedMode === undefined) {
+            const outcome = await resolveAttackModeResolvers(playerName, playerStats, targetName, attack, activeBuffs, consumeAttackTe, avengingAngelActive, campaignName);
             if (outcome) {
                 forcedMode = outcome.mode;
                 advantageReason = outcome.reason;
@@ -646,41 +631,15 @@ export async function buildAttackContextSync(attack, playerStats, campaignName, 
 
         const criticalRange = computeCriticalRange(playerStats);
 
-        // Compute Defensive Duelist AC bonus (2024 rules)
-        const ddBuff = (getRuntimeValue(playerName, 'activeBuffs', campaignName) || []).find(b => b.effect === 'defensive_duelist');
-        const defensiveDuelistBonus = ddBuff ? (playerStats.proficiency || 0) : 0;
+        // Compute Defensive Duelist and Bait and Switch AC bonuses (2024 rules)
+        const { defensiveDuelistBonus, baitAndSwitchBonus } = computeDefensiveBonuses(playerName, targetName, playerStats, campaignName);
 
-        // Compute Bait and Switch AC bonus (2024 rules)
-        const baitAndSwitchActive = getRuntimeValue(targetName, 'baitAndSwitchActive', campaignName);
-        const baitAndSwitchBonus = baitAndSwitchActive ? Number(getRuntimeValue(targetName, 'baitAndSwitchBonus', campaignName) || 0) : 0;
-
-        // Stroke of Luck: check if the player has the passive available
-        const hasStrokeOfLuck = (playerStats.automation?.passives || []).some(
-            p => p.type === 'stroke_of_luck'
-        );
-        const strokeOfLuckAvailable = hasStrokeOfLuck && !getRuntimeValue(playerName, 'strokeOfLuckUsed', campaignName);
-
-        // Boon of Combat Prowess: check if the player has auto_reroll for attacks (stored in actions/reactions, not passives)
-        const allAutomation = [
-            ...(playerStats.automation?.actions || []),
-            ...(playerStats.automation?.reactions || []),
-            ...(playerStats.automation?.passives || []),
-        ];
-        const hasBoonOfCombatProwess = allAutomation.some(
-            p => p.type === 'auto_reroll' && (p.effect === 'convert_miss_to_hit' || p.automation?.effect === 'convert_miss_to_hit')
-        );
-        const boonOfCombatProwessAvailable = hasBoonOfCombatProwess && !getRuntimeValue(playerName, 'boonOfCombatProwessUsed');
+        // Stroke of Luck / Boon of Combat Prowess / Boon of Fate availability flags
+        const { strokeOfLuckAvailable, boonOfCombatProwessAvailable, boonOfFateAvailable } = computeRerollAvailabilities(playerStats, playerName, campaignName);
 
         const { grazeDamage, grazeAbilityName, grazeAbilityMod } = computeGraze(attack, playerStats);
 
-        // Boon of Fate: check if the player has the passive available
-        const hasBoonOfFate = (playerStats.automation?.passives || []).some(
-            p => p.type === 'modify_d20_roll'
-        );
-        const boonOfFateAvailable = hasBoonOfFate && !getRuntimeValue(playerName, 'boonOfFateUsed', campaignName);
-
         const sneakAttackDice = await computeSneakAttackDice(playerStats, attack, targetName, forcedMode, campaignName);
-
         return {
             damageType: attack.damageType || attack.damage_type_primary || '',
             resistanceNotice,
@@ -716,4 +675,64 @@ export async function buildAttackContextSync(attack, playerStats, campaignName, 
             sneakAttackDice,
         };
     });
+}
+
+// Antimagic Field / Resilient Sphere blocking — evaluated in original order
+function resolveBlockedAttackContext(attack, playerName, targetName, playerStats, campaignName) {
+    // Antimagic Field — allow only weapon attacks when either attacker or target is affected
+    if (targetName && campaignTargetEffects().some(te => (te.effect === 'antimagic_field') && (te.target === playerName || te.target === targetName)) && isAntimagicBlockedAttack(attack)) {
+        return buildBlockedAttackContext(attack, playerName, targetName, playerStats,
+            'Antimagic Field blocks non-weapon attacks',
+            'Attack blocked by Antimagic Field — only weapon attacks are allowed.');
+    }
+
+    // Resilient Sphere — block all attacks when attacker or target is enclosed
+    if (targetName && isResilientSphereActive(playerName, campaignName)) {
+        return buildBlockedAttackContext(attack, playerName, targetName, playerStats,
+            'Resilient Sphere blocks attacks — nothing passes through the barrier',
+            'Attack blocked by Resilient Sphere — nothing can pass through the barrier.');
+    }
+    if (targetName && isResilientSphereActive(targetName, campaignName)) {
+        return buildBlockedAttackContext(attack, playerName, targetName, playerStats,
+            'Resilient Sphere blocks attacks — nothing passes through the barrier',
+            'Attack blocked by Resilient Sphere — nothing can pass through the barrier.');
+    }
+    return undefined;
+}
+
+// Compute Defensive Duelist and Bait and Switch AC bonuses (2024 rules)
+function computeDefensiveBonuses(playerName, targetName, playerStats, campaignName) {
+    const ddBuff = (getRuntimeValue(playerName, 'activeBuffs', campaignName) || []).find(b => b.effect === 'defensive_duelist');
+    const defensiveDuelistBonus = ddBuff ? (playerStats.proficiency || 0) : 0;
+
+    const baitAndSwitchActive = getRuntimeValue(targetName, 'baitAndSwitchActive', campaignName);
+    const baitAndSwitchBonus = baitAndSwitchActive ? Number(getRuntimeValue(targetName, 'baitAndSwitchBonus', campaignName) || 0) : 0;
+
+    return { defensiveDuelistBonus, baitAndSwitchBonus };
+}
+
+// Stroke of Luck / Boon of Combat Prowess / Boon of Fate availability flags
+function computeRerollAvailabilities(playerStats, playerName, campaignName) {
+    const hasStrokeOfLuck = (playerStats.automation?.passives || []).some(
+        p => p.type === 'stroke_of_luck'
+    );
+    const strokeOfLuckAvailable = hasStrokeOfLuck && !getRuntimeValue(playerName, 'strokeOfLuckUsed', campaignName);
+
+    // Boon of Combat Prowess: auto_reroll for attacks lives in actions/reactions, not passives
+    const allAutomation = [
+        ...(playerStats.automation?.actions || []),
+        ...(playerStats.automation?.reactions || []),
+        ...(playerStats.automation?.passives || []),
+    ];
+    const hasBoonOfCombatProwess = allAutomation.some(
+        p => p.type === 'auto_reroll' && (p.effect === 'convert_miss_to_hit' || p.automation?.effect === 'convert_miss_to_hit')
+    );
+    const boonOfCombatProwessAvailable = hasBoonOfCombatProwess && !getRuntimeValue(playerName, 'boonOfCombatProwessUsed');
+
+    const hasBoonOfFate = (playerStats.automation?.passives || []).some(
+        p => p.type === 'modify_d20_roll'
+    );
+    const boonOfFateAvailable = hasBoonOfFate && !getRuntimeValue(playerName, 'boonOfFateUsed', campaignName);
+
+    return { strokeOfLuckAvailable, boonOfCombatProwessAvailable, boonOfFateAvailable };
 }

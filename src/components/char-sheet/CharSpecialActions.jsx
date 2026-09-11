@@ -79,6 +79,52 @@ function buildAutomationPopupHtml(payload, action) {
     return `<b>${name}</b><br/>${description}<br/><span class="dice-roll-hint">click to dismiss</span>`;
 }
 
+function showPayloadPopup(result, setPopupHtml) {
+    if (result?.payload) {
+        setPopupHtml(`<b>${result.payload.name}</b><br/>${result.payload.description}<br/><span class="dice-roll-hint">click to dismiss</span>`);
+    }
+}
+
+// Deduplicated players + non-player combat creatures, for target-choice distribution.
+function buildDistributeTargetList(characters, combatSummary) {
+    const allCreatures = [
+        ...(characters || []).map(c => ({ name: c.name, type: 'player' })),
+        ...(combatSummary?.creatures || []).filter(c => c.type !== 'player').map(c => ({ name: c.name, type: 'monster' }))
+    ];
+    const seen = new Set();
+    return allCreatures.filter(c => { if (seen.has(c.name)) return false; seen.add(c.name); return true; });
+}
+
+const FIGHTING_STYLE_NAMES = ['Great Weapon Fighting', 'Interception', 'Protection', 'Two-Weapon Fighting'];
+
+// First fighting style that isn't already a special action, appended if it exists in the map.
+function appendFightingStyles(specialActions, fightingStylesMap, fightingStyles) {
+    const match = FIGHTING_STYLE_NAMES.find(name => fightingStyles.includes(name) && !specialActions.find(sa => sa.name === name));
+    if (match && fightingStylesMap[match]) specialActions.push(fightingStylesMap[match]);
+}
+
+// Build the Special Actions list: fighting-style additions, minus actions shown elsewhere.
+function buildUniqueSpecialActions(playerStats, fightingStylesMap) {
+    const specialActions = [...(playerStats.specialActions || [])];
+    if (fightingStylesMap && playerStats.class.fightingStyles) {
+        appendFightingStyles(specialActions, fightingStylesMap, playerStats.class.fightingStyles);
+    }
+    const actionNames = new Set(playerStats.actions?.map(action => action.name) || []);
+    const bonusActionNames = new Set(playerStats.bonusActions?.map(action => action.name) || []);
+    const reactionNames = new Set(playerStats.reactions?.map(action => action.name) || []);
+    const characterAdvancementNames = new Set(playerStats.characterAdvancement?.map(feature => feature.name) || []);
+    const categories = getCategories(playerStats.rules || '5e');
+    const filteredActions = specialActions.filter(action =>
+          !actionNames.has(action.name) &&
+          !bonusActionNames.has(action.name) &&
+          !reactionNames.has(action.name) &&
+          !characterAdvancementNames.has(action.name) &&
+          !categories.featuresToIgnore.includes(action.name) &&
+          !(action.name && action.name.startsWith('Level 1 Spell [Instance'))
+      );
+    return Array.from(new Map(filteredActions.map(action => [action.name, action])).values());
+}
+
 function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, mapName }) {
     const [teleportModal, setTeleportModal] = useState(null);
     const [moonlightStepFallback, setMoonlightStepFallback] = useState(null);
@@ -153,12 +199,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
             return;
         }
         const combatSummary = await getCombatContext(campaignName);
-        const allCreatures = [
-            ...(characters || []).map(c => ({ name: c.name, type: 'player' })),
-            ...(combatSummary?.creatures || []).filter(c => c.type !== 'player').map(c => ({ name: c.name, type: 'monster' }))
-        ];
-        const seen = new Set();
-        const targets = allCreatures.filter(c => { if (seen.has(c.name)) return false; seen.add(c.name); return true; });
+        const targets = buildDistributeTargetList(characters, combatSummary);
         setReplenishingMealModal({ targets, maxTargets: current });
     }, [cannotAct, hasReplenishingMeal, replenishingMeals, replenishingMealMax, campaignName, characters, setPopupHtml]);
     const handleReplenishingMealConfirm = useCallback(async (selectedNames) => {
@@ -195,12 +236,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
             return;
         }
         const combatSummary = await getCombatContext(campaignName);
-        const allCreatures = [
-            ...(characters || []).map(c => ({ name: c.name, type: 'player' })),
-            ...(combatSummary?.creatures || []).filter(c => c.type !== 'player').map(c => ({ name: c.name, type: 'monster' }))
-        ];
-        const seen = new Set();
-        const targets = allCreatures.filter(c => { if (seen.has(c.name)) return false; seen.add(c.name); return true; });
+        const targets = buildDistributeTargetList(characters, combatSummary);
         setBolsteringTreatsModal({ targets, maxTargets: current });
     }, [cannotAct, hasBolsteringTreats, chefBolsteringTreats, bolsteringTreatsMax, campaignName, characters, setPopupHtml]);
     const handleBolsteringTreatsConfirm = useCallback(async (selectedNames) => {
@@ -278,10 +314,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
             selectedTargets,
             bolsteringPerformanceModal.tempHp
         );
-        if (result?.payload) {
-            const html = `<b>${result.payload.name}</b><br/>${result.payload.description}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-            setPopupHtml(html);
-        }
+        showPayloadPopup(result, setPopupHtml);
         setBolsteringPerformanceModal(null);
     }, [bolsteringPerformanceModal, setPopupHtml]);
     const handleEncouragingSongConfirm = useCallback(async (selectedTargets) => {
@@ -292,10 +325,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
             encouragingSongModal.campaignName,
             selectedTargets
         );
-        if (result?.payload) {
-            const html = `<b>${result.payload.name}</b><br/>${result.payload.description}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-            setPopupHtml(html);
-        }
+        showPayloadPopup(result, setPopupHtml);
         setEncouragingSongModal(null);
     }, [encouragingSongModal, setPopupHtml]);
     const handleEncouragingSongSkip = useCallback(async () => {
@@ -305,28 +335,19 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
             encouragingSongModal.playerStats,
             encouragingSongModal.campaignName
         );
-        if (result?.payload) {
-            const html = `<b>${result.payload.name}</b><br/>${result.payload.description}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-            setPopupHtml(html);
-        }
+        showPayloadPopup(result, setPopupHtml);
         setEncouragingSongModal(null);
     }, [encouragingSongModal, setPopupHtml]);
     const handleElfisLineageConfirm = useCallback(async (chosenLineage, playerStats, campaignName) => {
         if (!elfishLineageModal) return;
         const result = await confirmElfisLineage(playerStats, chosenLineage, campaignName);
-        if (result?.payload) {
-            const html = `<b>${result.payload.name}</b><br/>${result.payload.description}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-            setPopupHtml(html);
-        }
+        showPayloadPopup(result, setPopupHtml);
         setElfisLineageModal(null);
     }, [elfishLineageModal, setPopupHtml]);
     const handleGnomishLineageConfirm = useCallback(async (chosenLineage, playerStats, campaignName) => {
         if (!gnomishLineageModal) return;
         const result = await confirmGnomishLineage(playerStats, chosenLineage, campaignName);
-        if (result?.payload) {
-            const html = `<b>${result.payload.name}</b><br/>${result.payload.description}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-            setPopupHtml(html);
-        }
+        showPayloadPopup(result, setPopupHtml);
         setGnomishLineageModal(null);
     }, [gnomishLineageModal, setPopupHtml]);
     useEffect(() => {
@@ -640,40 +661,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
     const handlePortentModalClose = useCallback(() => {
         setPortentModal(null);
     }, []);
-    // Build specialActions list immutably
-    let specialActions = [...(playerStats.specialActions || [])];
-    // Add fighting style special actions
-    if (fightingStylesMap && playerStats.class.fightingStyles) {
-        if (playerStats.class.fightingStyles.includes('Great Weapon Fighting') && !specialActions.find((specialAction) => specialAction.name === 'Great Weapon Fighting')) {
-            const style = fightingStylesMap['Great Weapon Fighting'];
-            if (style) specialActions.push(style);
-         } else if (playerStats.class.fightingStyles.includes('Interception') && !specialActions.find((specialAction) => specialAction.name === 'Interception')) {
-            const style = fightingStylesMap['Interception'];
-            if (style) specialActions.push(style);
-         } else if (playerStats.class.fightingStyles.includes('Protection') && !specialActions.find((specialAction) => specialAction.name === 'Protection')) {
-            const style = fightingStylesMap['Protection'];
-            if (style) specialActions.push(style);
-         } else if (playerStats.class.fightingStyles.includes('Two-Weapon Fighting') && !specialActions.find((specialAction) => specialAction.name === 'Two-Weapon Fighting')) {
-            const style = fightingStylesMap['Two-Weapon Fighting'];
-            if (style) specialActions.push(style);
-            }
-    }
-    // Get names of features that should not be shown in Special Actions
-    const actionNames = new Set(playerStats.actions?.map(action => action.name) || []);
-    const bonusActionNames = new Set(playerStats.bonusActions?.map(action => action.name) || []);
-    const reactionNames = new Set(playerStats.reactions?.map(action => action.name) || []);
-    const characterAdvancementNames = new Set(playerStats.characterAdvancement?.map(feature => feature.name) || []);
-      const categories = getCategories(playerStats.rules || '5e');
-    // Filter out features that are in actions, bonusActions, reactions, or characterAdvancement, or featuresToIgnore
-    const filteredActions = specialActions.filter(action =>
-          !actionNames.has(action.name) &&
-          !bonusActionNames.has(action.name) &&
-          !reactionNames.has(action.name) &&
-          !characterAdvancementNames.has(action.name) &&
-          !categories.featuresToIgnore.includes(action.name) &&
-          !(action.name && action.name.startsWith('Level 1 Spell [Instance'))
-      );
-    const uniqueActions = Array.from(new Map(filteredActions.map(action => [action.name, action])).values());
+    const uniqueActions = buildUniqueSpecialActions(playerStats, fightingStylesMap);
     return (
             <div className='char-special-actions'>
                 <div className='sectionHeader'>Special Actions</div>

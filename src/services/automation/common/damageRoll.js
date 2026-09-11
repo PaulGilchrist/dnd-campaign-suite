@@ -42,16 +42,7 @@ export async function buildAttackContextForDamage(attackContext, playerName, cam
 
     // Check Nature's Sanctuary resistance for creatures in the sanctuary
     if (!resistanceNotice && targetName && campaignName) {
-        const sanctuaryCreatures = getRuntimeValue(playerName, 'naturesSanctuaryCreatures', campaignName);
-        if (sanctuaryCreatures?.includes(targetName)) {
-            const landResistance = getRuntimeValue(playerName, 'naturesSanctuaryResistance', campaignName);
-            if (landResistance) {
-                const lowerDamageType = attackContext.damageType.toLowerCase();
-                if (lowerDamageType === landResistance.toLowerCase()) {
-                    resistanceNotice = `${targetName} resists ${attackContext.damageType} (Nature's Sanctuary)`;
-                }
-            }
-        }
+        resistanceNotice = resolveSanctuaryNotice(attackContext, playerName, campaignName, targetName);
     }
 
     if (!mapName) {
@@ -74,22 +65,7 @@ export async function buildAttackContextForDamage(attackContext, playerName, cam
 
         const attackerPlayer = mapData?.players?.find(p => p.name === playerName);
         if (attackerPlayer) {
-            let targetPos = null;
-            const cs2 = await getCombatContext(campaignName);
-            if (cs2) {
-                const tgt = getTargetFromAttacker(cs2, playerName);
-                if (tgt) {
-                    const targetPlayer = mapData?.players?.find(p => p.name === tgt.name);
-                    const targetNpc = mapData?.placedItems?.length
-                        ? getNearestPlacedItem(mapData.placedItems, tgt.name, { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY })
-                        : null;
-                    if (targetPlayer) {
-                        targetPos = { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY };
-                     } else if (targetNpc) {
-                        targetPos = { gridX: targetNpc.gridX, gridY: targetNpc.gridY };
-                     }
-                 }
-             }
+            const targetPos = await resolveTargetPosition(mapData, playerName, attackerPlayer, campaignName);
 
             const numericRange = rangeToFeet(attackContext.range) || 0;
             const isRanged = numericRange > 8;
@@ -155,4 +131,26 @@ function buildSyncCtx(targetName, resistanceNotice, attackContext, attackerName)
         dcSuccess: attackContext.saveSuccess,
         attackerName,
      };
+}
+
+function resolveSanctuaryNotice(attackContext, playerName, campaignName, targetName) {
+    const sanctuaryCreatures = getRuntimeValue(playerName, 'naturesSanctuaryCreatures', campaignName);
+    if (!sanctuaryCreatures?.includes(targetName)) return null;
+    const landResistance = getRuntimeValue(playerName, 'naturesSanctuaryResistance', campaignName);
+    if (!landResistance) return null;
+    if (attackContext.damageType.toLowerCase() !== landResistance.toLowerCase()) return null;
+    return `${targetName} resists ${attackContext.damageType} (Nature's Sanctuary)`;
+}
+
+async function resolveTargetPosition(mapData, playerName, attackerPlayer, campaignName) {
+    const cs2 = await getCombatContext(campaignName);
+    if (!cs2) return null;
+    const tgt = getTargetFromAttacker(cs2, playerName);
+    if (!tgt) return null;
+    const targetPlayer = mapData?.players?.find(p => p.name === tgt.name);
+    const targetNpc = mapData?.placedItems?.length
+        ? getNearestPlacedItem(mapData.placedItems, tgt.name, { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY })
+        : null;
+    if (targetPlayer) return { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY };
+    return targetNpc ? { gridX: targetNpc.gridX, gridY: targetNpc.gridY } : null;
 }

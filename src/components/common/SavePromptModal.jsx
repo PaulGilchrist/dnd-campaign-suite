@@ -202,45 +202,59 @@ function buildLastAttackData(current, { finalRoll, roll1, roll2, saveBonus, aura
   };
 }
 
-function computeRerollAvailability(current, targetCharacter, campaignName) {
-  const fanaticalFocusUsed = current ? getRuntimeValue(current.targetName, 'fanaticalFocusUsed', campaignName) : false;
-  const activeBuffsForSave = getRuntimeValue(current?.targetName, 'activeBuffs', campaignName) || [];
-  const isRagingForSave = Array.isArray(activeBuffsForSave) && activeBuffsForSave.some(b => b.damageBonusExpression);
-  const livingLegendActive = current ? getRuntimeValue(current.targetName, 'livingLegendActive', campaignName) === true : false;
-  const indomitableUses = current ? Number(getRuntimeValue(current?.targetName, 'indomitableUses', campaignName) ?? 0) : 0;
-  const indomitableMax = 1;
+function isRaging(activeBuffs) {
+  return Array.isArray(activeBuffs) && activeBuffs.some(b => b.damageBonusExpression);
+}
+
+function resolveCurrentFocusPoints(current, targetCharacter, campaignName) {
   const targetClassLevel = targetCharacter?.class?.class_levels?.[(targetCharacter.level || 1) - 1] || {};
   const maxFocusPoints = targetClassLevel.focus_points || 0;
-  const currentFocusPoints = current ? Number(getRuntimeValue(current.targetName, 'focusPoints', campaignName) ?? maxFocusPoints) : 0;
+  return current ? Number(getRuntimeValue(current.targetName, 'focusPoints', campaignName) ?? maxFocusPoints) : 0;
+}
 
-  const guardedMindUsed = current ? getRuntimeValue(current.targetName, '_guardedMind_usedRest', campaignName) : false;
-  const guardedMindSpecialAction = (targetCharacter?.computedStats?.automation?.specialActions || []).find(
+function findGuardedMindAction(targetCharacter) {
+  return (targetCharacter?.computedStats?.automation?.specialActions || []).find(
     a => a.type === 'auto_reroll' && a.effect === 'override_fail_to_success' && a.oncePer === 'short_or_long_rest'
   );
-  const isValidSaveType = current && GUARDED_MIND_SAVE_TYPES.includes(current.saveType);
+}
 
-  // Indomitable (Fighter lv9+): reroll a failed save with a +fighter level bonus,
-  // tracked via runtime `indomitableUses` (recharged on a Long Rest).
-  const targetSaveModifiersForIndomitable = targetCharacter?.saveModifiers || targetCharacter?.computedStats?.saveModifiers || [];
-  const indomitableModifier = targetSaveModifiersForIndomitable.find(
+// Indomitable (Fighter lv9+): reroll a failed save with a +fighter level bonus,
+// tracked via runtime `indomitableUses` (recharged on a Long Rest).
+function resolveIndomitableReroll(targetCharacter) {
+  const modifiers = targetCharacter?.saveModifiers || targetCharacter?.computedStats?.saveModifiers || [];
+  const modifier = modifiers.find(
     m => m.effect === 'reroll' && m.target === 'saving_throw' && (m.source === 'Indomitable' || /fighter_level/i.test(m.bonusExpression || ''))
   );
-  const indomitableFeatureLevel = targetCharacter?.level ?? targetCharacter?.computedStats?.level ?? 0;
-  const indomitableMaxUses = indomitableFeatureLevel >= 17 ? 3 : indomitableFeatureLevel >= 13 ? 2 : 1;
-  const indomitableRerollBonus = indomitableModifier
-    ? (evaluateAutoExpression(indomitableModifier.bonusExpression || '0', { level: indomitableFeatureLevel }) || indomitableFeatureLevel)
+  const featureLevel = targetCharacter?.level ?? targetCharacter?.computedStats?.level ?? 0;
+  const maxUses = featureLevel >= 17 ? 3 : featureLevel >= 13 ? 2 : 1;
+  const rerollBonus = modifier
+    ? (evaluateAutoExpression(modifier.bonusExpression || '0', { level: featureLevel }) || featureLevel)
     : 0;
+  return { modifier, maxUses, rerollBonus };
+}
+
+function computeRerollAvailability(current, targetCharacter, campaignName) {
+  const fanaticalFocusUsed = current ? getRuntimeValue(current.targetName, 'fanaticalFocusUsed', campaignName) : false;
+  const isRagingForSave = isRaging(getRuntimeValue(current?.targetName, 'activeBuffs', campaignName) || []);
+  const livingLegendActive = current ? getRuntimeValue(current.targetName, 'livingLegendActive', campaignName) === true : false;
+  const indomitableUses = current ? Number(getRuntimeValue(current?.targetName, 'indomitableUses', campaignName) ?? 0) : 0;
+  const currentFocusPoints = resolveCurrentFocusPoints(current, targetCharacter, campaignName);
+  const guardedMindUsed = current ? getRuntimeValue(current.targetName, '_guardedMind_usedRest', campaignName) : false;
+
+  const guardedMindSpecialAction = findGuardedMindAction(targetCharacter);
+  const isValidSaveType = !!current && GUARDED_MIND_SAVE_TYPES.includes(current.saveType);
+  const indomitable = resolveIndomitableReroll(targetCharacter);
 
   return {
     fanaticalFocusAvailable: isRagingForSave && !fanaticalFocusUsed,
     currentFocusPoints,
     disciplinedSurvivorAvailable: !fanaticalFocusUsed && currentFocusPoints > 0,
-    livingLegendAvailable: livingLegendActive && !fanaticalFocusUsed && indomitableUses < indomitableMax,
-    guardedMindAvailable: !guardedMindUsed && !!guardedMindSpecialAction && !!isValidSaveType,
-    indomitableAvailable: !!indomitableModifier && indomitableUses < indomitableMaxUses,
+    livingLegendAvailable: livingLegendActive && !fanaticalFocusUsed && indomitableUses < 1,
+    guardedMindAvailable: !guardedMindUsed && !!guardedMindSpecialAction && isValidSaveType,
+    indomitableAvailable: !!indomitable.modifier && indomitableUses < indomitable.maxUses,
     indomitableUses,
-    indomitableMaxUses,
-    indomitableRerollBonus,
+    indomitableMaxUses: indomitable.maxUses,
+    indomitableRerollBonus: indomitable.rerollBonus,
   };
 }
 

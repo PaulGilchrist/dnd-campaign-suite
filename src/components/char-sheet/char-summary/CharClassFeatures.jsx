@@ -8,26 +8,29 @@ import WeaponKindMasteryModal from '../modals/WeaponKindMasteryModal.jsx';
 import { loadFightingStyles } from '../../../services/ui/dataLoader.js';
 import { isUnbreakableMajestyActive, getUnbreakableMajestySaveDc, clearUnbreakableMajesty } from '../../../services/combat/auras/unbreakableMajesty.js';
 import { getAuraRangeFromStats } from '../../../services/combat/auras/auraOfProtection.js';
+function barbarianRageScaling(classLevel, is2024, level) {
+    return {
+        extraAttacks: is2024 ? (classLevel?.extra_attacks || 0) : (level > 4 ? 1 : 0),
+        rageCount: is2024 ? (classLevel?.rages || 0) : (classLevel?.class_specific?.rage_count || 0),
+        rageDamage: is2024 ? (classLevel?.rage_damage || 0) : (classLevel?.class_specific?.rage_damage_bonus || 0),
+        weaponMastery: is2024 ? (classLevel?.weapon_mastery ?? 'N/A') : 'N/A',
+    };
+}
+
+function barbarianWarriorMaxDice(level) {
+    return level >= 17 ? 7 : level >= 12 ? 6 : level >= 6 ? 5 : 4;
+}
+
+function abilityBonus(playerStats, abilityName) {
+    return playerStats.abilities?.find(a => a.name === abilityName)?.bonus || 0;
+}
+
 /* ─── Barbarian ─── */
 const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName, onWeaponMasteryClick }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     const is2024 = playerStats.rules === '2024';
 
-    const extraAttacks = is2024
-        ? (classLevel?.extra_attacks || 0)
-        : (playerStats.level > 4 ? 1 : 0);
-
-    const rageCount = is2024
-        ? (classLevel?.rages || 0)
-        : (classLevel?.class_specific?.rage_count || 0);
-
-    const rageDamage = is2024
-        ? (classLevel?.rage_damage || 0)
-        : (classLevel?.class_specific?.rage_damage_bonus || 0);
-
-    const weaponMastery = is2024
-        ? (classLevel?.weapon_mastery ?? 'N/A')
-        : 'N/A';
+    const { extraAttacks, rageCount, rageDamage, weaponMastery } = barbarianRageScaling(classLevel, is2024, playerStats.level);
 
     const hasAspectOfTheWilds = (playerStats.automation?.specialActions ?? []).some(
         p => p.type === 'animal_aspect'
@@ -41,7 +44,7 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName
     const wildHeartOption = wildHeartBuff?.optionName || null;
 
     const warriorOfTheGodsFeature = (playerStats.bonusActions || []).find(f => f.name === 'Warrior of the Gods');
-    const maxDice = playerStats.level >= 17 ? 7 : playerStats.level >= 12 ? 6 : playerStats.level >= 6 ? 5 : 4;
+    const maxDice = barbarianWarriorMaxDice(playerStats.level);
 
     return (
           <div data-testid="char-class-barbarian">
@@ -526,14 +529,20 @@ const SorcererFeatures = function SorcererFeatures({ playerStats, campaignName }
 };
 
 /* ─── Warlock ─── */
+function matchPatron(playerStats, patronNames) {
+    const cls = playerStats?.class || {};
+    const assignedNames = [cls.major?.name, cls.subclass?.name];
+    return patronNames.some(name => assignedNames.includes(name));
+}
+
 const WarlockFeatures = function WarlockFeatures({ playerStats, campaignName }) {
     const warlockFeatures = getClassFeatures(playerStats);
     const arcanumLevels = warlockFeatures.arcanumLevels || {};
     const hasStepsOfTheFey = (playerStats.automation?.bonusActions ?? []).some(a => a.type === 'steps_of_the_fey');
-    const isCelestialPatron = playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron';
-    const isFiendPatron = playerStats.class?.major?.name === 'Fiend' || playerStats.class?.subclass?.name === 'Fiend' || playerStats.class?.major?.name === 'Fiend Patron' || playerStats.class?.subclass?.name === 'Fiend Patron';
-    const isGreatOldOnePatron = playerStats.class?.major?.name === 'Great Old One Patron' || playerStats.class?.subclass?.name === 'Great Old One Patron';
-    const chaMod = playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0;
+    const isCelestialPatron = matchPatron(playerStats, ['Celestial Patron']);
+    const isFiendPatron = matchPatron(playerStats, ['Fiend', 'Fiend Patron']);
+    const isGreatOldOnePatron = matchPatron(playerStats, ['Great Old One Patron']);
+    const chaMod = abilityBonus(playerStats, 'Charisma');
     const awakenedMindTarget = useRuntimeValue(playerStats.name, 'awakenedMindTarget', campaignName);
 
     return (

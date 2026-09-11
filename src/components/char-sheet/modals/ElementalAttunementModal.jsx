@@ -58,6 +58,196 @@ const ELEMENT_DESCRIPTIONS = {
     Thunder: '5-ft radius burst of sonic energy. Constitution save or 1d6 thunder damage (half on save) and pushed 10 ft.',
 };
 
+function resolveNpcDamageResult({ combatSummary, characters, target, targetName, saveRoll, saveTotal, saveBonus, success, saveType, saveDc, elementData, playerStatsName, campaignName, actionName }) {
+    const logEntry = {
+        type: 'roll',
+        characterName: playerStatsName,
+        rollType: 'save-damage',
+        name: actionName,
+        targetName,
+        saveType: saveType.toLowerCase(),
+        saveDc,
+        saveResult: success ? 'success' : 'failure',
+        saveRoll,
+        saveBonus,
+        saveRawRolls: [saveRoll],
+        timestamp: Date.now(),
+    };
+
+    const damageRoll = rollExpression(elementData.damage);
+    const rawDamage = damageRoll?.total ?? 0;
+    const damageAfterSave = computeDamageAfterSave(rawDamage, success, elementData.dcSuccess);
+    const resResult = computeDamageAfterResistancesWithDetails(
+        damageAfterSave, [elementData.damageType], target.resistances || [], target.immunities || []
+    );
+    const finalDamage = resResult.finalDamage;
+
+    applyDamageToTarget(
+        combatSummary, targetName, finalDamage, [elementData.damageType],
+        campaignName, characters, false, playerStatsName, false
+    );
+
+    logEntry.formula = elementData.damage;
+    logEntry.rolls = damageRoll?.rolls ?? [];
+    logEntry.total = rawDamage;
+    logEntry.modifier = damageRoll?.modifier ?? 0;
+    logEntry.damageType = elementData.damageType;
+    logEntry.finalDamage = finalDamage;
+
+    addEntry(campaignName, logEntry).catch((e) => {
+        console.error('[ElementalAttunementModal] Error logging NPC save:', e);
+    });
+
+    return {
+        targetName,
+        success,
+        roll: saveRoll,
+        total: saveTotal,
+        saveBonus,
+        rawDamage,
+        finalDamage,
+        formula: elementData.damage,
+        rolls: damageRoll?.rolls ?? [],
+        damageType: elementData.damageType,
+    };
+}
+
+function resolveNpcSpeedReductionResult({ targetName, saveRoll, saveTotal, saveBonus, success, saveType, saveDc, chosenElement, playerStatsName, campaignName, actionName }) {
+    if (!success) {
+        const activeConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+        const speedReductionActive = activeConditions.includes('speed_reduction');
+        const newConditions = speedReductionActive
+            ? activeConditions
+            : [...activeConditions, 'speed_reduction'];
+        setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
+    }
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStatsName,
+        abilityName: actionName,
+        description: `${actionName} (${chosenElement}) on <strong>${targetName}</strong>: ${success ? 'saved' : 'failed'} ${saveType} save (DC ${saveDc}). ${success ? 'No effect.' : 'Speed reduced by 15 ft.'}`,
+        saveRoll,
+        saveBonus,
+        saveTotal,
+        saveDc,
+        saveSuccess: success,
+    }).catch((e) => { console.error('[ElementalAttunementModal] Error logging speed reduction:', e); });
+
+    return {
+        targetName,
+        success,
+        roll: saveRoll,
+        total: saveTotal,
+        saveBonus,
+        rawDamage: 0,
+        finalDamage: 0,
+        effect: 'speed_reduction',
+    };
+}
+
+function resolveNpcPushResult({ combatSummary, characters, target, targetName, saveRoll, saveTotal, saveBonus, success, saveType, saveDc, elementData, playerStatsName, campaignName, actionName }) {
+    const logEntry = {
+        type: 'roll',
+        characterName: playerStatsName,
+        rollType: 'save-damage',
+        name: actionName,
+        targetName,
+        saveType: saveType.toLowerCase(),
+        saveDc,
+        saveResult: success ? 'success' : 'failure',
+        saveRoll,
+        saveBonus,
+        saveRawRolls: [saveRoll],
+        timestamp: Date.now(),
+    };
+
+    const damageRoll = rollExpression(elementData.damage);
+    const rawDamage = damageRoll?.total ?? 0;
+    const damageAfterSave = computeDamageAfterSave(rawDamage, success, elementData.dcSuccess);
+    const resResult = computeDamageAfterResistancesWithDetails(
+        damageAfterSave, [elementData.damageType], target.resistances || [], target.immunities || []
+    );
+    const finalDamage = resResult.finalDamage;
+
+    applyDamageToTarget(
+        combatSummary, targetName, finalDamage, [elementData.damageType],
+        campaignName, characters, false, playerStatsName, false
+    );
+
+    if (!success) {
+        const pushDistance = elementData.effectValue;
+        const currentTarget = combatSummary.creatures.find(c => c.name === targetName);
+        if (currentTarget) {
+            const pushEffect = {
+                target: targetName,
+                direction: currentTarget.pushDirection || 'forward',
+                distance: pushDistance,
+                source: playerStatsName,
+                feature: actionName,
+            };
+            const targetEffects = getRuntimeValue(targetName, 'targetEffects', campaignName) || [];
+            const newTargetEffects = [...targetEffects, pushEffect];
+            setRuntimeValue(targetName, 'targetEffects', newTargetEffects, campaignName);
+        }
+    }
+
+    logEntry.formula = elementData.damage;
+    logEntry.rolls = damageRoll?.rolls ?? [];
+    logEntry.total = rawDamage;
+    logEntry.modifier = damageRoll?.modifier ?? 0;
+    logEntry.damageType = elementData.damageType;
+    logEntry.finalDamage = finalDamage;
+
+    addEntry(campaignName, logEntry).catch((e) => {
+        console.error('[ElementalAttunementModal] Error logging Thunder save:', e);
+    });
+
+    return {
+        targetName,
+        success,
+        roll: saveRoll,
+        total: saveTotal,
+        saveBonus,
+        rawDamage,
+        finalDamage,
+        formula: elementData.damage,
+        rolls: damageRoll?.rolls ?? [],
+        damageType: elementData.damageType,
+    };
+}
+
+function queuePlayerSavePrompt({ campaignName, targetName, saveType, saveDc, playerStatsName, elementData }) {
+    const promptId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+    if (elementData?.damage) {
+        const damageRoll = rollExpression(elementData.damage);
+        const rawDamage = damageRoll?.total ?? 0;
+
+        sendSavePrompt(campaignName, {
+            promptId,
+            targetName,
+            saveType,
+            saveDc,
+            sourceName: playerStatsName,
+            rawDamage,
+        });
+
+        return { promptId, targetName };
+    } else if (elementData?.effect === 'speed_reduction') {
+        sendSavePrompt(campaignName, {
+            promptId,
+            targetName,
+            saveType,
+            saveDc,
+            sourceName: playerStatsName,
+        });
+
+        return { promptId, targetName };
+    }
+    return null;
+}
+
 function ElementalAttunementModal({ action, playerStats, campaignName, mapName, activeOverlay, onClose }) {
     const [phase, setPhase] = useState('element');
     const [chosenElement, setChosenElement] = useState(null);
@@ -120,174 +310,17 @@ function ElementalAttunementModal({ action, playerStats, campaignName, mapName, 
                 const saveRoll = Math.floor(Math.random() * 20) + 1;
                 const saveTotal = saveRoll + saveBonus;
                 const success = saveTotal >= saveDc;
-
-                const logEntry = {
-                    type: 'roll',
-                    characterName: playerStats.name,
-                    rollType: 'save-damage',
-                    name: action.name,
-                    targetName,
-                    saveType: saveType.toLowerCase(),
-                    saveDc,
-                    saveResult: success ? 'success' : 'failure',
-                    saveRoll,
-                    saveBonus,
-                    saveRawRolls: [saveRoll],
-                    timestamp: Date.now(),
-                };
-
+                const npcCtx = { combatSummary, characters, target, targetName, saveRoll, saveTotal, saveBonus, success, saveType, saveDc, elementData, chosenElement, playerStatsName: playerStats.name, campaignName, actionName: action.name };
                 if (elementData?.damage) {
-                    const damageRoll = rollExpression(elementData.damage);
-                    const rawDamage = damageRoll?.total ?? 0;
-                    const damageAfterSave = computeDamageAfterSave(rawDamage, success, elementData.dcSuccess);
-                    const resResult = computeDamageAfterResistancesWithDetails(
-                        damageAfterSave, [elementData.damageType], target.resistances || [], target.immunities || []
-                    );
-                    const finalDamage = resResult.finalDamage;
-
-                    applyDamageToTarget(
-                        combatSummary, targetName, finalDamage, [elementData.damageType],
-                        campaignName, characters, false, playerStats.name, false
-                    );
-
-                    logEntry.formula = elementData.damage;
-                    logEntry.rolls = damageRoll?.rolls ?? [];
-                    logEntry.total = rawDamage;
-                    logEntry.modifier = damageRoll?.modifier ?? 0;
-                    logEntry.damageType = elementData.damageType;
-                    logEntry.finalDamage = finalDamage;
-
-                    addEntry(campaignName, logEntry).catch((e) => {
-                        console.error('[ElementalAttunementModal] Error logging NPC save:', e);
-                    });
-
-                    results.push({
-                        targetName,
-                        success,
-                        roll: saveRoll,
-                        total: saveTotal,
-                        saveBonus,
-                        rawDamage,
-                        finalDamage,
-                        formula: elementData.damage,
-                        rolls: damageRoll?.rolls ?? [],
-                        damageType: elementData.damageType,
-                    });
+                    results.push(resolveNpcDamageResult(npcCtx));
                 } else if (elementData?.effect === 'speed_reduction') {
-                    if (!success) {
-                        const activeConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-                        const speedReductionActive = activeConditions.includes('speed_reduction');
-                        const newConditions = speedReductionActive
-                            ? activeConditions
-                            : [...activeConditions, 'speed_reduction'];
-                        setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
-                    }
-
-                    addEntry(campaignName, {
-                        type: 'ability_use',
-                        characterName: playerStats.name,
-                        abilityName: action.name,
-                        description: `${action.name} (${chosenElement}) on <strong>${targetName}</strong>: ${success ? 'saved' : 'failed'} ${saveType} save (DC ${saveDc}). ${success ? 'No effect.' : 'Speed reduced by 15 ft.'}`,
-                        saveRoll,
-                        saveBonus,
-                        saveTotal,
-                        saveDc,
-                        saveSuccess: success,
-                    }).catch((e) => { console.error('[ElementalAttunementModal] Error logging speed reduction:', e); });
-
-                    results.push({
-                        targetName,
-                        success,
-                        roll: saveRoll,
-                        total: saveTotal,
-                        saveBonus,
-                        rawDamage: 0,
-                        finalDamage: 0,
-                        effect: 'speed_reduction',
-                    });
+                    results.push(resolveNpcSpeedReductionResult(npcCtx));
                 } else if (elementData?.effect === 'push') {
-                    const damageRoll = rollExpression(elementData.damage);
-                    const rawDamage = damageRoll?.total ?? 0;
-                    const damageAfterSave = computeDamageAfterSave(rawDamage, success, elementData.dcSuccess);
-                    const resResult = computeDamageAfterResistancesWithDetails(
-                        damageAfterSave, [elementData.damageType], target.resistances || [], target.immunities || []
-                    );
-                    const finalDamage = resResult.finalDamage;
-
-                    applyDamageToTarget(
-                        combatSummary, targetName, finalDamage, [elementData.damageType],
-                        campaignName, characters, false, playerStats.name, false
-                    );
-
-                    if (!success) {
-                        const pushDistance = elementData.effectValue;
-                        const currentTarget = combatSummary.creatures.find(c => c.name === targetName);
-                        if (currentTarget) {
-                            const pushEffect = {
-                                target: targetName,
-                                direction: currentTarget.pushDirection || 'forward',
-                                distance: pushDistance,
-                                source: playerStats.name,
-                                feature: action.name,
-                            };
-                            const targetEffects = getRuntimeValue(targetName, 'targetEffects', campaignName) || [];
-                            const newTargetEffects = [...targetEffects, pushEffect];
-                            setRuntimeValue(targetName, 'targetEffects', newTargetEffects, campaignName);
-                        }
-                    }
-
-                    logEntry.formula = elementData.damage;
-                    logEntry.rolls = damageRoll?.rolls ?? [];
-                    logEntry.total = rawDamage;
-                    logEntry.modifier = damageRoll?.modifier ?? 0;
-                    logEntry.damageType = elementData.damageType;
-                    logEntry.finalDamage = finalDamage;
-
-                    addEntry(campaignName, logEntry).catch((e) => {
-                        console.error('[ElementalAttunementModal] Error logging Thunder save:', e);
-                    });
-
-                    results.push({
-                        targetName,
-                        success,
-                        roll: saveRoll,
-                        total: saveTotal,
-                        saveBonus,
-                        rawDamage,
-                        finalDamage,
-                        formula: elementData.damage,
-                        rolls: damageRoll?.rolls ?? [],
-                        damageType: elementData.damageType,
-                    });
+                    results.push(resolveNpcPushResult(npcCtx));
                 }
             } else {
-                const promptId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-
-                if (elementData?.damage) {
-                    const damageRoll = rollExpression(elementData.damage);
-                    const rawDamage = damageRoll?.total ?? 0;
-
-                    sendSavePrompt(campaignName, {
-                        promptId,
-                        targetName,
-                        saveType,
-                        saveDc,
-                        sourceName: playerStats.name,
-                        rawDamage,
-                    });
-
-                    prompts.push({ promptId, targetName });
-                } else if (elementData?.effect === 'speed_reduction') {
-                    sendSavePrompt(campaignName, {
-                        promptId,
-                        targetName,
-                        saveType,
-                        saveDc,
-                        sourceName: playerStats.name,
-                    });
-
-                    prompts.push({ promptId, targetName });
-                }
+                const prompt = queuePlayerSavePrompt({ campaignName, targetName, saveType, saveDc, playerStatsName: playerStats.name, elementData });
+                if (prompt) prompts.push(prompt);
             }
         }
 

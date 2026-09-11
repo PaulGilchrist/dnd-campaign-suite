@@ -5,10 +5,7 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import storage from '../../../ui/storage.js';
 import { addEntry } from '../../../ui/logService.js';
 
-export async function handle(action, playerStats, campaignName, _mapName) {
-    const auto = action.automation;
-
-    if (auto.effect === 'bonus_initiative_allies') {
+async function handleBonusInitiativeAllies(action, auto, playerStats, campaignName) {
         const activeConditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName) || [];
         if (activeConditions.includes('incapacitated')) {
             return {
@@ -82,9 +79,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 automationType: auto.type,
             },
         };
-     }
+}
 
-    if (auto.effect === 'wild_shape_regen_on_initiative') {
+async function handleWildShapeRegenOnInitiative(action, auto, playerStats, campaignName) {
         const resourceKey = auto.resourceKey || 'wildShapeUses';
         const maxWS = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0;
         if (maxWS === 0) return null;
@@ -113,9 +110,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 description: `${action.name}: You regained 1 use of Wild Shape.`,
                },
           };
-      }
+}
 
-    if (auto.effect === 'regain_bardic_inspiration_on_initiative') {
+async function handleRegainBardicInspirationOnInitiative(action, auto, playerStats, campaignName) {
         const minTarget = auto.minTarget || 2;
         const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
         const maxBI = classLevel?.bardic_inspiration_uses ?? playerStats?.proficiency ?? 0;
@@ -145,20 +142,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 description: `${action.name}: Regained Bardic Inspiration uses. Now have ${newBI}/${maxBI}.`,
             },
         };
-    }
+}
 
-    if (auto.effect !== 'regain_focus_points_and_heal') {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                automationType: auto.type,
-                description: action.description || '',
-              },
-          };
-        }
-
+async function handleUncannyMetabolism(action, auto, playerStats, campaignName) {
     const uncannyMetabolismUsed = getRuntimeValue(playerStats.name, 'uncannyMetabolismUsed', campaignName) === true;
     if (uncannyMetabolismUsed) {
         // CLA-372: refusals must reach the campaign log (CLA-345/355/394 family).
@@ -240,4 +226,27 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             damageApplied: true,
              },
              };
+}
+
+const effectHandlers = {
+    bonus_initiative_allies: handleBonusInitiativeAllies,
+    wild_shape_regen_on_initiative: handleWildShapeRegenOnInitiative,
+    regain_bardic_inspiration_on_initiative: handleRegainBardicInspirationOnInitiative,
+    regain_focus_points_and_heal: handleUncannyMetabolism,
+};
+
+export async function handle(action, playerStats, campaignName, _mapName) {
+    const auto = action.automation;
+    const effectHandler = effectHandlers[auto.effect];
+    if (effectHandler) return effectHandler(action, auto, playerStats, campaignName);
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            automationType: auto.type,
+            description: action.description || '',
+        },
+    };
 }

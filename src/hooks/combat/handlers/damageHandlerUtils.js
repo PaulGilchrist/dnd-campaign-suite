@@ -1,4 +1,6 @@
 // Shared helpers for the damage handlers in this directory.
+import { applyMinDamageAdjustment } from '../loggedDiceRollUtils.js';
+import { hasGreatWeaponFighting, applyGreatWeaponFightingToDamage } from '../../../services/combat/automation/automationService.js';
 
 export function getHpThreshold({ oldHp, newHp, maxHp, deadHp = newHp }) {
     const wasAlive = oldHp > 0;
@@ -16,6 +18,18 @@ export function assignSecondaryFields(dest, secondaryResult, suffixes) {
     for (const suffix of suffixes) {
         dest['secondary' + suffix] = secondaryResult[suffix[0].toLowerCase() + suffix.slice(1)];
     }
+}
+
+// Great Weapon Fighting: re-roll 1s/2s on secondary damage dice and re-apply
+// the damage minimum. Returns the adjusted secondary total.
+export function computeGwfAdjustedSecondaryTotal(secondaryRollResult, playerStats, secondaryDamageType) {
+    const secondaryTotal = applyMinDamageAdjustment(secondaryRollResult.total, secondaryRollResult.rolls, playerStats, secondaryDamageType);
+    if (!hasGreatWeaponFighting(playerStats)) return secondaryTotal;
+    const gwfSecondaryRolls = applyGreatWeaponFightingToDamage(secondaryRollResult.rolls, playerStats);
+    const hasSecondaryChanges = gwfSecondaryRolls.some((r, i) => r !== secondaryRollResult.rolls[i]);
+    if (!hasSecondaryChanges) return secondaryTotal;
+    const gwfSecondaryTotal = gwfSecondaryRolls.reduce((sum, r) => sum + r, 0) + secondaryRollResult.modifier;
+    return applyMinDamageAdjustment(gwfSecondaryTotal, gwfSecondaryRolls, playerStats, secondaryDamageType);
 }
 
 export function buildDamageBreakdownEntry(applyResult, damageType, amount) {

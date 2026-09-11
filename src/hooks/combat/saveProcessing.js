@@ -122,72 +122,66 @@ async function processPlayerSave(target, characterName, campaignName, context, b
     return { saveSuccess, effectiveD20ForSave, saveTotal, saveResult };
 }
 
-async function processNpcSave(rollType, target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml, saveDc, saveType, attackerName, actionName, targetName) {
-    // Cosmic Omen: apply global pending bonus to effectiveD20
-    let effectiveD20ForSave = context.effectiveD20;
-    let cosmicOmenPendingRawSave2 = getRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus');
-    if (cosmicOmenPendingRawSave2) {
-        try {
-            const pending = JSON.parse(cosmicOmenPendingRawSave2);
-            if (pending && typeof pending.value === 'number' && pending.value > 0) {
-                const isWeal = pending.type === 'Weal';
-                effectiveD20ForSave += isWeal ? pending.value : -pending.value;
-                setRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus', null, campaignName, true);
-            }
-        } catch (_e) { /* ignore */ }
-    }
+// Cosmic Omen: apply global pending bonus to effectiveD20
+function applyCosmicOmenToSave(effectiveD20, campaignName) {
+    let adjusted = effectiveD20;
+    const cosmicOmenPendingRawSave2 = getRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus');
+    if (!cosmicOmenPendingRawSave2) return adjusted;
+    try {
+        const pending = JSON.parse(cosmicOmenPendingRawSave2);
+        if (pending && typeof pending.value === 'number' && pending.value > 0) {
+            const isWeal = pending.type === 'Weal';
+            adjusted += isWeal ? pending.value : -pending.value;
+            setRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus', null, campaignName, true);
+        }
+    } catch (_e) { /* ignore */ }
+    return adjusted;
+}
 
-    // Bane/Blade Ward: apply -1d4 penalty to saving throws
-    let baneSavePenalty = 0;
-    let baneSaveRoll = null;
-    let baneSaveDisplayLabel = 'Bane';
-    const allTargetEffectsForSave = getRuntimeValue('campaign', 'targetEffects') || [];
+// Bane/Blade Ward: apply -1d4 penalty to saving throws
+function rollBaneSavePenalty(allTargetEffectsForSave, targetName) {
     const baneEffectsForSave = allTargetEffectsForSave.filter(te => te.target === targetName && te.effect === 'bane_penalty');
-    if (baneEffectsForSave.length > 0) {
-        const r = rollExpression('1d4');
-        if (r) {
-            baneSavePenalty = -r.total;
-            baneSaveRoll = r.total;
-            baneSaveDisplayLabel = baneEffectsForSave[0].displayLabel || 'Bane';
-        }
-    }
+    if (baneEffectsForSave.length === 0) return { baneSavePenalty: 0, baneSaveRoll: null, baneSaveDisplayLabel: 'Bane' };
+    const r = rollExpression('1d4');
+    if (!r) return { baneSavePenalty: 0, baneSaveRoll: null, baneSaveDisplayLabel: 'Bane' };
+    return { baneSavePenalty: -r.total, baneSaveRoll: r.total, baneSaveDisplayLabel: baneEffectsForSave[0].displayLabel || 'Bane' };
+}
 
-    // Bane/Blade Ward on attacker: grant +1d4 to the target's save when the attacker is cursed
-    let baneAttackerBonus = 0;
-    let baneAttackerRoll = null;
-    let baneAttackerDisplayLabel = 'Bane';
-    if (attackerName) {
-        const baneOnAttacker = allTargetEffectsForSave.filter(te => te.target === attackerName && te.effect === 'bane_penalty');
-        if (baneOnAttacker.length > 0) {
-            const r = rollExpression('1d4');
-            if (r) {
-                baneAttackerBonus = r.total;
-                baneAttackerRoll = r.total;
-                baneAttackerDisplayLabel = baneOnAttacker[0].displayLabel || 'Bane';
-            }
-        }
-    }
+// Bane/Blade Ward on attacker: grant +1d4 to the target's save when the attacker is cursed
+function rollBaneAttackerBonus(allTargetEffectsForSave, attackerName) {
+    if (!attackerName) return { baneAttackerBonus: 0, baneAttackerRoll: null, baneAttackerDisplayLabel: 'Bane' };
+    const baneOnAttacker = allTargetEffectsForSave.filter(te => te.target === attackerName && te.effect === 'bane_penalty');
+    if (baneOnAttacker.length === 0) return { baneAttackerBonus: 0, baneAttackerRoll: null, baneAttackerDisplayLabel: 'Bane' };
+    const r = rollExpression('1d4');
+    if (!r) return { baneAttackerBonus: 0, baneAttackerRoll: null, baneAttackerDisplayLabel: 'Bane' };
+    return { baneAttackerBonus: r.total, baneAttackerRoll: r.total, baneAttackerDisplayLabel: baneOnAttacker[0].displayLabel || 'Bane' };
+}
 
-    // Bless: add 1d4 to saving throws for blessed targets
-    let blessSaveBonus = 0;
-    let blessSaveRoll = null;
+// Bless: add 1d4 to saving throws for blessed targets
+function rollBlessSaveBonus(allTargetEffectsForSave, targetName) {
     const blessEffectsForSave = allTargetEffectsForSave.filter(te => te.target === targetName && te.effect === 'bless_bonus');
-    if (blessEffectsForSave.length > 0) {
-        const r = rollExpression('1d4');
-        if (r) {
-            blessSaveBonus += r.total;
-            blessSaveRoll = r.total;
-        }
-    }
+    if (blessEffectsForSave.length === 0) return { blessSaveBonus: 0, blessSaveRoll: null };
+    const r = rollExpression('1d4');
+    if (!r) return { blessSaveBonus: 0, blessSaveRoll: null };
+    return { blessSaveBonus: r.total, blessSaveRoll: r.total };
+}
 
-    // Warding Bond: +1 flat bonus to saving throws
-    let wardingBondSaveBonus = 0;
+// Warding Bond: +1 flat bonus to saving throws
+function resolveWardingBondSaveBonus(targetName, campaignName) {
     const targetBuffsForSave = getRuntimeValue(targetName, 'activeBuffs', campaignName);
     const targetActiveBuffsForSave = Array.isArray(targetBuffsForSave) ? targetBuffsForSave : [];
     const wardingBondBuffForSave = targetActiveBuffsForSave.find(b => b.effect === 'warding_bond' && b.saveBonus);
-    if (wardingBondBuffForSave) {
-        wardingBondSaveBonus = wardingBondBuffForSave.saveBonus;
-    }
+    return wardingBondBuffForSave ? wardingBondBuffForSave.saveBonus : 0;
+}
+
+async function processNpcSave(rollType, target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml, saveDc, saveType, attackerName, actionName, targetName) {
+    const effectiveD20ForSave = applyCosmicOmenToSave(context.effectiveD20, campaignName);
+
+    const allTargetEffectsForSave = getRuntimeValue('campaign', 'targetEffects') || [];
+    const { baneSavePenalty, baneSaveRoll, baneSaveDisplayLabel } = rollBaneSavePenalty(allTargetEffectsForSave, targetName);
+    const { baneAttackerBonus, baneAttackerRoll, baneAttackerDisplayLabel } = rollBaneAttackerBonus(allTargetEffectsForSave, attackerName);
+    const { blessSaveBonus, blessSaveRoll } = rollBlessSaveBonus(allTargetEffectsForSave, targetName);
+    const wardingBondSaveBonus = resolveWardingBondSaveBonus(targetName, campaignName);
 
     const saveTotal = effectiveD20ForSave + bonus + baneSavePenalty + blessSaveBonus + baneAttackerBonus + wardingBondSaveBonus;
     const saveSuccess = saveDc != null ? (saveTotal >= saveDc) : null;
@@ -270,18 +264,8 @@ async function processNpcSave(rollType, target, characterName, campaignName, con
     return { saveSuccess, effectiveD20ForSave, saveTotal };
 }
 
-async function applySaveDamage(context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters) {
-    const damageFormula = context.autoDamageFormula;
-    const damageType = context?.autoDamageDamageType || 'Slashing';
-    const saveConditions = context?.saveConditions || [];
-    const damageResult = rollExpression(damageFormula);
-    if (!damageResult) return;
-
-    const applyTarget = targetName || characterName;
-    const normalizedSaveType = normalizeSaveType(saveType);
+function resolveSaveEvasion({ context, characters, applyTarget, normalizedSaveType, isIncapacitated, campaignName }) {
     const targetChar = (characters || []).find(c => c.name === applyTarget);
-    const targetConditions = getRuntimeValue(applyTarget, 'activeConditions', campaignName) || [];
-    const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
     const ownEvasion = targetChar?.computedStats?.evasionEffects;
     const hasOwnEvasion = !isIncapacitated && context?.dcSuccess === 'half' && ownEvasion?.some(ef => ef.saveType === normalizedSaveType);
     const hasSharedEvasion = !hasOwnEvasion && !isIncapacitated && context?.dcSuccess === 'half' &&
@@ -291,6 +275,51 @@ async function applySaveDamage(context, characterName, campaignName, attackerNam
             return ev?.some(ef => ef.saveType === normalizedSaveType && ef.shareable && ef.shareRange >= 5);
         });
     const hasEvasion = hasOwnEvasion || hasSharedEvasion || isCircleOfPowerActive(applyTarget, campaignName);
+    return { targetChar, hasOwnEvasion, hasEvasion };
+}
+
+function applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName }) {
+    if (saveConditions.length <= 0 || saveSuccess) return;
+    const targetStats = targetChar?.computedStats || targetChar;
+    const isImmune = targetStats && playerIsImmuneToCondition({
+        conditionKey: saveConditions[0],
+        playerStats: targetStats,
+        getRuntimeValue,
+        campaignName,
+    });
+    if (isImmune) return;
+    const currentConditions = getRuntimeValue(applyTarget, 'activeConditions') || [];
+    const newConditions = [...currentConditions];
+    for (const cond of saveConditions) {
+        if (!newConditions.some(c => String(c).toLowerCase() === cond)) {
+            newConditions.push(cond);
+        }
+    }
+    setRuntimeValue(applyTarget, 'activeConditions', newConditions, campaignName);
+    const conditionNames = saveConditions.map(c => c.charAt(0).toUpperCase() + c.slice(1));
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: applyTarget,
+        condition: conditionNames.join(', '),
+        sourceName: attackerName,
+        sourceAbility: context?.actionName || context.name,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[saveProcessing:log-error]", e); });
+}
+
+async function applySaveDamage(context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters) {
+    const damageFormula = context.autoDamageFormula;
+    const damageType = context?.autoDamageDamageType || 'Slashing';
+    const saveConditions = context?.saveConditions || [];
+    const damageResult = rollExpression(damageFormula);
+    if (!damageResult) return;
+
+    const applyTarget = targetName || characterName;
+    const normalizedSaveType = normalizeSaveType(saveType);
+    const targetConditions = getRuntimeValue(applyTarget, 'activeConditions', campaignName) || [];
+    const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
+    const { targetChar, hasOwnEvasion, hasEvasion } = resolveSaveEvasion({ context, characters, applyTarget, normalizedSaveType, isIncapacitated, campaignName });
     if (hasEvasion) {
         logEntry({
             type: 'roll',
@@ -353,33 +382,5 @@ async function applySaveDamage(context, characterName, campaignName, attackerNam
         damageReduced: applyResult?.damageReduced,
     });
 
-    if (saveConditions.length > 0 && !saveSuccess) {
-        const targetStats = targetChar?.computedStats || targetChar;
-        const isImmune = targetStats && playerIsImmuneToCondition({
-            conditionKey: saveConditions[0],
-            playerStats: targetStats,
-            getRuntimeValue,
-            campaignName,
-        });
-        if (!isImmune) {
-            const currentConditions = getRuntimeValue(applyTarget, 'activeConditions') || [];
-            const newConditions = [...currentConditions];
-            for (const cond of saveConditions) {
-                if (!newConditions.some(c => String(c).toLowerCase() === cond)) {
-                    newConditions.push(cond);
-                }
-            }
-            setRuntimeValue(applyTarget, 'activeConditions', newConditions, campaignName);
-            const conditionNames = saveConditions.map(c => c.charAt(0).toUpperCase() + c.slice(1));
-            addEntry(campaignName, {
-                type: 'condition',
-                action: 'applied',
-                characterName: applyTarget,
-                condition: conditionNames.join(', '),
-                sourceName: attackerName,
-                sourceAbility: context?.actionName || context.name,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[saveProcessing:log-error]", e); });
-        }
-    }
+    applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName });
 }

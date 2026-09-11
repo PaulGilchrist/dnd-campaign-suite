@@ -701,6 +701,72 @@ function stampPhantasmalCast(modifiedSpell, spellName, phantasmalPassive, player
   }
 }
 
+// Resource consumption branch chain — mutually exclusive, order is rule-significant.
+// Mutates result.slotConsumed / result.freeCastUsed / result.metaCtx in place.
+function consumeSpellResource(spell, result, { isWgbSpell, isEyebiteRecast, isUpcast, isFreeCast, isQuickRitualCast, isWarlock, effectiveSpellLevel, playerName, playerStats, campaignName }) {
+  if (isWgbSpell && spell.name === 'Spiritual Weapon') {
+    cleanupBuffsByName(playerName, 'Shield of Faith', campaignName);
+  } else if (isEyebiteRecast) {
+    // Recasting Eyebite while already concentrating on it — no slot consumed, no buff updated
+  } else if (isUpcast && !isFreeCast && !result.metaCtx._psionicUsed && effectiveSpellLevel !== spell.level) {
+    result.slotConsumed = consumeUpcastSlot(spell, playerName, playerStats, effectiveSpellLevel, campaignName);
+  } else if (isQuickRitualCast) {
+    consumeQuickRitual(spell, playerName, campaignName);
+    result.freeCastUsed = true;
+    result.metaCtx.quickRitualUsed = true;
+  } else if (isFreeCast) {
+    consumeFreeCast(spell, playerName, playerStats, campaignName);
+    result.freeCastUsed = true;
+    result.metaCtx.freeCastUsed = true;
+  } else if (!result.metaCtx._psionicUsed) {
+    result.slotConsumed = consumeBaseSlot(spell, playerName, playerStats, isWarlock, campaignName);
+  }
+}
+
+// FT-068: Ritual Master Quick Ritual — a prepared ritual spell granted by the feat is
+// cast using its regular casting time (the spell never had its casting time changed)
+// WITHOUT expending a spell slot, once per Long Rest. Opt-in via spell.quickRitual
+// (popup checkbox); consumed here, refused (falls through to normal slot payment) when
+// spent, re-armed by restRules-longRest.
+function isQuickRitualGrant(spell, playerStats, playerName, campaignName, isUpcast) {
+  const quickRitualHold = (playerStats.automation?.ritualSpells || []).some(f => f.chosenSpells && f.quickRitual);
+  const quickRitualUsed = getRuntimeValue(playerName, '_Ritual_Master_quickRitualUsed', campaignName);
+  return spell.quickRitual === true && spell._ritualMasterRitual === true && quickRitualHold && quickRitualUsed == null && !isUpcast;
+}
+
+// Set new concentration on the combat summary (Hunter's Mark / Hex carry targetName).
+function applyNewConcentration(spell, playerName, playerStats, campaignName) {
+  const cs = getCombatSummary(campaignName);
+  if (!cs) return;
+  const targetName = (spell.name === "Hunter's Mark" || spell.name === 'Hex')
+    ? (cs.creatures.find(c => c.name === playerStats.name)?.targetName || null)
+    : null;
+  addConcentration(cs, playerName, spell.name, playerStats.spellAbilities?.saveDc ?? 10, targetName);
+  storageService.default.set('combatSummary', cs, campaignName);
+}
+
+// Psychic damage-type override, Spell Breaker bonus-action Dispel Magic, and
+// CLA-252 phantasmal (spectral) free-cast stamping on the modified spell.
+function stampModifiedSpell(modifiedSpell, spell, playerStats, usePsychicDamage, freeCastAuthorized, playerName, campaignName) {
+  const hasPsychicSpells = playerStats.automation?.passives?.some(p => p.type === 'psychic_spells');
+  const hasSpellBreaker = playerStats.automation?.passives?.some(p => p.type === 'spell_breaker');
+  const hasDamage = !!spell.damage;
+  const canChangeDamageType = playerStats.class?.name === 'Warlock' && hasPsychicSpells && hasDamage;
+  const isDispelMagicAsBonusAction = hasSpellBreaker && spell.name === 'Dispel Magic';
+
+  if (canChangeDamageType && usePsychicDamage) {
+    modifiedSpell._psychicSpellsOverride = true;
+  }
+  if (isDispelMagicAsBonusAction && modifiedSpell.casting_time === '1 action') {
+    modifiedSpell.casting_time = '1 bonus action';
+  }
+
+  const phantasmalPassive = playerStats.automation?.passives?.find(p => p.type === 'phantasmal_creatures');
+  if (phantasmalPassive && freeCastAuthorized && (phantasmalPassive.freeCastSpells || []).includes(spell.name)) {
+    stampPhantasmalCast(modifiedSpell, spell.name, phantasmalPassive, playerName, campaignName);
+  }
+}
+
 export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats, campaignName, isUpcast, upcastLevel, usePsionicPayment, usePsychicDamage, freeCastAuthorized }) {
   const result = {
     modifiedSpell: { ...spell },
@@ -740,33 +806,9 @@ export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats
     applyPsionicSorceryPayment(spell, playerName, effectiveSpellLevel, campaignName, result.metaCtx);
   }
 
-  // FT-068: Ritual Master Quick Ritual — a prepared ritual spell granted by the feat is
-  // cast using its regular casting time (the spell never had its casting time changed)
-  // WITHOUT expending a spell slot, once per Long Rest. Opt-in via spell.quickRitual
-  // (popup checkbox); consumed here, refused (falls through to normal slot payment) when
-  // spent, re-armed by restRules-longRest.
-  const quickRitualHold = (playerStats.automation?.ritualSpells || []).some(f => f.chosenSpells && f.quickRitual);
-  const quickRitualUsed = getRuntimeValue(playerName, '_Ritual_Master_quickRitualUsed', campaignName);
-  const isQuickRitualCast = spell.quickRitual === true && spell._ritualMasterRitual === true && quickRitualHold && quickRitualUsed == null && !isUpcast;
+  const isQuickRitualCast = isQuickRitualGrant(spell, playerStats, playerName, campaignName, isUpcast);
 
-  // Resource consumption
-  if (isWgbSpell && spell.name === 'Spiritual Weapon') {
-    cleanupBuffsByName(playerName, 'Shield of Faith', campaignName);
-  } else if (isEyebiteRecast) {
-    // Recasting Eyebite while already concentrating on it — no slot consumed, no buff updated
-  } else if (isUpcast && !isFreeCast && !result.metaCtx._psionicUsed && effectiveSpellLevel !== spell.level) {
-    result.slotConsumed = consumeUpcastSlot(spell, playerName, playerStats, effectiveSpellLevel, campaignName);
-  } else if (isQuickRitualCast) {
-    consumeQuickRitual(spell, playerName, campaignName);
-    result.freeCastUsed = true;
-    result.metaCtx.quickRitualUsed = true;
-  } else if (isFreeCast) {
-    consumeFreeCast(spell, playerName, playerStats, campaignName);
-    result.freeCastUsed = true;
-    result.metaCtx.freeCastUsed = true;
-  } else if (!result.metaCtx._psionicUsed) {
-    result.slotConsumed = consumeBaseSlot(spell, playerName, playerStats, isWarlock, campaignName);
-  }
+  consumeSpellResource(spell, result, { isWgbSpell, isEyebiteRecast, isUpcast, isFreeCast, isQuickRitualCast, isWarlock, effectiveSpellLevel, playerName, playerStats, campaignName });
 
   // Cleanup old concentration effects
   if (oldConcentrationSpell) {
@@ -775,14 +817,7 @@ export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats
 
   // Set new concentration
   if (shouldSetConcentration) {
-    const cs = getCombatSummary(campaignName);
-    if (cs) {
-      const targetName = (spell.name === "Hunter's Mark" || spell.name === 'Hex')
-        ? (cs.creatures.find(c => c.name === playerStats.name)?.targetName || null)
-        : null;
-      addConcentration(cs, playerName, spell.name, playerStats.spellAbilities?.saveDc ?? 10, targetName);
-      storageService.default.set('combatSummary', cs, campaignName);
-    }
+    applyNewConcentration(spell, playerName, playerStats, campaignName);
   }
 
   // Hunter's Mark / Hex buff tracking
@@ -796,27 +831,11 @@ export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats
   }
 
   // Build modified spell
-  let modifiedSpell = effectiveSpellLevel !== spell.level
+  const modifiedSpell = effectiveSpellLevel !== spell.level
     ? { ...spell, level: effectiveSpellLevel, baseLevel: spell.level }
     : { ...spell };
 
-  const hasPsychicSpells = playerStats.automation?.passives?.some(p => p.type === 'psychic_spells');
-  const hasSpellBreaker = playerStats.automation?.passives?.some(p => p.type === 'spell_breaker');
-  const hasDamage = !!spell.damage;
-  const canChangeDamageType = playerStats.class?.name === 'Warlock' && hasPsychicSpells && hasDamage;
-  const isDispelMagicAsBonusAction = hasSpellBreaker && spell.name === 'Dispel Magic';
-
-  if (canChangeDamageType && usePsychicDamage) {
-    modifiedSpell._psychicSpellsOverride = true;
-  }
-  if (isDispelMagicAsBonusAction && modifiedSpell.casting_time === '1 action') {
-    modifiedSpell.casting_time = '1 bonus action';
-  }
-
-  const phantasmalPassiveForStamp = playerStats.automation?.passives?.find(p => p.type === 'phantasmal_creatures');
-  if (phantasmalPassiveForStamp && freeCastAuthorized && (phantasmalPassiveForStamp.freeCastSpells || []).includes(spell.name)) {
-    stampPhantasmalCast(modifiedSpell, spell.name, phantasmalPassiveForStamp, playerName, campaignName);
-  }
+  stampModifiedSpell(modifiedSpell, spell, playerStats, usePsychicDamage, freeCastAuthorized, playerName, campaignName);
 
   result.modifiedSpell = modifiedSpell;
   return result;

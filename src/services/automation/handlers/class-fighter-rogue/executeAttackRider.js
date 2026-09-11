@@ -42,6 +42,115 @@ export async function applyManeuveringAllyGrant(allyName, casterName, targetName
     return { halfSpeed, description };
 }
 
+async function applyBrutalStrikeRider(maneuver, targetName, playerStats, campaignName, dieValue, dieDescription, description) {
+    const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const newEffect = {
+        target: targetName,
+        source: maneuver.name,
+        effect: 'secondary_damage',
+        value: dieValue,
+        damageType: maneuver.damageType || 'force',
+        duration: 'instant',
+        saveType: null,
+        saveDc: null,
+        saveAbility: null,
+    };
+    const updatedEffects = [...storedEffects, newEffect];
+    setRuntimeValue('campaign', 'targetEffects', updatedEffects, campaignName);
+
+    const cs = await getCombatContext(campaignName);
+    const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
+    if (cs && targetName) {
+        const result = applyDamageToTarget(cs, targetName, dieValue, [maneuver.damageType || 'force'], campaignName, characters, false, playerStats.name);
+        if (result.finalDamage > 0) {
+            description += ` ${targetName} takes ${result.finalDamage} ${maneuver.damageType || 'force'} damage.`;
+        }
+    }
+
+    const logEntry = {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: maneuver.name,
+        description: `${maneuver.name}: ${dieDescription} ${targetName} takes ${dieValue} ${maneuver.damageType || 'force'} damage.`,
+    };
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: maneuver.name,
+            description,
+        },
+        logEntries: [logEntry],
+    };
+}
+
+// MN-018: reuse the ORIGINAL attack roll vs the SECOND creature's AC; offer a
+// real chooser gated to creatures within 5 feet of the original target; carry
+// the REAL original damageType (was hardcoded 'slashing'); stash RAW combatants
+// into pendingSweepingAttack (CLA-326 shape) so the confirm applies real damage.
+async function resolveSweepingAttack(maneuver, auto, targetName, playerStats, campaignName, attackInfo, dieValue, dieDescription) {
+    const cs = await getCombatContext(campaignName);
+    const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
+    const damageType = attackInfo?.damageType || lastAttack?.damageType || maneuver.damageType || (console.error('[MN-018] Sweeping Attack: no original attack damageType'), 'Slashing');
+    const attackBonus = lastAttack?.bonus || 0;
+    const originalTotal = lastAttack?.total ?? attackBonus;
+    const originalD20Roll = lastAttack?.d20Roll ?? (originalTotal - attackBonus);
+
+    const candidates = (cs?.creatures || []).filter(c =>
+        c.name !== targetName && c.name !== playerStats.name
+    );
+    const rawSecondary = [];
+    for (const c of candidates) {
+        const ok = await isWithinRange(targetName, c.name, 5);
+        if (ok) rawSecondary.push(c);
+    }
+
+    if (rawSecondary.length === 0) {
+        const logDescription = `${maneuver.name}: ${dieDescription} No other creature is within 5 feet of ${targetName || 'the original target'}.`;
+        return {
+            type: 'popup',
+            payload: { type: 'automation_info', name: maneuver.name, description: `${dieDescription} No other creature is within 5 feet of ${targetName || 'the original target'}.`, automation: auto },
+            logEntries: [{ type: 'ability_use', characterName: playerStats.name, abilityName: maneuver.name, description: logDescription }],
+        };
+    }
+
+    await setRuntimeValue(playerStats.name, 'pendingSweepingAttack', {
+        dieValue,
+        damageType,
+        primaryTarget: targetName,
+        targetName,
+        originalTotal,
+        originalD20Roll,
+        attackBonus,
+        secondaryTargets: rawSecondary,
+    }, campaignName);
+
+    const chooserDescription = `${maneuver.name}: ${dieDescription} Choose a creature within 5 feet of ${targetName || 'the original target'} — the original attack roll (${originalTotal}) is reused against its AC; if it would hit, it takes ${dieValue} ${damageType} damage.`;
+
+    const logEntry = {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: maneuver.name,
+        description: `${maneuver.name}: ${dieDescription} Expend 1 Superiority Die.`,
+    };
+    return {
+        type: 'modal',
+        modalName: 'sweepingAttackTarget',
+        payload: {
+            playerStats,
+            campaignName,
+            dieValue,
+            damageType,
+            primaryTarget: targetName,
+            targetName,
+            secondaryTargets: rawSecondary,
+            description: chooserDescription,
+        },
+        logEntries: [logEntry],
+    };
+}
+
 export async function executeAttackRiderManeuver(action, playerStats, campaignName, maneuverName, attackInfo) {
     const auto = action.automation || {};
     const allManeuvers = await getManeuversForRules(playerStats.rules);
@@ -95,46 +204,7 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
     // Handle attack_rider maneuvers with options (Brutal Strike)
     const riderOptions = maneuver.automation?.options || [];
     if (riderOptions.length > 0 && maneuver.automation?.type === 'attack_rider') {
-        const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-        const newEffect = {
-            target: targetName,
-            source: maneuver.name,
-            effect: 'secondary_damage',
-            value: dieValue,
-            damageType: maneuver.damageType || 'force',
-            duration: 'instant',
-            saveType: null,
-            saveDc: null,
-            saveAbility: null,
-        };
-        const updatedEffects = [...storedEffects, newEffect];
-        setRuntimeValue('campaign', 'targetEffects', updatedEffects, campaignName);
-
-        const cs = await getCombatContext(campaignName);
-        const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-        if (cs && targetName) {
-            const result = applyDamageToTarget(cs, targetName, dieValue, [maneuver.damageType || 'force'], campaignName, characters, false, playerStats.name);
-            if (result.finalDamage > 0) {
-                description += ` ${targetName} takes ${result.finalDamage} ${maneuver.damageType || 'force'} damage.`;
-            }
-        }
-
-        const logEntry = {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: maneuver.name,
-            description: `${maneuver.name}: ${dieDescription} ${targetName} takes ${dieValue} ${maneuver.damageType || 'force'} damage.`,
-        };
-
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: maneuver.name,
-                description,
-            },
-            logEntries: [logEntry],
-        };
+        return applyBrutalStrikeRider(maneuver, targetName, playerStats, campaignName, dieValue, dieDescription, description);
     }
 
     if (maneuver.saveType && targetName) {
@@ -178,69 +248,7 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
     }
 
     if (maneuver.effect === 'secondary_damage') {
-        // MN-018: reuse the ORIGINAL attack roll vs the SECOND creature's AC; offer a
-        // real chooser gated to creatures within 5 feet of the original target; carry
-        // the REAL original damageType (was hardcoded 'slashing'); stash RAW combatants
-        // into pendingSweepingAttack (CLA-326 shape) so the confirm applies real damage.
-        const cs = await getCombatContext(campaignName);
-        const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
-        const damageType = attackInfo?.damageType || lastAttack?.damageType || maneuver.damageType || (console.error('[MN-018] Sweeping Attack: no original attack damageType'), 'Slashing');
-        const attackBonus = lastAttack?.bonus || 0;
-        const originalTotal = lastAttack?.total ?? attackBonus;
-        const originalD20Roll = lastAttack?.d20Roll ?? (originalTotal - attackBonus);
-
-        const candidates = (cs?.creatures || []).filter(c =>
-            c.name !== targetName && c.name !== playerStats.name
-        );
-        const rawSecondary = [];
-        for (const c of candidates) {
-            const ok = await isWithinRange(targetName, c.name, 5);
-            if (ok) rawSecondary.push(c);
-        }
-
-        if (rawSecondary.length === 0) {
-            const logDescription = `${maneuver.name}: ${dieDescription} No other creature is within 5 feet of ${targetName || 'the original target'}.`;
-            return {
-                type: 'popup',
-                payload: { type: 'automation_info', name: maneuver.name, description: `${dieDescription} No other creature is within 5 feet of ${targetName || 'the original target'}.`, automation: auto },
-                logEntries: [{ type: 'ability_use', characterName: playerStats.name, abilityName: maneuver.name, description: logDescription }],
-            };
-        }
-
-        await setRuntimeValue(playerStats.name, 'pendingSweepingAttack', {
-            dieValue,
-            damageType,
-            primaryTarget: targetName,
-            targetName,
-            originalTotal,
-            originalD20Roll,
-            attackBonus,
-            secondaryTargets: rawSecondary,
-        }, campaignName);
-
-        const chooserDescription = `${maneuver.name}: ${dieDescription} Choose a creature within 5 feet of ${targetName || 'the original target'} — the original attack roll (${originalTotal}) is reused against its AC; if it would hit, it takes ${dieValue} ${damageType} damage.`;
-
-        const logEntry = {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: maneuver.name,
-            description: `${maneuver.name}: ${dieDescription} Expend 1 Superiority Die.`,
-        };
-        return {
-            type: 'modal',
-            modalName: 'sweepingAttackTarget',
-            payload: {
-                playerStats,
-                campaignName,
-                dieValue,
-                damageType,
-                primaryTarget: targetName,
-                targetName,
-                secondaryTargets: rawSecondary,
-                description: chooserDescription,
-            },
-            logEntries: [logEntry],
-        };
+        return resolveSweepingAttack(maneuver, auto, targetName, playerStats, campaignName, attackInfo, dieValue, dieDescription);
     }
 
     if (maneuver.damageBonus) {

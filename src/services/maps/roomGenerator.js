@@ -16,12 +16,7 @@ export function generateRooms(opts) {
   const rng = opts.rng;
 
   // Grid: true = wall, false = floor (indexed as grid[y][x])
-  const grid = [];
-  for (let y = 0; y < gridSize; y++) {
-    const row = [];
-    for (let x = 0; x < gridSize; x++) row.push(true);
-    grid.push(row);
-  }
+  const grid = buildWalledGrid(gridSize);
   const corridorCells = {};
 
   // ---- 1. BSP rooms ----
@@ -38,6 +33,41 @@ export function generateRooms(opts) {
   const minRoom = Math.max(4, Math.floor(gridSize / 8));
   const maxRoom = Math.max(8, Math.min(18, Math.floor(gridSize / 2.5)));
 
+  splitBspTree(root, rng, targetSplits);
+
+  let rooms = root.createRooms(rng, minRoom, maxRoom);
+
+  // Cull rooms that overlap after random placement within leaves
+  rooms = cullOverlappingRooms(rooms);
+
+  // If very few rooms survived, add a few random ones as filler
+  addFillerRooms(rooms, { padding, gridSize, minRoom, maxRoom, rng });
+
+  for (let i = 0; i < rooms.length; i++) rooms[i].id = i;
+
+  // ---- 2. Carve rooms ----
+  for (let r = 0; r < rooms.length; r++) carveRoomRect(grid, gridSize, rooms[r].rect);
+
+  // ---- 3. Connect rooms (MST + extras) ----
+  connectRooms(rooms, grid, gridSize, corridorCells, rng);
+
+  // ---- 3b. Cap dead-end corridors with small rooms ----
+  capDeadEnds(rooms, grid, gridSize, corridorCells);
+
+  return { grid, rooms, corridorCells };
+}
+
+function buildWalledGrid(gridSize) {
+  const grid = [];
+  for (let y = 0; y < gridSize; y++) {
+    const row = [];
+    for (let x = 0; x < gridSize; x++) row.push(true);
+    grid.push(row);
+  }
+  return grid;
+}
+
+function splitBspTree(root, rng, targetSplits) {
   let nodes = [root];
   let splits = 0;
   while (nodes.length > 0 && splits < targetSplits) {
@@ -48,10 +78,9 @@ export function generateRooms(opts) {
       splits++;
     }
   }
+}
 
-  let rooms = root.createRooms(rng, minRoom, maxRoom);
-
-  // Cull rooms that overlap after random placement within leaves
+function cullOverlappingRooms(rooms) {
   const culled = [];
   for (let i = 0; i < rooms.length; i++) {
     let overlap = false;
@@ -63,9 +92,10 @@ export function generateRooms(opts) {
     }
     if (!overlap) culled.push(rooms[i]);
   }
-  rooms = culled;
+  return culled;
+}
 
-  // If very few rooms survived, add a few random ones as filler
+function addFillerRooms(rooms, { padding, gridSize, minRoom, maxRoom, rng }) {
   let attempts = 0;
   while (rooms.length < 4 && attempts < 50) {
     const w = minRoom + Math.floor(rng() * Math.min(4, maxRoom - minRoom + 1));
@@ -85,89 +115,87 @@ export function generateRooms(opts) {
     }
     attempts++;
   }
+}
 
-  for (let i = 0; i < rooms.length; i++) rooms[i].id = i;
+function carveRoomRect(grid, gridSize, rect) {
+  for (let y = rect.y; y < rect.y + rect.h; y++) {
+    for (let x = rect.x; x < rect.x + rect.w; x++) {
+      if (x >= 0 && x < gridSize && y >= 0 && y < gridSize) {
+        grid[y][x] = false;
+      }
+    }
+  }
+}
 
-  // ---- 2. Carve rooms ----
-  for (let r = 0; r < rooms.length; r++) {
-    const room = rooms[r];
-    for (let y = room.rect.y; y < room.rect.y + room.rect.h; y++) {
-      for (let x = room.rect.x; x < room.rect.x + room.rect.w; x++) {
-        if (x >= 0 && x < gridSize && y >= 0 && y < gridSize) {
-          grid[y][x] = false;
+function connectRooms(rooms, grid, gridSize, corridorCells, rng) {
+  if (rooms.length < 2) return;
+
+  const connected = {};
+  const unconnected = {};
+  connected[0] = true;
+  for (let i = 1; i < rooms.length; i++) unconnected[i] = true;
+
+  while (Object.keys(unconnected).length > 0) {
+    let bestDist = Infinity;
+    let bestA = -1;
+    let bestB = -1;
+
+    const connKeys = Object.keys(connected).map(Number);
+    const unconnKeys = Object.keys(unconnected).map(Number);
+
+    for (let i = 0; i < connKeys.length; i++) {
+      const a = connKeys[i];
+      for (let j = 0; j < unconnKeys.length; j++) {
+        const b = unconnKeys[j];
+        const ca = rectCenter(rooms[a].rect);
+        const cb = rectCenter(rooms[b].rect);
+        const dist = Math.abs(ca[0] - cb[0]) + Math.abs(ca[1] - cb[1]);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestA = a;
+          bestB = b;
         }
       }
     }
+
+    carveCorridor(rooms[bestA], rooms[bestB], grid, gridSize, corridorCells, rng);
+    rooms[bestA].connected.push(bestB);
+    rooms[bestB].connected.push(bestA);
+    connected[bestB] = true;
+    delete unconnected[bestB];
   }
 
-  // ---- 3. Connect rooms (MST + extras) ----
-  if (rooms.length >= 2) {
-    const connected = {};
-    const unconnected = {};
-    connected[0] = true;
-    for (let i = 1; i < rooms.length; i++) unconnected[i] = true;
-
-    while (Object.keys(unconnected).length > 0) {
-      let bestDist = Infinity;
-      let bestA = -1;
-      let bestB = -1;
-
-      const connKeys = Object.keys(connected).map(Number);
-      const unconnKeys = Object.keys(unconnected).map(Number);
-
-      for (let i = 0; i < connKeys.length; i++) {
-        const a = connKeys[i];
-        for (let j = 0; j < unconnKeys.length; j++) {
-          const b = unconnKeys[j];
-          const ca = rectCenter(rooms[a].rect);
-          const cb = rectCenter(rooms[b].rect);
-          const dist = Math.abs(ca[0] - cb[0]) + Math.abs(ca[1] - cb[1]);
-          if (dist < bestDist) {
-            bestDist = dist;
-            bestA = a;
-            bestB = b;
-          }
-        }
-      }
-
-      carveCorridor(rooms[bestA], rooms[bestB], grid, gridSize, corridorCells, rng);
-      rooms[bestA].connected.push(bestB);
-      rooms[bestB].connected.push(bestA);
-      connected[bestB] = true;
-      delete unconnected[bestB];
-    }
-
-    // Extra connections for loops
-    const extra = Math.max(1, Math.floor(rooms.length / 5));
-    for (let i = 0; i < extra; i++) {
-      const a = Math.floor(rng() * rooms.length);
-      let b = Math.floor(rng() * rooms.length);
-      if (a !== b && rooms[a].connected.indexOf(b) === -1) {
-        carveCorridor(rooms[a], rooms[b], grid, gridSize, corridorCells, rng);
-        rooms[a].connected.push(b);
-        rooms[b].connected.push(a);
-      }
+  // Extra connections for loops
+  const extra = Math.max(1, Math.floor(rooms.length / 5));
+  for (let i = 0; i < extra; i++) {
+    const a = Math.floor(rng() * rooms.length);
+    let b = Math.floor(rng() * rooms.length);
+    if (a !== b && rooms[a].connected.indexOf(b) === -1) {
+      carveCorridor(rooms[a], rooms[b], grid, gridSize, corridorCells, rng);
+      rooms[a].connected.push(b);
+      rooms[b].connected.push(a);
     }
   }
+}
 
-  // ---- 3b. Cap dead-end corridors with small rooms ----
-  function isOpen(x, y) {
-    return x >= 0 && x < gridSize && y >= 0 && y < gridSize && !grid[y][x];
-  }
+function isOpen(grid, gridSize, x, y) {
+  return x >= 0 && x < gridSize && y >= 0 && y < gridSize && !grid[y][x];
+}
 
-  function openNeighborCount(x, y) {
-    let n = 0;
-    if (isOpen(x - 1, y)) n++;
-    if (isOpen(x + 1, y)) n++;
-    if (isOpen(x, y - 1)) n++;
-    if (isOpen(x, y + 1)) n++;
-    return n;
-  }
+function openNeighborCount(grid, gridSize, x, y) {
+  let n = 0;
+  if (isOpen(grid, gridSize, x - 1, y)) n++;
+  if (isOpen(grid, gridSize, x + 1, y)) n++;
+  if (isOpen(grid, gridSize, x, y - 1)) n++;
+  if (isOpen(grid, gridSize, x, y + 1)) n++;
+  return n;
+}
 
+function capDeadEnds(rooms, grid, gridSize, corridorCells) {
   const deadEndTips = [];
   for (const key in corridorCells) {
     const [cx, cy] = key.split(',').map(Number);
-    if (openNeighborCount(cx, cy) === 1) {
+    if (openNeighborCount(grid, gridSize, cx, cy) === 1) {
       deadEndTips.push([cx, cy]);
     }
   }
@@ -180,20 +208,9 @@ export function generateRooms(opts) {
     const rH = Math.min(3, gridSize - rY - 1);
     if (rW < 3 || rH < 3) continue;
 
-    let canCap = true;
-    for (let y = rY; y < rY + rH; y++) {
-      for (let x = rX; x < rX + rW; x++) {
-        if (!grid[y][x]) { canCap = false; break; }
-      }
-      if (!canCap) break;
-    }
-    if (!canCap) continue;
+    if (!isAreaAllWalls(grid, rX, rY, rW, rH)) continue;
 
-    for (let y = rY; y < rY + rH; y++) {
-      for (let x = rX; x < rX + rW; x++) {
-        grid[y][x] = false;
-      }
-    }
+    carveRoomRect(grid, gridSize, { x: rX, y: rY, w: rW, h: rH });
     rooms.push({
       rect: { x: rX, y: rY, w: rW, h: rH },
       id: rooms.length,
@@ -201,8 +218,15 @@ export function generateRooms(opts) {
       _deadEndCap: true,
     });
   }
+}
 
-  return { grid, rooms, corridorCells };
+function isAreaAllWalls(grid, rX, rY, rW, rH) {
+  for (let y = rY; y < rY + rH; y++) {
+    for (let x = rX; x < rX + rW; x++) {
+      if (!grid[y][x]) return false;
+    }
+  }
+  return true;
 }
 
 function carveCorridor(a, b, grid, gridSize, corridorCells, rng) {

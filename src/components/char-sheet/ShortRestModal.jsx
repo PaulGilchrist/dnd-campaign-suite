@@ -41,14 +41,7 @@ function applyNaturalRecoverySelections(playerStats, campaignName, naturalRecove
     }
 }
 
-function collectRestoredResources(playerStats, campaignName, ctx) {
-    const { arcaneRecoveryRequested, restorationRequested, naturalRecoveryAvailable, naturalRecoverySelections, hasFontOfInspiration } = ctx;
-    const restoredResources = [];
-    const resourceLabels = getShortRestResourceLabels(playerStats);
-    SHORT_REST_RESOURCES.forEach(key => {
-        const label = resourceLabels.find(r => r.key === key);
-        if (label) restoredResources.push(label.label);
-    });
+function collectClassResourceLabels(playerStats, campaignName, restoredResources) {
     if (playerStats.class?.name === 'Fighter') {
         const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
         const maxSW = classLevel?.second_wind || 0;
@@ -63,6 +56,10 @@ function collectRestoredResources(playerStats, campaignName, ctx) {
         const currentRage = storedRage != null ? Number(storedRage) : (trackedRage?.current ?? maxRage);
         if (currentRage < maxRage) restoredResources.push('Rage (2024)');
     }
+}
+
+function collectFeatureRestorationLabels(playerStats, campaignName, ctx, restoredResources) {
+    const { arcaneRecoveryRequested, restorationRequested, hasFontOfInspiration } = ctx;
     const hasImprovedWardingFlare = playerStats.specialActions?.some(f => f.name === 'Improved Warding Flare');
     if (hasImprovedWardingFlare) restoredResources.push('Warding Flare');
     if (hasFontOfInspiration) restoredResources.push('Bardic Inspiration (Font of Inspiration)');
@@ -80,54 +77,102 @@ function collectRestoredResources(playerStats, campaignName, ctx) {
     }
     const hasSorcRestoration = (playerStats.automation?.passives ?? []).some(p => p.type === 'resource_restoration' && p.resourceKey === 'sorcerousRestorationUses');
     if (hasSorcRestoration && restorationRequested) restoredResources.push('Sorcery Points (Sorcerous Restoration)');
-    let naturalRecoveryDetail = null;
+}
+
+function buildNaturalRecoveryDetail(playerStats, naturalRecoveryAvailable, naturalRecoverySelections) {
     const hasNaturalRecovery = (playerStats.automation?.passives ?? []).some(p => p.type === 'natural_recovery');
     if (hasNaturalRecovery && naturalRecoveryAvailable && Object.keys(naturalRecoverySelections).some(k => naturalRecoverySelections[k] > 0)) {
-        naturalRecoveryDetail = Object.entries(naturalRecoverySelections)
+        return Object.entries(naturalRecoverySelections)
             .filter(([_, count]) => count > 0)
             .map(([lvl, count]) => `${count}x level ${lvl}`)
             .join(', ');
-        restoredResources.push(`Natural Recovery (${naturalRecoveryDetail})`);
     }
+    return null;
+}
+
+function collectRestoredResources(playerStats, campaignName, ctx) {
+    const restoredResources = [];
+    const resourceLabels = getShortRestResourceLabels(playerStats);
+    SHORT_REST_RESOURCES.forEach(key => {
+        const label = resourceLabels.find(r => r.key === key);
+        if (label) restoredResources.push(label.label);
+    });
+    collectClassResourceLabels(playerStats, campaignName, restoredResources);
+    collectFeatureRestorationLabels(playerStats, campaignName, ctx, restoredResources);
+    const naturalRecoveryDetail = buildNaturalRecoveryDetail(playerStats, ctx.naturalRecoveryAvailable, ctx.naturalRecoverySelections);
+    if (naturalRecoveryDetail) restoredResources.push(`Natural Recovery (${naturalRecoveryDetail})`);
     return { restoredResources, naturalRecoveryDetail };
 }
 
-// Pure: resolve the class/feature recovery flags the modal gates on.
-function computeRestFlags(playerStats) {
+// Pure: resolve Sorcerous Restoration flags the modal gates on.
+function computeSorcererRestFlags(playerStats) {
     const isSorcerer = playerStats?.class?.name === 'Sorcerer';
     const sorcRestoration = isSorcerer && (playerStats.automation?.passives ?? []).find(a => a.type === 'resource_restoration');
     const restorationCur = getRuntimeValue(playerStats.name, 'sorcerousRestorationUses');
     const restorationAvailable = !!sorcRestoration && restorationCur !== 0;
+    const restoreAmount = isSorcerer ? evaluateAutoExpression(sorcRestoration?.restore_expression ?? '', playerStats, playerStats.proficiency, playerStats.level) : 0;
+    return { isSorcerer, sorcRestoration, restorationAvailable, restoreAmount };
+}
 
+// Pure: resolve Wizard Arcane Recovery / memorize_spell flags the modal gates on.
+function computeWizardRestFlags(playerStats) {
     const isWizard = playerStats?.class?.name === 'Wizard';
     const arcaneRecovery = isWizard && (playerStats.automation?.passives ?? []).find(a => a.type === 'resource_restoration' && a.resourceKey === 'arcaneRecoveryLevels');
     const arcaneRecoveryCur = getRuntimeValue(playerStats.name, 'arcaneRecoveryLevels');
     const arcaneRecoveryAvailable = !!arcaneRecovery && arcaneRecoveryCur !== null && arcaneRecoveryCur !== 0;
     const arcaneRecoveryMaxSlots = isWizard ? Math.ceil(playerStats.level / 2) : 0;
+    // CLA-226: automationRouter routes memorize_spell into specialActions (automationRouter.js:589),
+    // matching the signature_spells gate pattern in restRules-shortRest.js — gate must read that bucket.
+    const hasMemorizeSpell = isWizard && (playerStats.automation?.specialActions ?? []).find(a => a.type === 'memorize_spell');
+    return { arcaneRecovery, arcaneRecoveryAvailable, arcaneRecoveryMaxSlots, hasMemorizeSpell };
+}
 
+// Pure: resolve Druid Natural Recovery flags the modal gates on.
+function computeDruidRestFlags(playerStats) {
     const isDruid = playerStats?.class?.name === 'Druid';
     const naturalRecovery = isDruid && (playerStats.automation?.passives ?? []).find(a => a.type === 'natural_recovery');
     const naturalRecoveryCur = getRuntimeValue(playerStats.name, 'naturalRecoverySlots');
     const naturalRecoveryAvailable = !!naturalRecovery && naturalRecoveryCur !== 0;
     const naturalRecoveryMaxLevels = isDruid ? Math.floor(playerStats.level / 2) : 0;
+    return { naturalRecovery, naturalRecoveryAvailable, naturalRecoveryMaxLevels };
+}
 
-    // CLA-226: automationRouter routes memorize_spell into specialActions (automationRouter.js:589),
-    // matching the signature_spells gate pattern in restRules-shortRest.js — gate must read that bucket.
-    const hasMemorizeSpell = isWizard && (playerStats.automation?.specialActions ?? []).find(a => a.type === 'memorize_spell');
-
+// Pure: resolve Bard Font of Inspiration flags the modal gates on.
+function computeBardRestFlags(playerStats) {
     const hasFontOfInspiration = (playerStats.automation?.passives ?? []).some(p => p.type === 'font_of_inspiration');
     const bardicInspirationMax = playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0;
     const bardicInspirationCur = getRuntimeValue(playerStats.name, 'bardicInspirationUses');
     const fontOfInspirationAvailable = hasFontOfInspiration && (bardicInspirationCur == null || Number(bardicInspirationCur) < bardicInspirationMax);
+    return { hasFontOfInspiration, bardicInspirationMax, fontOfInspirationAvailable };
+}
 
-    const hasBolsteringTreats = (playerStats.automation?.passives ?? []).some(p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats');
-    const maxHitDice = playerStats.level;
-    const hitDie = getHitDieSize(playerStats);
-    const conBonus = playerStats.abilities?.find(a => a.name === 'Constitution')?.bonus || 0;
-    const songOfRestDie = getClassFeatures(playerStats)?.songOfRestDie || null;
-    const restoreAmount = isSorcerer ? evaluateAutoExpression(sorcRestoration?.restore_expression ?? '', playerStats, playerStats.proficiency, playerStats.level) : 0;
-
-    return { isSorcerer, sorcRestoration, restorationAvailable, arcaneRecovery, arcaneRecoveryAvailable, arcaneRecoveryMaxSlots, naturalRecovery, naturalRecoveryAvailable, naturalRecoveryMaxLevels, hasMemorizeSpell, hasFontOfInspiration, bardicInspirationMax, fontOfInspirationAvailable, hasBolsteringTreats, maxHitDice, hitDie, conBonus, songOfRestDie, restoreAmount };
+// Pure: resolve the class/feature recovery flags the modal gates on.
+function computeRestFlags(playerStats) {
+    const sorcerer = computeSorcererRestFlags(playerStats);
+    const wizard = computeWizardRestFlags(playerStats);
+    const druid = computeDruidRestFlags(playerStats);
+    const bard = computeBardRestFlags(playerStats);
+    return {
+        isSorcerer: sorcerer.isSorcerer,
+        sorcRestoration: sorcerer.sorcRestoration,
+        restorationAvailable: sorcerer.restorationAvailable,
+        arcaneRecovery: wizard.arcaneRecovery,
+        arcaneRecoveryAvailable: wizard.arcaneRecoveryAvailable,
+        arcaneRecoveryMaxSlots: wizard.arcaneRecoveryMaxSlots,
+        naturalRecovery: druid.naturalRecovery,
+        naturalRecoveryAvailable: druid.naturalRecoveryAvailable,
+        naturalRecoveryMaxLevels: druid.naturalRecoveryMaxLevels,
+        hasMemorizeSpell: wizard.hasMemorizeSpell,
+        hasFontOfInspiration: bard.hasFontOfInspiration,
+        bardicInspirationMax: bard.bardicInspirationMax,
+        fontOfInspirationAvailable: bard.fontOfInspirationAvailable,
+        hasBolsteringTreats: (playerStats.automation?.passives ?? []).some(p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats'),
+        maxHitDice: playerStats.level,
+        hitDie: getHitDieSize(playerStats),
+        conBonus: playerStats.abilities?.find(a => a.name === 'Constitution')?.bonus || 0,
+        songOfRestDie: getClassFeatures(playerStats)?.songOfRestDie || null,
+        restoreAmount: sorcerer.restoreAmount,
+    };
 }
 
 function ShortRestRollLog({ rollLog, recoveredHp }) {

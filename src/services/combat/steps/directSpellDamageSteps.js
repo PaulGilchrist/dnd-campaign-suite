@@ -5,6 +5,71 @@ import { featureModules } from './features/index.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getChosenRuntimeValue } from '../../../services/automation/common/choiceStorage.js';
 
+function applyEmpoweredEvocation(formula, ctx, ps) {
+  const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(ps).length > 0;
+  const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(ps) : 0;
+  const spellSchool = (ctx.autoDamageSchool || '').toLowerCase();
+  if (hasEmpoweredEvoc && spellSchool === 'evocation' && empEvocIntMod > 0) {
+    return `${formula} + ${empEvocIntMod} [Empowered Evocation]`;
+  }
+  return formula;
+}
+
+function blessedStrikesModifier(ps, potentFeature) {
+  const spellcastingAbility = potentFeature.abilityName || 'Wisdom';
+  const wis = ps.abilities?.find(a => a.name === spellcastingAbility);
+  return Math.max(0, wis?.bonus || 0);
+}
+
+function applyBlessedStrikes(formula, ctx, ps) {
+  if (!ctx.isCantrip || !ps.automation?.actions) return formula;
+  const potentFeature = ps.automation.actions.find(
+    a => a.type === 'damage_bonus' && !a.upgrades && a.options?.some(o => o.toLowerCase().includes('spellcasting'))
+  );
+  if (!potentFeature) return formula;
+  const optKey = `_${(potentFeature.name || 'PotentSpellcasting').replace(/\s+/g, '_')}_option`;
+  const chosen = getRuntimeValue(ps.name, optKey, ctx.campaignName);
+  const chosenSpellcasting = !!chosen && chosen.toLowerCase().includes('spellcasting');
+  if (!chosenSpellcasting && potentFeature.options.length > 1) return formula;
+  if (!chosenSpellcasting && potentFeature.options.length !== 1) return formula;
+  const spellcastingMod = blessedStrikesModifier(ps, potentFeature);
+  if (spellcastingMod > 0) {
+    return `${formula} + ${spellcastingMod} [Blessed Strikes]`;
+  }
+  return formula;
+}
+
+function applyElementalAffinity(formula, ctx, ps) {
+  const elementalAffinityType = getChosenRuntimeValue(ps, 'Elemental Affinity', 'chosenType', ctx.campaignName);
+  if (!elementalAffinityType || typeof elementalAffinityType !== 'string') return formula;
+  const spellDamageType = (ctx.attack?.damageType || '').toLowerCase();
+  if (spellDamageType !== elementalAffinityType.toLowerCase()) return formula;
+  const charismaAbility = ps.abilities?.find(a => a.name === 'Charisma');
+  const chaMod = Math.max(0, charismaAbility?.bonus || 0);
+  if (chaMod > 0) {
+    return `${formula} + ${chaMod} [Elemental Affinity]`;
+  }
+  return formula;
+}
+
+function applyRadiantSoul(formula, ctx, ps) {
+  // CLA-279: execution/index.js computeRadiantSoul is the single owner of the direct-path
+  // adder — ctx.attack.damage may already carry " + N [Radiant Soul]"; never re-append.
+  const radiantSoulPassive = ps.automation?.passives?.find(p => p.type === 'radiant_soul');
+  if (!radiantSoulPassive || !radiantSoulPassive.hasAutomation || formula.includes('[Radiant Soul]')) return formula;
+  const spellDamageType = (ctx.attack?.damageType || '').toLowerCase();
+  const damageTypes = (radiantSoulPassive.damageTypes || []).map(dt => dt.toLowerCase());
+  const oncePerTurnKey = `_radiantSoul_${ps.name.replace(/\s+/g, '_')}_oncePerTurn`;
+  const onceUsed = getRuntimeValue(ps.name, oncePerTurnKey, ctx.campaignName);
+  if (onceUsed || !damageTypes.includes(spellDamageType)) return formula;
+  const charismaAbility = ps.abilities?.find(a => a.name === 'Charisma');
+  const chaMod = Math.max(0, charismaAbility?.bonus || 0);
+  if (chaMod > 0) {
+    return `${formula} + ${chaMod} [Radiant Soul]`;
+  }
+  return formula;
+}
+
 /**
  * Build the damage pipeline steps for a spell-type action.
  * Each step: { name, subscribe, emit, condition(ctx), handler(ctx) → result|null }
@@ -35,79 +100,10 @@ export function buildDirectSpellDamageSteps() {
       condition: (ctx) => !!ctx.playerStats,
       handler: async (ctx) => {
         let formula = ctx.attack?.damage || ctx.autoFormulaOverride || '0';
-        const ps = ctx.playerStats;
-        const isCantripFlag = ctx.isCantrip || false;
-
-        // Empowered Evocation: add int mod to evocation cantrip damage
-        const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(ps).length > 0;
-        const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(ps) : 0;
-        const spellSchool = (ctx.autoDamageSchool || '').toLowerCase();
-        const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && spellSchool === 'evocation' && empEvocIntMod > 0;
-
-        if (shouldApplyEmpoweredEvoc) {
-          formula = `${formula} + ${empEvocIntMod} [Empowered Evocation]`;
-        }
-
-        // Blessed Strikes / Potent Spellcasting: add spellcasting ability mod to cantrip damage
-        if (isCantripFlag && ps.automation?.actions) {
-          const potentFeature = ps.automation.actions.find(
-            a => a.type === 'damage_bonus' && !a.upgrades && a.options?.some(o => o.toLowerCase().includes('spellcasting'))
-          );
-          if (potentFeature) {
-            const optKey = `_${(potentFeature.name || 'PotentSpellcasting').replace(/\s+/g, '_')}_option`;
-            const chosen = getRuntimeValue(ps.name, optKey, ctx.campaignName);
-            if (potentFeature.options.length > 1 && !chosen) {
-              // multi-option feature with no choice yet — skip
-            } else if (chosen && chosen.toLowerCase().includes('spellcasting')) {
-              const spellcastingAbility = potentFeature.abilityName || 'Wisdom';
-              const wis = ps.abilities?.find(a => a.name === spellcastingAbility);
-              const spellcastingMod = Math.max(0, wis?.bonus || 0);
-              if (spellcastingMod > 0) {
-                formula = `${formula} + ${spellcastingMod} [Blessed Strikes]`;
-              }
-            } else if (potentFeature.options.length === 1) {
-              const spellcastingAbility = potentFeature.abilityName || 'Wisdom';
-              const wis = ps.abilities?.find(a => a.name === spellcastingAbility);
-              const spellcastingMod = Math.max(0, wis?.bonus || 0);
-              if (spellcastingMod > 0) {
-                formula = `${formula} + ${spellcastingMod} [Blessed Strikes]`;
-              }
-            }
-          }
-        }
-
-        // Elemental Affinity: add CHA mod to one spell damage roll of chosen type
-        const elementalAffinityType = getChosenRuntimeValue(ps, 'Elemental Affinity', 'chosenType', ctx.campaignName);
-        if (elementalAffinityType && typeof elementalAffinityType === 'string') {
-          const spellDamageType = (ctx.attack?.damageType || '').toLowerCase();
-          const chosenTypeLower = elementalAffinityType.toLowerCase();
-          if (spellDamageType === chosenTypeLower) {
-            const charismaAbility = ps.abilities?.find(a => a.name === 'Charisma');
-            const chaMod = Math.max(0, charismaAbility?.bonus || 0);
-            if (chaMod > 0) {
-              formula = `${formula} + ${chaMod} [Elemental Affinity]`;
-            }
-          }
-        }
-
-        // Radiant Soul: add CHA mod to spell damage when dealing Radiant or Fire damage.
-        // CLA-279: execution/index.js computeRadiantSoul is the single owner of the direct-path
-        // adder — ctx.attack.damage may already carry " + N [Radiant Soul]"; never re-append.
-        const radiantSoulPassive = ps.automation?.passives?.find(p => p.type === 'radiant_soul');
-        if (radiantSoulPassive && radiantSoulPassive.hasAutomation && !formula.includes('[Radiant Soul]')) {
-          const spellDamageType = (ctx.attack?.damageType || '').toLowerCase();
-          const damageTypes = (radiantSoulPassive.damageTypes || []).map(dt => dt.toLowerCase());
-          const oncePerTurnKey = `_radiantSoul_${ps.name.replace(/\s+/g, '_')}_oncePerTurn`;
-          const onceUsed = getRuntimeValue(ps.name, oncePerTurnKey, ctx.campaignName);
-          if (!onceUsed && damageTypes.includes(spellDamageType)) {
-            const charismaAbility = ps.abilities?.find(a => a.name === 'Charisma');
-            const chaMod = Math.max(0, charismaAbility?.bonus || 0);
-            if (chaMod > 0) {
-              formula = `${formula} + ${chaMod} [Radiant Soul]`;
-            }
-          }
-        }
-
+        formula = applyEmpoweredEvocation(formula, ctx, ctx.playerStats);
+        formula = applyBlessedStrikes(formula, ctx, ctx.playerStats);
+        formula = applyElementalAffinity(formula, ctx, ctx.playerStats);
+        formula = applyRadiantSoul(formula, ctx, ctx.playerStats);
         return { data: { formula } };
       },
     },

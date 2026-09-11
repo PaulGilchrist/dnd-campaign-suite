@@ -92,19 +92,159 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
+function consumeSpellSlot(playerName, playerStats, campaignName, consumedSlotLevel) {
+    if (!consumedSlotLevel) return;
+    const slotKey = `spell_slots_level_${consumedSlotLevel}`;
+    const current = getRuntimeValue(playerName, slotKey, campaignName);
+    const max = playerStats.spellAbilities?.[slotKey] || 0;
+    const available = current != null ? Math.min(max, Number(current)) : max;
+    if (available > 0) {
+        setRuntimeValue(playerName, slotKey, available - 1, campaignName);
+    }
+}
+
+// CLA-366: swap must persist a state mirror + campaign log like the
+// verified CLA-357 telekinetic_movement model — popup text alone was inert.
+// The illusion has no token/position entity, so the distance cap is
+// stamped for GM adjudication (isWithinRange cannot measure a phantom).
+function applyTranspositionOutcome(action, playerName, campaignName, auto) {
+    const rangeFt = rangeToFeet(auto.distance) ?? 30;
+    const description = auto.moveIllusion
+        ? `${action.name}: Moved your Invoke Duplicity illusion up to ${rangeFt} feet and swapped places with it.`
+        : `${action.name}: Swapped places with your illusion (up to ${rangeFt} feet).`;
+
+    if (!getEffectDefinition('teleport_swap_with_illusion')) {
+        console.error('[tempTeleportHandler] Missing teleport_swap_with_illusion entry in targetEffectDefinitions registry');
+    }
+    registerTargetEffect(campaignName, playerName, 'teleport_swap_with_illusion', action.name, {
+        value: rangeFt,
+        swappedDistanceFt: rangeFt,
+        movedIllusion: !!auto.moveIllusion,
+        duration: 'instant',
+    });
+
+    const logDescription = auto.moveIllusion
+        ? `${playerName} used ${action.name} to move their Invoke Duplicity illusion up to ${rangeFt} feet and swap places with it.`
+        : `${playerName} used ${action.name} to teleport, swapping places with their Invoke Duplicity illusion (up to ${rangeFt} feet).`;
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: action.name,
+        description: logDescription,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[tempTeleport] Error logging transposition:", e); });
+
+    return description;
+}
+
+// CLA-230: replace any existing same-effect te instead of appending —
+// repeat teleports must not stack "next attack" advantage markers.
+function registerNextAttackAdvantage(playerName, campaignName, targetName, source) {
+    const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const newEffect = {
+        target: targetName,
+        source,
+        effect: 'next_attack_advantage',
+        value: null,
+        duration: 'until_end_of_turn',
+    };
+    const replacedEffects = storedEffects.filter(
+        te => !(te.effect === 'next_attack_advantage' && te.target === targetName && te.source === source)
+    );
+    setRuntimeValue('campaign', 'targetEffects', [...replacedEffects, newEffect], campaignName);
+    return newEffect;
+}
+
+async function applyImprovedShadowStep(action, playerStats, playerName, campaignName) {
+    const improvedStep = playerStats.automation?.passives?.find(f => f.name === 'Improved Shadow Step');
+    if (!improvedStep) return '';
+
+    const targetInfo = await resolveTarget(campaignName, playerStats.name);
+    const targetName = targetInfo?.target?.name || 'Unknown';
+
+    const currentEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const perceptionEffect = {
+        target: targetName,
+        source: 'Improved Shadow Step',
+        effect: 'disadvantage_perception_checks',
+        value: null,
+        duration: 'until_start_of_next_turn',
+    };
+    setRuntimeValue('campaign', 'targetEffects', [...currentEffects, perceptionEffect], campaignName);
+    addExpiration(playerName, targetName, [
+        { type: 'remove_target_effect', effectKey: 'disadvantage_perception_checks', source: 'Improved Shadow Step', target: targetName },
+        { type: 'condition', condition: 'blinded' }
+    ], campaignName, undefined, playerName);
+
+    const saveDc = buildSaveDc({ saveDc: 'ability', saveAbility: 'WIS' }, playerStats);
+    const { promptId } = createSaveListener(campaignName, {
+        targetName,
+        saveType: 'WIS',
+        saveDc,
+    });
+
+    const handleSaveResult = (event) => {
+        if (event.detail.promptId !== promptId) return;
+        if (!event.detail.success) {
+            const storedConds = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+            const newConds = Array.isArray(storedConds) ? [...storedConds, 'blinded'] : ['blinded'];
+            setRuntimeValue(targetName, 'activeConditions', newConds, campaignName);
+        }
+        window.removeEventListener('save-result', handleSaveResult);
+    };
+    window.addEventListener('save-result', handleSaveResult);
+
+    return ` Improved Shadow Step: ${targetName} has perception disadvantage and must make a WIS save (DC ${saveDc}) or be Blinded.`;
+}
+
+async function applySharedMoonlight(playerStats, playerName, campaignName) {
+    const lunarForm = playerStats.automation?.passives?.find(f => f.name === 'Lunar Form');
+    if (!lunarForm) return '';
+
+    const targetInfo = await resolveTarget(campaignName, playerStats.name);
+    const targetName = targetInfo?.target?.name || null;
+    if (!targetName) return '';
+
+    registerNextAttackAdvantage(playerName, campaignName, targetName, 'Shared Moonlight');
+    addExpiration(playerName, targetName, [
+        { type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: 'Shared Moonlight', target: targetName }
+    ], campaignName, undefined, playerName);
+    return ` Shared Moonlight: ${targetName} also gains Advantage on their next attack roll.`;
+}
+
+function applyStepTeleportAdvantage(action, playerStats, playerName, campaignName, distance, consumedSlotLevel, auto) {
+    let logDescription = `${playerName} used ${action.name} to teleport ${distance}. Gains Advantage on next attack roll.`;
+    if (consumedSlotLevel) {
+        logDescription += ` Expend a level ${consumedSlotLevel} spell slot.`;
+    }
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: action.name,
+        description: logDescription,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[tempTeleport] Error logging:", e); });
+
+    registerNextAttackAdvantage(playerName, campaignName, playerName, action.name);
+    addExpiration(playerName, playerName, [
+        { type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: action.name, target: playerName }
+    ], campaignName, undefined, playerName);
+
+    if (auto.effect === 'moonlight_step_teleport') {
+        const usesKey = 'moonlightStepUses';
+        const usesMax = evaluateAutoExpression('WIS modifier', playerStats);
+        const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? usesMax);
+        if (currentUses > 0) {
+            setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
+        }
+    }
+}
+
 export async function confirmTeleport(action, playerStats, campaignName, useExtended, consumedSlotLevel) {
     const auto = action?.automation || {};
     const playerName = playerStats.name;
 
-    if (consumedSlotLevel) {
-        const slotKey = `spell_slots_level_${consumedSlotLevel}`;
-        const current = getRuntimeValue(playerName, slotKey, campaignName);
-        const max = playerStats.spellAbilities?.[slotKey] || 0;
-        const available = current != null ? Math.min(max, Number(current)) : max;
-        if (available > 0) {
-            setRuntimeValue(playerName, slotKey, available - 1, campaignName);
-        }
-    }
+    consumeSpellSlot(playerName, playerStats, campaignName, consumedSlotLevel);
 
     const distance = useExtended
         ? (auto.extendedDistance || '150 ft')
@@ -116,35 +256,7 @@ export async function confirmTeleport(action, playerStats, campaignName, useExte
 
     let description;
     if (auto.effect === 'teleport_swap_with_illusion') {
-        // CLA-366: swap must persist a state mirror + campaign log like the
-        // verified CLA-357 telekinetic_movement model — popup text alone was inert.
-        // The illusion has no token/position entity, so the distance cap is
-        // stamped for GM adjudication (isWithinRange cannot measure a phantom).
-        const rangeFt = rangeToFeet(auto.distance) ?? 30;
-        description = auto.moveIllusion
-            ? `${action.name}: Moved your Invoke Duplicity illusion up to ${rangeFt} feet and swapped places with it.`
-            : `${action.name}: Swapped places with your illusion (up to ${rangeFt} feet).`;
-
-        if (!getEffectDefinition('teleport_swap_with_illusion')) {
-            console.error('[tempTeleportHandler] Missing teleport_swap_with_illusion entry in targetEffectDefinitions registry');
-        }
-        registerTargetEffect(campaignName, playerName, 'teleport_swap_with_illusion', action.name, {
-            value: rangeFt,
-            swappedDistanceFt: rangeFt,
-            movedIllusion: !!auto.moveIllusion,
-            duration: 'instant',
-        });
-
-        const logDescription = auto.moveIllusion
-            ? `${playerName} used ${action.name} to move their Invoke Duplicity illusion up to ${rangeFt} feet and swap places with it.`
-            : `${playerName} used ${action.name} to teleport, swapping places with their Invoke Duplicity illusion (up to ${rangeFt} feet).`;
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerName,
-            abilityName: action.name,
-            description: logDescription,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[tempTeleport] Error logging transposition:", e); });
+        description = applyTranspositionOutcome(action, playerName, campaignName, auto);
     } else {
         description = `${action.name}: Teleported ${distance} to an unoccupied space you can see.`;
         if (useExtended && auto.bringAllies && auto.allyCount > 0) {
@@ -153,113 +265,14 @@ export async function confirmTeleport(action, playerStats, campaignName, useExte
     }
 
     if (auto.effect === 'shadow_step_teleport' || auto.effect === 'moonlight_step_teleport') {
-        let logDescription = `${playerName} used ${action.name} to teleport ${distance}. Gains Advantage on next attack roll.`;
-        if (consumedSlotLevel) {
-            logDescription += ` Expend a level ${consumedSlotLevel} spell slot.`;
-        }
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerName,
-            abilityName: action.name,
-            description: logDescription,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[tempTeleport] Error logging:", e); });
-
-        const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-        const newEffect = {
-            target: playerName,
-            source: action.name,
-            effect: 'next_attack_advantage',
-            value: null,
-            duration: 'until_end_of_turn',
-        };
-        // CLA-230: replace any existing same-effect te instead of appending —
-        // repeat teleports must not stack "next attack" advantage markers.
-        const replacedEffects = storedEffects.filter(
-            te => !(te.effect === 'next_attack_advantage' && te.target === playerName && te.source === action.name)
-        );
-        setRuntimeValue('campaign', 'targetEffects', [...replacedEffects, newEffect], campaignName);
-        addExpiration(playerName, playerName, [
-            { type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: action.name, target: playerName }
-        ], campaignName, undefined, playerName);
-
-        if (auto.effect === 'moonlight_step_teleport') {
-            const usesKey = 'moonlightStepUses';
-            const usesMax = evaluateAutoExpression('WIS modifier', playerStats);
-            const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? usesMax);
-            if (currentUses > 0) {
-                setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
-            }
-        }
+        applyStepTeleportAdvantage(action, playerStats, playerName, campaignName, distance, consumedSlotLevel, auto);
 
         if (auto.effect === 'shadow_step_teleport') {
-            const improvedStep = playerStats.automation?.passives?.find(f => f.name === 'Improved Shadow Step');
-            if (improvedStep) {
-                const targetInfo = await resolveTarget(campaignName, playerStats.name);
-                const targetName = targetInfo?.target?.name || 'Unknown';
-
-                const currentEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-                const perceptionEffect = {
-                    target: targetName,
-                    source: 'Improved Shadow Step',
-                    effect: 'disadvantage_perception_checks',
-                    value: null,
-                    duration: 'until_start_of_next_turn',
-                };
-                setRuntimeValue('campaign', 'targetEffects', [...currentEffects, perceptionEffect], campaignName);
-                addExpiration(playerName, targetName, [
-                    { type: 'remove_target_effect', effectKey: 'disadvantage_perception_checks', source: 'Improved Shadow Step', target: targetName },
-                    { type: 'condition', condition: 'blinded' }
-                ], campaignName, undefined, playerName);
-
-                const saveDc = buildSaveDc({ saveDc: 'ability', saveAbility: 'WIS' }, playerStats);
-                const { promptId } = createSaveListener(campaignName, {
-                    targetName,
-                    saveType: 'WIS',
-                    saveDc,
-                });
-
-                const handleSaveResult = (event) => {
-                    if (event.detail.promptId !== promptId) return;
-                    if (!event.detail.success) {
-                        const storedConds = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-                        const newConds = Array.isArray(storedConds) ? [...storedConds, 'blinded'] : ['blinded'];
-                        setRuntimeValue(targetName, 'activeConditions', newConds, campaignName);
-                    }
-                    window.removeEventListener('save-result', handleSaveResult);
-                };
-                window.addEventListener('save-result', handleSaveResult);
-
-                description += ` Improved Shadow Step: ${targetName} has perception disadvantage and must make a WIS save (DC ${saveDc}) or be Blinded.`;
-            }
+            description += await applyImprovedShadowStep(action, playerStats, playerName, campaignName);
         }
 
         if (auto.effect === 'moonlight_step_teleport') {
-            const lunarForm = playerStats.automation?.passives?.find(f => f.name === 'Lunar Form');
-            if (lunarForm) {
-                const targetInfo = await resolveTarget(campaignName, playerStats.name);
-                const targetName = targetInfo?.target?.name || null;
-
-                if (targetName) {
-                    const currentEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-                    const allyEffect = {
-                        target: targetName,
-                        source: 'Shared Moonlight',
-                        effect: 'next_attack_advantage',
-                        value: null,
-                        duration: 'until_end_of_turn',
-                    };
-                    // CLA-230: same dedupe lifecycle as the caster te — replace, never stack.
-                    const replacedAllyEffects = currentEffects.filter(
-                        te => !(te.effect === 'next_attack_advantage' && te.target === targetName && te.source === 'Shared Moonlight')
-                    );
-                    setRuntimeValue('campaign', 'targetEffects', [...replacedAllyEffects, allyEffect], campaignName);
-                    addExpiration(playerName, targetName, [
-                        { type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: 'Shared Moonlight', target: targetName }
-                    ], campaignName, undefined, playerName);
-                    description += ` Shared Moonlight: ${targetName} also gains Advantage on their next attack roll.`;
-                }
-            }
+            description += await applySharedMoonlight(playerStats, playerName, campaignName);
         }
     }
 

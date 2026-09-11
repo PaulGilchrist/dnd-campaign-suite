@@ -152,6 +152,218 @@ function BonusActionTargetModals({ hordeBreakerTargets, setHordeBreakerTargets, 
     );
 }
 
+function BonusAttackRow({ attack, playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, is2024Rules, hasWeaponMastery, displaySaveDcBonus, hordeBreakerReady, onAttackClick, onResolveSpellDamage, handleSimpleDamageRoll, handleHordeBreakerClick, getWeaponMastery, setPopupHtml }) {
+    const attackLevel = getAttackSpellLevel(playerStats.spellAbilities, attack.name);
+    const attackItem = { ...attack };
+    const isHbRow = !!attack.isHordeBreaker;
+    const hbClick = () => handleHordeBreakerClick();
+    const sacredWeaponBonus = (() => {
+        const buffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || [];
+        if (!Array.isArray(buffs) || !buffs.some(b => b.effect === 'sacred_weapon')) return 0;
+        if (attack.weaponType !== 'melee' && attack.weaponType !== 'unarmed') return 0;
+        const cha = playerStats.abilities?.find(a => a.name === 'Charisma');
+        return Math.max(1, cha?.bonus || 0);
+    })();
+    const effectiveHit = attack.hitBonus + sacredWeaponBonus;
+    const hitTitle = sacredWeaponBonus > 0
+        ? `Base: +${attack.hitBonus}, Sacred Weapon: +${sacredWeaponBonus}`
+        : undefined;
+    return <React.Fragment>
+        <div className={isHbRow ? 'left clickable' : 'left'} onClick={isHbRow ? hbClick : undefined}>{attack.name}</div>
+        <div>{attackLevel != null ? (attackLevel === 0 ? 'Cantrip' : attackLevel) : ''}</div>
+        <div>{formatRange(attack.range)}</div>
+        {attack.saveDc
+           ? <div className="save-dc-display">DC {attack.saveDc + displaySaveDcBonus} {attack.saveType}</div>
+         : isHbRow
+             ? <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} title={`Attack a different creature within 5 feet of ${hordeBreakerReady?.targetName || 'the original target'} with your ${attack.weaponName || attack.name}`} onClick={hbClick}>{signFormatter.format(effectiveHit - exhaustionPenalty)}</div>
+             : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} title={hitTitle} onClick={() => onAttackClick(attackItem)}>{signFormatter.format(effectiveHit - exhaustionPenalty)}</div>}
+        <div className={attack.damage ? "clickable" : ""} onClick={() => {
+            if (cannotAct) return;
+            if (isHbRow) { hbClick(); return; }
+            if (attack.saveDc) { onResolveSpellDamage(attackItem); return; }
+            handleSimpleDamageRoll(attackItem);
+        }}>{attack.damage}</div>
+        <div className='left'>{attack.damageType}</div>
+        {is2024Rules && hasWeaponMastery && (() => { const mastery = getWeaponMastery(attack.name, attack, playerStats); return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>; })()}
+    </React.Fragment>;
+}
+
+function BonusSpellRow({ spell, playerStats, exhaustionPenalty, conditionAttackMode, cannotAct, is2024Rules, hasWeaponMastery, displaySaveDcBonus, onAttackClick, onResolveSpellDamage, gateMetamagic, getBonusSpellDamageDisplay, onSpellNameClick }) {
+    const damageType = typeof spell.damage === 'string' ? '' : (spell.damage?.damage_type || '');
+    const resolvedDamage = spell.heal_at_slot_level
+        ? resolveHealExpression(spell, playerStats.level, playerStats.spellAbilities?.modifier || 0)
+        : resolveSpellDamageAtLevel(spell, playerStats.level);
+    const autoHit = isAutoHitSpell(spell);
+    const isSpellAtk = !spell.dc;
+    const hasAttackType = spell.attack_type != null && spell.attack_type !== '';
+    const isUtilityConc = spell.concentration && !spell.dc;
+    const attackItem = { ...spell, type: 'Bonus Action', hitBonus: playerStats.spellAbilities?.toHit, saveDc: spell.dc ? playerStats.spellAbilities.saveDc : null, saveType: spell.dc?.dc_type, saveSuccess: spell.dc?.dc_success, damage: resolvedDamage, damageType };
+    return <React.Fragment>
+        <div className='left clickable' onClick={() => onSpellNameClick(spell.name)}>{spell.name}</div>
+        <div>{spell.level === 0 ? 'Cantrip' : spell.level}</div>
+        <div>{formatRange(spell.range)}</div>
+        {isUtilityConc
+            ? <div></div>
+            : autoHit
+                ? <div></div>
+                : isSpellAtk && hasAttackType
+                    ? <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(attackItem)}>{signFormatter.format(playerStats.spellAbilities?.toHit - exhaustionPenalty)}</div>
+                    : isSpellAtk && !hasAttackType
+                        ? <div></div>
+                        : <div className="save-dc-display">DC {playerStats.spellAbilities?.saveDc + displaySaveDcBonus} {spell.dc?.dc_type}</div>}
+        <div className={isUtilityConc ? "" : (resolvedDamage ? "clickable" : "")} onClick={() => {
+            if (cannotAct || isUtilityConc) return;
+            // SINGLE ENTRY POINT for bonus action spell casting:
+            // - Save DC spells: onResolveSpellDamage handles AoE modals + prepareSpellCast (from parent)
+            // - Non-save-DC spells: gateMetamagic is the single entry point (calls prepareSpellCast → spell slots, concentration)
+            // NEVER call bonusCastAction, castAction, or executeSpellCast directly from JSX onClick handlers.
+            if (isSpellAtk && spell.saveDc) { onResolveSpellDamage(attackItem); return; }
+            if (isSpellAtk) { gateMetamagic(spell, {}); return; }
+            gateMetamagic(spell, {});
+        }}>{isUtilityConc ? '' : getBonusSpellDamageDisplay(spell)}</div>
+        <div className='left'>{isUtilityConc ? 'Utility' : (damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility'))}</div>
+        {is2024Rules && hasWeaponMastery && <div></div>}
+    </React.Fragment>;
+}
+
+function BonusAttacksSection({ displayedBonusAttacks, bonusActionSpells, playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, is2024Rules, hasWeaponMastery, displaySaveDcBonus, hordeBreakerReady, onAttackClick, onResolveSpellDamage, handleSimpleDamageRoll, handleHordeBreakerClick, getWeaponMastery, setPopupHtml, gateMetamagic, getBonusSpellDamageDisplay, handleBonusSpellClick }) {
+    const showSection = displayedBonusAttacks.length > 0 || bonusActionSpells.length > 0;
+    if (!showSection) return null;
+    return (
+        <div className={`attacks ${is2024Rules && hasWeaponMastery ? 'mastery-enabled' : ''}`}>
+            <div className='left'><b>Name</b></div>
+            <div><b>Level</b></div>
+            <div><b>Range</b></div>
+            <div><b>Hit</b></div>
+            <div><b>Damage</b></div>
+            <div className='left'><b>Type</b></div>
+            {is2024Rules && hasWeaponMastery && <div><b>Mastery</b></div>}
+            {displayedBonusAttacks.map((attack) => (
+                <BonusAttackRow
+                    key={attack.name}
+                    attack={attack}
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    exhaustionPenalty={exhaustionPenalty}
+                    conditionAttackMode={conditionAttackMode}
+                    cannotAct={cannotAct}
+                    is2024Rules={is2024Rules}
+                    hasWeaponMastery={hasWeaponMastery}
+                    displaySaveDcBonus={displaySaveDcBonus}
+                    hordeBreakerReady={hordeBreakerReady}
+                    onAttackClick={onAttackClick}
+                    onResolveSpellDamage={onResolveSpellDamage}
+                    handleSimpleDamageRoll={handleSimpleDamageRoll}
+                    handleHordeBreakerClick={handleHordeBreakerClick}
+                    getWeaponMastery={getWeaponMastery}
+                    setPopupHtml={setPopupHtml}
+                />
+            ))}
+            {bonusActionSpells.map((spell) => (
+                <BonusSpellRow
+                    key={spell.name}
+                    spell={spell}
+                    playerStats={playerStats}
+                    exhaustionPenalty={exhaustionPenalty}
+                    conditionAttackMode={conditionAttackMode}
+                    cannotAct={cannotAct}
+                    is2024Rules={is2024Rules}
+                    hasWeaponMastery={hasWeaponMastery}
+                    displaySaveDcBonus={displaySaveDcBonus}
+                    onAttackClick={onAttackClick}
+                    onResolveSpellDamage={onResolveSpellDamage}
+                    gateMetamagic={gateMetamagic}
+                    getBonusSpellDamageDisplay={getBonusSpellDamageDisplay}
+                    onSpellNameClick={handleBonusSpellClick}
+                />
+            ))}
+            <div className='half-line'></div>
+        </div>
+    );
+}
+
+function EatTreatRow({ handleEatBolsteringTreat }) {
+    return (
+        <div>
+            <b className="clickable" onClick={handleEatBolsteringTreat}>Eat Bolstering Treat:</b> <span>Eat treat to gain a number of Temporary Hit Points equal to your Proficiency Bonus.</span>
+        </div>
+    );
+}
+
+function ApplyPoisonRow({ playerStats, handleApplyPoison }) {
+    const dexMod = playerStats.abilities?.find(a => a.name === 'Dexterity')?.bonus ?? 0;
+    const intMod = playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus ?? 0;
+    const saveDc = 8 + Math.max(dexMod, intMod) + (playerStats.proficiency || 0);
+    return (
+        <div>
+            <b className="clickable" onClick={handleApplyPoison}>Apply Poison:</b> <span>{`Apply a poison dose to a weapon. Target must succeed on a CON save (DC ${saveDc}) or take 2d8 Poison damage and have the Poisoned condition until the end of your next turn.`}</span>
+        </div>
+    );
+}
+
+function WarBondRow({ openWarBondChooser, bondedWeapons, warBondMax }) {
+    return (
+        <div>
+            <b className="clickable" onClick={openWarBondChooser}>Bond Weapon:</b> <span>{bondedWeapons.length > 0 ? `Bonded: ${bondedWeapons.join(', ')} (${bondedWeapons.length}/${warBondMax}).` : `No bonded weapons — choose up to ${warBondMax} from your inventory.`}</span>
+        </div>
+    );
+}
+
+function PsychicTeleportationRow({ psychicTeleportationAuto, onAutomationAction }) {
+    return (
+        <div>
+            <b className="clickable" onClick={() => onAutomationAction({
+                name: 'Psychic Teleportation',
+                description: 'Expend 1 Psionic Energy die, throw a manifested Psychic Blade to an unoccupied space you can see, and teleport to that space. The blade vanishes.',
+                automation: psychicTeleportationAuto,
+            })}>Psychic Teleportation:</b> <span>Expend 1 Psionic Energy die and teleport up to 10 ft per the die roll to an unoccupied space you can see. The blade vanishes.</span>
+        </div>
+    );
+}
+
+function findWarBondRow(bonusActions) {
+    return (bonusActions || []).find(a =>
+        (Array.isArray(a.automation) ? a.automation : [a.automation]).some(x => x && x.type === 'war_bond_summon'));
+}
+
+function findWarBondAutomation(row) {
+    return (Array.isArray(row?.automation) ? row.automation : [row?.automation]).find(x => x && x.type === 'war_bond_summon');
+}
+
+function showApplyPoisonRow(playerStats, poisonDoses, cannotAct) {
+    const hasApplyPoison = (playerStats.automation?.bonusActions ?? []).some(
+        a => a.type === 'apply_poison' && a.name === 'Apply Poison'
+    );
+    return hasApplyPoison && Number(poisonDoses ?? 0) > 0 && !cannotAct;
+}
+
+function computeShowHordeBreakerRow(playerStats, huntersPreyChoice, hordeBreakerReady, hordeBreakerUsedRound, cannotAct, hordeBreakerWeapon) {
+    const hordeBreakerMarker = (playerStats.attacks || []).find(a => a.isHordeBreaker);
+    const showHordeBreakerRow = !!hordeBreakerMarker
+        && huntersPreyChoice === 'Horde Breaker'
+        && !!hordeBreakerReady
+        && hordeBreakerReady.round === getCurrentCombatRound()
+        && hordeBreakerUsedRound !== getCurrentCombatRound()
+        && !cannotAct;
+    if (showHordeBreakerRow && !hordeBreakerWeapon) {
+        console.error('Horde Breaker: no attack entry found for weapon', hordeBreakerReady.attackName);
+    }
+    return showHordeBreakerRow;
+}
+
+function buildHordeBreakerAttackItem(hordeBreakerMarker, hordeBreakerWeapon) {
+    if (!hordeBreakerMarker || !hordeBreakerWeapon) return null;
+    return {
+        ...hordeBreakerMarker,
+        damage: hordeBreakerWeapon.damage,
+        damageType: hordeBreakerWeapon.damageType,
+        hitBonus: hordeBreakerWeapon.hitBonus,
+        hitBonusFormula: hordeBreakerWeapon.hitBonusFormula,
+        range: hordeBreakerWeapon.range,
+        weaponName: hordeBreakerWeapon.name,
+    };
+}
+
 function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, characters, onAttackClick, onResolveSpellDamage, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo, setModalState, modalState }) {
     const { popupHtml, setPopupHtml } = useDiceRollPopup();
     const [selectedBonusSpell, setSelectedBonusSpell] = useState(null);
@@ -178,19 +390,15 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
     const hasChefBolsteringTreats = Number(chefBolsteringTreats ?? 0) > 0;
     const showEatTreat = hasBolsteringTreat || hasChefBolsteringTreats;
 
-    const hasApplyPoison = (playerStats.automation?.bonusActions ?? []).some(
-        a => a.type === 'apply_poison' && a.name === 'Apply Poison'
-    );
     const poisonDoses = useRuntimeValue(playerStats.name, 'poisonDoses', campaignName);
-    const showApplyPoison = hasApplyPoison && Number(poisonDoses ?? 0) > 0 && !cannotAct;
+    const showApplyPoison = showApplyPoisonRow(playerStats, poisonDoses, cannotAct);
 
     // CLA-379: War Bond (Eldritch Knight lv3, 2024) — in-app bond writer row.
     // warBondWeapons previously had zero production writers, so the pool was
     // unreachable in-app. This row opens a chooser over inventory weapons
     // (cap bondedWeaponCount) that persists warBondWeapons via handleBond.
-    const warBondRow = (playerStats.bonusActions || []).find(a =>
-        (Array.isArray(a.automation) ? a.automation : [a.automation]).some(x => x && x.type === 'war_bond_summon'));
-    const warBondInfo = (Array.isArray(warBondRow?.automation) ? warBondRow.automation : [warBondRow?.automation]).find(x => x && x.type === 'war_bond_summon');
+    const warBondRow = findWarBondRow(playerStats.bonusActions);
+    const warBondInfo = findWarBondAutomation(warBondRow);
     const warBondMax = warBondInfo?.bondedWeaponCount || 2;
     const storedBonded = useRuntimeValue(playerStats.name, 'warBondWeapons', campaignName);
     const bondedWeapons = React.useMemo(() => (Array.isArray(storedBonded) ? storedBonded : []), [storedBonded]);
@@ -341,27 +549,8 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
         if (!hordeBreakerReady || !hordeBreakerReady.attackName) return null;
         return (playerStats.attacks || []).find(a => !a.isHordeBreaker && a.name === hordeBreakerReady.attackName) || null;
     }, [hordeBreakerReady, playerStats.attacks]);
-    const showHordeBreakerRow = !!hordeBreakerMarker
-        && huntersPreyChoice === 'Horde Breaker'
-        && !!hordeBreakerReady
-        && hordeBreakerReady.round === getCurrentCombatRound()
-        && hordeBreakerUsedRound !== getCurrentCombatRound()
-        && !cannotAct;
-    if (showHordeBreakerRow && !hordeBreakerWeapon) {
-        console.error('Horde Breaker: no attack entry found for weapon', hordeBreakerReady.attackName);
-    }
-    const hordeBreakerAttackItem = React.useMemo(() => {
-        if (!hordeBreakerMarker || !hordeBreakerWeapon) return null;
-        return {
-            ...hordeBreakerMarker,
-            damage: hordeBreakerWeapon.damage,
-            damageType: hordeBreakerWeapon.damageType,
-            hitBonus: hordeBreakerWeapon.hitBonus,
-            hitBonusFormula: hordeBreakerWeapon.hitBonusFormula,
-            range: hordeBreakerWeapon.range,
-            weaponName: hordeBreakerWeapon.name,
-        };
-    }, [hordeBreakerMarker, hordeBreakerWeapon]);
+    const showHordeBreakerRow = computeShowHordeBreakerRow(playerStats, huntersPreyChoice, hordeBreakerReady, hordeBreakerUsedRound, cannotAct, hordeBreakerWeapon);
+    const hordeBreakerAttackItem = React.useMemo(() => buildHordeBreakerAttackItem(hordeBreakerMarker, hordeBreakerWeapon), [hordeBreakerMarker, hordeBreakerWeapon]);
     const visibleHordeBreakerItem = showHordeBreakerRow ? hordeBreakerAttackItem : null;
     const displayedBonusAttacks = visibleHordeBreakerItem ? [...bonusActionAttacks, visibleHordeBreakerItem] : bonusActionAttacks;
 
@@ -425,90 +614,28 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
              * DO NOT put action or reaction spell handlers here.
              */}
               <div className='sectionHeader'>Bonus Actions</div>
-                {(displayedBonusAttacks.length > 0 || bonusActionSpells.length > 0) ? (
-                  <div className={`attacks ${is2024Rules && hasWeaponMastery ? 'mastery-enabled' : ''}`}>
-                    <div className='left'><b>Name</b></div>
-                        <div><b>Level</b></div>
-                        <div><b>Range</b></div>
-                        <div><b>Hit</b></div>
-                        <div><b>Damage</b></div>
-                        <div className='left'><b>Type</b></div>
-                        {is2024Rules && hasWeaponMastery && <div><b>Mastery</b></div>}
-                        {displayedBonusAttacks.map((attack) => {
-                            const attackLevel = getAttackSpellLevel(playerStats.spellAbilities, attack.name);
-                            const attackItem = { ...attack };
-                            const isHbRow = !!attack.isHordeBreaker;
-                            const hbClick = () => handleHordeBreakerClick();
-                            const sacredWeaponBonus = (() => {
-                                const buffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || [];
-                                if (!Array.isArray(buffs) || !buffs.some(b => b.effect === 'sacred_weapon')) return 0;
-                                if (attack.weaponType !== 'melee' && attack.weaponType !== 'unarmed') return 0;
-                                const cha = playerStats.abilities?.find(a => a.name === 'Charisma');
-                                return Math.max(1, cha?.bonus || 0);
-                            })();
-                            const effectiveHit = attack.hitBonus + sacredWeaponBonus;
-                            const hitTitle = sacredWeaponBonus > 0
-                                ? `Base: +${attack.hitBonus}, Sacred Weapon: +${sacredWeaponBonus}`
-                                : undefined;
-                            return <React.Fragment key={attack.name}>
-                                <div className={isHbRow ? 'left clickable' : 'left'} onClick={isHbRow ? hbClick : undefined}>{attack.name}</div>
-                                <div>{attackLevel != null ? (attackLevel === 0 ? 'Cantrip' : attackLevel) : ''}</div>
-                                <div>{formatRange(attack.range)}</div>
-                                {attack.saveDc
-                                   ? <div className="save-dc-display">DC {attack.saveDc + displaySaveDcBonus} {attack.saveType}</div>
-                                 : isHbRow
-                                     ? <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} title={`Attack a different creature within 5 feet of ${hordeBreakerReady?.targetName || 'the original target'} with your ${attack.weaponName || attack.name}`} onClick={hbClick}>{signFormatter.format(effectiveHit - exhaustionPenalty)}</div>
-                                     : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} title={hitTitle} onClick={() => onAttackClick(attackItem)}>{signFormatter.format(effectiveHit - exhaustionPenalty)}</div>}
-                               <div className={attack.damage ? "clickable" : ""} onClick={() => {
-                                   if (cannotAct) return;
-                                   if (isHbRow) { hbClick(); return; }
-                                   if (attack.saveDc) { onResolveSpellDamage(attackItem); return; }
-                                   handleSimpleDamageRoll(attackItem);
-                               }}>{attack.damage}</div>
-                              <div className='left'>{attack.damageType}</div>
-                               {is2024Rules && hasWeaponMastery && (() => { const mastery = getWeaponMastery(attack.name, attack, playerStats); return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>; })()}
-                         </React.Fragment>;
-                         })}
-                        {bonusActionSpells.map((spell) => {
-                            const damageType = typeof spell.damage === 'string' ? '' : (spell.damage?.damage_type || '');
-                            const resolvedDamage = spell.heal_at_slot_level
-                                ? resolveHealExpression(spell, playerStats.level, playerStats.spellAbilities?.modifier || 0)
-                                : resolveSpellDamageAtLevel(spell, playerStats.level);
-                            const autoHit = isAutoHitSpell(spell);
-                            const isSpellAtk = !spell.dc;
-                            const hasAttackType = spell.attack_type != null && spell.attack_type !== '';
-                            const isUtilityConc = spell.concentration && !spell.dc;
-                            const attackItem = { ...spell, type: 'Bonus Action', hitBonus: playerStats.spellAbilities?.toHit, saveDc: spell.dc ? playerStats.spellAbilities.saveDc : null, saveType: spell.dc?.dc_type, saveSuccess: spell.dc?.dc_success, damage: resolvedDamage, damageType };
-                            return <React.Fragment key={spell.name}>
-                                <div className='left clickable' onClick={() => handleBonusSpellClick(spell.name)}>{spell.name}</div>
-                                <div>{spell.level === 0 ? 'Cantrip' : spell.level}</div>
-                                <div>{formatRange(spell.range)}</div>
-                                {isUtilityConc
-                                    ? <div></div>
-                                    : autoHit
-                                        ? <div></div>
-                                        : isSpellAtk && hasAttackType
-                                            ? <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(attackItem)}>{signFormatter.format(playerStats.spellAbilities?.toHit - exhaustionPenalty)}</div>
-                                            : isSpellAtk && !hasAttackType
-                                                ? <div></div>
-                                                : <div className="save-dc-display">DC {playerStats.spellAbilities?.saveDc + displaySaveDcBonus} {spell.dc?.dc_type}</div>}
-                                <div className={isUtilityConc ? "" : (resolvedDamage ? "clickable" : "")} onClick={() => {
-                                    if (cannotAct || isUtilityConc) return;
-                                    // SINGLE ENTRY POINT for bonus action spell casting:
-                                    // - Save DC spells: onResolveSpellDamage handles AoE modals + prepareSpellCast (from parent)
-                                    // - Non-save-DC spells: gateMetamagic is the single entry point (calls prepareSpellCast → spell slots, concentration)
-                                    // NEVER call bonusCastAction, castAction, or executeSpellCast directly from JSX onClick handlers.
-                                    if (isSpellAtk && spell.saveDc) { onResolveSpellDamage(attackItem); return; }
-                                    if (isSpellAtk) { gateMetamagic(spell, {}); return; }
-                                    gateMetamagic(spell, {});
-                                }}>{isUtilityConc ? '' : getBonusSpellDamageDisplay(spell)}</div>
-                                <div className='left'>{isUtilityConc ? 'Utility' : (damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility'))}</div>
-                                {is2024Rules && hasWeaponMastery && <div></div>}
-                           </React.Fragment>;
-                      })}
-                      <div className='half-line'></div>
-                  </div>
-               ) : null}
+                <BonusAttacksSection
+                    displayedBonusAttacks={displayedBonusAttacks}
+                    bonusActionSpells={bonusActionSpells}
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    exhaustionPenalty={exhaustionPenalty}
+                    conditionAttackMode={conditionAttackMode}
+                    cannotAct={cannotAct}
+                    is2024Rules={is2024Rules}
+                    hasWeaponMastery={hasWeaponMastery}
+                    displaySaveDcBonus={displaySaveDcBonus}
+                    hordeBreakerReady={hordeBreakerReady}
+                    onAttackClick={onAttackClick}
+                    onResolveSpellDamage={onResolveSpellDamage}
+                    handleSimpleDamageRoll={handleSimpleDamageRoll}
+                    handleHordeBreakerClick={handleHordeBreakerClick}
+                    getWeaponMastery={getWeaponMastery}
+                    setPopupHtml={setPopupHtml}
+                    gateMetamagic={gateMetamagic}
+                    getBonusSpellDamageDisplay={getBonusSpellDamageDisplay}
+                    handleBonusSpellClick={handleBonusSpellClick}
+                />
               <SpellCastPopups
                   selectedBonusSpell={selectedBonusSpell}
                   setSelectedBonusSpell={setSelectedBonusSpell}
@@ -646,33 +773,13 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                     );
                 })()}
 
-                {showEatTreat && (
-                    <div>
-                        <b className="clickable" onClick={handleEatBolsteringTreat}>Eat Bolstering Treat:</b> <span>Eat treat to gain a number of Temporary Hit Points equal to your Proficiency Bonus.</span>
-                    </div>
-                )}
+                {showEatTreat && <EatTreatRow handleEatBolsteringTreat={handleEatBolsteringTreat} />}
 
-                {showApplyPoison && (
-                    <div>
-                        <b className="clickable" onClick={handleApplyPoison}>Apply Poison:</b> <span>Apply a poison dose to a weapon. Target must succeed on a CON save (DC {8 + Math.max(playerStats.abilities?.find(a => a.name === 'Dexterity')?.bonus ?? 0, playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus ?? 0) + (playerStats.proficiency || 0)}) or take 2d8 Poison damage and have the Poisoned condition until the end of your next turn.</span>
-                    </div>
-                )}
+                {showApplyPoison && <ApplyPoisonRow playerStats={playerStats} handleApplyPoison={handleApplyPoison} />}
 
-                {warBondInfo && (
-                    <div>
-                        <b className="clickable" onClick={openWarBondChooser}>Bond Weapon:</b> <span>{bondedWeapons.length > 0 ? `Bonded: ${bondedWeapons.join(', ')} (${bondedWeapons.length}/${warBondMax}).` : `No bonded weapons — choose up to ${warBondMax} from your inventory.`}</span>
-                    </div>
-                )}
+                {warBondInfo && <WarBondRow openWarBondChooser={openWarBondChooser} bondedWeapons={bondedWeapons} warBondMax={warBondMax} />}
 
-                {showPsychicTeleportation && (
-                    <div>
-                        <b className="clickable" onClick={() => onAutomationAction({
-                            name: 'Psychic Teleportation',
-                            description: 'Expend 1 Psionic Energy die, throw a manifested Psychic Blade to an unoccupied space you can see, and teleport to that space. The blade vanishes.',
-                            automation: psychicTeleportationAuto,
-                        })}>Psychic Teleportation:</b> <span>Expend 1 Psionic Energy die and teleport up to 10 ft per the die roll to an unoccupied space you can see. The blade vanishes.</span>
-                    </div>
-                )}
+                {showPsychicTeleportation && <PsychicTeleportationRow psychicTeleportationAuto={psychicTeleportationAuto} onAutomationAction={onAutomationAction} />}
 
                 <BonusActionTargetModals
                     hordeBreakerTargets={hordeBreakerTargets}

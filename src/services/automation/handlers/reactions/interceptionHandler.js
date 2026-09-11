@@ -62,9 +62,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // Reaction consumption: one Reaction per round (spent until your next turn).
     const currentRound = combatSummary.round || 1;
     const usedMark = getRuntimeValue(playerName, USED_ROUND_KEY);
-    const sameTrigger = usedMark && usedMark.lastAttackTimestamp && attackEvent?.timestamp
-        && usedMark.lastAttackTimestamp === attackEvent.timestamp;
-    if (sameTrigger || (usedMark && usedMark.round === currentRound)) {
+    if (isReactionSpent(usedMark, attackEvent, currentRound)) {
         return makePopup(action, auto, `${featureName} has already been used this round — your Reaction is spent until your next turn.`);
     }
 
@@ -97,22 +95,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const originalDamage = attackResult.totalDamage || 0;
 
     const damageRoll = rollExpression(auto.damageExpression || '1d10');
-    let damageBonus = auto.damageBonus || 0;
-    if (!damageBonus && auto.damageBonusExpression) {
-        if (auto.damageBonusExpression === 'proficiency_bonus') {
-            damageBonus = playerStats.proficiency || 0;
-        } else {
-            try {
-                const num = Number(auto.damageBonusExpression);
-                if (!isNaN(num)) {
-                    damageBonus = num;
-                }
-            } catch (_e) {
-                // Keep default 0
-                console.warn('[interceptionHandler] Damage bonus expression invalid, keeping default 0:', _e);
-            }
-        }
-    }
+    const damageBonus = resolveInterceptionDamageBonus(auto, playerStats);
     const reductionAmount = (damageRoll?.total || 0) + damageBonus;
     const reducedDamage = Math.max(0, originalDamage - reductionAmount);
     const actualHeal = Math.min(reductionAmount, originalDamage);
@@ -158,6 +141,30 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }).catch((e) => { console.error("[interception] Error:", e); });
 
     return result;
+}
+
+function isReactionSpent(usedMark, attackEvent, currentRound) {
+    const sameTrigger = usedMark && usedMark.lastAttackTimestamp && attackEvent?.timestamp
+        && usedMark.lastAttackTimestamp === attackEvent.timestamp;
+    return sameTrigger || (usedMark && usedMark.round === currentRound);
+}
+
+function resolveInterceptionDamageBonus(auto, playerStats) {
+    let damageBonus = auto.damageBonus || 0;
+    if (damageBonus || !auto.damageBonusExpression) return damageBonus;
+    if (auto.damageBonusExpression === 'proficiency_bonus') {
+        return playerStats.proficiency || 0;
+    }
+    try {
+        const num = Number(auto.damageBonusExpression);
+        if (!isNaN(num)) {
+            return num;
+        }
+    } catch (_e) {
+        // Keep default 0
+        console.warn('[interceptionHandler] Damage bonus expression invalid, keeping default 0:', _e);
+    }
+    return damageBonus;
 }
 
 function checkShieldOrWeapon(playerStats, auto, featureName) {

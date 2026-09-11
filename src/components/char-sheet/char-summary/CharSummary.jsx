@@ -164,6 +164,34 @@ function SummaryBadges({ playerStats, campaignName, activeMapName, characters, e
     );
 }
 
+function StatListsBlock({ playerStats, seeInvisibilityActive }) {
+    return (
+        <>
+            {playerStats.vulnerabilities != null && playerStats.vulnerabilities.length > 0 && <span><b>Vulnerabilities: </b>{playerStats.vulnerabilities.join(', ')}</span>}
+            {playerStats.senses != null && playerStats.senses.length > 0 && <div><b>Senses: </b>{[...playerStats.senses.map((sense) => `${sense.name} ${sense.value}`), ...(seeInvisibilityActive ? ['See Invisibility'] : [])].join(', ')}</div>}
+            {playerStats.proficiencies?.length > 0 && <div><b>Proficiencies: </b>{[...playerStats.proficiencies.filter(p => !/^(\d+) from: (.+)$/.test(p)), ...(playerStats.toolProficiencies || [])].join(', ')}</div>}
+            {playerStats.languages != null && playerStats.languages.length > 0 && <span><b>Languages: </b>{playerStats.languages.join(', ')}</span>}<br />
+        </>
+    );
+}
+
+function WildSurgeBadge({ surgeEffects }) {
+    if (!surgeEffects || !Array.isArray(surgeEffects) || surgeEffects.length === 0) return null;
+    return (
+        <div className="wild-surge-badge">
+            <b>Surge Effects: </b>
+            <ul className="wild-surge-effects-list">
+                {surgeEffects.map((surge, index) => (
+                    <li key={surge.timestamp || index} className="wild-surge-badge-name" title={surge.effect}>
+                        {surge.roll === 'tamed' ? 'Tamed' : `#${surge.roll}`} — {surge.effect}
+                        {surge.duration && <i className="fa-solid fa-hourglass-end" title={surge.duration}></i>}
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+
 function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters, onLongRest, exhaustionLevel, conditionEffects, onConditionsChange, auraComboEffects }) {
     const { setPopupHtml } = useDiceRollPopup();
     const { rollInitiative } = useLoggedDiceRoll(playerStats.name, campaignName, { characters });
@@ -471,11 +499,8 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
 
                 </span>
               ))}
-          </div>}
-          {playerStats.vulnerabilities != null && playerStats.vulnerabilities.length > 0 && <span><b>Vulnerabilities: </b>{playerStats.vulnerabilities.join(', ')}</span>}
-            {playerStats.senses != null && playerStats.senses.length > 0 && <div><b>Senses: </b>{[...playerStats.senses.map((sense) => `${sense.name} ${sense.value}`), ...(seeInvisibilityActive ? ['See Invisibility'] : [])].join(', ')}</div>}
-            {playerStats.proficiencies?.length > 0 && <div><b>Proficiencies: </b>{[...playerStats.proficiencies.filter(p => !/^(\d+) from: (.+)$/.test(p)), ...(playerStats.toolProficiencies || [])].join(', ')}</div>}
-            {playerStats.languages != null && playerStats.languages.length > 0 && <span><b>Languages: </b>{playerStats.languages.join(', ')}</span>}<br />
+           </div>}
+          <StatListsBlock playerStats={playerStats} seeInvisibilityActive={seeInvisibilityActive} />
             {showShortRest && (
                 <ShortRestModal
                     playerStats={playerStats}
@@ -530,19 +555,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                     />
                 </div>
               </div>
-               {surgeEffects && Array.isArray(surgeEffects) && surgeEffects.length > 0 && (
-                   <div className="wild-surge-badge">
-                       <b>Surge Effects: </b>
-                       <ul className="wild-surge-effects-list">
-                           {surgeEffects.map((surge, index) => (
-                               <li key={surge.timestamp || index} className="wild-surge-badge-name" title={surge.effect}>
-                                   {surge.roll === 'tamed' ? 'Tamed' : `#${surge.roll}`} — {surge.effect}
-                                   {surge.duration && <i className="fa-solid fa-hourglass-end" title={surge.duration}></i>}
-                               </li>
-                           ))}
-                       </ul>
-                   </div>
-               )}
+               <WildSurgeBadge surgeEffects={surgeEffects} />
               {showAllyModal && (
                   <AllySelectionModal
                       creatures={allyModalCreatures}

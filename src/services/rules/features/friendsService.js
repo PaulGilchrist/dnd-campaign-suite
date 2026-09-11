@@ -53,21 +53,62 @@ function recordFriendsCast(casterName, targetName, campaignName) {
     }
 }
 
+/**
+ * Resolve the Friends target: explicit selection, else the caster's target in
+ * initiative view. Logs (and returns null) when nothing is selected.
+ */
+async function resolveFriendsTarget(metaCtx, playerStats, campaignName) {
+    let targetName = metaCtx?.targetName;
+    if (targetName) return targetName;
+
+    const cs = await getCombatContext(campaignName);
+    if (cs?.creatures && cs.creatures.length > 0) {
+        const attackerTarget = getTargetFromAttacker(cs, playerStats.name);
+        if (attackerTarget) targetName = attackerTarget.name;
+    }
+    if (!targetName) {
+        console.error(`[friendsService] No target selected for Friends by ${playerStats.name}. Caster has no target in initiative view.`);
+    }
+    return targetName || null;
+}
+
+// Shared "no effect" campaign log + popup for the pre-cast condition checks.
+function logFriendsNoEffect(campaignName, casterName, targetName, reason, popupDescription) {
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: casterName,
+        abilityName: 'Friends',
+        description: `${casterName} casts Friends on ${targetName} but it has no effect — ${reason}.`,
+    }).catch((e) => { console.error("[friendsService:log-error]", e); });
+    return { type: 'popup', payload: { type: 'automation_info', name: 'Friends', description: popupDescription } };
+}
+
+// Check 3 support: target's current/max HP (players read the runtime store,
+// monsters the combat-summary creature entry).
+function resolveTargetHealth(targetCreature, targetName, playerStats, campaignName) {
+    if (targetCreature?.type === 'player') {
+        const currentHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? playerStats.computedStats?.currentHp ?? 0;
+        const maxHp = getRuntimeValue(targetName, 'hitPoints', campaignName) ?? playerStats.computedStats?.maxHp ?? 0;
+        return { currentHp, maxHp };
+    }
+    const currentHp = targetCreature?.currentHp ?? targetCreature?.hit_points?.current ?? 0;
+    const maxHp = targetCreature?.maxHp ?? 0;
+    return { currentHp, maxHp };
+}
+
+// Set concentration on the caster so the badge shows in the initiative tracker
+function setFriendsConcentrationBadge(csForConc, playerStats, campaignName) {
+    const concentrationDc = 8 + (playerStats.proficiency || 2) + (playerStats.abilities?.CON?.bonus ?? 0);
+    addConcentration(csForConc, playerStats.name, 'Friends', concentrationDc);
+    storage.set('combatSummary', csForConc, campaignName);
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+}
+
 export async function triggerFriends(spell, metaCtx, playerStats, campaignName, mapName) {
     const isFriends = (spell.name || '').toLowerCase() === 'friends';
     if (!isFriends) return null;
 
-    let targetName = metaCtx?.targetName;
-    if (!targetName) {
-        const cs = await getCombatContext(campaignName);
-        if (cs?.creatures && cs.creatures.length > 0) {
-            const attackerTarget = getTargetFromAttacker(cs, playerStats.name);
-            if (attackerTarget) targetName = attackerTarget.name;
-        }
-        if (!targetName) {
-            console.error(`[friendsService] No target selected for Friends by ${playerStats.name}. Caster has no target in initiative view.`);
-        }
-    }
+    const targetName = await resolveFriendsTarget(metaCtx, playerStats, campaignName);
     if (!targetName) {
         return { type: 'popup', payload: { type: 'automation_info', name: 'Friends', description: 'No target selected for Friends.' } };
     }
@@ -77,60 +118,35 @@ export async function triggerFriends(spell, metaCtx, playerStats, campaignName, 
     // Check 1: Target is not a Humanoid
     const humanoid = await isTargetHumanoid(targetName, campaignName);
     if (!humanoid) {
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: 'Friends',
-            description: `${playerStats.name} casts Friends on ${targetName} but it has no effect — ${targetName} is not a Humanoid.`,
-        }).catch((e) => { console.error("[friendsService:log-error]", e); });
-        return { type: 'popup', payload: { type: 'automation_info', name: 'Friends', description: `No effect. ${targetName} is not a Humanoid.` } };
+        return logFriendsNoEffect(campaignName, playerStats.name, targetName,
+            `${targetName} is not a Humanoid.`,
+            `No effect. ${targetName} is not a Humanoid.`);
     }
 
     // Check 2: Cast within 24 hours
     if (hasRecentFriendsCast(playerStats.name, targetName, campaignName)) {
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: 'Friends',
-            description: `${playerStats.name} casts Friends on ${targetName} but it has no effect — already cast within the past 24 hours.`,
-        }).catch((e) => { console.error("[friendsService:log-error]", e); });
-        return { type: 'popup', payload: { type: 'automation_info', name: 'Friends', description: `No effect. You have already cast Friends on ${targetName} within the past 24 hours.` } };
+        return logFriendsNoEffect(campaignName, playerStats.name, targetName,
+            'already cast within the past 24 hours.',
+            `No effect. You have already cast Friends on ${targetName} within the past 24 hours.`);
     }
 
     // Check 3: Target is not at full health (immunized — cannot be charmed)
     const cs = await getCombatContext(campaignName);
     const targetCreature = cs?.creatures?.find(c => c.name === targetName);
-    const targetIsPlayer = targetCreature?.type === 'player';
-    let currentHp = 0;
-    let maxHp = 0;
-    if (targetIsPlayer) {
-        currentHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? playerStats.computedStats?.currentHp ?? 0;
-        maxHp = getRuntimeValue(targetName, 'hitPoints', campaignName) ?? playerStats.computedStats?.maxHp ?? 0;
-    } else {
-        currentHp = targetCreature?.currentHp ?? targetCreature?.hit_points?.current ?? 0;
-        maxHp = targetCreature?.maxHp ?? 0;
-    }
+    const { currentHp, maxHp } = resolveTargetHealth(targetCreature, targetName, playerStats, campaignName);
     const isAtFullHealth = currentHp >= maxHp && maxHp > 0;
     if (!isAtFullHealth) {
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: 'Friends',
-            description: `${playerStats.name} casts Friends on ${targetName} but it has no effect — ${targetName} is not at full health and is immunized to the effect.`,
-        }).catch((e) => { console.error("[friendsService:log-error]", e); });
-        return { type: 'popup', payload: { type: 'automation_info', name: 'Friends', description: `No effect. ${targetName} is not at full health and is immunized to the effect.` } };
+        return logFriendsNoEffect(campaignName, playerStats.name, targetName,
+            `${targetName} is not at full health and is immunized to the effect.`,
+            `No effect. ${targetName} is not at full health and is immunized to the effect.`);
     }
 
     // Record the cast for cooldown tracking
     recordFriendsCast(playerStats.name, targetName, campaignName);
 
-    // Set concentration on the caster so the badge shows in the initiative tracker
     const csForConc = getCombatSummary(campaignName);
     if (csForConc) {
-        const concentrationDc = 8 + (playerStats.proficiency || 2) + (playerStats.abilities?.CON?.bonus ?? 0);
-        addConcentration(csForConc, playerStats.name, 'Friends', concentrationDc);
-        storage.set('combatSummary', csForConc, campaignName);
-        window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+        setFriendsConcentrationBadge(csForConc, playerStats, campaignName);
     }
 
     // Build the spell save DC

@@ -328,96 +328,104 @@ async function runNoDamagePath(spell, fullSpell, metaCtx, playerStats, campaignN
     return { handled: false };
 }
 
+function resolveHealExpression(healAtSlotLevel, slotLevel) {
+    const expression = healAtSlotLevel[slotLevel];
+    if (expression) return expression;
+    const levels = Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b);
+    const highestBelow = levels.filter(l => l <= slotLevel).pop();
+    return highestBelow ? healAtSlotLevel[highestBelow] : expression;
+}
+
+function resolveTargetHpBounds(target, playerStats, characters) {
+    const isTargetPlayer = target.name === playerStats.name || (characters || []).some(c => c.name === target.name && c.type === 'player');
+    const maxHp = isTargetPlayer
+        ? (getRuntimeValue(target.name, 'hitPoints') || playerStats.hitPoints || 0)
+        : (getRuntimeValue(target.name, 'hitPoints') || 0);
+    const currentHp = getRuntimeValue(target.name, 'currentHitPoints') ?? maxHp;
+    return { maxHp, currentHp };
+}
+
+async function applyHealToCombat(actualHeal, targetName, campaignName) {
+    if (!(actualHeal > 0)) return;
+    const combatSummary = await getCombatContext(campaignName);
+    if (combatSummary) {
+        applyHealingToTarget(combatSummary, targetName, actualHeal, campaignName);
+    }
+}
+
+// 'max' expression branch — heals target to full.
+async function applyMaxHeal(spell, target, playerStats, characters, campaignName, bonusHeal, bonusDetails) {
+    const { maxHp, currentHp } = resolveTargetHpBounds(target, playerStats, characters);
+    const actualHeal = maxHp - currentHp;
+    const genericHealResult = { targetName: target.name, healAmount: Math.max(0, actualHeal), formula: 'max', rolls: [], rawTotal: Math.max(0, actualHeal), bonusHeal, bonusDetails };
+    await applyHealToCombat(actualHeal, target.name, campaignName);
+    addEntry(campaignName, {
+        type: 'hp_change', targetName: target.name, delta: actualHeal,
+        currentHp: Math.min(maxHp, currentHp + Math.max(0, actualHeal)), maxHp,
+        isHealing: true, sourceName: playerStats.name, note: spell.name, timestamp: Date.now(),
+    }).catch((e) => { console.error("[spellCast] Error:", e); });
+    return genericHealResult;
+}
+
+// Dice-expression branch — rolls, applies maximize/reroll-ones, heals, and logs.
+async function applyRolledHeal(spell, target, playerStats, characters, campaignName, expression, spellCastingMod, bonusHeal, bonusDetails) {
+    const resolvedExpression = expression.replace(/\bMOD\b/g, String(spellCastingMod));
+    const maximize = hasHealingMaximizationForTarget(playerStats, target.name, campaignName);
+    const rerollOnes = hasRerollHealingOnes(playerStats);
+    const result = maximize ? rollExpressionMaximized(resolvedExpression) : rollExpression(resolvedExpression);
+    let displayRolls = result?.rolls || null;
+    let healingRerollOriginalRolls = null;
+    if (result && rerollOnes && !maximize) {
+        const { displayRolls: rerolled, originalRolls } = applyHealingRerollOnes(result.rolls, resolvedExpression);
+        displayRolls = rerolled;
+        healingRerollOriginalRolls = originalRolls;
+    }
+    if (!result) return null;
+    const { maxHp, currentHp } = resolveTargetHpBounds(target, playerStats, characters);
+    const healAmount = result.total + bonusHeal;
+    const actualHeal = Math.min(Math.max(0, healAmount), Math.max(0, maxHp - currentHp));
+    await applyHealToCombat(actualHeal, target.name, campaignName);
+    const genericHealResult = { targetName: target.name, healAmount: actualHeal, formula: resolvedExpression, rolls: displayRolls || result.rolls, rawTotal: result.total + bonusHeal, bonusHeal, bonusDetails, healingRerollOriginalRolls, healingRerollDisplayRolls: displayRolls };
+    const formulaParts = [resolvedExpression];
+    if (bonusDetails.length > 0) {
+        const bonusParts = bonusDetails.map(d => `${d.amount} ${d.name}`).join(' + ');
+        formulaParts.push(`(${bonusParts})`);
+    }
+    addEntry(campaignName, {
+        type: 'hp_change', targetName: target.name, delta: actualHeal,
+        currentHp: Math.min(maxHp, currentHp + actualHeal), maxHp,
+        isHealing: true, sourceName: playerStats.name, note: spell.name,
+        formula: formulaParts.join(' + '),
+        bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[spellCast] Error:", e); });
+    return genericHealResult;
+}
+
+async function resolveGenericHeal(spell, target, metaCtx, playerStats, campaignName, characters, spellCastingMod) {
+    if (metaCtx?.slotLevel == null && spell.level == null) {
+        console.error('[spellCast] executeSpellCast: slot level is missing (metaCtx.slotLevel and spell.level) for healing spell');
+        throw new Error('slot level is required for healing spell');
+    }
+    const slotLevel = metaCtx?.slotLevel || spell.level;
+    const expression = resolveHealExpression(spell.heal_at_slot_level, slotLevel);
+    if (!expression) return null;
+    const targetChar = (characters || []).find(c => c.name === target.name);
+    const targetStats = targetChar?.computedStats || targetChar;
+    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName, targetStats);
+    if (expression === 'max') {
+        return await applyMaxHeal(spell, target, playerStats, characters, campaignName, bonusHeal, bonusDetails);
+    }
+    return await applyRolledHeal(spell, target, playerStats, characters, campaignName, expression, spellCastingMod, bonusHeal, bonusDetails);
+}
+
 // Generic healing path (spell.heal_at_slot_level) — returns genericHealResult.
 async function runGenericHealPath(spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, spellCastingMod) {
     const explicitTarget = metaCtx?.targetName ? { name: metaCtx.targetName } : null;
     const target = explicitTarget || await getTargetInfo();
     let genericHealResult = null;
     if (target?.name) {
-        if (metaCtx?.slotLevel == null && spell.level == null) {
-            console.error('[spellCast] executeSpellCast: slot level is missing (metaCtx.slotLevel and spell.level) for healing spell');
-            throw new Error('slot level is required for healing spell');
-        }
-        const slotLevel = metaCtx?.slotLevel || spell.level;
-        const healAtSlotLevel = spell.heal_at_slot_level;
-        let expression = healAtSlotLevel[slotLevel];
-        if (!expression) {
-            const levels = Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b);
-            const highestBelow = levels.filter(l => l <= slotLevel).pop();
-            if (highestBelow) {
-                expression = healAtSlotLevel[highestBelow];
-            }
-        }
-        if (expression) {
-            const targetChar = (characters || []).find(c => c.name === target.name);
-            const targetStats = targetChar?.computedStats || targetChar;
-            const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName, targetStats);
-            if (expression === 'max') {
-                const isTargetPlayer = target.name === playerStats.name || (characters || []).some(c => c.name === target.name && c.type === 'player');
-                const maxHp = isTargetPlayer
-                    ? (getRuntimeValue(target.name, 'hitPoints') || playerStats.hitPoints || 0)
-                    : (getRuntimeValue(target.name, 'hitPoints') || 0);
-                const currentHp = isTargetPlayer
-                    ? (getRuntimeValue(target.name, 'currentHitPoints') ?? maxHp)
-                    : (getRuntimeValue(target.name, 'currentHitPoints') ?? maxHp);
-                const actualHeal = maxHp - currentHp;
-                genericHealResult = { targetName: target.name, healAmount: Math.max(0, actualHeal), formula: 'max', rolls: [], rawTotal: Math.max(0, actualHeal), bonusHeal, bonusDetails };
-                if (actualHeal > 0) {
-                    const combatSummary = await getCombatContext(campaignName);
-                    if (combatSummary) {
-                        applyHealingToTarget(combatSummary, target.name, actualHeal, campaignName);
-                    }
-                }
-                addEntry(campaignName, {
-                    type: 'hp_change', targetName: target.name, delta: actualHeal,
-                    currentHp: Math.min(maxHp, currentHp + Math.max(0, actualHeal)), maxHp,
-                    isHealing: true, sourceName: playerStats.name, note: spell.name, timestamp: Date.now(),
-                }).catch((e) => { console.error("[spellCast] Error:", e); });
-            } else {
-                let resolvedExpression = expression.replace(/\bMOD\b/g, String(spellCastingMod));
-                const maximize = hasHealingMaximizationForTarget(playerStats, target.name, campaignName);
-                const rerollOnes = hasRerollHealingOnes(playerStats);
-                const result = maximize ? rollExpressionMaximized(resolvedExpression) : rollExpression(resolvedExpression);
-                let displayRolls = result?.rolls || null;
-                let healingRerollOriginalRolls = null;
-                if (result && rerollOnes && !maximize) {
-                    const { displayRolls: rerolled, originalRolls } = applyHealingRerollOnes(result.rolls, resolvedExpression);
-                    displayRolls = rerolled;
-                    healingRerollOriginalRolls = originalRolls;
-                }
-                if (result) {
-                    const isTargetPlayer = target.name === playerStats.name || (characters || []).some(c => c.name === target.name && c.type === 'player');
-                    const maxHp = isTargetPlayer
-                        ? (getRuntimeValue(target.name, 'hitPoints') || playerStats.hitPoints || 0)
-                        : (getRuntimeValue(target.name, 'hitPoints') || 0);
-                    const currentHp = isTargetPlayer
-                        ? (getRuntimeValue(target.name, 'currentHitPoints') ?? maxHp)
-                        : (getRuntimeValue(target.name, 'currentHitPoints') ?? maxHp);
-                    const healAmount = result.total + bonusHeal;
-                    const actualHeal = Math.min(Math.max(0, healAmount), Math.max(0, maxHp - currentHp));
-                    if (actualHeal > 0) {
-                        const combatSummary = await getCombatContext(campaignName);
-                        if (combatSummary) {
-                            applyHealingToTarget(combatSummary, target.name, actualHeal, campaignName);
-                        }
-                    }
-                    genericHealResult = { targetName: target.name, healAmount: actualHeal, formula: resolvedExpression, rolls: displayRolls || result.rolls, rawTotal: result.total + bonusHeal, bonusHeal, bonusDetails, healingRerollOriginalRolls, healingRerollDisplayRolls: displayRolls };
-                    const formulaParts = [resolvedExpression];
-                    if (bonusDetails.length > 0) {
-                        const bonusParts = bonusDetails.map(d => `${d.amount} ${d.name}`).join(' + ');
-                        formulaParts.push(`(${bonusParts})`);
-                    }
-                    addEntry(campaignName, {
-                        type: 'hp_change', targetName: target.name, delta: actualHeal,
-                        currentHp: Math.min(maxHp, currentHp + actualHeal), maxHp,
-                        isHealing: true, sourceName: playerStats.name, note: spell.name,
-                        formula: formulaParts.join(' + '),
-                        bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error("[spellCast] Error:", e); });
-                }
-            }
-        }
+        genericHealResult = await resolveGenericHeal(spell, target, metaCtx, playerStats, campaignName, characters, spellCastingMod);
     }
 
     triggerPostCastSelfHeals(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
@@ -514,6 +522,29 @@ async function runPostCastTriggers(spell, metaCtx, playerStats, campaignName, ma
     return triggerResult;
 }
 
+// Auto-miss (out of range) — roll a zero-damage result and optionally run the save path.
+async function runAutoMissPath(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, innateSorceryActive, effectiveDamageType, spellSaveDc, overchannelFormula, overchannelActive, overchannelUseCount, rollAttack, rollDamage, formula, hasInvisible, rangeResult) {
+    const context = {
+        targetName: (await getTargetInfo())?.name,
+        attackerName: playerStats.name,
+        ...metaCtx,
+        isAutoMiss: true,
+        rangeReason: rangeResult.rangeReason,
+        saveDc: spellSaveDc,
+        saveType: spell.dc?.dc_type || fullSpell.dc?.dc_type,
+        dcSuccess: spell.dc?.dc_success ?? fullSpell.dc?.dc_success,
+        metamagicHeighten: metaCtx?.metamagicHeighten,
+        isCantrip: spell.baseLevel === 0 || spell.level === 0,
+    };
+    rollDamage(spell.name, formula || '0', 0, [], 0, context);
+    if (spell.dc || fullSpell.dc) {
+        await handleSavePath(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters,
+            getTargetInfo, getRuntimeValue, innateSorceryActive, effectiveDamageType, spellSaveDc,
+            overchannelFormula, overchannelActive, overchannelUseCount, rollAttack, rollDamage, formula, hasInvisible);
+    }
+    return null;
+}
+
 export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, featEffects, campaignName, mapName, characters }) {
     // --- Block checks ---
     const buffBlock = await checkBlockedBySpellcastingBuff(spell, playerStats, campaignName);
@@ -562,38 +593,19 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
 
     await logGenericSpellCast(spell, fullSpell, playerStats, campaignName, getTargetInfo, spellSaveDc, damageType, formula);
 
-    // --- Power Word Heal/Kill ---
-    const pwhResult = await handlePowerWordHeal(spell, metaCtx, getTargetInfo, playerStats, campaignName, applyPowerWordHealToTarget);
-    if (pwhResult.handled) return pwhResult.result;
-
-    const pwkResult = await handlePowerWordKill(spell, metaCtx, getTargetInfo, playerStats, campaignName, applyPowerWordKillToTarget);
-    if (pwkResult.handled) return pwkResult.result;
-
-    // --- Modal spells (early returns) ---
-    let massSuggestionResult = handleMassSuggestion(spell, spellSaveDc, playerStats, campaignName);
-    if (massSuggestionResult.handled) return massSuggestionResult.result;
-
-    let calmEmotionsResult = handleCalmEmotions(fullSpell, spellSaveDc, playerStats, campaignName, metaCtx);
-    if (calmEmotionsResult.handled) return calmEmotionsResult.result;
-
-    let hypnoticPatternEarlyResult = handleHypnoticPatternEarly(fullSpell, spellSaveDc, playerStats, campaignName, metaCtx, innateSorceryActive);
-    if (hypnoticPatternEarlyResult.handled) return hypnoticPatternEarlyResult.result;
-
-    let confusionEarlyResult = handleConfusionEarly(fullSpell, spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName, (s, m, p, c, mp) => triggerConfusion(s, m, p, c, mp));
-    if (confusionEarlyResult.handled) return confusionEarlyResult.result?.result;
-
-    let shapechangeResult = handleShapechange(fullSpell, metaCtx, playerStats, campaignName, mapName, characters);
-    if (shapechangeResult.handled) return shapechangeResult.result;
-
-    let sleepResult = handleSleep(fullSpell, spellSaveDc, playerStats, campaignName, metaCtx, characters);
-    if (sleepResult.handled) return sleepResult.result;
-
-    // --- Generic automation routing ---
-    let genericAutomationResult = await handleGenericAutomation(spell, executeHandler, (sp, mc, ps, cn) => triggerArcaneWard(sp, mc, ps, cn), playerStats, campaignName, mapName, characters, metaCtx);
-    if (genericAutomationResult.handled) {
-        if (genericAutomationResult.result) return genericAutomationResult.result;
-        return;
-    }
+    // --- Power Word Heal/Kill, modal spells, generic automation (early returns) ---
+    const earlyResult = await runTriggerChain([
+        async () => passThrough(await handlePowerWordHeal(spell, metaCtx, getTargetInfo, playerStats, campaignName, applyPowerWordHealToTarget)),
+        async () => passThrough(await handlePowerWordKill(spell, metaCtx, getTargetInfo, playerStats, campaignName, applyPowerWordKillToTarget)),
+        () => passThrough(handleMassSuggestion(spell, spellSaveDc, playerStats, campaignName)),
+        () => passThrough(handleCalmEmotions(fullSpell, spellSaveDc, playerStats, campaignName, metaCtx)),
+        () => passThrough(handleHypnoticPatternEarly(fullSpell, spellSaveDc, playerStats, campaignName, metaCtx, innateSorceryActive)),
+        () => { const r = handleConfusionEarly(fullSpell, spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName, (s, m, p, c, mp) => triggerConfusion(s, m, p, c, mp)); return r.handled ? { value: r.result?.result } : null; },
+        () => passThrough(handleShapechange(fullSpell, metaCtx, playerStats, campaignName, mapName, characters)),
+        () => passThrough(handleSleep(fullSpell, spellSaveDc, playerStats, campaignName, metaCtx, characters)),
+        async () => { const r = await handleGenericAutomation(spell, executeHandler, (sp, mc, ps, cn) => triggerArcaneWard(sp, mc, ps, cn), playerStats, campaignName, mapName, characters, metaCtx); return r.handled ? { value: r.result || undefined } : null; },
+    ]);
+    if (earlyResult) return earlyResult.value;
 
     // --- NO DAMAGE PATH ---
     if (!formula) {
@@ -617,25 +629,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     const { overchannelFormula, overchannelActive, overchannelUseCount } = computeOverchannel(spell, metaCtx, playerStats, campaignName, getRuntimeValue, empEvocFormula, finalFormula);
 
     if (rangeResult.isAutoMiss) {
-        const context = {
-            targetName: (await getTargetInfo())?.name,
-            attackerName: playerStats.name,
-            ...metaCtx,
-            isAutoMiss: true,
-            rangeReason: rangeResult.rangeReason,
-            saveDc: spellSaveDc,
-            saveType: spell.dc?.dc_type || fullSpell.dc?.dc_type,
-            dcSuccess: spell.dc?.dc_success ?? fullSpell.dc?.dc_success,
-            metamagicHeighten: metaCtx?.metamagicHeighten,
-            isCantrip: spell.baseLevel === 0 || spell.level === 0,
-        };
-        rollDamage(spell.name, formula || '0', 0, [], 0, context);
-        if (spell.dc || fullSpell.dc) {
-            await handleSavePath(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters,
-                getTargetInfo, getRuntimeValue, innateSorceryActive, effectiveDamageType, spellSaveDc,
-                overchannelFormula, overchannelActive, overchannelUseCount, rollAttack, rollDamage, formula, hasInvisible);
-        }
-        return null;
+        return await runAutoMissPath(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, innateSorceryActive, effectiveDamageType, spellSaveDc, overchannelFormula, overchannelActive, overchannelUseCount, rollAttack, rollDamage, formula, hasInvisible, rangeResult);
     }
 
     if (spell.dc || fullSpell.dc) {

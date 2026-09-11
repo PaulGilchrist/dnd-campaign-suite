@@ -88,6 +88,77 @@ export function useActionSpellMetamagic({
         pending.action({});
     }, [pendingActionMetamagic, playerStats.name, campaignName]);
 
+    const showCastPopup = (castResult) => {
+        if (!castResult?.automationPopup) return
+        const popup = castResult.automationPopup
+        if (popup.type === 'modal' && setModalState) {
+            // handled by useSpellCastExecutor pattern
+        } else {
+            setPopupHtml(popup.payload)
+        }
+    }
+
+    const castNoSpellAttack = async (attack) => {
+        addEntry(campaignName, {
+            type: 'spell',
+            characterName: playerStats.name,
+            spellName: attack.name,
+            spellLevel: attack.spellLevel || 0,
+            castingTime: attack.castingTime || 'Action',
+            metamagic: [],
+            spCost: 0,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[useActionSpellMetamagic:log-error]", e); });
+        const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, attack.name, attack.spellLevel || 0, playerStats, campaignName)
+        const metaCtx = {};
+        const result = await prepareSpellCast({ name: attack.name, level: attack.spellLevel || 0, baseLevel: 0 }, metaCtx, {
+            playerName: playerStats.name,
+            playerStats,
+            campaignName,
+            isUpcast: false,
+            freeCastAuthorized,
+        });
+        const castResult = await executeSpellCast({ name: attack.name, level: attack.spellLevel || 0, baseLevel: 0 }, result.metaCtx, {
+            rollAttack,
+            rollDamage,
+            playerStats,
+            getTargetInfo: async () => {
+                const cs = await buildCtx(attack);
+                return cs?.targetName ? { name: cs.targetName } : null;
+            },
+            campaignName,
+            mapName,
+            characters,
+        });
+        showCastPopup(castResult)
+    }
+
+    const castKnownSpell = async (attack, spell) => {
+        const spellLevel = attack.spellLevel || spell.level || 0;
+        const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, attack.name, spellLevel, playerStats, campaignName)
+        const metaCtx = {};
+        const result = await prepareSpellCast({ ...spell, name: attack.name, level: spellLevel }, metaCtx, {
+            playerName: playerStats.name,
+            playerStats,
+            campaignName,
+            isUpcast: false,
+            freeCastAuthorized,
+        });
+        const castResult = await executeSpellCast({ ...spell, name: attack.name, level: spellLevel }, result.metaCtx, {
+            rollAttack,
+            rollDamage,
+            playerStats,
+            getTargetInfo: async () => {
+                const cs = await buildCtx(attack);
+                return cs?.targetName ? { name: cs.targetName } : null;
+            },
+            campaignName,
+            mapName,
+            characters,
+        });
+        showCastPopup(castResult)
+    }
+
     const resolveSpellDamage = async (attack) => {
 
         const aoe = attack.area_of_effect;
@@ -119,80 +190,10 @@ export function useActionSpellMetamagic({
         if (!isBonusSorcerer) {
             const spell = playerStats.spellAbilities?.spells?.find(s => s.name === attack.name);
             if (!spell) {
-                addEntry(campaignName, {
-                    type: 'spell',
-                    characterName: playerStats.name,
-                    spellName: attack.name,
-                    spellLevel: attack.spellLevel || 0,
-                    castingTime: attack.castingTime || 'Action',
-                    metamagic: [],
-                    spCost: 0,
-                    timestamp: Date.now(),
-                }).catch((e) => { console.error("[useActionSpellMetamagic:log-error]", e); });
-                const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, attack.name, attack.spellLevel || 0, playerStats, campaignName);
-                const metaCtx = {};
-                const result = await prepareSpellCast({ name: attack.name, level: attack.spellLevel || 0, baseLevel: 0 }, metaCtx, {
-                    playerName: playerStats.name,
-                    playerStats,
-                    campaignName,
-                    isUpcast: false,
-                    freeCastAuthorized,
-                });
-                const castResult = await executeSpellCast({ name: attack.name, level: attack.spellLevel || 0, baseLevel: 0 }, result.metaCtx, {
-                    rollAttack,
-                    rollDamage,
-                    playerStats,
-                    getTargetInfo: async () => {
-                        const cs = await buildCtx(attack);
-                        return cs?.targetName ? { name: cs.targetName } : null;
-                    },
-                    campaignName,
-                    mapName,
-                    characters,
-                });
-                if (castResult?.automationPopup) {
-                    const popup = castResult.automationPopup;
-                    if (popup.type === 'modal' && setModalState) {
-                        // handled by useSpellCastExecutor pattern
-                    } else {
-                        setPopupHtml(popup.payload);
-                    }
-                }
+                await castNoSpellAttack(attack)
                 return;
             }
-
-            const spellLevel = attack.spellLevel || spell.level || 0;
-
-            const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, attack.name, spellLevel, playerStats, campaignName);
-            const metaCtx = {};
-            const result = await prepareSpellCast({ ...spell, name: attack.name, level: spellLevel }, metaCtx, {
-                playerName: playerStats.name,
-                playerStats,
-                campaignName,
-                isUpcast: false,
-                freeCastAuthorized,
-            });
-
-            const castResult = await executeSpellCast({ ...spell, name: attack.name, level: spellLevel }, result.metaCtx, {
-                rollAttack,
-                rollDamage,
-                playerStats,
-                getTargetInfo: async () => {
-                    const cs = await buildCtx(attack);
-                    return cs?.targetName ? { name: cs.targetName } : null;
-                },
-                campaignName,
-                mapName,
-                characters,
-            });
-            if (castResult?.automationPopup) {
-                const popup = castResult.automationPopup;
-                if (popup.type === 'modal' && setModalState) {
-                    // handled by useSpellCastExecutor pattern
-                } else {
-                    setPopupHtml(popup.payload);
-                }
-            }
+            await castKnownSpell(attack, spell)
             return;
         }
 
@@ -318,14 +319,7 @@ export function useActionSpellMetamagic({
                     mapName,
                     characters,
                 });
-                if (castResult?.automationPopup) {
-                    const popup = castResult.automationPopup;
-                    if (popup.type === 'modal' && setModalState) {
-                        // handled by useSpellCastExecutor pattern
-                    } else {
-                        setPopupHtml(popup.payload);
-                    }
-                }
+                showCastPopup(castResult)
             },
         });
     };

@@ -3,15 +3,14 @@ import { addEntry } from '../../../services/ui/logService.js';
 import utils from '../../../services/ui/utils.js';
 import { applyDamageToTarget, clearReTriggeredSequence } from '../../../services/rules/combat/applyDamage.js';
 import { getRuntimeValue, setRuntimeValue } from '../../runtime/useRuntimeState.js';
-import { hasIgnoreResistance, hasGreatWeaponFighting, applyGreatWeaponFightingToDamage } from '../../../services/combat/automation/automationService.js';
+import { hasIgnoreResistance } from '../../../services/combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../../../services/rules/features/invisibilityService.js';
-import { applyMinDamageAdjustment } from '../loggedDiceRollUtils.js';
 import { hasBardicInspirationOffense, getBardicInspirationDieSize, getBardicInspirationDieSizeFromClass } from '../../../services/combat/auras/bardicInspirationState.js';
 import { hasEmpoweredSpell } from '../../../services/rules/spells/empoweredSpellService.js';
 import { getChaModifier } from '../../../services/rules/spells/metamagicRules.js';
 import { sendSavePrompt } from '../../../services/combat/conditions/savePromptService.js';
 import { handleOverchannelSelfDamage } from './handleOverchannelSelfDamage.js';
-import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry } from './damageHandlerUtils.js';
+import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry, computeGwfAdjustedSecondaryTotal } from './damageHandlerUtils.js';
 
 const SECONDARY_LOG_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage'];
 const SECONDARY_POPUP_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage'];
@@ -77,15 +76,7 @@ async function rollAndApplySecondaryPlainDamage({ context, combatSummary, target
     const secondaryRollResult = context?.isAutoCrit ? rollExpressionDoubled(secondaryFormula) : rollExpression(secondaryFormula);
     if (!secondaryRollResult) return { applyResult: null, secondaryResult: null, secondaryFinalDamage: 0 };
 
-    let secondaryTotal = applyMinDamageAdjustment(secondaryRollResult.total, secondaryRollResult.rolls, context?.playerStats, secondaryDamageType);
-    if (hasGreatWeaponFighting(context?.playerStats)) {
-        const gwfSecondaryRolls = applyGreatWeaponFightingToDamage(secondaryRollResult.rolls, context?.playerStats);
-        const hasSecondaryChanges = gwfSecondaryRolls.some((r, i) => r !== secondaryRollResult.rolls[i]);
-        if (hasSecondaryChanges) {
-            const gwfSecondaryTotal = gwfSecondaryRolls.reduce((sum, r) => sum + r, 0) + secondaryRollResult.modifier;
-            secondaryTotal = applyMinDamageAdjustment(gwfSecondaryTotal, gwfSecondaryRolls, context?.playerStats, secondaryDamageType);
-        }
-    }
+    let secondaryTotal = computeGwfAdjustedSecondaryTotal(secondaryRollResult, context?.playerStats, secondaryDamageType);
     const secondaryRawDamage = secondaryTotal;
     const secondaryIgnoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, secondaryDamageType)) || false;
     const damageSequenceId = `seq_${Date.now()}_${Math.random()}`;
@@ -211,13 +202,15 @@ function applyRamProneCondition(target, campaignName, logEntry) {
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 }
 
-function attachPopupFeatureFlags(popupData, context, characterName, campaignName) {
+function attachInspirationEmpoweredFlags(popupData, context, characterName, campaignName) {
     popupData.bardicInspirationOffense = context?.bardicInspirationOffense || (context?.playerStats ? hasBardicInspirationOffense(context.playerStats, campaignName) : false);
     popupData.bardicInspirationOffenseDieSize = context?.bardicInspirationOffenseDieSize || getBardicInspirationDieSize(characterName, campaignName) || (context?.playerStats ? getBardicInspirationDieSizeFromClass(context.playerStats) : null);
     popupData.empoweredSpell = context?.empoweredSpell || (context?.playerStats ? hasEmpoweredSpell(context.playerStats) : false);
     popupData.empoweredSpellChaMod = context?.empoweredSpellChaMod || getChaModifier(context?.playerStats);
     popupData.spellName = context?.spellName || '';
+}
 
+function attachPiercerFlag(popupData, context, characterName, campaignName) {
     // Check for Piercer - Puncture availability
     const isPiercing = (popupData.damageType || '').toLowerCase() === 'piercing';
     const hasPiercerFeat = context?.playerStats?.reactions?.some(r =>
@@ -225,17 +218,29 @@ function attachPopupFeatureFlags(popupData, context, characterName, campaignName
     ) || false;
     const punctureUsed = hasPiercerFeat ? getRuntimeValue(characterName, 'piercerPunctureUsedThisTurn', campaignName) : false;
     popupData.piercerPuncture = isPiercing && hasPiercerFeat && !punctureUsed;
+}
 
+function resolveWeaponTypeFlags(context) {
     // Determine weapon type for popup
     const isUnarmedStrike = context?.isUnarmedStrike || false;
     const isMelee = context?.isMelee != null ? context.isMelee : (context?.damageType === 'ranged' ? false : true);
-    popupData.weaponType = isUnarmedStrike ? 'unarmed' : (isMelee ? 'melee' : 'ranged');
+    return { isUnarmedStrike, isMelee };
+}
 
+function attachSavageAttackerFlag(popupData, context, characterName, campaignName, isMelee, isUnarmedStrike) {
     // Check for Savage Attacker availability
     const hasSavageAttacker = context?.playerStats?.automation?.passives?.some(p => p.type === 'passive_rule' && p.effect === 'reroll_damage_once_per_turn') || false;
     const isMeleeOrUnarmed = (isMelee || isUnarmedStrike);
     const saUsed = hasSavageAttacker ? getRuntimeValue(characterName, '_Savage_Attacker_usedRound', campaignName) : false;
     popupData.savageAttacker = hasSavageAttacker && isMeleeOrUnarmed && !saUsed;
+}
+
+function attachPopupFeatureFlags(popupData, context, characterName, campaignName) {
+    attachInspirationEmpoweredFlags(popupData, context, characterName, campaignName);
+    attachPiercerFlag(popupData, context, characterName, campaignName);
+    const { isUnarmedStrike, isMelee } = resolveWeaponTypeFlags(context);
+    popupData.weaponType = isUnarmedStrike ? 'unarmed' : (isMelee ? 'melee' : 'ranged');
+    attachSavageAttackerFlag(popupData, context, characterName, campaignName, isMelee, isUnarmedStrike);
 }
 
 async function applyDamageForTarget({ context, target, combatSummary, characters, campaignName, characterName, attackerName, damageType, adjustedTotal, name }) {
@@ -425,6 +430,64 @@ async function handleMultiPlainTarget({ combatSummary, context, target, campaign
     }));
 }
 
+function maybeApplyRamProne({ context, target, applyResult, campaignName, logEntry }) {
+    if (!(context?.ramActive && context?.isMelee && target && applyResult)) return;
+    const isLargeOrSmaller = !target.size || ['Tiny', 'Small', 'Medium', 'Large'].includes(target.size);
+    if (!isLargeOrSmaller) return;
+    applyRamProneCondition(target, campaignName, logEntry);
+}
+
+function attachPopupHpFallbacks(popupData, target, targetMaxHp) {
+    popupData.targetCurrentHp = popupData.targetCurrentHp || (target?.type === 'player' ? (getRuntimeValue(target.name, 'hitPoints') ?? 0) : (target?.currentHp ?? target?.maxHp));
+    popupData.targetMaxHp = popupData.targetMaxHp || targetMaxHp;
+}
+
+function writePlainHpResults({ campaignName, target, totalDamageDealt, hpAfterDamage, maxHp, isUnconscious, threshold, damageBreakdown, newHp, oldHp }) {
+    const hpEntry = {
+        type: 'hp_change',
+        targetName: target?.name,
+        delta: -(totalDamageDealt),
+        currentHp: hpAfterDamage,
+        maxHp,
+        isHealing: false,
+        isUnconscious: isUnconscious,
+        damageBreakdown,
+    };
+    if (threshold) hpEntry.threshold = threshold;
+    addEntry(campaignName, hpEntry).catch((e) => { console.error("[useLoggedDiceRollDamage] Error:", e); });
+
+    if (target?.type === 'player') {
+        setRuntimeValue(target.name, 'currentHitPoints', newHp, campaignName);
+        if (oldHp > 0 && isUnconscious) {
+            setRuntimeValue(target.name, 'deathSaves', [false, false, false], campaignName);
+            setRuntimeValue(target.name, 'deathFailures', [false, false, false], campaignName);
+        }
+    }
+}
+
+async function runFollowupTargets({ context, combatSummary, target, campaignName, characterName, characters, name, formula, modifier, damageType, adjustedTotal, displayRolls, gwfBaseRolls, gwfDisplayRolls, setPopupHtml, logEntry }) {
+    if (!target) return;
+    if (context?.metamagicTwinTarget) {
+        await handleTwinPlainTarget({ combatSummary, context, target, campaignName, characterName, characters, name, formula, modifier, damageType, adjustedTotal, displayRolls, gwfBaseRolls, gwfDisplayRolls, setPopupHtml, logEntry });
+    }
+    if (context?.multiTarget) {
+        await handleMultiPlainTarget({ combatSummary, context, target, campaignName, characterName, name, formula, modifier, damageType, adjustedTotal, displayRolls, gwfBaseRolls, gwfDisplayRolls, setPopupHtml, logEntry });
+    }
+}
+
+function computeDamageOutcome({ applyResult, isIntercepted, appliedDamage, secondaryFinalDamage, target }) {
+    const totalDamageDealt = appliedDamage + secondaryFinalDamage;
+    const newHp = applyResult?.newHp ?? resolveCurrentHp(target);
+    const hpAfterDamage = isIntercepted ? 0 : newHp;
+    const oldHp = isIntercepted ? applyResult.oldHp : (newHp + totalDamageDealt);
+    const isUnconscious = hpAfterDamage <= 0;
+    const maxHp = target?.type === 'player'
+        ? (getRuntimeValue(target.name, 'hitPoints') ?? newHp)
+        : target?.maxHp;
+    const threshold = getHpThreshold({ oldHp, newHp, maxHp, deadHp: hpAfterDamage });
+    return { totalDamageDealt, newHp, hpAfterDamage, oldHp, isUnconscious, maxHp, threshold };
+}
+
 export function createPlainDamageHandler(deps) {
     const { characterName, campaignName, characters, setPopupHtml, logEntry } = deps;
 
@@ -457,15 +520,7 @@ export function createPlainDamageHandler(deps) {
             endInvisibilityOnHostileAction(characterName, campaignName);
         }
 
-        const totalDamageDealt = appliedDamage + secondaryFinalDamage;
-        const newHp = applyResult?.newHp ?? resolveCurrentHp(target);
-        const hpAfterDamage = isIntercepted ? 0 : newHp;
-        const oldHp = isIntercepted ? applyResult.oldHp : (newHp + totalDamageDealt);
-        const isUnconscious = hpAfterDamage <= 0;
-        const maxHp = target?.type === 'player'
-            ? (getRuntimeValue(target.name, 'hitPoints') ?? newHp)
-            : target?.maxHp;
-        const threshold = getHpThreshold({ oldHp, newHp, maxHp, deadHp: hpAfterDamage });
+        const { totalDamageDealt, newHp, hpAfterDamage, oldHp, isUnconscious, maxHp, threshold } = computeDamageOutcome({ applyResult, isIntercepted, appliedDamage, secondaryFinalDamage, target });
 
         const isCrit = context?.isAutoCrit || false;
 
@@ -478,35 +533,11 @@ export function createPlainDamageHandler(deps) {
             damageBreakdown.push(buildDamageBreakdownEntry(secondaryResult, secondaryResult.damageType, secondaryResult.finalDamage));
         }
 
-        const hpEntry = {
-            type: 'hp_change',
-            targetName: target?.name,
-            delta: -(totalDamageDealt),
-            currentHp: hpAfterDamage,
-            maxHp,
-            isHealing: false,
-            isUnconscious: isUnconscious,
-            damageBreakdown,
-        };
-        if (threshold) hpEntry.threshold = threshold;
-        addEntry(campaignName, hpEntry).catch((e) => { console.error("[useLoggedDiceRollDamage] Error:", e); });
-
-        if (target?.type === 'player') {
-            setRuntimeValue(target.name, 'currentHitPoints', newHp, campaignName);
-            if (oldHp > 0 && isUnconscious) {
-                setRuntimeValue(target.name, 'deathSaves', [false, false, false], campaignName);
-                setRuntimeValue(target.name, 'deathFailures', [false, false, false], campaignName);
-            }
-        }
+        writePlainHpResults({ campaignName, target, totalDamageDealt, hpAfterDamage, maxHp, isUnconscious, threshold, damageBreakdown, newHp, oldHp });
 
         applyResult = await resolveDeathStrike({ applyResult, context, combatSummary, target, characters, campaignName, characterName, adjustedTotal, formula, rolls, modifier, damageType, setPopupHtml, logEntry });
 
-        if (context?.ramActive && context?.isMelee && target && applyResult) {
-            const isLargeOrSmaller = !target.size || ['Tiny', 'Small', 'Medium', 'Large'].includes(target.size);
-            if (isLargeOrSmaller) {
-                applyRamProneCondition(target, campaignName, logEntry);
-            }
-        }
+        maybeApplyRamProne({ context, target, applyResult, campaignName, logEntry });
 
         handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);
 
@@ -514,8 +545,7 @@ export function createPlainDamageHandler(deps) {
 
         assignSecondaryFields(popupData, secondaryResult, SECONDARY_POPUP_SUFFIXES);
 
-        popupData.targetCurrentHp = popupData.targetCurrentHp || (target?.type === 'player' ? (getRuntimeValue(target.name, 'hitPoints') ?? 0) : (target?.currentHp ?? target?.maxHp));
-        popupData.targetMaxHp = popupData.targetMaxHp || targetMaxHp;
+        attachPopupHpFallbacks(popupData, target, targetMaxHp);
 
         applyPopupApplyResult(popupData, { applyResult, appliedDamage, targetMaxHp, isIntercepted });
 
@@ -527,12 +557,6 @@ export function createPlainDamageHandler(deps) {
             await storeDamageLastAttack({ context, campaignName, target, damageType, adjustedTotal, displayRolls, applyResult });
         }
 
-        if (context?.metamagicTwinTarget && target) {
-            await handleTwinPlainTarget({ combatSummary, context, target, campaignName, characterName, characters, name, formula, modifier, damageType, adjustedTotal, displayRolls, gwfBaseRolls, gwfDisplayRolls, setPopupHtml, logEntry });
-        }
-
-        if (context?.multiTarget && target) {
-            await handleMultiPlainTarget({ combatSummary, context, target, campaignName, characterName, name, formula, modifier, damageType, adjustedTotal, displayRolls, gwfBaseRolls, gwfDisplayRolls, setPopupHtml, logEntry });
-        }
+        await runFollowupTargets({ context, combatSummary, target, campaignName, characterName, characters, name, formula, modifier, damageType, adjustedTotal, displayRolls, gwfBaseRolls, gwfDisplayRolls, setPopupHtml, logEntry });
     };
 }

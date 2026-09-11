@@ -220,6 +220,48 @@ async function openManeuveringAllyModal({ result, popupHtmlData, attackInfo, pla
     }
 }
 
+async function applyRiderManeuverPostResolution({ result, maneuver, attack, popupHtmlData, attackInfo, playerStats, campaignName, setModalState, setPopupHtml, updatedFormula, updatedTotal, updatedRolls, resumeAttackPipeline }) {
+    if (result?.type === 'modal' && result.modalName === 'attackRiderOptions') {
+        setModalState({ attackRiderOptionsModal: result.payload });
+        return { formula: updatedFormula, total: updatedTotal, rolls: updatedRolls, pendingOptions: true };
+    }
+
+    // MN-015: a size-gate refusal must NOT ride the maneuver die onto damage.
+    if (result?.type === 'popup' && !result.refused && maneuver?.damageBonus) {
+        const dieValue = Number(result.dieValue) || rollExpression(maneuver.dieExpression || 'superiority_die')?.total || evaluateAutoExpression(maneuver.dieExpression || 'superiority_die', playerStats);
+        const dmgType = attack.damageType || 'same_as_weapon';
+        if (dieValue > 0) {
+            await setRuntimeValue(playerStats.name, 'attackRiderDieValue', dieValue, campaignName);
+            if (updatedFormula != null) {
+                updatedFormula += ` + ${dieValue} [${dmgType}]`;
+                updatedTotal += dieValue;
+                updatedRolls = [...updatedRolls, dieValue];
+            }
+        }
+    }
+
+    setModalState({ attackRiderManeuverPrompt: null });
+    if (result?.logEntries?.length) {
+        for (const entry of result.logEntries) {
+            await addEntry(campaignName, entry).catch((e) => { console.error('[attackRiderManeuver:log-error]', e); });
+        }
+    }
+    if (result?.type === 'popup' && maneuver?.effect === 'ally_movement') {
+        await openManeuveringAllyModal({ result, popupHtmlData, attackInfo, playerStats, campaignName, setModalState, setPopupHtml });
+    } else if (result?.type === 'popup') {
+        setPopupHtml(result.payload);
+    }
+    if (result?.type === 'modal' && result.modalName === 'sweepingAttackTarget') {
+        setModalState({ sweepingAttackTargetModal: result.payload });
+        await resumeAttackPipeline();
+        return { formula: updatedFormula, total: updatedTotal, rolls: updatedRolls, chooserOpened: true };
+    }
+
+    await resumeAttackPipeline();
+
+    return { formula: updatedFormula, total: updatedTotal, rolls: updatedRolls };
+}
+
 export default function useAttackDamageResolution({
     playerStats, campaignName, mapName,
     popupHtml, setPopupHtml, rollDamage, buildCtx, buildCtxSync,
@@ -421,43 +463,7 @@ export default function useAttackDamageResolution({
                 return await handlePrecisionAttackMiss({ popupHtml, maneuver, currentFormula: updatedFormula, currentTotal: updatedTotal, currentRolls: updatedRolls, playerStats, resumeRef, setModalState, setPopupHtml, resumeAttackPipeline });
             }
         } else {
-            if (result?.type === 'modal' && result.modalName === 'attackRiderOptions') {
-                setModalState({ attackRiderOptionsModal: result.payload });
-                return { formula: updatedFormula, total: updatedTotal, rolls: updatedRolls, pendingOptions: true };
-            }
-
-            // MN-015: a size-gate refusal must NOT ride the maneuver die onto damage.
-            if (result?.type === 'popup' && !result.refused && maneuver?.damageBonus) {
-                const dieValue = Number(result.dieValue) || rollExpression(maneuver.dieExpression || 'superiority_die')?.total || evaluateAutoExpression(maneuver.dieExpression || 'superiority_die', playerStats);
-                const dmgType = attack.damageType || 'same_as_weapon';
-                if (dieValue > 0) {
-                    await setRuntimeValue(playerStats.name, 'attackRiderDieValue', dieValue, campaignName);
-                    if (updatedFormula != null) {
-                        updatedFormula += ` + ${dieValue} [${dmgType}]`;
-                        updatedTotal += dieValue;
-                        updatedRolls = [...updatedRolls, dieValue];
-                    }
-                }
-            }
-
-            setModalState({ attackRiderManeuverPrompt: null });
-            if (result?.logEntries?.length) {
-                for (const entry of result.logEntries) {
-                    await addEntry(campaignName, entry).catch((e) => { console.error('[attackRiderManeuver:log-error]', e); });
-                }
-            }
-            if (result?.type === 'popup' && maneuver?.effect === 'ally_movement') {
-                await openManeuveringAllyModal({ result, popupHtmlData, attackInfo, playerStats, campaignName, setModalState, setPopupHtml });
-            } else if (result?.type === 'popup') {
-                setPopupHtml(result.payload);
-            }
-            if (result?.type === 'modal' && result.modalName === 'sweepingAttackTarget') {
-                setModalState({ sweepingAttackTargetModal: result.payload });
-                await resumeAttackPipeline();
-                return { formula: updatedFormula, total: updatedTotal, rolls: updatedRolls, chooserOpened: true };
-            }
-
-            await resumeAttackPipeline();
+            return await applyRiderManeuverPostResolution({ result, maneuver, attack, popupHtmlData, attackInfo, playerStats, campaignName, setModalState, setPopupHtml, updatedFormula, updatedTotal, updatedRolls, resumeAttackPipeline });
         }
 
         return { formula: updatedFormula, total: updatedTotal, rolls: updatedRolls };

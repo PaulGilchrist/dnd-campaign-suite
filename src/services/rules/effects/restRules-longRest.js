@@ -435,43 +435,38 @@ function resetChefFeatures(name, playerStats, campaignName) {
   return { hasBolsteringTreats, hasReplenishingMeal }
 }
 
-// Log long rest to campaign log (incl. Circle of the Stars Star Map resets)
-function logLongRestSummary(name, playerStats, campaignName, flags) {
-  const { hasPortent, hasNaturalRecovery, hasBolsteringTreats, hasReplenishingMeal, currentExhaustion } = flags
-
-  const logEntries = []
-  logEntries.push(`${name} takes a long rest.`)
+// Resources-restored list for the long rest log, in original push order.
+function buildLongRestResourcesList(playerStats, flags) {
+  const { hasPortent, hasNaturalRecovery, hasBolsteringTreats, hasReplenishingMeal } = flags
+  const isWarlock = playerStats.class?.name === 'Warlock'
   const resources = []
   resources.push('All hit dice restored')
   resources.push('All spell slots restored')
-  if (playerStats.class?.name === 'Warlock') resources.push('Pact Magic (Warlock spell slots)')
+  if (isWarlock) resources.push('Pact Magic (Warlock spell slots)')
   if (hasPortent) resources.push('Portent dice')
   if (hasBolsteringTreats) resources.push('Bolstering Treats')
   if (hasReplenishingMeal) resources.push('Replenishing Meals')
-  const hasCelestialResilience = playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron';
+  const hasCelestialResilience = playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron'
   if (hasCelestialResilience && playerStats.specialActions?.some(f => f.name === 'Celestial Resilience')) resources.push('Celestial Resilience (temp HP)')
   if (hasNaturalRecovery) resources.push('Natural Recovery (spell slots)')
-  if (playerStats.class?.name === 'Warlock') resources.push('Magical Cunning (feature reset)')
+  if (isWarlock) resources.push('Magical Cunning (feature reset)')
   if ((playerStats.automation?.reactions ?? []).some(r => r.type === 'telekinetic_thrust')) resources.push('Telekinetic Thrust (use restored)')
-  if (resources.length > 0) {
-    logEntries.push(`Resources restored: ${resources.join(', ')}`)
-  }
-  if (typeof currentExhaustion === 'number' && currentExhaustion > 0) {
-    const newExhaustion = getLevelAfterLongRest(currentExhaustion);
-    logEntries.push(`Exhaustion: ${currentExhaustion} → ${newExhaustion}`)
-  }
+  return resources
+}
 
-  // Circle of the Stars: Star Map free cast count on Long Rest (reset to WIS modifier, min 1)
+// Circle of the Stars: Star Map free cast count and Cosmic Omen roll on Long Rest.
+// Appends its log lines to logEntries; runtime writes run in original order.
+function resetStarMapOnLongRest(name, playerStats, campaignName, logEntries) {
   const isDruid = playerStats.class?.name === 'Druid'
   const isCircleOfTheStars = playerStats.class?.major?.name === 'Circle of the Stars' || playerStats.class?.subclass?.name === 'Circle of the Stars'
+  // Star Map free cast count (reset to WIS modifier, min 1)
   if (isDruid && isCircleOfTheStars && playerStats.level >= 3) {
     const wis = playerStats.abilities?.find(a => a.name === 'Wisdom')
     const maxUses = Math.max(wis?.bonus || 0, 1)
     setRuntimeValue(name, '_Star_Map_freeCastCount', maxUses, campaignName, true)
     logEntries.push(`Star Map free casts: ${maxUses}`)
   }
-
-  // Circle of the Stars: Cosmic Omen Star Map roll on Long Rest
+  // Cosmic Omen Star Map roll
   if (isDruid && isCircleOfTheStars && playerStats.level >= 6) {
     const starMapRoll = rollD20()
     const isEven = starMapRoll % 2 === 0
@@ -484,6 +479,24 @@ function logLongRestSummary(name, playerStats, campaignName, flags) {
     clearAllExpirationEffects(name, campaignName)
     logEntries.push(`Cosmic Omen Star Map: ${starMapRoll} → ${omenType}`)
   }
+}
+
+// Log long rest to campaign log
+function logLongRestSummary(name, playerStats, campaignName, flags) {
+  const { currentExhaustion } = flags
+
+  const logEntries = []
+  logEntries.push(`${name} takes a long rest.`)
+  const resources = buildLongRestResourcesList(playerStats, flags)
+  if (resources.length > 0) {
+    logEntries.push(`Resources restored: ${resources.join(', ')}`)
+  }
+  if (typeof currentExhaustion === 'number' && currentExhaustion > 0) {
+    const newExhaustion = getLevelAfterLongRest(currentExhaustion);
+    logEntries.push(`Exhaustion: ${currentExhaustion} → ${newExhaustion}`)
+  }
+
+  resetStarMapOnLongRest(name, playerStats, campaignName, logEntries)
 
   try {
     addEntry(campaignName, { type: 'long_rest', message: logEntries.join(' | ') });

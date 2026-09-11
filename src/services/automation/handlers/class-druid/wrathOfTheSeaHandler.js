@@ -52,6 +52,136 @@ function refusal(action, playerName, campaignName, reason) {
     };
 }
 
+async function activateWrathEmanation(action, auto, playerStats, playerName, campaignName) {
+    const maxWS = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0;
+    const currentWS = Number(getRuntimeValue(playerName, 'wildShapeUses', campaignName) ?? maxWS);
+
+    if (currentWS <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${action.name}: No Wild Shape uses remaining.`,
+                automation: auto,
+            },
+        };
+    }
+
+    await setRuntimeValue(playerName, 'wildShapeUses', currentWS - 1, campaignName);
+    await setRuntimeValue(playerName, 'wrathOfTheSeaActive', true, campaignName);
+
+    // CLA-393: register the 10-minute emanation clock (CLA-334 minutes×10).
+    addExpiration(playerName, playerName, [{ type: 'wrath_of_the_sea_end' }], campaignName, wrathRounds(auto));
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: action.name,
+        description: `${playerName} activated Wrath of the Sea. Ocean spray emanation active for 10 minutes.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[wrathOfTheSeaHandler:log-error]", e); });
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            automationType: auto.type,
+            description: `${action.name} activated — ocean spray emanation surrounds you for 10 minutes. Once per turn on your turns, use it again as a Bonus Action to force a creature within 5 feet of the Emanation to make a Constitution save or take Cold damage and be pushed up to 15 feet away from you.`,
+            automation: auto,
+        },
+    };
+}
+
+async function resolveNpcSaveAndDamage(action, combatSummary, target, playerName, playerStats, damageResult, damageFormula, saveDc, pushDistanceFt, campaignName) {
+    const saveBonus = target?.saveBonuses?.['con'] ?? 0;
+    const saveRoll = rollD20();
+    const saveTotal = saveRoll + saveBonus;
+    const saveSuccess = saveTotal >= saveDc;
+
+    const finalDamage = saveSuccess ? 0 : damageResult.total;
+    const applyResult = applyDamageToTarget(
+        combatSummary, target.name, finalDamage, ['cold'], campaignName,
+        [playerStats], false, playerName, false
+    );
+
+    const actualDamage = applyResult?.finalDamage ?? finalDamage;
+    const newHp = applyResult?.newHp ?? target.currentHp;
+
+    if (actualDamage > 0) {
+        endInvisibilityOnHostileAction(playerName, campaignName);
+    }
+
+    // CLA-393: push record — the failed-save creature is pushed up to 15 feet
+    // away from you if Large or smaller (no grid-position consumer exists;
+    // instant te marker + log per WM-006/CLA-357 precedent).
+    const size = String(target?.size || '').toLowerCase();
+    const canBePushed = !NO_PUSH_SIZES.includes(size);
+    if (!saveSuccess && canBePushed) {
+        registerTargetEffect(campaignName, target.name, 'push', action.name, {
+            value: pushDistanceFt,
+            movedDistanceFt: pushDistanceFt,
+            duration: 'instant',
+        });
+    }
+
+    const result = {
+        targetName: target.name,
+        saveSuccess,
+        saveRoll,
+        saveTotal,
+        saveBonus,
+        damage: actualDamage,
+        newHp,
+        pushed: !saveSuccess && canBePushed,
+    };
+
+    await addEntry(campaignName, {
+        type: 'roll',
+        characterName: playerName,
+        rollType: 'save-damage',
+        name: action.name,
+        formula: damageFormula,
+        rolls: damageResult.rolls,
+        total: damageResult.total,
+        modifier: damageResult.modifier,
+        damageType: 'cold',
+        targetName: target.name,
+        saveType: 'CON',
+        saveDc,
+        dcSuccess: 'none',
+        saveResult: saveSuccess ? 'success' : 'failure',
+        saveRoll,
+        saveBonus,
+        saveRawRolls: [saveRoll, saveRoll],
+        finalDamage: actualDamage,
+        pushedDistanceFt: (!saveSuccess && canBePushed) ? pushDistanceFt : 0,
+        note: 'combined_save_damage_roll',
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[wrathOfTheSea] Log error:', e); });
+
+    return result;
+}
+
+function buildWrathResultsHtml(action, saveDc, damageFormula, damageResult, results, playerPrompts, pushDistanceFt) {
+    let resultsHtml = `<b>${action.name} used!</b><br/><br/>`;
+    resultsHtml += `<b>Save DC: ${saveDc}</b> (CON)<br/><br/>`;
+    resultsHtml += `<b>Rolls:</b> ${damageFormula} = ${damageResult.total} Cold damage<br/><br/>`;
+
+    for (const r of results) {
+        const saveResult = r.saveSuccess ? '<span style="color: #4caf50;">Passed</span>' : '<span style="color: #f44336;">Failed</span>';
+        const damageWord = r.saveSuccess ? 'none' : 'full';
+        resultsHtml += `<b>${r.targetName}</b>: ${saveResult} (${r.saveRoll}+${r.saveBonus}=${r.saveTotal} vs DC ${saveDc}) — ${damageWord} damage: ${r.damage}${r.pushed ? ` — pushed up to ${pushDistanceFt} feet away from you` : ''}<br/>`;
+    }
+
+    if (playerPrompts.length > 0) {
+        resultsHtml += `<br/><b>${playerPrompts.length} player${playerPrompts.length !== 1 ? 's' : ''} rolling saves...</b> — on a failed save, Cold damage and pushed up to ${pushDistanceFt} feet away from you (Large or smaller).`;
+    }
+
+    return resultsHtml;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const isAllyAttack = auto?.allyAttack === true;
@@ -66,45 +196,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         const wrathActive = getRuntimeValue(playerName, 'wrathOfTheSeaActive', campaignName);
 
         if (!wrathActive) {
-            const maxWS = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0;
-            const currentWS = Number(getRuntimeValue(playerName, 'wildShapeUses', campaignName) ?? maxWS);
-
-            if (currentWS <= 0) {
-                return {
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: action.name,
-                        description: `${action.name}: No Wild Shape uses remaining.`,
-                        automation: auto,
-                    },
-                };
-            }
-
-            await setRuntimeValue(playerName, 'wildShapeUses', currentWS - 1, campaignName);
-            await setRuntimeValue(playerName, 'wrathOfTheSeaActive', true, campaignName);
-
-            // CLA-393: register the 10-minute emanation clock (CLA-334 minutes×10).
-            addExpiration(playerName, playerName, [{ type: 'wrath_of_the_sea_end' }], campaignName, wrathRounds(auto));
-
-            await addEntry(campaignName, {
-                type: 'ability_use',
-                characterName: playerName,
-                abilityName: action.name,
-                description: `${playerName} activated Wrath of the Sea. Ocean spray emanation active for 10 minutes.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[wrathOfTheSeaHandler:log-error]", e); });
-
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    automationType: auto.type,
-                    description: `${action.name} activated — ocean spray emanation surrounds you for 10 minutes. Once per turn on your turns, use it again as a Bonus Action to force a creature within 5 feet of the Emanation to make a Constitution save or take Cold damage and be pushed up to 15 feet away from you.`,
-                    automation: auto,
-                },
-            };
+            return await activateWrathEmanation(action, auto, playerStats, playerName, campaignName);
         }
     }
 
@@ -161,71 +253,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const playerPrompts = [];
 
     if (isNpc) {
-        const saveBonus = target?.saveBonuses?.['con'] ?? 0;
-        const saveRoll = rollD20();
-        const saveTotal = saveRoll + saveBonus;
-        const saveSuccess = saveTotal >= saveDc;
-
-        const finalDamage = saveSuccess ? 0 : damageResult.total;
-        const applyResult = applyDamageToTarget(
-            combatSummary, target.name, finalDamage, ['cold'], campaignName,
-            [playerStats], false, playerName, false
-        );
-
-        const actualDamage = applyResult?.finalDamage ?? finalDamage;
-        const newHp = applyResult?.newHp ?? target.currentHp;
-
-        if (actualDamage > 0) {
-            endInvisibilityOnHostileAction(playerName, campaignName);
-        }
-
-        // CLA-393: push record — the failed-save creature is pushed up to 15 feet
-        // away from you if Large or smaller (no grid-position consumer exists;
-        // instant te marker + log per WM-006/CLA-357 precedent).
-        const size = String(target?.size || '').toLowerCase();
-        const canBePushed = !NO_PUSH_SIZES.includes(size);
-        if (!saveSuccess && canBePushed) {
-            registerTargetEffect(campaignName, target.name, 'push', action.name, {
-                value: pushDistanceFt,
-                movedDistanceFt: pushDistanceFt,
-                duration: 'instant',
-            });
-        }
-
-        results.push({
-            targetName: target.name,
-            saveSuccess,
-            saveRoll,
-            saveTotal,
-            saveBonus,
-            damage: actualDamage,
-            newHp,
-            pushed: !saveSuccess && canBePushed,
-        });
-
-        await addEntry(campaignName, {
-            type: 'roll',
-            characterName: playerName,
-            rollType: 'save-damage',
-            name: action.name,
-            formula: damageFormula,
-            rolls: damageResult.rolls,
-            total: damageResult.total,
-            modifier: damageResult.modifier,
-            damageType: 'cold',
-            targetName: target.name,
-            saveType: 'CON',
-            saveDc,
-            dcSuccess: 'none',
-            saveResult: saveSuccess ? 'success' : 'failure',
-            saveRoll,
-            saveBonus,
-            saveRawRolls: [saveRoll, saveRoll],
-            finalDamage: actualDamage,
-            pushedDistanceFt: (!saveSuccess && canBePushed) ? pushDistanceFt : 0,
-            note: 'combined_save_damage_roll',
-            timestamp: Date.now(),
-        }).catch((e) => { console.error('[wrathOfTheSea] Log error:', e); });
+        results.push(await resolveNpcSaveAndDamage(action, combatSummary, target, playerName, playerStats, damageResult, damageFormula, saveDc, pushDistanceFt, campaignName));
     } else {
         const promptId = `${action.name.replace(/\s+/g, '_')}_${target.name}_${Date.now()}`;
 
@@ -262,19 +290,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         window.dispatchEvent(new CustomEvent('combat-summary-updated'));
     }
 
-    let resultsHtml = `<b>${action.name} used!</b><br/><br/>`;
-    resultsHtml += `<b>Save DC: ${saveDc}</b> (CON)<br/><br/>`;
-    resultsHtml += `<b>Rolls:</b> ${damageFormula} = ${damageResult.total} Cold damage<br/><br/>`;
-
-    for (const r of results) {
-        const saveResult = r.saveSuccess ? '<span style="color: #4caf50;">Passed</span>' : '<span style="color: #f44336;">Failed</span>';
-        const damageWord = r.saveSuccess ? 'none' : 'full';
-        resultsHtml += `<b>${r.targetName}</b>: ${saveResult} (${r.saveRoll}+${r.saveBonus}=${r.saveTotal} vs DC ${saveDc}) — ${damageWord} damage: ${r.damage}${r.pushed ? ` — pushed up to ${pushDistanceFt} feet away from you` : ''}<br/>`;
-    }
-
-    if (playerPrompts.length > 0) {
-        resultsHtml += `<br/><b>${playerPrompts.length} player${playerPrompts.length !== 1 ? 's' : ''} rolling saves...</b> — on a failed save, Cold damage and pushed up to ${pushDistanceFt} feet away from you (Large or smaller).`;
-    }
+    const resultsHtml = buildWrathResultsHtml(action, saveDc, damageFormula, damageResult, results, playerPrompts, pushDistanceFt);
 
     return {
         type: 'popup',

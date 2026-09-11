@@ -29,25 +29,139 @@ function pickBonusAttackWeapon(playerStats) {
         || null;
 }
 
+async function checkPolearmRequirement(action, campaignName) {
+    const lastAttackResult = await findLastAttack(campaignName);
+    const lastAttack = lastAttackResult.attackEvent;
+    const weaponName = lastAttack?.damageName || lastAttack?.attackName;
+    const isPolearm = await isPolearmWeapon(weaponName);
+    if (isPolearm) return null;
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            description: `${action.name} requires you to be holding a Quarterstaff, Spear, or a weapon with the Heavy and Reach properties.`,
+            automation: action.automation,
+        },
+    };
+}
+
+async function resolvePoleStrikeLeg(action, playerStats, campaignName, usesKey, usesMax) {
+    const auto = action.automation;
+    const lastAttackResult = await findLastAttack(campaignName);
+    const targetName = lastAttackResult.targetName || null;
+    const hitBonus = lastAttackResult.attackEvent?.bonus ?? (playerStats.proficiency || 0);
+
+    const damageExpression = auto.damage || auto.extraDamageExpression || '1d4';
+    const damageType = auto.damageType || 'Bludgeoning';
+
+    // CLA-382: decrement moved here from the pre-gate so the single awaited
+    // spend happens on the leg that actually resolves an attack.
+    if (usesMax > 0) {
+        const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
+        await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+    }
+
+    const poleStrikeAttack = {
+        name: action.name || 'Pole Strike',
+        type: 'Bonus Action',
+        range: MELEE_REACH_FEET,
+        hitBonus,
+        damage: damageExpression,
+        damageType,
+        autoDamageFormula: damageExpression,
+        autoDamageName: action.name || 'Pole Strike',
+    };
+
+    return {
+        type: 'attack_roll',
+        payload: {
+            attack: poleStrikeAttack,
+            targetName,
+            sourceName: action.name,
+        },
+    };
+}
+
+async function resolveDisengageLeg(action, playerStats, campaignName) {
+    const auto = action.automation;
+    const storedConditions = getRuntimeValue(playerStats.name, 'activeConditions') || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'grappled');
+    if (filtered.length !== conditions.length) {
+        await setRuntimeValue(playerStats.name, 'activeConditions', filtered, campaignName);
+    }
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            description: `You take the Disengage action and the Grappled condition ends on you.`,
+            automation: auto,
+        },
+    };
+}
+
+// CLA-382: War Priest (2024 Cleric, War Domain lv3) was popup-only — the row
+// declared no trigger, so nothing ever produced an attack_roll. Any uses-bearing
+// bonus_action_attack row that reaches here (War Priest is the only one in app
+// data) now resolves a real weapon attack mirroring the verified Pole Strike shape.
+async function resolveWarPriestLeg(action, playerStats, campaignName, usesKey, usesMax, refusal, logRefusal) {
+    const cs = await getCombatContext(campaignName);
+    const target = getTargetFromAttacker(cs, playerStats.name);
+    const targetName = target?.name || null;
+    if (!targetName) {
+        const reason = `${action.name}: No target selected — no attack made, no use spent.`;
+        await logRefusal(reason);
+        return refusal(reason);
+    }
+
+    const weapon = pickBonusAttackWeapon(playerStats);
+    if (!weapon) {
+        const reason = `${action.name}: No usable weapon or Unarmed Strike — no use spent.`;
+        await logRefusal(reason);
+        return refusal(reason);
+    }
+
+    const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
+    // Awaited single write BEFORE the attack resolves (CLA-334 §6-#18 write-race rule).
+    await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+
+    const attack = {
+        name: `${action.name || 'War Priest'} (${weapon.name})`,
+        type: 'Bonus Action',
+        range: weapon.range ?? MELEE_REACH_FEET,
+        hitBonus: weapon.hitBonus ?? (playerStats.proficiency || 0),
+        damage: weapon.damage,
+        damageType: weapon.damageType || 'Bludgeoning',
+        autoDamageFormula: weapon.damage,
+        autoDamageName: `${action.name || 'War Priest'} (${weapon.name})`,
+    };
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: action.name,
+        description: `${action.name} — bonus-action ${weapon.name} attack on ${targetName} (${currentUses - 1} of ${usesMax} uses remaining).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[bonusActionAttackHandler:log-error]', e); });
+
+    return {
+        type: 'attack_roll',
+        payload: {
+            attack,
+            targetName,
+            sourceName: action.name,
+        },
+    };
+}
+
 export async function handle(action, playerStats, campaignName, _mapName, _allEquipment) {
     const auto = action.automation;
 
     if (auto?.trigger === 'after_attack_action_with_polearm' || auto?.weaponRequirement === 'quarterstaff_spear_heavy_reach') {
-        const lastAttackResult = await findLastAttack(campaignName);
-        const lastAttack = lastAttackResult.attackEvent;
-        const weaponName = lastAttack?.damageName || lastAttack?.attackName;
-        const isPolearm = await isPolearmWeapon(weaponName);
-        if (!isPolearm) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: `${action.name} requires you to be holding a Quarterstaff, Spear, or a weapon with the Heavy and Reach properties.`,
-                    automation: auto,
-                },
-            };
-        }
+        const invalid = await checkPolearmRequirement(action, campaignName);
+        if (invalid) return invalid;
     }
 
     // CLA-382: bonus-action-attack rows dispatch the RAW classes.json automation,
@@ -93,111 +207,15 @@ export async function handle(action, playerStats, campaignName, _mapName, _allEq
     }
 
     if (auto?.effect === 'disengage_end_grappled') {
-        const storedConditions = getRuntimeValue(playerStats.name, 'activeConditions') || [];
-        const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-        const filtered = conditions.filter(c => String(c).toLowerCase() !== 'grappled');
-        if (filtered.length !== conditions.length) {
-            await setRuntimeValue(playerStats.name, 'activeConditions', filtered, campaignName);
-        }
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `You take the Disengage action and the Grappled condition ends on you.`,
-                automation: auto,
-            },
-        };
+        return resolveDisengageLeg(action, playerStats, campaignName);
     }
 
     if (auto?.trigger === 'after_attack_action_with_polearm') {
-        const lastAttackResult = await findLastAttack(campaignName);
-        const targetName = lastAttackResult.targetName || null;
-        const hitBonus = lastAttackResult.attackEvent?.bonus ?? (playerStats.proficiency || 0);
-
-        const damageExpression = auto.damage || auto.extraDamageExpression || '1d4';
-        const damageType = auto.damageType || 'Bludgeoning';
-
-        // CLA-382: decrement moved here from the pre-gate so the single awaited
-        // spend happens on the leg that actually resolves an attack.
-        if (usesMax > 0) {
-            const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
-            await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
-        }
-
-        const poleStrikeAttack = {
-            name: action.name || 'Pole Strike',
-            type: 'Bonus Action',
-            range: MELEE_REACH_FEET,
-            hitBonus,
-            damage: damageExpression,
-            damageType,
-            autoDamageFormula: damageExpression,
-            autoDamageName: action.name || 'Pole Strike',
-        };
-
-        return {
-            type: 'attack_roll',
-            payload: {
-                attack: poleStrikeAttack,
-                targetName,
-                sourceName: action.name,
-            },
-        };
+        return resolvePoleStrikeLeg(action, playerStats, campaignName, usesKey, usesMax);
     }
 
-    // CLA-382: War Priest (2024 Cleric, War Domain lv3) was popup-only — the row
-    // declared no trigger, so nothing ever produced an attack_roll. Any uses-bearing
-    // bonus_action_attack row that reaches here (War Priest is the only one in app
-    // data) now resolves a real weapon attack mirroring the verified Pole Strike shape.
     if (usesMax > 0) {
-        const cs = await getCombatContext(campaignName);
-        const target = getTargetFromAttacker(cs, playerStats.name);
-        const targetName = target?.name || null;
-        if (!targetName) {
-            const reason = `${action.name}: No target selected — no attack made, no use spent.`;
-            await logRefusal(reason);
-            return refusal(reason);
-        }
-
-        const weapon = pickBonusAttackWeapon(playerStats);
-        if (!weapon) {
-            const reason = `${action.name}: No usable weapon or Unarmed Strike — no use spent.`;
-            await logRefusal(reason);
-            return refusal(reason);
-        }
-
-        const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
-        // Awaited single write BEFORE the attack resolves (CLA-334 §6-#18 write-race rule).
-        await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
-
-        const attack = {
-            name: `${action.name || 'War Priest'} (${weapon.name})`,
-            type: 'Bonus Action',
-            range: weapon.range ?? MELEE_REACH_FEET,
-            hitBonus: weapon.hitBonus ?? (playerStats.proficiency || 0),
-            damage: weapon.damage,
-            damageType: weapon.damageType || 'Bludgeoning',
-            autoDamageFormula: weapon.damage,
-            autoDamageName: `${action.name || 'War Priest'} (${weapon.name})`,
-        };
-
-        await addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: action.name,
-            description: `${action.name} — bonus-action ${weapon.name} attack on ${targetName} (${currentUses - 1} of ${usesMax} uses remaining).`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error('[bonusActionAttackHandler:log-error]', e); });
-
-        return {
-            type: 'attack_roll',
-            payload: {
-                attack,
-                targetName,
-                sourceName: action.name,
-            },
-        };
+        return resolveWarPriestLeg(action, playerStats, campaignName, usesKey, usesMax, refusal, logRefusal);
     }
 
     return automationInfoPopup(action);

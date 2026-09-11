@@ -312,39 +312,28 @@ export async function processPotentCantrip(hit, isAutoMiss, targetName, characte
     }
 }
 
-async function processPotentCantripMissDamage(potentFormula, storedDamageResult, hit, isAutoMiss, targetName, characterName, campaignName, context, combatSummary, characters, logEntry, setPopupHtml, missType) {
-    const potentPlayerStats = context?.playerStats;
+function buildPotentMissFormula(potentFormula, potentPlayerStats, context) {
     const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(potentPlayerStats).length > 0;
     const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(potentPlayerStats) : 0;
     const spellSchool = (context?.autoDamageSchool || '').toLowerCase();
     const isEvocation = spellSchool === 'evocation';
     const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
-    let finalFormula = potentFormula;
-    if (shouldApplyEmpoweredEvoc) {
-        finalFormula = `${potentFormula} + ${empEvocIntMod} [Empowered Evocation]`;
-    }
+    return shouldApplyEmpoweredEvoc ? `${potentFormula} + ${empEvocIntMod} [Empowered Evocation]` : potentFormula;
+}
 
-    let damageResult;
-    let adjustedTotal;
-
+// Returns { aborted } when a fresh roll fails — preserves the original
+// early-return before any logging/damage application.
+function resolvePotentMissTotal(storedDamageResult, missType, finalFormula, context) {
     if (storedDamageResult && missType === 'miss') {
-        const adjustedStoredTotal = applyMinDamageAdjustment(storedDamageResult.total, storedDamageResult.rolls, context?.playerStats, context?.damageType);
-        adjustedTotal = adjustedStoredTotal;
-    } else {
-        damageResult = rollExpression(finalFormula);
-        if (!damageResult) return;
-        adjustedTotal = applyMinDamageAdjustment(damageResult.total, damageResult.rolls, context?.playerStats, context?.damageType);
+        return { damageResult: undefined, adjustedTotal: applyMinDamageAdjustment(storedDamageResult.total, storedDamageResult.rolls, context?.playerStats, context?.damageType) };
     }
+    const damageResult = rollExpression(finalFormula);
+    if (!damageResult) return { aborted: true };
+    return { damageResult, adjustedTotal: applyMinDamageAdjustment(damageResult.total, damageResult.rolls, context?.playerStats, context?.damageType) };
+}
 
-    const halfDamage = Math.floor(adjustedTotal / 2);
-    const combatSummary2 = await loadCombatSummary(campaignName);
-    const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, context?.damageType)) || false;
-    const applyResult = await applyDamageToTarget(combatSummary2, targetName, halfDamage, [context?.damageType], campaignName, characters, ignoreResistance, context.attackerName || characterName);
-    const missTargetMaxHp = context._target?.type === 'player'
-        ? (getRuntimeValue(targetName, 'hitPoints') ?? 0)
-        : context._target?.maxHp ?? 0;
-
-    logEntry({
+function buildPotentMissLogData({ characterName, context, targetName, finalFormula, damageResult, storedDamageResult, halfDamage }) {
+    return {
         type: 'roll',
         characterName,
         rollType: 'cantrip-miss-half-damage',
@@ -356,9 +345,11 @@ async function processPotentCantripMissDamage(potentFormula, storedDamageResult,
         damageType: context?.damageType,
         targetName: targetName,
         isPotentCantrip: true,
-    });
+    };
+}
 
-    setPopupHtml({
+function buildPotentMissPopupData({ context, targetName, finalFormula, damageResult, storedDamageResult, applyResult, missTargetMaxHp }) {
+    return {
         type: 'save-damage',
         name: context.name,
         formula: finalFormula,
@@ -377,5 +368,25 @@ async function processPotentCantripMissDamage(potentFormula, storedDamageResult,
         damageApplied: true,
         damageReduced: applyResult?.damageReduced,
         isPotentCantrip: true,
-    });
+    };
+}
+
+async function processPotentCantripMissDamage(potentFormula, storedDamageResult, hit, isAutoMiss, targetName, characterName, campaignName, context, combatSummary, characters, logEntry, setPopupHtml, missType) {
+    const potentPlayerStats = context?.playerStats;
+    const finalFormula = buildPotentMissFormula(potentFormula, potentPlayerStats, context);
+
+    const { damageResult, adjustedTotal, aborted } = resolvePotentMissTotal(storedDamageResult, missType, finalFormula, context);
+    if (aborted) return;
+
+    const halfDamage = Math.floor(adjustedTotal / 2);
+    const combatSummary2 = await loadCombatSummary(campaignName);
+    const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, context?.damageType)) || false;
+    const applyResult = await applyDamageToTarget(combatSummary2, targetName, halfDamage, [context?.damageType], campaignName, characters, ignoreResistance, context.attackerName || characterName);
+    const missTargetMaxHp = context._target?.type === 'player'
+        ? (getRuntimeValue(targetName, 'hitPoints') ?? 0)
+        : context._target?.maxHp ?? 0;
+
+    logEntry(buildPotentMissLogData({ characterName, context, targetName, finalFormula, damageResult, storedDamageResult, halfDamage }));
+
+    setPopupHtml(buildPotentMissPopupData({ context, targetName, finalFormula, damageResult, storedDamageResult, applyResult, missTargetMaxHp }));
 }

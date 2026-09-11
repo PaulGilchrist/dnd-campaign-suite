@@ -180,6 +180,109 @@ async function rollWeaponAttack(action, playerStats, campaignName, targetName, t
     return { d20Roll, totalAttack, hit, isCrit, finalDamage, damageType, ac: targetAc };
 }
 
+async function resolveSpellSaveDamage(action, spell, selectedSpellName, playerName, playerStats, campaignName, targetName) {
+    const formula = resolveSpellDamageAtLevel(spell, spell.level);
+    const { promise } = createSaveListener(campaignName, {
+        targetName,
+        attackerName: playerName,
+        saveType: spell.dc.dc_type,
+        saveDc: playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 0),
+        sourceName: `${action.name} — ${selectedSpellName}`,
+    });
+    let spellRolls = [];
+    let spellDamage = 0;
+    let spellFormula;
+    try {
+        const saveResult = await promise;
+        const success = saveResult?.success ?? false;
+        if (!success) {
+            const result = rollExpression(formula);
+            spellRolls = result?.rolls || [];
+            spellDamage = result?.total || 0;
+            if (spell.dc.dc_success === 'half') {
+                spellDamage = Math.floor(spellDamage / 2);
+            }
+        }
+        spellFormula = success ? `${formula} — save succeeded, no damage` : `${formula} — save failed`;
+    } catch {
+        spellFormula = `${formula} — save prompt dismissed`;
+    }
+    return { spellRolls, spellDamage, spellFormula };
+}
+
+// Resolve spell damage against the card target: shield-block, auto-hit,
+// save-for-half, or spell-attack paths (in original guard order).
+async function resolveWarMagicSpellDamage(action, spell, selectedSpellName, playerName, playerStats, campaignName, cs, targetName) {
+    let spellDamage = 0;
+    let spellFormula = '';
+    let spellRolls = [];
+
+    const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
+    const isShieldActive = (getRuntimeValue(targetName, 'activeBuffs', campaignName) || [])
+        .some(b => b.effect === 'shield');
+
+    if (isShieldActive && selectedSpellName.toLowerCase() === 'magic missile') {
+        // Shield blocks Magic Missile entirely (mirrors executeMagicMissile).
+        spellDamage = 0;
+        spellFormula = 'Blocked by Shield';
+    } else if (isAutoHitSpell(spell)) {
+        const missile = selectedSpellName.toLowerCase() === 'magic missile'
+            ? rollMagicMissileDamage(spell.level)
+            : null;
+        if (missile) {
+            spellRolls = missile.rolls;
+            spellDamage = missile.total;
+            spellFormula = missile.formula;
+        } else {
+            spellFormula = resolveSpellDamageAtLevel(spell, spell.level);
+            const result = rollExpression(spellFormula);
+            spellRolls = result?.rolls || [];
+            spellDamage = result?.total || 0;
+        }
+    } else if (spell.dc?.dc_type) {
+        const saveOutcome = await resolveSpellSaveDamage(action, spell, selectedSpellName, playerName, playerStats, campaignName, targetName);
+        spellRolls = saveOutcome.spellRolls;
+        spellDamage = saveOutcome.spellDamage;
+        spellFormula = saveOutcome.spellFormula;
+    } else {
+        // Spell attack roll against the target's AC.
+        const formula = resolveSpellDamageAtLevel(spell, spell.level);
+        const toHit = playerStats.spellAbilities?.toHit ?? 0;
+        const d20 = rollD20();
+        const hit = d20 === 1 ? false : (d20 + toHit) >= (cs?.creatures?.find(c => c.name === targetName)?.ac || 10);
+        if (hit) {
+            const result = rollExpression(formula);
+            spellRolls = result?.rolls || [];
+            spellDamage = result?.total || 0;
+        }
+        spellFormula = hit ? `${formula} (spell attack hit)` : `${formula} (spell attack missed)`;
+    }
+
+    if (spellDamage > 0) {
+        const applyResult = await applyDamageToTarget(cs, targetName, spellDamage, [spell.damage?.damage_type || 'Force'], campaignName, characters, false, playerName);
+        spellDamage = applyResult?.finalDamage ?? spellDamage;
+        if (spellDamage > 0) {
+            endInvisibilityOnHostileAction(playerName, campaignName);
+            addEntry(campaignName, {
+                type: 'roll',
+                characterName: playerName,
+                rollType: 'damage',
+                name: `${selectedSpellName} (${targetName})`,
+                formula: spellFormula,
+                rolls: spellRolls,
+                total: spellDamage,
+                damageType: spell.damage?.damage_type || 'Force',
+                targetName,
+                finalDamage: spellDamage,
+                isAutoHit: isAutoHitSpell(spell),
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[warMagicSpellHandler:spell-damage-log-error]', e); });
+        }
+    }
+
+    return { spellDamage, spellFormula, spellRolls };
+}
+
 export async function confirmWarMagicSpell(action, playerStats, campaignName, selectedSpellName) {
     if (!selectedSpellName) {
         return {
@@ -254,91 +357,10 @@ export async function confirmWarMagicSpell(action, playerStats, campaignName, se
     // Resolve spell damage against the card target.
     const spellDamageType = spell.damage?.damage_type || 'Force';
     let spellDamage = 0;
-    let spellFormula = '';
-    let spellRolls = [];
 
     if (spell.damage) {
-        const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-        const isShieldActive = (getRuntimeValue(targetName, 'activeBuffs', campaignName) || [])
-            .some(b => b.effect === 'shield');
-
-        if (isShieldActive && selectedSpellName.toLowerCase() === 'magic missile') {
-            // Shield blocks Magic Missile entirely (mirrors executeMagicMissile).
-            spellDamage = 0;
-            spellFormula = 'Blocked by Shield';
-        } else if (isAutoHitSpell(spell)) {
-            const missile = selectedSpellName.toLowerCase() === 'magic missile'
-                ? rollMagicMissileDamage(spell.level)
-                : null;
-            if (missile) {
-                spellRolls = missile.rolls;
-                spellDamage = missile.total;
-                spellFormula = missile.formula;
-            } else {
-                spellFormula = resolveSpellDamageAtLevel(spell, spell.level);
-                const result = rollExpression(spellFormula);
-                spellRolls = result?.rolls || [];
-                spellDamage = result?.total || 0;
-            }
-        } else if (spell.dc?.dc_type) {
-            const formula = resolveSpellDamageAtLevel(spell, spell.level);
-            const { promise } = createSaveListener(campaignName, {
-                targetName,
-                attackerName: playerName,
-                saveType: spell.dc.dc_type,
-                saveDc: playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 0),
-                sourceName: `${action.name} — ${selectedSpellName}`,
-            });
-            try {
-                const saveResult = await promise;
-                const success = saveResult?.success ?? false;
-                if (!success) {
-                    const result = rollExpression(formula);
-                    spellRolls = result?.rolls || [];
-                    spellDamage = result?.total || 0;
-                    if (spell.dc.dc_success === 'half') {
-                        spellDamage = Math.floor(spellDamage / 2);
-                    }
-                }
-                spellFormula = success ? `${formula} — save succeeded, no damage` : `${formula} — save failed`;
-            } catch {
-                spellFormula = `${formula} — save prompt dismissed`;
-            }
-        } else {
-            // Spell attack roll against the target's AC.
-            const formula = resolveSpellDamageAtLevel(spell, spell.level);
-            const toHit = playerStats.spellAbilities?.toHit ?? 0;
-            const d20 = rollD20();
-            const hit = d20 === 1 ? false : (d20 + toHit) >= (cs?.creatures?.find(c => c.name === targetName)?.ac || 10);
-            if (hit) {
-                const result = rollExpression(formula);
-                spellRolls = result?.rolls || [];
-                spellDamage = result?.total || 0;
-            }
-            spellFormula = hit ? `${formula} (spell attack hit)` : `${formula} (spell attack missed)`;
-        }
-
-        if (spellDamage > 0) {
-            const applyResult = await applyDamageToTarget(cs, targetName, spellDamage, [spellDamageType], campaignName, characters, false, playerName);
-            spellDamage = applyResult?.finalDamage ?? spellDamage;
-            if (spellDamage > 0) {
-                endInvisibilityOnHostileAction(playerName, campaignName);
-                addEntry(campaignName, {
-                    type: 'roll',
-                    characterName: playerName,
-                    rollType: 'damage',
-                    name: `${selectedSpellName} (${targetName})`,
-                    formula: spellFormula,
-                    rolls: spellRolls,
-                    total: spellDamage,
-                    damageType: spellDamageType,
-                    targetName,
-                    finalDamage: spellDamage,
-                    isAutoHit: isAutoHitSpell(spell),
-                    timestamp: Date.now(),
-                }).catch((e) => { console.error('[warMagicSpellHandler:spell-damage-log-error]', e); });
-            }
-        }
+        const resolved = await resolveWarMagicSpellDamage(action, spell, selectedSpellName, playerName, playerStats, campaignName, cs, targetName);
+        spellDamage = resolved.spellDamage;
     }
 
     // Grant and roll one weapon attack against the same target.

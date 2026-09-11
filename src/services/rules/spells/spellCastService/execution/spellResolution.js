@@ -7,110 +7,71 @@ import { endFriendsOnHostileAction } from '../../../features/friendsService.js';
 import { endInvisibilityOnHostileAction } from '../../../features/invisibilityService.js';
 import { resolveSpellDamageWithTypes } from '../../../core/spellDamageUtils.js';
 
-function resolveSpellResolution(spell, metaCtx, playerStats, campaignName, getTargetInfo) {
-    const result = {
-        globeTargetName: null,
-        magicalAmbush: false,
-        casterConditions: [],
-        hasInvisible: false,
-        psychicSpellsConfig: null,
-        spellLevel: 1,
-        innateSorceryActive: false,
-        damageInfo: null,
-        formula: null,
-        damageType: '',
-        effectiveDamageType: '',
-        cantripSpellAbility: null,
-        spellToHit: 0,
-        spellSaveDc: 0,
-        spellCastingMod: 0,
-        fullSpell: spell,
-        needsLookup: false,
-    };
-
+// Buff block: a blocksSpellcasting buff denies the cast (logs and short-circuits).
+function checkBlockedByBuff(spell, playerStats, campaignName) {
     const buffs = getActiveBuffs(playerStats.name, campaignName);
     const blockingBuff = buffs.find(b => b.blocksSpellcasting);
-    if (blockingBuff) {
-        const blockName = blockingBuff.name || 'Shape-Shift';
-        const refusalType = String(blockingBuff.effect || blockName).toLowerCase().replace(/\s+/g, '_') + '_refused';
-        addEntry(campaignName, {
-            type: 'automation',
-            automationType: refusalType,
-            creatureName: playerStats.name,
-            characterName: playerStats.name,
-            name: blockName,
-            description: `${spell.name} blocked — ${playerStats.name} cannot cast spells while under ${blockName}.`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[spellResolution:blocked-by-buff-log-error]", e); });
-        return { blockedByBuffs: true };
-    }
+    if (!blockingBuff) return false;
+    const blockName = blockingBuff.name || 'Shape-Shift';
+    const refusalType = String(blockingBuff.effect || blockName).toLowerCase().replace(/\s+/g, '_') + '_refused';
+    addEntry(campaignName, {
+        type: 'automation',
+        automationType: refusalType,
+        creatureName: playerStats.name,
+        characterName: playerStats.name,
+        name: blockName,
+        description: `${spell.name} blocked — ${playerStats.name} cannot cast spells while under ${blockName}.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[spellResolution:blocked-by-buff-log-error]", e); });
+    return true;
+}
 
-    result.globeTargetName = getTargetInfo ? (async () => {
-        const target = await getTargetInfo();
-        return target?.name || null;
-    })() : null;
-
-    // Magical ambush + invisibility setup
+// Magical ambush + invisibility setup.
+function resolveAmbushFlags(playerStats, campaignName) {
     const passives = playerStats.automation?.passives;
     if (passives == null) {
         console.error('[spellCast] magicalAmbush check: playerStats.automation.passives is missing');
         throw new Error('playerStats.automation.passives is required for magical ambush check');
     }
-    result.magicalAmbush = passives.some(p => p.type === 'passive_rule' && p.effect === 'magical_ambush');
-    const rawConditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName);
-    if (rawConditions == null || !Array.isArray(rawConditions)) {
+    const magicalAmbush = passives.some(p => p.type === 'passive_rule' && p.effect === 'magical_ambush');
+    const casterConditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName);
+    if (casterConditions == null || !Array.isArray(casterConditions)) {
         console.error('[spellCast] casterConditions: activeConditions is not an array');
         throw new Error('activeConditions must be an array for caster');
     }
-    result.casterConditions = rawConditions;
-    result.hasInvisible = result.magicalAmbush && result.casterConditions.some(c => String(c).toLowerCase() === 'invisible');
+    const hasInvisible = magicalAmbush && casterConditions.some(c => String(c).toLowerCase() === 'invisible');
+    return { magicalAmbush, casterConditions, hasInvisible };
+}
 
-    // Silence — block Verbal components if caster is in a silence zone
-    if (spell.components && spell.components.includes('V')) {
-        const silenceCaster = getSilenceSource(playerStats.name, campaignName);
-        if (silenceCaster && isCreatureInSilenceZone(playerStats.name, silenceCaster, campaignName)) {
-            addEntry(campaignName, {
-                type: 'automation',
-                creatureName: playerStats.name,
-                name: 'Silence',
-                description: `${spell.name} blocked — ${playerStats.name} is inside ${silenceCaster}'s Silence zone; Verbal components are impossible there.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[spellResolution:silence-log-error]", e); });
-            return { blockedBySilence: true };
-        }
+// Silence — block Verbal components if caster is in a silence zone.
+function checkSilenceBlocked(spell, playerStats, campaignName) {
+    if (!(spell.components && spell.components.includes('V'))) return false;
+    const silenceCaster = getSilenceSource(playerStats.name, campaignName);
+    if (!(silenceCaster && isCreatureInSilenceZone(playerStats.name, silenceCaster, campaignName))) return false;
+    addEntry(campaignName, {
+        type: 'automation',
+        creatureName: playerStats.name,
+        name: 'Silence',
+        description: `${spell.name} blocked — ${playerStats.name} is inside ${silenceCaster}'s Silence zone; Verbal components are impossible there.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[spellResolution:silence-log-error]", e); });
+    return true;
+}
+
+// Psychic Spells — remove Verbal/Somatic components for Enchantment/Illusion Warlock spells
+function applyPsychicComponents(spell, psychicSpellsConfig) {
+    if (!(psychicSpellsConfig && spell.components)) return;
+    const spellSchool = (spell.school || '').toLowerCase();
+    const reducedSchools = (psychicSpellsConfig.spellSchools || []).map(s => s.toLowerCase());
+    if (reducedSchools.includes(spellSchool)) {
+        const reducedComponents = (psychicSpellsConfig.componentReduction || []).map(c => c.toUpperCase());
+        spell.components = spell.components.filter(c => !reducedComponents.includes(c.toUpperCase()));
     }
+}
 
-    // Psychic Spells — remove Verbal/Somatic components for Enchantment/Illusion Warlock spells
-    result.psychicSpellsConfig = getPsychicSpellsConfig(playerStats);
-    if (result.psychicSpellsConfig && spell.components) {
-        const spellSchool = (spell.school || '').toLowerCase();
-        const reducedSchools = (result.psychicSpellsConfig.spellSchools || []).map(s => s.toLowerCase());
-        if (reducedSchools.includes(spellSchool)) {
-            const reducedComponents = (result.psychicSpellsConfig.componentReduction || []).map(c => c.toUpperCase());
-            spell.components = spell.components.filter(c => !reducedComponents.includes(c.toUpperCase()));
-        }
-    }
-
-    // End Friends/Invisibility on spell cast
-    if (spell.name && spell.name.toLowerCase() !== 'friends') {
-        endFriendsOnHostileAction(playerStats.name, campaignName);
-    }
-    endInvisibilityOnHostileAction(playerStats.name, campaignName);
-
-    if (spell.casting_time === '1 action') {
-        getRuntimeValue('__placeholder__', '__placeholder__'); // side-effect only: tracked via setRuntimeValue called in executeSpellCast
-    }
-
-    // Full spell data lookup
-    result.needsLookup = !spell.area_of_effect || (spell.automation?.type && !spell.automation?.effects);
-    if (result.needsLookup) {
-        // This will be handled async in executeSpellCast
-        result.fullSpell = spell;
-    }
-
-    // Spell stats resolution
+// Damage type + to-hit/DC/modifier resolution onto the result object.
+function resolveSpellStats(result, spell, playerStats) {
     result.spellLevel = spell.level || 1;
-    result.innateSorceryActive = isInnateSorceryActive(playerStats.name, campaignName);
     result.damageInfo = resolveSpellDamageWithTypes(spell, result.spellLevel);
     result.formula = result.damageInfo?.formula || null;
     result.damageType = result.damageInfo?.primaryType || spell.damage?.damage_type || '';
@@ -132,22 +93,79 @@ function resolveSpellResolution(spell, metaCtx, playerStats, campaignName, getTa
         result.spellSaveDc = playerStats.spellAbilities.saveDc;
     }
 
-    if (result.cantripSpellAbility && playerStats.abilities) {
-        const ability = playerStats.abilities.find(a => a.name === result.cantripSpellAbility);
-        if (ability) {
-            result.spellToHit = ability.bonus + playerStats.proficiency;
-            result.spellSaveDc = 8 + ability.bonus + playerStats.proficiency;
-        }
+    const cantripAbility = result.cantripSpellAbility && playerStats.abilities
+        ? playerStats.abilities.find(a => a.name === result.cantripSpellAbility)
+        : null;
+    if (cantripAbility) {
+        result.spellToHit = cantripAbility.bonus + playerStats.proficiency;
+        result.spellSaveDc = 8 + cantripAbility.bonus + playerStats.proficiency;
     }
 
     if (result.cantripSpellAbility && playerStats.abilities) {
-        const ability = playerStats.abilities.find(a => a.name === result.cantripSpellAbility);
-        if (ability) {
-            result.spellCastingMod = ability.bonus;
-        }
+        result.spellCastingMod = cantripAbility ? cantripAbility.bonus : 0;
     } else if (playerStats.spellAbilities) {
         result.spellCastingMod = playerStats.spellAbilities.modifier || 0;
     }
+}
+
+function resolveSpellResolution(spell, metaCtx, playerStats, campaignName, getTargetInfo) {
+    const result = {
+        globeTargetName: null,
+        magicalAmbush: false,
+        casterConditions: [],
+        hasInvisible: false,
+        psychicSpellsConfig: null,
+        spellLevel: 1,
+        innateSorceryActive: false,
+        damageInfo: null,
+        formula: null,
+        damageType: '',
+        effectiveDamageType: '',
+        cantripSpellAbility: null,
+        spellToHit: 0,
+        spellSaveDc: 0,
+        spellCastingMod: 0,
+        fullSpell: spell,
+        needsLookup: false,
+    };
+
+    if (checkBlockedByBuff(spell, playerStats, campaignName)) {
+        return { blockedByBuffs: true };
+    }
+
+    result.globeTargetName = getTargetInfo ? (async () => {
+        const target = await getTargetInfo();
+        return target?.name || null;
+    })() : null;
+
+    Object.assign(result, resolveAmbushFlags(playerStats, campaignName));
+
+    if (checkSilenceBlocked(spell, playerStats, campaignName)) {
+        return { blockedBySilence: true };
+    }
+
+    result.psychicSpellsConfig = getPsychicSpellsConfig(playerStats);
+    applyPsychicComponents(spell, result.psychicSpellsConfig);
+
+    // End Friends/Invisibility on spell cast
+    if (spell.name && spell.name.toLowerCase() !== 'friends') {
+        endFriendsOnHostileAction(playerStats.name, campaignName);
+    }
+    endInvisibilityOnHostileAction(playerStats.name, campaignName);
+
+    if (spell.casting_time === '1 action') {
+        getRuntimeValue('__placeholder__', '__placeholder__'); // side-effect only: tracked via setRuntimeValue called in executeSpellCast
+    }
+
+    // Full spell data lookup
+    result.needsLookup = !spell.area_of_effect || (spell.automation?.type && !spell.automation?.effects);
+    if (result.needsLookup) {
+        // This will be handled async in executeSpellCast
+        result.fullSpell = spell;
+    }
+
+    result.innateSorceryActive = isInnateSorceryActive(playerStats.name, campaignName);
+    resolveSpellStats(result, spell, playerStats);
 
     return result;
 }

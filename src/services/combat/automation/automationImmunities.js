@@ -47,6 +47,78 @@ export function getConditionalImmunities(features) {
     return result
 }
 
+// Protection from Evil and Good: if target has the spell active, they are immune
+// to Charmed and Frightened conditions from warded creature types.
+// Also prevents possession from warded creature types — possession is tracked as a
+// special state, not a condition — handled separately.
+function isWardedConditionImmunity(lowerCondition, playerStats, campaignName, sourceCreatureType) {
+    if (!isProtectionFromEvilAndGoodActive(playerStats.name, campaignName)) return false
+    const isWardableCondition = lowerCondition === 'charmed' || lowerCondition === 'frightened'
+    if (!isWardableCondition || !sourceCreatureType) return false
+    return isCreatureWarded(sourceCreatureType, playerStats.name, campaignName)
+}
+
+function immunityStringMatches(immunityStr, lowerCondition) {
+    const tokens = immunityStr.split(/[\s,]+/).filter(Boolean)
+    return tokens.some(t => t === lowerCondition || immunityStr.includes(lowerCondition))
+}
+
+function passiveImmunityMatches(auto, lowerCondition) {
+    if (immunityStringMatches(String(auto.conditionImmunity || '').toLowerCase(), lowerCondition)) {
+        return true
+    }
+    if (auto.damageResistance && auto.damageResistance.length > 0) {
+        const lowerDamage = lowerCondition.replace(/^damage:/, '')
+        if (lowerDamage && auto.damageResistance.some(d => d.toLowerCase() === lowerDamage)) {
+            return true
+        }
+    }
+    return false
+}
+
+function conditionalImmunityMatches(auto, lowerCondition, playerStats, getRuntimeValue, campaignName) {
+    const immunities = (auto.immunities || []).map(i => String(i).toLowerCase())
+    if (!immunities.includes(lowerCondition)) return false
+
+    const requiresActive = auto.requiresActive || ''
+    if (!requiresActive) return true
+
+    const activeBuffs = (getRuntimeValue && campaignName)
+        ? (getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || [])
+        : []
+    return Array.isArray(activeBuffs) && activeBuffs.some(
+        b => String(b.name).toLowerCase() === requiresActive.toLowerCase()
+    )
+}
+
+function automationGrantsImmunity(auto, lowerCondition, playerStats, getRuntimeValue, campaignName) {
+    if (auto.type === 'passive_immunity' && passiveImmunityMatches(auto, lowerCondition)) {
+        return true
+    }
+    if (auto.type === 'land_resistance' && auto.conditionImmunity) {
+        if (immunityStringMatches(String(auto.conditionImmunity || '').toLowerCase(), lowerCondition)) {
+            return true
+        }
+    }
+    if (auto.type === 'condition_immunity_while_active') {
+        if (conditionalImmunityMatches(auto, lowerCondition, playerStats, getRuntimeValue, campaignName)) {
+            return true
+        }
+    }
+    return false
+}
+
+// Check active buffs for temporary condition immunity (e.g., Feign Death)
+function activeBuffGrantsImmunity(playerStats, lowerCondition, getRuntimeValue, campaignName) {
+    if (!getRuntimeValue || !campaignName) return false
+    const activeBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || []
+    if (!Array.isArray(activeBuffs)) return false
+    return activeBuffs.some(buff =>
+        buff.conditionImmunity && Array.isArray(buff.conditionImmunity) &&
+        buff.conditionImmunity.some(c => String(c).toLowerCase() === lowerCondition)
+    )
+}
+
 export function playerIsImmuneToCondition({
     conditionKey,
     playerStats,
@@ -58,16 +130,8 @@ export function playerIsImmuneToCondition({
 
     const lowerCondition = String(conditionKey).toLowerCase()
 
-    // Protection from Evil and Good: if target has the spell active, they are immune
-    // to Charmed and Frightened conditions from warded creature types
-    if (isProtectionFromEvilAndGoodActive(playerStats.name, campaignName)) {
-        if ((lowerCondition === 'charmed' || lowerCondition === 'frightened') && sourceCreatureType) {
-            if (isCreatureWarded(sourceCreatureType, playerStats.name, campaignName)) {
-                return true
-            }
-        }
-        // Also prevent possession from warded creature types
-        // Possession is tracked as a special state, not a condition — handled separately
+    if (isWardedConditionImmunity(lowerCondition, playerStats, campaignName, sourceCreatureType)) {
+        return true
     }
 
     // Check playerStats.immunities array (race immunities like "Magical Sleep")
@@ -83,59 +147,14 @@ export function playerIsImmuneToCondition({
         if (!feature?.automation) continue
         const automations = Array.isArray(feature.automation) ? feature.automation : [feature.automation]
         for (const auto of automations) {
-            if (auto.type === 'passive_immunity') {
-                const immunityStr = String(auto.conditionImmunity || '').toLowerCase()
-                const tokens = immunityStr.split(/[\s,]+/).filter(Boolean)
-                if (tokens.some(t => t === lowerCondition || immunityStr.includes(lowerCondition))) {
-                    return true
-                }
-
-                if (auto.damageResistance && auto.damageResistance.length > 0) {
-                    const lowerDamage = lowerCondition.replace(/^damage:/, '')
-                    if (lowerDamage && auto.damageResistance.some(d => d.toLowerCase() === lowerDamage)) {
-                        return true
-                    }
-                }
-            }
-
-            if (auto.type === 'land_resistance' && auto.conditionImmunity) {
-                const immunityStr = String(auto.conditionImmunity || '').toLowerCase()
-                const tokens = immunityStr.split(/[\s,]+/).filter(Boolean)
-                if (tokens.some(t => t === lowerCondition || immunityStr.includes(lowerCondition))) {
-                    return true
-                }
-            }
-
-            if (auto.type === 'condition_immunity_while_active') {
-                const immunities = (auto.immunities || []).map(i => String(i).toLowerCase())
-                if (!immunities.includes(lowerCondition)) continue
-
-                const requiresActive = auto.requiresActive || ''
-                if (!requiresActive) return true
-
-                const activeBuffs = (getRuntimeValue && campaignName)
-                    ? (getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || [])
-                    : []
-                const isActive = Array.isArray(activeBuffs) && activeBuffs.some(
-                    b => String(b.name).toLowerCase() === requiresActive.toLowerCase()
-                )
-                if (isActive) return true
+            if (automationGrantsImmunity(auto, lowerCondition, playerStats, getRuntimeValue, campaignName)) {
+                return true
             }
         }
     }
 
-    // Check active buffs for temporary condition immunity (e.g., Feign Death)
-    if (getRuntimeValue && campaignName) {
-        const activeBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || [];
-        if (Array.isArray(activeBuffs)) {
-            for (const buff of activeBuffs) {
-                if (buff.conditionImmunity && Array.isArray(buff.conditionImmunity)) {
-                    if (buff.conditionImmunity.some(c => String(c).toLowerCase() === lowerCondition)) {
-                        return true;
-                    }
-                }
-            }
-        }
+    if (activeBuffGrantsImmunity(playerStats, lowerCondition, getRuntimeValue, campaignName)) {
+        return true
     }
 
     return false

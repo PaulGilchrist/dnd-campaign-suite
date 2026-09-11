@@ -154,6 +154,32 @@ function buildPendingData({ context, target, campaignName, characterName, setPop
     };
 }
 
+// Gather all target-side condition/buff/reroll state for a player save, in the
+// original read order (runtime-store reads must stay in sequence).
+function resolveTargetSaveContext({ charactersRef, campaignName, target, attackerName, characterName }) {
+    const targetChar = (charactersRef.current || []).find(c => c.name === target.name);
+    const targetConditions = getRuntimeValue(target.name, 'activeConditions', campaignName) || [];
+    const targetSaveModifiers = targetChar?.computedStats?.saveModifiers || [];
+    const targetEffects = (getRuntimeValue('campaign', 'targetEffects') || []).filter(te => te.target === target.name);
+    const targetBuffs = getRuntimeValue(target.name, 'activeBuffs', campaignName) || [];
+    const isRaging = Array.isArray(targetBuffs) && targetBuffs.some(b => b.damageBonusExpression);
+    const shapeShiftActive = Array.isArray(targetBuffs) && targetBuffs.some(b => b.effect === 'shape_shift');
+    const seeInvisibilityActive = Array.isArray(targetBuffs) && targetBuffs.some(b => b.effect === 'see_invisibility');
+    const isLivingLegendActive = getRuntimeValue(target.name, 'livingLegendActive', campaignName) === true;
+    const isElderChampionActive = getRuntimeValue(target.name, 'elderChampionActive', campaignName) === true;
+    const effectiveAttackerName = attackerName || characterName;
+    const isElderChampionAttackerActive = effectiveAttackerName !== target.name && getRuntimeValue(effectiveAttackerName, 'elderChampionActive', campaignName) === true;
+    const holyAuraTargets = getHolyAuraTargets(target.name, campaignName);
+    const isProtectionFromPoisonActive = Array.isArray(targetBuffs) && targetBuffs.some(b => b.name === 'Protection from Poison' && b.effect === 'protection_from_poison');
+    const combatContext = getCombatSummary(campaignName);
+    const targetConditionEffects = computeConditionEffects(targetConditions, targetSaveModifiers, targetEffects, isRaging, shapeShiftActive, false, false, combatContext, seeInvisibilityActive, target.name, isLivingLegendActive, isElderChampionActive, isElderChampionAttackerActive, holyAuraTargets, isProtectionFromPoisonActive, false);
+    const fanaticalFocusUsed = getRuntimeValue(target.name, 'fanaticalFocusUsed', campaignName);
+    const indomitableUses = Number(getRuntimeValue(target.name, 'indomitableUses', campaignName) ?? 0);
+    const indomitableMax = computeIndomitableMax(targetChar?.computedStats?.level || 0);
+    const { autoRerollForSaves, autoRerollBonus } = resolveAutoRerolls({ targetConditionEffects, targetChar, fanaticalFocusUsed, indomitableUses, indomitableMax });
+    return { targetEffects, targetConditionEffects, autoRerollForSaves, autoRerollBonus };
+}
+
 export function createPlayerSaveDamageHandler(deps) {
     const { characterName, campaignName, characters, charactersRef, setPopupHtml, logEntry, pendingSaves } = deps;
 
@@ -163,27 +189,8 @@ export function createPlayerSaveDamageHandler(deps) {
         if (!target || target.type !== 'player') return;
         const targetMaxHp = getRuntimeValue(target.name, 'hitPoints') ?? 0;
 
-        const targetChar = (charactersRef.current || []).find(c => c.name === target.name);
-        const targetConditions = getRuntimeValue(target.name, 'activeConditions', campaignName) || [];
-        const targetSaveModifiers = targetChar?.computedStats?.saveModifiers || [];
-        const targetEffects = (getRuntimeValue('campaign', 'targetEffects') || []).filter(te => te.target === target.name);
-        const targetBuffs = getRuntimeValue(target.name, 'activeBuffs', campaignName) || [];
-        const isRaging = Array.isArray(targetBuffs) && targetBuffs.some(b => b.damageBonusExpression);
-        const shapeShiftActive = Array.isArray(targetBuffs) && targetBuffs.some(b => b.effect === 'shape_shift');
-        const seeInvisibilityActive = Array.isArray(targetBuffs) && targetBuffs.some(b => b.effect === 'see_invisibility');
-        const isLivingLegendActive = getRuntimeValue(target.name, 'livingLegendActive', campaignName) === true;
-        const isElderChampionActive = getRuntimeValue(target.name, 'elderChampionActive', campaignName) === true;
-        const effectiveAttackerName = attackerName || characterName;
-        const isElderChampionAttackerActive = effectiveAttackerName !== target.name && getRuntimeValue(effectiveAttackerName, 'elderChampionActive', campaignName) === true;
-        const holyAuraTargets = getHolyAuraTargets(target.name, campaignName);
-        const isProtectionFromPoisonActive = Array.isArray(targetBuffs) && targetBuffs.some(b => b.name === 'Protection from Poison' && b.effect === 'protection_from_poison');
-        const combatContext = getCombatSummary(campaignName);
-        const targetConditionEffects = computeConditionEffects(targetConditions, targetSaveModifiers, targetEffects, isRaging, shapeShiftActive, false, false, combatContext, seeInvisibilityActive, target.name, isLivingLegendActive, isElderChampionActive, isElderChampionAttackerActive, holyAuraTargets, isProtectionFromPoisonActive, false);
+        const { targetEffects, targetConditionEffects, autoRerollForSaves, autoRerollBonus } = resolveTargetSaveContext({ charactersRef, campaignName, target, attackerName, characterName });
         const restoreBalance = targetConditionEffects.restoreBalance;
-        const fanaticalFocusUsed = getRuntimeValue(target.name, 'fanaticalFocusUsed', campaignName);
-        const indomitableUses = Number(getRuntimeValue(target.name, 'indomitableUses', campaignName) ?? 0);
-        const indomitableMax = computeIndomitableMax(targetChar?.computedStats?.level || 0);
-        const { autoRerollForSaves, autoRerollBonus } = resolveAutoRerolls({ targetConditionEffects, targetChar, fanaticalFocusUsed, indomitableUses, indomitableMax });
 
         if (context?.metamagicCareful) {
             const allyList = getAllyList(characterName);

@@ -4,85 +4,9 @@
 // Complexity ratchet: per-directory thresholds equal each directory's current
 // worst metric (non-test code). New code must not exceed its directory baseline,
 // since npm run lint runs with --max-warnings 0.
-// NOTE: step mode — src/components/char-sheet complexity temporarily dropped to 58.
+// NOTE: step mode — src/components/initiative complexity temporarily dropped to 34.
 // Fix the reported violations, then run npm run lint:complexity-baseline to lock.
 export default [
-  {
-    files: ['src/services/character/**'],
-    rules: {
-      'complexity': ['warn', 72],
-      'max-depth': ['warn', 8],
-      'max-statements': ['warn', 96],
-    },
-  },
-  {
-    files: ['src/hooks/combat/**'],
-    rules: {
-      'complexity': ['warn', 68],
-      'max-statements': ['warn', 96],
-      'max-params': ['warn', 15],
-    },
-  },
-  {
-    files: ['src/services/automation/**'],
-    rules: {
-      'complexity': ['warn', 68],
-      'max-depth': ['warn', 7],
-      'max-statements': ['warn', 91],
-      'max-params': ['warn', 10],
-    },
-  },
-  {
-    files: ['src/components/char-sheet/**'],
-    rules: {
-      'complexity': ['warn', 58],
-      'max-depth': ['warn', 6],
-      'max-statements': ['warn', 98],
-      'max-params': ['warn', 11],
-    },
-  },
-  {
-    files: ['src/services/combat/**'],
-    rules: {
-      'complexity': ['warn', 58],
-      'max-depth': ['warn', 6],
-      'max-statements': ['warn', 68],
-      'max-params': ['warn', 18],
-    },
-  },
-  {
-    files: ['src/services/rules/**'],
-    rules: {
-      'complexity': ['warn', 58],
-      'max-depth': ['warn', 6],
-      'max-statements': ['warn', 76],
-      'max-params': ['warn', 19],
-    },
-  },
-  {
-    files: ['src/services/maps/**'],
-    rules: {
-      'complexity': ['warn', 46],
-      'max-depth': ['warn', 5],
-      'max-statements': ['warn', 116],
-      'max-params': ['warn', 8],
-    },
-  },
-  {
-    files: ['src/components/common/**'],
-    rules: {
-      'complexity': ['warn', 45],
-      'max-params': ['warn', 7],
-    },
-  },
-  {
-    files: ['src/components/initiative/**'],
-    rules: {
-      'complexity': ['warn', 41],
-      'max-depth': ['warn', 6],
-      'max-statements': ['warn', 72],
-    },
-  },
   {
     files: ['src/components/encounter/**'],
     rules: {
@@ -99,11 +23,54 @@ export default [
     },
   },
   {
+    files: ['src/components/char-sheet/**'],
+    rules: {
+      'complexity': ['warn', 38],
+      'max-depth': ['warn', 6],
+      'max-statements': ['warn', 81],
+      'max-params': ['warn', 11],
+    },
+  },
+  {
     files: ['src/components/hex-map/**'],
     rules: {
       'complexity': ['warn', 38],
       'max-statements': ['warn', 63],
       'max-params': ['warn', 9],
+    },
+  },
+  {
+    files: ['src/services/combat/**'],
+    rules: {
+      'complexity': ['warn', 37],
+      'max-depth': ['warn', 6],
+      'max-params': ['warn', 18],
+    },
+  },
+  {
+    files: ['src/services/rules/**'],
+    rules: {
+      'complexity': ['warn', 37],
+      'max-depth': ['warn', 6],
+      'max-statements': ['warn', 76],
+      'max-params': ['warn', 19],
+    },
+  },
+  {
+    files: ['src/hooks/combat/**'],
+    rules: {
+      'complexity': ['warn', 36],
+      'max-statements': ['warn', 80],
+      'max-params': ['warn', 15],
+    },
+  },
+  {
+    files: ['src/services/automation/**'],
+    rules: {
+      'complexity': ['warn', 36],
+      'max-depth': ['warn', 6],
+      'max-statements': ['warn', 70],
+      'max-params': ['warn', 10],
     },
   },
   {
@@ -115,10 +82,26 @@ export default [
     },
   },
   {
+    files: ['src/services/character/**'],
+    rules: {
+      'complexity': ['warn', 35],
+      'max-depth': ['warn', 7],
+      'max-statements': ['warn', 63],
+    },
+  },
+  {
     files: ['src/components/character-creation/**'],
     rules: {
       'complexity': ['warn', 34],
       'max-depth': ['warn', 5],
+    },
+  },
+  {
+    files: ['src/components/initiative/**'],
+    rules: {
+      'complexity': ['warn', 34],
+      'max-depth': ['warn', 6],
+      'max-statements': ['warn', 72],
     },
   },
   {
@@ -159,6 +142,21 @@ export default [
     files: ['server/routes/campaigns-character.js'],
     rules: {
       'complexity': ['warn', 31],
+    },
+  },
+  {
+    files: ['src/components/common/**'],
+    rules: {
+      'complexity': ['warn', 31],
+      'max-params': ['warn', 7],
+    },
+  },
+  {
+    files: ['src/services/maps/**'],
+    rules: {
+      'complexity': ['warn', 30],
+      'max-depth': ['warn', 5],
+      'max-params': ['warn', 8],
     },
   },
   {

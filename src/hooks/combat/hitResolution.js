@@ -141,59 +141,72 @@ async function runVeerRedirect({ target, combatSummary, campaignName, logEntry, 
     }
 }
 
+function logHomingNatOneMiss(characterName, campaignName) {
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName,
+        abilityName: 'Soul Blades',
+        description: `${characterName} rolled a natural 1 with the Psychic Blade — an attack roll of 1 always misses; Homing Strikes was not attempted.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[homingStrikes] Log error:', e); });
+}
+
+function attemptHomingStrike(state, result, { characterName, campaignName, context, ps, homingAc, effectiveD20Roll }) {
+    const psionicDieSize = Number(evaluateAutoExpression('psionic_energy_die', ps)) || 6;
+    const psionicBonus = Math.floor(Math.random() * psionicDieSize) + 1;
+    result.homingStrikesAttempted = true;
+    const newTotal = effectiveD20Roll + context.bonus + psionicBonus;
+    const newHit = homingAc != null ? (newTotal >= homingAc) : null;
+    if (newHit === true) {
+        const defaultMax = ps?._trackedResources?.psionicEnergy?.max || 0;
+        const currentEnergy = Number(getRuntimeValue(characterName, 'psionicEnergy', campaignName) ?? defaultMax);
+        if (currentEnergy > 0) {
+            setRuntimeValue(characterName, 'psionicEnergy', currentEnergy - 1, campaignName);
+            state.hit = true;
+            result.homingStrikesUsed = true;
+            result.homingStrikesBonus = psionicBonus;
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName,
+                abilityName: 'Soul Blades',
+                description: `${characterName} used Soul Blades (Homing Strikes) to turn a miss into a hit (total: ${newTotal} vs AC: ${homingAc}), consuming 1 Psionic Energy. Psionic Energy: ${currentEnergy - 1}/${defaultMax}.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[homingStrikes] Log error:', e); });
+        }
+    } else if (newHit !== null) {
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName,
+            abilityName: 'Soul Blades',
+            description: `${characterName} tried Soul Blades (Homing Strikes) but even with the psionic die roll of ${psionicBonus}, the attack still missed (total: ${newTotal} vs AC: ${homingAc}).`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[homingStrikes] Log error:', e); });
+    }
+}
+
+function logHomingStrikesCheck(state, { characterName, campaignName, ps, isSoulknife, hasSoulBlades, isPsychicBlade }) {
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName,
+        abilityName: 'Soul Blades',
+        description: `Soul Blades (Homing Strikes) check: isSoulknife=${isSoulknife}, hasSoulBlades=${hasSoulBlades}, isPsychicBlade=${isPsychicBlade}, hit=${state.hit}. ps.class=${ps?.class?.name}, ps.major=${ps?.class?.major?.name}, level=${ps?.level}.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[homingStrikes] Log error:', e); });
+}
+
 function runHomingStrikes(state, { characterName, campaignName, context, ps, targetAc, effectiveAc, effectiveD20Roll }) {
     const result = { homingStrikesUsed: false, homingStrikesBonus: 0, homingStrikesAttempted: false };
     const isSoulknife = ps?.class?.name === 'Rogue' && ps?.class?.major?.name === 'Soulknife';
     const hasSoulBlades = isSoulknife && ps?.level >= 9;
     const isPsychicBlade = context?.isPsychicBlade === true;
     const homingAc = effectiveAc != null ? effectiveAc : targetAc;
-    if (hasSoulBlades && isPsychicBlade && state.hit === false && !state.isAutoMiss && effectiveD20Roll === 1) {
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName,
-            abilityName: 'Soul Blades',
-            description: `${characterName} rolled a natural 1 with the Psychic Blade — an attack roll of 1 always misses; Homing Strikes was not attempted.`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error('[homingStrikes] Log error:', e); });
-    } else if (hasSoulBlades && isPsychicBlade && state.hit === false && !state.isAutoMiss) {
-        const psionicDieSize = Number(evaluateAutoExpression('psionic_energy_die', ps)) || 6;
-        const psionicBonus = Math.floor(Math.random() * psionicDieSize) + 1;
-        result.homingStrikesAttempted = true;
-        const newTotal = effectiveD20Roll + context.bonus + psionicBonus;
-        const newHit = homingAc != null ? (newTotal >= homingAc) : null;
-        if (newHit === true) {
-            const defaultMax = ps?._trackedResources?.psionicEnergy?.max || 0;
-            const currentEnergy = Number(getRuntimeValue(characterName, 'psionicEnergy', campaignName) ?? defaultMax);
-            if (currentEnergy > 0) {
-                setRuntimeValue(characterName, 'psionicEnergy', currentEnergy - 1, campaignName);
-                state.hit = true;
-                result.homingStrikesUsed = true;
-                result.homingStrikesBonus = psionicBonus;
-                addEntry(campaignName, {
-                    type: 'ability_use',
-                    characterName,
-                    abilityName: 'Soul Blades',
-                    description: `${characterName} used Soul Blades (Homing Strikes) to turn a miss into a hit (total: ${newTotal} vs AC: ${homingAc}), consuming 1 Psionic Energy. Psionic Energy: ${currentEnergy - 1}/${defaultMax}.`,
-                    timestamp: Date.now(),
-                }).catch((e) => { console.error('[homingStrikes] Log error:', e); });
-            }
-        } else if (newHit !== null) {
-            addEntry(campaignName, {
-                type: 'ability_use',
-                characterName,
-                abilityName: 'Soul Blades',
-                description: `${characterName} tried Soul Blades (Homing Strikes) but even with the psionic die roll of ${psionicBonus}, the attack still missed (total: ${newTotal} vs AC: ${homingAc}).`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[homingStrikes] Log error:', e); });
-        }
-    } else if (isPsychicBlade && state.hit === false && !state.isAutoMiss) {
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName,
-            abilityName: 'Soul Blades',
-            description: `Soul Blades (Homing Strikes) check: isSoulknife=${isSoulknife}, hasSoulBlades=${hasSoulBlades}, isPsychicBlade=${isPsychicBlade}, hit=${state.hit}. ps.class=${ps?.class?.name}, ps.major=${ps?.class?.major?.name}, level=${ps?.level}.`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error('[homingStrikes] Log error:', e); });
+    const missToResolve = state.hit === false && !state.isAutoMiss;
+    if (hasSoulBlades && isPsychicBlade && missToResolve && effectiveD20Roll === 1) {
+        logHomingNatOneMiss(characterName, campaignName);
+    } else if (hasSoulBlades && isPsychicBlade && missToResolve) {
+        attemptHomingStrike(state, result, { characterName, campaignName, context, ps, homingAc, effectiveD20Roll });
+    } else if (isPsychicBlade && missToResolve) {
+        logHomingStrikesCheck(state, { characterName, campaignName, ps, isSoulknife, hasSoulBlades, isPsychicBlade });
     }
     return result;
 }
@@ -255,21 +268,23 @@ async function maybeStoreDeathStrike(characterName, campaignName, context, targe
     setRuntimeValue('campaign', 'targetEffects', updatedEffects, campaignName);
 }
 
-export async function resolveHit(characterName, campaignName, context, bonus, effectiveD20Roll, target, combatSummary, characters, logEntry, _setPopupHtml) {
-    const attackerName = context?.attackerName || characterName;
-    const targetName = (context?.rollType === 'attack' || context?.rollType === 'save') ? (target?.name || context?.targetName) : undefined;
-
-    const targetAc = computeTargetAc(context, target, characters);
-
+// SP-109: Slow imposes a -2 AC penalty on the target while it is slowed.
+// SP-125: Warding Bond grants the warded target +1 AC (from activeBuffs acBonus).
+function computeEffectiveAc(context, target, targetAc) {
     const coverAcBonus = context?.coverAcBonus || 0;
-    // SP-109: Slow imposes a -2 AC penalty on the target while it is slowed.
-    // SP-125: Warding Bond grants the warded target +1 AC (from activeBuffs acBonus).
-    const effectiveAc = target ? targetAc + coverAcBonus + (context?.defensiveDuelistBonus || 0) + (context?.baitAndSwitchBonus || 0) + (context._shieldAcBonus || 0) + (context._shieldOfFaithAcBonus || 0) + (context._wardingBondAcBonus || 0) - (context._slowAcPenalty || 0) : undefined;
-    const state = {
+    return target ? targetAc + coverAcBonus + (context?.defensiveDuelistBonus || 0) + (context?.baitAndSwitchBonus || 0) + (context._shieldAcBonus || 0) + (context._shieldOfFaithAcBonus || 0) + (context._wardingBondAcBonus || 0) - (context._slowAcPenalty || 0) : undefined;
+}
+
+function computeInitialHitState(context, target, effectiveD20Roll, effectiveAc) {
+    return {
         hit: context.isAutoMiss ? false : (target ? (effectiveD20Roll + context.effectiveBonus >= effectiveAc) : undefined),
         isAutoMiss: context.isAutoMiss,
     };
+}
 
+// Sequential on-hit defenses — state.hit may flip between awaits, so each
+// guard re-reads state exactly where it originally did.
+async function runOnHitDefenses(state, { target, attackerName, campaignName, logEntry, combatSummary, context, characters, effectiveD20Roll, effectiveAc }) {
     // Unbreakable Majesty on hit
     if (state.hit && target) {
         await runUnbreakableMajesty({ target, attackerName, campaignName, logEntry, state });
@@ -284,6 +299,22 @@ export async function resolveHit(characterName, campaignName, context, bonus, ef
     if (state.hit && target && context?.rollType === 'attack') {
         await runVeerRedirect({ target, combatSummary, campaignName, logEntry, state });
     }
+}
+
+function computeIsCrit(state, context, effectiveD20Roll, rollsInCriticalRange) {
+    return !state.isAutoMiss && (utils.DEBUG_FORCE_CRIT || effectiveD20Roll === 20 || context?.isAutoCrit || rollsInCriticalRange) && (state.hit || rollsInCriticalRange);
+}
+
+export async function resolveHit(characterName, campaignName, context, bonus, effectiveD20Roll, target, combatSummary, characters, logEntry, _setPopupHtml) {
+    const attackerName = context?.attackerName || characterName;
+    const targetName = (context?.rollType === 'attack' || context?.rollType === 'save') ? (target?.name || context?.targetName) : undefined;
+
+    const targetAc = computeTargetAc(context, target, characters);
+
+    const effectiveAc = computeEffectiveAc(context, target, targetAc);
+    const state = computeInitialHitState(context, target, effectiveD20Roll, effectiveAc);
+
+    await runOnHitDefenses(state, { target, attackerName, campaignName, logEntry, combatSummary, context, characters, effectiveD20Roll, effectiveAc });
 
     // Soul Blades (Soulknife level 9) — Homing Strikes
     const ps = context?.playerStats;
@@ -291,7 +322,7 @@ export async function resolveHit(characterName, campaignName, context, bonus, ef
 
     // Critical range check
     const rollsInCriticalRange = rollsWithinCriticalRange(context?.criticalRange, effectiveD20Roll);
-    const isCrit = !state.isAutoMiss && (utils.DEBUG_FORCE_CRIT || effectiveD20Roll === 20 || context?.isAutoCrit || rollsInCriticalRange) && (state.hit || rollsInCriticalRange);
+    const isCrit = computeIsCrit(state, context, effectiveD20Roll, rollsInCriticalRange);
 
     // Unerring Strike (Living Legend)
     const unerringStrikeApplied = await applyUnerringStrike(state, { characterName, campaignName, context, targetName, targetAc, effectiveD20Roll });

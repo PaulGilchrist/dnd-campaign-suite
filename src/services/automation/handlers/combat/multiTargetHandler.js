@@ -94,6 +94,98 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
+async function checkSecondTargetRange(playerName, firstTarget, secondTarget, rangeFt, secondTargetName, auto, actionName, _mapName) {
+    if (rangeFt == null || !_mapName) return null;
+    const firstInRange = await isWithinRange(playerName, firstTarget.name, rangeFt);
+    const secondInRange = await isWithinRange(playerName, secondTarget.name, rangeFt);
+    if (firstInRange && secondInRange) return null;
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: actionName,
+            description: `Second target ${secondTargetName} is out of range.`,
+            automation: auto,
+        },
+    };
+}
+
+function applySpreadDamage(combatSummary, secondTarget, secondTargetName, spell, spellName, damageType, metaCtx, playerStats, campaignName) {
+    if (!spell?.damage) return;
+    const rawDamage = metaCtx?.totalDamage || metaCtx?.rawDamage || 0;
+    if (rawDamage <= 0) return;
+    const applyResult = applyDamageToTarget(combatSummary, secondTargetName, rawDamage, [damageType], campaignName, null, false, playerStats.name);
+    if (applyResult && applyResult.finalDamage > 0) {
+        endInvisibilityOnHostileAction(playerStats.name, campaignName);
+    }
+    if (applyResult) {
+        addEntry(campaignName, {
+            type: 'hp_change',
+            targetName: secondTargetName,
+            delta: applyResult.newHp - (secondTarget.currentHp || 0),
+            currentHp: applyResult.newHp,
+            maxHp: secondTarget.maxHp,
+            isHealing: false,
+            sourceName: playerStats.name,
+            note: `${spellName} (multi-target spread)`,
+        }).catch((e) => { console.error("[multiTarget] Error:", e); });
+    }
+}
+
+function applyPowerWordHealSpread(combatSummary, secondTarget, secondTargetName, spell, spellName, playerStats, campaignName) {
+    if (spellName.toLowerCase() !== 'power word heal') return;
+
+    const maxHp = secondTarget.maxHp || (playerStats.hitPoints || 0);
+    const currentHp = secondTarget.currentHp ?? getRuntimeValue(secondTargetName, 'currentHitPoints', campaignName) ?? maxHp;
+    const healAmount = maxHp - currentHp;
+    if (healAmount > 0) {
+        const healResult = applyHealingToTarget(combatSummary, secondTargetName, healAmount, campaignName);
+        if (healResult) {
+            addEntry(campaignName, {
+                type: 'hp_change',
+                targetName: secondTargetName,
+                delta: healResult.actualHeal,
+                currentHp: healResult.newHp,
+                maxHp,
+                isHealing: true,
+                sourceName: playerStats.name,
+                note: `${spellName} (multi-target spread)`,
+            }).catch((e) => { console.error("[multiTarget] Error:", e); });
+        }
+    }
+
+    const storedConditions = getRuntimeValue(secondTargetName, 'activeConditions') || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const hasProne = conditions.some(c => String(c).toLowerCase() === 'prone');
+
+    if (spell.status_effects) {
+        const conditionsToRemove = spell.status_effects.map(e => e.toLowerCase());
+        const newConditions = conditions.filter(c => !conditionsToRemove.includes(String(c).toLowerCase()));
+        if (newConditions.length !== conditions.length) {
+            setRuntimeValue(secondTargetName, 'activeConditions', newConditions, campaignName);
+            for (const removed of conditionsToRemove) {
+                if (!newConditions.some(c => String(c).toLowerCase() === removed)) {
+                    addEntry(campaignName, {
+                        type: 'condition',
+                        action: 'removed',
+                        characterName: secondTargetName,
+                        condition: removed.charAt(0).toUpperCase() + removed.slice(1),
+                        reason: `${spellName} (multi-target spread)`,
+                        timestamp: Date.now(),
+                    }).catch((e) => { console.error("[multiTarget] Error:", e); });
+                }
+            }
+        }
+    }
+
+    if (hasProne) {
+        const existingStance = getRuntimeValue(secondTargetName, 'powerWordHealStandPermission');
+        if (!existingStance) {
+            setRuntimeValue(secondTargetName, 'powerWordHealStandPermission', true, campaignName);
+        }
+    }
+}
+
 export async function applyMultiTarget(
     action,
     playerStats,
@@ -120,100 +212,15 @@ export async function applyMultiTarget(
 
     if (!firstTarget || !secondTarget) return null;
 
-    if (rangeFt != null && firstTarget && secondTarget) {
-        if (_mapName) {
-            const firstInRange = await isWithinRange(playerName, firstTarget.name, rangeFt);
-            const secondInRange = await isWithinRange(playerName, secondTarget.name, rangeFt);
-            if (!firstInRange || !secondInRange) {
-                return {
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: action.name,
-                        description: `Second target ${secondTargetName} is out of range.`,
-                        automation: auto,
-                    },
-                };
-            }
-        }
-    }
+    const rangeReject = await checkSecondTargetRange(playerName, firstTarget, secondTarget, rangeFt, secondTargetName, auto, action.name, _mapName);
+    if (rangeReject) return rangeReject;
 
     const spellName = spell?.name || action.payload?.spellName || 'Unknown Spell';
     const damageType = spell?.damage?.damage_type || '';
 
-    if (spell?.damage) {
-        const rawDamage = metaCtx?.totalDamage || metaCtx?.rawDamage || 0;
-        if (rawDamage > 0) {
-            const applyResult = applyDamageToTarget(combatSummary, secondTargetName, rawDamage, [damageType], campaignName, null, false, playerStats.name);
-            if (applyResult && applyResult.finalDamage > 0) {
-                endInvisibilityOnHostileAction(playerStats.name, campaignName);
-            }
-            if (applyResult) {
-                addEntry(campaignName, {
-                    type: 'hp_change',
-                    targetName: secondTargetName,
-                    delta: applyResult.newHp - (secondTarget.currentHp || 0),
-                    currentHp: applyResult.newHp,
-                    maxHp: secondTarget.maxHp,
-                    isHealing: false,
-                    sourceName: playerStats.name,
-                    note: `${spellName} (multi-target spread)`,
-                }).catch((e) => { console.error("[multiTarget] Error:", e); });
-            }
-        }
-    }
+    applySpreadDamage(combatSummary, secondTarget, secondTargetName, spell, spellName, damageType, metaCtx, playerStats, campaignName);
 
-    if (spellName.toLowerCase() === 'power word heal') {
-        const maxHp = secondTarget.maxHp || (playerStats.hitPoints || 0);
-        const currentHp = secondTarget.currentHp ?? getRuntimeValue(secondTargetName, 'currentHitPoints', campaignName) ?? maxHp;
-        const healAmount = maxHp - currentHp;
-        if (healAmount > 0) {
-            const healResult = applyHealingToTarget(combatSummary, secondTargetName, healAmount, campaignName);
-            if (healResult) {
-                addEntry(campaignName, {
-                    type: 'hp_change',
-                    targetName: secondTargetName,
-                    delta: healResult.actualHeal,
-                    currentHp: healResult.newHp,
-                    maxHp,
-                    isHealing: true,
-                    sourceName: playerStats.name,
-                    note: `${spellName} (multi-target spread)`,
-                }).catch((e) => { console.error("[multiTarget] Error:", e); });
-            }
-        }
-
-        const storedConditions = getRuntimeValue(secondTargetName, 'activeConditions') || [];
-        const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-        const hasProne = conditions.some(c => String(c).toLowerCase() === 'prone');
-
-        if (spell.status_effects) {
-            const conditionsToRemove = spell.status_effects.map(e => e.toLowerCase());
-            const newConditions = conditions.filter(c => !conditionsToRemove.includes(String(c).toLowerCase()));
-            if (newConditions.length !== conditions.length) {
-                setRuntimeValue(secondTargetName, 'activeConditions', newConditions, campaignName);
-                for (const removed of conditionsToRemove) {
-                    if (!newConditions.some(c => String(c).toLowerCase() === removed)) {
-                        addEntry(campaignName, {
-                            type: 'condition',
-                            action: 'removed',
-                            characterName: secondTargetName,
-                            condition: removed.charAt(0).toUpperCase() + removed.slice(1),
-                            reason: `${spellName} (multi-target spread)`,
-                            timestamp: Date.now(),
-                        }).catch((e) => { console.error("[multiTarget] Error:", e); });
-                    }
-                }
-            }
-        }
-
-        if (hasProne) {
-            const existingStance = getRuntimeValue(secondTargetName, 'powerWordHealStandPermission');
-            if (!existingStance) {
-                setRuntimeValue(secondTargetName, 'powerWordHealStandPermission', true, campaignName);
-            }
-        }
-    }
+    applyPowerWordHealSpread(combatSummary, secondTarget, secondTargetName, spell, spellName, playerStats, campaignName);
 
     addEntry(campaignName, {
         type: 'ability_use',

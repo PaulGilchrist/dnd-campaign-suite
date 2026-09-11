@@ -4,6 +4,47 @@ import { getCurrentCombatRound } from '../../../encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getChosenRuntimeValue } from '../../automation/common/choiceStorage.js';
 
+function getPositiveCharismaModifier(ps) {
+  const charismaAbility = ps.abilities?.find(a => a.name === 'Charisma');
+  return Math.max(0, charismaAbility?.bonus || 0);
+}
+
+function applyElementalAffinity(formula, ctx, ps) {
+  const elementalAffinityType = getChosenRuntimeValue(ps, 'Elemental Affinity', 'chosenType', ctx.campaignName);
+  if (!elementalAffinityType || typeof elementalAffinityType !== 'string') return formula;
+  const spellDamageType = (ctx.attack?.damageType || '').toLowerCase();
+  if (spellDamageType !== elementalAffinityType.toLowerCase()) return formula;
+  const chaMod = getPositiveCharismaModifier(ps);
+  if (chaMod <= 0) return formula;
+  return `${formula} + ${chaMod} [Elemental Affinity]`;
+}
+
+// CLA-279: execution/index.js computeRadiantSoul is the single owner of the direct-path
+// adder — attack.damage may already carry " + N [Radiant Soul]"; never re-append.
+function applyRadiantSoulBonus(formula, ctx, ps) {
+  const radiantSoulPassive = ps.automation?.passives?.find(p => p.type === 'radiant_soul');
+  if (!radiantSoulPassive || !radiantSoulPassive.hasAutomation || formula.includes('[Radiant Soul]')) return formula;
+  const spellDamageType = (ctx.attack?.damageType || '').toLowerCase();
+  const damageTypes = (radiantSoulPassive.damageTypes || []).map(dt => dt.toLowerCase());
+  const oncePerTurnKey = `_radiantSoul_${ps.name.replace(/\s+/g, '_')}_oncePerTurn`;
+  const onceUsed = getRuntimeValue(ps.name, oncePerTurnKey, ctx.campaignName);
+  if (onceUsed || !damageTypes.includes(spellDamageType)) return formula;
+  const chaMod = getPositiveCharismaModifier(ps);
+  if (chaMod <= 0) return formula;
+  return `${formula} + ${chaMod} [Radiant Soul]`;
+}
+
+function markRadiantSoulUsed(ctx, ps) {
+  if (!ps?.automation?.passives) return;
+  const radiantSoulPassive = ps.automation.passives.find(p => p.type === 'radiant_soul');
+  if (!radiantSoulPassive || !radiantSoulPassive.hasAutomation) return;
+  const spellDamageType = (ctx.attack?.damageType || '').toLowerCase();
+  const damageTypes = (radiantSoulPassive.damageTypes || []).map(dt => dt.toLowerCase());
+  if (!damageTypes.includes(spellDamageType)) return;
+  const oncePerTurnKey = `_radiantSoul_${ps.name.replace(/\s+/g, '_')}_oncePerTurn`;
+  setRuntimeValue(ps.name, oncePerTurnKey, true, ctx.campaignName);
+}
+
 export function buildRollBaseDamageStep() {
   return {
     name: 'rollBaseDamage',
@@ -26,35 +67,8 @@ export function buildRollBaseDamageStep() {
       }
 
       const ps = ctx.playerStats;
-      const elementalAffinityType = getChosenRuntimeValue(ps, 'Elemental Affinity', 'chosenType', ctx.campaignName);
-      if (elementalAffinityType && typeof elementalAffinityType === 'string') {
-        const spellDamageType = (ctx.attack?.damageType || '').toLowerCase();
-        const chosenTypeLower = elementalAffinityType.toLowerCase();
-        if (spellDamageType === chosenTypeLower) {
-          const charismaAbility = ps.abilities?.find(a => a.name === 'Charisma');
-          const chaMod = Math.max(0, charismaAbility?.bonus || 0);
-          if (chaMod > 0) {
-            formula = `${formula} + ${chaMod} [Elemental Affinity]`;
-          }
-        }
-      }
-
-      // CLA-279: execution/index.js computeRadiantSoul is the single owner of the direct-path
-      // adder — attack.damage may already carry " + N [Radiant Soul]"; never re-append.
-      const radiantSoulPassive = ps.automation?.passives?.find(p => p.type === 'radiant_soul');
-      if (radiantSoulPassive && radiantSoulPassive.hasAutomation && !formula.includes('[Radiant Soul]')) {
-        const spellDamageType = (ctx.attack?.damageType || '').toLowerCase();
-        const damageTypes = (radiantSoulPassive.damageTypes || []).map(dt => dt.toLowerCase());
-        const oncePerTurnKey = `_radiantSoul_${ps.name.replace(/\s+/g, '_')}_oncePerTurn`;
-        const onceUsed = getRuntimeValue(ps.name, oncePerTurnKey, ctx.campaignName);
-        if (!onceUsed && damageTypes.includes(spellDamageType)) {
-          const charismaAbility = ps.abilities?.find(a => a.name === 'Charisma');
-          const chaMod = Math.max(0, charismaAbility?.bonus || 0);
-          if (chaMod > 0) {
-            formula = `${formula} + ${chaMod} [Radiant Soul]`;
-          }
-        }
-      }
+      formula = applyElementalAffinity(formula, ctx, ps);
+      formula = applyRadiantSoulBonus(formula, ctx, ps);
 
       const isOverchannel = ctx.overchannelActive;
       const result = isOverchannel
@@ -62,17 +76,7 @@ export function buildRollBaseDamageStep() {
         : (wasCrit ? rollExpressionDoubled(formula) : rollExpression(formula));
       if (!result) return null;
 
-      if (ps?.automation?.passives) {
-        const radiantSoulPassive = ps.automation.passives.find(p => p.type === 'radiant_soul');
-        if (radiantSoulPassive && radiantSoulPassive.hasAutomation) {
-          const spellDamageType = (ctx.attack?.damageType || '').toLowerCase();
-          const damageTypes = (radiantSoulPassive.damageTypes || []).map(dt => dt.toLowerCase());
-          if (damageTypes.includes(spellDamageType)) {
-            const oncePerTurnKey = `_radiantSoul_${ps.name.replace(/\s+/g, '_')}_oncePerTurn`;
-            setRuntimeValue(ps.name, oncePerTurnKey, true, ctx.campaignName);
-          }
-        }
-      }
+      markRadiantSoulUsed(ctx, ps);
 
       return {
         data: { formula, total: result.total, rolls: result.rolls, modifier: result.modifier },

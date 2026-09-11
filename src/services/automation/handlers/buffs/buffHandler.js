@@ -74,22 +74,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     // Check long rest recharge for traits with no explicit uses field
-    if (auto?.recharge === 'long_rest' && !auto?.uses) {
-        const stored = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
-        const activeBuffs = Array.isArray(stored) ? stored : [];
-        const isActive = activeBuffs.some(b => b.name === action.name);
-        if (isActive) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: `${action.name} has been used and cannot be used again until a Long Rest.`,
-                    automation: auto,
-                },
-            };
-        }
-    }
+    const longRestPopup = buildLongRestRechargePopup(action, auto, playerStats, campaignName);
+    if (longRestPopup) return longRestPopup;
 
     if (TELEPORT_EFFECTS.has(auto?.effect)) {
         return handleTeleport(action, playerStats, campaignName, _mapName);
@@ -105,16 +91,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return handleTelepathicSpeech(action, playerStats, campaignName, _mapName);
     }
 
-    let targetName = playerStats.name;
-    if (auto?.target === 'willing_creature') {
-        const combatSummary = getCombatSummary(campaignName);
-        if (combatSummary) {
-            const target = getTargetFromAttacker(combatSummary, playerStats.name);
-            if (target) {
-                targetName = target.name;
-            }
-        }
-    }
+    let targetName = resolveWillingTargetName(auto, playerStats, campaignName);
 
     // Wild Shape: uses gate applies to the ON leg only — toggling OFF must
     // always be able to end the form, even at 0 uses (CLA-391).
@@ -158,6 +135,35 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         }).catch((e) => { console.error('[buffHandler] Tracked buff activation log error:', e); });
     }
 
+    await applyGenericBuffSideEffects(action, auto, playerStats, targetName, campaignName, wasActive);
+
+    return buildBuffTogglePopup(action, auto, playerStats, targetName, wasActive, usesKey, usesAfterActivation);
+}
+
+function resolveWillingTargetName(auto, playerStats, campaignName) {
+    if (auto?.target !== 'willing_creature') return playerStats.name;
+    const combatSummary = getCombatSummary(campaignName);
+    const target = combatSummary ? getTargetFromAttacker(combatSummary, playerStats.name) : null;
+    return target ? target.name : playerStats.name;
+}
+
+function buildLongRestRechargePopup(action, auto, playerStats, campaignName) {
+    if (!(auto?.recharge === 'long_rest' && !auto?.uses)) return null;
+    const stored = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+    const activeBuffs = Array.isArray(stored) ? stored : [];
+    if (!activeBuffs.some(b => b.name === action.name)) return null;
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            description: `${action.name} has been used and cannot be used again until a Long Rest.`,
+            automation: auto,
+        },
+    };
+}
+
+async function applyGenericBuffSideEffects(action, auto, playerStats, targetName, campaignName, wasActive) {
     if (auto?.effect === 'invisible') {
         applyInvisibilityToggle(targetName, playerStats, campaignName, wasActive);
     }
@@ -176,7 +182,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             setTempHp(playerStats.name, amount, campaignName);
         }
     }
+}
 
+function buildBuffTogglePopup(action, auto, playerStats, targetName, wasActive, usesKey, usesAfterActivation) {
     const displayTarget = targetName === playerStats.name ? 'yourself' : targetName;
     let durationDisplay = auto.duration || '10 min';
     if (auto.effect === 'shape_shift' && durationDisplay === 'half_druid_level_hours') {

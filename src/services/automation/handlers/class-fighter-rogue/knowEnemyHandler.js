@@ -7,6 +7,43 @@ import { getCombatContext, getTargetFromAttacker } from '../../../../services/ru
 import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
 import { addEntry } from '../../../ui/logService.js';
 
+async function resolveTargetName(playerStats, campaignName) {
+    try {
+        const combatContext = await getCombatContext(campaignName);
+        if (!combatContext) return null;
+        const target = getTargetFromAttacker(combatContext, playerStats.name);
+        return target ? target.name : null;
+    } catch (error) { console.warn('[knowEnemyHandler] No combat context:', error); return null; }
+}
+
+async function resolveTargetIRV(targetName) {
+    if (!targetName) return null;
+    try {
+        const monsterData = await getMonsterData(targetName, null);
+        return monsterData ? resolveMonsterIRV(monsterData) : null;
+    } catch (error) { console.warn('[knowEnemyHandler] Monster data not found for target:', error); return null; }
+}
+
+function buildIravLines(irvInfo) {
+    let text = '';
+    if (irvInfo.immunities.length > 0) {
+        text += `Immunities: ${irvInfo.immunities.join(', ')}\n`;
+    }
+    if (irvInfo.resistances.length > 0) {
+        text += `Resistances: ${irvInfo.resistances.join(', ')}\n`;
+    }
+    if (irvInfo.vulnerabilities.length > 0) {
+        text += `Vulnerabilities: ${irvInfo.vulnerabilities.join(', ')}\n`;
+    }
+    if (irvInfo.conditionImmunities.length > 0) {
+        text += `Condition Immunities: ${irvInfo.conditionImmunities.join(', ')}\n`;
+    }
+    if (irvInfo.immunities.length === 0 && irvInfo.resistances.length === 0 && irvInfo.vulnerabilities.length === 0 && irvInfo.conditionImmunities.length === 0) {
+        text += `No immunities, resistances, vulnerabilities, or condition immunities.\n`;
+    }
+    return text;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const usesKey = 'superiorityDice';
@@ -47,27 +84,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     // Get target from combat context
-    let targetName = null;
-    try {
-        const combatContext = await getCombatContext(campaignName);
-        if (combatContext) {
-            const target = getTargetFromAttacker(combatContext, playerStats.name);
-            if (target) {
-                targetName = target.name;
-            }
-        }
-    } catch (error) { console.warn('[knowEnemyHandler] No combat context:', error); }
+    const targetName = await resolveTargetName(playerStats, campaignName);
 
     // Look up monster data for target
-    let irvInfo = null;
-    if (targetName) {
-        try {
-            const monsterData = await getMonsterData(targetName, null);
-            if (monsterData) {
-                irvInfo = resolveMonsterIRV(monsterData);
-            }
-        } catch (error) { console.warn('[knowEnemyHandler] Monster data not found for target:', error); }
-    }
+    const irvInfo = await resolveTargetIRV(targetName);
+    const iravLines = irvInfo ? buildIravLines(irvInfo) : '';
 
     let description = `${action.name}: Expend 1 Superiority Die to discern enemy strengths and weaknesses.\n`;
     if (usedRelentless) {
@@ -75,26 +96,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
     description += `Target: ${targetName || 'None (not in combat)'}.\n`;
     description += `Range: ${auto.range || '30 ft'}.\n\n`;
-
-    if (irvInfo) {
-        if (irvInfo.immunities.length > 0) {
-            description += `Immunities: ${irvInfo.immunities.join(', ')}\n`;
-        }
-        if (irvInfo.resistances.length > 0) {
-            description += `Resistances: ${irvInfo.resistances.join(', ')}\n`;
-        }
-        if (irvInfo.vulnerabilities.length > 0) {
-            description += `Vulnerabilities: ${irvInfo.vulnerabilities.join(', ')}\n`;
-        }
-        if (irvInfo.conditionImmunities.length > 0) {
-            description += `Condition Immunities: ${irvInfo.conditionImmunities.join(', ')}\n`;
-        }
-        if (irvInfo.immunities.length === 0 && irvInfo.resistances.length === 0 && irvInfo.vulnerabilities.length === 0 && irvInfo.conditionImmunities.length === 0) {
-            description += `No immunities, resistances, vulnerabilities, or condition immunities.\n`;
-        }
-    } else {
-        description += `No monster data found for target. The target may be a player character or a custom NPC.\n`;
-    }
+    description += irvInfo ? iravLines : `No monster data found for target. The target may be a player character or a custom NPC.\n`;
 
     let logDescription = `Know Your Enemy used by ${playerStats.name}`;
     if (targetName) {
@@ -104,23 +106,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         logDescription += ` (Relentless - free d${dieValue} die)`;
     }
     logDescription += `.\nRange: ${auto.range || '30 ft'}.\n`;
-    if (irvInfo) {
-        if (irvInfo.immunities.length > 0) {
-            logDescription += `Immunities: ${irvInfo.immunities.join(', ')}\n`;
-        }
-        if (irvInfo.resistances.length > 0) {
-            logDescription += `Resistances: ${irvInfo.resistances.join(', ')}\n`;
-        }
-        if (irvInfo.vulnerabilities.length > 0) {
-            logDescription += `Vulnerabilities: ${irvInfo.vulnerabilities.join(', ')}\n`;
-        }
-        if (irvInfo.conditionImmunities.length > 0) {
-            logDescription += `Condition Immunities: ${irvInfo.conditionImmunities.join(', ')}\n`;
-        }
-        if (irvInfo.immunities.length === 0 && irvInfo.resistances.length === 0 && irvInfo.vulnerabilities.length === 0 && irvInfo.conditionImmunities.length === 0) {
-            logDescription += `No immunities, resistances, vulnerabilities, or condition immunities.\n`;
-        }
-    }
+    logDescription += iravLines;
 
     addEntry(campaignName, {
         type: 'ability_use',

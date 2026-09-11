@@ -12,6 +12,70 @@ import { createPlainDamageHandler } from './handlers/handlePlainDamage.js';
 import { handleSanctuarySave } from './handlers/handleSanctuarySave.js';
 import { applySuperiorityDamageBonuses } from './handlers/handleSuperiorityBonuses.js';
 
+function applyDamageRollAdjustments({ isCrit, context, boostedTotal, boostedRolls, modifier, damageType }) {
+    const gwfBaseRolls = isCrit && context?.doubledRolls ? context.doubledRolls.slice(0, context.doubledRolls.length / 2) : boostedRolls;
+    const rollsForMin = isCrit && context?.doubledRolls ? context.doubledRolls : boostedRolls;
+    let adjustedTotal = applyMinDamageAdjustment(boostedTotal, rollsForMin, context?.playerStats, damageType);
+    let displayRolls = isCrit && context?.doubledRolls ? context.doubledRolls : boostedRolls;
+    let gwfDisplayRolls = gwfBaseRolls;
+    if (hasGreatWeaponFighting(context?.playerStats)) {
+        const gwfRolls = applyGreatWeaponFightingToDamage(gwfBaseRolls, context?.playerStats);
+        const hasChanges = gwfRolls.some((r, i) => r !== gwfBaseRolls[i]);
+        if (hasChanges) {
+            const gwfTotal = (isCrit ? gwfRolls.reduce((sum, r) => sum + r, 0) * 2 : gwfRolls.reduce((sum, r) => sum + r, 0)) + modifier;
+            adjustedTotal = applyMinDamageAdjustment(gwfTotal, gwfRolls, context?.playerStats, damageType);
+            displayRolls = isCrit ? gwfRolls.concat(gwfRolls) : gwfRolls;
+            gwfDisplayRolls = gwfRolls;
+        }
+    }
+    return { adjustedTotal, displayRolls, gwfBaseRolls, gwfDisplayRolls };
+}
+
+async function handleMagicMissileImmunity({ characterName, campaignName, name, formula, rolls, total, modifier, context, logEntry, setPopupHtml }) {
+    if (!isMagicMissileImmune(characterName, campaignName) || !name || name.toLowerCase() !== 'magic missile') return false;
+    const combatSummary = await loadCombatSummary(campaignName);
+    const target = combatSummary?.creatures?.find(c => c.name === context?.targetName) || null;
+    const targetMaxHp = target?.type === 'player'
+        ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
+        : target?.maxHp ?? 0;
+    const isCrit = context?.isAutoCrit || false;
+    const displayFormula = isCrit ? formatDamageFormula(formula, rolls, true) : formula;
+    logEntry({
+        type: 'roll',
+        characterName,
+        rollType: 'damage',
+        name,
+        formula: displayFormula,
+        rolls,
+        total,
+        modifier,
+        damageType: context?.damageType,
+        targetName: context?.targetName,
+        finalDamage: 0,
+        note: 'Shield: Immune to Magic Missile',
+        isCrit,
+    });
+    setPopupHtml({
+        type: 'damage',
+        name,
+        formula,
+        rolls,
+        bonus: 0,
+        modifier,
+        damageType: context?.damageType,
+        targetName: context?.targetName,
+        total,
+        adjustedTotal: 0,
+        targetCurrentHp: target?.type === 'player' ? (getRuntimeValue(target.name, 'hitPoints') ?? 0) : (target?.currentHp ?? target?.maxHp),
+        targetMaxHp,
+        damageApplied: true,
+        finalDamage: 0,
+        damageReduced: true,
+        note: 'Shield: Immune to Magic Missile',
+    });
+    return true;
+}
+
 export function createLogDamageAndShow(deps) {
     const { characterName, campaignName, setPopupHtml, logEntry } = deps;
     const handlerDeps = { characterName, campaignName, characters: deps.characters, charactersRef: deps.charactersRef, setPopupHtml, logEntry, pendingSaves: deps.pendingSaves };
@@ -36,65 +100,9 @@ export function createLogDamageAndShow(deps) {
 
         const { saveDc, saveType, damageType, isAutoMiss } = context || {};
         const isCrit = context?.isAutoCrit || context?.isCrit || false;
-        const gwfBaseRolls = isCrit && context?.doubledRolls ? context.doubledRolls.slice(0, context.doubledRolls.length / 2) : boostedRolls;
-        const rollsForMin = isCrit && context?.doubledRolls ? context.doubledRolls : boostedRolls;
-        let adjustedTotal = applyMinDamageAdjustment(boostedTotal, rollsForMin, context?.playerStats, damageType);
-        let displayRolls = isCrit && context?.doubledRolls ? context.doubledRolls : boostedRolls;
-        let gwfDisplayRolls = gwfBaseRolls;
-        if (hasGreatWeaponFighting(context?.playerStats)) {
-            const gwfRolls = applyGreatWeaponFightingToDamage(gwfBaseRolls, context?.playerStats);
-            const hasChanges = gwfRolls.some((r, i) => r !== gwfBaseRolls[i]);
-            if (hasChanges) {
-                const gwfTotal = (isCrit ? gwfRolls.reduce((sum, r) => sum + r, 0) * 2 : gwfRolls.reduce((sum, r) => sum + r, 0)) + modifier;
-                adjustedTotal = applyMinDamageAdjustment(gwfTotal, gwfRolls, context?.playerStats, damageType);
-                displayRolls = isCrit ? gwfRolls.concat(gwfRolls) : gwfRolls;
-                gwfDisplayRolls = gwfRolls;
-            }
-        }
+        const { adjustedTotal, displayRolls, gwfBaseRolls, gwfDisplayRolls } = applyDamageRollAdjustments({ isCrit, context, boostedTotal, boostedRolls, modifier, damageType });
 
-        if (isMagicMissileImmune(characterName, campaignName) && name && name.toLowerCase() === 'magic missile') {
-            const combatSummary = await loadCombatSummary(campaignName);
-            const target = combatSummary?.creatures?.find(c => c.name === context?.targetName) || null;
-            const targetMaxHp = target?.type === 'player'
-                ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
-                : target?.maxHp ?? 0;
-            const isCrit = context?.isAutoCrit || false;
-            const displayFormula = isCrit ? formatDamageFormula(formula, rolls, true) : formula;
-            logEntry({
-                type: 'roll',
-                characterName,
-                rollType: 'damage',
-                name,
-                formula: displayFormula,
-                rolls,
-                total,
-                modifier,
-                damageType: context?.damageType,
-                targetName: context?.targetName,
-                finalDamage: 0,
-                note: 'Shield: Immune to Magic Missile',
-                isCrit,
-            });
-            setPopupHtml({
-                type: 'damage',
-                name,
-                formula,
-                rolls,
-                bonus: 0,
-                modifier,
-                damageType: context?.damageType,
-                targetName: context?.targetName,
-                total,
-                adjustedTotal: 0,
-                targetCurrentHp: target?.type === 'player' ? (getRuntimeValue(target.name, 'hitPoints') ?? 0) : (target?.currentHp ?? target?.maxHp),
-                targetMaxHp,
-                damageApplied: true,
-                finalDamage: 0,
-                damageReduced: true,
-                note: 'Shield: Immune to Magic Missile',
-            });
-            return;
-        }
+        if (await handleMagicMissileImmunity({ characterName, campaignName, name, formula, rolls, total, modifier, context, logEntry, setPopupHtml })) return;
 
         const combatSummary = await loadCombatSummary(campaignName);
 

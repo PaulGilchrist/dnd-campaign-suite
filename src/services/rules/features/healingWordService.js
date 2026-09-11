@@ -11,6 +11,45 @@ function isHealingWord(spell) {
     return (spell.name || '') === HEALING_WORD_NAME;
 }
 
+// Caster's spellcasting modifier for the Healing Word expression: named
+// ability from the spell/character, else the spellAbilities modifier.
+function resolveSpellCastingMod(spell, playerStats) {
+    const cantripSpellAbility = spell.spellCastingAbility || playerStats.spellAbilities?.spellCastingAbility;
+    let spellCastingMod = 0;
+    if (cantripSpellAbility && playerStats.abilities) {
+        const ability = playerStats.abilities.find(a => a.name === cantripSpellAbility);
+        if (ability) {
+            spellCastingMod = ability.bonus;
+        }
+    } else if (playerStats.spellAbilities) {
+        spellCastingMod = playerStats.spellAbilities.modifier || 0;
+    }
+    return spellCastingMod;
+}
+
+// Roll the healing expression (maximized when requested) and apply the
+// reroll-healing-ones pass when it applies.
+function rollHealingWordExpression(healExpression, maximize, rerollOnes) {
+    const result = maximize ? rollExpressionMaximized(healExpression) : rollExpression(healExpression);
+    let displayRolls = result?.rolls || null;
+    let healingRerollOriginalRolls = null;
+    if (result && rerollOnes && !maximize) {
+        const { displayRolls: rerolled, originalRolls } = applyHealingRerollOnes(result.rolls, healExpression);
+        displayRolls = rerolled;
+        healingRerollOriginalRolls = originalRolls;
+    }
+    return { result, displayRolls, healingRerollOriginalRolls };
+}
+
+// Target's current/max HP: max from combat summary (falling back to the
+// caster's hit points), current from the runtime store.
+function resolveTargetHp(combatSummary, targetName, playerStats, campaignName) {
+    const maxHp = combatSummary.creatures.find(c => c.name === targetName)?.maxHp || playerStats.hitPoints || 0;
+    const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
+    const currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
+    return { maxHp, currentHp };
+}
+
 export async function triggerHealingWord(spell, metaCtx, playerStats, campaignName, _mapName) {
     if (!isHealingWord(spell)) {
         return null;
@@ -24,17 +63,7 @@ export async function triggerHealingWord(spell, metaCtx, playerStats, campaignNa
 
     let healExpression = healAtSlotLevel[slotLevel];
 
-    const cantripSpellAbility = spell.spellCastingAbility || playerStats.spellAbilities?.spellCastingAbility;
-    let spellCastingMod = 0;
-    if (cantripSpellAbility && playerStats.abilities) {
-        const ability = playerStats.abilities.find(a => a.name === cantripSpellAbility);
-        if (ability) {
-            spellCastingMod = ability.bonus;
-        }
-    } else if (playerStats.spellAbilities) {
-        spellCastingMod = playerStats.spellAbilities.modifier || 0;
-    }
-
+    const spellCastingMod = resolveSpellCastingMod(spell, playerStats);
     if (spellCastingMod !== undefined) {
         healExpression = healExpression.replace(/\bMOD\b/g, String(spellCastingMod));
     }
@@ -47,21 +76,12 @@ export async function triggerHealingWord(spell, metaCtx, playerStats, campaignNa
 
     const maximize = hasHealingMaximizationForTarget(playerStats, targetName, campaignName);
     const rerollOnes = hasRerollHealingOnes(playerStats);
-    const result = maximize ? rollExpressionMaximized(healExpression) : rollExpression(healExpression);
-    let displayRolls = result?.rolls || null;
-    let healingRerollOriginalRolls = null;
-    if (result && rerollOnes && !maximize) {
-        const { displayRolls: rerolled, originalRolls } = applyHealingRerollOnes(result.rolls, healExpression);
-        displayRolls = rerolled;
-        healingRerollOriginalRolls = originalRolls;
-    }
+    const { result, displayRolls, healingRerollOriginalRolls } = rollHealingWordExpression(healExpression, maximize, rerollOnes);
     if (!result) return null;
 
     const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName);
     const healAmount = result.total + bonusHeal;
-    const maxHp = combatSummary.creatures.find(c => c.name === targetName)?.maxHp || playerStats.hitPoints || 0;
-    const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
-    const currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
+    const { maxHp, currentHp } = resolveTargetHp(combatSummary, targetName, playerStats, campaignName);
     const actualHeal = Math.min(healAmount, maxHp - currentHp);
 
     if (actualHeal > 0) {

@@ -153,22 +153,7 @@ async function applyPortentChoice(action, playerStats, campaignName, targetName,
 
         // Miss→hit: trigger damage
         if (!eventData.hit && newHit) {
-            const damageFormula = context?.damageFormula || null;
-            if (damageFormula) {
-                const dmgResult = rollExpression(damageFormula);
-                if (dmgResult && dmgResult.total > 0) {
-                    const cs = await getCombatContext(campaignName);
-                    const characters = [playerStats];
-                    try {
-                        const appliedDmg = applyDamageToTarget(cs, eventData.targetName, dmgResult.total, [context?.damageType || 'unknown'], campaignName, characters, false, playerName);
-                        if (appliedDmg) {
-                            damageRolled = dmgResult.total;
-                        }
-                    } catch (e) {
-                        console.error('[portent] applyDamageToTarget failed:', e);
-                    }
-                }
-            }
+            damageRolled = await applyMissToHitDamage(context, eventData, campaignName, playerName, playerStats);
         }
 
         // Hit→miss: undo damage using lastAttack's rawDamage
@@ -216,6 +201,24 @@ async function applyPortentChoice(action, playerStats, campaignName, targetName,
 
     const description = buildPortentDescription(action, eventType, chosenDie, bonus, label, originalD20, targetName, outcomeNote);
     return infoPopup(action.name, description, action.automation);
+}
+
+async function applyMissToHitDamage(context, eventData, campaignName, playerName, playerStats) {
+    const damageFormula = context?.damageFormula || null;
+    if (!damageFormula) return null;
+    const dmgResult = rollExpression(damageFormula);
+    if (!(dmgResult && dmgResult.total > 0)) return null;
+    const cs = await getCombatContext(campaignName);
+    const characters = [playerStats];
+    try {
+        const appliedDmg = applyDamageToTarget(cs, eventData.targetName, dmgResult.total, [context?.damageType || 'unknown'], campaignName, characters, false, playerName);
+        if (appliedDmg) {
+            return dmgResult.total;
+        }
+    } catch (e) {
+        console.error('[portent] applyDamageToTarget failed:', e);
+    }
+    return null;
 }
 
 async function refreshPortentDice(playerName, campaignName, playerStats) {

@@ -90,67 +90,77 @@ function applyOptionDetails(auto, action, playerStats, campaignName) {
 // Returns a refusal popup, or null when the cost was paid.
 async function consumeSaveAttackCost(action, auto, playerStats, campaignName, resolvedShape) {
     if (auto.resourceCost === 'channel_divinity') {
-        const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
-        const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
-        const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
-        const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
-
-        if (currentCharges <= 0) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: 'No Channel Divinity charges remaining.',
-                    automation: auto,
-                },
-            };
-        }
-
-        const newCharges = currentCharges - 1;
-        await setRuntimeValue(playerStats.name, 'channelDivinityCharges', newCharges, campaignName);
-        return null;
+        return consumeChannelDivinity(action, auto, playerStats, campaignName);
     }
 
     if (auto.resourceCost === 'wild_shape') {
-        const maxWS = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0;
-        const currentWS = getRuntimeValue(playerStats.name, 'wildShapeUses', campaignName);
-        const resolvedWS = currentWS != null ? Number(currentWS) : maxWS;
-        const cost = auto.doubleEmanation ? 2 : 1;
-
-        if (resolvedWS < cost) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: `${action.name}: Not enough Wild Shape uses remaining. ${cost} use${cost > 1 ? 's' : ''} required.`,
-                    automation: auto,
-                },
-            };
-        }
-
-        await setRuntimeValue(playerStats.name, 'wildShapeUses', resolvedWS - cost, campaignName);
-
-        // Set up duration expiration for area effects
-        if (auto.duration && isAreaShape(resolvedShape)) {
-            const durationRounds = parseDurationRounds(auto.duration);
-            if (durationRounds !== undefined) {
-                const rounds = durationRounds === 0 ? undefined : durationRounds;
-                if (rounds !== undefined) {
-                    addExpiration(playerStats.name, playerStats.name, [
-                        { type: 'remove_active_buff', buffName: action.name }
-                    ], campaignName, rounds);
-                } else {
-                    addExpiration(playerStats.name, playerStats.name, [
-                        { type: 'remove_active_buff', buffName: action.name }
-                    ], campaignName);
-                }
-            }
-        }
-        return null;
+        return consumeWildShapeUses(action, auto, playerStats, campaignName, resolvedShape);
     }
 
+    return consumeTrackedUses(action, auto, playerStats, campaignName);
+}
+
+function refusalPopup(action, auto, description) {
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            description,
+            automation: auto,
+        },
+    };
+}
+
+async function consumeChannelDivinity(action, auto, playerStats, campaignName) {
+    const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
+    const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
+    const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
+    const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
+
+    if (currentCharges <= 0) {
+        return refusalPopup(action, auto, 'No Channel Divinity charges remaining.');
+    }
+
+    const newCharges = currentCharges - 1;
+    await setRuntimeValue(playerStats.name, 'channelDivinityCharges', newCharges, campaignName);
+    return null;
+}
+
+async function consumeWildShapeUses(action, auto, playerStats, campaignName, resolvedShape) {
+    const maxWS = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0;
+    const currentWS = getRuntimeValue(playerStats.name, 'wildShapeUses', campaignName);
+    const resolvedWS = currentWS != null ? Number(currentWS) : maxWS;
+    const cost = auto.doubleEmanation ? 2 : 1;
+
+    if (resolvedWS < cost) {
+        return refusalPopup(action, auto, `${action.name}: Not enough Wild Shape uses remaining. ${cost} use${cost > 1 ? 's' : ''} required.`);
+    }
+
+    await setRuntimeValue(playerStats.name, 'wildShapeUses', resolvedWS - cost, campaignName);
+
+    // Set up duration expiration for area effects
+    applyShapeDurationExpiration(action, auto, playerStats, resolvedShape, campaignName);
+    return null;
+}
+
+function applyShapeDurationExpiration(action, auto, playerStats, resolvedShape, campaignName) {
+    if (!(auto.duration && isAreaShape(resolvedShape))) return;
+    const durationRounds = parseDurationRounds(auto.duration);
+    if (durationRounds === undefined) return;
+    const rounds = durationRounds === 0 ? undefined : durationRounds;
+    if (rounds !== undefined) {
+        addExpiration(playerStats.name, playerStats.name, [
+            { type: 'remove_active_buff', buffName: action.name }
+        ], campaignName, rounds);
+    } else {
+        addExpiration(playerStats.name, playerStats.name, [
+            { type: 'remove_active_buff', buffName: action.name }
+        ], campaignName);
+    }
+}
+
+async function consumeTrackedUses(action, auto, playerStats, campaignName) {
     const resolvedUses = auto.usesMax ?? resolveUses(playerStats, auto.uses) ?? playerStats.level;
     const maxUses = resolvedUses > 0 ? resolvedUses : 0;
 
@@ -163,27 +173,11 @@ async function consumeSaveAttackCost(action, auto, playerStats, campaignName, re
                 const storedRage = getRuntimeValue(playerStats.name, 'ragePoints', campaignName);
                 const currentRage = storedRage != null ? Number(storedRage) : (playerStats._trackedResources?.ragePoints?.current ?? 0);
                 if (currentRage <= 0) {
-                    return {
-                        type: 'popup',
-                        payload: {
-                            type: 'automation_info',
-                            name: action.name,
-                            description: `${action.name} has been used and cannot be used again until a long rest.`,
-                            automation: auto,
-                        },
-                    };
+                    return refusalPopup(action, auto, `${action.name} has been used and cannot be used again until a long rest.`);
                 }
                 await setRuntimeValue(playerStats.name, 'ragePoints', currentRage - 1, campaignName);
             } else {
-                return {
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: action.name,
-                        description: `${action.name} has been used and cannot be used again until a long rest.`,
-                        automation: auto,
-                    },
-                };
+                return refusalPopup(action, auto, `${action.name} has been used and cannot be used again until a long rest.`);
             }
         } else {
             await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
