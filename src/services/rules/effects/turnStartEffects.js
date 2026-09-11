@@ -19,26 +19,155 @@ function ensureArray(value, name) {
     return value;
 }
 
+function clearFlagIfSet(activeName, key, value, campaignName) {
+    if (getRuntimeValue(activeName, key, campaignName)) {
+        setRuntimeValue(activeName, key, value, campaignName);
+    }
+}
+
+// BUG SP-099: Resistance is "once per TURN" — the benefit re-arms for EVERY
+// protected creature at EVERY creature's turn start, not only the active
+// creature's own turn (which degraded it to once-per-round). Clear the
+// resistanceUsedThisTurn flag for all resistance_damage_reduction te holders
+// at every turn boundary. Sequential awaits — each setRuntimeValue POSTs the
+// full store snapshot (pitfall 21).
+async function clearResistanceUsedThisTurnFlags(campaignName) {
+    const resistanceEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    for (const te of resistanceEffects) {
+        if (!te || te.effect !== 'resistance_damage_reduction' || !te.target) continue;
+        if (getRuntimeValue(te.target, 'resistanceUsedThisTurn', campaignName)) {
+            await setRuntimeValue(te.target, 'resistanceUsedThisTurn', false, campaignName);
+        }
+    }
+}
+
+// Wild Magic Surge: expire effects with the given duration text.
+async function expireWildMagicSurgeEffects(activeName, campaignName, durationText) {
+    const surgeEffects = getRuntimeValue(activeName, 'wildMagicSurgeEffects', campaignName);
+    if (!Array.isArray(surgeEffects) || surgeEffects.length === 0) return;
+    const filtered = surgeEffects.filter(e => {
+        if (!e || !e.duration) return true;
+        return e.duration.trim().toLowerCase() !== durationText;
+    });
+    if (filtered.length !== surgeEffects.length) {
+        await setRuntimeValue(activeName, 'wildMagicSurgeEffects', filtered, campaignName, true);
+        const label = durationText.startsWith('start') ? 'start' : 'end';
+        console.error(`[expirations] Removed ${surgeEffects.length - filtered.length} "${label} of next turn" surge effects for ${activeName}`);
+    }
+}
+
+// CLA-393: Wrath of the Sea Emanation ends early if the holder has the
+// Incapacitated condition (Cloak of Shadows precedent).
+function endWrathOfTheSeaIfIncapacitated(activeName, campaignName) {
+    if (!getRuntimeValue(activeName, 'wrathOfTheSeaActive', campaignName)) return;
+    const wrathConds = getRuntimeValue(activeName, 'activeConditions', campaignName);
+    if (!(Array.isArray(wrathConds) && wrathConds.some(c => String(c).toLowerCase() === 'incapacitated'))) return;
+    setRuntimeValue(activeName, 'wrathOfTheSeaActive', false, campaignName);
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: activeName,
+        abilityName: 'Wrath of the Sea',
+        description: `${activeName}'s Wrath of the Sea Emanation ended early — Incapacitated.`,
+    }).catch((e) => { console.error('[turnStartEffects:wrath-of-the-sea-incapacitated-log-error]', e); });
+}
+
+// Cloak of Shadows: end when incapacitated
+function endCloakOfShadowsIfIncapacitated(activeName, campaignName) {
+    const cloakBuffs = getRuntimeValue(activeName, 'activeBuffs', campaignName);
+    if (!Array.isArray(cloakBuffs) || !cloakBuffs.some(b => b.effect === 'cloak_of_shadows')) return;
+    const conds = getRuntimeValue(activeName, 'activeConditions', campaignName);
+    if (!(Array.isArray(conds) && conds.some(c => String(c).toLowerCase() === 'incapacitated'))) return;
+    const filteredBuffs = cloakBuffs.filter(b => b.effect !== 'cloak_of_shadows');
+    setRuntimeValue(activeName, 'activeBuffs', filteredBuffs, campaignName);
+    const filteredConds = conds.filter(c => String(c).toLowerCase() !== 'invisible');
+    if (filteredConds.length !== conds.length) {
+        setRuntimeValue(activeName, 'activeConditions', filteredConds, campaignName);
+    }
+    setRuntimeValue('campaign', `_activeInvisibility_${activeName}`, null, campaignName);
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: activeName,
+        abilityName: 'Cloak of Shadows',
+        description: `${activeName}'s Cloak of Shadows ended due to the Incapacitated condition.`,
+    }).catch((e) => { console.error("[turnStartEffects:log-error]", e); });
+}
+
+// Turn start effect type → handler. Async handlers return a Promise and are
+// awaited by the dispatch loop; sync handlers return undefined and run
+// synchronously — matching the original per-branch await semantics exactly.
+const TURN_START_HANDLERS = {
+    'heroic_inspiration': (activeName, _playerStats, _effect, campaignName) => {
+        if (!getRuntimeValue(activeName, 'hasInspiration')) {
+            setRuntimeValue(activeName, 'hasInspiration', true, campaignName);
+        }
+    },
+    // BUG CLA-307: the `condition_removal` branch (Self-Restoration) was consumed
+    // HERE, i.e. at the owner's NEXT turn START — a full round late vs RAW "end of
+    // each turn" — and silently. It now runs at the owner's turn END via
+    // applyTurnEndConditionRemoval (turnEndConditionRemoval.js), invoked from
+    // navigationHandlers.handleNextCreature and the sseHandlers activeCreatureName
+    // echo for the OUTGOING active creature.
+    'flurry_healing_harm': applyFlurryHealingHarmTurnStart,
+    'living_legend_turn_start': (activeName, _playerStats, _effect, campaignName) => {
+        setRuntimeValue(activeName, 'unerringStrikeUsed', false, campaignName);
+    },
+    'elder_champion_regeneration': applyElderChampionRegeneration,
+    'radiant_soul_turn_start': (activeName, _playerStats, _effect, campaignName) => {
+        const key = `_radiantSoul_${activeName.replace(/\s+/g, '_')}_oncePerTurn`;
+        setRuntimeValue(activeName, key, false, campaignName);
+    },
+    'inner_radiance_turn_start': (activeName, playerStats, _effect, campaignName, characters) => {
+        // BUG CLA-198: gated on the effect type so it ticks exactly ONCE per
+        // invocation (previously it sat unconditionally in the loop and damaged
+        // every creature once per turnStartEffects entry). Modelled at the
+        // owner's turn boundary (the app has no turn-END consumer — same
+        // verified pattern as Holy Nimbus), gated by lastAppliedTurnStartCreature.
+        return applyAuraDamage(activeName, playerStats, campaignName, characters, {
+            activeKey: 'innerRadianceActive',
+            damageValue: playerStats.proficiency || 0,
+            range: 10,
+            damageType: 'Radiant',
+        });
+    },
+    'dread_ambush_speed': applyDreadAmbushSpeedTurnStart,
+    'umbral_sight': applyUmbralSightTurnStart,
+    'steady_aim_clear': applySteadyAimClearTurnStart,
+    'bait_and_switch_clear': (activeName, _playerStats, _effect, campaignName) => {
+        setRuntimeValue(activeName, 'baitAndSwitchActive', null, campaignName);
+        setRuntimeValue(activeName, 'baitAndSwitchBonus', null, campaignName);
+        setRuntimeValue(activeName, 'baitAndSwitchSource', null, campaignName);
+    },
+    // CLA-218: Mage Hand Legerdemain — the collector (automation/
+    // turnStartEffects.js) pushed this with no consumer. Spectral-hand
+    // control lasts until the start of your next turn, so clear the
+    // mageHandControlled flag (set by mageHandControlHandler) which
+    // arms the Dexterity (Sleight of Hand) check advantage.
+    'mage_hand_legerdemain': (activeName, _playerStats, _effect, campaignName) => {
+        clearFlagIfSet(activeName, 'mageHandControlled', false, campaignName);
+    },
+    'supreme_sneak': applySupremeSneakTurnStart,
+    'use_magic_device': applyUseMagicDeviceTurnStart,
+    'grapple_damage': applyGrappleDamageTurnStart,
+    'heroism_temp_hp': applyHeroismTempHp,
+    'regenerate_turn_start_heal': applyRegenerateTurnStartHeal,
+    'survivor_turn_start_heal': applySurvivorTurnStartHeal,
+    'resistance_clear_turn': (activeName, _playerStats, _effect, campaignName) => {
+        setRuntimeValue(activeName, 'resistanceUsedThisTurn', false, campaignName);
+    },
+    'vitalityOfTheTree_turn_start': applyVitalityOfTheTreeTurnStart,
+    'aura_of_life_turn_start_heal': applyAuraOfLifeTurnStartHeal,
+    'confusion_turn_start': (_activeName, _playerStats, _effect, campaignName) => applyConfusionTurnStart(_activeName, campaignName),
+};
+
 export async function applyTurnStartEffects(activeName, playerStats, campaignName, characters = []) {
     // Holy Nimbus: radiant damage to enemies in aura when they start their turn
     // Must run before the playerStats check since active creature may be an NPC
     await applyHolyNimbusDamage(activeName, characters, campaignName);
 
-    // BUG SP-099: Resistance is "once per TURN" — the benefit re-arms for EVERY
-    // protected creature at EVERY creature's turn start, not only the active
-    // creature's own turn (which degraded it to once-per-round). Clear the
-    // resistanceUsedThisTurn flag for all resistance_damage_reduction te holders
-    // at every turn boundary. Runs before the playerStats guard since EB monster
-    // turns never carry playerStats (Holy Nimbus precedent). Sequential awaits —
-    // each setRuntimeValue POSTs the full store snapshot (pitfall 21).
+    // Runs before the playerStats guard since EB monster turns never carry
+    // playerStats (Holy Nimbus precedent).
     if (activeName) {
-        const resistanceEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-        for (const te of resistanceEffects) {
-            if (!te || te.effect !== 'resistance_damage_reduction' || !te.target) continue;
-            if (getRuntimeValue(te.target, 'resistanceUsedThisTurn', campaignName)) {
-                await setRuntimeValue(te.target, 'resistanceUsedThisTurn', false, campaignName);
-            }
-        }
+        await clearResistanceUsedThisTurnFlags(campaignName);
     }
 
     if (!activeName || !playerStats) {
@@ -58,219 +187,39 @@ export async function applyTurnStartEffects(activeName, playerStats, campaignNam
     }
 
     // Clear Survivor once-per-turn flag at start of the active creature's turn (before processing effects)
-    if (activeName) {
-        const survivorUsed = getRuntimeValue(activeName, 'survivorUsedThisTurn', campaignName);
-        if (survivorUsed) {
-            setRuntimeValue(activeName, 'survivorUsedThisTurn', false, campaignName);
-        }
-    }
+    clearFlagIfSet(activeName, 'survivorUsedThisTurn', false, campaignName);
 
     // Wild Magic Surge: expire effects with "start of your next turn" duration
-    if (activeName) {
-        const surgeEffects = getRuntimeValue(activeName, 'wildMagicSurgeEffects', campaignName);
-        if (Array.isArray(surgeEffects) && surgeEffects.length > 0) {
-            const filtered = surgeEffects.filter(e => {
-                if (!e || !e.duration) return true;
-                return e.duration.trim().toLowerCase() !== 'start of your next turn';
-            });
-            if (filtered.length !== surgeEffects.length) {
-                await setRuntimeValue(activeName, 'wildMagicSurgeEffects', filtered, campaignName, true);
-                console.error(`[expirations] Removed ${surgeEffects.length - filtered.length} "start of next turn" surge effects for ${activeName}`);
-            }
-        }
-    }
+    await expireWildMagicSurgeEffects(activeName, campaignName, 'start of your next turn');
 
     for (const effect of turnStartEffects) {
-        if (effect.type === 'heroic_inspiration') {
-            const currentInspiration = getRuntimeValue(activeName, 'hasInspiration') || false;
-            if (!currentInspiration) {
-                setRuntimeValue(activeName, 'hasInspiration', true, campaignName);
-            }
-        }
-        // BUG CLA-307: the `condition_removal` branch (Self-Restoration) was consumed
-        // HERE, i.e. at the owner's NEXT turn START — a full round late vs RAW "end of
-        // each turn" — and silently. It now runs at the owner's turn END via
-        // applyTurnEndConditionRemoval (turnEndConditionRemoval.js), invoked from
-        // navigationHandlers.handleNextCreature and the sseHandlers activeCreatureName
-        // echo for the OUTGOING active creature.
-        if (effect.type === 'flurry_healing_harm') {
-            await applyFlurryHealingHarmTurnStart(activeName, playerStats, effect, campaignName);
-        }
-        if (effect.type === 'living_legend_turn_start') {
-            setRuntimeValue(activeName, 'unerringStrikeUsed', false, campaignName);
-        }
-        if (effect.type === 'elder_champion_regeneration') {
-            await applyElderChampionRegeneration(activeName, playerStats, effect, campaignName);
-        }
-        if (effect.type === 'radiant_soul_turn_start') {
-            const key = `_radiantSoul_${activeName.replace(/\s+/g, '_')}_oncePerTurn`;
-            setRuntimeValue(activeName, key, false, campaignName);
-        }
-        if (effect.type === 'inner_radiance_turn_start') {
-            // BUG CLA-198: gated on the effect type so it ticks exactly ONCE per
-            // invocation (previously it sat unconditionally in the loop and damaged
-            // every creature once per turnStartEffects entry). Modelled at the
-            // owner's turn boundary (the app has no turn-END consumer — same
-            // verified pattern as Holy Nimbus), gated by lastAppliedTurnStartCreature.
-            await applyAuraDamage(activeName, playerStats, campaignName, characters, {
-                activeKey: 'innerRadianceActive',
-                damageValue: playerStats.proficiency || 0,
-                range: 10,
-                damageType: 'Radiant',
-            });
-        }
-        if (effect.type === 'dread_ambush_speed') {
-            await applyDreadAmbushSpeedTurnStart(activeName, playerStats, effect, campaignName);
-        }
-        if (effect.type === 'umbral_sight') {
-            await applyUmbralSightTurnStart(activeName, playerStats, effect, campaignName);
-        }
-        if (effect.type === 'steady_aim_clear') {
-            await applySteadyAimClearTurnStart(activeName, playerStats, effect, campaignName);
-        }
-        if (effect.type === 'bait_and_switch_clear') {
-            setRuntimeValue(activeName, 'baitAndSwitchActive', null, campaignName);
-            setRuntimeValue(activeName, 'baitAndSwitchBonus', null, campaignName);
-            setRuntimeValue(activeName, 'baitAndSwitchSource', null, campaignName);
-        }
-        if (effect.type === 'mage_hand_legerdemain') {
-            // CLA-218: Mage Hand Legerdemain — the collector (automation/
-            // turnStartEffects.js) pushed this with no consumer. Spectral-hand
-            // control lasts until the start of your next turn, so clear the
-            // mageHandControlled flag (set by mageHandControlHandler) which
-            // arms the Dexterity (Sleight of Hand) check advantage.
-            const controlled = getRuntimeValue(activeName, 'mageHandControlled', campaignName);
-            if (controlled) {
-                setRuntimeValue(activeName, 'mageHandControlled', false, campaignName);
-            }
-        }
-        if (effect.type === 'supreme_sneak') {
-            await applySupremeSneakTurnStart(activeName, playerStats, effect, campaignName);
-        }
-        if (effect.type === 'use_magic_device') {
-            applyUseMagicDeviceTurnStart(activeName, playerStats, effect, campaignName);
-        }
-        if (effect.type === 'grapple_damage') {
-            await applyGrappleDamageTurnStart(activeName, playerStats, effect, campaignName);
-        }
-        if (effect.type === 'heroism_temp_hp') {
-            await applyHeroismTempHp(activeName, playerStats, effect, campaignName);
-        }
-        if (effect.type === 'regenerate_turn_start_heal') {
-            await applyRegenerateTurnStartHeal(activeName, playerStats, effect, campaignName);
-        }
-        if (effect.type === 'survivor_turn_start_heal') {
-            await applySurvivorTurnStartHeal(activeName, playerStats, effect, campaignName);
-        }
-        if (effect.type === 'resistance_clear_turn') {
-            setRuntimeValue(activeName, 'resistanceUsedThisTurn', false, campaignName);
-        }
-        if (effect.type === 'vitalityOfTheTree_turn_start') {
-            await applyVitalityOfTheTreeTurnStart(activeName, playerStats, effect, campaignName);
-        }
-        if (effect.type === 'aura_of_life_turn_start_heal') {
-            await applyAuraOfLifeTurnStartHeal(activeName, playerStats, effect, campaignName);
-        }
-        if (effect.type === 'confusion_turn_start') {
-            await applyConfusionTurnStart(activeName, campaignName);
+        const handler = TURN_START_HANDLERS[effect.type];
+        if (handler) {
+            const result = handler(activeName, playerStats, effect, campaignName, characters);
+            if (result) await result;
         }
     }
 
     // Check for regenerate buff (not tied to turnStartEffects - it's a spell buff)
-    if (activeName && playerStats) {
-        const regenerateActive = getRuntimeValue(activeName, 'regenerateActive', campaignName);
-        if (regenerateActive) {
-            await applyRegenerateBuffHeal(activeName, playerStats, campaignName);
-        }
+    const regenerateActive = getRuntimeValue(activeName, 'regenerateActive', campaignName);
+    if (regenerateActive) {
+        await applyRegenerateBuffHeal(activeName, playerStats, campaignName);
     }
 
-    // Clear Portent once-per-turn flag at start of each creature's turn
-    if (activeName) {
-        const portentUsed = getRuntimeValue(activeName, 'portentUsedThisTurn', campaignName);
-        if (portentUsed) {
-            setRuntimeValue(activeName, 'portentUsedThisTurn', false, campaignName);
-        }
-    }
+    // Clear once-per-turn flags at start of each creature's turn
+    clearFlagIfSet(activeName, 'portentUsedThisTurn', false, campaignName);
+    clearFlagIfSet(activeName, '_recklessAttack_offeredThisTurn', null, campaignName);
+    clearFlagIfSet(activeName, 'piercerPunctureUsedThisTurn', null, campaignName);
+    clearFlagIfSet(activeName, '_Savage_Attacker_usedRound', null, campaignName);
 
-    // Clear Reckless Attack offered flag at start of each creature's turn
-    if (activeName) {
-        const recklessOffered = getRuntimeValue(activeName, '_recklessAttack_offeredThisTurn', campaignName);
-        if (recklessOffered) {
-            setRuntimeValue(activeName, '_recklessAttack_offeredThisTurn', null, campaignName);
-        }
-    }
-
-    // Clear Piercer - Puncture at start of each creature's turn
-    if (activeName) {
-        const punctureUsed = getRuntimeValue(activeName, 'piercerPunctureUsedThisTurn', campaignName);
-        if (punctureUsed) {
-            setRuntimeValue(activeName, 'piercerPunctureUsedThisTurn', null, campaignName);
-        }
-    }
-
-    // Clear Savage Attacker at start of each creature's turn
-    if (activeName) {
-        const saUsed = getRuntimeValue(activeName, '_Savage_Attacker_usedRound', campaignName);
-        if (saUsed) {
-            setRuntimeValue(activeName, '_Savage_Attacker_usedRound', null, campaignName);
-        }
-    }
-
-    // CLA-393: Wrath of the Sea Emanation ends early if the holder has the
-    // Incapacitated condition (Cloak of Shadows precedent).
-    if (activeName && getRuntimeValue(activeName, 'wrathOfTheSeaActive', campaignName)) {
-        const wrathConds = getRuntimeValue(activeName, 'activeConditions', campaignName);
-        if (Array.isArray(wrathConds) && wrathConds.some(c => String(c).toLowerCase() === 'incapacitated')) {
-            setRuntimeValue(activeName, 'wrathOfTheSeaActive', false, campaignName);
-            addEntry(campaignName, {
-                type: 'ability_use',
-                characterName: activeName,
-                abilityName: 'Wrath of the Sea',
-                description: `${activeName}'s Wrath of the Sea Emanation ended early — Incapacitated.`,
-            }).catch((e) => { console.error('[turnStartEffects:wrath-of-the-sea-incapacitated-log-error]', e); });
-        }
-    }
-
-    // Cloak of Shadows: end when incapacitated
-    if (activeName) {
-        const cloakBuffs = getRuntimeValue(activeName, 'activeBuffs', campaignName);
-        if (Array.isArray(cloakBuffs) && cloakBuffs.some(b => b.effect === 'cloak_of_shadows')) {
-            const conds = getRuntimeValue(activeName, 'activeConditions', campaignName);
-            if (Array.isArray(conds) && conds.some(c => String(c).toLowerCase() === 'incapacitated')) {
-                const filteredBuffs = cloakBuffs.filter(b => b.effect !== 'cloak_of_shadows');
-                setRuntimeValue(activeName, 'activeBuffs', filteredBuffs, campaignName);
-                const filteredConds = conds.filter(c => String(c).toLowerCase() !== 'invisible');
-                if (filteredConds.length !== conds.length) {
-                    setRuntimeValue(activeName, 'activeConditions', filteredConds, campaignName);
-                }
-                setRuntimeValue('campaign', `_activeInvisibility_${activeName}`, null, campaignName);
-                addEntry(campaignName, {
-                    type: 'ability_use',
-                    characterName: activeName,
-                    abilityName: 'Cloak of Shadows',
-                    description: `${activeName}'s Cloak of Shadows ended due to the Incapacitated condition.`,
-                }).catch((e) => { console.error("[turnStartEffects:log-error]", e); });
-            }
-        }
-    }
+    endWrathOfTheSeaIfIncapacitated(activeName, campaignName);
+    endCloakOfShadowsIfIncapacitated(activeName, campaignName);
 
     // Clean up Topple weapon mastery Prone condition at start of target's next turn
     cleanUpToppleConditions(activeName, campaignName);
 
     // Wild Magic Surge: expire effects with "end of next turn" duration at the START of the next turn
-    if (activeName) {
-        const surgeEffects = getRuntimeValue(activeName, 'wildMagicSurgeEffects', campaignName);
-        if (Array.isArray(surgeEffects) && surgeEffects.length > 0) {
-            const filtered = surgeEffects.filter(e => {
-                if (!e || !e.duration) return true;
-                return e.duration.trim().toLowerCase() !== 'end of your next turn';
-            });
-            if (filtered.length !== surgeEffects.length) {
-                await setRuntimeValue(activeName, 'wildMagicSurgeEffects', filtered, campaignName, true);
-                console.error(`[expirations] Removed ${surgeEffects.length - filtered.length} "end of next turn" surge effects for ${activeName}`);
-            }
-        }
-    }
+    await expireWildMagicSurgeEffects(activeName, campaignName, 'end of your next turn');
 }
 
 // --- Turn start effect handlers ---
@@ -404,7 +353,7 @@ async function applySupremeSneakTurnStart(activeName, playerStats, effect, campa
     }
 }
 
-async function applyUseMagicDeviceTurnStart(_activeName, _playerStats, _effect, _campaignName) {
+function applyUseMagicDeviceTurnStart(_activeName, _playerStats, _effect, _campaignName) {
     // Use Magic Device: No per-turn state to manage.
     // The passive effects (attunement limit, charge reroll, scroll handling)
     // are applied continuously via saveModifiers and passive effects.

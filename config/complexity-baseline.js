@@ -4,53 +4,9 @@
 // Complexity ratchet: per-directory thresholds equal each directory's current
 // worst metric (non-test code). New code must not exceed its directory baseline,
 // since npm run lint runs with --max-warnings 0.
-// NOTE: step mode — src/services/automation complexity temporarily dropped to 72.
+// NOTE: step mode — src/components/char-sheet complexity temporarily dropped to 58.
 // Fix the reported violations, then run npm run lint:complexity-baseline to lock.
 export default [
-  {
-    files: ['src/components/initiative/**'],
-    rules: {
-      'complexity': ['warn', 79],
-      'max-depth': ['warn', 6],
-      'max-statements': ['warn', 72],
-    },
-  },
-  {
-    files: ['src/services/rules/**'],
-    rules: {
-      'complexity': ['warn', 76],
-      'max-depth': ['warn', 6],
-      'max-statements': ['warn', 122],
-      'max-params': ['warn', 19],
-    },
-  },
-  {
-    files: ['src/services/combat/**'],
-    rules: {
-      'complexity': ['warn', 73],
-      'max-depth': ['warn', 6],
-      'max-statements': ['warn', 103],
-      'max-params': ['warn', 18],
-    },
-  },
-  {
-    files: ['src/components/char-sheet/**'],
-    rules: {
-      'complexity': ['warn', 72],
-      'max-depth': ['warn', 6],
-      'max-statements': ['warn', 98],
-      'max-params': ['warn', 11],
-    },
-  },
-  {
-    files: ['src/services/automation/**'],
-    rules: {
-      'complexity': ['warn', 72],
-      'max-depth': ['warn', 7],
-      'max-statements': ['warn', 127],
-      'max-params': ['warn', 10],
-    },
-  },
   {
     files: ['src/services/character/**'],
     rules: {
@@ -68,6 +24,42 @@ export default [
     },
   },
   {
+    files: ['src/services/automation/**'],
+    rules: {
+      'complexity': ['warn', 68],
+      'max-depth': ['warn', 7],
+      'max-statements': ['warn', 91],
+      'max-params': ['warn', 10],
+    },
+  },
+  {
+    files: ['src/components/char-sheet/**'],
+    rules: {
+      'complexity': ['warn', 58],
+      'max-depth': ['warn', 6],
+      'max-statements': ['warn', 98],
+      'max-params': ['warn', 11],
+    },
+  },
+  {
+    files: ['src/services/combat/**'],
+    rules: {
+      'complexity': ['warn', 58],
+      'max-depth': ['warn', 6],
+      'max-statements': ['warn', 68],
+      'max-params': ['warn', 18],
+    },
+  },
+  {
+    files: ['src/services/rules/**'],
+    rules: {
+      'complexity': ['warn', 58],
+      'max-depth': ['warn', 6],
+      'max-statements': ['warn', 76],
+      'max-params': ['warn', 19],
+    },
+  },
+  {
     files: ['src/services/maps/**'],
     rules: {
       'complexity': ['warn', 46],
@@ -81,6 +73,14 @@ export default [
     rules: {
       'complexity': ['warn', 45],
       'max-params': ['warn', 7],
+    },
+  },
+  {
+    files: ['src/components/initiative/**'],
+    rules: {
+      'complexity': ['warn', 41],
+      'max-depth': ['warn', 6],
+      'max-statements': ['warn', 72],
     },
   },
   {

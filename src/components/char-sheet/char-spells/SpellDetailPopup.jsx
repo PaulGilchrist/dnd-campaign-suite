@@ -64,12 +64,37 @@ function FreeCastNotices({ freeCastAuthorized, isShadowArtsFreeCast, isPhantasma
   );
 }
 
+function computeIsUpcastable(spell, isCantrip) {
+  const slotDmg = spell.damage?.damage_at_slot_level;
+  const healAtSlotLevel = spell.heal_at_slot_level;
+  const upcastAtSlot = spell.upcast_at_slot_level;
+  return !isCantrip && ((slotDmg && Object.keys(slotDmg).length > 1) || (healAtSlotLevel && Object.keys(healAtSlotLevel).length > 1) || (upcastAtSlot && Object.keys(upcastAtSlot).length > 1));
+}
+
+function SpellMeta({ isCantrip, spell, isPhantasmalFreeCast, isDispelMagicAsBonusAction, isWarlock, warlockSlotLevel, playerStats, showUpcastSelector, psionicSorceryAvailable }) {
+  return (
+    <div className="spell-detail-meta">
+      <span><b>Level:</b> {isCantrip ? 'Cantrip' : spell.level}</span>
+      {/* CLA-322: Spell Breaker converts its bonusActionSpells to Bonus Action display */}
+      <span><b>Casting Time:</b> {isDispelMagicAsBonusAction ? 'Bonus Action' : (spell.casting_time || '—')}</span>
+      <span><b>Range:</b> {spell.range || '—'}</span>
+      <span><b>Duration:</b> {spell.duration || '—'}</span>
+      {spell.school && <span><b>School:</b> {isPhantasmalFreeCast ? 'Illusion (spectral)' : spell.school}</span>}
+      {/* CLA-234: per-spell casting-ability override (e.g. Nature Speaker — Wisdom) */}
+      {spell.spellCastingAbility && <span><b>Casting Ability:</b> {spell.spellCastingAbility}</span>}
+      {spell.area_of_effect && <span><b>Area:</b> {spell.area_of_effect.type || spell.area_of_effect.shape}{spell.area_of_effect.size ? ` - ${spell.area_of_effect.size}` : ''}</span>}
+      {!isCantrip && !showUpcastSelector && (
+        <span><b>Slots Remaining:</b> <SlotsRemainingText isWarlock={isWarlock} warlockSlotLevel={warlockSlotLevel} spell={spell} playerStats={playerStats} psionicSorceryAvailable={psionicSorceryAvailable} /></span>
+      )}
+    </div>
+  );
+}
+
 function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, upcastLevels = [], playerLevel = 1 }) {
   const isCantrip = spell.level === 0;
   const slotDmg = spell.damage?.damage_at_slot_level;
-  const healAtSlotLevel = spell.heal_at_slot_level;
   const charDmg = spell.damage?.damage_at_character_level;
-  const isUpcastable = !isCantrip && ((slotDmg && Object.keys(slotDmg).length > 1) || (healAtSlotLevel && Object.keys(healAtSlotLevel).length > 1) || (spell.upcast_at_slot_level && Object.keys(spell.upcast_at_slot_level).length > 1));
+  const isUpcastable = computeIsUpcastable(spell, isCantrip);
 
   // CLA-312: free-cast authorization is gated on the EFFECTIVE cast level —
   // selecting a higher upcast level here must revoke the free-cast affordance
@@ -204,20 +229,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
       <div className="spell-detail-content">
         <h3 dangerouslySetInnerHTML={{ __html: sanitizeHtml(spell.name) }} />
         <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(Array.isArray(spell.description) ? spell.description.join('') : spell.description || '') }} />
-        <div className="spell-detail-meta">
-          <span><b>Level:</b> {isCantrip ? 'Cantrip' : spell.level}</span>
-          {/* CLA-322: Spell Breaker converts its bonusActionSpells to Bonus Action display */}
-          <span><b>Casting Time:</b> {isDispelMagicAsBonusAction ? 'Bonus Action' : (spell.casting_time || '—')}</span>
-          <span><b>Range:</b> {spell.range || '—'}</span>
-          <span><b>Duration:</b> {spell.duration || '—'}</span>
-          {spell.school && <span><b>School:</b> {isPhantasmalFreeCast ? 'Illusion (spectral)' : spell.school}</span>}
-          {/* CLA-234: per-spell casting-ability override (e.g. Nature Speaker — Wisdom) */}
-          {spell.spellCastingAbility && <span><b>Casting Ability:</b> {spell.spellCastingAbility}</span>}
-          {spell.area_of_effect && <span><b>Area:</b> {spell.area_of_effect.type || spell.area_of_effect.shape}{spell.area_of_effect.size ? ` - ${spell.area_of_effect.size}` : ''}</span>}
-           {!isCantrip && !showUpcastSelector && (
-             <span><b>Slots Remaining:</b> <SlotsRemainingText isWarlock={isWarlock} warlockSlotLevel={warlockSlotLevel} spell={spell} playerStats={playerStats} psionicSorceryAvailable={_psionicSorceryAvailable} /></span>
-           )}
-        </div>
+        <SpellMeta isCantrip={isCantrip} spell={spell} isPhantasmalFreeCast={isPhantasmalFreeCast} isDispelMagicAsBonusAction={isDispelMagicAsBonusAction} isWarlock={isWarlock} warlockSlotLevel={warlockSlotLevel} playerStats={playerStats} showUpcastSelector={showUpcastSelector} psionicSorceryAvailable={_psionicSorceryAvailable} />
         {showUpcastSelector && (
           <div className="spell-detail-upcast">
             <p className="spell-detail-upcast-label"><i className="fa-solid fa-arrow-up"></i> Cast at Level:</p>

@@ -92,6 +92,281 @@ function collectRestoredResources(playerStats, campaignName, ctx) {
     return { restoredResources, naturalRecoveryDetail };
 }
 
+// Pure: resolve the class/feature recovery flags the modal gates on.
+function computeRestFlags(playerStats) {
+    const isSorcerer = playerStats?.class?.name === 'Sorcerer';
+    const sorcRestoration = isSorcerer && (playerStats.automation?.passives ?? []).find(a => a.type === 'resource_restoration');
+    const restorationCur = getRuntimeValue(playerStats.name, 'sorcerousRestorationUses');
+    const restorationAvailable = !!sorcRestoration && restorationCur !== 0;
+
+    const isWizard = playerStats?.class?.name === 'Wizard';
+    const arcaneRecovery = isWizard && (playerStats.automation?.passives ?? []).find(a => a.type === 'resource_restoration' && a.resourceKey === 'arcaneRecoveryLevels');
+    const arcaneRecoveryCur = getRuntimeValue(playerStats.name, 'arcaneRecoveryLevels');
+    const arcaneRecoveryAvailable = !!arcaneRecovery && arcaneRecoveryCur !== null && arcaneRecoveryCur !== 0;
+    const arcaneRecoveryMaxSlots = isWizard ? Math.ceil(playerStats.level / 2) : 0;
+
+    const isDruid = playerStats?.class?.name === 'Druid';
+    const naturalRecovery = isDruid && (playerStats.automation?.passives ?? []).find(a => a.type === 'natural_recovery');
+    const naturalRecoveryCur = getRuntimeValue(playerStats.name, 'naturalRecoverySlots');
+    const naturalRecoveryAvailable = !!naturalRecovery && naturalRecoveryCur !== 0;
+    const naturalRecoveryMaxLevels = isDruid ? Math.floor(playerStats.level / 2) : 0;
+
+    // CLA-226: automationRouter routes memorize_spell into specialActions (automationRouter.js:589),
+    // matching the signature_spells gate pattern in restRules-shortRest.js — gate must read that bucket.
+    const hasMemorizeSpell = isWizard && (playerStats.automation?.specialActions ?? []).find(a => a.type === 'memorize_spell');
+
+    const hasFontOfInspiration = (playerStats.automation?.passives ?? []).some(p => p.type === 'font_of_inspiration');
+    const bardicInspirationMax = playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0;
+    const bardicInspirationCur = getRuntimeValue(playerStats.name, 'bardicInspirationUses');
+    const fontOfInspirationAvailable = hasFontOfInspiration && (bardicInspirationCur == null || Number(bardicInspirationCur) < bardicInspirationMax);
+
+    const hasBolsteringTreats = (playerStats.automation?.passives ?? []).some(p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats');
+    const maxHitDice = playerStats.level;
+    const hitDie = getHitDieSize(playerStats);
+    const conBonus = playerStats.abilities?.find(a => a.name === 'Constitution')?.bonus || 0;
+    const songOfRestDie = getClassFeatures(playerStats)?.songOfRestDie || null;
+    const restoreAmount = isSorcerer ? evaluateAutoExpression(sorcRestoration?.restore_expression ?? '', playerStats, playerStats.proficiency, playerStats.level) : 0;
+
+    return { isSorcerer, sorcRestoration, restorationAvailable, arcaneRecovery, arcaneRecoveryAvailable, arcaneRecoveryMaxSlots, naturalRecovery, naturalRecoveryAvailable, naturalRecoveryMaxLevels, hasMemorizeSpell, hasFontOfInspiration, bardicInspirationMax, fontOfInspirationAvailable, hasBolsteringTreats, maxHitDice, hitDie, conBonus, songOfRestDie, restoreAmount };
+}
+
+function ShortRestRollLog({ rollLog, recoveredHp }) {
+    if (rollLog.length === 0) return null;
+    return (
+        <div className="short-rest-roll-log">
+            <table>
+                <thead>
+                    <tr><th>Roll</th><th>HP Recovered</th></tr>
+                </thead>
+                <tbody>
+                    {rollLog.map((entry, i) => (
+                        <tr key={i} className={entry.isSongOfRest ? 'short-rest-song-row' : ''}>
+                            <td>{entry.roll}{entry.isSongOfRest ? ' (Song of Rest)' : ''}</td>
+                            <td>{entry.hp}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+            <p className="short-rest-total"><b>Total HP Recovered:</b> {recoveredHp}</p>
+        </div>
+    );
+}
+
+function SongOfRestSection({ songOfRestDie, applied, onApply }) {
+    if (!songOfRestDie || applied) return null;
+    return (
+        <div className="short-rest-section">
+            <h4>Song of Rest</h4>
+            <p>Roll d{songOfRestDie} + CON bonus and add to recovered HP.</p>
+            <div className="short-rest-dice-row">
+                <button className="char-btn" onClick={onApply}>
+                    <i className="fa-solid fa-music"></i> Apply Song of Rest (d{songOfRestDie})
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function SorcerousRestorationSection({ restoration, available, requested, restoreAmount, onRequest }) {
+    if (!restoration || (!available && !requested)) return null;
+    return (
+        <div className="short-rest-section">
+            <h4>Sorcerous Restoration</h4>
+            <p>Regain {restoreAmount} expended sorcery points.</p>
+            <div className="short-rest-dice-row">
+                {requested ? (
+                    <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Restoration requested</span>
+                  ) : (
+                    <button className="char-btn" onClick={onRequest} disabled={!available}>
+                        <i className="fas fa-wand-magic-sparkles"></i> Regain {restoreAmount} Sorcery Points
+                    </button>
+                  )}
+            </div>
+        </div>
+    );
+}
+
+function FontOfInspirationSection({ visible, bardicInspirationMax }) {
+    if (!visible) return null;
+    return (
+        <div className="short-rest-section">
+            <h4>Font of Inspiration</h4>
+            <p>Regain {bardicInspirationMax} expended Bardic Inspiration uses.</p>
+            <div className="short-rest-dice-row">
+                <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Font of Inspiration applied on short rest</span>
+            </div>
+        </div>
+    );
+}
+
+function BolsteringTreatsSection({ visible, crafted, proficiency, onCraft }) {
+    if (!visible) return null;
+    return (
+        <div className="short-rest-section">
+            <h4>Bolstering Treats</h4>
+            <p>Craft {proficiency || 0} bolstering treats (last 8 hours).</p>
+            <div className="short-rest-dice-row">
+                {crafted ? (
+                    <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Treats crafted</span>
+                  ) : (
+                    <button className="char-btn" onClick={onCraft}>
+                        <i className="fas fa-cookie-bite"></i> Craft Bolstering Treats
+                    </button>
+                  )}
+            </div>
+        </div>
+    );
+}
+
+function MealSections({ hasMeal, mealConsumed }) {
+    return (
+        <>
+            {hasMeal && !mealConsumed && (
+                <div className="short-rest-section">
+                    <h4>Replenishing Meal</h4>
+                    <p>Your next Hit Die roll gains +1d8 HP. The meal will be consumed.</p>
+                </div>
+            )}
+            {mealConsumed && (
+                <div className="short-rest-section">
+                    <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Replenishing Meal consumed (+1d8 HP)</span>
+                </div>
+            )}
+        </>
+    );
+}
+
+function NaturalRecoverySection({ naturalRecovery, maxLevels, budgetRemaining, slotLevels, selections, onChange }) {
+    if (!naturalRecovery) return null;
+    return (
+        <div className="short-rest-section">
+            <h4>Natural Recovery</h4>
+            <p>Recover expended spell slots with combined level up to {maxLevels}.</p>
+            <>
+                <div className="short-rest-nr-budget">
+                        Budget: {budgetRemaining} of {maxLevels} levels remaining
+                    </div>
+                    <table className="short-rest-nr-table">
+                        <thead>
+                            <tr>
+                                <th>Level</th>
+                                <th>Current</th>
+                                <th>Available</th>
+                                <th>Recover</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {slotLevels.map(({ level, max, current, available }) => {
+                                const selected = selections[level] || 0;
+                                const canAdd = selected < available && budgetRemaining >= level;
+                                const canRemove = selected > 0;
+                                return (
+                                    <tr key={level}>
+                                        <td>{level}</td>
+                                        <td>{current} / {max}</td>
+                                        <td>{available}</td>
+                                        <td className="short-rest-nr-controls">
+                                            <button
+                                                className="char-btn char-btn-sm"
+                                                onClick={() => onChange(level, -1)}
+                                                disabled={!canRemove}
+                                            >-</button>
+                                            <span className="short-rest-nr-count">{selected}</span>
+                                            <button
+                                                className="char-btn char-btn-sm"
+                                                onClick={() => onChange(level, 1)}
+                                                disabled={!canAdd}
+                                            >+</button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </>
+        </div>
+    );
+}
+
+function ArcaneRecoverySection({ arcaneRecovery, available, requested, maxSlots, onRequest }) {
+    if (!arcaneRecovery || (!available && !requested)) return null;
+    return (
+        <div className="short-rest-section">
+            <h4>Arcane Recovery</h4>
+            <p>Regain expended Wizard spell slots up to level {maxSlots}. No slots level 6+.</p>
+            <div className="short-rest-dice-row">
+                {requested ? (
+                    <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Arcane Recovery applied</span>
+                  ) : (
+                    <button className="char-btn" onClick={onRequest} disabled={!available}>
+                        <i className="fas fa-book-open"></i> Recover Spell Slots
+                    </button>
+                  )}
+            </div>
+        </div>
+    );
+}
+
+function MemorizeSpellSection({ hasMemorizeSpell, available, mode, from, to, fromOptions, toOptions, onEnterMode, onChangeFrom, onChangeTo, onSwap, onCancel }) {
+    if (!hasMemorizeSpell || (!available && !mode)) return null;
+    return (
+        <div className="short-rest-section">
+            <h4>Memorize Spell</h4>
+            <p>Replace one prepared level 1+ spell with another from your spellbook.</p>
+            <div className="short-rest-dice-row">
+                {!mode ? (
+                    <button className="char-btn" onClick={onEnterMode}>
+                        <i className="fas fa-book-journal-whills"></i> Swap Prepared Spell
+                    </button>
+                  ) : (
+                     <div>
+                         <div className="short-rest-memorize-field">
+                             <label>Remove prepared spell: </label>
+                             <select className="char-btn" value={from || ''} onChange={e => onChangeFrom(e.target.value)}>
+                                 <option value="">-- Select spell to remove --</option>
+                                 {fromOptions.map(s => (
+                                     <option key={s.name} value={s.name}>{s.name} (level {s.level})</option>
+                                 ))}
+                             </select>
+                         </div>
+                         <div className="short-rest-memorize-field">
+                             <label>Add from spellbook: </label>
+                            <select className="char-btn" value={to || ''} onChange={e => onChangeTo(e.target.value)}>
+                                <option value="">-- Select spell to add --</option>
+                                {toOptions.map(s => (
+                                    <option key={s.name} value={s.name}>{s.name} (level {s.level})</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="short-rest-dice-row">
+                            <button className="char-btn" onClick={onSwap} disabled={!from || !to}>
+                                <i className="fas fa-check"></i> Swap Spell
+                            </button>
+                            <button className="char-btn" onClick={onCancel}>
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                  )}
+            </div>
+        </div>
+    );
+}
+
+function ResourceLabelsSection({ labels }) {
+    if (labels.length === 0) return null;
+    return (
+        <div className="short-rest-section">
+            <h4>Resources Restored</h4>
+            <ul>
+                {labels.map(label => (
+                    <li key={label}>{label}</li>
+                  ))}
+            </ul>
+        </div>
+    );
+}
+
 function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const [remainingHitDice, setRemainingHitDice] = React.useState(() => {
         const stored = getRuntimeValue(playerStats.name, 'shortRestHitDice');
@@ -108,29 +383,9 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const [mealConsumed, setMealConsumed] = React.useState(false);
 
 
-    const isSorcerer = playerStats?.class?.name === 'Sorcerer';
-    const sorcRestoration = isSorcerer && (playerStats.automation?.passives ?? []).find(
-        a => a.type === 'resource_restoration'
-      );
-    const restorationCur = getRuntimeValue(playerStats.name, 'sorcerousRestorationUses');
-    const restorationAvailable = !!sorcRestoration && restorationCur !== 0;
+    const { sorcRestoration, restorationAvailable, arcaneRecovery, arcaneRecoveryAvailable, arcaneRecoveryMaxSlots, naturalRecovery, naturalRecoveryAvailable, naturalRecoveryMaxLevels, hasMemorizeSpell, hasFontOfInspiration, bardicInspirationMax, fontOfInspirationAvailable, hasBolsteringTreats, maxHitDice, hitDie, conBonus, songOfRestDie, restoreAmount } = computeRestFlags(playerStats);
 
-    const isWizard = playerStats?.class?.name === 'Wizard';
-    const arcaneRecovery = isWizard && (playerStats.automation?.passives ?? []).find(
-        a => a.type === 'resource_restoration' && a.resourceKey === 'arcaneRecoveryLevels'
-    );
-    const arcaneRecoveryCur = getRuntimeValue(playerStats.name, 'arcaneRecoveryLevels');
-    const arcaneRecoveryAvailable = !!arcaneRecovery && arcaneRecoveryCur !== null && arcaneRecoveryCur !== 0;
-    const arcaneRecoveryMaxSlots = isWizard ? Math.ceil(playerStats.level / 2) : 0;
     const [arcaneRecoveryRequested, setArcaneRecoveryRequested] = React.useState(false);
-
-    const isDruid = playerStats?.class?.name === 'Druid';
-    const naturalRecovery = isDruid && (playerStats.automation?.passives ?? []).find(
-        a => a.type === 'natural_recovery'
-    );
-    const naturalRecoveryCur = getRuntimeValue(playerStats.name, 'naturalRecoverySlots');
-    const naturalRecoveryAvailable = !!naturalRecovery && naturalRecoveryCur !== 0;
-    const naturalRecoveryMaxLevels = isDruid ? Math.floor(playerStats.level / 2) : 0;
 
     const [naturalRecoverySelections, setNaturalRecoverySelections] = React.useState({});
 
@@ -166,9 +421,6 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
 
     // CLA-226: automationRouter routes memorize_spell into specialActions (automationRouter.js:589),
     // matching the signature_spells gate pattern in restRules-shortRest.js — gate must read that bucket.
-    const hasMemorizeSpell = isWizard && (playerStats.automation?.specialActions ?? []).find(
-        a => a.type === 'memorize_spell'
-    );
     const [memorizeSpellMode, setMemorizeSpellMode] = React.useState(false);
     const [memorizeSpellFrom, setMemorizeSpellFrom] = React.useState(null);
     const [memorizeSpellTo, setMemorizeSpellTo] = React.useState(null);
@@ -222,19 +474,7 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         setMemorizeSpellTo(null);
     };
 
-    const hasFontOfInspiration = (playerStats.automation?.passives ?? []).some(p => p.type === 'font_of_inspiration');
-    const bardicInspirationMax = (() => { const charisma = playerStats.abilities?.find(a => a.name === 'Charisma'); return charisma?.bonus || 0; })();
-    const bardicInspirationCur = getRuntimeValue(playerStats.name, 'bardicInspirationUses');
-    const fontOfInspirationAvailable = hasFontOfInspiration && (bardicInspirationCur == null || Number(bardicInspirationCur) < bardicInspirationMax);
-
-    const hasBolsteringTreats = (playerStats.automation?.passives ?? []).some(p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats');
     const [bolsteringTreatsCrafted, setBolsteringTreatsCrafted] = React.useState(false);
-
-    const maxHitDice = playerStats.level;
-    const hitDie = getHitDieSize(playerStats);
-    const conBonus = playerStats.abilities?.find(a => a.name === 'Constitution')?.bonus || 0;
-    const classFeatures = getClassFeatures(playerStats);
-    const songOfRestDie = classFeatures?.songOfRestDie || null;
     const resourceLabels = React.useMemo(() => getShortRestResourceLabels(playerStats), [playerStats]);
 
     const handleRollOne = () => {
@@ -294,8 +534,6 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         }
         setSongOfRestApplied(true);
        };
-
-    const restoreAmount = isSorcerer ? evaluateAutoExpression(sorcRestoration?.restore_expression ?? '', playerStats, playerStats.proficiency, playerStats.level) : 0;
 
     const handleApplySorcerousRestoration = () => {
         if (!sorcRestoration || !restorationAvailable || restorationRequested) return;
@@ -442,216 +680,32 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
                             <i className="fa-solid fa-dice-d6"></i> Roll All ({remainingHitDice})
                         </button>
                     </div>
-                     {rollLog.length > 0 && (
-                         <div className="short-rest-roll-log">
-                             <table>
-                                 <thead>
-                                     <tr><th>Roll</th><th>HP Recovered</th></tr>
-                                 </thead>
-                                 <tbody>
-                                     {rollLog.map((entry, i) => (
-                                         <tr key={i} className={entry.isSongOfRest ? 'short-rest-song-row' : ''}>
-                                             <td>{entry.roll}{entry.isSongOfRest ? ' (Song of Rest)' : ''}</td>
-                                             <td>{entry.hp}</td>
-                                         </tr>
-                                     ))}
-                                 </tbody>
-                             </table>
-                             <p className="short-rest-total"><b>Total HP Recovered:</b> {recoveredHp}</p>
-                         </div>
-                     )}
+                     <ShortRestRollLog rollLog={rollLog} recoveredHp={recoveredHp} />
                  </div>
 
-                 {songOfRestDie && !songOfRestApplied && (
-                     <div className="short-rest-section">
-                         <h4>Song of Rest</h4>
-                         <p>Roll d{songOfRestDie} + CON bonus and add to recovered HP.</p>
-                         <div className="short-rest-dice-row">
-                             <button className="char-btn" onClick={handleApplySongOfRest}>
-                                 <i className="fa-solid fa-music"></i> Apply Song of Rest (d{songOfRestDie})
-                             </button>
-                         </div>
-                     </div>
-                   )}
+                 <SongOfRestSection songOfRestDie={songOfRestDie} applied={songOfRestApplied} onApply={handleApplySongOfRest} />
 
-                   {sorcRestoration && (restorationAvailable || restorationRequested) && (
-                        <div className="short-rest-section">
-                            <h4>Sorcerous Restoration</h4>
-                            <p>Regain {restoreAmount} expended sorcery points.</p>
-                            <div className="short-rest-dice-row">
-                                {restorationRequested ? (
-                                    <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Restoration requested</span>
-                                  ) : (
-                                    <button className="char-btn" onClick={handleApplySorcerousRestoration} disabled={!restorationAvailable}>
-                                        <i className="fas fa-wand-magic-sparkles"></i> Regain {restoreAmount} Sorcery Points
-                                    </button>
-                                  )}
-                            </div>
-                        </div>
-                    )}
+                   <SorcerousRestorationSection restoration={sorcRestoration} available={restorationAvailable} requested={restorationRequested} restoreAmount={restoreAmount} onRequest={handleApplySorcerousRestoration} />
 
-                      {hasFontOfInspiration && fontOfInspirationAvailable && (
-                          <div className="short-rest-section">
-                              <h4>Font of Inspiration</h4>
-                              <p>Regain {bardicInspirationMax} expended Bardic Inspiration uses.</p>
-                              <div className="short-rest-dice-row">
-                                  <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Font of Inspiration applied on short rest</span>
-                              </div>
-                          </div>
-                      )}
+                     <FontOfInspirationSection visible={hasFontOfInspiration && fontOfInspirationAvailable} bardicInspirationMax={bardicInspirationMax} />
 
-                      {hasBolsteringTreats && (
-                          <div className="short-rest-section">
-                              <h4>Bolstering Treats</h4>
-                              <p>Craft {playerStats.proficiency || 0} bolstering treats (last 8 hours).</p>
-                              <div className="short-rest-dice-row">
-                                  {bolsteringTreatsCrafted ? (
-                                      <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Treats crafted</span>
-                                    ) : (
-                                      <button className="char-btn" onClick={handleCraftBolsteringTreats}>
-                                          <i className="fas fa-cookie-bite"></i> Craft Bolstering Treats
-                                      </button>
-                                    )}
-                              </div>
-                          </div>
-                      )}
+                     <BolsteringTreatsSection visible={hasBolsteringTreats} crafted={bolsteringTreatsCrafted} proficiency={playerStats.proficiency} onCraft={handleCraftBolsteringTreats} />
 
-                      {hasMeal && !mealConsumed && (
-                          <div className="short-rest-section">
-                              <h4>Replenishing Meal</h4>
-                              <p>Your next Hit Die roll gains +1d8 HP. The meal will be consumed.</p>
-                          </div>
-                      )}
-                      {mealConsumed && (
-                          <div className="short-rest-section">
-                              <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Replenishing Meal consumed (+1d8 HP)</span>
-                          </div>
-                      )}
+                     <MealSections hasMeal={hasMeal} mealConsumed={mealConsumed} />
 
-                       {resourceLabels.length > 0 && (
-                       <div className="short-rest-section">
-                           <h4>Resources Restored</h4>
-                           <ul>
-                               {resourceLabels.map(label => (
-                                   <li key={label}>{label}</li>
-                                  ))}
-                           </ul>
-                       </div>
-                   )}
+                     <ResourceLabelsSection labels={resourceLabels} />
 
-                    {naturalRecovery && (
-                        <div className="short-rest-section">
-                            <h4>Natural Recovery</h4>
-                            <p>Recover expended spell slots with combined level up to {naturalRecoveryMaxLevels}.</p>
-                            <>
-                                <div className="short-rest-nr-budget">
-                                        Budget: {naturalRecoveryBudgetRemaining} of {naturalRecoveryMaxLevels} levels remaining
-                                    </div>
-                                    <table className="short-rest-nr-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Level</th>
-                                                <th>Current</th>
-                                                <th>Available</th>
-                                                <th>Recover</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {naturalRecoverySlotLevels.map(({ level, max, current, available }) => {
-                                                const selected = naturalRecoverySelections[level] || 0;
-                                                const canAdd = selected < available && naturalRecoveryBudgetRemaining >= level;
-                                                const canRemove = selected > 0;
-                                                return (
-                                                    <tr key={level}>
-                                                        <td>{level}</td>
-                                                        <td>{current} / {max}</td>
-                                                        <td>{available}</td>
-                                                        <td className="short-rest-nr-controls">
-                                                            <button
-                                                                className="char-btn char-btn-sm"
-                                                                onClick={() => handleNaturalRecoveryChange(level, -1)}
-                                                                disabled={!canRemove}
-                                                            >-</button>
-                                                            <span className="short-rest-nr-count">{selected}</span>
-                                                            <button
-                                                                className="char-btn char-btn-sm"
-                                                                onClick={() => handleNaturalRecoveryChange(level, 1)}
-                                                                disabled={!canAdd}
-                                                            >+</button>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </>
-                        </div>
-                    )}
+                     <NaturalRecoverySection naturalRecovery={naturalRecovery} maxLevels={naturalRecoveryMaxLevels} budgetRemaining={naturalRecoveryBudgetRemaining} slotLevels={naturalRecoverySlotLevels} selections={naturalRecoverySelections} onChange={handleNaturalRecoveryChange} />
 
-                    {arcaneRecovery && (arcaneRecoveryAvailable || arcaneRecoveryRequested) && (
-                        <div className="short-rest-section">
-                            <h4>Arcane Recovery</h4>
-                            <p>Regain expended Wizard spell slots up to level {arcaneRecoveryMaxSlots}. No slots level 6+.</p>
-                            <div className="short-rest-dice-row">
-                                {arcaneRecoveryRequested ? (
-                                    <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Arcane Recovery applied</span>
-                                  ) : (
-                                    <button className="char-btn" onClick={() => setArcaneRecoveryRequested(true)} disabled={!arcaneRecoveryAvailable}>
-                                        <i className="fas fa-book-open"></i> Recover Spell Slots
-                                    </button>
-                                  )}
-                            </div>
-                        </div>
-                    )}
+                     <ArcaneRecoverySection arcaneRecovery={arcaneRecovery} available={arcaneRecoveryAvailable} requested={arcaneRecoveryRequested} maxSlots={arcaneRecoveryMaxSlots} onRequest={() => setArcaneRecoveryRequested(true)} />
 
-                    {hasMemorizeSpell && (memorizeSpellAvailable || memorizeSpellMode) && (
-                        <div className="short-rest-section">
-                            <h4>Memorize Spell</h4>
-                            <p>Replace one prepared level 1+ spell with another from your spellbook.</p>
-                            <div className="short-rest-dice-row">
-                                {!memorizeSpellMode ? (
-                                    <button className="char-btn" onClick={() => setMemorizeSpellMode(true)}>
-                                        <i className="fas fa-book-journal-whills"></i> Swap Prepared Spell
-                                    </button>
-                                  ) : (
-                                     <div>
-                                         <div className="short-rest-memorize-field">
-                                             <label>Remove prepared spell: </label>
-                                             <select className="char-btn" value={memorizeSpellFrom || ''} onChange={e => setMemorizeSpellFrom(e.target.value)}>
-                                                 <option value="">-- Select spell to remove --</option>
-                                                 {memorizeSpellFromOptions.map(s => (
-                                                     <option key={s.name} value={s.name}>{s.name} (level {s.level})</option>
-                                                 ))}
-                                             </select>
-                                         </div>
-                                         <div className="short-rest-memorize-field">
-                                             <label>Add from spellbook: </label>
-                                            <select className="char-btn" value={memorizeSpellTo || ''} onChange={e => setMemorizeSpellTo(e.target.value)}>
-                                                <option value="">-- Select spell to add --</option>
-                                                {memorizeSpellToOptions.map(s => (
-                                                    <option key={s.name} value={s.name}>{s.name} (level {s.level})</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div className="short-rest-dice-row">
-                                            <button className="char-btn" onClick={handleMemorizeSwap} disabled={!memorizeSpellFrom || !memorizeSpellTo}>
-                                                <i className="fas fa-check"></i> Swap Spell
-                                            </button>
-                                            <button className="char-btn" onClick={() => {
-                                                setMemorizeSpellMode(false);
-                                                setMemorizeSpellFrom(null);
-                                                setMemorizeSpellTo(null);
-                                            }}>
-                                                Cancel
-                                            </button>
-                                        </div>
-                                    </div>
-                                  )}
-                            </div>
-                        </div>
-                    )}
+                     <MemorizeSpellSection hasMemorizeSpell={hasMemorizeSpell} available={memorizeSpellAvailable} mode={memorizeSpellMode} from={memorizeSpellFrom} to={memorizeSpellTo} fromOptions={memorizeSpellFromOptions} toOptions={memorizeSpellToOptions} onEnterMode={() => setMemorizeSpellMode(true)} onChangeFrom={setMemorizeSpellFrom} onChangeTo={setMemorizeSpellTo} onSwap={handleMemorizeSwap} onCancel={() => {
+                         setMemorizeSpellMode(false);
+                         setMemorizeSpellFrom(null);
+                         setMemorizeSpellTo(null);
+                     }} />
 
-                    {celestialResilienceModal && (
+                     {celestialResilienceModal && (
                         <CreatureSelectionModal
                             title="Celestial Resilience"
                             icon="fa-shield-hart"

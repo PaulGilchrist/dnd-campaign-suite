@@ -26,6 +26,59 @@ import { confirmElfisLineage } from '../../services/automation/handlers/class-ot
 import { confirmGnomishLineage } from '../../services/automation/handlers/class-other/gnomishLineageHandler.js';
 import CharSpecialActionsModals from './CharSpecialActionsModals.jsx';
 import './CharSpecialActions.css';
+
+// modalName -> setter for automation 'modal' results (exact-match dispatch map).
+const MODAL_DISPATCH = {
+    teleport: (payload, d) => d.setTeleportModal(payload),
+    signatureSpells: (payload, d) => d.setSignatureSpellsModal(payload),
+    spellMastery: (payload, d) => d.setSpellMasteryModal(payload),
+    combatSuperiority: (payload, d) => d.setCombatSuperiorityModal(payload),
+    weaponKindMastery: (payload, d) => d.setWeaponKindMasteryModal(payload),
+    weaponMasteryChoice: (payload, d) => d.setWeaponMasteryChoiceModal(payload),
+    resourcePool: (payload, d) => d.setResourcePoolModal(payload),
+    naturalRecovery: (payload, d) => d.setNaturalRecoveryModal(payload),
+    circleOfTheLandSpells: (payload, d) => d.setCircleOfTheLandSpellsModal(payload),
+    moonlightStepFallback: (payload, d) => d.setMoonlightStepFallback(payload),
+    elementalAffinity: (payload, d) => d.setElementalAffinityModal(payload),
+    wildMagicSurge: (payload, d) => d.setWildMagicSurgeModal(payload),
+    strideOfTheElements: (payload, d) => d.setStrideModal(payload),
+    elementalEpitome: (payload, d) => d.setEpitomeModal(payload),
+    destructiveStride: (payload, d) => d.setDestructiveStrideModal(payload),
+    destructiveStrideTarget: (payload, d) => d.setDestructiveStrideTargetModal(payload),
+    quiveringPalm: (payload, d) => d.setQuiveringPalmModal(payload),
+    stepsOfTheFeyTaunt: (payload, d) => d.setStepsOfTheFeyTauntModal(payload),
+    mistyWanderer: (payload, d) => d.setMistyWandererModal(payload),
+    twinklingConstellation: (payload, d) => d.setTwinklingConstellationModal(payload),
+    hurlThroughHell: (payload, d) => d.setHurlThroughHellModal(payload),
+    clairvoyantCombatant: (payload, d) => d.setClairvoyantCombatantModal(payload),
+    portentDiceChoice: (payload, d) => d.setPortentModal(payload),
+    celestialResilienceModal: (payload, d) => d.setCelestialResilienceModal({ ...payload, playerStats: d.playerStats, campaignName: d.campaignName }),
+    fiendishResilience: (payload, d) => d.setFiendishResilienceModal(payload),
+    boonOfEnergyResistance: (payload, d) => d.setMultiResistanceModal(payload),
+    bolsteringPerformanceTarget: (payload, d) => d.setBolsteringPerformanceModal(payload),
+    encouragingSongTarget: (payload, d) => d.setEncouragingSongModal(payload),
+    elfishLineage: (payload, d) => d.setElfisLineageModal(payload),
+    gnomishLineage: (payload, d) => d.setGnomishLineageModal(payload),
+    feyReinforcements: (payload, d) => d.setFeyReinforcementsModal(payload),
+    fiendishLegacy: (payload, d) => d.setFiendishLegacyModal(payload),
+};
+
+function dispatchModalResult(modalName, payload, d) {
+    if (modalName?.includes('Savant')) {
+        d.setSavantModal(payload);
+        return;
+    }
+    const setter = MODAL_DISPATCH[modalName];
+    if (setter) setter(payload, d);
+}
+
+// Build the dismissable popup HTML for a generic automation popup result.
+function buildAutomationPopupHtml(payload, action) {
+    const name = payload?.name || action?.name || 'Automation';
+    const description = payload?.description || '';
+    return `<b>${name}</b><br/>${description}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+}
+
 function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, mapName }) {
     const [teleportModal, setTeleportModal] = useState(null);
     const [moonlightStepFallback, setMoonlightStepFallback] = useState(null);
@@ -416,81 +469,21 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
         const result = await executeHandler(action, playerStats, campaignName, mapName, characters);
         if (!result) return;
         if (result.type === 'modal') {
-            if (result.modalName === 'teleport') {
-                setTeleportModal(result.payload);
-            } else if (result.modalName === 'signatureSpells') {
-                setSignatureSpellsModal(result.payload);
-            } else if (result.modalName === 'spellMastery') {
-                setSpellMasteryModal(result.payload);
-            } else if (result.modalName?.includes('Savant')) {
-                setSavantModal(result.payload);
-            } else if (result.modalName === 'combatSuperiority') {
-                setCombatSuperiorityModal(result.payload);
-            } else if (result.modalName === 'weaponKindMastery') {
-                setWeaponKindMasteryModal(result.payload);
-            } else if (result.modalName === 'weaponMasteryChoice') {
-                setWeaponMasteryChoiceModal(result.payload);
-            } else if (result.modalName === 'resourcePool') {
-                setResourcePoolModal(result.payload);
-            } else if (result.modalName === 'naturalRecovery') {
-                setNaturalRecoveryModal(result.payload);
-            } else if (result.modalName === 'circleOfTheLandSpells') {
-                setCircleOfTheLandSpellsModal(result.payload);
-            } else if (result.modalName === 'moonlightStepFallback') {
-                setMoonlightStepFallback(result.payload);
-            } else if (result.modalName === 'elementalAffinity') {
-                setElementalAffinityModal(result.payload);
-            } else if (result.modalName === 'wildMagicSurge') {
-                setWildMagicSurgeModal(result.payload);
-            } else if (result.modalName === 'strideOfTheElements') {
-                setStrideModal(result.payload);
-            } else if (result.modalName === 'elementalEpitome') {
-                setEpitomeModal(result.payload);
-            } else if (result.modalName === 'destructiveStride') {
-                setDestructiveStrideModal(result.payload);
-            } else if (result.modalName === 'destructiveStrideTarget') {
-                setDestructiveStrideTargetModal(result.payload);
-            } else if (result.modalName === 'quiveringPalm') {
-                setQuiveringPalmModal(result.payload);
-            } else if (result.modalName === 'stepsOfTheFeyTaunt') {
-                setStepsOfTheFeyTauntModal(result.payload);
-            } else if (result.modalName === 'mistyWanderer') {
-                // CLA-229: companion-carry picker for the Special Actions row.
-                setMistyWandererModal(result.payload);
-            } else if (result.modalName === 'twinklingConstellation') {
-                // CLA-368: constellation re-swap picker for the Special Actions row.
-                setTwinklingConstellationModal(result.payload);
-            } else if (result.modalName === 'hurlThroughHell') {
-                setHurlThroughHellModal(result.payload);
-            } else if (result.modalName === 'clairvoyantCombatant') {
-                setClairvoyantCombatantModal(result.payload);
-            } else if (result.modalName === 'portentDiceChoice') {
-                setPortentModal(result.payload);
-            } else if (result.modalName === 'celestialResilienceModal') {
-                setCelestialResilienceModal({ ...result.payload, playerStats, campaignName });
-            } else if (result.modalName === 'fiendishResilience') {
-                setFiendishResilienceModal(result.payload);
-            } else if (result.modalName === 'boonOfEnergyResistance') {
-                setMultiResistanceModal(result.payload);
-            } else if (result.modalName === 'bolsteringPerformanceTarget') {
-                setBolsteringPerformanceModal(result.payload);
-            } else if (result.modalName === 'encouragingSongTarget') {
-                setEncouragingSongModal(result.payload);
-            } else if (result.modalName === 'elfishLineage') {
-                setElfisLineageModal(result.payload);
-            } else if (result.modalName === 'gnomishLineage') {
-                setGnomishLineageModal(result.payload);
-            } else if (result.modalName === 'feyReinforcements') {
-                setFeyReinforcementsModal(result.payload);
-            } else if (result.modalName === 'fiendishLegacy') {
-                setFiendishLegacyModal(result.payload);
-            }
+            dispatchModalResult(result.modalName, result.payload, {
+                playerStats, campaignName,
+                setTeleportModal, setSignatureSpellsModal, setSpellMasteryModal, setSavantModal,
+                setCombatSuperiorityModal, setWeaponKindMasteryModal, setWeaponMasteryChoiceModal,
+                setResourcePoolModal, setNaturalRecoveryModal, setCircleOfTheLandSpellsModal,
+                setMoonlightStepFallback, setElementalAffinityModal, setWildMagicSurgeModal,
+                setStrideModal, setEpitomeModal, setDestructiveStrideModal, setDestructiveStrideTargetModal,
+                setQuiveringPalmModal, setStepsOfTheFeyTauntModal, setMistyWandererModal,
+                setTwinklingConstellationModal, setHurlThroughHellModal, setClairvoyantCombatantModal,
+                setPortentModal, setCelestialResilienceModal, setFiendishResilienceModal,
+                setMultiResistanceModal, setBolsteringPerformanceModal, setEncouragingSongModal,
+                setElfisLineageModal, setGnomishLineageModal, setFeyReinforcementsModal, setFiendishLegacyModal,
+            });
         } else if (result.type === 'popup') {
-            const payload = result.payload;
-            const name = payload?.name || action?.name || 'Automation';
-            const description = payload?.description || '';
-            const html = `<b>${name}</b><br/>${description}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-            setPopupHtml(html);
+            setPopupHtml(buildAutomationPopupHtml(result.payload, action));
         }
     }, [playerStats, campaignName, cannotAct, mapName, characters, setCombatSuperiorityModal, setPopupHtml, handleReplenishingMealClick, handleBolsteringTreatsClick, handleBrewPoisonClick, setFeyReinforcementsModal, setGnomishLineageModal]);
     const handleStrideConfirm = useCallback(async (optionName, buffEntry) => {

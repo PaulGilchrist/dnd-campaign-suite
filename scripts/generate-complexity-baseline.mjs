@@ -4,13 +4,13 @@ import path from 'node:path';
 
 const RULES = ['complexity', 'max-depth', 'max-statements', 'max-params'];
 const DEFAULTS = {
-  complexity: 15,
+  'complexity': 15,
   'max-depth': 4,
   'max-statements': 60,
   'max-params': 5,
 };
 const METRIC_PATTERNS = {
-  complexity: /complexity of (\d+)/,
+  'complexity': /complexity of (\d+)/,
   'max-depth': /deeply \((\d+)\)/,
   'max-statements': /statements \((\d+)\)/,
   'max-params': /parameters \((\d+)\)/,

@@ -212,6 +212,74 @@ function SummonConfirmationModals({ mergedModalState, setModalState, setPopupHtm
     );
 }
 
+function RecklessAttackHost({ mergedModalState, playerStats, campaignName, handleBrutalStrikeConfirm, handleBrutalStrikeCancel, handleRecklessAttackConfirm, handleRecklessAttackCancel }) {
+    const rm = mergedModalState.recklessAttackModal;
+    if (!rm) return null;
+    return (
+        <RecklessAttackModal
+            playerStats={playerStats}
+            campaignName={campaignName}
+            attack={rm.attack}
+            mode={rm.mode || 'full'}
+            hasBrutalStrike={rm.hasBrutalStrike || false}
+            brutalStrikeOptions={rm.brutalStrikeOptions || []}
+            maxEffects={rm.maxEffects || 1}
+            onConfirm={rm.mode === 'brutalOnly'
+                ? (choice) => handleBrutalStrikeConfirm({ ...choice, riderName: rm.riderName })
+                : (attack, choice) => handleRecklessAttackConfirm(attack, { ...choice, riderName: rm.riderName })}
+            onCancel={rm.mode === 'brutalOnly'
+                ? (choice) => handleBrutalStrikeCancel(choice)
+                : () => handleRecklessAttackCancel(rm.attack)}
+        />
+    );
+}
+
+function AllySelectionModals({ mergedModalState, setModalState, handleMantleOfInspirationConfirm, handleCelestialResilienceConfirm, handleCelestialResilienceSkip, handleVitalityOfTheTreeConfirm, handleInspiringSmiteConfirm }) {
+    return (
+        <>
+            {mergedModalState.mantleOfInspirationTarget && (
+                <MantleOfInspirationModal
+                    creatureTargets={mergedModalState.mantleOfInspirationTarget.creatureTargets}
+                    tempHp={mergedModalState.mantleOfInspirationTarget.tempHp}
+                    dieRoll={mergedModalState.mantleOfInspirationTarget.dieRoll}
+                    bardicDieSize={mergedModalState.mantleOfInspirationTarget.bardicDieSize}
+                    maxTargets={mergedModalState.mantleOfInspirationTarget.maxTargets}
+                    onConfirm={handleMantleOfInspirationConfirm}
+                    onSkip={() => setModalState({ mantleOfInspirationTarget: null })}
+                />
+            )}
+            {mergedModalState.celestialResilienceModal && (
+                <CelestialResilienceModal
+                    creatureTargets={mergedModalState.celestialResilienceModal.creatureTargets}
+                    allyTempHp={mergedModalState.celestialResilienceModal.allyTempHp}
+                    selfTempHp={mergedModalState.celestialResilienceModal.selfTempHp}
+                    maxTargets={mergedModalState.celestialResilienceModal.maxTargets}
+                    onConfirm={handleCelestialResilienceConfirm}
+                    onSkip={handleCelestialResilienceSkip}
+                />
+            )}
+            {mergedModalState.vitalityOfTheTreeTarget && (
+                <VitalityOfTheTreeModal
+                    creatureTargets={mergedModalState.vitalityOfTheTreeTarget.creatureTargets}
+                    tempHp={mergedModalState.vitalityOfTheTreeTarget.tempHp}
+                    maxTargets={mergedModalState.vitalityOfTheTreeTarget.maxTargets}
+                    onConfirm={handleVitalityOfTheTreeConfirm}
+                    onSkip={() => setModalState({ vitalityOfTheTreeTarget: null })}
+                />
+            )}
+            {mergedModalState.inspiringSmiteModal && (
+                <InspiringSmiteModal
+                    creatureTargets={mergedModalState.inspiringSmiteModal.creatureTargets}
+                    tempHp={mergedModalState.inspiringSmiteModal.tempHp}
+                    roll={mergedModalState.inspiringSmiteModal.roll}
+                    onConfirm={handleInspiringSmiteConfirm}
+                    onSkip={() => setModalState({ inspiringSmiteModal: null })}
+                />
+            )}
+        </>
+    );
+}
+
 function SecondaryModals({
     mergedModalState,
     setModalState,
@@ -629,45 +697,15 @@ function SecondaryModals({
                     onSkip={() => setModalState({ radianceOfDawnModal: null })}
                 />
             )}
-            {mergedModalState.mantleOfInspirationTarget && (
-                <MantleOfInspirationModal
-                    creatureTargets={mergedModalState.mantleOfInspirationTarget.creatureTargets}
-                    tempHp={mergedModalState.mantleOfInspirationTarget.tempHp}
-                    dieRoll={mergedModalState.mantleOfInspirationTarget.dieRoll}
-                    bardicDieSize={mergedModalState.mantleOfInspirationTarget.bardicDieSize}
-                    maxTargets={mergedModalState.mantleOfInspirationTarget.maxTargets}
-                    onConfirm={handleMantleOfInspirationConfirm}
-                    onSkip={() => setModalState({ mantleOfInspirationTarget: null })}
-                />
-            )}
-            {mergedModalState.celestialResilienceModal && (
-                <CelestialResilienceModal
-                    creatureTargets={mergedModalState.celestialResilienceModal.creatureTargets}
-                    allyTempHp={mergedModalState.celestialResilienceModal.allyTempHp}
-                    selfTempHp={mergedModalState.celestialResilienceModal.selfTempHp}
-                    maxTargets={mergedModalState.celestialResilienceModal.maxTargets}
-                    onConfirm={handleCelestialResilienceConfirm}
-                    onSkip={handleCelestialResilienceSkip}
-                />
-            )}
-            {mergedModalState.vitalityOfTheTreeTarget && (
-                <VitalityOfTheTreeModal
-                    creatureTargets={mergedModalState.vitalityOfTheTreeTarget.creatureTargets}
-                    tempHp={mergedModalState.vitalityOfTheTreeTarget.tempHp}
-                    maxTargets={mergedModalState.vitalityOfTheTreeTarget.maxTargets}
-                    onConfirm={handleVitalityOfTheTreeConfirm}
-                    onSkip={() => setModalState({ vitalityOfTheTreeTarget: null })}
-                />
-            )}
-            {mergedModalState.inspiringSmiteModal && (
-                <InspiringSmiteModal
-                    creatureTargets={mergedModalState.inspiringSmiteModal.creatureTargets}
-                    tempHp={mergedModalState.inspiringSmiteModal.tempHp}
-                    roll={mergedModalState.inspiringSmiteModal.roll}
-                    onConfirm={handleInspiringSmiteConfirm}
-                    onSkip={() => setModalState({ inspiringSmiteModal: null })}
-                />
-            )}
+            <AllySelectionModals
+                mergedModalState={mergedModalState}
+                setModalState={setModalState}
+                handleMantleOfInspirationConfirm={handleMantleOfInspirationConfirm}
+                handleCelestialResilienceConfirm={handleCelestialResilienceConfirm}
+                handleCelestialResilienceSkip={handleCelestialResilienceSkip}
+                handleVitalityOfTheTreeConfirm={handleVitalityOfTheTreeConfirm}
+                handleInspiringSmiteConfirm={handleInspiringSmiteConfirm}
+            />
             {mergedModalState.epitomeModal && (
                 <ElementalEpitomeModal
                     action={mergedModalState.epitomeModal.action}
@@ -687,23 +725,15 @@ function SecondaryModals({
                     onClose={() => setModalState({ destructiveStrideModal: null })}
                 />
             )}
-            {mergedModalState.recklessAttackModal && (
-                <RecklessAttackModal
-                    playerStats={playerStats}
-                    campaignName={campaignName}
-                    attack={mergedModalState.recklessAttackModal.attack}
-                    mode={mergedModalState.recklessAttackModal.mode || 'full'}
-                    hasBrutalStrike={mergedModalState.recklessAttackModal.hasBrutalStrike || false}
-                    brutalStrikeOptions={mergedModalState.recklessAttackModal.brutalStrikeOptions || []}
-                    maxEffects={mergedModalState.recklessAttackModal.maxEffects || 1}
-                    onConfirm={mergedModalState.recklessAttackModal.mode === 'brutalOnly'
-                        ? (choice) => handleBrutalStrikeConfirm({ ...choice, riderName: mergedModalState.recklessAttackModal.riderName })
-                        : (attack, choice) => handleRecklessAttackConfirm(attack, { ...choice, riderName: mergedModalState.recklessAttackModal.riderName })}
-                    onCancel={mergedModalState.recklessAttackModal.mode === 'brutalOnly'
-                        ? (choice) => handleBrutalStrikeCancel(choice)
-                        : () => handleRecklessAttackCancel(mergedModalState.recklessAttackModal.attack)}
-                />
-            )}
+            <RecklessAttackHost
+                mergedModalState={mergedModalState}
+                playerStats={playerStats}
+                campaignName={campaignName}
+                handleBrutalStrikeConfirm={handleBrutalStrikeConfirm}
+                handleBrutalStrikeCancel={handleBrutalStrikeCancel}
+                handleRecklessAttackConfirm={handleRecklessAttackConfirm}
+                handleRecklessAttackCancel={handleRecklessAttackCancel}
+            />
             {mergedModalState.clockworkCavalcadeModal && (
                 <ClockworkCavalcadeModal
                     onChoose={handleClockworkCavalcadeChoice}

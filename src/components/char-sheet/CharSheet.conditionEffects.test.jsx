@@ -210,42 +210,19 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn((_key, prop, _val, _camp) => mockStore.set(prop, _val)),
   useRuntimeValue: vi.fn((key, prop) => {
     if (prop === 'exhaustionLevel') return 0;
-    if (prop === 'bardicInspirationDie') return mockStore.get(prop) ?? null;
-    if (prop === 'bardicInspirationCombatOptions') return mockStore.get(prop) ?? null;
-    if (prop === 'activeConditions') return mockStore.get(prop) ?? [];
-    if (prop === 'activeBuffs') return mockStore.get(prop) ?? [];
-    if (prop === 'targetEffects') return mockStore.get('targetEffects') ?? [];
-    if (prop === 'preparedSpells') return mockStore.get(prop) ?? null;
-    if (prop === 'aspectOfTheWildsOption') return mockStore.get(prop) ?? null;
-    if (prop === 'bardicInspirationGrantedBy') return mockStore.get(prop) ?? 'unknown';
-    if (prop === 'stunned_speedHalved') return mockStore.get(prop) ?? null;
-    if (prop === 'fanaticalFocusUsed') return mockStore.get(prop) ?? null;
-    if (prop === 'focusPoints') return mockStore.get(prop) ?? null;
-    if (prop === 'indomitableUses') return mockStore.get(prop) ?? 0;
-    if (prop === 'disciplinedSurvivorUsed') return mockStore.get(prop) ?? null;
-    if (prop === 'strokeOfLuckUsed') return mockStore.get(prop) ?? null;
-    if (prop === 'bardicInspirationUses') return mockStore.get(prop) ?? 0;
-    if (prop === 'secondWindUses') return mockStore.get(prop) ?? 0;
-    if (prop === 'superiorityDice') return mockStore.get(prop) ?? 0;
-    if (prop === 'psionicEnergy') return mockStore.get(prop) ?? 0;
-    if (prop === 'peerlessAthleteActive') return mockStore.get(prop) ?? null;
-    if (prop === 'largeFormActive') return mockStore.get(prop) ?? null;
-    if (prop === 'holyNimbusActive') return mockStore.get(prop) ?? null;
-    if (prop === '_Defensive_Tactics_choice') return mockStore.get(prop) ?? null;
-    if (prop === 'luckyAdvantageActive') return mockStore.get(prop) ?? null;
-    if (prop === 'luckyDisadvantageActive') return mockStore.get(prop) ?? null;
-    if (prop === '_circleOfTheLandType') return mockStore.get(prop) ?? null;
-    if (prop === '_Energy_Resistances_chosenTypes') return mockStore.get(prop) ?? null;
-    if (prop === '_Fiendish_Resilience_chosenType') return mockStore.get(prop) ?? null;
-    if (prop === '_spellThiefCasterBlock') return mockStore.get(prop) ?? null;
-    if (prop === '_spellThiefStolenList') return mockStore.get(prop) ?? null;
-    if (prop === 'piercerPunctureUsedThisTurn') return mockStore.get(prop) ?? null;
-    if (prop === '_Savage_Attacker_usedRound') return mockStore.get(prop) ?? null;
-    if (prop === 'darkOnesLuckUses') return mockStore.get(prop) ?? null;
-    if (prop === 'tranceOfOrderActive') return mockStore.get(prop) ?? null;
-    if (prop === 'livingLegendActive') return mockStore.get(prop) ?? null;
-    if (prop === 'elderChampionActive') return mockStore.get(prop) ?? null;
-    return null;
+    const defaults = {
+      activeConditions: [],
+      activeBuffs: [],
+      targetEffects: [],
+      bardicInspirationGrantedBy: 'unknown',
+      indomitableUses: 0,
+      bardicInspirationUses: 0,
+      secondWindUses: 0,
+      superiorityDice: 0,
+      psionicEnergy: 0,
+    };
+    const def = Object.prototype.hasOwnProperty.call(defaults, prop) ? defaults[prop] : null;
+    return mockStore.get(prop) ?? def;
   }),
 }));
 

@@ -10,6 +10,88 @@ function sizeIndexFor(size, fallbackIndex) {
     return index === -1 ? fallbackIndex : index;
 }
 
+// Pure: resolve the Stealth check bonus from passive/skill modifiers.
+function computeStealthBonus(conditionEffects, playerStats, exhaustionPenalty) {
+    const stealthSkill = playerStats?.abilities?.flatMap(a => a.skills || []).find(s => s.name === 'Stealth');
+    let stealthBonus = stealthSkill?.bonus ?? 0 - exhaustionPenalty;
+    const isCharismaSkill = ['Deception', 'Intimidation', 'Performance', 'Persuasion'].includes('Stealth');
+    if (conditionEffects?.wisCheckReplace && isCharismaSkill) {
+        const wisAbility = playerStats?.abilities?.find(a => a.name === 'Wisdom');
+        const wisMod = wisAbility?.bonus || 0;
+        const wisBonus = Math.max(1, wisMod);
+        const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
+        const isProficient = playerStats.skillProficiencies?.includes('Stealth');
+        const isExpert = playerStats.expertise?.includes('Stealth');
+        let newBonus = wisBonus;
+        if (isProficient) newBonus += proficiency;
+        if (isExpert) newBonus += proficiency;
+        stealthBonus = newBonus - exhaustionPenalty;
+    }
+    const isJackOfAllTrades = playerStats?.automation?.passives?.some(p => p.type === 'jack_of_all_trades');
+    const isNotProficient = !playerStats?.skillProficiencies?.includes('Stealth');
+    if (isJackOfAllTrades && isNotProficient) {
+        const prof = Math.floor((playerStats.level - 1) / 4 + 2);
+        stealthBonus += Math.floor(prof / 2);
+    }
+    if (conditionEffects?.passWithoutTraceBonus && 'Stealth' === 'Stealth') {
+        stealthBonus += parseInt(conditionEffects.passWithoutTraceBonus, 10);
+    }
+    return stealthBonus;
+}
+
+// Pure: resolve advantage/disadvantage context + Skulker fog-of-war flag.
+function resolveStealthCheckContext(conditionEffects, playerStats) {
+    const checkContext = {};
+    const hasSkulkerFeat = (playerStats?.feats || []).some(f => String(f).toLowerCase().includes('skulker'));
+    const is2024Rules = playerStats?.rules === '2024';
+    let skulkerFogOfWarApplied = false;
+    if (conditionEffects?.abilityCheckDisadvantage) checkContext.forcedMode = 'disadvantage';
+    if (!checkContext.forcedMode && conditionEffects?.hexAbilityCheckDisadvantage && conditionEffects?.hexAbilityCheckDisadvantageAbility === 'DEX') checkContext.forcedMode = 'disadvantage';
+    if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === 'Stealth')) {
+        checkContext.forcedMode = checkContext.forcedMode === 'disadvantage' ? undefined : 'advantage';
+    }
+    if (conditionEffects?.peerlessAthleteAdvantageSkills && conditionEffects.peerlessAthleteAdvantageSkills.includes('Stealth')) {
+        checkContext.forcedMode = checkContext.forcedMode === 'disadvantage' ? undefined : 'advantage';
+    }
+    if (!checkContext.forcedMode && is2024Rules && hasSkulkerFeat) {
+        checkContext.forcedMode = 'advantage';
+        skulkerFogOfWarApplied = true;
+    }
+    return { checkContext, skulkerFogOfWarApplied };
+}
+
+// Pure: build the success popup description + log line for a Hide result.
+function buildHideSuccessMessages({ d20Val, stealthBonus, rollTotal, dc, skulkerFogOfWarApplied, naturallyStealthyObscuredBy }) {
+    let successDesc = `Hide successful! (d20: ${d20Val} + ${stealthBonus} = ${rollTotal}) You gain the Invisible condition and advantage on Dexterity (Stealth) checks until you attack, take damage, or use Lesser Restoration to remove the condition.`;
+    let successLog = `Stealth check: ${rollTotal} (d20: ${d20Val} + ${stealthBonus}) vs DC ${dc} — Success. Gained Invisible condition and advantage on Stealth checks.`;
+    if (skulkerFogOfWarApplied) {
+        successDesc = `Hide successful! (Advantage from Skulker - Fog of War) (d20: ${d20Val} + ${stealthBonus} = ${rollTotal}) You gain the Invisible condition and advantage on Dexterity (Stealth) checks until you attack, take damage, or use Lesser Restoration to remove the condition.`;
+        successLog = `Stealth check: ${rollTotal} (Advantage from Skulker - Fog of War) (d20: ${d20Val} + ${stealthBonus}) vs DC ${dc} — Success. Gained Invisible condition and advantage on Stealth checks.`;
+    }
+    if (naturallyStealthyObscuredBy) {
+        const obscurement = `${naturallyStealthyObscuredBy.name} (${naturallyStealthyObscuredBy.size}, at least one size larger)`;
+        successDesc = `Hide successful! (Naturally Stealthy - obscured by ${obscurement}) (d20: ${d20Val} + ${stealthBonus} = ${rollTotal}) You gain the Invisible condition and advantage on Dexterity (Stealth) checks until you attack, take damage, or use Lesser Restoration to remove the condition.`;
+        successLog = `Stealth check: ${rollTotal} (Naturally Stealthy - obscured by ${obscurement}) (d20: ${d20Val} + ${stealthBonus}) vs DC ${dc} — Success. Gained Invisible condition and advantage on Stealth checks.`;
+    }
+    return { successDesc, successLog };
+}
+
+// Pure: build the failure popup description + log line for a Hide result.
+function buildHideFailureMessages({ d20Val, stealthBonus, rollTotal, dc, skulkerFogOfWarApplied, naturallyStealthyObscuredBy }) {
+    let failDesc = `Hide failed! (d20: ${d20Val} + ${stealthBonus} = ${rollTotal}) You remain visible.`;
+    let failLog = `Stealth check: ${rollTotal} (d20: ${d20Val} + ${stealthBonus}) vs DC ${dc} — Failure. Did not gain the Invisible condition.`;
+    if (skulkerFogOfWarApplied) {
+        failDesc = `Hide failed! (Advantage from Skulker - Fog of War) (d20: ${d20Val} + ${stealthBonus} = ${rollTotal}) You remain visible.`;
+        failLog = `Stealth check: ${rollTotal} (Advantage from Skulker - Fog of War) (d20: ${d20Val} + ${stealthBonus}) vs DC ${dc} — Failure. Did not gain the Invisible condition.`;
+    }
+    if (naturallyStealthyObscuredBy) {
+        const obscurement = `${naturallyStealthyObscuredBy.name} (${naturallyStealthyObscuredBy.size}, at least one size larger)`;
+        failDesc = `Hide failed! (Naturally Stealthy - obscured by ${obscurement}) (d20: ${d20Val} + ${stealthBonus} = ${rollTotal}) You remain visible.`;
+        failLog = `Stealth check: ${rollTotal} (Naturally Stealthy - obscured by ${obscurement}) (d20: ${d20Val} + ${stealthBonus}) vs DC ${dc} — Failure. Did not gain the Invisible condition.`;
+    }
+    return { failDesc, failLog };
+}
+
 export default function useCharActionsBaseActions({
     cannotAct,
     getRuntimeValue,
@@ -57,57 +139,17 @@ export default function useCharActionsBaseActions({
             setPopupHtml({ type: 'automation_info', name: 'Hide', description: 'You are already hidden (Invisible condition active).' });
             return;
         }
-        const stealthSkill = playerStats?.abilities?.flatMap(a => a.skills || []).find(s => s.name === 'Stealth');
-        let stealthBonus = stealthSkill?.bonus ?? 0 - exhaustionPenalty;
-
-        const isCharismaSkill = ['Deception', 'Intimidation', 'Performance', 'Persuasion'].includes('Stealth');
-        if (conditionEffects?.wisCheckReplace && isCharismaSkill) {
-            const wisAbility = playerStats?.abilities?.find(a => a.name === 'Wisdom');
-            const wisMod = wisAbility?.bonus || 0;
-            const wisBonus = Math.max(1, wisMod);
-            const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
-            const isProficient = playerStats.skillProficiencies?.includes('Stealth');
-            const isExpert = playerStats.expertise?.includes('Stealth');
-            let newBonus = wisBonus;
-            if (isProficient) newBonus += proficiency;
-            if (isExpert) newBonus += proficiency;
-            stealthBonus = newBonus - exhaustionPenalty;
-        }
-        const isJackOfAllTrades = playerStats?.automation?.passives?.some(p => p.type === 'jack_of_all_trades');
-        const isNotProficient = !playerStats?.skillProficiencies?.includes('Stealth');
-        if (isJackOfAllTrades && isNotProficient) {
-            const prof = Math.floor((playerStats.level - 1) / 4 + 2);
-            stealthBonus += Math.floor(prof / 2);
-        }
-        if (conditionEffects?.passWithoutTraceBonus && 'Stealth' === 'Stealth') {
-            stealthBonus += parseInt(conditionEffects.passWithoutTraceBonus, 10);
-        }
-        let checkContext = {};
-        const hasSkulkerFeat = (playerStats?.feats || []).some(f => String(f).toLowerCase().includes('skulker'));
-        const is2024Rules = playerStats?.rules === '2024';
-        let skulkerFogOfWarApplied = false;
-        if (conditionEffects?.abilityCheckDisadvantage) checkContext.forcedMode = 'disadvantage';
-        if (!checkContext.forcedMode && conditionEffects?.hexAbilityCheckDisadvantage && conditionEffects?.hexAbilityCheckDisadvantageAbility === 'DEX') checkContext.forcedMode = 'disadvantage';
-        if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === 'Stealth')) {
-            checkContext.forcedMode = checkContext.forcedMode === 'disadvantage' ? undefined : 'advantage';
-        }
-        if (conditionEffects?.peerlessAthleteAdvantageSkills && conditionEffects.peerlessAthleteAdvantageSkills.includes('Stealth')) {
-            checkContext.forcedMode = checkContext.forcedMode === 'disadvantage' ? undefined : 'advantage';
-        }
-        if (!checkContext.forcedMode && is2024Rules && hasSkulkerFeat) {
-            checkContext.forcedMode = 'advantage';
-            skulkerFogOfWarApplied = true;
-        }
-        let naturallyStealthyObscuredBy = null;
-        if (hasNaturallyStealthy(playerStats)) {
-            naturallyStealthyObscuredBy = await findLargerObscuringCreature();
-        }
+        const stealthBonus = computeStealthBonus(conditionEffects, playerStats, exhaustionPenalty);
+        const { checkContext, skulkerFogOfWarApplied } = resolveStealthCheckContext(conditionEffects, playerStats);
+        const naturallyStealthyObscuredBy = hasNaturallyStealthy(playerStats) ? await findLargerObscuringCreature() : null;
         await rollSkillCheck('Stealth', stealthBonus, checkContext);
         await new Promise(resolve => setTimeout(resolve, 50));
         const lastAttackData = await getRuntimeValue('campaign', 'lastAttack', campaignName);
         const rollTotal = lastAttackData?.total;
         const dc = 15;
+        const d20Val = lastAttackData?.d20 ?? '?';
         const success = rollTotal >= dc;
+        const msgArgs = { d20Val, stealthBonus, rollTotal, dc, skulkerFogOfWarApplied, naturallyStealthyObscuredBy };
         if (success) {
             const newConditions = [...currentConditions, 'invisible'];
             await setRuntimeValue(playerStats.name, 'activeConditions', newConditions, campaignName);
@@ -115,18 +157,7 @@ export default function useCharActionsBaseActions({
             const hasAdvantageOnStealth = activeBuffs.some(b => b.effect === 'advantage_on_stealth');
             const newBuffs = hasAdvantageOnStealth ? activeBuffs : [...activeBuffs, { name: 'Hide', effect: 'advantage_on_stealth' }];
             await setRuntimeValue(playerStats.name, 'activeBuffs', newBuffs, campaignName);
-            const d20Val = lastAttackData?.d20 ?? '?';
-            let successDesc = `Hide successful! (d20: ${d20Val} + ${stealthBonus} = ${rollTotal}) You gain the Invisible condition and advantage on Dexterity (Stealth) checks until you attack, take damage, or use Lesser Restoration to remove the condition.`;
-            let successLog = `Stealth check: ${rollTotal} (d20: ${d20Val} + ${stealthBonus}) vs DC ${dc} — Success. Gained Invisible condition and advantage on Stealth checks.`;
-            if (skulkerFogOfWarApplied) {
-                successDesc = `Hide successful! (Advantage from Skulker - Fog of War) (d20: ${d20Val} + ${stealthBonus} = ${rollTotal}) You gain the Invisible condition and advantage on Dexterity (Stealth) checks until you attack, take damage, or use Lesser Restoration to remove the condition.`;
-                successLog = `Stealth check: ${rollTotal} (Advantage from Skulker - Fog of War) (d20: ${d20Val} + ${stealthBonus}) vs DC ${dc} — Success. Gained Invisible condition and advantage on Stealth checks.`;
-            }
-            if (naturallyStealthyObscuredBy) {
-                const obscurement = `${naturallyStealthyObscuredBy.name} (${naturallyStealthyObscuredBy.size}, at least one size larger)`;
-                successDesc = `Hide successful! (Naturally Stealthy - obscured by ${obscurement}) (d20: ${d20Val} + ${stealthBonus} = ${rollTotal}) You gain the Invisible condition and advantage on Dexterity (Stealth) checks until you attack, take damage, or use Lesser Restoration to remove the condition.`;
-                successLog = `Stealth check: ${rollTotal} (Naturally Stealthy - obscured by ${obscurement}) (d20: ${d20Val} + ${stealthBonus}) vs DC ${dc} — Success. Gained Invisible condition and advantage on Stealth checks.`;
-            }
+            const { successDesc, successLog } = buildHideSuccessMessages(msgArgs);
             setPopupHtml({ type: 'automation_info', name: 'Hide', description: successDesc });
             await addEntry(campaignName, {
                 type: 'ability_use',
@@ -135,18 +166,7 @@ export default function useCharActionsBaseActions({
                 description: successLog,
             }).catch((e) => { console.error("[useCharActionsBaseActions:log-error]", e); });
         } else {
-            const d20Val = lastAttackData?.d20 ?? '?';
-            let failDesc = `Hide failed! (d20: ${d20Val} + ${stealthBonus} = ${rollTotal}) You remain visible.`;
-            let failLog = `Stealth check: ${rollTotal} (d20: ${d20Val} + ${stealthBonus}) vs DC ${dc} — Failure. Did not gain the Invisible condition.`;
-            if (skulkerFogOfWarApplied) {
-                failDesc = `Hide failed! (Advantage from Skulker - Fog of War) (d20: ${d20Val} + ${stealthBonus} = ${rollTotal}) You remain visible.`;
-                failLog = `Stealth check: ${rollTotal} (Advantage from Skulker - Fog of War) (d20: ${d20Val} + ${stealthBonus}) vs DC ${dc} — Failure. Did not gain the Invisible condition.`;
-            }
-            if (naturallyStealthyObscuredBy) {
-                const obscurement = `${naturallyStealthyObscuredBy.name} (${naturallyStealthyObscuredBy.size}, at least one size larger)`;
-                failDesc = `Hide failed! (Naturally Stealthy - obscured by ${obscurement}) (d20: ${d20Val} + ${stealthBonus} = ${rollTotal}) You remain visible.`;
-                failLog = `Stealth check: ${rollTotal} (Naturally Stealthy - obscured by ${obscurement}) (d20: ${d20Val} + ${stealthBonus}) vs DC ${dc} — Failure. Did not gain the Invisible condition.`;
-            }
+            const { failDesc, failLog } = buildHideFailureMessages(msgArgs);
             setPopupHtml({ type: 'automation_info', name: 'Hide', description: failDesc });
             await addEntry(campaignName, {
                 type: 'ability_use',

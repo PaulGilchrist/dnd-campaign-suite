@@ -60,6 +60,132 @@ function applyRerollKillSwitches(conditionEffects, playerStats, campaignName) {
 }
 
 // Warding Bond: +1 AC and +1 to all saving throws (only if within 60 feet)
+function buffsHave(activeBuffs, predicate) {
+    return Array.isArray(activeBuffs) && activeBuffs.some(predicate);
+}
+
+function hasBuffEffect(activeBuffs, effect) {
+    return buffsHave(activeBuffs, b => b.effect === effect);
+}
+
+function normalizeExhaustion(storedExhaustion) {
+    return typeof storedExhaustion === 'number' ? Math.min(6, Math.max(0, storedExhaustion)) : 0;
+}
+
+function buildAllSaveModifiers(playerStats, stanceSaveModifiers, pfeagSaveAdvantage, mageHandControlled) {
+    return [...(playerStats?.saveModifiers || []), ...stanceSaveModifiers, ...pfeagSaveAdvantage]
+        .filter(m => m.condition !== 'mage_hand_legerdemain' || mageHandControlled);
+}
+
+// Boolean activity flags (buff-effect lookups + runtime reads) feeding computeConditionEffects.
+function computeConditionFlags(activeBuffs, playerStats, campaignName) {
+    return {
+        isRaging: buffsHave(activeBuffs, b => b.damageBonusExpression),
+        shapeShiftActive: hasBuffEffect(activeBuffs, 'shape_shift'),
+        isPeerlessAthlete: getRuntimeValue(playerStats?.name, 'peerlessAthleteActive', campaignName),
+        isLargeFormActive: getRuntimeValue(playerStats?.name, 'largeFormActive', campaignName),
+        seeInvisibilityActive: hasBuffEffect(activeBuffs, 'see_invisibility'),
+        isLivingLegendActive: getRuntimeValue(playerStats?.name, 'livingLegendActive', campaignName) === true,
+        isElderChampionActive: getRuntimeValue(playerStats?.name, 'elderChampionActive', campaignName) === true,
+        isHolyAuraActive: getHolyAuraTargets(playerStats?.name, campaignName),
+        isProtectionFromPoisonActive: buffsHave(activeBuffs, b => b.name === 'Protection from Poison' && b.effect === 'protection_from_poison'),
+        isTranceOfOrderActive: getRuntimeValue(playerStats?.name, 'tranceOfOrderActive', campaignName) === true,
+    };
+}
+
+// Protection from Evil and Good: warded attacker has Disadvantage on attack rolls against the target.
+function applyPfeagTargetDisadvantage(conditionEffects, playerStats, combatContext, campaignName) {
+    const attackerName = combatContext.attackerName;
+    if (!attackerName) return;
+    const attackerCreature = combatContext.creatures?.find(c => c.name === attackerName);
+    if (attackerCreature && isCreatureWarded(attackerCreature.type, playerStats.name, campaignName)) {
+        conditionEffects.targetDisadvantageCount = (conditionEffects.targetDisadvantageCount || 0) + 1;
+    }
+}
+
+// Elusive: no attack roll can have Advantage against you unless Incapacitated.
+function applyElusive(conditionEffects, playerStats, activeConditions) {
+    const hasElusive = [
+        ...(playerStats.actions || []),
+        ...(playerStats.bonusActions || []),
+        ...(playerStats.reactions || []),
+        ...(playerStats.specialActions || [])
+    ].some(a => a.name === 'Elusive');
+    const isIncapacitated = activeConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c));
+    if (hasElusive && !isIncapacitated) {
+        conditionEffects.noAdvantageAgainst = true;
+    }
+}
+
+// Post-compute buff/feature modifiers applied to the base conditionEffects, in original order.
+function applyPostComputeModifiers(conditionEffects, activeBuffs, playerSummary, playerStats, combatContext, campaignName, pfeagActive, activeConditions) {
+    if (playerStats) {
+        const speedHalvedTime = getRuntimeValue(playerStats.name, 'stunned_speedHalved', campaignName);
+        if (speedHalvedTime) conditionEffects.speedHalved = true;
+        if (conditionEffects.autoRerollBonus) {
+            conditionEffects.autoRerollBonus = evaluateAutoExpression(conditionEffects.autoRerollBonus, playerStats);
+        }
+        applyRerollKillSwitches(conditionEffects, playerStats, campaignName);
+    }
+    // Reckless Attack: enemies have Advantage on attack rolls against you
+    if (hasBuffEffect(activeBuffs, 'advantage_attacks_advantage_against')) {
+        conditionEffects.targetAdvantageCount = (conditionEffects.targetAdvantageCount || 0) + 1;
+    }
+    // Blessing of the Trickster: Advantage on Dexterity (Stealth) checks
+    const hasTricksterBlessing = hasBuffEffect(activeBuffs, 'advantage_on_stealth');
+    if (hasTricksterBlessing) {
+        conditionEffects.abilityCheckAdvantage = true;
+        conditionEffects.abilityCheckAdvantageSkill = 'Stealth';
+    }
+    // Buff-ally effects (e.g., Zealous Presence): Advantage on attack rolls and saving throws
+    const buffAllyActive = hasBuffEffect(activeBuffs, 'advantage_attacks_and_saves');
+    if (buffAllyActive) {
+        conditionEffects.attackAdvantageCount = (conditionEffects.attackAdvantageCount || 0) + 1;
+        conditionEffects.saveAdvantageCount = (conditionEffects.saveAdvantageCount || 0) + 1;
+    }
+    // Cloak of Shadows: Invisibility grants attack advantage and target disadvantage
+    const cloakOfShadowsActive = hasBuffEffect(activeBuffs, 'cloak_of_shadows');
+    if (cloakOfShadowsActive) {
+        conditionEffects.attackAdvantageCount = (conditionEffects.attackAdvantageCount || 0) + 1;
+        conditionEffects.targetDisadvantageCount = (conditionEffects.targetDisadvantageCount || 0) + 1;
+    }
+    // Shield: +5 AC until start of next turn, immune to Magic Missile
+    const shieldActive = hasBuffEffect(activeBuffs, 'shield');
+    if (shieldActive) {
+        conditionEffects.shieldAcBonus = 5;
+        conditionEffects.magicMissileImmune = true;
+    }
+    const { wardingBondAcBonus, wardingBondSaveBonus } = computeWardingBondBonuses(activeBuffs, playerSummary, playerStats, combatContext);
+    if (wardingBondAcBonus > 0) {
+        conditionEffects.wardingBondAcBonus = wardingBondAcBonus;
+    }
+    if (wardingBondSaveBonus > 0) {
+        conditionEffects.saveBonusExpression = (conditionEffects.saveBonusExpression || '0') + ' + ' + wardingBondSaveBonus;
+    }
+    // Shield of Faith: +2 AC for duration (Concentration, up to 10 minutes)
+    const shieldOfFaithActive = hasBuffEffect(activeBuffs, 'shield_of_faith');
+    if (shieldOfFaithActive) {
+        conditionEffects.shieldOfFaithAcBonus = 2;
+    }
+    // Alert: Other creatures don't gain advantage on attack rolls against you from being unseen
+    if (playerStats?.unseenAttackerAdvantageNegate) {
+        conditionEffects.noAdvantageAgainst = true;
+    }
+    // Protection from Evil and Good: warded creatures have Disadvantage on attack rolls against you
+    if (pfeagActive && playerStats && combatContext) {
+        applyPfeagTargetDisadvantage(conditionEffects, playerStats, combatContext, campaignName);
+    }
+    // Haste: Advantage on Dexterity saving throws
+    const hasteActive = hasBuffEffect(activeBuffs, 'haste');
+    if (hasteActive) {
+        conditionEffects.saveAdvantageAbilities = [...(conditionEffects.saveAdvantageAbilities || []), 'DEX'];
+    }
+    if (playerStats) {
+        applyElusive(conditionEffects, playerStats, activeConditions);
+    }
+    return { hasTricksterBlessing, buffAllyActive, cloakOfShadowsActive, shieldActive, shieldOfFaithActive, hasteActive, wardingBondAcBonus, wardingBondSaveBonus };
+}
+
 function computeWardingBondBonuses(activeBuffs, playerSummary, playerStats, combatContext) {
     let wardingBondAcBonus = 0;
     let wardingBondSaveBonus = 0;
@@ -85,13 +211,13 @@ function computeWardingBondBonuses(activeBuffs, playerSummary, playerStats, comb
 export function computeCharConditionEffects(playerSummary, playerStats, campaignName, activeBuffs) {
     const storedConditions = getRuntimeValue(playerSummary?.name, 'activeConditions', campaignName);
     const storedExhaustion = getRuntimeValue(playerSummary?.name, 'exhaustionLevel', campaignName);
-    const exhaustionLevel = typeof storedExhaustion === 'number' ? Math.min(6, Math.max(0, storedExhaustion)) : 0;
+    const exhaustionLevel = normalizeExhaustion(storedExhaustion);
     const activeConditions = Array.isArray(storedConditions) ? storedConditions : [];
 
     const stanceSaveModifiers = buildStanceSaveModifiers(activeBuffs);
 
     // Protection from Evil and Good: check if spell is active
-    const pfeagActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'protection_from_evil_and_good');
+    const pfeagActive = hasBuffEffect(activeBuffs, 'protection_from_evil_and_good');
     const pfeagSaveAdvantage = buildPfeagSaveAdvantage(activeConditions, pfeagActive, playerStats);
     // CLA-218: Mage Hand Legerdemain — the conditional_advantage saveModifier
     // (target ability_check, abilities DEX, condition mage_hand_legerdemain)
@@ -101,116 +227,15 @@ export function computeCharConditionEffects(playerSummary, playerStats, campaign
     // modifier must be dropped — its condition matches no active condition, so
     // saveModifierApplies would otherwise fall through to an unconditional pass.
     const mageHandControlled = getRuntimeValue(playerStats?.name, 'mageHandControlled', campaignName) === true;
-    const allSaveModifiers = [...(playerStats?.saveModifiers || []), ...stanceSaveModifiers, ...pfeagSaveAdvantage]
-        .filter(m => m.condition !== 'mage_hand_legerdemain' || mageHandControlled);
+    const allSaveModifiers = buildAllSaveModifiers(playerStats, stanceSaveModifiers, pfeagSaveAdvantage, mageHandControlled);
     const allTargetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) ?? [];
     const myTargetEffects = allTargetEffects.filter(te => te.target === (playerSummary?.name));
-    const isRaging = Array.isArray(activeBuffs) && activeBuffs.some(b => b.damageBonusExpression);
-    const shapeShiftActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shape_shift');
-    const isPeerlessAthlete = getRuntimeValue(playerStats?.name, 'peerlessAthleteActive', campaignName);
-    const isLargeFormActive = getRuntimeValue(playerStats?.name, 'largeFormActive', campaignName);
-    const seeInvisibilityActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'see_invisibility');
-    const isLivingLegendActive = getRuntimeValue(playerStats?.name, 'livingLegendActive', campaignName) === true;
-    const isElderChampionActive = getRuntimeValue(playerStats?.name, 'elderChampionActive', campaignName) === true;
-    const isHolyAuraActive = getHolyAuraTargets(playerStats?.name, campaignName);
-    const isProtectionFromPoisonActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Protection from Poison' && b.effect === 'protection_from_poison');
-    const isTranceOfOrderActive = getRuntimeValue(playerStats?.name, 'tranceOfOrderActive', campaignName) === true;
+    const flags = computeConditionFlags(activeBuffs, playerStats, campaignName);
     const combatContext = getCombatSummary(campaignName);
-    const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers, myTargetEffects, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, seeInvisibilityActive, playerStats?.name, isLivingLegendActive, isElderChampionActive, false, isHolyAuraActive, isProtectionFromPoisonActive, isTranceOfOrderActive, playerStats?.hasPowerfulBuild === true);
-    
-    if (playerStats) {
-        const speedHalvedTime = getRuntimeValue(playerStats.name, 'stunned_speedHalved', campaignName);
-        if (speedHalvedTime) conditionEffects.speedHalved = true;
-    }
-    if (conditionEffects.autoRerollBonus && playerStats) {
-        conditionEffects.autoRerollBonus = evaluateAutoExpression(conditionEffects.autoRerollBonus, playerStats);
-    }
-    if (playerStats) {
-        applyRerollKillSwitches(conditionEffects, playerStats, campaignName);
-    }
-    // Reckless Attack: enemies have Advantage on attack rolls against you
-    if (Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'advantage_attacks_advantage_against')) {
-        conditionEffects.targetAdvantageCount = (conditionEffects.targetAdvantageCount || 0) + 1;
-    }
+    const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers, myTargetEffects, flags.isRaging, flags.shapeShiftActive, flags.isPeerlessAthlete, flags.isLargeFormActive, combatContext, flags.seeInvisibilityActive, playerStats?.name, flags.isLivingLegendActive, flags.isElderChampionActive, false, flags.isHolyAuraActive, flags.isProtectionFromPoisonActive, flags.isTranceOfOrderActive, playerStats?.hasPowerfulBuild === true);
 
-    // Blessing of the Trickster: Advantage on Dexterity (Stealth) checks
-    const hasTricksterBlessing = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'advantage_on_stealth');
-    if (hasTricksterBlessing) {
-        conditionEffects.abilityCheckAdvantage = true;
-        conditionEffects.abilityCheckAdvantageSkill = 'Stealth';
-    }
-
-    // Buff-ally effects (e.g., Zealous Presence): Advantage on attack rolls and saving throws
-    const buffAllyActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'advantage_attacks_and_saves');
-    if (buffAllyActive) {
-        conditionEffects.attackAdvantageCount = (conditionEffects.attackAdvantageCount || 0) + 1;
-        conditionEffects.saveAdvantageCount = (conditionEffects.saveAdvantageCount || 0) + 1;
-    }
-
-    // Cloak of Shadows: Invisibility grants attack advantage and target disadvantage
-    const cloakOfShadowsActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'cloak_of_shadows');
-    if (cloakOfShadowsActive) {
-        conditionEffects.attackAdvantageCount = (conditionEffects.attackAdvantageCount || 0) + 1;
-        conditionEffects.targetDisadvantageCount = (conditionEffects.targetDisadvantageCount || 0) + 1;
-    }
-
-    // Shield: +5 AC until start of next turn, immune to Magic Missile
-    const shieldActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shield');
-    if (shieldActive) {
-        conditionEffects.shieldAcBonus = 5;
-        conditionEffects.magicMissileImmune = true;
-    }
-
-    const { wardingBondAcBonus, wardingBondSaveBonus } = computeWardingBondBonuses(activeBuffs, playerSummary, playerStats, combatContext);
-    if (wardingBondAcBonus > 0) {
-        conditionEffects.wardingBondAcBonus = wardingBondAcBonus;
-    }
-    if (wardingBondSaveBonus > 0) {
-        conditionEffects.saveBonusExpression = (conditionEffects.saveBonusExpression || '0') + ' + ' + wardingBondSaveBonus;
-    }
-
-    // Shield of Faith: +2 AC for duration (Concentration, up to 10 minutes)
-    const shieldOfFaithActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shield_of_faith');
-    if (shieldOfFaithActive) {
-        conditionEffects.shieldOfFaithAcBonus = 2;
-    }
-
-    // Alert: Other creatures don't gain advantage on attack rolls against you from being unseen
-    if (playerStats?.unseenAttackerAdvantageNegate) {
-        conditionEffects.noAdvantageAgainst = true;
-    }
-
-    // Protection from Evil and Good: warded creature types have Disadvantage on attack rolls,
-    // target can't be charmed/frightened/possessed by them, advantage on new saves against existing effects
-    if (pfeagActive && playerStats && combatContext) {
-        const attackerName = combatContext.attackerName;
-        if (attackerName) {
-            const attackerCreature = combatContext.creatures?.find(c => c.name === attackerName);
-            if (attackerCreature && isCreatureWarded(attackerCreature.type, playerStats.name, campaignName)) {
-                conditionEffects.targetDisadvantageCount = (conditionEffects.targetDisadvantageCount || 0) + 1;
-            }
-        }
-    }
-
-    // Haste: Advantage on Dexterity saving throws
-    const hasteActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'haste');
-    if (hasteActive) {
-        conditionEffects.saveAdvantageAbilities = [...(conditionEffects.saveAdvantageAbilities || []), 'DEX'];
-    }
-
-    // Elusive: No attack roll can have Advantage against you unless you have the Incapacitated condition
-    if (playerStats) {
-        const hasElusive = [
-            ...(playerStats.actions || []),
-            ...(playerStats.bonusActions || []),
-            ...(playerStats.reactions || []),
-            ...(playerStats.specialActions || [])
-        ].some(a => a.name === 'Elusive');
-        const isIncapacitated = activeConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c));
-        if (hasElusive && !isIncapacitated) {
-            conditionEffects.noAdvantageAgainst = true;
-        }
-    }
+    const { hasTricksterBlessing, buffAllyActive, cloakOfShadowsActive, shieldActive, shieldOfFaithActive, hasteActive, wardingBondAcBonus, wardingBondSaveBonus } =
+        applyPostComputeModifiers(conditionEffects, activeBuffs, playerSummary, playerStats, combatContext, campaignName, pfeagActive, activeConditions);
 
     const cannotAct = activeConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c));
     // SP-111: the Poisoned-by-Stinking-Cloud rider blocks Actions + Bonus
@@ -228,8 +253,8 @@ export function computeCharConditionEffects(playerSummary, playerStats, campaign
         cannotActActions,
         cannotActReason: cloudBlockTe ? (cloudBlockTe.reason || 'Can\'t take an Action or Bonus Action') : null,
         conditionAttackMode,
-        isRaging,
-        shapeShiftActive,
+        isRaging: flags.isRaging,
+        shapeShiftActive: flags.shapeShiftActive,
         shieldActive,
         shieldOfFaithActive,
         hasteActive,

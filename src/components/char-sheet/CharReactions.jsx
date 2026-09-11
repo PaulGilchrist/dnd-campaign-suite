@@ -34,45 +34,11 @@ import { resolveSpellDamageAtLevel, isAutoHitSpell, resolveHealExpression } from
 import { signFormatter } from '../../services/ui/formatUtils.js';
 import './CharActions.css'
 
-function CharReactions({ playerStats, campaignName, cannotAct, mapName, characters }) {
-    const { setPopupHtml } = useDiceRollPopup();
-    const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, { characters, autoDamageSource: 'char-reactions', autoDamageRoll: async (autoDamage, isCrit) => {
-            const { attack, ctx: ctxOverrides } = normalizeAutoDamage(autoDamage, isCrit, playerStats);
-            await resolveAttackDamageStandalone(attack, ctxOverrides, { playerStats, campaignName, setPopupHtml, rollDamage, setModalState: () => {} });
-        } });
-    const [selectedSpell, setSelectedSpell] = React.useState(null);
-    const [reactiveSpellEligible, setReactiveSpellEligible] = React.useState(null);
-    const [isReactiveSpellFlow, setIsReactiveSpellFlow] = React.useState(false);
-    const [modalState, setModalState] = React.useState({});
-    // modalState and setModalState are now passed as props from CharSheet
-
-    const activeBuffs = useRuntimeValue(playerStats?.name, 'activeBuffs', campaignName) ?? [];
-
-    const pwhStance = useRuntimeValue(playerStats?.name, 'powerWordHealStandPermission', campaignName);
-
-    const getReactionSpellDamageDisplay = React.useCallback((spell) => {
-        if (spell.heal_at_slot_level) {
-            const spellCastingMod = playerStats.spellAbilities?.modifier || 0;
-            return resolveHealExpression(spell, playerStats.level, spellCastingMod);
-        }
-        const resolved = resolveSpellDamageAtLevel(spell, playerStats.level);
-        if (!resolved || spell.level !== 0) return resolved;
-        const potentFeature = playerStats.automation?.actions?.find(
-            a => a.type === 'damage_bonus' && !a.upgrades && a.options?.some(o => o.toLowerCase().includes('spellcasting'))
-        );
-        if (!potentFeature) return resolved;
-        const optKey = `_${(potentFeature.name || 'PotentSpellcasting').replace(/\s+/g, '_')}_option`;
-        const chosen = getRuntimeValue(playerStats.name, optKey, campaignName);
-        if (potentFeature.options.length > 1 && !chosen) return resolved;
-        if (chosen && !chosen.toLowerCase().includes('spellcasting')) return resolved;
-        const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
-        const wisMod = Math.max(0, wis?.bonus || 0);
-        if (wisMod <= 0) return resolved;
-        return `${resolved}+${wisMod}`;
-    }, [playerStats, campaignName]);
-
-    // Build reactions list immutably
-    let reactions = [...(playerStats.reactions || [])];
+// Build the reactions list + reaction-spells list immutably from playerStats,
+// active buffs, and dynamic buff/stance grants. Returns the entries the
+// component renders plus the click-through reaction spells.
+function buildReactions({ playerStats, activeBuffs, pwhStance, wardActive, wardDice }) {
+    const reactions = [...(playerStats.reactions || [])];
 
     // Add automation reactions from playerStats.automation.reactions (e.g., Commanding Presence reaction)
     const automationReactions = playerStats.automation?.reactions || [];
@@ -112,8 +78,6 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
     // Add Bastion of Law ward reaction if active — replace the action entry
     // with the spend variant so clicking it triggers handleSpendDice (SPEND
     // modal) instead of handleBastionOfLaw (CREATE modal).
-    const wardActive = useRuntimeValue(playerStats?.name, 'bastionOfLawActive', campaignName);
-    const wardDice = useRuntimeValue(playerStats?.name, 'bastionOfLawWardDice', campaignName) || [];
     if (wardActive && wardDice.length > 0) {
         const existingIdx = reactions.findIndex(r => r.name === 'Bastion of Law');
         if (existingIdx !== -1) {
@@ -164,6 +128,51 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
     if (!reactions.find((reaction) => reaction.name === OPPORTUNITY_ATTACK.name)) {
         reactions.push(OPPORTUNITY_ATTACK);
     }
+
+    return { reactions, reactionSpells };
+}
+
+function CharReactions({ playerStats, campaignName, cannotAct, mapName, characters }) {
+    const { setPopupHtml } = useDiceRollPopup();
+    const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, { characters, autoDamageSource: 'char-reactions', autoDamageRoll: async (autoDamage, isCrit) => {
+            const { attack, ctx: ctxOverrides } = normalizeAutoDamage(autoDamage, isCrit, playerStats);
+            await resolveAttackDamageStandalone(attack, ctxOverrides, { playerStats, campaignName, setPopupHtml, rollDamage, setModalState: () => {} });
+        } });
+    const [selectedSpell, setSelectedSpell] = React.useState(null);
+    const [reactiveSpellEligible, setReactiveSpellEligible] = React.useState(null);
+    const [isReactiveSpellFlow, setIsReactiveSpellFlow] = React.useState(false);
+    const [modalState, setModalState] = React.useState({});
+    // modalState and setModalState are now passed as props from CharSheet
+
+    const activeBuffs = useRuntimeValue(playerStats?.name, 'activeBuffs', campaignName) ?? [];
+
+    const pwhStance = useRuntimeValue(playerStats?.name, 'powerWordHealStandPermission', campaignName);
+
+    const getReactionSpellDamageDisplay = React.useCallback((spell) => {
+        if (spell.heal_at_slot_level) {
+            const spellCastingMod = playerStats.spellAbilities?.modifier || 0;
+            return resolveHealExpression(spell, playerStats.level, spellCastingMod);
+        }
+        const resolved = resolveSpellDamageAtLevel(spell, playerStats.level);
+        if (!resolved || spell.level !== 0) return resolved;
+        const potentFeature = playerStats.automation?.actions?.find(
+            a => a.type === 'damage_bonus' && !a.upgrades && a.options?.some(o => o.toLowerCase().includes('spellcasting'))
+        );
+        if (!potentFeature) return resolved;
+        const optKey = `_${(potentFeature.name || 'PotentSpellcasting').replace(/\s+/g, '_')}_option`;
+        const chosen = getRuntimeValue(playerStats.name, optKey, campaignName);
+        if (potentFeature.options.length > 1 && !chosen) return resolved;
+        if (chosen && !chosen.toLowerCase().includes('spellcasting')) return resolved;
+        const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
+        const wisMod = Math.max(0, wis?.bonus || 0);
+        if (wisMod <= 0) return resolved;
+        return `${resolved}+${wisMod}`;
+    }, [playerStats, campaignName]);
+
+    // Build reactions list immutably
+    const wardActive = useRuntimeValue(playerStats?.name, 'bastionOfLawActive', campaignName);
+    const wardDice = useRuntimeValue(playerStats?.name, 'bastionOfLawWardDice', campaignName) || [];
+    const { reactions, reactionSpells } = buildReactions({ playerStats, activeBuffs, pwhStance, wardActive, wardDice });
 
     // SP-109: a slowed creature can't take Reactions.
     const isSlowed = () => {

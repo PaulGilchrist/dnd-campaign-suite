@@ -15,6 +15,210 @@ import { renderTargetList, persistAndNotify } from './AreaEffectTargetModalBase.
 import { handleOverchannelSelfDamage } from '../../../../hooks/combat/handlers/handleOverchannelSelfDamage.js';
 import { hasSoulstitchProtection, clearSoulstitchStamp } from '../../../../hooks/combat/loggedDiceRollUtils.js';
 
+// Decide the NPC's save roll against the AoE DC, honouring heighten / rider / slow disadvantage.
+function computeNpcSave(targetName, ctx) {
+    const { target, saveType, saveDc, heightenTarget } = ctx;
+    const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
+    const isHeightenTarget = heightenTarget === targetName;
+    const targetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const hasRiderDisadvantage = targetEffects.some(te => te.target === targetName && te.effect === 'disadvantage_on_next_save');
+    const targetActiveConditions = getRuntimeValue(targetName, 'activeConditions') || [];
+    const slowDexDisadvantage = saveType.toLowerCase() === 'dex' && (
+        (Array.isArray(targetActiveConditions) && targetActiveConditions.some(c => String(c).toLowerCase() === 'slow'))
+        || targetEffects.some(te => te.target === targetName && te.effect === 'dex_save_disadvantage')
+    );
+    const saveRollRaw1 = Math.floor(Math.random() * 20) + 1;
+    const saveRollRaw2 = Math.floor(Math.random() * 20) + 1;
+    const hasSaveDisadvantage = isHeightenTarget || hasRiderDisadvantage || slowDexDisadvantage;
+    const saveRoll = hasSaveDisadvantage ? Math.min(saveRollRaw1, saveRollRaw2) : saveRollRaw1;
+    const saveTotal = saveRoll + saveBonus;
+    const success = saveTotal >= saveDc;
+    return { saveBonus, hasRiderDisadvantage, hasSaveDisadvantage, saveRollRaw1, saveRollRaw2, saveRoll, saveTotal, success, targetEffects };
+}
+
+// Build the campaign-log roll entry for an NPC save + damage resolution.
+function buildNpcSaveLogEntry({ action, playerStats, targetDamageFormula, damageRoll, rawDamage, damageType, targetName, saveType, saveDc, dcSuccess, success, saveRoll, saveBonus, saveRollRaw1, saveRollRaw2, hasSaveDisadvantage, finalDamage }) {
+    return {
+        type: 'roll',
+        characterName: playerStats.name,
+        rollType: 'save-damage',
+        name: action.name,
+        formula: targetDamageFormula,
+        rolls: damageRoll?.rolls ?? [],
+        total: rawDamage,
+        modifier: damageRoll?.modifier ?? 0,
+        damageType: damageType,
+        targetName,
+        saveType: saveType,
+        saveDc: saveDc,
+        dcSuccess: dcSuccess,
+        saveResult: success ? 'success' : 'failure',
+        saveRoll: saveRoll,
+        saveBonus,
+        saveRawRolls: [saveRollRaw1, saveRollRaw2],
+        mode: hasSaveDisadvantage ? 'disadvantage' : 'normal',
+        finalDamage: finalDamage,
+        timestamp: Date.now(),
+    };
+}
+
+// Resolve an NPC target's save/damage, performing all writes, and return the results row.
+function resolveNpcTarget(ctx) {
+    const { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName } = ctx;
+    const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
+    const isSoulstitchProtected = hasSoulstitchProtection(targetName, playerStats.name, campaignName);
+
+    if (isSoulstitchProtected) {
+        // CLA-321: Soulstitch Spells — chosen creature auto-succeeds, takes no damage.
+        const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
+        addEntry(campaignName, {
+            type: 'roll',
+            characterName: playerStats.name,
+            rollType: 'save-damage',
+            name: `${action.name} (Soulstitch)`,
+            formula: resolvedDamage,
+            rolls: [],
+            total: 0,
+            modifier: 0,
+            damageType: damageType,
+            targetName,
+            saveType: saveType,
+            saveDc: saveDc,
+            dcSuccess: dcSuccess,
+            saveResult: 'soulstitch_auto_success',
+            saveRoll: null,
+            saveBonus,
+            saveRawRolls: [],
+            finalDamage: 0,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging soulstitch auto-save:', e); });
+        addTargetResult(campaignName, { targetName, saveResult: 'soulstitch_auto_success', roll: null, total: saveBonus, conditions: [], appliedDamage: 0 });
+        return { targetName, success: true, roll: null, total: saveBonus, saveBonus, rawDamage: 0, finalDamage: 0, soulstitchProtected: true };
+    }
+
+    const { saveBonus, hasRiderDisadvantage, hasSaveDisadvantage, saveRollRaw1, saveRollRaw2, saveRoll, saveTotal, success, targetEffects } = computeNpcSave(targetName, ctx);
+
+    const isRadiantSoulTarget = targetName === radiantSoulTarget;
+    const targetDamageFormula = isRadiantSoulTarget ? `${resolvedDamage} + ${radiantSoulChaMod} [Radiant Soul]` : resolvedDamage;
+    const damageRoll = overchannelActive ? rollExpressionMaximized(targetDamageFormula) : rollExpression(targetDamageFormula);
+    const rawDamage = damageRoll?.total ?? 0;
+    const targetCreature = combatSummary.creatures.find(c => c.name === targetName);
+    const resistances = targetCreature?.resistances || [];
+    const immunities = targetCreature?.immunities || [];
+    const targetChar = (combatSummary.creatures?.filter(c => c.type === 'player') || []).find(c => c.name === targetName);
+    const normalizedSaveType = normalizeSaveType(saveType);
+    const evasionEffects = targetChar?.computedStats?.evasionEffects;
+    const evasionActive = hasEvasionForSave(evasionEffects, normalizedSaveType);
+    const damageAfterSave = computeDamageAfterEvasion(rawDamage, success, dcSuccess, evasionActive);
+    const resResult = computeDamageAfterResistancesWithDetails(damageAfterSave, [damageType], resistances, immunities, false);
+    let finalDamage = resResult.finalDamage;
+
+    if (carefulSpellProtected) {
+        finalDamage = 0;
+    }
+
+    if (finalDamage > 0) {
+        applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], campaignName, characters, true, playerStats.name, false);
+        if (isRadiantSoulTarget) {
+            setRuntimeValue(playerStats.name, radiantSoulFlagKey, true, campaignName);
+            setRuntimeValue(playerStats.name, 'pendingRadiantSoulTarget', null, campaignName);
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName: playerStats.name,
+                abilityName: 'Radiant Soul',
+                description: `Radiant Soul: +${radiantSoulChaMod} ${damageType} damage added to ${targetName}'s damage roll (once per turn).`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging Radiant Soul:', e); });
+        }
+        addEntry(campaignName, buildNpcSaveLogEntry({ action, playerStats, targetDamageFormula, damageRoll, rawDamage, damageType, targetName, saveType, saveDc, dcSuccess, success, saveRoll, saveBonus, saveRollRaw1, saveRollRaw2, hasSaveDisadvantage, finalDamage })).catch((e) => { console.error('[SaveAttackAoeModal] Error logging save:', e); });
+    }
+
+    if (!success && pullMarkerEffect) {
+        // CLA-384: feature-flagged save-fail marker (e.g. Warping Implosion pull).
+        registerTargetEffect(campaignName, targetName, pullMarkerEffect, action.name, { duration: 'instant' });
+    }
+    if (success && logSaveSuccess) {
+        addEntry(campaignName, {
+            type: 'roll',
+            rollType: 'save-damage',
+            characterName: playerStats.name,
+            name: action.name,
+            targetName,
+            saveType: saveType,
+            saveDc: saveDc,
+            dcSuccess: dcSuccess,
+            saveResult: 'success',
+            saveRoll: saveRoll,
+            saveBonus,
+            finalDamage: 0,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging save success:', e); });
+    }
+    if (hasRiderDisadvantage) {
+        const updatedEffects = targetEffects.filter(te => !(te.target === targetName && te.effect === 'disadvantage_on_next_save'));
+        setRuntimeValue('campaign', 'targetEffects', updatedEffects, campaignName);
+    }
+    addTargetResult(campaignName, { targetName, saveResult: success ? 'success' : 'failure', roll: saveRoll, total: saveTotal, conditions: [], appliedDamage: finalDamage });
+    return { targetName, success, roll: saveRoll, total: saveTotal, saveBonus, rawDamage, finalDamage };
+}
+
+// Resolve a PC target: soulstitch/careful auto-protect (returns { result }) or a save prompt ({ prompt }).
+function resolvePcTarget(ctx) {
+    const { action, targetName, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, overchannelActive, isCarefulSpell, isCarefulAlly, heightenTarget, playerStats, campaignName } = ctx;
+    const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
+    const isSoulstitchProtected = hasSoulstitchProtection(targetName, playerStats.name, campaignName);
+
+    if (isSoulstitchProtected) {
+        // CLA-321: chosen creature auto-succeeds its save — no prompt, no damage.
+        applyDamageToTarget(combatSummary, targetName, 0, [damageType], campaignName, characters, true, playerStats.name, false);
+        addEntry(campaignName, {
+            type: 'roll',
+            characterName: playerStats.name,
+            rollType: 'save-damage',
+            name: `${action.name} (Soulstitch)`,
+            targetName,
+            saveType: saveType,
+            saveDc: saveDc,
+            dcSuccess: dcSuccess,
+            saveResult: 'soulstitch_auto_success',
+            saveRoll: null,
+            finalDamage: 0,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging soulstitch auto-save:', e); });
+        addTargetResult(campaignName, { targetName, saveResult: 'soulstitch_auto_success', roll: null, total: 0, conditions: [], appliedDamage: 0 });
+        return { result: { targetName, success: true, roll: null, total: 0, saveBonus: 0, rawDamage: 0, finalDamage: 0, soulstitchProtected: true } };
+    }
+
+    if (carefulSpellProtected) {
+        applyDamageToTarget(combatSummary, targetName, 0, [damageType], campaignName, characters, true, playerStats.name, false);
+        return { result: { targetName, success: true, roll: null, total: 0, saveBonus: 0, rawDamage: 0, finalDamage: 0 } };
+    }
+
+    const promptId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const scalingEntry = resolveScaling(playerStats, action.automation?.scaling);
+    const pcResolvedDamage = scalingEntry?.damage || resolvedDamage;
+    const isRadiantSoulTarget = targetName === radiantSoulTarget;
+    const targetDamageFormula = isRadiantSoulTarget ? `${pcResolvedDamage} + ${radiantSoulChaMod} [Radiant Soul]` : pcResolvedDamage;
+    const damageRoll = overchannelActive ? rollExpressionMaximized(targetDamageFormula) : rollExpression(targetDamageFormula);
+    const rawDamage = damageRoll?.total ?? 0;
+
+    sendSavePrompt(campaignName, {
+        promptId,
+        targetName,
+        saveType: saveType,
+        saveDc: saveDc,
+        sourceName: playerStats.name,
+        rawDamage,
+        dcSuccess,
+        disadvantage: heightenTarget === targetName,
+    });
+
+    const existingPrompts = Array.from(getRuntimeValue('campaign', 'pendingSaveListenerPrompts') || []);
+    existingPrompts.push(promptId);
+    setRuntimeValue('campaign', 'pendingSaveListenerPrompts', existingPrompts, campaignName);
+    return { prompt: { promptId, targetName } };
+}
+
 function SaveAttackAoeModal({
     action,
     playerStats,
@@ -96,266 +300,18 @@ function SaveAttackAoeModal({
             if (!target) continue;
 
             const isNpc = target.type === 'npc';
-            const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
+            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName };
 
             if (isNpc) {
-                const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
-                const isSoulstitchProtected = hasSoulstitchProtection(targetName, playerStats.name, campaignName);
+                results.push(resolveNpcTarget(ctx));
+                continue;
+            }
 
-                if (isSoulstitchProtected) {
-                    // CLA-321: Soulstitch Spells — chosen creature auto-succeeds, takes no damage.
-                    addEntry(campaignName, {
-                        type: 'roll',
-                        characterName: playerStats.name,
-                        rollType: 'save-damage',
-                        name: `${action.name} (Soulstitch)`,
-                        formula: resolvedDamage,
-                        rolls: [],
-                        total: 0,
-                        modifier: 0,
-                        damageType: damageType,
-                        targetName,
-                        saveType: saveType,
-                        saveDc: saveDc,
-                        dcSuccess: dcSuccess,
-                        saveResult: 'soulstitch_auto_success',
-                        saveRoll: null,
-                        saveBonus,
-                        saveRawRolls: [],
-                        finalDamage: 0,
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging soulstitch auto-save:', e); });
-
-                    addTargetResult(campaignName, {
-                        targetName,
-                        saveResult: 'soulstitch_auto_success',
-                        roll: null,
-                        total: saveBonus,
-                        conditions: [],
-                        appliedDamage: 0,
-                    });
-                    results.push({
-                        targetName,
-                        success: true,
-                        roll: null,
-                        total: saveBonus,
-                        saveBonus,
-                        rawDamage: 0,
-                        finalDamage: 0,
-                        soulstitchProtected: true,
-                    });
-                    continue;
-                }
-
-                const isHeightenTarget = heightenTarget === targetName;
-
-                const targetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-                const hasRiderDisadvantage = targetEffects.some(te => te.target === targetName && te.effect === 'disadvantage_on_next_save');
-                // SP-109: Slow forces disadvantage on DEX saves (house model of the RAW -2 penalty).
-                const targetActiveConditions = getRuntimeValue(targetName, 'activeConditions') || [];
-                const slowDexDisadvantage = saveType.toLowerCase() === 'dex' && (
-                    (Array.isArray(targetActiveConditions) && targetActiveConditions.some(c => String(c).toLowerCase() === 'slow'))
-                    || targetEffects.some(te => te.target === targetName && te.effect === 'dex_save_disadvantage')
-                );
-
-                const saveRollRaw1 = Math.floor(Math.random() * 20) + 1;
-                const saveRollRaw2 = Math.floor(Math.random() * 20) + 1;
-                const hasSaveDisadvantage = isHeightenTarget || hasRiderDisadvantage || slowDexDisadvantage;
-                const saveRoll = hasSaveDisadvantage ? Math.min(saveRollRaw1, saveRollRaw2) : saveRollRaw1;
-                const saveTotal = saveRoll + saveBonus;
-                const success = saveTotal >= saveDc;
-                const isRadiantSoulTarget = targetName === radiantSoulTarget;
-                const targetDamageFormula = isRadiantSoulTarget ? `${resolvedDamage} + ${radiantSoulChaMod} [Radiant Soul]` : resolvedDamage;
-                const damageRoll = overchannelActive ? rollExpressionMaximized(targetDamageFormula) : rollExpression(targetDamageFormula);
-                const rawDamage = damageRoll?.total ?? 0;
-                const targetCreature = combatSummary.creatures.find(c => c.name === targetName);
-                const resistances = targetCreature?.resistances || [];
-                const immunities = targetCreature?.immunities || [];
-
-                const targetChar = (combatSummary.creatures?.filter(c => c.type === 'player') || []).find(c => c.name === targetName);
-                const normalizedSaveType = normalizeSaveType(saveType);
-                const evasionEffects = targetChar?.computedStats?.evasionEffects;
-                const evasionActive = hasEvasionForSave(evasionEffects, normalizedSaveType);
-                const damageAfterSave = computeDamageAfterEvasion(rawDamage, success, dcSuccess, evasionActive);
-                const resResult = computeDamageAfterResistancesWithDetails(damageAfterSave, [damageType], resistances, immunities, false);
-                let finalDamage = resResult.finalDamage;
-
-                if (carefulSpellProtected) {
-                    finalDamage = 0;
-                }
-
-                if (finalDamage > 0) {
-                    applyDamageToTarget(
-                        combatSummary, targetName, finalDamage, [damageType],
-                        campaignName, characters, true, playerStats.name, false
-                    );
-
-                    if (isRadiantSoulTarget) {
-                        setRuntimeValue(playerStats.name, radiantSoulFlagKey, true, campaignName);
-                        setRuntimeValue(playerStats.name, 'pendingRadiantSoulTarget', null, campaignName);
-                        addEntry(campaignName, {
-                            type: 'ability_use',
-                            characterName: playerStats.name,
-                            abilityName: 'Radiant Soul',
-                            description: `Radiant Soul: +${radiantSoulChaMod} ${damageType} damage added to ${targetName}'s damage roll (once per turn).`,
-                            timestamp: Date.now(),
-                        }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging Radiant Soul:', e); });
-                    }
-
-                    addEntry(campaignName, {
-                        type: 'roll',
-                        characterName: playerStats.name,
-                        rollType: 'save-damage',
-                        name: action.name,
-                        formula: targetDamageFormula,
-                        rolls: damageRoll?.rolls ?? [],
-                        total: rawDamage,
-                        modifier: damageRoll?.modifier ?? 0,
-                        damageType: damageType,
-                        targetName,
-                        saveType: saveType,
-                        saveDc: saveDc,
-                        dcSuccess: dcSuccess,
-                        saveResult: success ? 'success' : 'failure',
-                        saveRoll: saveRoll,
-                        saveBonus,
-                        saveRawRolls: [saveRollRaw1, saveRollRaw2],
-                        mode: hasSaveDisadvantage ? 'disadvantage' : 'normal',
-                        finalDamage: finalDamage,
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging save:', e); });
-                }
-
-                if (!success && pullMarkerEffect) {
-                    // CLA-384: feature-flagged save-fail marker (e.g. Warping Implosion pull).
-                    registerTargetEffect(campaignName, targetName, pullMarkerEffect, action.name, { duration: 'instant' });
-                }
-                if (success && logSaveSuccess) {
-                    addEntry(campaignName, {
-                        type: 'roll',
-                        rollType: 'save-damage',
-                        characterName: playerStats.name,
-                        name: action.name,
-                        targetName,
-                        saveType: saveType,
-                        saveDc: saveDc,
-                        dcSuccess: dcSuccess,
-                        saveResult: 'success',
-                        saveRoll: saveRoll,
-                        saveBonus,
-                        finalDamage: 0,
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging save success:', e); });
-                }
-
-                if (hasRiderDisadvantage) {
-                    const updatedEffects = targetEffects.filter(te => !(te.target === targetName && te.effect === 'disadvantage_on_next_save'));
-                    setRuntimeValue('campaign', 'targetEffects', updatedEffects, campaignName);
-                }
-
-                addTargetResult(campaignName, {
-                    targetName,
-                    saveResult: success ? 'success' : 'failure',
-                    roll: saveRoll,
-                    total: saveTotal,
-                    conditions: [],
-                    appliedDamage: finalDamage,
-                });
-                results.push({
-                    targetName,
-                    success,
-                    roll: saveRoll,
-                    total: saveTotal,
-                    saveBonus,
-                    rawDamage,
-                    finalDamage,
-                });
+            const outcome = resolvePcTarget(ctx);
+            if (outcome.result) {
+                results.push(outcome.result);
             } else {
-                const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
-                const isSoulstitchProtected = hasSoulstitchProtection(targetName, playerStats.name, campaignName);
-
-                if (isSoulstitchProtected) {
-                    // CLA-321: chosen creature auto-succeeds its save — no prompt, no damage.
-                    applyDamageToTarget(
-                        combatSummary, targetName, 0, [damageType],
-                        campaignName, characters, true, playerStats.name, false
-                    );
-
-                    addEntry(campaignName, {
-                        type: 'roll',
-                        characterName: playerStats.name,
-                        rollType: 'save-damage',
-                        name: `${action.name} (Soulstitch)`,
-                        targetName,
-                        saveType: saveType,
-                        saveDc: saveDc,
-                        dcSuccess: dcSuccess,
-                        saveResult: 'soulstitch_auto_success',
-                        saveRoll: null,
-                        finalDamage: 0,
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging soulstitch auto-save:', e); });
-
-                    addTargetResult(campaignName, {
-                        targetName,
-                        saveResult: 'soulstitch_auto_success',
-                        roll: null,
-                        total: 0,
-                        conditions: [],
-                        appliedDamage: 0,
-                    });
-
-                    results.push({
-                        targetName,
-                        success: true,
-                        roll: null,
-                        total: 0,
-                        saveBonus: 0,
-                        rawDamage: 0,
-                        finalDamage: 0,
-                        soulstitchProtected: true,
-                    });
-                } else if (carefulSpellProtected) {
-                    applyDamageToTarget(
-                        combatSummary, targetName, 0, [damageType],
-                        campaignName, characters, true, playerStats.name, false
-                    );
-
-                    results.push({
-                        targetName,
-                        success: true,
-                        roll: null,
-                        total: 0,
-                        saveBonus: 0,
-                        rawDamage: 0,
-                        finalDamage: 0,
-                    });
-                } else {
-                    const promptId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-                    const scalingEntry = resolveScaling(playerStats, action.automation?.scaling);
-                    const resolvedDamage = scalingEntry?.damage || damage;
-                    const isRadiantSoulTarget = targetName === radiantSoulTarget;
-                    const targetDamageFormula = isRadiantSoulTarget ? `${resolvedDamage} + ${radiantSoulChaMod} [Radiant Soul]` : resolvedDamage;
-                    const damageRoll = overchannelActive ? rollExpressionMaximized(targetDamageFormula) : rollExpression(targetDamageFormula);
-                    const rawDamage = damageRoll?.total ?? 0;
-
-                    sendSavePrompt(campaignName, {
-                        promptId,
-                        targetName,
-                        saveType: saveType,
-                        saveDc: saveDc,
-                        sourceName: playerStats.name,
-                        rawDamage,
-                        dcSuccess,
-                        disadvantage: heightenTarget === targetName,
-                    });
-
-                    const existingPrompts = Array.from(getRuntimeValue('campaign', 'pendingSaveListenerPrompts') || []);
-                    existingPrompts.push(promptId);
-                    setRuntimeValue('campaign', 'pendingSaveListenerPrompts', existingPrompts, campaignName);
-
-                    prompts.push({ promptId, targetName });
-                }
+                prompts.push(outcome.prompt);
             }
         }
 
@@ -372,7 +328,7 @@ function SaveAttackAoeModal({
         clearSoulstitchStamp(playerStats.name, campaignName);
 
         return { results, prompts };
-    }, [campaignName, action.name, action.automation?.scaling, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess]);
+    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess]);
 
     const handleSaveResult = useCallback(async (event, ctx) => {
         const detail = event.detail;

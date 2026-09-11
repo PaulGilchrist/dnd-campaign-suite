@@ -29,7 +29,7 @@
         "build": "vite build",
         "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
         "lint:complexity-baseline": "node scripts/generate-complexity-baseline.mjs",
-        "lint:complexity-ratchet": "node scripts/generate-complexity-baseline.mjs --step 1",
+        "lint:complexity-ratchet": "node scripts/generate-complexity-baseline.mjs --step auto",
         "preview": "vite preview --host",
         "start": "npm install && npm run build && node server.js",
         "test": "vitest",

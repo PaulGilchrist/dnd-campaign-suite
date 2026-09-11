@@ -90,24 +90,20 @@ function isConcentrationRecastFreeCast(playerName, spellName, campaignName) {
   return Boolean(creature && creature.concentration && creature.concentration.spell === spellName);
 }
 
-function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, campaignName) {
+// Runtime-keyed free-cast grants: Natural Recovery recovery list and Bewitching Magic
+// (free Misty Step while the feature flag is up).
+function runtimeSelectionFreeCast(playerName, spellName) {
   const naturalRecoveryFreeCast = getRuntimeValue(playerName, 'naturalRecoveryFreeCast');
   if (naturalRecoveryFreeCast && Array.isArray(naturalRecoveryFreeCast) && naturalRecoveryFreeCast.includes(spellName)) return true;
 
   const bewitchingFreeCast = getRuntimeValue(playerName, '_Bewitching_Magic_freeCast');
   if (bewitchingFreeCast && spellName === 'Misty Step') return true;
+  return false;
+}
 
-  // CLA-234: Path of the Wild Heart ritual-only grants (Nature Speaker → Commune with
-  // Nature; Animal Speaker → Beast Sense / Speak with Animals). Spell entries are stamped
-  // _ritualOnly by spellCalc2024; the feature text carries no once-per-day limit, so the
-  // ritual cast is always authorized and never consumes a spell slot.
-  const spellEntry = playerStats?.spellAbilities?.spells?.find(s => s.name === spellName);
-  if (spellEntry?._ritualOnly) return true;
-  // CLA-356: Telekinetic Master (Psi Warrior lv18) — "Always have Telekinesis prepared.
-  // Cast without spell slot." Unlimited slotless free cast (no uses limit in the feature
-  // text), so it is always authorized and never consumes a spell slot (CLA-234 pattern).
-  if (spellEntry?._telekineticMasterFreeCast) return true;
-
+// Spell Mastery (lv1/lv2 mastery selections) and the once-per-day choice Savants
+// (Signature Spells lv3, Divination Savant).
+function masteryOrSavantFreeCast(playerName, spellName, spellLevel, campaignName) {
   const masteryLevel1 = getRuntimeValue(playerName, 'SpellMastery_level1', campaignName);
   const masteryLevel2 = getRuntimeValue(playerName, 'SpellMastery_level2', campaignName);
   if (spellName === masteryLevel1 && spellLevel === 1) return true;
@@ -126,15 +122,62 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
     const used = getRuntimeValue(playerName, usedKey, campaignName);
     if (!used) return true;
   }
+  return false;
+}
 
+// CLA-231: the counter is keyed by the cast spell's own level — a lv7 arcanum
+// consumes mysticArcanumLevel7, never a lower-level arcanum's counter.
+function arcanumFreeCast(playerName, spellName, spellLevel, playerStats) {
   const arcanums = playerStats?.class?.arcanums || [];
-  if (arcanums.includes(spellName)) {
-    // CLA-231: the counter is keyed by the cast spell's own level — a lv7 arcanum
-    // consumes mysticArcanumLevel7, never a lower-level arcanum's counter.
-    if (spellLevel < 6 || spellLevel > 9) return false;
-    const count = Number(getRuntimeValue(playerName, `mysticArcanumLevel${spellLevel}`) ?? 1);
-    return count > 0;
+  if (!arcanums.includes(spellName)) return undefined;
+  if (spellLevel < 6 || spellLevel > 9) return false;
+  const count = Number(getRuntimeValue(playerName, `mysticArcanumLevel${spellLevel}`) ?? 1);
+  return count > 0;
+}
+
+// Active-buff free casts that interleave the automation action scans:
+// War God's Blessing (before bonusActions) and Mantle of Majesty (before specialActions).
+function activeBuffFreeCast(playerName, spellName, buffKey, buffMatcher) {
+  const active = getRuntimeValue(playerName, buffKey);
+  if (buffMatcher(active)) return true;
+  return false;
+}
+
+// Aura of Vitality is free while the caster carries the aura targetEffect.
+function auraOfVitalityFreeCast(playerName, spellName, campaignName) {
+  if ((spellName || '').toLowerCase() !== 'aura of vitality') return false;
+  const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+  return Array.isArray(targetEffects) && targetEffects.some(te => te.effect === 'aura_of_vitality' && te.target === playerName);
+}
+
+// Concentration recasts — free cast when already concentrating on the same spell
+// (Eyebite, Spiritual Weapon, Shapechange).
+const CONCENTRATION_RECAST_FREE_SPELLS = ['Eyebite', 'Spiritual Weapon', 'Shapechange'];
+
+function concentrationRecastFreeCast(playerName, spellName, campaignName) {
+  for (const recastSpell of CONCENTRATION_RECAST_FREE_SPELLS) {
+    if (spellName === recastSpell && isConcentrationRecastFreeCast(playerName, spellName, campaignName)) return true;
   }
+  return false;
+}
+
+function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, campaignName) {
+  if (runtimeSelectionFreeCast(playerName, spellName)) return true;
+
+  // CLA-234: Path of the Wild Heart ritual-only grants (Nature Speaker → Commune with
+  // Nature; Animal Speaker → Beast Sense / Speak with Animals). Spell entries are stamped
+  // _ritualOnly by spellCalc2024; the feature text carries no once-per-day limit, so the
+  // ritual cast is always authorized and never consumes a spell slot.
+  // CLA-356: Telekinetic Master (Psi Warrior lv18) — "Always have Telekinesis prepared.
+  // Cast without spell slot." Unlimited slotless free cast (no uses limit in the feature
+  // text), so it is always authorized and never consumes a spell slot (CLA-234 pattern).
+  const spellEntry = playerStats?.spellAbilities?.spells?.find(s => s.name === spellName);
+  if (spellEntry?._ritualOnly || spellEntry?._telekineticMasterFreeCast) return true;
+
+  if (masteryOrSavantFreeCast(playerName, spellName, spellLevel, campaignName)) return true;
+
+  const arcanumDecision = arcanumFreeCast(playerName, spellName, spellLevel, playerStats);
+  if (arcanumDecision !== undefined) return arcanumDecision;
 
   // CLA-252: Phantasmal Creatures — one free cast PER SPELL per Long Rest.
   const phantasmalPassive = playerStats?.automation?.passives?.find(p => p.type === 'phantasmal_creatures');
@@ -149,37 +192,23 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
   if (perSpellFreeCastAvailable(shadowArtsPassive, playerName, spellName, 'Shadow_Arts', campaignName)) return true;
 
   const actionsScan = scanFreeCastEntries(playerStats?.automation?.actions || [], playerName, spellName, spellLevel, campaignName);
-  if (actionsScan === true) return true;
-  if (actionsScan === false) return false;
+  if (actionsScan !== undefined) return actionsScan;
 
-  const wgbActive = getRuntimeValue(playerName, '_War_Gods_Blessing_active');
-  if (wgbActive && ['Shield of Faith', 'Spiritual Weapon'].includes(spellName)) return true;
+  if (activeBuffFreeCast(playerName, spellName, '_War_Gods_Blessing_active',
+    (active) => active && ['Shield of Faith', 'Spiritual Weapon'].includes(spellName))) return true;
 
   const bonusActionsScan = scanFreeCastEntries(playerStats?.automation?.bonusActions || [], playerName, spellName, spellLevel, campaignName);
-  if (bonusActionsScan === true) return true;
-  if (bonusActionsScan === false) return false;
+  if (bonusActionsScan !== undefined) return bonusActionsScan;
 
-  const mantleActive = getRuntimeValue(playerName, 'activeBuffs');
-  const mantleBuffs = Array.isArray(mantleActive) ? mantleActive : [];
-  if (mantleBuffs.some(b => b.name === 'Mantle of Majesty') && spellName === 'Command') return true;
+  if (activeBuffFreeCast(playerName, spellName, 'activeBuffs',
+    (active) => (Array.isArray(active) ? active : []).some(b => b.name === 'Mantle of Majesty') && spellName === 'Command')) return true;
 
   const specialActionsScan = scanFreeCastEntries(playerStats?.automation?.specialActions || [], playerName, spellName, spellLevel, campaignName);
-  if (specialActionsScan === true) return true;
-  if (specialActionsScan === false) return false;
+  if (specialActionsScan !== undefined) return specialActionsScan;
 
-  const isAuraOfVitality = (spellName || '').toLowerCase() === 'aura of vitality';
-  if (isAuraOfVitality) {
-    const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
-    if (Array.isArray(targetEffects) && targetEffects.some(te => te.effect === 'aura_of_vitality' && te.target === playerName)) {
-      return true;
-    }
-  }
+  if (auraOfVitalityFreeCast(playerName, spellName, campaignName)) return true;
 
-  // Concentration recasts — free cast when already concentrating on the same spell
-  // (Eyebite, Spiritual Weapon, Shapechange).
-  if (spellName === 'Eyebite' && isConcentrationRecastFreeCast(playerName, spellName, campaignName)) return true;
-  if (spellName === 'Spiritual Weapon' && isConcentrationRecastFreeCast(playerName, spellName, campaignName)) return true;
-  if (spellName === 'Shapechange' && isConcentrationRecastFreeCast(playerName, spellName, campaignName)) return true;
+  if (concentrationRecastFreeCast(playerName, spellName, campaignName)) return true;
 
   return false;
 }

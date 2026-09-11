@@ -187,39 +187,17 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn((_key, _prop, _val, _camp) => mockStore.set(`${_key}:${_prop}`, _val)),
   useRuntimeValue: vi.fn((key, prop) => {
     if (prop === 'exhaustionLevel') return 0;
-    if (prop === 'bardicInspirationDie') return mockStore.get(`${key}:bardicInspirationDie`) ?? null;
-    if (prop === 'bardicInspirationCombatOptions') return mockStore.get(`${key}:bardicInspirationCombatOptions`) ?? null;
-    if (prop === 'activeConditions') return [];
-    if (prop === 'activeBuffs') return [];
-    if (prop === 'targetEffects') return [];
-    if (prop === 'preparedSpells') return mockStore.get(`${key}:preparedSpells`) ?? null;
-    if (prop === 'aspectOfTheWildsOption') return mockStore.get(`${key}:aspectOfTheWildsOption`) ?? null;
-    if (prop === 'bardicInspirationGrantedBy') return mockStore.get(`${key}:bardicInspirationGrantedBy`) ?? 'unknown';
-    if (prop === 'stunned_speedHalved') return mockStore.get(`${key}:stunned_speedHalved`) ?? null;
-    if (prop === 'fanaticalFocusUsed') return mockStore.get(`${key}:fanaticalFocusUsed`) ?? null;
-    if (prop === 'focusPoints') return mockStore.get(`${key}:focusPoints`) ?? null;
-    if (prop === 'indomitableUses') return mockStore.get(`${key}:indomitableUses`) ?? 0;
-    if (prop === 'disciplinedSurvivorUsed') return mockStore.get(`${key}:disciplinedSurvivorUsed`) ?? null;
-    if (prop === 'strokeOfLuckUsed') return mockStore.get(`${key}:strokeOfLuckUsed`) ?? null;
-    if (prop === 'bardicInspirationUses') return mockStore.get(`${key}:bardicInspirationUses`) ?? 0;
-    if (prop === 'secondWindUses') return mockStore.get(`${key}:secondWindUses`) ?? 0;
-    if (prop === 'superiorityDice') return mockStore.get(`${key}:superiorityDice`) ?? 0;
-    if (prop === 'psionicEnergy') return mockStore.get(`${key}:psionicEnergy`) ?? 0;
-    if (prop === 'peerlessAthleteActive') return mockStore.get(`${key}:peerlessAthleteActive`) ?? null;
-    if (prop === 'largeFormActive') return mockStore.get(`${key}:largeFormActive`) ?? null;
-    if (prop === 'holyNimbusActive') return mockStore.get(`${key}:holyNimbusActive`) ?? null;
-    if (prop === '_Defensive_Tactics_choice') return mockStore.get(`${key}:_Defensive_Tactics_choice`) ?? null;
-    if (prop === 'luckyAdvantageActive') return mockStore.get(`${key}:luckyAdvantageActive`) ?? null;
-    if (prop === 'luckyDisadvantageActive') return mockStore.get(`${key}:luckyDisadvantageActive`) ?? null;
-    if (prop === '_circleOfTheLandType') return mockStore.get(`${key}:_circleOfTheLandType`) ?? null;
-    if (prop === '_Energy_Resistances_chosenTypes') return mockStore.get(`${key}:_Energy_Resistances_chosenTypes`) ?? null;
-    if (prop === '_Fiendish_Resilience_chosenType') return mockStore.get(`${key}:_Fiendish_Resilience_chosenType`) ?? null;
-    if (prop === '_spellThiefCasterBlock') return mockStore.get(`${key}:_spellThiefCasterBlock`) ?? null;
-    if (prop === '_spellThiefStolenList') return mockStore.get(`${key}:_spellThiefStolenList`) ?? null;
-    if (prop === 'piercerPunctureUsedThisTurn') return mockStore.get(`${key}:piercerPunctureUsedThisTurn`) ?? null;
-    if (prop === '_Savage_Attacker_usedRound') return mockStore.get(`${key}:_Savage_Attacker_usedRound`) ?? null;
-    if (prop === 'darkOnesLuckUses') return mockStore.get(`${key}:darkOnesLuckUses`) ?? null;
-    return null;
+    if (prop === 'activeConditions' || prop === 'activeBuffs' || prop === 'targetEffects') return [];
+    const defaults = {
+      bardicInspirationGrantedBy: 'unknown',
+      indomitableUses: 0,
+      bardicInspirationUses: 0,
+      secondWindUses: 0,
+      superiorityDice: 0,
+      psionicEnergy: 0,
+    };
+    const def = Object.prototype.hasOwnProperty.call(defaults, prop) ? defaults[prop] : null;
+    return mockStore.get(`${key}:${prop}`) ?? def;
   }),
 }));
 

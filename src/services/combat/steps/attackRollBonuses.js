@@ -7,6 +7,156 @@ import { resolveDiceExpression } from '../automation/automationExpressions.js';
 import { addEntry } from '../../ui/logService.js';
 import { selectBrutalStrikeRiders } from '../brutalStrikeSelection.js';
 
+function applyMeleeWeaponHitBonuses(ctx, acc) {
+  const melee = (ctx.playerStats.automation.actions || []).filter(x => x.type === 'damage_bonus' && x.trigger === 'melee_weapon_hit');
+  if (melee.length === 0 || ctx.isMeleeOrUnarmed !== true) return acc;
+  for (const a of melee) {
+    const r = rollExpression(a.damageExpression);
+    if (r) { acc.formula += ` + ${a.damageExpression} [${a.damageType.toLowerCase()}]`; acc.total += r.total; acc.rolls = [...acc.rolls, ...r.rolls]; }
+  }
+  return acc;
+}
+
+function applyMonkWeaponHitBonuses(ctx, acc) {
+  const monks = (ctx.playerStats.automation.actions || []).filter(x => x.type === 'damage_bonus' && x.trigger === 'monk_weapon_or_unarmed_hit');
+  for (const a of monks) {
+    const r = rollExpression(a.damageExpression);
+    if (!r) continue;
+    const dt = (getRuntimeValue(ctx.playerStats.name, '_Elemental_Attunement_option', ctx.campaignName) || 'fire').toLowerCase();
+    acc.formula += ` + ${a.damageExpression} [${dt}]`; acc.total += r.total; acc.rolls = [...acc.rolls, ...r.rolls];
+  }
+  return acc;
+}
+
+function applyHeavyWeaponHitBonuses(ctx, acc) {
+  const heavy = (ctx.playerStats.automation.actions || []).filter(x => x.type === 'damage_bonus' && x.trigger === 'melee_heavy_weapon_hit');
+  if (heavy.length === 0 || !(ctx.attack?.properties || []).includes('Heavy')) return acc;
+  for (const a of heavy) {
+    const r = rollExpression(a.damageExpression);
+    const evalResult = evaluateAutoExpression(a.damageExpression, ctx.playerStats);
+    const bonusValue = r ? r.total : evalResult;
+    if (!bonusValue) continue;
+    const dt = (a.damageType || ctx.attack?.damageType || 'Slashing').toLowerCase();
+    const label = dt === 'same_as_weapon' ? (a.name || 'slashing') : dt;
+    const displayExpr = r ? a.damageExpression : String(bonusValue);
+    acc.formula += ` + ${displayExpr} [${label}]`;
+    acc.total += bonusValue;
+    if (r) acc.rolls = [...acc.rolls, ...r.rolls];
+  }
+  return acc;
+}
+
+function applyFrenzyBonuses(ctx, acc) {
+  const frenzy = (ctx.playerStats.automation.actions || []).filter(x => x.type === 'damage_bonus' && x.trigger === 'reckless_attack_hit_while_raging');
+  if (frenzy.length === 0) return acc;
+  const used = getRuntimeValue(ctx.playerStats.name, '_frenzyUsedRound', ctx.campaignName);
+  const round = getCurrentCombatRound(ctx.campaignName);
+  if (used === round || !ctx.hit) return acc;
+  const buffs = getRuntimeValue(ctx.playerStats.name, 'activeBuffs', ctx.campaignName) || [];
+  const isReckless = buffs.some(b => b.effect === 'advantage_attacks_advantage_against');
+  const isRaging = buffs.some(b => b.damageBonusExpression);
+  const attackAbilityName = ctx.attack?.abilityName;
+  const isStr = attackAbilityName ? attackAbilityName.toLowerCase() === 'strength' : null;
+  const strMod = ctx.playerStats.abilities?.find(a => a.name === 'Strength')?.bonus ?? 0;
+  const dexMod = ctx.playerStats.abilities?.find(a => a.name === 'Dexterity')?.bonus ?? 0;
+  const inferredIsStr = strMod >= dexMod;
+  const isStrFinal = isStr !== null ? isStr : inferredIsStr;
+  if (!(isReckless && isRaging && isStrFinal)) return acc;
+  for (const a of frenzy) {
+    const resolvedExpr = resolveDiceExpression(a.damageExpression, ctx.playerStats);
+    const r = rollExpression(resolvedExpr);
+    if (r) {
+      const dt = a.damageType === 'same_as_weapon' ? (ctx.attack?.damageType || 'Slashing').toLowerCase() : a.damageType.toLowerCase();
+      acc.formula += ` + ${resolvedExpr} [${dt}]`;
+      acc.total += r.total;
+      acc.rolls = [...acc.rolls, ...r.rolls];
+    }
+  }
+  setRuntimeValue(ctx.playerStats.name, '_frenzyUsedRound', round, ctx.campaignName);
+  return acc;
+}
+
+function applyDivineFuryBonuses(ctx, acc) {
+  const df = (ctx.playerStats.automation.actions || []).filter(x => x.type === 'damage_bonus' && x.trigger === 'first_hit_while_raging');
+  if (df.length === 0) return acc;
+  const used = getRuntimeValue(ctx.playerStats.name, '_divineFuryUsedRound', ctx.campaignName);
+  const round = getCurrentCombatRound(ctx.campaignName);
+  if (used === round) return acc;
+  const buffs = getRuntimeValue(ctx.playerStats.name, 'activeBuffs', ctx.campaignName) || [];
+  const isRaging = buffs.some(b => b.damageBonusExpression);
+  if (!isRaging) return acc;
+  const a = df[0];
+  let expr = a.damageExpression || '';
+  expr = expr.replace(/barbarian_level\s*\/\s*2/gi, String(Math.floor(ctx.playerStats.level / 2)))
+    .replace(/barbarian_level/gi, String(ctx.playerStats.level));
+  const r = rollExpression(expr);
+  if (r) {
+    const dt = a.damageType || '';
+    if (dt.includes(' or ')) {
+      ctx.setDivineFuryChoice?.(dt);
+      return { modalResult: {
+        data: { _divineFuryPending: true, bonusExpr: expr, bonusTotal: r.total, bonusRolls: r.rolls },
+        modal: { type: 'divineFury', props: { damageType: dt } },
+      } };
+    }
+    acc.formula += ` + ${expr} [${dt}]`; acc.total += r.total; acc.rolls = [...acc.rolls, ...r.rolls];
+  }
+  setRuntimeValue(ctx.playerStats.name, '_divineFuryUsedRound', round, ctx.campaignName);
+  return acc;
+}
+
+function applyBrutalStrikeTargetEffects(ctx, rider) {
+  const effectChoices = getRuntimeValue(ctx.playerStats.name, '_brutalStrikeEffects', ctx.campaignName) || [];
+  const targetName = ctx.targetName;
+  if (effectChoices.length === 0 || !targetName) return;
+
+  let storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+  const riderOptions = rider.options || [];
+
+  for (const choiceName of effectChoices) {
+    const option = riderOptions.find(o => o.name === choiceName);
+    if (!option) continue;
+
+    if (option.effect === 'disadvantage_on_next_save' || option.effect === 'next_attack_bonus') {
+      const newEffect = {
+        target: targetName,
+        source: ctx.playerStats.name,
+        option: option.name,
+        effect: option.effect,
+        value: option.effect === 'next_attack_bonus' ? (option.value || 5) : (option.value || null),
+        noOpportunityAttacks: option.noOpportunityAttacks || false,
+        duration: 'until_start_of_next_turn',
+      };
+      storedEffects = [...storedEffects, newEffect];
+    }
+  }
+  setRuntimeValue('campaign', 'targetEffects', storedEffects, ctx.campaignName);
+}
+
+function applyBrutalStrikeBonuses(ctx, acc) {
+  const brutalStrikeActive = getRuntimeValue(ctx.playerStats.name, '_brutalStrikeActive', ctx.campaignName);
+  if (!brutalStrikeActive) return acc;
+  const allAutomation = [...(ctx.playerStats.automation.actions || []), ...(ctx.playerStats.automation.passives || [])];
+  const rider = selectBrutalStrikeRiders(allAutomation)[0];
+  if (!rider) return acc;
+
+  const r = rollExpression(rider.damageExpression);
+  if (r) {
+    acc.formula += ` + ${rider.damageExpression} [${(rider.damageType || 'same_as_weapon').toLowerCase()}]`;
+    acc.total += r.total;
+    acc.rolls = [...acc.rolls, ...r.rolls];
+  }
+
+  applyBrutalStrikeTargetEffects(ctx, rider);
+
+  const targetName = ctx.targetName;
+  addEntry(ctx.campaignName, { type: 'ability_use', characterName: ctx.playerStats.name, abilityName: rider.name, description: `${ctx.playerStats.name} used ${rider.name} on ${targetName}`, targetName }).catch((e) => { console.error("[attackRollBonuses:log-error]", e); });
+
+  setRuntimeValue(ctx.playerStats.name, '_brutalStrikeActive', null, ctx.campaignName);
+  setRuntimeValue(ctx.playerStats.name, '_brutalStrikeEffects', null, ctx.campaignName);
+  return acc;
+}
+
 export function buildAutomationBonusesStep() {
   return {
     name: 'automationBonuses',
@@ -14,149 +164,16 @@ export function buildAutomationBonusesStep() {
     emit: 'automation:applied',
     condition: (ctx) => (!!ctx.playerStats.automation?.actions || !!ctx.playerStats.automation?.passives),
     handler: async (ctx) => {
-      let formula = ctx.formula;
-      let total = ctx.total;
-      let rolls = [...(ctx.rolls || [])];
-      const actions = ctx.playerStats.automation.actions || [];
-
-      const melee = actions.filter(x => x.type === 'damage_bonus' && x.trigger === 'melee_weapon_hit');
-      if (melee.length > 0 && ctx.isMeleeOrUnarmed === true) {
-        for (const a of melee) {
-          const r = rollExpression(a.damageExpression);
-          if (r) { formula += ` + ${a.damageExpression} [${a.damageType.toLowerCase()}]`; total += r.total; rolls = [...rolls, ...r.rolls]; }
-        }
-      }
-
-      for (const a of actions.filter(x => x.type === 'damage_bonus' && x.trigger === 'monk_weapon_or_unarmed_hit')) {
-        const r = rollExpression(a.damageExpression);
-        if (r) {
-          const dt = (getRuntimeValue(ctx.playerStats.name, '_Elemental_Attunement_option', ctx.campaignName) || 'fire').toLowerCase();
-          formula += ` + ${a.damageExpression} [${dt}]`; total += r.total; rolls = [...rolls, ...r.rolls];
-        }
-      }
-
-      const heavy = actions.filter(x => x.type === 'damage_bonus' && x.trigger === 'melee_heavy_weapon_hit');
-      if (heavy.length > 0 && (ctx.attack?.properties || []).includes('Heavy')) {
-        for (const a of heavy) {
-          const r = rollExpression(a.damageExpression);
-          const evalResult = evaluateAutoExpression(a.damageExpression, ctx.playerStats);
-          const bonusValue = r ? r.total : evalResult;
-          if (bonusValue) {
-            const dt = (a.damageType || ctx.attack?.damageType || 'Slashing').toLowerCase();
-            const label = dt === 'same_as_weapon' ? (a.name || 'slashing') : dt;
-            const displayExpr = r ? a.damageExpression : String(bonusValue);
-            formula += ` + ${displayExpr} [${label}]`;
-            total += bonusValue;
-            if (r) rolls = [...rolls, ...r.rolls];
-          }
-        }
-      }
-
-      const frenzy = actions.filter(x => x.type === 'damage_bonus' && x.trigger === 'reckless_attack_hit_while_raging');
-      if (frenzy.length > 0) {
-        const used = getRuntimeValue(ctx.playerStats.name, '_frenzyUsedRound', ctx.campaignName);
-        const round = getCurrentCombatRound(ctx.campaignName);
-        if (used !== round && ctx.hit) {
-          const buffs = getRuntimeValue(ctx.playerStats.name, 'activeBuffs', ctx.campaignName) || [];
-          const isReckless = buffs.some(b => b.effect === 'advantage_attacks_advantage_against');
-          const isRaging = buffs.some(b => b.damageBonusExpression);
-          const attackAbilityName = ctx.attack?.abilityName;
-          const isStr = attackAbilityName ? attackAbilityName.toLowerCase() === 'strength' : null;
-          const strMod = ctx.playerStats.abilities?.find(a => a.name === 'Strength')?.bonus ?? 0;
-          const dexMod = ctx.playerStats.abilities?.find(a => a.name === 'Dexterity')?.bonus ?? 0;
-          const inferredIsStr = strMod >= dexMod;
-          const isStrFinal = isStr !== null ? isStr : inferredIsStr;
-          if (isReckless && isRaging && isStrFinal) {
-            for (const a of frenzy) {
-              const resolvedExpr = resolveDiceExpression(a.damageExpression, ctx.playerStats);
-              const r = rollExpression(resolvedExpr);
-              if (r) {
-                const dt = a.damageType === 'same_as_weapon' ? (ctx.attack?.damageType || 'Slashing').toLowerCase() : a.damageType.toLowerCase();
-                formula += ` + ${resolvedExpr} [${dt}]`;
-                total += r.total;
-                rolls = [...rolls, ...r.rolls];
-              }
-            }
-            setRuntimeValue(ctx.playerStats.name, '_frenzyUsedRound', round, ctx.campaignName);
-          }
-        }
-      }
-
-      const df = actions.filter(x => x.type === 'damage_bonus' && x.trigger === 'first_hit_while_raging');
-      if (df.length > 0) {
-        const used = getRuntimeValue(ctx.playerStats.name, '_divineFuryUsedRound', ctx.campaignName);
-        const round = getCurrentCombatRound(ctx.campaignName);
-        if (used !== round) {
-          const buffs = getRuntimeValue(ctx.playerStats.name, 'activeBuffs', ctx.campaignName) || [];
-          const isRaging = buffs.some(b => b.damageBonusExpression);
-          if (isRaging) {
-            const a = df[0];
-            let expr = a.damageExpression || '';
-            expr = expr.replace(/barbarian_level\s*\/\s*2/gi, String(Math.floor(ctx.playerStats.level / 2)))
-              .replace(/barbarian_level/gi, String(ctx.playerStats.level));
-            const r = rollExpression(expr);
-            if (r) {
-              const dt = a.damageType || '';
-              if (dt.includes(' or ')) {
-                ctx.setDivineFuryChoice?.(dt);
-                return {
-                  data: { _divineFuryPending: true, bonusExpr: expr, bonusTotal: r.total, bonusRolls: r.rolls },
-                  modal: { type: 'divineFury', props: { damageType: dt } },
-                };
-              }
-              formula += ` + ${expr} [${dt}]`; total += r.total; rolls = [...rolls, ...r.rolls];
-            }
-            setRuntimeValue(ctx.playerStats.name, '_divineFuryUsedRound', round, ctx.campaignName);
-          }
-        }
-      }
-
-      const brutalStrikeActive = getRuntimeValue(ctx.playerStats.name, '_brutalStrikeActive', ctx.campaignName);
-      if (brutalStrikeActive) {
-          const allAutomation = [...(ctx.playerStats.automation.actions || []), ...(ctx.playerStats.automation.passives || [])];
-          const rider = selectBrutalStrikeRiders(allAutomation)[0];
-        if (rider) {
-          const r = rollExpression(rider.damageExpression);
-          if (r) {
-            formula += ` + ${rider.damageExpression} [${(rider.damageType || 'same_as_weapon').toLowerCase()}]`;
-            total += r.total;
-            rolls = [...rolls, ...r.rolls];
-          }
-
-          const effectChoices = getRuntimeValue(ctx.playerStats.name, '_brutalStrikeEffects', ctx.campaignName) || [];
-          const targetName = ctx.targetName;
-          if (effectChoices.length > 0 && targetName) {
-            let storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-            const riderOptions = rider.options || [];
-
-            for (const choiceName of effectChoices) {
-              const option = riderOptions.find(o => o.name === choiceName);
-              if (!option) continue;
-
-              if (option.effect === 'disadvantage_on_next_save' || option.effect === 'next_attack_bonus') {
-                const newEffect = {
-                  target: targetName,
-                  source: ctx.playerStats.name,
-                  option: option.name,
-                  effect: option.effect,
-                  value: option.effect === 'next_attack_bonus' ? (option.value || 5) : (option.value || null),
-                  noOpportunityAttacks: option.noOpportunityAttacks || false,
-                  duration: 'until_start_of_next_turn',
-                };
-                storedEffects = [...storedEffects, newEffect];
-              }
-            }
-            setRuntimeValue('campaign', 'targetEffects', storedEffects, ctx.campaignName);
-          }
-
-          addEntry(ctx.campaignName, { type: 'ability_use', characterName: ctx.playerStats.name, abilityName: rider.name, description: `${ctx.playerStats.name} used ${rider.name} on ${targetName}`, targetName }).catch((e) => { console.error("[attackRollBonuses:log-error]", e); });
-
-          setRuntimeValue(ctx.playerStats.name, '_brutalStrikeActive', null, ctx.campaignName);
-          setRuntimeValue(ctx.playerStats.name, '_brutalStrikeEffects', null, ctx.campaignName);
-        }
-      }
-
-      return { data: { formula, total, rolls } };
+      let acc = { formula: ctx.formula, total: ctx.total, rolls: [...(ctx.rolls || [])] };
+      acc = applyMeleeWeaponHitBonuses(ctx, acc);
+      acc = applyMonkWeaponHitBonuses(ctx, acc);
+      acc = applyHeavyWeaponHitBonuses(ctx, acc);
+      acc = applyFrenzyBonuses(ctx, acc);
+      const fury = applyDivineFuryBonuses(ctx, acc);
+      if (fury.modalResult) return fury.modalResult;
+      acc = fury;
+      acc = applyBrutalStrikeBonuses(ctx, acc);
+      return { data: acc };
     },
   };
 }

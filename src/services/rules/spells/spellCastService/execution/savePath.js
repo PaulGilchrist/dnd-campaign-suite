@@ -36,92 +36,90 @@ async function handleSavePath(spell, fullSpell, metaCtx, playerStats, campaignNa
         overchannelFormula, overchannelActive, overchannelUseCount, rollDamage, formula, hasInvisible, soulstitchSelection);
 }
 
-async function handleAoE(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, getTargetInfo, getRuntimeValue,
-    innateSorceryActive, effectiveDamageType, spellSaveDc, aoeShape, rangeToFeet, hasInvisible,
-    overchannelActive, overchannelUseCount) {
-
-    const cs = getCombatContext(campaignName);
-    const attackerTargetName = cs ? cs.creatures?.find(c => c.name === playerStats.name)?.targetName : null;
-    const isOverlayTargeted = attackerTargetName?.startsWith('overlay-');
-
-    let activeOverlay = null;
-    if (isOverlayTargeted) {
-        const overlayId = attackerTargetName.slice('overlay-'.length);
-        try {
-            const response = await fetch(`/api/campaigns/${campaignName}/spell-overlays`);
-            const overlays = await response.json();
-            activeOverlay = overlays.find(o => o.id === overlayId) || null;
-        } catch (error) {
-            console.error('[spellCast] Error fetching overlay:', error);
-        }
+// Resolve the active spell overlay when the attacker is currently overlay-targeted.
+async function resolveActiveOverlay(attackerTargetName, campaignName) {
+    if (!attackerTargetName?.startsWith('overlay-')) return null;
+    const overlayId = attackerTargetName.slice('overlay-'.length);
+    try {
+        const response = await fetch(`/api/campaigns/${campaignName}/spell-overlays`);
+        const overlays = await response.json();
+        return overlays.find(o => o.id === overlayId) || null;
+    } catch (error) {
+        console.error('[spellCast] Error fetching overlay:', error);
+        return null;
     }
+}
 
-    const rangeFeet = rangeToFeet(fullSpell.range || spell.range);
-    const slotLevel = metaCtx?.slotLevel || spell.level;
-    const damageAtSlotLevel = fullSpell.damage?.damage_at_slot_level || fullSpell.damage?.damage_at_character_level || spell.damage?.damage_at_slot_level || {};
-    let damageExpression = damageAtSlotLevel[slotLevel];
-    if (!damageExpression && Object.keys(damageAtSlotLevel).length > 0) {
+// Slot-level damage expression with fallback to the highest level at or below the
+// slot, then to the first defined level.
+function resolveAoeDamageExpression(damageAtSlotLevel, slotLevel) {
+    const damageExpression = damageAtSlotLevel[slotLevel];
+    if (damageExpression) return damageExpression;
+    if (Object.keys(damageAtSlotLevel).length > 0) {
         const levels = Object.keys(damageAtSlotLevel).map(Number).sort((a, b) => a - b);
         const highestBelow = levels.filter(l => l <= slotLevel).pop();
         if (highestBelow) {
-            damageExpression = damageAtSlotLevel[highestBelow];
+            return damageAtSlotLevel[highestBelow];
         }
     }
-    if (!damageExpression) {
-        const firstKey = Object.keys(damageAtSlotLevel)[0];
-        damageExpression = damageAtSlotLevel[firstKey];
+    const firstKey = Object.keys(damageAtSlotLevel)[0];
+    return damageAtSlotLevel[firstKey];
+}
+
+// CLA-279: Radiant Soul (Celestial Patron) — one target of the spell's damage roll gains CHA mod.
+// Gate checked here at cast resolution; the SaveAttackAoeModal stamps the first selected eligible
+// target via pendingRadiantSoulTarget and consumes the once-per-turn flag at damage application.
+function resolveRadiantSoulChaMod(playerStats, effectiveDamageType, getRuntimeValue, campaignName) {
+    const radiantSoulPassive = playerStats.automation?.passives?.find(p => p.type === 'radiant_soul');
+    const radiantSoulTypes = (radiantSoulPassive?.damageTypes || []).map(dt => String(dt).toLowerCase());
+    const radiantSoulFlagKey = `_radiantSoul_${playerStats.name.replace(/\s+/g, '_')}_oncePerTurn`;
+    if (radiantSoulPassive?.hasAutomation
+        && radiantSoulTypes.includes(String(effectiveDamageType || '').toLowerCase())
+        && !getRuntimeValue(playerStats.name, radiantSoulFlagKey, campaignName)) {
+        return Math.max(0, playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0);
     }
+    return 0;
+}
 
-    const hasDamage = !!damageExpression && damageExpression !== '0' && damageExpression !== '';
-    const automationEffects = fullSpell.automation?.effects;
-    const isConditionOnlyAoe = !hasDamage && automationEffects?.fail?.length > 0;
+function resolveAoeSaveType(fullSpell, spell, fallback) {
+    return fullSpell.dc?.dc_type || spell.dc.dc_type || fallback;
+}
 
-    // Mirror the single-target save formula builder: Empowered Evocation bonus + Overchannel maximize suffix
-    const { empEvocFormula } = computeEmpoweredEvocation(playerStats, fullSpell, damageExpression || null);
-    const damageFormula = empEvocFormula || damageExpression || '0';
-    const payloadDamage = overchannelActive ? `${damageFormula} [Overchannel Maximize]` : damageFormula;
+function normalizeDcSuccess(fullSpell, spell) {
+    const success = fullSpell.dc?.dc_success ?? spell.dc.dc_success;
+    return success === 0 ? 'none' : (success === 0.5 ? 'half' : success);
+}
 
-    // CLA-279: Radiant Soul (Celestial Patron) — one target of the spell's damage roll gains CHA mod.
-    // Gate checked here at cast resolution; the SaveAttackAoeModal stamps the first selected eligible
-    // target via pendingRadiantSoulTarget and consumes the once-per-turn flag at damage application.
-    let radiantSoulChaMod = 0;
-    if (hasDamage) {
-        const radiantSoulPassive = playerStats.automation?.passives?.find(p => p.type === 'radiant_soul');
-        const radiantSoulTypes = (radiantSoulPassive?.damageTypes || []).map(dt => String(dt).toLowerCase());
-        const radiantSoulFlagKey = `_radiantSoul_${playerStats.name.replace(/\s+/g, '_')}_oncePerTurn`;
-        if (radiantSoulPassive?.hasAutomation
-            && radiantSoulTypes.includes(String(effectiveDamageType || '').toLowerCase())
-            && !getRuntimeValue(playerStats.name, radiantSoulFlagKey, campaignName)) {
-            radiantSoulChaMod = Math.max(0, playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0);
-        }
-    }
-
-    if (isConditionOnlyAoe) {
-        const conditionNames = automationEffects.fail.map(e => e.condition || e.type).filter(Boolean);
-        const includeCaster = fullSpell.name && fullSpell.name.toLowerCase() === 'grease';
-        return {
-            automationPopup: {
-                type: 'modal',
-                modalName: 'aoeCondition',
-                payload: {
-                    action: { name: fullSpell.name, automation: fullSpell.automation },
-                    playerStats,
-                    campaignName,
-                    shape: aoeShape,
-                    range: rangeFeet,
-                    saveType: fullSpell.dc?.dc_type || spell.dc.dc_type || 'CON',
-                    saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
-                    effects: automationEffects.fail,
-                    conditionLabel: conditionNames.join(', '),
-                    activeOverlay,
-                    metamagicCareful: metaCtx?.metamagicCareful || false,
-        metamagicHeighten: hasInvisible || metaCtx?.metamagicHeighten,
-                    includeCaster,
-                },
+function buildConditionOnlyAoePopup({ fullSpell, spell, metaCtx, playerStats, campaignName, aoeShape, rangeFeet,
+    spellSaveDc, innateSorceryActive, automationEffects, activeOverlay, hasInvisible }) {
+    const conditionNames = automationEffects.fail.map(e => e.condition || e.type).filter(Boolean);
+    const includeCaster = fullSpell.name && fullSpell.name.toLowerCase() === 'grease';
+    return {
+        automationPopup: {
+            type: 'modal',
+            modalName: 'aoeCondition',
+            payload: {
+                action: { name: fullSpell.name, automation: fullSpell.automation },
+                playerStats,
+                campaignName,
+                shape: aoeShape,
+                range: rangeFeet,
+                saveType: resolveAoeSaveType(fullSpell, spell, 'CON'),
+                saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
+                effects: automationEffects.fail,
+                conditionLabel: conditionNames.join(', '),
+                activeOverlay,
+                metamagicCareful: metaCtx?.metamagicCareful || false,
+                metamagicHeighten: hasInvisible || metaCtx?.metamagicHeighten,
+                includeCaster,
             },
-        };
-    }
+        },
+    };
+}
 
+function buildSaveAttackAoePopup({ fullSpell, spell, metaCtx, playerStats, campaignName, aoeShape, rangeFeet,
+    payloadDamage, effectiveDamageType, radiantSoulChaMod, spellSaveDc, innateSorceryActive, activeOverlay,
+    hasInvisible, overchannelActive, overchannelUseCount, slotLevel }) {
     return {
         automationPopup: {
             type: 'modal',
@@ -135,12 +133,9 @@ async function handleAoE(spell, fullSpell, metaCtx, playerStats, campaignName, m
                 damage: payloadDamage,
                 damageType: effectiveDamageType,
                 radiantSoulChaMod,
-                saveType: fullSpell.dc?.dc_type || spell.dc.dc_type || 'DEX',
+                saveType: resolveAoeSaveType(fullSpell, spell, 'DEX'),
                 saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
-                dcSuccess: (() => {
-                    const success = fullSpell.dc?.dc_success ?? spell.dc.dc_success;
-                    return success === 0 ? 'none' : (success === 0.5 ? 'half' : success);
-                })(),
+                dcSuccess: normalizeDcSuccess(fullSpell, spell),
                 activeOverlay,
                 metamagicCareful: metaCtx?.metamagicCareful || false,
                 metamagicHeighten: hasInvisible || metaCtx?.metamagicHeighten,
@@ -150,6 +145,40 @@ async function handleAoE(spell, fullSpell, metaCtx, playerStats, campaignName, m
             },
         },
     };
+}
+
+async function handleAoE(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, getTargetInfo, getRuntimeValue,
+    innateSorceryActive, effectiveDamageType, spellSaveDc, aoeShape, rangeToFeet, hasInvisible,
+    overchannelActive, overchannelUseCount) {
+
+    const cs = getCombatContext(campaignName);
+    const attackerTargetName = cs ? cs.creatures?.find(c => c.name === playerStats.name)?.targetName : null;
+    const activeOverlay = await resolveActiveOverlay(attackerTargetName, campaignName);
+
+    const rangeFeet = rangeToFeet(fullSpell.range || spell.range);
+    const slotLevel = metaCtx?.slotLevel || spell.level;
+    const damageAtSlotLevel = fullSpell.damage?.damage_at_slot_level || fullSpell.damage?.damage_at_character_level || spell.damage?.damage_at_slot_level || {};
+    const damageExpression = resolveAoeDamageExpression(damageAtSlotLevel, slotLevel);
+
+    const hasDamage = !!damageExpression && damageExpression !== '0' && damageExpression !== '';
+    const automationEffects = fullSpell.automation?.effects;
+    const isConditionOnlyAoe = !hasDamage && automationEffects?.fail?.length > 0;
+
+    // Mirror the single-target save formula builder: Empowered Evocation bonus + Overchannel maximize suffix
+    const { empEvocFormula } = computeEmpoweredEvocation(playerStats, fullSpell, damageExpression || null);
+    const damageFormula = empEvocFormula || damageExpression || '0';
+    const payloadDamage = overchannelActive ? `${damageFormula} [Overchannel Maximize]` : damageFormula;
+
+    const radiantSoulChaMod = hasDamage ? resolveRadiantSoulChaMod(playerStats, effectiveDamageType, getRuntimeValue, campaignName) : 0;
+
+    if (isConditionOnlyAoe) {
+        return buildConditionOnlyAoePopup({ fullSpell, spell, metaCtx, playerStats, campaignName, aoeShape, rangeFeet,
+            spellSaveDc, innateSorceryActive, automationEffects, activeOverlay, hasInvisible });
+    }
+
+    return buildSaveAttackAoePopup({ fullSpell, spell, metaCtx, playerStats, campaignName, aoeShape, rangeFeet,
+        payloadDamage, effectiveDamageType, radiantSoulChaMod, spellSaveDc, innateSorceryActive, activeOverlay,
+        hasInvisible, overchannelActive, overchannelUseCount, slotLevel });
 }
 
 async function handleSingleTargetSave(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters,
