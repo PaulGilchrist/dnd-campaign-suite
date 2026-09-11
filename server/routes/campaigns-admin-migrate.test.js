@@ -176,6 +176,12 @@ function ensureRealCampaignsDir(campaignNames) {
 
 describe('campaignsAdmin - POST /api/campaigns/migrate-image-paths', () => {
 
+    beforeEach(() => {
+        mockFsState.exists.clear();
+        mockFsState.files.clear();
+        mockFsState.readdir.clear();
+    });
+
     it('should return early when campaigns directory does not exist', async () => {
         const app = createTestApp();
         const res = await request(app).post('/api/campaigns/migrate-image-paths').set('Host', 'localhost');
@@ -283,6 +289,8 @@ describe('campaignsAdmin - POST /api/campaigns/migrate-image-paths', () => {
         ensureRealCampaignsDir(['test-campaign']);
         mockFsState.exists.add(realCampaignPath);
         const npcPath = `${realCampaignPath}/data/npcs.json`;
+        mockFsState.exists.add(`${realCampaignPath}/data`);
+        mockFsState.exists.add(npcPath);
         const npcData = JSON.stringify([
             { name: 'Goblin' },
         ]);
@@ -306,6 +314,10 @@ describe('campaignsAdmin - POST /api/campaigns/migrate-image-paths', () => {
         ensureRealCampaignsDir(['test-campaign']);
         mockFsState.exists.add(realCampaignPath);
         mockFsState.readdir.set(realCampaignPath, ['character1.json']);
+        mockFsState.files.set(`${realCampaignPath}/character1.json`, JSON.stringify({
+            name: 'Hero',
+            level: 5,
+        }));
 
         const res = await request(app).post('/api/campaigns/migrate-image-paths').set('Host', 'localhost');
         expect(res.status).toBe(200);
@@ -351,6 +363,10 @@ describe('campaignsAdmin - POST /api/campaigns/migrate-image-paths', () => {
         ensureRealCampaignsDir(['test-campaign']);
         mockFsState.exists.add(realCampaignPath);
         mockFsState.readdir.set(realCampaignPath, ['character1.json', 'readme.txt', 'map.png']);
+        mockFsState.files.set(`${realCampaignPath}/character1.json`, JSON.stringify({
+            name: 'Hero',
+            level: 5,
+        }));
 
         const res = await request(app).post('/api/campaigns/migrate-image-paths').set('Host', 'localhost');
         expect(res.status).toBe(200);
@@ -374,5 +390,8 @@ describe('campaignsAdmin - POST /api/campaigns/migrate-image-paths', () => {
         const res = await request(app).post('/api/campaigns/migrate-image-paths').set('Host', 'localhost');
         expect(res.status).toBe(200);
         expect(res.body.message).toBe('Migration complete. Migrated 0 imagePath fields.');
+
+        // File must not have been rewritten
+        expect(mockFsState.files.get(charPath)).toBe(imageData);
     });
 });
