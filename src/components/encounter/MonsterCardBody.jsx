@@ -15,18 +15,22 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
     const monsterConditions = creature?.conditions || [];
     const condKeys = monsterConditions.map(c => c.key);
     const condEffects = computeConditionEffects(condKeys, [], monsterTargetEffects, false, false, false, false, null, false, null, false, false, false, false, false, false, false);
-    const condEffectBadges = [];
-    if (condEffects) {
-      if (condEffects.noAdvantageAgainst) condEffectBadges.push({ label: 'No Adv vs', cls: 'effect-target-disadv', icon: 'fa-arrow-down' });
-      if (condEffects.targetDisadvantageCount > 0 && !condEffects.noAdvantageAgainst) condEffectBadges.push({ label: 'Disadv vs', cls: 'effect-target-disadv', icon: 'fa-arrow-down' });
-      if (condEffects.riderSaveDisadvantage) condEffectBadges.push({ label: 'Save Disadv', cls: 'effect-disadvantage', icon: 'fa-shield' });
-      if (condEffects.riderAttackBonus > 0) condEffectBadges.push({ label: `+${condEffects.riderAttackBonus} to hit`, cls: 'effect-target-adv', icon: 'fa-bullseye' });
-      if (condEffects.riderCannotOpportunityAttack) condEffectBadges.push({ label: 'No OA', cls: 'effect-cannot-act', icon: 'fa-ban' });
-      if (inspiringMoveNoOA) condEffectBadges.push({ label: 'Insp. Move', cls: 'effect-cannot-act', icon: 'fa-person-walking' });
-      if (remarkableNoOA) condEffectBadges.push({ label: 'No OA (Crit)', cls: 'effect-cannot-act', icon: 'fa-ban' });
-      if (speedyOpportunityDisadvantage) condEffectBadges.push({ label: 'OA Disadv', cls: 'effect-disadvantage', icon: 'fa-arrow-down' });
-      if (speedyDifficultTerrainIgnore) condEffectBadges.push({ label: 'No Difficult Terrain on Dash', cls: 'effect-cannot-act', icon: 'fa-person-walking' });
-    }
+    const condEffectBadges = buildCondEffectBadges(condEffects, {
+      inspiringMoveNoOA,
+      remarkableNoOA,
+      speedyOpportunityDisadvantage,
+      speedyDifficultTerrainIgnore,
+    });
+
+    const actionSections = [
+      { key: 'traits', title: null, actions: monster.traits, blocked: attackerActionBlocked },
+      { key: 'actions', title: 'Actions', actions: monster.actions, blocked: attackerActionBlocked },
+      { key: 'reactions', title: 'Reactions', actions: monster.reactions, blocked: attackerCannotAct },
+      { key: 'legendary_actions', title: 'Legendary Actions', actions: monster.legendary_actions, blocked: attackerActionBlocked },
+    ].filter(s => s.actions?.length > 0);
+
+    const lairActions = getLairActions(monster);
+    const regionalEffects = getRegionalEffects(monster);
 
     return (
       <div className="mc-card" onClick={(e) => e.stopPropagation()}>
@@ -40,83 +44,16 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
           <MonsterCardAbilities monster={monster} handleAbilityCheck={handleAbilityCheck} />
           <hr />
           <MonsterCardDefenses monster={monster} monsterName={monsterName} campaignName={campaignName} handleSaveThrow={handleSaveThrow} handleSkillCheck={handleSkillCheck} />
-          {monster.traits?.length > 0 && (
-            <>
-              <hr />
-              <div className="mc-section">
-                {monster.traits.map((t, i) => (
-                  <MonsterAction key={i} action={t} index={i} attackerCannotAct={attackerActionBlocked} onAttack={handleAttack} onDamage={handleDamage} onSaveRoll={handleSaveRoll} />
-                ))}
-              </div>
-            </>
+          {actionSections.map(s => (
+            <MonsterActionSection key={s.key} title={s.title} actions={s.actions} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} />
+          ))}
+          {lairActions && (
+            <MonsterNamedEffectSection title="Lair Actions" items={lairActions} renderItem={(la, i) => <MonsterLairAction key={i} la={la} />} />
           )}
-          {monster.actions?.length > 0 && (
-            <>
-              <hr />
-              <h5 className="mc-section-title">Actions</h5>
-              <div className="mc-section">
-                {monster.actions.map((a, i) => (
-                  <MonsterAction key={i} action={a} index={i} attackerCannotAct={attackerActionBlocked} onAttack={handleAttack} onDamage={handleDamage} onSaveRoll={handleSaveRoll} />
-                ))}
-              </div>
-            </>
+          {regionalEffects && (
+            <MonsterNamedEffectSection title="Regional Effects" items={regionalEffects} renderItem={(re, i) => <MonsterRegionalEffect key={i} re={re} />} />
           )}
-          {monster.reactions?.length > 0 && (
-            <>
-              <hr />
-              <h5 className="mc-section-title">Reactions</h5>
-              <div className="mc-section">
-                {monster.reactions.map((r, i) => (
-                  <MonsterAction key={i} action={r} index={i} attackerCannotAct={attackerCannotAct} onAttack={handleAttack} onDamage={handleDamage} onSaveRoll={handleSaveRoll} />
-                ))}
-              </div>
-            </>
-          )}
-          {monster.legendary_actions?.length > 0 && (
-            <>
-              <hr />
-              <h5 className="mc-section-title">Legendary Actions</h5>
-              <div className="mc-section">
-                {monster.legendary_actions.map((la, i) => (
-                  <MonsterAction key={i} action={la} index={i} attackerCannotAct={attackerActionBlocked} onAttack={handleAttack} onDamage={handleDamage} onSaveRoll={handleSaveRoll} />
-                ))}
-              </div>
-            </>
-          )}
-          {monster.lair_actions && (Array.isArray(monster.lair_actions) ? monster.lair_actions.length > 0 : monster.lair_actions?.actions?.length > 0) && (
-            <>
-              <hr />
-              <h5 className="mc-section-title">Lair Actions</h5>
-              <div className="mc-section">
-                {(Array.isArray(monster.lair_actions) ? monster.lair_actions : monster.lair_actions.actions).map((la, i) => (
-                  <MonsterLairAction key={i} la={la} />
-                ))}
-              </div>
-            </>
-          )}
-          {monster.regional_effects && (monster.regional_effects?.effects?.length > 0 || (Array.isArray(monster.regional_effects) && monster.regional_effects.length > 0)) && (
-            <>
-              <hr />
-              <h5 className="mc-section-title">Regional Effects</h5>
-              <div className="mc-section">
-                {(Array.isArray(monster.regional_effects) ? monster.regional_effects : monster.regional_effects.effects).map((re, i) => (
-                  <MonsterRegionalEffect key={i} re={re} />
-                ))}
-              </div>
-            </>
-          )}
-          {monster.desc && (
-            <>
-              <hr />
-              <div className="mc-section">
-                <h5 className="mc-section-title">Description</h5>
-                <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(monster.desc) }} />
-                {monster.book && (
-                  <div className="mc-source"><em>{monster.book}{monster.page ? ` (page ${monster.page})` : ''}</em></div>
-                )}
-              </div>
-            </>
-          )}
+          <MonsterCardDescription monster={monster} />
         </div>
         <div className="mc-footer no-print">
           <span className="mc-ally-badge clickable" onClick={(e) => { e.stopPropagation(); handleAllyModalOpen(); }} title="Manage allies">
@@ -128,6 +65,31 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
   }, [monster, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked, handleAttack, handleDamage, handleSaveRoll, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterName]);
 
   return content;
+}
+
+function buildCondEffectBadges(condEffects, { inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore }) {
+  const badges = [];
+  if (!condEffects) return badges;
+  if (condEffects.noAdvantageAgainst) badges.push({ label: 'No Adv vs', cls: 'effect-target-disadv', icon: 'fa-arrow-down' });
+  if (condEffects.targetDisadvantageCount > 0 && !condEffects.noAdvantageAgainst) badges.push({ label: 'Disadv vs', cls: 'effect-target-disadv', icon: 'fa-arrow-down' });
+  if (condEffects.riderSaveDisadvantage) badges.push({ label: 'Save Disadv', cls: 'effect-disadvantage', icon: 'fa-shield' });
+  if (condEffects.riderAttackBonus > 0) badges.push({ label: `+${condEffects.riderAttackBonus} to hit`, cls: 'effect-target-adv', icon: 'fa-bullseye' });
+  if (condEffects.riderCannotOpportunityAttack) badges.push({ label: 'No OA', cls: 'effect-cannot-act', icon: 'fa-ban' });
+  if (inspiringMoveNoOA) badges.push({ label: 'Insp. Move', cls: 'effect-cannot-act', icon: 'fa-person-walking' });
+  if (remarkableNoOA) badges.push({ label: 'No OA (Crit)', cls: 'effect-cannot-act', icon: 'fa-ban' });
+  if (speedyOpportunityDisadvantage) badges.push({ label: 'OA Disadv', cls: 'effect-disadvantage', icon: 'fa-arrow-down' });
+  if (speedyDifficultTerrainIgnore) badges.push({ label: 'No Difficult Terrain on Dash', cls: 'effect-cannot-act', icon: 'fa-person-walking' });
+  return badges;
+}
+
+function getLairActions(monster) {
+  if (Array.isArray(monster.lair_actions)) return monster.lair_actions.length > 0 ? monster.lair_actions : null;
+  return monster.lair_actions?.actions?.length > 0 ? monster.lair_actions.actions : null;
+}
+
+function getRegionalEffects(monster) {
+  if (Array.isArray(monster.regional_effects)) return monster.regional_effects.length > 0 ? monster.regional_effects : null;
+  return monster.regional_effects?.effects?.length > 0 ? monster.regional_effects.effects : null;
 }
 
 function MonsterCardHeader({ monster, monsterName, onClose }) {
@@ -230,6 +192,48 @@ function MonsterCardAbilities({ monster, handleAbilityCheck }) {
         </div>
       ))}
     </div>
+  );
+}
+
+function MonsterActionSection({ title, actions, attackerCannotAct, handleAttack, handleDamage, handleSaveRoll }) {
+  return (
+    <>
+      <hr />
+      {title && <h5 className="mc-section-title">{title}</h5>}
+      <div className="mc-section">
+        {actions.map((a, i) => (
+          <MonsterAction key={i} action={a} index={i} attackerCannotAct={attackerCannotAct} onAttack={handleAttack} onDamage={handleDamage} onSaveRoll={handleSaveRoll} />
+        ))}
+      </div>
+    </>
+  );
+}
+
+function MonsterNamedEffectSection({ title, items, renderItem }) {
+  return (
+    <>
+      <hr />
+      <h5 className="mc-section-title">{title}</h5>
+      <div className="mc-section">
+        {items.map(renderItem)}
+      </div>
+    </>
+  );
+}
+
+function MonsterCardDescription({ monster }) {
+  if (!monster.desc) return null;
+  return (
+    <>
+      <hr />
+      <div className="mc-section">
+        <h5 className="mc-section-title">Description</h5>
+        <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(monster.desc) }} />
+        {monster.book && (
+          <div className="mc-source"><em>{monster.book}{monster.page ? ` (page ${monster.page})` : ''}</em></div>
+        )}
+      </div>
+    </>
   );
 }
 

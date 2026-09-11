@@ -36,12 +36,86 @@ import { computeCharSummaryContext } from './charSummaryCalc.js';
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
+const AC_BONUS_KEYS = ['hasteAcBonus', 'shieldAcBonus', 'baitAndSwitchBonus', 'shieldOfFaithBonus', 'defensiveDuelistBonus'];
+
+function computeArmorClassValue(ctx, conditionEffects, playerStats) {
+    const { circleFormsACOverride, barkskinActive, mageArmorActive, mageArmorAc, dexBonus } = ctx;
+    if (circleFormsACOverride !== undefined && circleFormsACOverride !== null) return circleFormsACOverride;
+    const bonuses = AC_BONUS_KEYS.reduce((sum, key) => sum + ctx[key], 0);
+    const wardingBondAcBonus = conditionEffects?.wardingBondAcBonus || 0;
+    const acPenalty = conditionEffects?.acPenalty || 0;
+    if (barkskinActive) return 17;
+    if (mageArmorActive) return mageArmorAc + dexBonus + bonuses + wardingBondAcBonus - acPenalty;
+    return playerStats.armorClass + bonuses + wardingBondAcBonus - acPenalty;
+}
+
+const AC_BADGE_SPECS = [
+    {
+        key: 'haste-mage-armor',
+        guard: (ctx) => ctx.hasteAcBonus > 0 || ctx.mageArmorActive || ctx.shieldAcBonus > 0 || ctx.shieldOfFaithBonus > 0 || ctx.defensiveDuelistBonus > 0 || ctx.barkskinActive,
+        render: (ctx) => <span className="aura-source" title={ctx.mageArmorActive ? `From Mage Armor (13 + ${ctx.dexBonus} Dex)` : undefined}>{ctx.hasteAcBonus > 0 && ` (+${ctx.hasteAcBonus} from Haste)`}{ctx.mageArmorActive && ` (${ctx.mageArmorAc} + ${ctx.dexBonus} Dex)`}</span>,
+    },
+    {
+        key: 'shield',
+        guard: (ctx) => ctx.shieldAcBonus > 0,
+        render: () => <span className="aura-source" title="From Shield"> (+5 from Shield)</span>,
+    },
+    {
+        key: 'shield-of-faith',
+        guard: (ctx) => ctx.shieldOfFaithBonus > 0,
+        render: () => <span className="aura-source" title="From Shield of Faith"> (+2 from Shield of Faith)</span>,
+    },
+    {
+        key: 'defensive-duelist',
+        guard: (ctx) => ctx.defensiveDuelistBonus > 0,
+        render: (ctx) => <span className="aura-source" title="From Defensive Duelist"> (+{ctx.defensiveDuelistBonus} from Defensive Duelist)</span>,
+    },
+    {
+        key: 'bait-and-switch',
+        guard: (ctx) => ctx.baitAndSwitchBonus > 0,
+        render: (ctx) => <span className="aura-source" title={`From ${ctx.baitAndSwitchSource || 'Bait and Switch'}`}> (+{ctx.baitAndSwitchBonus} from {ctx.baitAndSwitchSource || 'Bait and Switch'})</span>,
+    },
+    {
+        key: 'barkskin',
+        guard: (ctx) => ctx.barkskinActive,
+        render: () => <span className="aura-source" title="From Barkskin"> (AC 17 from Barkskin)</span>,
+    },
+    {
+        key: 'warding-bond',
+        guard: (ctx, ce) => (ce?.wardingBondAcBonus || 0) > 0,
+        render: (ctx, ce) => <span className="aura-source" title="From Warding Bond"> (+{ce.wardingBondAcBonus} from Warding Bond)</span>,
+    },
+    {
+        key: 'slow-penalty',
+        guard: (ctx, ce) => (ce?.acPenalty || 0) > 0,
+        render: (ctx, ce) => <span className="stat--penalized" title="Slow spell penalty"> ({'−'}{ce.acPenalty} from Slow)</span>,
+    },
+    {
+        key: 'smite-cover',
+        guard: (ctx) => ctx.smiteOfProtectionCoverActive,
+        render: () => <span className="aura-source cover-badge" title="Half Cover from Smite of Protection — applies to all attackers while in Aura of Protection"> (+2 Cover: Smite of Protection)</span>,
+    },
+    {
+        key: 'bulwark-cover',
+        guard: (ctx) => ctx.bulwarkOfForceCoverActive,
+        render: () => <span className="aura-source cover-badge" title="Half Cover from Bulwark of Force — applies to all attackers"> (+2 Cover: Bulwark of Force)</span>,
+    },
+    {
+        key: 'sanctuary-cover',
+        guard: (ctx) => ctx.naturesSanctuaryCoverActive,
+        render: () => <span className="aura-source cover-badge" title="Half Cover from Nature's Sanctuary — applies to all attackers"> (+2 Cover: Nature's Sanctuary)</span>,
+    },
+];
+
+function ArmorClassBadges({ ctx, conditionEffects }) {
+    return AC_BADGE_SPECS.map((spec) => spec.guard(ctx, conditionEffects)
+        ? <React.Fragment key={spec.key}>{spec.render(ctx, conditionEffects)}</React.Fragment>
+        : null);
+}
+
 function ArmorClassSummary({ playerStats, conditionEffects, ctx, showArmorClassFormulaPopup }) {
-    const { circleFormsACOverride, barkskinActive, mageArmorActive, mageArmorAc, dexBonus, hasteAcBonus, shieldAcBonus,
-        baitAndSwitchBonus, shieldOfFaithBonus, defensiveDuelistBonus, baitAndSwitchSource,
-        smiteOfProtectionCoverActive, bulwarkOfForceCoverActive, naturesSanctuaryCoverActive } = ctx;
     return (
-        <div className='clickable' onClick={showArmorClassFormulaPopup}><b>Armor Class: </b>{circleFormsACOverride ?? (barkskinActive ? 17 : (mageArmorActive ? mageArmorAc + dexBonus + hasteAcBonus + shieldAcBonus + baitAndSwitchBonus + shieldOfFaithBonus + defensiveDuelistBonus + (conditionEffects?.wardingBondAcBonus || 0) - (conditionEffects?.acPenalty || 0) : (playerStats.armorClass + hasteAcBonus + shieldAcBonus + baitAndSwitchBonus + shieldOfFaithBonus + defensiveDuelistBonus + (conditionEffects?.wardingBondAcBonus || 0) - (conditionEffects?.acPenalty || 0))))}{(hasteAcBonus > 0 || mageArmorActive || shieldAcBonus > 0 || shieldOfFaithBonus > 0 || defensiveDuelistBonus > 0 || barkskinActive) && <span className="aura-source" title={mageArmorActive ? `From Mage Armor (13 + ${dexBonus} Dex)` : undefined}>{hasteAcBonus > 0 && ` (+${hasteAcBonus} from Haste)`}{mageArmorActive && ` (${mageArmorAc} + ${dexBonus} Dex)`}</span>}{shieldAcBonus > 0 && <span className="aura-source" title="From Shield"> (+5 from Shield)</span>}{shieldOfFaithBonus > 0 && <span className="aura-source" title="From Shield of Faith"> (+2 from Shield of Faith)</span>}{defensiveDuelistBonus > 0 && <span className="aura-source" title="From Defensive Duelist"> (+{defensiveDuelistBonus} from Defensive Duelist)</span>}{baitAndSwitchBonus > 0 && <span className="aura-source" title={`From ${baitAndSwitchSource || 'Bait and Switch'}`}> (+{baitAndSwitchBonus} from {baitAndSwitchSource || 'Bait and Switch'})</span>}{barkskinActive && <span className="aura-source" title="From Barkskin"> (AC 17 from Barkskin)</span>}{(conditionEffects?.wardingBondAcBonus || 0) > 0 && <span className="aura-source" title="From Warding Bond"> (+{conditionEffects.wardingBondAcBonus} from Warding Bond)</span>}{(conditionEffects?.acPenalty || 0) > 0 && <span className="stat--penalized" title="Slow spell penalty"> ({'−'}{conditionEffects.acPenalty} from Slow)</span>}{smiteOfProtectionCoverActive && <span className="aura-source cover-badge" title="Half Cover from Smite of Protection — applies to all attackers while in Aura of Protection"> (+2 Cover: Smite of Protection)</span>}{bulwarkOfForceCoverActive && <span className="aura-source cover-badge" title="Half Cover from Bulwark of Force — applies to all attackers"> (+2 Cover: Bulwark of Force)</span>}{naturesSanctuaryCoverActive && <span className="aura-source cover-badge" title="Half Cover from Nature's Sanctuary — applies to all attackers"> (+2 Cover: Nature's Sanctuary)</span>}</div>
+        <div className='clickable' onClick={showArmorClassFormulaPopup}><b>Armor Class: </b>{computeArmorClassValue(ctx, conditionEffects, playerStats)}<ArmorClassBadges ctx={ctx} conditionEffects={conditionEffects} /></div>
     );
 }
 
@@ -192,6 +266,54 @@ function WildSurgeBadge({ surgeEffects }) {
     );
 }
 
+function CharacterSummaryText({ playerStats, levelSuffix, handleXpModalOpen }) {
+    return (
+        <div className='summary' data-testid='char-summary-text'>
+            {playerStats.race.subrace && playerStats.race.subrace.name ? playerStats.race.subrace.name : playerStats.race.name}
+            {playerStats.race.type ? ` (${playerStats.race.type.toLowerCase()})` : ''},&nbsp;
+            {playerStats.class.name}{playerStats.class.subclass ? ` (${playerStats.class.subclass.name.toLowerCase()}` : ''}
+            {playerStats.class.subclass && playerStats.class.subclass.type ? `-${playerStats.class.subclass.type.toLowerCase()}` : ''}
+            ), Level {playerStats.level}<span className='clickable' onClick={handleXpModalOpen}>{levelSuffix}</span>, {playerStats.alignment}
+        </div>
+    );
+}
+
+function ContextFeatureBadges({ ctx }) {
+    const { flyBuffActive, flyBuffName, largeFormActive, huntersMarkActive, tremorsenseActive } = ctx;
+    const badgeSpecs = [
+        { show: flyBuffActive, icon: 'fa-feather', label: `${flyBuffName} Active`, cls: 'effect-buff' },
+        { show: largeFormActive, icon: 'fa-expand', label: 'Large Form', cls: 'effect-buff' },
+        { show: huntersMarkActive, icon: 'fa-crosshairs', label: "Hunter's Mark Active", cls: 'effect-neutral' },
+        { show: tremorsenseActive, icon: 'fa-ear', label: 'Tremorsense 60 ft.', cls: 'effect-buff' },
+    ];
+    return badgeSpecs.map((badge) => badge.show && <CreatureBadge key={badge.icon} icon={badge.icon} label={badge.label} cls={badge.cls} />);
+}
+
+function ResistanceImmunityLines({ allResistances, allImmunities, auraResistances, auraResistanceSource }) {
+    return (
+        <>
+            {allResistances.length > 0 && <div>
+                <b>Resistances: </b>
+                {allResistances.filter(r => typeof r === 'string').map((r, i) => (
+                    <span key={r}>
+                        {i > 0 ? ', ' : ''}{r.charAt(0).toUpperCase() + r.slice(1)}
+                        {auraResistances.includes(r) && auraResistanceSource && <span className="aura-source" title={`From ${auraResistanceSource}'s Aura of Warding`}>*</span>}
+                    </span>
+                ))}
+            </div>}
+            {allImmunities.length > 0 && <div>
+                <b>Immunities: </b>
+                {allImmunities.filter(imm => typeof imm === 'string').map((imm, i) => (
+                    <span key={imm}>
+                        {i > 0 ? ', ' : ''}{imm.charAt(0).toUpperCase() + imm.slice(1)}
+
+                    </span>
+                ))}
+            </div>}
+        </>
+    );
+}
+
 function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters, onLongRest, exhaustionLevel, conditionEffects, onConditionsChange, auraComboEffects }) {
     const { setPopupHtml } = useDiceRollPopup();
     const { rollInitiative } = useLoggedDiceRoll(playerStats.name, campaignName, { characters });
@@ -284,8 +406,8 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
 
     const ctx = computeCharSummaryContext(playerStats, campaignName, characters, conditionEffects, auraComboEffects, exhaustionLevel);
     const {
-        flyBuffActive, flyBuffName, allImmunities, allResistances, auraResistances, auraResistanceSource,
-        seeInvisibilityActive, tremorsenseActive, largeFormActive, huntersMarkActive, effectiveInitiative,
+        allImmunities, allResistances, auraResistances, auraResistanceSource,
+        seeInvisibilityActive, effectiveInitiative,
     } = ctx;
     const allTargetEffects = useRuntimeValue('campaign', 'targetEffects');
     const myTargetEffects = React.useMemo(() => {
@@ -410,13 +532,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                             <LongRestButton playerStats={playerStats} campaignName={campaignName} onLongRest={onLongRest} />
                         </div>
                     </div>
-                    <div className='summary' data-testid='char-summary-text'>
-                        {playerStats.race.subrace && playerStats.race.subrace.name ? playerStats.race.subrace.name : playerStats.race.name}
-                        {playerStats.race.type ? ` (${playerStats.race.type.toLowerCase()})` : ''},&nbsp;
-                        {playerStats.class.name}{playerStats.class.subclass ? ` (${playerStats.class.subclass.name.toLowerCase()}` : ''}
-                        {playerStats.class.subclass && playerStats.class.subclass.type ? `-${playerStats.class.subclass.type.toLowerCase()}` : ''}
-                        ), Level {playerStats.level}<span className='clickable' onClick={handleXpModalOpen}>{levelSuffix}</span>, {playerStats.alignment}
-                    </div>
+                    <CharacterSummaryText playerStats={playerStats} levelSuffix={levelSuffix} handleXpModalOpen={handleXpModalOpen} />
                 </div>
             </div>
             <div className='summaryGrid'>
@@ -470,10 +586,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                     <span className="ally-badge clickable no-print" onClick={handleAllyModalOpen} title="Manage allies">
                         <i className="fa-solid fa-users"></i> Allies ({currentAllies.length})
                     </span>
-                    {flyBuffActive && <CreatureBadge icon='fa-feather' label={`${flyBuffName} Active`} cls='effect-buff' />}
-                    {largeFormActive && <CreatureBadge icon='fa-expand' label='Large Form' cls='effect-buff' />}
-                    {huntersMarkActive && <CreatureBadge icon='fa-crosshairs' label="Hunter's Mark Active" cls='effect-neutral' />}
-                    {tremorsenseActive && <CreatureBadge icon='fa-ear' label='Tremorsense 60 ft.' cls='effect-buff' />}
+                    <ContextFeatureBadges ctx={ctx} />
                 </div>
                 <div>
                     <TrackedResourceInput label="Short Rest Hit Dice" resourceKey="shortRestHitDice" playerName={playerStats.name} getMax={() => playerStats.level} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
@@ -482,24 +595,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                       <CharRaceFeatures playerStats={playerStats} campaignName={campaignName} />
                 </div>
       </div>
-          {allResistances.length > 0 && <div>
-              <b>Resistances: </b>
-              {allResistances.filter(r => typeof r === 'string').map((r, i) => (
-                <span key={r}>
-                  {i > 0 ? ', ' : ''}{r.charAt(0).toUpperCase() + r.slice(1)}
-                  {auraResistances.includes(r) && auraResistanceSource && <span className="aura-source" title={`From ${auraResistanceSource}'s Aura of Warding`}>*</span>}
-                </span>
-              ))}
-          </div>}
-          {allImmunities.length > 0 && <div>
-              <b>Immunities: </b>
-              {allImmunities.filter(imm => typeof imm === 'string').map((imm, i) => (
-                <span key={imm}>
-                  {i > 0 ? ', ' : ''}{imm.charAt(0).toUpperCase() + imm.slice(1)}
-
-                </span>
-              ))}
-           </div>}
+          <ResistanceImmunityLines allResistances={allResistances} allImmunities={allImmunities} auraResistances={auraResistances} auraResistanceSource={auraResistanceSource} />
           <StatListsBlock playerStats={playerStats} seeInvisibilityActive={seeInvisibilityActive} />
             {showShortRest && (
                 <ShortRestModal

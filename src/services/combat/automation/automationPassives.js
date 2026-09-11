@@ -51,50 +51,46 @@ export function getPassiveBuffs(features, playerStats) {
  * @param {Object} playerStats - PlayerStats object with equipment + automation.passives
  * @returns {{ baseMastery: string|null, extraMasteries: string[] }}
  */
+const CHOICE_MASTERY_NAMES = ['Push', 'Topple'];
+
+function accumulateMasteryPassive(passive, playerStats, baseName, weapon, acc) {
+    if (passive.extraMastery && Array.isArray(passive.extraMastery)) {
+        for (const m of passive.extraMastery) {
+            const bucket = CHOICE_MASTERY_NAMES.includes(m) ? acc.choiceMasteries : acc.extraMasteries;
+            if (!bucket.includes(m)) {
+                bucket.push(m);
+            }
+        }
+    }
+    if (passive.replaceMastery && Array.isArray(passive.replaceMastery) && passive.replaceMastery.length > 0) {
+        acc.replaceMastery = passive.replaceMastery;
+    }
+    if (passive.type === 'weapon_mastery_choice' && passive.masteryProperties) {
+        const chosenMastery = getChosenRuntimeValue(playerStats, passive.name, 'chosenMastery');
+        if (chosenMastery && passive.masteryProperties.includes(chosenMastery)) {
+            acc.extraMasteries.push(chosenMastery);
+        }
+    }
+    if (passive.type === 'weapon_kind_mastery') {
+        const chosenWeapons = getRuntimeValue(playerStats.name, '_Weapon_Kind_Mastery_chosenWeapons');
+        if (chosenWeapons && Array.isArray(chosenWeapons) && chosenWeapons.includes(baseName)) {
+            const isMeleeOnly = passive.meleeOnly;
+            if (!isMeleeOnly || weapon?.weapon_range === 'Melee') {
+                acc.hasKindMasteryMatch = true;
+            }
+        }
+    }
+}
+
 export function collectWeaponMastery(weaponName, playerStats) {
     const { baseName } = parseMagicItemName(weaponName);
     const weapon = playerStats.equipment?.find(item => item.name === baseName);
     let baseMastery = weapon?.mastery || null;
 
-    const extraMasteries = [];
-    let replaceMastery = null;
-    let replaceMasteryOptions = null;
-    let choiceMasteries = [];
-    let hasKindMasteryMatch = false;
+    const acc = { extraMasteries: [], replaceMastery: null, choiceMasteries: [], hasKindMasteryMatch: false };
     const passives = playerStats.automation?.passives || [];
     for (const passive of passives) {
-        if (passive.extraMastery && Array.isArray(passive.extraMastery)) {
-            const choiceMasteryNames = ['Push', 'Topple'];
-            for (const m of passive.extraMastery) {
-                if (choiceMasteryNames.includes(m)) {
-                    if (!choiceMasteries.includes(m)) {
-                        choiceMasteries.push(m);
-                    }
-                } else {
-                    if (!extraMasteries.includes(m)) {
-                        extraMasteries.push(m);
-                    }
-                }
-            }
-        }
-        if (passive.replaceMastery && Array.isArray(passive.replaceMastery) && passive.replaceMastery.length > 0) {
-            replaceMastery = passive.replaceMastery;
-        }
-        if (passive.type === 'weapon_mastery_choice' && passive.masteryProperties) {
-            const chosenMastery = getChosenRuntimeValue(playerStats, passive.name, 'chosenMastery');
-            if (chosenMastery && passive.masteryProperties.includes(chosenMastery)) {
-                extraMasteries.push(chosenMastery);
-            }
-        }
-        if (passive.type === 'weapon_kind_mastery') {
-            const chosenWeapons = getRuntimeValue(playerStats.name, '_Weapon_Kind_Mastery_chosenWeapons');
-            if (chosenWeapons && Array.isArray(chosenWeapons) && chosenWeapons.includes(baseName)) {
-                const isMeleeOnly = passive.meleeOnly;
-                if (!isMeleeOnly || weapon?.weapon_range === 'Melee') {
-                    hasKindMasteryMatch = true;
-                }
-            }
-        }
+        accumulateMasteryPassive(passive, playerStats, baseName, weapon, acc);
     }
 
     // WM-008: kind-bucket gate. When the player has a weapon_kind_mastery passive,
@@ -103,26 +99,27 @@ export function collectWeaponMastery(weaponName, playerStats) {
     // (replaceMastery) bypassed the gate and a non-chosen weapon (e.g. Shortbow with
     // chosenWeapons=['Shortsword']) kept its raw Vex mastery and auto-applied it.
     const hasKindGate = passives.some(p => p.type === 'weapon_kind_mastery');
-    if (hasKindGate && !hasKindMasteryMatch) {
+    if (hasKindGate && !acc.hasKindMasteryMatch) {
         baseMastery = null;
     }
 
-    if (replaceMastery) {
+    let replaceMasteryOptions = null;
+    if (acc.replaceMastery) {
         if (baseMastery) {
             // Tactical Master: only offer replacement when weapon has a usable mastery
-            replaceMasteryOptions = replaceMastery;
+            replaceMasteryOptions = acc.replaceMastery;
         }
-    } else if (choiceMasteries.length > 0) {
-        replaceMasteryOptions = choiceMasteries;
-    } else if (!hasKindMasteryMatch) {
+    } else if (acc.choiceMasteries.length > 0) {
+        replaceMasteryOptions = acc.choiceMasteries;
+    } else if (!acc.hasKindMasteryMatch) {
         baseMastery = null;
     }
 
     return {
         baseMastery,
-        extraMasteries: [...new Set(extraMasteries)],
+        extraMasteries: [...new Set(acc.extraMasteries)],
         replaceMasteryOptions: replaceMasteryOptions || null,
-        choiceMasteries: choiceMasteries.length > 0 ? choiceMasteries : null,
+        choiceMasteries: acc.choiceMasteries.length > 0 ? acc.choiceMasteries : null,
     };
 }
 
@@ -255,46 +252,58 @@ export function hasMinDamage(playerStats, damageType) {
     return false;
 }
 
+function gatedResistanceTypes(passive, playerStats) {
+    if (passive.name === 'Stormborn') {
+        const wrathActive = getRuntimeValue(playerStats.name, 'wrathOfTheSeaActive');
+        if (!wrathActive) return [];
+    }
+    if (passive.name === 'Full of Stars') {
+        const activeBuffs = getRuntimeValue(playerStats.name, 'activeBuffs') || [];
+        const starryFormActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Starry Form');
+        if (!starryFormActive) return [];
+    }
+    return passive.damageTypes;
+}
+
+function landMappedResistance(passive, playerStats) {
+    const runtimeLandType = getRuntimeValue(playerStats.name, '_circleOfTheLandType') || '';
+    const landType = (runtimeLandType || playerStats.class?.major?.type || playerStats.class?.subclass?.type || '').toLowerCase().trim();
+    if (landType && passive.landMappings[landType]) {
+        return [passive.landMappings[landType]];
+    }
+    return [];
+}
+
+// CLA-336: active-gated type:'resistance' passives (Stormborn Cold/Lightning/
+// Thunder while Wrath of the Sea is active) must resolve LIVE at hit-resolution.
+// Gates mirror rulesFactory.getPlayerStats (the compute-time path never sees the
+// wrathOfTheSeaActive toggle flip). 5e shares this function — 5e data's only
+// type:'resistance' passive (Avatar of Battle) is always-on and emits ungated.
+function passiveResistanceContribution(passive, playerStats) {
+    if (passive.type === 'passive_immunity' && Array.isArray(passive.damageResistance)) {
+        return passive.damageResistance;
+    }
+    if (passive.type === 'passive_buff' && Array.isArray(passive.resistances)) {
+        return passive.resistances;
+    }
+    if (passive.type === 'damage_type_choice' && passive.effect === 'fiendish_resilience') {
+        const chosenType = getChosenRuntimeValue(playerStats, passive.name, 'chosenType');
+        return chosenType ? [chosenType] : [];
+    }
+    if (passive.type === 'resistance' && Array.isArray(passive.damageTypes)) {
+        return gatedResistanceTypes(passive, playerStats);
+    }
+    if (passive.type === 'land_resistance' && passive.landMappings && typeof passive.landMappings === 'object') {
+        return landMappedResistance(passive, playerStats);
+    }
+    return [];
+}
+
 export function getDamageResistances(playerStats) {
     const passives = playerStats.automation?.passives || [];
     const resistances = [];
     for (const passive of passives) {
-        if (passive.type === 'passive_immunity' && Array.isArray(passive.damageResistance)) {
-            resistances.push(...passive.damageResistance);
-        }
-        if (passive.type === 'passive_buff' && Array.isArray(passive.resistances)) {
-            resistances.push(...passive.resistances);
-        }
-        if (passive.type === 'damage_type_choice' && passive.effect === 'fiendish_resilience') {
-            const chosenType = getChosenRuntimeValue(playerStats, passive.name, 'chosenType');
-            if (chosenType) {
-                resistances.push(chosenType);
-            }
-        }
-        // CLA-336: active-gated type:'resistance' passives (Stormborn Cold/Lightning/
-        // Thunder while Wrath of the Sea is active) must resolve LIVE at hit-resolution.
-        // Gates mirror rulesFactory.getPlayerStats (the compute-time path never sees the
-        // wrathOfTheSeaActive toggle flip). 5e shares this function — 5e data's only
-        // type:'resistance' passive (Avatar of Battle) is always-on and emits ungated.
-        if (passive.type === 'resistance' && Array.isArray(passive.damageTypes)) {
-            if (passive.name === 'Stormborn') {
-                const wrathActive = getRuntimeValue(playerStats.name, 'wrathOfTheSeaActive');
-                if (!wrathActive) continue;
-            }
-            if (passive.name === 'Full of Stars') {
-                const activeBuffs = getRuntimeValue(playerStats.name, 'activeBuffs') || [];
-                const starryFormActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Starry Form');
-                if (!starryFormActive) continue;
-            }
-            resistances.push(...passive.damageTypes);
-        }
-        if (passive.type === 'land_resistance' && passive.landMappings && typeof passive.landMappings === 'object') {
-            const runtimeLandType = getRuntimeValue(playerStats.name, '_circleOfTheLandType') || '';
-            const landType = (runtimeLandType || playerStats.class?.major?.type || playerStats.class?.subclass?.type || '').toLowerCase().trim();
-            if (landType && passive.landMappings[landType]) {
-                resistances.push(passive.landMappings[landType]);
-            }
-        }
+        resistances.push(...passiveResistanceContribution(passive, playerStats));
     }
     return [...new Set(resistances)];
 }

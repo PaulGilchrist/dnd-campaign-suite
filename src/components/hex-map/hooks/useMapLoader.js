@@ -4,6 +4,126 @@ import { hexKey } from '../../../services/maps/hexMapUtils.js';
 import { getDailyHexBudget } from '../../../services/campaign/travelService.js';
 import { DEFAULT_GRID_SIZE, GRID_COLS_MULTIPLIER, MIN_ZOOM, DEFAULT_TERRAIN } from '../../../config/outdoorConfig.js';
 
+function normalizeExistingView(existing) {
+    const loadedZoom = existing.zoom != null ? Math.max(MIN_ZOOM, existing.zoom) : MIN_ZOOM;
+    const isOldDefault = existing.panX === 0 && existing.panY === 0;
+    const loadedPanX = (!isOldDefault && existing.panX != null) ? existing.panX : 0;
+    const loadedPanY = (!isOldDefault && existing.panY != null) ? existing.panY : 0;
+    return { loadedZoom, loadedPanX, loadedPanY, isOldDefault };
+}
+
+function buildTravelInit(loadedTravel) {
+    return {
+        forcedMarchHours: typeof loadedTravel.forcedMarchHours === 'number' ? loadedTravel.forcedMarchHours : 0,
+        accruedCost: typeof loadedTravel.accruedCost === 'number' ? loadedTravel.accruedCost : 0,
+        dailyBudget: typeof loadedTravel.dailyBudget === 'number' ? loadedTravel.dailyBudget : getDailyHexBudget(loadedTravel.travelPace || 'normal'),
+        travelMode: loadedTravel.travelMode || 'inactive',
+        travelPace: loadedTravel.travelPace || 'normal',
+        destination: loadedTravel.destination || null,
+        path: Array.isArray(loadedTravel.path) ? loadedTravel.path : [],
+        pathIndex: typeof loadedTravel.pathIndex === 'number' ? loadedTravel.pathIndex : 0,
+    };
+}
+
+function applyExistingMap(existing, mapName, characters, ctx) {
+    const loadedTerrain = existing.terrain || {};
+    const loadedRivers = existing.rivers || [];
+    const loadedRoads = existing.roads || [];
+    const loadedPois = existing.pois || [];
+    const loadedGridSize = existing.gridSize || DEFAULT_GRID_SIZE;
+    const { loadedZoom, loadedPanX, loadedPanY, isOldDefault } = normalizeExistingView(existing);
+
+    if (!existing.type) existing.type = 'outdoor';
+
+    ctx.setMapData(existing);
+    ctx.setGridSize(loadedGridSize);
+    ctx.setTerrain(loadedTerrain);
+    ctx.setRivers(loadedRivers);
+    ctx.setRoads(loadedRoads);
+    ctx.setPois(loadedPois);
+    ctx.setZoom(loadedZoom);
+    ctx.setPanX(loadedPanX);
+    ctx.setPanY(loadedPanY);
+    ctx.hexMapDisplayNameRef.current = existing.displayName || mapName;
+    if (existing.weather) ctx.setWeather(existing.weather);
+
+    const travelInitData = buildTravelInit(existing.travelState || {});
+    const hasActiveTravel = travelInitData.travelMode !== 'inactive' || travelInitData.destination !== null;
+    if (hasActiveTravel) {
+        ctx.setTravelInit(travelInitData);
+    }
+
+    if (isOldDefault) {
+        ctx.needsResetViewRef.current = true;
+    }
+
+    const loadOrder = existing.marchingOrder ||
+        (characters.length > 0 ? characters.map(c => c.name) : []);
+    ctx.setMarchingOrder(loadOrder);
+
+    if (existing.partyPosition) {
+        ctx.setPartyPosition(existing.partyPosition);
+    } else {
+        const centerCols = loadedGridSize * GRID_COLS_MULTIPLIER;
+        ctx.setPartyPosition({ q: Math.floor(centerCols / 2), r: Math.floor(loadedGridSize / 2) });
+    }
+
+    ctx.hasLoaded.current = true;
+    ctx.setLoading(false);
+}
+
+function buildInitialMapData(characters) {
+    const initialTerrain = {};
+    const newCols = DEFAULT_GRID_SIZE * GRID_COLS_MULTIPLIER;
+    const newRows = DEFAULT_GRID_SIZE;
+    for (let r = 0; r < newRows; r++) {
+        for (let q = 0; q < newCols; q++) {
+            initialTerrain[hexKey(q, r)] = DEFAULT_TERRAIN;
+        }
+    }
+
+    const initialOrder = characters.length > 0 ? characters.map(c => c.name) : [];
+    const initialPartyPos = initialOrder.length > 0
+        ? { q: Math.floor(newCols / 2), r: Math.floor(newRows / 2) }
+        : null;
+
+    const newData = {
+        type: 'outdoor',
+        gridSize: DEFAULT_GRID_SIZE,
+        terrain: initialTerrain,
+        pois: [],
+        roads: [],
+        zoom: MIN_ZOOM,
+        marchingOrder: initialOrder,
+        partyPosition: initialPartyPos,
+    };
+
+    return { initialTerrain, initialOrder, initialPartyPos, newData };
+}
+
+async function createAndSaveNewMap(campaignName, mapName, characters, ctx) {
+    const { initialTerrain, initialOrder, initialPartyPos, newData } = buildInitialMapData(characters);
+
+    ctx.setMapData(newData);
+    ctx.setTerrain(initialTerrain);
+    ctx.setGridSize(DEFAULT_GRID_SIZE);
+    ctx.setMarchingOrder(initialOrder);
+    ctx.setPartyPosition(initialPartyPos);
+    ctx.setZoom(MIN_ZOOM);
+    ctx.setPanX(0);
+    ctx.setPanY(0);
+    ctx.needsResetViewRef.current = true;
+
+    try {
+        await mapsService.saveMapData(campaignName, mapName, newData);
+    } catch (err) {
+        console.error('Failed to save initial hex map data:', err);
+    }
+
+    ctx.hasLoaded.current = true;
+    ctx.setLoading(false);
+}
+
 function useMapLoader(campaignName, mapName, characters) {
     const [loading, setLoading] = useState(true);
     const [mapData, setMapData] = useState(null);
@@ -37,116 +157,25 @@ function useMapLoader(campaignName, mapName, characters) {
         if (isInitialized.current) return;
         isInitialized.current = true;
 
+        const ctx = {
+            setMapData, setGridSize, setTerrain, setRivers, setRoads, setPois,
+            setZoom, setPanX, setPanY, setWeather, setTravelInit,
+            setMarchingOrder, setPartyPosition, setLoading,
+            hexMapDisplayNameRef, needsResetViewRef, hasLoaded,
+        };
+
         const loadMap = async () => {
             try {
                 const existing = await mapsService.loadMapData(campaignName, mapName);
                 if (existing) {
-                    const loadedTerrain = existing.terrain || {};
-                    const loadedRivers = existing.rivers || [];
-                    const loadedRoads = existing.roads || [];
-                    const loadedPois = existing.pois || [];
-                    const loadedGridSize = existing.gridSize || DEFAULT_GRID_SIZE;
-                    const loadedZoom = existing.zoom != null ? Math.max(MIN_ZOOM, existing.zoom) : MIN_ZOOM;
-                    const isOldDefault = existing.panX === 0 && existing.panY === 0;
-                    const loadedPanX = (!isOldDefault && existing.panX != null) ? existing.panX : 0;
-                    const loadedPanY = (!isOldDefault && existing.panY != null) ? existing.panY : 0;
-
-                    if (!existing.type) existing.type = 'outdoor';
-
-                    setMapData(existing);
-                    setGridSize(loadedGridSize);
-                    setTerrain(loadedTerrain);
-                    setRivers(loadedRivers);
-                    setRoads(loadedRoads);
-                    setPois(loadedPois);
-                    setZoom(loadedZoom);
-                    setPanX(loadedPanX);
-                    setPanY(loadedPanY);
-                    hexMapDisplayNameRef.current = existing.displayName || mapName;
-                    if (existing.weather) setWeather(existing.weather);
-
-                    const loadedTravel = existing.travelState || {};
-                    const travelInitData = {
-                        forcedMarchHours: typeof loadedTravel.forcedMarchHours === 'number' ? loadedTravel.forcedMarchHours : 0,
-                        accruedCost: typeof loadedTravel.accruedCost === 'number' ? loadedTravel.accruedCost : 0,
-                        dailyBudget: typeof loadedTravel.dailyBudget === 'number' ? loadedTravel.dailyBudget : getDailyHexBudget(loadedTravel.travelPace || 'normal'),
-                        travelMode: loadedTravel.travelMode || 'inactive',
-                        travelPace: loadedTravel.travelPace || 'normal',
-                        destination: loadedTravel.destination || null,
-                        path: Array.isArray(loadedTravel.path) ? loadedTravel.path : [],
-                        pathIndex: typeof loadedTravel.pathIndex === 'number' ? loadedTravel.pathIndex : 0,
-                    };
-                    const hasActiveTravel = travelInitData.travelMode !== 'inactive' || travelInitData.destination !== null;
-                    if (hasActiveTravel) {
-                        setTravelInit(travelInitData);
-                    }
-
-                    if (isOldDefault) {
-                        needsResetViewRef.current = true;
-                    }
-
-                    const loadOrder = existing.marchingOrder ||
-                        (characters.length > 0 ? characters.map(c => c.name) : []);
-                    setMarchingOrder(loadOrder);
-
-                    if (existing.partyPosition) {
-                        setPartyPosition(existing.partyPosition);
-                    } else {
-                        const centerCols = loadedGridSize * GRID_COLS_MULTIPLIER;
-                        setPartyPosition({ q: Math.floor(centerCols / 2), r: Math.floor(loadedGridSize / 2) });
-                    }
-
-                    hasLoaded.current = true;
-                    setLoading(false);
+                    applyExistingMap(existing, mapName, characters, ctx);
                     return;
                 }
             } catch (_err) {
                 // ignore, fall through to empty map creation
             }
 
-            const initialTerrain = {};
-            const newCols = DEFAULT_GRID_SIZE * GRID_COLS_MULTIPLIER;
-            const newRows = DEFAULT_GRID_SIZE;
-            for (let r = 0; r < newRows; r++) {
-                for (let q = 0; q < newCols; q++) {
-                    initialTerrain[hexKey(q, r)] = DEFAULT_TERRAIN;
-                }
-            }
-
-            const initialOrder = characters.length > 0 ? characters.map(c => c.name) : [];
-            const initialPartyPos = initialOrder.length > 0
-                ? { q: Math.floor(newCols / 2), r: Math.floor(newRows / 2) }
-                : null;
-
-            const newData = {
-                type: 'outdoor',
-                gridSize: DEFAULT_GRID_SIZE,
-                terrain: initialTerrain,
-                pois: [],
-                roads: [],
-                zoom: MIN_ZOOM,
-                marchingOrder: initialOrder,
-                partyPosition: initialPartyPos,
-            };
-
-            setMapData(newData);
-            setTerrain(initialTerrain);
-            setGridSize(DEFAULT_GRID_SIZE);
-            setMarchingOrder(initialOrder);
-            setPartyPosition(initialPartyPos);
-            setZoom(MIN_ZOOM);
-            setPanX(0);
-            setPanY(0);
-            needsResetViewRef.current = true;
-
-            try {
-                await mapsService.saveMapData(campaignName, mapName, newData);
-            } catch (err) {
-                console.error('Failed to save initial hex map data:', err);
-            }
-
-            hasLoaded.current = true;
-            setLoading(false);
+            await createAndSaveNewMap(campaignName, mapName, characters, ctx);
         };
 
         loadMap();

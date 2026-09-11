@@ -580,6 +580,33 @@ function SavageAttackerResult({ savageAttackerResult, onKeep, onSavageAttackerCh
     );
 }
 
+function BardicInspirationDefenseRow({ bardicInspirationDefenseResult }) {
+    return (
+        <div className="dice-roll-reroll-result">
+            <i className="fa-solid fa-music"></i> Bardic Inspiration - Defense: 1d{bardicInspirationDefenseResult.dieSize} → {bardicInspirationDefenseResult.dieValue} → AC {bardicInspirationDefenseResult.newAc} ({bardicInspirationDefenseResult.willMiss ? 'Attack misses!' : 'Attack still hits'})
+        </div>
+    );
+}
+
+function EmpoweredSpellResult({ empoweredSpellResult }) {
+    const diff = empoweredSpellResult.damageDifference;
+    const diffSuffix = diff > 0 ? ` (+${diff})` : diff < 0 ? ` (${diff})` : '';
+    const messageSuffix = diff === 0 && !empoweredSpellResult.message ? '' : empoweredSpellResult.message ? ` — ${empoweredSpellResult.message}` : '';
+    return (
+        <div className="dice-roll-reroll-result">
+            <i className="fa-solid fa-wand-magic-sparkles"></i> Empowered Spell: rerolled {empoweredSpellResult.rerollCount} dice ({empoweredSpellResult.originalDice?.join(', ')} → {empoweredSpellResult.newDice?.join(', ')}) → <strong>{empoweredSpellResult.newTotal}</strong>{diffSuffix}{messageSuffix}
+        </div>
+    );
+}
+
+function PunctureResultRow({ punctureResult }) {
+    return (
+        <div className="dice-roll-reroll-result">
+            <i className="fa-solid fa-bolt"></i> Piercer - Puncture: {punctureResult.originalDice?.join(', ')} → {punctureResult.newDice?.join(', ')}
+        </div>
+    );
+}
+
 function FeatureResultSummary({ props, state, handlers }) {
     const { rerollUsed, rerollResult, strokeUsed, strokeResult, boonUsed,
         bardicInspirationUsed, bardicInspirationResult, bardicInspirationDefenseUsed,
@@ -611,9 +638,7 @@ function FeatureResultSummary({ props, state, handlers }) {
               </div>
             )}
             {bardicInspirationDefenseUsed && bardicInspirationDefenseResult !== null && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-music"></i> Bardic Inspiration - Defense: 1d{bardicInspirationDefenseResult.dieSize} → {bardicInspirationDefenseResult.dieValue} → AC {bardicInspirationDefenseResult.newAc} ({bardicInspirationDefenseResult.willMiss ? 'Attack misses!' : 'Attack still hits'})
-              </div>
+              <BardicInspirationDefenseRow bardicInspirationDefenseResult={bardicInspirationDefenseResult} />
             )}
             {bardicInspirationOffenseUsed && bardicInspirationOffenseResult !== null && (
               <div className="dice-roll-reroll-result">
@@ -621,15 +646,10 @@ function FeatureResultSummary({ props, state, handlers }) {
               </div>
             )}
             {empoweredSpellUsed && empoweredSpellResult && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-wand-magic-sparkles"></i> Empowered Spell: rerolled {empoweredSpellResult.rerollCount} dice ({empoweredSpellResult.originalDice?.join(', ')} → {empoweredSpellResult.newDice?.join(', ')}) → <strong>{empoweredSpellResult.newTotal}</strong>{empoweredSpellResult.damageDifference > 0 ? ` (+${empoweredSpellResult.damageDifference})` : empoweredSpellResult.damageDifference < 0 ? ` (${empoweredSpellResult.damageDifference})` : ''}
-                {empoweredSpellResult.damageDifference === 0 && !empoweredSpellResult.message ? '' : empoweredSpellResult.message ? ` — ${empoweredSpellResult.message}` : ''}
-              </div>
+              <EmpoweredSpellResult empoweredSpellResult={empoweredSpellResult} />
             )}
             {punctureUsed && punctureResult && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-bolt"></i> Piercer - Puncture: {punctureResult.originalDice?.join(', ')} → {punctureResult.newDice?.join(', ')}
-              </div>
+              <PunctureResultRow punctureResult={punctureResult} />
             )}
             {savageAttackerUsed && savageAttackerResult && (
               <SavageAttackerResult savageAttackerResult={savageAttackerResult} onKeep={handlers.handleSavageAttackerKeep} onSavageAttackerChoice={props.onSavageAttackerChoice} />

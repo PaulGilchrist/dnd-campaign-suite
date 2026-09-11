@@ -2,6 +2,131 @@ import { useState } from 'react';
 import { confirmTeleport, isExtendedAvailable } from '../../../services/automation/handlers/class-warlock/tempTeleportHandler.js';
 import '../CharSheet.css';
 
+function TeleportShell({ onClose, children }) {
+    return (
+        <div className="sp-overlay" onClick={(e) => {
+        if (e.target.closest('.sp-modal')) return;
+        onClose?.();
+    }}>
+            <div className="sp-modal">
+                {children}
+            </div>
+        </div>
+    );
+}
+
+function TeleportAppliedView({ result, action, isSwap, triggeredByElementalStride, onClose }) {
+    return (
+        <TeleportShell onClose={onClose}>
+            <div className="sp-header">
+                <i className={`fa-solid ${isSwap ? 'fa-arrows-rotate' : triggeredByElementalStride ? 'fa-wind' : 'fa-tree'}`}></i> {action.name}
+            </div>
+            <div className="sp-body" dangerouslySetInnerHTML={{ __html: result.payload.description }}>
+            </div>
+            <div className="sp-actions">
+                <button className="sp-roll-btn" onClick={onClose}>Done</button>
+            </div>
+        </TeleportShell>
+    );
+}
+
+function TeleportElementalView({ action, elementalDistance, handleConfirm, onClose }) {
+    return (
+        <TeleportShell onClose={onClose}>
+            <div className="sp-header">
+                <i className="fa-solid fa-wind"></i> {action.name} — Thunder
+            </div>
+            <div className="sp-body">
+                <p>Teleport up to {elementalDistance} to an unoccupied space you can see.</p>
+            </div>
+            <div className="sp-actions">
+                <button className="sp-roll-btn" onClick={handleConfirm}>
+                    <i className="fa-solid fa-wind"></i> Teleport
+                </button>
+                <button className="sp-dismiss-btn" onClick={onClose}>Cancel</button>
+            </div>
+        </TeleportShell>
+    );
+}
+
+function TeleportSwapView({ action, auto, handleConfirm, onClose }) {
+    return (
+        <TeleportShell onClose={onClose}>
+            <div className="sp-header">
+                <i className="fa-solid fa-arrows-rotate"></i> {action.name}
+            </div>
+            <div className="sp-body">
+                <p>Swap places with your illusion (up to {(auto && auto.distance) || '30 ft'}).</p>
+            </div>
+            <div className="sp-actions">
+                <button className="sp-roll-btn" onClick={handleConfirm}>
+                    <i className="fa-solid fa-arrows-rotate"></i> Swap
+                </button>
+                <button className="sp-dismiss-btn" onClick={onClose}>Cancel</button>
+            </div>
+        </TeleportShell>
+    );
+}
+
+function TeleportStandardView({ action, auto, isMoonlightStep, useExtended, extendedAvailable, setUseExtended, handleConfirm, onClose }) {
+    const standardDistance = (auto && auto.distance) || '60 ft';
+    const extendedDistance = (auto && auto.extendedDistance) || '150 ft';
+    return (
+        <TeleportShell onClose={onClose}>
+            <div className="sp-header">
+                <i className={isMoonlightStep ? "fa-solid fa-moon" : "fa-solid fa-tree"}></i> {action.name}
+            </div>
+            <div className="sp-body">
+                <p>Teleport to an unoccupied space you can see:</p>
+                {isMoonlightStep ? (
+                    <p style={{ marginTop: '12px', opacity: 0.8 }}>
+                        Gains Advantage on next attack roll.
+                    </p>
+                ) : (
+                    <div style={{ textAlign: 'left', marginTop: '12px' }}>
+                        <label style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: 'pointer', background: !useExtended ? 'rgba(255,255,255,0.15)' : 'transparent', border: !useExtended ? '1px solid var(--color-link)' : '1px solid transparent' }}>
+                            <input
+                                type="radio"
+                                name="teleportRange"
+                                checked={!useExtended}
+                                onChange={() => setUseExtended(false)}
+                                style={{ marginRight: '8px' }}
+                            />
+                            <strong>{standardDistance}</strong>
+                            <span style={{ opacity: 0.8, marginLeft: '8px' }}>— Standard teleport</span>
+                        </label>
+                        <label style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: extendedAvailable ? 'pointer' : 'not-allowed', background: useExtended ? 'rgba(255,255,255,0.15)' : 'transparent', border: useExtended ? '1px solid var(--color-link)' : '1px solid transparent', opacity: extendedAvailable ? 1 : 0.5 }}>
+                            <input
+                                type="radio"
+                                name="teleportRange"
+                                checked={useExtended}
+                                onChange={() => extendedAvailable && setUseExtended(true)}
+                                disabled={!extendedAvailable}
+                                style={{ marginRight: '8px' }}
+                            />
+                            <strong>{extendedDistance}</strong>
+                            <span style={{ opacity: 0.8, marginLeft: '8px' }}>
+                                {extendedAvailable ? '— Once per Rage' : '— Already used this Rage'}
+                            </span>
+                        </label>
+                    </div>
+                )}
+                {!isMoonlightStep && (auto && auto.bringAllies && auto.allyCount > 0) && (
+                    <p style={{ marginTop: '12px', opacity: 0.8 }}>
+                        <i className="fa-solid fa-users"></i> When using the extended teleport, you can bring up to {auto.allyCount} willing creatures within 10 ft of you. Each appears within {(auto && auto.teleportRange) || '10 ft'} of your destination.
+                    </p>
+                )}
+            </div>
+            <div className="sp-actions">
+                <button className="sp-roll-btn" onClick={handleConfirm}>
+                    <i className={isMoonlightStep ? "fa-solid fa-moon" : "fa-solid fa-tree"}></i> Teleport
+                </button>
+                <button className="sp-dismiss-btn" onClick={onClose}>Cancel</button>
+            </div>
+        </TeleportShell>
+    );
+}
+
 function TeleportModal({ action, playerStats, campaignName, onClose, triggeredByElementalStride, isMoonlightStep }) {
     const auto = action?.automation || {};
     const isSwap = auto?.effect === 'teleport_swap_with_illusion';
@@ -37,134 +162,28 @@ function TeleportModal({ action, playerStats, campaignName, onClose, triggeredBy
     };
 
     if (applied && result) {
-        return (
-            <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
-                <div className="sp-modal">
-                    <div className="sp-header">
-                        <i className={`fa-solid ${isSwap ? 'fa-arrows-rotate' : triggeredByElementalStride ? 'fa-wind' : 'fa-tree'}`}></i> {action.name}
-                    </div>
-                    <div className="sp-body" dangerouslySetInnerHTML={{ __html: result.payload.description }}>
-                    </div>
-                    <div className="sp-actions">
-                        <button className="sp-roll-btn" onClick={onClose}>Done</button>
-                    </div>
-                </div>
-            </div>
-        );
+        return <TeleportAppliedView result={result} action={action} isSwap={isSwap} triggeredByElementalStride={triggeredByElementalStride} onClose={onClose} />;
     }
 
     if (triggeredByElementalStride) {
-        return (
-            <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
-                <div className="sp-modal">
-                    <div className="sp-header">
-                        <i className="fa-solid fa-wind"></i> {action.name} — Thunder
-                    </div>
-                    <div className="sp-body">
-                        <p>Teleport up to {elementalDistance} to an unoccupied space you can see.</p>
-                    </div>
-                    <div className="sp-actions">
-                        <button className="sp-roll-btn" onClick={handleConfirm}>
-                            <i className="fa-solid fa-wind"></i> Teleport
-                        </button>
-                        <button className="sp-dismiss-btn" onClick={onClose}>Cancel</button>
-                    </div>
-                </div>
-            </div>
-        );
+        return <TeleportElementalView action={action} elementalDistance={elementalDistance} handleConfirm={handleConfirm} onClose={onClose} />;
     }
 
     if (isSwap) {
-        return (
-            <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
-                <div className="sp-modal">
-                    <div className="sp-header">
-                        <i className="fa-solid fa-arrows-rotate"></i> {action.name}
-                    </div>
-                    <div className="sp-body">
-                        <p>Swap places with your illusion (up to {(auto && auto.distance) || '30 ft'}).</p>
-                    </div>
-                    <div className="sp-actions">
-                        <button className="sp-roll-btn" onClick={handleConfirm}>
-                            <i className="fa-solid fa-arrows-rotate"></i> Swap
-                        </button>
-                        <button className="sp-dismiss-btn" onClick={onClose}>Cancel</button>
-                    </div>
-                </div>
-            </div>
-        );
+        return <TeleportSwapView action={action} auto={auto} handleConfirm={handleConfirm} onClose={onClose} />;
     }
 
-    const standardDistance = (auto && auto.distance) || '60 ft';
-    const extendedDistance = (auto && auto.extendedDistance) || '150 ft';
-
     return (
-        <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
-            <div className="sp-modal">
-                <div className="sp-header">
-                    <i className={isMoonlightStep ? "fa-solid fa-moon" : "fa-solid fa-tree"}></i> {action.name}
-                </div>
-                <div className="sp-body">
-                    <p>Teleport to an unoccupied space you can see:</p>
-                    {isMoonlightStep ? (
-                        <p style={{ marginTop: '12px', opacity: 0.8 }}>
-                            Gains Advantage on next attack roll.
-                        </p>
-                    ) : (
-                        <div style={{ textAlign: 'left', marginTop: '12px' }}>
-                            <label style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: 'pointer', background: !useExtended ? 'rgba(255,255,255,0.15)' : 'transparent', border: !useExtended ? '1px solid var(--color-link)' : '1px solid transparent' }}>
-                                <input
-                                    type="radio"
-                                    name="teleportRange"
-                                    checked={!useExtended}
-                                    onChange={() => setUseExtended(false)}
-                                    style={{ marginRight: '8px' }}
-                                />
-                                <strong>{standardDistance}</strong>
-                                <span style={{ opacity: 0.8, marginLeft: '8px' }}>— Standard teleport</span>
-                            </label>
-                            <label style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: extendedAvailable ? 'pointer' : 'not-allowed', background: useExtended ? 'rgba(255,255,255,0.15)' : 'transparent', border: useExtended ? '1px solid var(--color-link)' : '1px solid transparent', opacity: extendedAvailable ? 1 : 0.5 }}>
-                                <input
-                                    type="radio"
-                                    name="teleportRange"
-                                    checked={useExtended}
-                                    onChange={() => extendedAvailable && setUseExtended(true)}
-                                    disabled={!extendedAvailable}
-                                    style={{ marginRight: '8px' }}
-                                />
-                                <strong>{extendedDistance}</strong>
-                                <span style={{ opacity: 0.8, marginLeft: '8px' }}>
-                                    {extendedAvailable ? '— Once per Rage' : '— Already used this Rage'}
-                                </span>
-                            </label>
-                        </div>
-                    )}
-                    {!isMoonlightStep && (auto && auto.bringAllies && auto.allyCount > 0) && (
-                        <p style={{ marginTop: '12px', opacity: 0.8 }}>
-                            <i className="fa-solid fa-users"></i> When using the extended teleport, you can bring up to {auto.allyCount} willing creatures within 10 ft of you. Each appears within {(auto && auto.teleportRange) || '10 ft'} of your destination.
-                        </p>
-                    )}
-                </div>
-                <div className="sp-actions">
-                    <button className="sp-roll-btn" onClick={handleConfirm}>
-                        <i className={isMoonlightStep ? "fa-solid fa-moon" : "fa-solid fa-tree"}></i> Teleport
-                    </button>
-                    <button className="sp-dismiss-btn" onClick={onClose}>Cancel</button>
-                </div>
-            </div>
-        </div>
+        <TeleportStandardView
+            action={action}
+            auto={auto}
+            isMoonlightStep={isMoonlightStep}
+            useExtended={useExtended}
+            extendedAvailable={extendedAvailable}
+            setUseExtended={setUseExtended}
+            handleConfirm={handleConfirm}
+            onClose={onClose}
+        />
     );
 }
 

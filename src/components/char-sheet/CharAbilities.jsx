@@ -21,39 +21,43 @@ const SKILL_TO_ABILITY = {
     'Strength': 'STR', 'Dexterity': 'DEX', 'Constitution': 'CON', 'Intelligence': 'INT', 'Wisdom': 'WIS', 'Charisma': 'CHA',
 };
 
-function resolveCheckForcedMode(conditionEffects, checkName) {
-    let forcedMode = undefined;
-    if (conditionEffects?.abilityCheckDisadvantage) forcedMode = 'disadvantage';
-    if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === checkName)) {
+const CHARISMA_SKILLS = ['Deception', 'Intimidation', 'Performance', 'Persuasion'];
+
+const isStrCheckName = (checkName, abbr) => abbr === 'STR' || checkName === 'Strength';
+
+function resolveCancelingForcedMode(ce, checkName) {
+    let forcedMode = ce?.abilityCheckDisadvantage ? 'disadvantage' : undefined;
+    if (ce?.abilityCheckAdvantage && (!ce?.abilityCheckAdvantageSkill || ce.abilityCheckAdvantageSkill === checkName)) {
         forcedMode = forcedMode === 'disadvantage' ? undefined : 'advantage';
     }
-    // Peerless Athlete: skill-specific advantage (like expertise uses .includes(skill.name))
-    if (!forcedMode && conditionEffects?.peerlessAthleteAdvantageSkills?.includes(checkName)) {
-        forcedMode = 'advantage';
-    }
-    // Check per-ability check advantage (e.g., Remarkable Athlete for STR)
-    const abilityForCheck = SKILL_TO_ABILITY[checkName];
-    if (!forcedMode && abilityForCheck && conditionEffects?.abilityCheckAdvantageAbilities?.includes(abilityForCheck)) {
-        forcedMode = 'advantage';
-    }
-    // Check skill-specific advantage (e.g., Actor feat for Deception/Performance)
-    if (!forcedMode && conditionEffects?.abilityCheckAdvantageSkills?.includes(checkName)) {
-        forcedMode = 'advantage';
-    }
-    // Powerful Build: advantage on STR checks to escape grapple
-    const abbr = checkName.substring(0, 3).toUpperCase();
-    if (!forcedMode && conditionEffects?.strCheckAdvantage && (abbr === 'STR' || checkName === 'Strength' || checkName === 'Athletics')) {
-        forcedMode = 'advantage';
-    }
-    // Ray of Enfeeblement: STR-based d20 tests have disadvantage
-    if (!forcedMode && conditionEffects?.strCheckDisadvantage && (abbr === 'STR' || checkName === 'Strength')) {
-        forcedMode = 'disadvantage';
-    }
-    // Hex: ability check disadvantage for chosen ability
-    if (!forcedMode && abilityForCheck && conditionEffects?.abilityCheckDisadvantageAbilities?.includes(abilityForCheck)) {
-        forcedMode = 'disadvantage';
-    }
     return forcedMode;
+}
+
+const CHECK_FORCED_MODE_RULES = [
+    // Peerless Athlete: skill-specific advantage (like expertise uses .includes(skill.name))
+    { mode: 'advantage', guard: (ce, checkName) => ce?.peerlessAthleteAdvantageSkills?.includes(checkName) },
+    // Check per-ability check advantage (e.g., Remarkable Athlete for STR)
+    { mode: 'advantage', guard: (ce, checkName, abilityForCheck) => abilityForCheck && ce?.abilityCheckAdvantageAbilities?.includes(abilityForCheck) },
+    // Check skill-specific advantage (e.g., Actor feat for Deception/Performance)
+    { mode: 'advantage', guard: (ce, checkName) => ce?.abilityCheckAdvantageSkills?.includes(checkName) },
+    // Powerful Build: advantage on STR checks to escape grapple
+    { mode: 'advantage', guard: (ce, checkName, abilityForCheck, abbr) => ce?.strCheckAdvantage && (isStrCheckName(checkName, abbr) || checkName === 'Athletics') },
+    // Ray of Enfeeblement: STR-based d20 tests have disadvantage
+    { mode: 'disadvantage', guard: (ce, checkName, abilityForCheck, abbr) => ce?.strCheckDisadvantage && isStrCheckName(checkName, abbr) },
+    // Hex: ability check disadvantage for chosen ability
+    { mode: 'disadvantage', guard: (ce, checkName, abilityForCheck) => abilityForCheck && ce?.abilityCheckDisadvantageAbilities?.includes(abilityForCheck) },
+];
+
+function resolveCheckForcedMode(conditionEffects, checkName) {
+    const ce = conditionEffects;
+    const cancelingMode = resolveCancelingForcedMode(ce, checkName);
+    if (cancelingMode) return cancelingMode;
+    const abilityForCheck = SKILL_TO_ABILITY[checkName];
+    const abbr = checkName.substring(0, 3).toUpperCase();
+    for (const rule of CHECK_FORCED_MODE_RULES) {
+        if (rule.guard(ce, checkName, abilityForCheck, abbr)) return rule.mode;
+    }
+    return undefined;
 }
 
 function applyAbilityCheckReplacements(ctx, conditionEffects, playerStats) {
@@ -157,6 +161,36 @@ function buildSaveFeatureExtras(conditionEffects, playerStats, luckyDisadvantage
     return {};
 }
 
+function computeCharismaReplacedBonus(playerStats, skill, exhaustionPenalty) {
+    const wisAbility = playerStats?.abilities?.find(a => a.name === 'Wisdom');
+    const wisMod = wisAbility?.bonus || 0;
+    const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
+    let newBonus = Math.max(1, wisMod);
+    if (playerStats.skillProficiencies?.includes(skill.name)) {
+        newBonus += proficiency;
+    }
+    if (playerStats.expertise?.includes(skill.name)) {
+        newBonus += proficiency;
+    }
+    return newBonus - exhaustionPenalty;
+}
+
+function computeRageSkillBonus(playerStats, skill, exhaustionPenalty) {
+    const primalSkills = playerStats?.automation?.primalKnowledge || [];
+    if (!primalSkills.includes(skill.name)) return undefined;
+    const strengthAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
+    if (!strengthAbility) return undefined;
+    const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
+    let strengthBonus = strengthAbility.bonus;
+    if (playerStats.skillProficiencies?.includes(skill.name)) {
+        strengthBonus += proficiency;
+    }
+    if (playerStats.expertise?.includes(skill.name)) {
+        strengthBonus += proficiency;
+    }
+    return strengthBonus - exhaustionPenalty;
+}
+
 function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustionPenalty = 0, conditionEffects, isRaging = false, _onReroll, _onStrokeOfLuck, characters, luckyDisadvantageActive }) {
       const abilityDesc = buildAbilityDetailHtml(allAbilityScores);
       const { setPopupHtml } = useDiceRollPopup();
@@ -191,43 +225,14 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
          } catch (_e) { return 0; }
       }, [playerStats?.abilities, conditionEffects?.saveBonusExpression, conditionEffects?.saveBonusAbilities]);
 
-         const getSkillBonus = useCallback((skill) => {
-             let bonus = skill.bonus - exhaustionPenalty;
-             const isCharismaSkill = ['Deception', 'Intimidation', 'Performance', 'Persuasion'].includes(skill.name);
-             if (conditionEffects?.wisCheckReplace && isCharismaSkill) {
-                const wisAbility = playerStats?.abilities?.find(a => a.name === 'Wisdom');
-                const wisMod = wisAbility?.bonus || 0;
-                const wisBonus = Math.max(1, wisMod);
-                const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
-                const isProficient = playerStats.skillProficiencies?.includes(skill.name);
-                const isExpert = playerStats.expertise?.includes(skill.name);
-                let newBonus = wisBonus;
-                if (isProficient) {
-                    newBonus += proficiency;
-                }
-                if (isExpert) {
-                    newBonus += proficiency;
-                }
-                bonus = newBonus - exhaustionPenalty;
-             }
-             if (isRaging) {
-                const primalSkills = playerStats?.automation?.primalKnowledge || [];
-                if (primalSkills.includes(skill.name)) {
-                    const strengthAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
-                    if (strengthAbility) {
-                         const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
-                         const proficient = playerStats.skillProficiencies?.includes(skill.name);
-                         const expertise = playerStats.expertise?.includes(skill.name);
-                        let strengthBonus = strengthAbility.bonus;
-                        if (proficient) {
-                            strengthBonus += proficiency;
-                        }
-                        if (expertise) {
-                            strengthBonus += proficiency;
-                        }
-                        bonus = strengthBonus - exhaustionPenalty;
-                    }
-                }
+        const getSkillBonus = useCallback((skill) => {
+            let bonus = skill.bonus - exhaustionPenalty;
+            if (conditionEffects?.wisCheckReplace && CHARISMA_SKILLS.includes(skill.name)) {
+                bonus = computeCharismaReplacedBonus(playerStats, skill, exhaustionPenalty);
+            }
+            if (isRaging) {
+                const rageBonus = computeRageSkillBonus(playerStats, skill, exhaustionPenalty);
+                if (rageBonus !== undefined) bonus = rageBonus;
             }
             const isJackOfAllTrades = playerStats?.automation?.passives?.some(
                 p => p.type === 'jack_of_all_trades'

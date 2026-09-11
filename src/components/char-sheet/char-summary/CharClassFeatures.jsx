@@ -169,6 +169,65 @@ const ClericFeatures = function ClericFeatures({ playerStats, campaignName }) {
  }
 
  /* ─── Druid ─── */
+function hasSubclassNamed(playerStats, name) {
+    return playerStats.class?.major?.name === name || playerStats.class?.subclass?.name === name;
+}
+
+function CosmicOmenBadge({ cosmicOmenEffect }) {
+    if (!cosmicOmenEffect) return null;
+    try {
+        const effect = JSON.parse(cosmicOmenEffect);
+        if (!effect.type) return null;
+        return <span className="automation-badge"><i className="fa-solid fa-star"></i> Cosmic Omen: {effect.type} ({effect.isEven ? 'Even' : 'Odd'})</span>;
+    } catch (_e) { /* ignore */ }
+    return null;
+}
+
+function CircleLandBadges({ circleOfTheLandType, elementalFuryChoice, improvedElementalFuryChoice }) {
+    const badgeSpecs = [
+        { value: circleOfTheLandType, icon: 'fa-mountain-sun', label: 'Circle of the Land' },
+        { value: elementalFuryChoice, icon: 'fa-bolt', label: 'Elemental Fury' },
+        { value: improvedElementalFuryChoice, icon: 'fa-bolt', label: 'Improved Elemental Fury' },
+    ];
+    return badgeSpecs.map((badge) => badge.value && (
+        <span key={badge.label} className="automation-badge"><i className={`fa-solid ${badge.icon}`}></i> {badge.label}: {badge.value}</span>
+    ));
+}
+
+function MoonlightStepSection({ playerStats, campaignName, moonlightStepMax }) {
+    return (
+        <>
+            <TrackedResourceInput label="Moonlight Step Uses" resourceKey="moonlightStepUses" playerName={playerStats.name} getMax={() => moonlightStepMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+            {playerStats.level >= 10 && (
+                <div>
+                    <b
+                        className="clickable moonlight-step-restore-btn"
+                        role="button"
+                        title="Expend a level 2+ spell slot to regain 1 use of Moonlight Step"
+                        onClick={() => window.dispatchEvent(new CustomEvent('moonlight-step-restore'))}
+                    >
+                        <i className="fa-solid fa-moon"></i> Restore Uses
+                    </b>
+                </div>
+            )}
+        </>
+    );
+}
+
+function NaturalRecoverySection({ naturalRecoveryFreeCast, naturalRecoveryFreeCastUsed }) {
+    return (
+        <div>
+            <div><b>Natural Recovery:</b></div>
+            {Array.isArray(naturalRecoveryFreeCast) && naturalRecoveryFreeCast.length > 0 && (
+                <div className="automation-badge"><i className="fa-solid fa-check"></i> Free cast: {naturalRecoveryFreeCast[0]}</div>
+            )}
+            {naturalRecoveryFreeCastUsed && (
+                <div className="automation-badge"><i className="fa-solid fa-check"></i> Free cast used</div>
+            )}
+        </div>
+    );
+}
+
 const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
     const druidFeatures = getClassFeatures(playerStats);
     const multiMinuteBadges = useActiveBuffs(playerStats, campaignName);
@@ -180,8 +239,8 @@ const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
     const elementalFuryChoice = useRuntimeValue(playerStats.name, '_Elemental_Fury_option', campaignName);
     const improvedElementalFuryChoice = useRuntimeValue(playerStats.name, '_Improved_Elemental_Fury_option', campaignName);
     const circleOfTheLandType = useRuntimeValue(playerStats.name, '_circleOfTheLandType', campaignName);
-    const isCircleOfTheMoon = playerStats.class?.major?.name === 'Circle of the Moon' || playerStats.class?.subclass?.name === 'Circle of the Moon';
-    const isCircleOfTheStars = playerStats.class?.major?.name === 'Circle of the Stars' || playerStats.class?.subclass?.name === 'Circle of the Stars';
+    const isCircleOfTheMoon = hasSubclassNamed(playerStats, 'Circle of the Moon');
+    const isCircleOfTheStars = hasSubclassNamed(playerStats, 'Circle of the Stars');
     const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
     const moonlightStepMax = isCircleOfTheMoon ? Math.max(wis?.bonus || 0, 1) : 0;
     const wrathOfTheSeaActive = useRuntimeValue(playerStats.name, 'wrathOfTheSeaActive', campaignName);
@@ -193,46 +252,14 @@ const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
                 {druidFeatures?.beastKnownForms > 0 && <div><b>Beast Forms Known: </b>{druidFeatures.beastKnownForms}</div>}
                 {isCircleOfTheStars && playerStats.level >= 6 && (
                     <>
-                        {cosmicOmenEffect && (() => {
-                            try {
-                                const effect = JSON.parse(cosmicOmenEffect);
-                                if (effect.type) {
-                                    return <span className="automation-badge"><i className="fa-solid fa-star"></i> Cosmic Omen: {effect.type} ({effect.isEven ? 'Even' : 'Odd'})</span>;
-                                }
-                            } catch (_e) { /* ignore */ }
-                            return null;
-                        })()}
+                        <CosmicOmenBadge cosmicOmenEffect={cosmicOmenEffect} />
                         <TrackedResourceInput label="Cosmic Omen Uses" resourceKey="cosmicomenUses" playerName={playerStats.name} getMax={() => Math.max(wis?.bonus || 0, 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
                         <TrackedResourceInput label="Star Map Free Casts" resourceKey="_Star_Map_freeCastCount" playerName={playerStats.name} getMax={() => Math.max(wis?.bonus || 0, 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
                     </>
                 )}
-                {circleOfTheLandType && <span className="automation-badge"><i className="fa-solid fa-mountain-sun"></i> Circle of the Land: {circleOfTheLandType}</span>}
-                {elementalFuryChoice && <span className="automation-badge"><i className="fa-solid fa-bolt"></i> Elemental Fury: {elementalFuryChoice}</span>}
-                {improvedElementalFuryChoice && <span className="automation-badge"><i className="fa-solid fa-bolt"></i> Improved Elemental Fury: {improvedElementalFuryChoice}</span>}
-                {isCircleOfTheMoon && <TrackedResourceInput label="Moonlight Step Uses" resourceKey="moonlightStepUses" playerName={playerStats.name} getMax={() => moonlightStepMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />}
-                {isCircleOfTheMoon && playerStats.level >= 10 && (
-                    <div>
-                        <b
-                            className="clickable moonlight-step-restore-btn"
-                            role="button"
-                            title="Expend a level 2+ spell slot to regain 1 use of Moonlight Step"
-                            onClick={() => window.dispatchEvent(new CustomEvent('moonlight-step-restore'))}
-                        >
-                            <i className="fa-solid fa-moon"></i> Restore Uses
-                        </b>
-                    </div>
-                )}
-                {hasNaturalRecovery && (
-                    <div>
-                        <div><b>Natural Recovery:</b></div>
-                        {Array.isArray(naturalRecoveryFreeCast) && naturalRecoveryFreeCast.length > 0 && (
-                            <div className="automation-badge"><i className="fa-solid fa-check"></i> Free cast: {naturalRecoveryFreeCast[0]}</div>
-                        )}
-                        {naturalRecoveryFreeCastUsed && (
-                            <div className="automation-badge"><i className="fa-solid fa-check"></i> Free cast used</div>
-                        )}
-                    </div>
-                )}
+                <CircleLandBadges circleOfTheLandType={circleOfTheLandType} elementalFuryChoice={elementalFuryChoice} improvedElementalFuryChoice={improvedElementalFuryChoice} />
+                {isCircleOfTheMoon && <MoonlightStepSection playerStats={playerStats} campaignName={campaignName} moonlightStepMax={moonlightStepMax} />}
+                {hasNaturalRecovery && <NaturalRecoverySection naturalRecoveryFreeCast={naturalRecoveryFreeCast} naturalRecoveryFreeCastUsed={naturalRecoveryFreeCastUsed} />}
                 <div><b>Wild Shape Limitations: </b>{druidFeatures.wildShapeLimitations}</div>
                 <div><b>Wild Shape Max Challenge Rating: </b>{druidFeatures?.maxWildShapeChallengeRating}</div>
                 <TrackedResourceInput label="Wild Shape Uses" resourceKey="wildShapeUses" playerName={playerStats.name} getMax={() => druidFeatures?.maxWildShapeUses || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />

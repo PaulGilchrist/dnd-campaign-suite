@@ -53,6 +53,27 @@ function computeD20TestFailed({ waitingForPlayerSave, computedHit, isAutoMiss, s
     return success !== true;
 }
 
+function computeStrReplace({ strSaveReplace, strCheckReplace, rollType, displayTotal, strScore }) {
+    const appliesReplace = (strSaveReplace && rollType === 'save') || (strCheckReplace && CHECK_ROLL_TYPES.has(rollType));
+    const strReplaceApplied = appliesReplace && displayTotal < (strScore || 10);
+    const finalDisplayTotal = strReplaceApplied ? strScore : displayTotal;
+    return { appliesReplace, strReplaceApplied, finalDisplayTotal };
+}
+
+function computeWisTotals({ wisCheckReplace, wisCheckMinBonus, bonus, modifier, rollType, finalRoll, displayTotal }) {
+    const wisBonus = wisCheckReplace ? (wisCheckMinBonus || 1) : bonus;
+    const wisCheckApplies = wisCheckReplace && CHECK_ROLL_TYPES.has(rollType);
+    const wisDisplayTotal = wisCheckApplies ? finalRoll + wisBonus + modifier : displayTotal;
+    return { wisBonus, wisCheckApplies, wisDisplayTotal };
+}
+
+function computeFloorTotals({ reliableTalent, d20Floor10, starryDragonFloor, displayRoll, bonus, modifier, rollType }) {
+    const reliableTalentTotal = reliableTalent && CHECK_ROLL_TYPES.has(rollType) && displayRoll <= 9 ? 10 + bonus + modifier : null;
+    const d20Floor10Total = d20Floor10 && displayRoll <= 9 ? 10 + bonus + modifier : null;
+    const starryDragonFloorTotal = starryDragonFloor && displayRoll <= 9 ? 10 + bonus + modifier : null;
+    return { reliableTalentTotal, d20Floor10Total, starryDragonFloorTotal };
+}
+
 export function useDiceRollState(props) {
     const {
         rolls, rollType, bonus = 0, modifier = 0, total = 0,
@@ -106,15 +127,9 @@ export function useDiceRollState(props) {
     const originalTotal = (isDamageType || isHealType) ? total : (finalRoll + bonus + modifier);
     const displayRoll = computeDisplayRoll({ luckyRerolled, luckyRerollValue, strokeResult, rerollResult, bardicInspirationResult, finalRoll });
     const displayTotal = computeDisplayTotal({ luckyRerolled, luckyRerollValue, bonus, modifier, strokeResult, rerollResult, bardicInspirationResult, originalTotal });
-    const appliesReplace = (strSaveReplace && rollType === 'save') || (strCheckReplace && CHECK_ROLL_TYPES.has(rollType));
-    const strReplaceApplied = appliesReplace && displayTotal < (strScore || 10);
-    const finalDisplayTotal = strReplaceApplied ? strScore : displayTotal;
-    const wisBonus = wisCheckReplace ? (wisCheckMinBonus || 1) : bonus;
-    const wisCheckApplies = wisCheckReplace && CHECK_ROLL_TYPES.has(rollType);
-    const wisDisplayTotal = wisCheckApplies ? finalRoll + wisBonus + modifier : displayTotal;
-    const reliableTalentTotal = reliableTalent && CHECK_ROLL_TYPES.has(rollType) && displayRoll <= 9 ? 10 + bonus + modifier : null;
-    const d20Floor10Total = d20Floor10 && displayRoll <= 9 ? 10 + bonus + modifier : null;
-    const starryDragonFloorTotal = starryDragonFloor && displayRoll <= 9 ? 10 + bonus + modifier : null;
+    const { appliesReplace, strReplaceApplied, finalDisplayTotal } = computeStrReplace({ strSaveReplace, strCheckReplace, rollType, displayTotal, strScore });
+    const { wisBonus, wisCheckApplies, wisDisplayTotal } = computeWisTotals({ wisCheckReplace, wisCheckMinBonus, bonus, modifier, rollType, finalRoll, displayTotal });
+    const { reliableTalentTotal, d20Floor10Total, starryDragonFloorTotal } = computeFloorTotals({ reliableTalent, d20Floor10, starryDragonFloor, displayRoll, bonus, modifier, rollType });
     const baseTotal = computeBaseTotal({ starryDragonFloorTotal, d20Floor10Total, reliableTalentTotal, wisCheckApplies, rollType, wisDisplayTotal, finalDisplayTotal });
     // CLA-320: Homing Strikes (Soul Blades) — the authoritative resolver has
     // already folded the psionic die into the attack; mirror it here so the

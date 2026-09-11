@@ -10,6 +10,26 @@ import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 import { ResultsSummaryModal, TargetListRenderer } from './AOEConditionModal.subcomponents.jsx';
 
+const TRAP_BLOCKING_EFFECTS = ['forcecage', 'maze', 'banishment', 'imprisonment'];
+
+function trapEffectBlocksAttack(effects, effectName, attackerName, targetName) {
+    if (!Array.isArray(effects) || effects.length === 0) return false;
+    const attackerTrapped = effects.some(te => te.effect === effectName && te.target === attackerName);
+    const targetTrapped = effects.some(te => te.effect === effectName && te.target === targetName);
+    if (!attackerTrapped && !targetTrapped) return false;
+    if (!attackerTrapped || !targetTrapped) return true;
+    const attackerSources = effects
+        .filter(te => te.effect === effectName && te.target === attackerName)
+        .map(te => te.source);
+    return !effects.some(te => te.effect === effectName && te.target === targetName && attackerSources.includes(te.source));
+}
+
+function isTargetExcludedByTraps(c, attackerName) {
+    if (!attackerName || !c.name) return false;
+    const effects = getRuntimeValue('campaign', 'targetEffects') || [];
+    return TRAP_BLOCKING_EFFECTS.some(name => trapEffectBlocksAttack(effects, name, attackerName, c.name));
+}
+
 function AOEConditionModal({
     action,
     playerStats,
@@ -350,95 +370,7 @@ function AOEConditionModal({
     const eligibleTargets = useMemo(() => {
         if (!combatSummary?.creatures) return [];
         return combatSummary.creatures
-            .filter(c => {
-                if (!playerStats.name || !c.name) return true;
-
-                // Forcecage blocking
-                const forcecageEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-                if (!Array.isArray(forcecageEffects) || forcecageEffects.length === 0) {
-                    // Check maze even if no forcecage
-                } else {
-                    const attackerTrapped = forcecageEffects.some(te => te.effect === 'forcecage' && te.target === playerStats.name);
-                    const targetTrapped = forcecageEffects.some(te => te.effect === 'forcecage' && te.target === c.name);
-
-                    if (!attackerTrapped && !targetTrapped) {
-                        // No forcecage, check maze
-                    } else {
-                        if (attackerTrapped && targetTrapped) {
-                            const attackerSources = forcecageEffects
-                                .filter(te => te.effect === 'forcecage' && te.target === playerStats.name)
-                                .map(te => te.source);
-                            if (!forcecageEffects.some(te => te.effect === 'forcecage' && te.target === c.name && attackerSources.includes(te.source))) {
-                                return false;
-                            }
-                        } else {
-                            return false;
-                        }
-                    }
-                }
-
-                // Maze blocking
-                const mazeEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-                if (Array.isArray(mazeEffects) && mazeEffects.length > 0) {
-                    const attackerTrapped = mazeEffects.some(te => te.effect === 'maze' && te.target === playerStats.name);
-                    const targetTrapped = mazeEffects.some(te => te.effect === 'maze' && te.target === c.name);
-
-                    if (attackerTrapped || targetTrapped) {
-                        if (attackerTrapped && targetTrapped) {
-                            const attackerSources = mazeEffects
-                                .filter(te => te.effect === 'maze' && te.target === playerStats.name)
-                                .map(te => te.source);
-                            if (!mazeEffects.some(te => te.effect === 'maze' && te.target === c.name && attackerSources.includes(te.source))) {
-                                return false;
-                            }
-                        } else {
-                            return false;
-                        }
-                    }
-                }
-
-                // Banishment blocking
-                const banishmentEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-                if (Array.isArray(banishmentEffects) && banishmentEffects.length > 0) {
-                    const attackerTrapped = banishmentEffects.some(te => te.effect === 'banishment' && te.target === playerStats.name);
-                    const targetTrapped = banishmentEffects.some(te => te.effect === 'banishment' && te.target === c.name);
-
-                    if (attackerTrapped || targetTrapped) {
-                        if (attackerTrapped && targetTrapped) {
-                            const attackerSources = banishmentEffects
-                                .filter(te => te.effect === 'banishment' && te.target === playerStats.name)
-                                .map(te => te.source);
-                            if (!banishmentEffects.some(te => te.effect === 'banishment' && te.target === c.name && attackerSources.includes(te.source))) {
-                                return false;
-                            }
-                        } else {
-                            return false;
-                        }
-                    }
-                }
-
-                // Imprisonment blocking
-                const imprisonmentEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-                if (Array.isArray(imprisonmentEffects) && imprisonmentEffects.length > 0) {
-                    const attackerTrapped = imprisonmentEffects.some(te => te.effect === 'imprisonment' && te.target === playerStats.name);
-                    const targetTrapped = imprisonmentEffects.some(te => te.effect === 'imprisonment' && te.target === c.name);
-
-                    if (attackerTrapped || targetTrapped) {
-                        if (attackerTrapped && targetTrapped) {
-                            const attackerSources = imprisonmentEffects
-                                .filter(te => te.effect === 'imprisonment' && te.target === playerStats.name)
-                                .map(te => te.source);
-                            if (!imprisonmentEffects.some(te => te.effect === 'imprisonment' && te.target === c.name && attackerSources.includes(te.source))) {
-                                return false;
-                            }
-                        } else {
-                            return false;
-                        }
-                    }
-                }
-
-                return true;
-            })
+            .filter(c => !isTargetExcludedByTraps(c, playerStats.name))
             .map(c => ({
                 ...c,
                 carefulSpellProtected: isCarefulSpell && isCarefulAlly(c.name),

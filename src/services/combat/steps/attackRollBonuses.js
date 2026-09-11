@@ -178,6 +178,41 @@ export function buildAutomationBonusesStep() {
   };
 }
 
+const underscored = (name) => name.replace(/\s+/g, '_');
+
+function weaponHitChoiceSkips(ctx, bonus) {
+  const optKey = `_${underscored(bonus.upgrades || bonus.name)}_option`;
+  const chosen = getRuntimeValue(ctx.playerStats.name, optKey, ctx.campaignName);
+  if (!(bonus.options?.length > 0)) return false;
+  return !chosen || !chosen.toLowerCase().includes('strike');
+}
+
+function weaponHitBonusSpent(ctx, bonus, usedKey, round) {
+  if (bonus.oncePerTurn && getRuntimeValue(ctx.playerStats.name, usedKey, ctx.campaignName) === round) return true;
+  if (bonus.uses_expression && bonus.recharge) {
+    const usesKey = `_${underscored(bonus.name)}_uses`;
+    const cur = Number(getRuntimeValue(ctx.playerStats.name, usesKey, ctx.campaignName) ?? bonus.usesMax);
+    if (cur <= 0) return true;
+  }
+  return false;
+}
+
+function consumeWeaponHitUses(ctx, bonus, usedKey, round) {
+  if (bonus.oncePerTurn) setRuntimeValue(ctx.playerStats.name, usedKey, round, ctx.campaignName);
+  if (bonus.uses_expression && bonus.recharge) {
+    const usesKey = `_${underscored(bonus.name)}_uses`;
+    const cur = Number(getRuntimeValue(ctx.playerStats.name, usesKey, ctx.campaignName) ?? bonus.usesMax);
+    if (cur > 0) setRuntimeValue(ctx.playerStats.name, usesKey, cur - 1, ctx.campaignName);
+  }
+}
+
+function weaponHitModalResult(bonus, r) {
+  return {
+    data: { _weaponHitPending: true, bonusExpr: bonus.damageExpression, bonusTotal: r.total, bonusRolls: r.rolls, _weaponHitOnceKey: `_${underscored(bonus.name)}_usedRound` },
+    modal: { type: 'damageTypeChoice', props: { title: `${bonus.name} — Damage Type`, types: bonus.damageType.split(/\s+or\s+/).flatMap(t => t.split(/\s+/)).filter(Boolean) } },
+  };
+}
+
 export function buildWeaponHitBonusesStep() {
   return {
     name: 'weaponHitBonuses',
@@ -211,43 +246,24 @@ export function buildWeaponHitBonusesStep() {
       ).filter(b => !upgraded.has(b.name));
 
       for (const bonus of bonuses) {
-        const optKey = `_${(bonus.upgrades || bonus.name).replace(/\s+/g, '_')}_option`;
-        const chosen = getRuntimeValue(ctx.playerStats.name, optKey, ctx.campaignName);
-        if (bonus.options?.length > 0) {
-          if (!chosen) continue;
-          if (!chosen.toLowerCase().includes('strike')) continue;
-        }
+        if (weaponHitChoiceSkips(ctx, bonus)) continue;
 
-        const usedKey = `_${bonus.name.replace(/\s+/g, '_')}_usedRound`;
+        const usedKey = `_${underscored(bonus.name)}_usedRound`;
         const round = getCurrentCombatRound(ctx.campaignName);
-        if (bonus.oncePerTurn && getRuntimeValue(ctx.playerStats.name, usedKey, ctx.campaignName) === round) continue;
-
-        if (bonus.uses_expression && bonus.recharge) {
-          const usesKey = `_${bonus.name.replace(/\s+/g, '_')}_uses`;
-          const cur = Number(getRuntimeValue(ctx.playerStats.name, usesKey, ctx.campaignName) ?? bonus.usesMax);
-          if (cur <= 0) continue;
-        }
+        if (weaponHitBonusSpent(ctx, bonus, usedKey, round)) continue;
 
         const r = rollExpression(bonus.damageExpression);
         if (!r) continue;
 
         const dt = bonus.damageType || '';
         if (dt.includes(' or ')) {
-          return {
-            data: { _weaponHitPending: true, bonusExpr: bonus.damageExpression, bonusTotal: r.total, bonusRolls: r.rolls, _weaponHitOnceKey: usedKey },
-            modal: { type: 'damageTypeChoice', props: { title: `${bonus.name} — Damage Type`, types: dt.split(/\s+or\s+/).flatMap(t => t.split(/\s+/)).filter(Boolean) } },
-          };
+          return weaponHitModalResult(bonus, r);
         }
         formula += ` + ${bonus.damageExpression} [${dt.toLowerCase()}]`;
         total += r.total;
         rolls = [...rolls, ...r.rolls];
 
-        if (bonus.oncePerTurn) setRuntimeValue(ctx.playerStats.name, usedKey, round, ctx.campaignName);
-        if (bonus.uses_expression && bonus.recharge) {
-          const usesKey = `_${bonus.name.replace(/\s+/g, '_')}_uses`;
-          const cur = Number(getRuntimeValue(ctx.playerStats.name, usesKey, ctx.campaignName) ?? bonus.usesMax);
-          if (cur > 0) setRuntimeValue(ctx.playerStats.name, usesKey, cur - 1, ctx.campaignName);
-        }
+        consumeWeaponHitUses(ctx, bonus, usedKey, round);
       }
 
       return { data: { formula, total, rolls } };

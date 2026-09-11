@@ -111,6 +111,67 @@ function computeSpellDetailPassiveFlags(playerStats, spell, isWarlock) {
   };
 }
 
+function OverchannelSection({ isOverchannelApplicable, useOverchannel, onToggleOverchannel, overchannelDamage, nextOverchannelUse }) {
+  if (!isOverchannelApplicable) return null;
+  return (
+    <div className="spell-detail-upcast">
+      <label>
+        <input
+          type="checkbox"
+          checked={useOverchannel}
+          onChange={onToggleOverchannel}
+        />
+        <span>Overchannel (Maximize Damage)&nbsp;</span>
+      </label>
+      {overchannelDamage && overchannelDamage.expression && (
+        <div className="spell-detail-overchannel-warning">
+          <i className="fa-solid fa-skull"></i> Warning: Using Overchannel this time (use #{nextOverchannelUse}) will deal <strong>{overchannelDamage.expression}</strong> Necrotic damage to you (ignores resistance/immunity). First use deals no damage.
+        </div>
+      )}
+      {overchannelDamage === 0 && useOverchannel && (
+        <div className="spell-detail-overchannel-info">
+          <i className="fa-solid fa-shield-halved"></i> First use: no necrotic damage
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuickRitualSection({ isRitualMasterSpell, quickRitualActive, quickRitualUsed, onToggleQuickRitual }) {
+  if (!isRitualMasterSpell) return null;
+  return (
+    <div className="spell-detail-upcast">
+      <label>
+        <input
+          type="checkbox"
+          checked={quickRitualActive}
+          disabled={quickRitualUsed}
+          onChange={onToggleQuickRitual}
+        />
+        <span><i className="fa-solid fa-bolt"></i> Quick Ritual — regular casting time, no spell slot (once per Long Rest)</span>
+      </label>
+      {quickRitualUsed && (
+        <p className="spell-detail-no-slots"><i className="fa-solid fa-moon"></i> Quick Ritual already used — finish a Long Rest to regain it.</p>
+      )}
+    </div>
+  );
+}
+
+function PsychicDamageCheckbox({ usePsychicDamage, onTogglePsychicDamage }) {
+  return (
+    <div className="spell-detail-upcast">
+      <label>
+        <input
+          type="checkbox"
+          checked={usePsychicDamage}
+          onChange={onTogglePsychicDamage}
+        />
+        <span>Change damage type to Psychic</span>
+      </label>
+    </div>
+  );
+}
+
 function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, upcastLevels = [], playerLevel = 1 }) {
   const isCantrip = spell.level === 0;
   const slotDmg = spell.damage?.damage_at_slot_level;
@@ -291,55 +352,10 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
           );
         })()}
         {canChangeDamageType && (
-          <div className="spell-detail-upcast">
-            <label>
-              <input
-                type="checkbox"
-                checked={usePsychicDamage}
-                onChange={() => setUsePsychicDamage(!usePsychicDamage)}
-              />
-              <span>Change damage type to Psychic</span>
-            </label>
-          </div>
+          <PsychicDamageCheckbox usePsychicDamage={usePsychicDamage} onTogglePsychicDamage={() => setUsePsychicDamage(!usePsychicDamage)} />
         )}
-        {isOverchannelApplicable && (
-          <div className="spell-detail-upcast">
-            <label>
-              <input
-                type="checkbox"
-                checked={useOverchannel}
-                onChange={() => setUseOverchannel(!useOverchannel)}
-              />
-              <span>Overchannel (Maximize Damage)&nbsp;</span>
-            </label>
-            {overchannelDamage && overchannelDamage.expression && (
-              <div className="spell-detail-overchannel-warning">
-                <i className="fa-solid fa-skull"></i> Warning: Using Overchannel this time (use #{nextOverchannelUse}) will deal <strong>{overchannelDamage.expression}</strong> Necrotic damage to you (ignores resistance/immunity). First use deals no damage.
-              </div>
-            )}
-            {overchannelDamage === 0 && useOverchannel && (
-              <div className="spell-detail-overchannel-info">
-                <i className="fa-solid fa-shield-halved"></i> First use: no necrotic damage
-              </div>
-            )}
-          </div>
-        )}
-        {isRitualMasterSpell && (
-          <div className="spell-detail-upcast">
-            <label>
-              <input
-                type="checkbox"
-                checked={quickRitualActive}
-                disabled={quickRitualUsed}
-                onChange={() => setUseQuickRitual(!useQuickRitual)}
-              />
-              <span><i className="fa-solid fa-bolt"></i> Quick Ritual — regular casting time, no spell slot (once per Long Rest)</span>
-            </label>
-            {quickRitualUsed && (
-              <p className="spell-detail-no-slots"><i className="fa-solid fa-moon"></i> Quick Ritual already used — finish a Long Rest to regain it.</p>
-            )}
-          </div>
-        )}
+        <OverchannelSection isOverchannelApplicable={isOverchannelApplicable} useOverchannel={useOverchannel} onToggleOverchannel={() => setUseOverchannel(!useOverchannel)} overchannelDamage={overchannelDamage} nextOverchannelUse={nextOverchannelUse} />
+        <QuickRitualSection isRitualMasterSpell={isRitualMasterSpell} quickRitualActive={quickRitualActive} quickRitualUsed={quickRitualUsed} onToggleQuickRitual={() => setUseQuickRitual(!useQuickRitual)} />
         {noVSComponents && (
           <div className="spell-detail-free-cast">
             <i className="fa-solid fa-ghost"></i> No Verbal or Somatic components (Psychic Spells)

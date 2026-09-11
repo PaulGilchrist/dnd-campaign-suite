@@ -1,94 +1,83 @@
 import { evaluateAutoExpression } from '../automationExpressions.js'
 
+function resolveRiderDamageExpression(auto, playerStats) {
+    let resolvedExpr = auto.damageExpression || '';
+    if (!auto.scaling) return resolvedExpr;
+    const entries = Object.entries(auto.scaling)
+        .map(([k, v]) => ({ level: parseInt(k, 10), expr: String(v) }))
+        .filter(e => !isNaN(e.level))
+        .sort((a, b) => a.level - b.level);
+    for (const entry of entries) {
+        if (playerStats.level >= entry.level) {
+            resolvedExpr = entry.expr;
+        }
+    }
+    return resolvedExpr;
+}
+
+function defaultRiderOptions(auto) {
+    if (Array.isArray(auto.effects)) return null;
+    if (auto.effect === 'reduce_speed') {
+        const speedMatch = (auto.speedReduction || '10 ft').match(/(\d+)/);
+        return [{
+            name: 'Reduce Speed',
+            effect: 'speed_reduction',
+            value: parseInt(speedMatch ? speedMatch[1] : '10', 10) || 10,
+        }];
+    }
+    if (auto.effect === 'push_or_prone') {
+        return [{
+            name: 'Prone',
+            effect: 'prone',
+            saveType: auto.saveType || 'STR',
+            saveDc: auto.saveDc || 'ability',
+            saveAbility: auto.saveAbility || 'STR',
+        }];
+    }
+    return null;
+}
+
+const CONDITION_EFFECT_OPTION_DEFAULTS = {
+    prone: { label: 'Prone', saveAbility: 'DEX' },
+    poisoned: { label: 'Poisoned', saveAbility: 'CON' },
+    unconscious: { label: 'Unconscious', saveAbility: 'CON' },
+    blinded: { label: 'Blinded', saveAbility: 'DEX' },
+};
+
+function mapAutomationEffectOption(effect) {
+    if (effect.option === 'damage_bonus') {
+        return {
+            name: effect.name || 'Damage Bonus',
+            effect: 'damage_bonus',
+            damageExpression: effect.dice || '1d6',
+            damageType: effect.damageType || '',
+        };
+    }
+    const defaults = CONDITION_EFFECT_OPTION_DEFAULTS[effect.option];
+    if (defaults) {
+        return {
+            name: effect.name || defaults.label,
+            effect: effect.option,
+            saveType: effect.saveType || defaults.saveAbility,
+            saveDc: effect.saveDc || 'ability',
+            saveAbility: effect.saveAbility || defaults.saveAbility,
+        };
+    }
+    return {
+        name: effect.name || effect.option,
+        effect: effect.effect || effect.option,
+        value: effect.value || null,
+        sizeLimit: effect.sizeLimit || null,
+    };
+}
+
 export const attackHandlers = {
     'attack_rider': (feature, playerStats) => {
         const auto = feature.automation
-        let resolvedExpr = auto.damageExpression || '';
-        if (auto.scaling) {
-            const entries = Object.entries(auto.scaling)
-                .map(([k, v]) => ({ level: parseInt(k, 10), expr: String(v) }))
-                .filter(e => !isNaN(e.level))
-                .sort((a, b) => a.level - b.level);
-            for (const entry of entries) {
-                if (playerStats.level >= entry.level) {
-                    resolvedExpr = entry.expr;
-                }
-            }
-        }
+        const resolvedExpr = resolveRiderDamageExpression(auto, playerStats);
         let options = auto.options || [];
-        if (options.length === 0 && !Array.isArray(auto.effects) && auto.effect === 'reduce_speed') {
-            const speedMatch = (auto.speedReduction || '10 ft').match(/(\d+)/);
-            options = [{
-                name: 'Reduce Speed',
-                effect: 'speed_reduction',
-                value: parseInt(speedMatch ? speedMatch[1] : '10', 10) || 10,
-            }];
-        }
-        if (options.length === 0 && !Array.isArray(auto.effects) && auto.effect === 'push_or_prone') {
-            options = [
-                {
-                    name: 'Prone',
-                    effect: 'prone',
-                    saveType: auto.saveType || 'STR',
-                    saveDc: auto.saveDc || 'ability',
-                    saveAbility: auto.saveAbility || 'STR',
-                },
-            ];
-        }
-        if (options.length === 0 && Array.isArray(auto.effects)) {
-            options = auto.effects.map(effect => {
-                if (effect.option === 'damage_bonus') {
-                    const dice = effect.dice || '1d6';
-                    return {
-                        name: effect.name || 'Damage Bonus',
-                        effect: 'damage_bonus',
-                        damageExpression: dice,
-                        damageType: effect.damageType || '',
-                    };
-                }
-                if (effect.option === 'prone') {
-                    return {
-                        name: effect.name || 'Prone',
-                        effect: 'prone',
-                        saveType: effect.saveType || 'DEX',
-                        saveDc: effect.saveDc || 'ability',
-                        saveAbility: effect.saveAbility || 'DEX',
-                    };
-                }
-                if (effect.option === 'poisoned') {
-                    return {
-                        name: effect.name || 'Poisoned',
-                        effect: 'poisoned',
-                        saveType: effect.saveType || 'CON',
-                        saveDc: effect.saveDc || 'ability',
-                        saveAbility: effect.saveAbility || 'CON',
-                    };
-                }
-                if (effect.option === 'unconscious') {
-                    return {
-                        name: effect.name || 'Unconscious',
-                        effect: 'unconscious',
-                        saveType: effect.saveType || 'CON',
-                        saveDc: effect.saveDc || 'ability',
-                        saveAbility: effect.saveAbility || 'CON',
-                    };
-                }
-                if (effect.option === 'blinded') {
-                    return {
-                        name: effect.name || 'Blinded',
-                        effect: 'blinded',
-                        saveType: effect.saveType || 'DEX',
-                        saveDc: effect.saveDc || 'ability',
-                        saveAbility: effect.saveAbility || 'DEX',
-                    };
-                }
-                return {
-                    name: effect.name || effect.option,
-                    effect: effect.effect || effect.option,
-                    value: effect.value || null,
-                    sizeLimit: effect.sizeLimit || null,
-                };
-            });
+        if (options.length === 0) {
+            options = defaultRiderOptions(auto) || (Array.isArray(auto.effects) ? auto.effects.map(mapAutomationEffectOption) : []);
         }
         return {
             type: 'attack_rider',

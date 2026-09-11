@@ -219,6 +219,55 @@ function resolvePcTarget(ctx) {
     return { prompt: { promptId, targetName } };
 }
 
+// CLA-321: soulstitch-chosen target auto-succeeds the prompt's save, takes no damage.
+function resolveSoulstitchOutcome(detail, isSoulstitchProtected) {
+    return {
+        success: isSoulstitchProtected ? true : detail.success,
+        rawDamage: isSoulstitchProtected ? 0 : (detail.rawDamage ?? 0),
+        saveBonus: detail.saveBonus ?? 0,
+    };
+}
+
+function resolveEvasionFinalDamage({ combatSummary, targetName, rawDamage, success, saveType, dcSuccess }) {
+    const targetChar = (combatSummary?.creatures?.filter(c => c.type === 'player') || []).find(c => c.name === targetName);
+    const evasionEffects = targetChar?.computedStats?.evasionEffects;
+    const evasionActive = hasEvasionForSave(evasionEffects, normalizeSaveType(saveType));
+    return computeDamageAfterEvasion(rawDamage, success, dcSuccess, evasionActive);
+}
+
+function saveResultLabel(isSoulstitchProtected, success) {
+    if (isSoulstitchProtected) return 'soulstitch_auto_success';
+    return success ? 'success' : 'failure';
+}
+
+function appendPromptTargetResult(setResultsFn, setPendingPromptsFn, targetResult, promptId) {
+    setResultsFn(prev => {
+        if (prev.some(r => r.targetName === targetResult.targetName)) return prev;
+        return [...prev, targetResult];
+    });
+    setPendingPromptsFn(prev => prev.filter(p => p.promptId !== promptId));
+}
+
+const TRAP_BLOCKING_EFFECTS = ['forcecage', 'maze', 'banishment', 'imprisonment'];
+
+function trapEffectBlocksAttack(effects, effectName, attackerName, targetName) {
+    if (!Array.isArray(effects) || effects.length === 0) return false;
+    const attackerTrapped = effects.some(te => te.effect === effectName && te.target === attackerName);
+    const targetTrapped = effects.some(te => te.effect === effectName && te.target === targetName);
+    if (!attackerTrapped && !targetTrapped) return false;
+    if (!attackerTrapped || !targetTrapped) return true;
+    const attackerSources = effects
+        .filter(te => te.effect === effectName && te.target === attackerName)
+        .map(te => te.source);
+    return !effects.some(te => te.effect === effectName && te.target === targetName && attackerSources.includes(te.source));
+}
+
+function isTargetExcludedByTraps(c, attackerName) {
+    if (!attackerName || !c.name) return false;
+    const effects = getRuntimeValue('campaign', 'targetEffects') || [];
+    return TRAP_BLOCKING_EFFECTS.some(name => trapEffectBlocksAttack(effects, name, attackerName, c.name));
+}
+
 function SaveAttackAoeModal({
     action,
     playerStats,
@@ -434,17 +483,12 @@ function SaveAttackAoeModal({
         const targetName = pendingPrompts[pendingIndex].targetName;
         // CLA-321: soulstitch-chosen target auto-succeeds the prompt's save, takes no damage.
         const isSoulstitchProtected = hasSoulstitchProtection(targetName, playerStats.name, campaignName);
-        const success = isSoulstitchProtected ? true : detail.success;
-        const saveBonus = detail.saveBonus ?? 0;
-
-        const rawDamage = isSoulstitchProtected ? 0 : (detail.rawDamage ?? 0);
+        const { success, rawDamage, saveBonus } = resolveSoulstitchOutcome(detail, isSoulstitchProtected);
+        const saveRoll = detail.roll ?? 0;
+        const saveTotal = detail.total ?? 0;
 
         const combatSummary = getCombatSummary(campaignName);
-        const targetChar = (combatSummary?.creatures?.filter(c => c.type === 'player') || []).find(c => c.name === targetName);
-        const evasionEffects = targetChar?.computedStats?.evasionEffects;
-        const normalizedSaveType = normalizeSaveType(detail.saveType);
-        const evasionActive = hasEvasionForSave(evasionEffects, normalizedSaveType);
-        const finalDamage = computeDamageAfterEvasion(rawDamage, success, dcSuccess, evasionActive);
+        const finalDamage = resolveEvasionFinalDamage({ combatSummary, targetName, rawDamage, success, saveType: detail.saveType, dcSuccess });
 
         if (isSoulstitchProtected) {
             logSoulstitchAutoSave({ campaignName, playerStats, actionName: action.name, targetName, detail, saveBonus });
@@ -473,9 +517,9 @@ function SaveAttackAoeModal({
 
         addTargetResult(campaignName, {
             targetName,
-            saveResult: isSoulstitchProtected ? 'soulstitch_auto_success' : (success ? 'success' : 'failure'),
-            roll: detail.roll ?? 0,
-            total: detail.total ?? 0,
+            saveResult: saveResultLabel(isSoulstitchProtected, success),
+            roll: saveRoll,
+            total: saveTotal,
             conditions: [],
             appliedDamage: finalDamage,
         });
@@ -486,26 +530,15 @@ function SaveAttackAoeModal({
         const targetResult = {
             targetName,
             success,
-            roll: detail.roll ?? 0,
-            total: detail.total ?? 0,
+            roll: saveRoll,
+            total: saveTotal,
             saveBonus,
             rawDamage,
             finalDamage,
             soulstitchProtected: isSoulstitchProtected,
         };
-        if (ctx) {
-            ctx.setResults(prev => {
-                if (prev.some(r => r.targetName === targetName)) return prev;
-                return [...prev, targetResult];
-            });
-            ctx.setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
-        } else {
-            setResults(prev => {
-                if (prev.some(r => r.targetName === targetName)) return prev;
-                return [...prev, targetResult];
-            });
-            setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
-        }
+        const setters = ctx || { setResults, setPendingPrompts };
+        appendPromptTargetResult(setters.setResults, setters.setPendingPrompts, targetResult, detail.promptId);
     }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action.name, action.automation?.scaling, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess]);
 
     useEffect(() => {
@@ -540,91 +573,7 @@ function SaveAttackAoeModal({
     const eligibleTargets = React.useMemo(() => {
         if (!combatSummary?.creatures) return [];
         return combatSummary.creatures
-            .filter(c => {
-                if (!playerStats.name || !c.name) return true;
-
-                // Forcecage blocking
-                const forcecageEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-                if (Array.isArray(forcecageEffects) && forcecageEffects.length > 0) {
-                    const attackerTrapped = forcecageEffects.some(te => te.effect === 'forcecage' && te.target === playerStats.name);
-                    const targetTrapped = forcecageEffects.some(te => te.effect === 'forcecage' && te.target === c.name);
-
-                    if (attackerTrapped || targetTrapped) {
-                        if (attackerTrapped && targetTrapped) {
-                            const attackerSources = forcecageEffects
-                                .filter(te => te.effect === 'forcecage' && te.target === playerStats.name)
-                                .map(te => te.source);
-                            if (!forcecageEffects.some(te => te.effect === 'forcecage' && te.target === c.name && attackerSources.includes(te.source))) {
-                                return false;
-                            }
-                        } else {
-                            return false;
-                        }
-                    }
-                }
-
-                // Maze blocking
-                const mazeEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-                if (Array.isArray(mazeEffects) && mazeEffects.length > 0) {
-                    const attackerTrapped = mazeEffects.some(te => te.effect === 'maze' && te.target === playerStats.name);
-                    const targetTrapped = mazeEffects.some(te => te.effect === 'maze' && te.target === c.name);
-
-                    if (attackerTrapped || targetTrapped) {
-                        if (attackerTrapped && targetTrapped) {
-                            const attackerSources = mazeEffects
-                                .filter(te => te.effect === 'maze' && te.target === playerStats.name)
-                                .map(te => te.source);
-                            if (!mazeEffects.some(te => te.effect === 'maze' && te.target === c.name && attackerSources.includes(te.source))) {
-                                return false;
-                            }
-                        } else {
-                            return false;
-                        }
-                    }
-                }
-
-                // Banishment blocking
-                const banishmentEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-                if (Array.isArray(banishmentEffects) && banishmentEffects.length > 0) {
-                    const attackerTrapped = banishmentEffects.some(te => te.effect === 'banishment' && te.target === playerStats.name);
-                    const targetTrapped = banishmentEffects.some(te => te.effect === 'banishment' && te.target === c.name);
-
-                    if (attackerTrapped || targetTrapped) {
-                        if (attackerTrapped && targetTrapped) {
-                            const attackerSources = banishmentEffects
-                                .filter(te => te.effect === 'banishment' && te.target === playerStats.name)
-                                .map(te => te.source);
-                            if (!banishmentEffects.some(te => te.effect === 'banishment' && te.target === c.name && attackerSources.includes(te.source))) {
-                                return false;
-                            }
-                        } else {
-                            return false;
-                        }
-                    }
-                }
-
-                // Imprisonment blocking
-                const imprisonmentEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-                if (Array.isArray(imprisonmentEffects) && imprisonmentEffects.length > 0) {
-                    const attackerTrapped = imprisonmentEffects.some(te => te.effect === 'imprisonment' && te.target === playerStats.name);
-                    const targetTrapped = imprisonmentEffects.some(te => te.effect === 'imprisonment' && te.target === c.name);
-
-                    if (attackerTrapped || targetTrapped) {
-                        if (attackerTrapped && targetTrapped) {
-                            const attackerSources = imprisonmentEffects
-                                .filter(te => te.effect === 'imprisonment' && te.target === playerStats.name)
-                                .map(te => te.source);
-                            if (!imprisonmentEffects.some(te => te.effect === 'imprisonment' && te.target === c.name && attackerSources.includes(te.source))) {
-                                return false;
-                            }
-                        } else {
-                            return false;
-                        }
-                    }
-                }
-
-                return true;
-            })
+            .filter(c => !isTargetExcludedByTraps(c, playerStats.name))
             .map(c => ({
                 ...c,
                 carefulSpellProtected: isCarefulSpell && isCarefulAlly(c.name),

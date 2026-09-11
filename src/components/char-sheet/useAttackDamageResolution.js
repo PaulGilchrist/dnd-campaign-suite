@@ -88,13 +88,11 @@ export async function resolveAttackDamageStandalone(attack, ctxOverrides, { play
  * @param {object} playerStats - The acting character's computed stats
  * @returns {{ attack: object, ctx: object }}
  */
-export function normalizeAutoDamage(autoDamage, isCrit, playerStats) {
-  const isUnarmed = autoDamage.name?.includes('Unarmed Strike');
-  const weaponAttack = playerStats?.attacks?.find(a => a.name === autoDamage.name);
-  // SP-112: carry spell-attack tokens (school / attackType) through to the pipeline
-  // attack so weapon-only damage_bonus riders (Divine Strike family) can discriminate
-  // spells. weaponType stays registry-authoritative (never flipped to spell here).
-  const attack = {
+// SP-112: carry spell-attack tokens (school / attackType) through to the pipeline
+// attack so weapon-only damage_bonus riders (Divine Strike family) can discriminate
+// spells. weaponType stays registry-authoritative (never flipped to spell here).
+function buildNormalizedAttack(autoDamage, isUnarmed, weaponAttack) {
+  return {
     name: autoDamage.name,
     damage: autoDamage.formula,
     damageType: autoDamage.damageType,
@@ -105,18 +103,24 @@ export function normalizeAutoDamage(autoDamage, isCrit, playerStats) {
     type: autoDamage.attackType || weaponAttack?.type,
     isHordeBreaker: weaponAttack?.isHordeBreaker || false,
   };
+}
 
-  // Compute Empowered Evocation modifier
+// Compute Empowered Evocation modifier
+function resolveEmpoweredEvocationModifier(autoDamage, playerStats) {
   const hasEmpoweredEvoc = playerStats ? getEmpoweredEvocationFeatures(playerStats).length > 0 : false;
   const empEvocIntMod = (hasEmpoweredEvoc && playerStats) ? getEmpoweredEvocationIntModifier(playerStats) : 0;
   const spellSchool = (autoDamage.autoDamageSchool || '').toLowerCase();
   const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && spellSchool === 'evocation' && empEvocIntMod > 0;
+  return shouldApplyEmpoweredEvoc ? empEvocIntMod : 0;
+}
 
-  const ctx = {
+function buildNormalizedCtx(autoDamage, isCrit, empoweredEvocationModifier) {
+  const isCritRoll = isCrit || autoDamage.isAutoCrit || false;
+  return {
     attackName: autoDamage.name,
     hit: true,
-    isCrit: isCrit || autoDamage.isAutoCrit || false,
-    isAutoCrit: isCrit || autoDamage.isAutoCrit || false,
+    isCrit: isCritRoll,
+    isAutoCrit: isCritRoll,
     isNatural20: isCrit || false,
     targetName: autoDamage.targetName || null,
     isBonusActionAttack: false,
@@ -128,7 +132,7 @@ export function normalizeAutoDamage(autoDamage, isCrit, playerStats) {
     saveType: autoDamage.saveType,
     dcSuccess: autoDamage.dcSuccess,
     autoDamageSource: true,
-    empoweredEvocationModifier: shouldApplyEmpoweredEvoc ? empEvocIntMod : 0,
+    empoweredEvocationModifier,
     autoDamageSecondaryFormula: autoDamage.secondaryFormula,
     autoDamageSecondaryName: autoDamage.secondaryName,
     autoDamageSecondaryDamageType: autoDamage.secondaryDamageType,
@@ -139,7 +143,14 @@ export function normalizeAutoDamage(autoDamage, isCrit, playerStats) {
     autoDamageSchool: autoDamage.autoDamageSchool || '',
     d20Roll: autoDamage.d20Roll,
   };
+}
 
+export function normalizeAutoDamage(autoDamage, isCrit, playerStats) {
+  const isUnarmed = autoDamage.name?.includes('Unarmed Strike');
+  const weaponAttack = playerStats?.attacks?.find(a => a.name === autoDamage.name);
+  const attack = buildNormalizedAttack(autoDamage, isUnarmed, weaponAttack);
+  const empoweredEvocationModifier = resolveEmpoweredEvocationModifier(autoDamage, playerStats);
+  const ctx = buildNormalizedCtx(autoDamage, isCrit, empoweredEvocationModifier);
     return { attack, ctx };
 }
 

@@ -211,14 +211,7 @@ const SIZE_CULTURE_MAP = {
   metropolis: ['Mixed', 'Human', 'Nomadic'],
 };
 
-export async function generateSettlement(existingSettlements = [], options = {}) {
-  const [names, npcNames, descs, shopNames, guildNames, rumors] = await Promise.all([
-    loadNameData(), loadNpcNameData(), loadDescData(), loadShopNameData(), loadGuildNameData(), loadRumorData(),
-  ]);
-
-  const size = options.size || pick(SIZE_LABELS);
-  const culture = pick(SIZE_CULTURE_MAP[size]);
-
+function pickSettlementName(names, culture, size, existingNames) {
   const cultureNames = names[culture];
   let name;
   if (cultureNames && cultureNames[size] && cultureNames[size].length > 0) {
@@ -230,16 +223,90 @@ export async function generateSettlement(existingSettlements = [], options = {})
 
   let uniqueName = name;
   let counter = 2;
-  const existingNames = existingSettlements.map(s => s.name);
   while (existingNames.includes(uniqueName)) {
     uniqueName = `${name} ${counter}`;
     counter++;
   }
+  return uniqueName;
+}
+
+function pickSizeFlavor(sizeDescs) {
+  return {
+    description: pick(sizeDescs.descriptions || []),
+    atmosphere: pick(sizeDescs.atmospheres || []),
+    government: pick(sizeDescs.governments || ''),
+  };
+}
+
+function pickServiceName(svcType, shopNames, serviceConfig, usedShopNames) {
+  const typeNames = shopNames[svcType];
+  if (typeNames && typeNames.length > 0) {
+    const available = typeNames.filter(n => !usedShopNames.has(n));
+    const svcName = pick(available.length > 0 ? available : typeNames);
+    usedShopNames.add(svcName);
+    return svcName;
+  }
+  return serviceConfig.types.includes(svcType) ? `The ${SERVICE_TYPE_LABELS[svcType]}` : `Local ${SERVICE_TYPE_LABELS[svcType]}`;
+}
+
+function pickNpcName(npcNames, npcNameUsed) {
+  const npcRace = pick(['Human', 'Elf', 'Dwarf', 'Halfling', 'Half-Elf', 'Half-Orc']);
+  const npcGender = Math.random() > 0.5 ? 'male' : 'female';
+  const npcNamePool = npcNames[npcRace] || npcNames['Human'];
+  const npcFirstName = pick(npcNamePool[npcGender] || npcNamePool['male'] || []);
+
+  let uniqueNpcName = `${npcFirstName}`;
+  let npcCounter = 2;
+  while (npcNameUsed.has(uniqueNpcName)) {
+    uniqueNpcName = `${npcFirstName} ${npcCounter}`;
+    npcCounter++;
+  }
+  return uniqueNpcName;
+}
+
+function buildNotableNpc(svcType, svcName, npcNames, existingNames, notableNPCs) {
+  const npcRole = pick(SERVICE_NPC_TYPES[svcType] || ['shopkeeper']);
+  const npcNameUsed = new Set([...existingNames, ...notableNPCs.map(n => n.name)]);
+  return {
+    name: pickNpcName(npcNames, npcNameUsed),
+    role: npcRole,
+    description: `The ${npcRole} of ${svcName}. ${pick(SERVICE_NPC_DESCRIPTORS)}`,
+  };
+}
+
+function resolveServiceName(svcType, svcName, guildNames) {
+  if (svcType !== 'guild') return svcName;
+  const guildCategory = pick(GUILD_TYPE_MAP.guild);
+  const guildTypeName = pick(guildNames[guildCategory] || guildNames.merchants);
+  return guildTypeName || svcName;
+}
+
+const RUMOR_KEYS = ['general', 'quest_hooks', 'faction_intrigue', 'supernatural', 'trade_economy'];
+
+function selectRumors(rumors, rumorCount) {
+  const allRumors = RUMOR_KEYS.flatMap(key => rumors[key] || []);
+  return pickN(allRumors, rumorCount);
+}
+
+function buildTags(size, culture, services) {
+  const tags = [size, culture.toLowerCase() + '-culture'];
+  if (services.length > 0) tags.push(services[0].type);
+  if (services.length > 3) tags.push('many-services');
+  return tags;
+}
+
+export async function generateSettlement(existingSettlements = [], options = {}) {
+  const [names, npcNames, descs, shopNames, guildNames, rumors] = await Promise.all([
+    loadNameData(), loadNpcNameData(), loadDescData(), loadShopNameData(), loadGuildNameData(), loadRumorData(),
+  ]);
+
+  const size = options.size || pick(SIZE_LABELS);
+  const culture = pick(SIZE_CULTURE_MAP[size]);
+  const existingNames = existingSettlements.map(s => s.name);
+  const uniqueName = pickSettlementName(names, culture, size, existingNames);
 
   const sizeDescs = descs[size] || descs.town;
-  const description = pick(sizeDescs.descriptions || []);
-  const atmosphere = pick(sizeDescs.atmospheres || []);
-  const government = pick(sizeDescs.governments || '');
+  const flavor = pickSizeFlavor(sizeDescs);
   const population = pick(POPULATION_RANGES[size]);
 
   const featureCount = randomInt(2, 4);
@@ -255,74 +322,25 @@ export async function generateSettlement(existingSettlements = [], options = {})
   const usedShopNames = new Set();
 
   for (const svcType of serviceTypes) {
-    const typeNames = shopNames[svcType];
-    let svcName;
-    if (typeNames && typeNames.length > 0) {
-      const available = typeNames.filter(n => !usedShopNames.has(n));
-      svcName = pick(available.length > 0 ? available : typeNames);
-      usedShopNames.add(svcName);
-    } else {
-      svcName = serviceConfig.types.includes(svcType) ? `The ${SERVICE_TYPE_LABELS[svcType]}` : `Local ${SERVICE_TYPE_LABELS[svcType]}`;
-    }
-
+    const svcName = pickServiceName(svcType, shopNames, serviceConfig, usedShopNames);
     const svcDesc = pick(SERVICE_DESCRIPTIONS[svcType] || ['A local establishment.']);
-
-    const npcTypes = SERVICE_NPC_TYPES[svcType] || ['shopkeeper'];
-    const npcRole = pick(npcTypes);
-
-    const npcRace = pick(['Human', 'Elf', 'Dwarf', 'Halfling', 'Half-Elf', 'Half-Orc']);
-    const npcGender = Math.random() > 0.5 ? 'male' : 'female';
-    const npcNamePool = npcNames[npcRace] || npcNames['Human'];
-    const npcFirstName = pick(npcNamePool[npcGender] || npcNamePool['male'] || []);
-
-    const fullNpcName = `${npcFirstName}`;
-    const npcNameUsed = new Set([...existingNames, ...notableNPCs.map(n => n.name)]);
-    let uniqueNpcName = fullNpcName;
-    let npcCounter = 2;
-    while (npcNameUsed.has(uniqueNpcName)) {
-      uniqueNpcName = `${fullNpcName} ${npcCounter}`;
-      npcCounter++;
-    }
-
-    notableNPCs.push({
-      name: uniqueNpcName,
-      role: npcRole,
-      description: `The ${npcRole} of ${svcName}. ${pick(SERVICE_NPC_DESCRIPTORS)}`,
-    });
-
-    let guildTypeName = '';
-    if (svcType === 'guild') {
-      const guildCategory = pick(GUILD_TYPE_MAP.guild);
-      guildTypeName = pick(guildNames[guildCategory] || guildNames.merchants);
-    }
-
+    notableNPCs.push(buildNotableNpc(svcType, svcName, npcNames, existingNames, notableNPCs));
     services.push({
       type: svcType,
-      name: svcType === 'guild' && guildTypeName ? guildTypeName : svcName,
+      name: resolveServiceName(svcType, svcName, guildNames),
       description: svcDesc,
     });
   }
 
-  const rumorCount = randomInt(1, 3);
-  const allRumors = [
-    ...(rumors.general || []),
-    ...(rumors.quest_hooks || []),
-    ...(rumors.faction_intrigue || []),
-    ...(rumors.supernatural || []),
-    ...(rumors.trade_economy || []),
-  ];
-  const selectedRumors = pickN(allRumors, rumorCount);
-
-  const tags = [size, culture.toLowerCase() + '-culture'];
-  if (services.length > 0) tags.push(services[0].type);
-  if (services.length > 3) tags.push('many-services');
+  const selectedRumors = selectRumors(rumors, randomInt(1, 3));
+  const tags = buildTags(size, culture, services);
 
   return {
     name: uniqueName,
     size,
-    description: `${description} ${features.map(f => f).join(' ')}`,
-    atmosphere,
-    government,
+    description: `${flavor.description} ${features.map(f => f).join(' ')}`,
+    atmosphere: flavor.atmosphere,
+    government: flavor.government,
     population,
     services,
     notableNPCs,

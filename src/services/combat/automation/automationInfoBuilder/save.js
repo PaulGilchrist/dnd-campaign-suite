@@ -1,10 +1,40 @@
 import { getSaveDc, resolveUses, resolveDiceExpression, resolveScaling } from '../automationExpressions.js'
 import { normalizeCastingTime } from '../../../shared/castingTimeUtils.js'
 
+const ACTION_BY_CASTING_TIME = {
+    '1 bonus action': 'bonus_action',
+    '1 action': 'action',
+    '1 reaction': 'reaction',
+}
+
+function resolveCastingAction(auto, castingTime) {
+    if (auto.action) return auto.action
+    if (!castingTime) return null
+    return ACTION_BY_CASTING_TIME[normalizeCastingTime(castingTime)] || null
+}
+
+function resolveAbilitySaveDc(auto, playerStats, abilityFallback) {
+    if (auto.saveDc !== 'ability') return auto.saveDc || 10
+    return getSaveDc(playerStats, auto.saveAbility || abilityFallback, playerStats.proficiency || 0)
+}
+
+function resolveHealExpression(auto, playerStats) {
+    let healExpression = auto.healExpression || ''
+    if (auto.healScaling) {
+        const healScaling = resolveScaling(playerStats, auto.healScaling)
+        if (healScaling?.damage) {
+            healExpression = healScaling.damage
+        }
+    }
+    if (healExpression) {
+        healExpression = resolveDiceExpression(healExpression, playerStats)
+    }
+    return healExpression
+}
+
 export const saveHandlers = {
     'save_attack': (feature, playerStats) => {
         const auto = feature.automation
-        const prof = playerStats.proficiency || 0
         const scaling = resolveScaling(playerStats, auto.scaling)
         const rawDamage = scaling?.damage || auto.damage || ''
         const damage = resolveDiceExpression(rawDamage, playerStats)
@@ -12,31 +42,10 @@ export const saveHandlers = {
         if (auto.resourceCost === 'wild_shape') {
             uses = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0
         }
-        const saveDc = auto.saveDc === 'ability'
-            ? getSaveDc(playerStats, auto.saveAbility || 'CON', prof)
-            : auto.saveDc || 10
-        let healExpression = auto.healExpression || ''
-        if (auto.healScaling) {
-            const healScaling = resolveScaling(playerStats, auto.healScaling)
-            if (healScaling?.damage) {
-                healExpression = healScaling.damage
-            }
-        }
-        if (healExpression) {
-            healExpression = resolveDiceExpression(healExpression, playerStats)
-        }
+        const saveDc = resolveAbilitySaveDc(auto, playerStats, 'CON')
+        const healExpression = resolveHealExpression(auto, playerStats)
         const castingTime = auto.casting_time || ''
-        let action = auto.action
-        if (!action && castingTime) {
-            const ct = normalizeCastingTime(castingTime)
-            if (ct === '1 bonus action') {
-                action = 'bonus_action'
-            } else if (ct === '1 action') {
-                action = 'action'
-            } else if (ct === '1 reaction') {
-                action = 'reaction'
-            }
-        }
+        const action = resolveCastingAction(auto, castingTime)
         return {
             type: 'save_attack',
             name: feature.name,
@@ -66,25 +75,12 @@ export const saveHandlers = {
 
     'elemental_burst': (feature, playerStats) => {
         const auto = feature.automation
-        const prof = playerStats.proficiency || 0
         const scaling = resolveScaling(playerStats, auto.scaling)
         const rawDamage = scaling?.damage || auto.damage || ''
         const damage = resolveDiceExpression(rawDamage, playerStats)
-        const saveDc = auto.saveDc === 'ability'
-            ? getSaveDc(playerStats, auto.saveAbility || 'CON', prof)
-            : auto.saveDc || 10
+        const saveDc = resolveAbilitySaveDc(auto, playerStats, 'CON')
         const castingTime = auto.casting_time || ''
-        let action = auto.action
-        if (!action && castingTime) {
-            const ct = normalizeCastingTime(castingTime)
-            if (ct === '1 bonus action') {
-                action = 'bonus_action'
-            } else if (ct === '1 action') {
-                action = 'action'
-            } else if (ct === '1 reaction') {
-                action = 'reaction'
-            }
-        }
+        const action = resolveCastingAction(auto, castingTime)
         return {
             type: 'elemental_burst',
             name: feature.name,

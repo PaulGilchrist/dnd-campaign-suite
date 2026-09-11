@@ -28,6 +28,40 @@ async function getCreatureSaveBonus(creature, abilityAbbr, characters, campaignN
     return 0
 }
 
+const CONDITION_KEYWORD_TO_KEY = { poison: 'poisoned' }
+
+function isSavingThrowAdvantageMod(mod, conditionKey) {
+    return mod.target === 'saving_throw' && mod.effect === 'advantage' && (!mod.abilities || mod.abilities.length === 0) && (mod.condition === conditionKey || CONDITION_KEYWORD_TO_KEY[mod.condition] === conditionKey)
+}
+
+function isPowerfulBuildAdvantageMod(mod) {
+    return mod.target === 'ability_check' && mod.effect === 'advantage' && mod.abilities?.includes('STR') && mod.condition === 'powerful_build_grapple_escape'
+}
+
+function hasPassiveImmunityAdvantage(creature, characters, getName, conditionKey) {
+    if (creature.type !== 'player') return false
+    const playerCharacter = characters.find(c => getName(c.name) === creature.name)
+    const playerStats = playerCharacter?.computedStats || playerCharacter
+    const saveModifiers = playerStats?.saveModifiers || playerCharacter?.saveModifiers
+    if (saveModifiers?.some(mod => isSavingThrowAdvantageMod(mod, conditionKey))) {
+        return true
+    }
+    const powerfulBuildAdvantage = saveModifiers?.some(isPowerfulBuildAdvantageMod)
+    return !!(powerfulBuildAdvantage && conditionKey === 'grappled')
+}
+
+function hasProtectionFromPoisonAdvantage(creatureName, campaignName, conditionKey) {
+    if (conditionKey !== 'poisoned') return false
+    const activeBuffs = getRuntimeValue(creatureName, 'activeBuffs', campaignName) || []
+    return activeBuffs.some(b => b.name === 'Protection from Poison' && b.saveAdvantageTypes?.includes('poisoned'))
+}
+
+function buildSaveResult(roll, rolls, saveBonus, auraBonus, aura, dc, starryDragonFloor, advantage) {
+    const total = roll + saveBonus + auraBonus
+    const bonusDetail = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined
+    return { roll, total, success: total >= dc, bonus: saveBonus + auraBonus, bonusDetail, ...(advantage ? { advantage: true } : {}), rolls, starryDragonFloor }
+}
+
 async function rollConditionSave(creature, condition, characters, campaignNpcs, campaignName, mapName, getName) {
     const saveBonus = await getCreatureSaveBonus(creature, condition.ability, characters, campaignNpcs, getName)
     const aura = await computeAuraBonus({ targetName: creature.name, characters, campaignName, activeMapName: mapName, allCreatures: getCombatSummary(campaignName)?.creatures })
@@ -44,57 +78,19 @@ async function rollConditionSave(creature, condition, characters, campaignNpcs, 
             creature.name, JSON.stringify(rawStored), JSON.stringify(activeBuffs.map(b => b.name)))
     }
 
-    let hasPassiveImmunityAdvantage = false
-    if (creature.type === 'player') {
-        const playerCharacter = characters.find(c => getName(c.name) === creature.name)
-        const playerStats = playerCharacter?.computedStats || playerCharacter
-        const saveModifiers = playerStats?.saveModifiers || playerCharacter?.saveModifiers
-        const CONDITION_KEYWORD_TO_KEY = { poison: 'poisoned' }
-        if (saveModifiers) {
-            const matchingModifier = saveModifiers.find(mod =>
-                mod.target === 'saving_throw' && mod.effect === 'advantage' && (!mod.abilities || mod.abilities.length === 0) && (mod.condition === conditionKey || CONDITION_KEYWORD_TO_KEY[mod.condition] === conditionKey)
-            )
-            if (matchingModifier) {
-                hasPassiveImmunityAdvantage = true
-            }
-        }
-        const powerfulBuildAdvantage = saveModifiers?.some(mod =>
-            mod.target === 'ability_check' && mod.effect === 'advantage' && mod.abilities?.includes('STR') && mod.condition === 'powerful_build_grapple_escape'
-        )
-        if (powerfulBuildAdvantage && conditionKey === 'grappled') {
-            hasPassiveImmunityAdvantage = true
-        }
-    }
-
-    let hasProtectionFromPoisonAdvantage = false
-    if (conditionKey === 'poisoned') {
-        const activeBuffs = getRuntimeValue(creature.name, 'activeBuffs', campaignName) || []
-        hasProtectionFromPoisonAdvantage = activeBuffs.some(b => b.name === 'Protection from Poison' && b.saveAdvantageTypes?.includes('poisoned'))
-    }
-
-    const hasAdvantage = hasAuraOfPurityAdvantage || hasPassiveImmunityAdvantage || isCircleOfPowerActive(creature.name, campaignName) || hasProtectionFromPoisonAdvantage
+    const hasPassiveAdvantage = hasPassiveImmunityAdvantage(creature, characters, getName, conditionKey)
+    const hasPoisonAdvantage = hasProtectionFromPoisonAdvantage(creature.name, campaignName, conditionKey)
+    const hasAdvantage = hasAuraOfPurityAdvantage || hasPassiveAdvantage || isCircleOfPowerActive(creature.name, campaignName) || hasPoisonAdvantage
     const dragonConstellationActive = String(condition.ability || '').toLowerCase() === 'con' && hasStarryDragonConstellation(creature, characters)
     if (hasAdvantage) {
-        const a = rollD20()
-        const b = rollD20()
-        let roll = Math.max(a, b)
-        if (dragonConstellationActive && roll <= 9) {
-            roll = 10
-        }
-        const total = roll + saveBonus + auraBonus
-        const success = total >= condition.dc
-        const bonusDetail = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined
-        return { roll, total, success, bonus: saveBonus + auraBonus, bonusDetail, advantage: true, rolls: [a, b], starryDragonFloor: dragonConstellationActive }
+        const rolls = [rollD20(), rollD20()]
+        const max = Math.max(...rolls)
+        const roll = dragonConstellationActive && max <= 9 ? 10 : max
+        return buildSaveResult(roll, rolls, saveBonus, auraBonus, aura, condition.dc, dragonConstellationActive, true)
     }
-    let r1 = rollD20()
-    const rawRoll = r1
-    if (dragonConstellationActive && r1 <= 9) {
-        r1 = 10
-    }
-    const total = r1 + saveBonus + auraBonus
-    const success = total >= condition.dc
-    const bonusDetail = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined
-    return { roll: r1, total, success, bonus: saveBonus + auraBonus, bonusDetail, rolls: [rawRoll], starryDragonFloor: dragonConstellationActive }
+    const rawRoll = rollD20()
+    const roll = dragonConstellationActive && rawRoll <= 9 ? 10 : rawRoll
+    return buildSaveResult(roll, [rawRoll], saveBonus, auraBonus, aura, condition.dc, dragonConstellationActive, false)
 }
 
 function removeCondition(combatSummary, creatureName, condition, getRuntimeValue, setRuntimeValue, campaignName) {

@@ -19,6 +19,52 @@ import { useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { normalizeAutoDamage, resolveAttackDamageStandalone } from '../useAttackDamageResolution.js';
 import './CharSpells.css'
 
+function resolveSpellDamageDisplay(spell, dmgObj, playerStats) {
+    const isCantrip = spell.level === 0;
+    let damageDisplay = isCantrip ? dmgObj[Math.max(...Object.keys(dmgObj).map(Number).filter(l => l <= playerStats.level))] || dmgObj[Object.keys(dmgObj)[0]] : dmgObj[Object.keys(dmgObj)[0]];
+    if (spell.name === "Hunter's Mark" && playerStats.class?.name === 'Ranger' && playerStats.level >= 20) {
+        damageDisplay = damageDisplay.replace('1d6', '1d10');
+    }
+    return damageDisplay;
+}
+
+function computeSpellEffectLabel(spell, playerStats) {
+    if (spell.damage) {
+        const slotDmg = spell.damage.damage_at_slot_level;
+        const charDmg = spell.damage.damage_at_character_level;
+        const dmgObj = slotDmg && Object.keys(slotDmg).length ? slotDmg : charDmg;
+        if (!dmgObj) return 'Utility';
+        const damageDisplay = resolveSpellDamageDisplay(spell, dmgObj, playerStats);
+        let effect = `${damageDisplay} ${spell.damage.damage_type}`;
+        if (spell.dc) {
+            const saveLabel = spell.dc.dc_success === 'half' ? 'half' : 'negates';
+            effect += ` (${spell.dc.dc_type} ${saveLabel})`;
+        }
+        return effect;
+    }
+    if (spell.dc) {
+        const saveLabel = spell.dc.dc_success === 'half' ? 'half' : spell.dc.dc_success === 'negates' ? 'negates' : '';
+        return spell.dc.dc_type + (saveLabel ? ` ${saveLabel}` : '');
+    }
+    return 'Utility';
+}
+
+function formatSpellCastingTime(playerStats, spell) {
+    // CLA-322: Spell Breaker shows Dispel Magic as Bonus Action
+    const ct = isSpellBreakerBonusActionSpell(playerStats, spell.name) ? 'bonus action' : spell.casting_time;
+    return ct ? ct.replace(/\bbonus action\b/g, 'BA').replace(/\baction\b/g, ' A').replace(/\breaction\b/g, 'Reaction').replace(/\bminute\b/g, 'min').replace(/\bminutes\b/g, 'min') : '';
+}
+
+function formatSpellDuration(spell) {
+    if (!spell.duration) return '';
+    return spell.duration.replace('Instantaneous','Instant').replace('minute','min').replace('minutes','min').replace('up to ','');
+}
+
+function SpellPreparedCell({ spell, handleTogglePreparedSpells }) {
+    if (spell.prepared !== 'Prepared' && spell.prepared !== '') return <td>{spell.prepared}</td>;
+    return <td><input tabIndex={0} type="checkbox" checked={spell.prepared === 'Prepared'} onChange={() => handleTogglePreparedSpells(spell.name)}/></td>;
+}
+
 const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName, characters, setModalState }) {
     const _activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName); (void _activeBuffs); // subscribe to activeBuffs changes for re-render
     const innateSorceryActive = isInnateSorceryActive(playerStats.name, campaignName);
@@ -372,33 +418,8 @@ return (
                 </thead>
                 <tbody>
                     {spells.map((spell) => {
-                        let notes = [];
-                        if(spell.components) notes.push(spell.components.join('/'));
-                        let effect = 'Utility';
-                        if(spell.damage) {
-                            const slotDmg = spell.damage.damage_at_slot_level;
-                            const charDmg = spell.damage.damage_at_character_level;
-                            const dmgObj = slotDmg && Object.keys(slotDmg).length ? slotDmg : charDmg;
-                            if (dmgObj) {
-                                const isCantrip = spell.level === 0;
-                                let damageDisplay = isCantrip ? dmgObj[Math.max(...Object.keys(dmgObj).map(Number).filter(l => l <= playerStats.level))] || dmgObj[Object.keys(dmgObj)[0]] : dmgObj[Object.keys(dmgObj)[0]];
-                                if (spell.name === "Hunter's Mark" && playerStats.class?.name === 'Ranger' && playerStats.level >= 20) {
-                                    damageDisplay = damageDisplay.replace('1d6', '1d10');
-                                }
-                                if (isCantrip) {
-                                    effect = `${damageDisplay} ${spell.damage.damage_type}`;
-                                } else {
-                                    effect = `${damageDisplay} ${spell.damage.damage_type}`;
-                                }
-                                if (spell.dc) {
-                                    const saveLabel = spell.dc.dc_success === 'half' ? 'half' : 'negates';
-                                    effect += ` (${spell.dc.dc_type} ${saveLabel})`;
-                                }
-                            }
-                        } else if (spell.dc) {
-                            const saveLabel = spell.dc.dc_success === 'half' ? 'half' : spell.dc.dc_success === 'negates' ? 'negates' : '';
-                            effect = spell.dc.dc_type + (saveLabel ? ` ${saveLabel}` : '');
-                        }
+                        const notes = spell.components ? [spell.components.join('/')] : [];
+                        const effect = computeSpellEffectLabel(spell, playerStats);
                         const isPrepared = spell.prepared === 'Always' || spell.prepared === 'Prepared';
                         // 2024 wizards: unprepared non-ritual spells are in the spellbook but not castable;
                         // unprepared rituals remain castable via Ritual Adept. Other classes always have
@@ -407,15 +428,13 @@ return (
                         return <tr key={spell.name} className={isGrayedNonCastable ? 'spell-row-not-castable' : ''}>
                             <td className={`left spell-name ${isGrayedNonCastable ? 'not-castable' : 'clickable'}`} title={isGrayedNonCastable ? 'Not prepared' : undefined} onClick={() => { if (!isGrayedNonCastable) setSelectedSpell(spell); }}>{spell.name}</td>
                             <td>{spell.level === 0 ? 'Cantrip' : spell.level}</td>
-                            {showPreparedColumn && (spell.prepared !== 'Prepared' && spell.prepared !== '') && <td>{spell.prepared}</td>}
-                            {showPreparedColumn && (spell.prepared === 'Prepared' || spell.prepared === '') && <td><input tabIndex={0} type="checkbox" checked={spell.prepared === 'Prepared'} onChange={() => handleTogglePreparedSpells(spell.name)}/></td>}
-                            {/* CLA-322: Spell Breaker shows Dispel Magic as Bonus Action */}
-                            <td>{(() => { const ct = isSpellBreakerBonusActionSpell(playerStats, spell.name) ? 'bonus action' : spell.casting_time; return ct ? ct.replace(/\bbonus action\b/g, 'BA').replace(/\baction\b/g, ' A').replace(/\breaction\b/g, 'Reaction').replace(/\bminute\b/g, 'min').replace(/\bminutes\b/g, 'min') : ''; })()}</td>
+                            {showPreparedColumn && <SpellPreparedCell spell={spell} handleTogglePreparedSpells={handleTogglePreparedSpells} />}
+                            <td>{formatSpellCastingTime(playerStats, spell)}</td>
                             <td>{spell.range}</td>
                             <td>{effect}</td>
-                            <td>{spell.duration ? spell.duration.replace('Instantaneous','Instant').replace('minute','min').replace('minutes','min').replace('up to ','') : ''}</td>
+                            <td>{formatSpellDuration(spell)}</td>
                             <td className='left'>{notes.join(', ').replace('Concentration','Con')}</td>
-                        </tr>
+                        </tr>;
                     })}
                 </tbody>
             </table>}

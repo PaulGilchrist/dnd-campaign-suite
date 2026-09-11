@@ -10,51 +10,58 @@ import { applyDamageToTarget, computeDamageAfterEvasion, computeDamageAfterSave,
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { renderTargetList, logSaveEntry, persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 
+function computeHealEvasionDamage(combatSummary, targetName, rawDamage, success, saveType) {
+    const targetChar = (combatSummary.creatures?.filter(c => c.type === 'player') || []).find(c => c.name === targetName);
+    const evasionEffects = targetChar?.computedStats?.evasionEffects;
+    const evasionActive = hasEvasionForSave(evasionEffects, normalizeSaveType(saveType));
+    return computeDamageAfterEvasion(rawDamage, success, 'half', evasionActive);
+}
+
+function applyAndLogHealNpcDamage({ combatSummary, campaignName, featureName, attackerName, saveDc, saveType, damageExpression, damageType, characters, targetName, success, saveRollTotal, saveBonus, rawDamage, finalDamage, damageRoll }) {
+    if (finalDamage <= 0) return;
+    const applyResult = applyDamageToTarget(
+        combatSummary, targetName, finalDamage, [damageType],
+        campaignName, characters, false, attackerName, false
+    );
+
+    addEntry(campaignName, {
+        type: 'roll', characterName: attackerName, rollType: 'save-damage',
+        name: featureName, formula: damageExpression,
+        rolls: damageRoll?.rolls ?? [], total: rawDamage, modifier: damageRoll?.modifier ?? 0,
+        damageType, targetName, saveType, saveDc, dcSuccess: 'half',
+        saveResult: success ? 'success' : 'failure',
+        saveRoll: saveRollTotal, saveBonus,
+        saveRawRolls: [saveRollTotal, saveRollTotal],
+        finalDamage: applyResult?.finalDamage ?? finalDamage,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[SaveAttackHealModal] Error logging damage:', e); });
+}
+
 function resolveHealNpcTarget({ combatSummary, campaignName, featureName, attackerName, saveDc, saveType, damageExpression, damageType, characters, targetName, saveBonus }) {
     const saveRoll = rollExpression('1d20');
-    const saveTotal = (saveRoll?.total ?? 0) + saveBonus;
+    const saveRollTotal = saveRoll?.total ?? 0;
+    const saveTotal = saveRollTotal + saveBonus;
     const success = saveTotal >= saveDc;
 
     const damageRoll = rollExpression(damageExpression);
     const rawDamage = damageRoll?.total ?? 0;
 
-    const targetChar = (combatSummary.creatures?.filter(c => c.type === 'player') || []).find(c => c.name === targetName);
-    const normalizedSaveType = normalizeSaveType(saveType);
-    const evasionEffects = targetChar?.computedStats?.evasionEffects;
-    const evasionActive = hasEvasionForSave(evasionEffects, normalizedSaveType);
-    const finalDamage = computeDamageAfterEvasion(rawDamage, success, 'half', evasionActive);
+    const finalDamage = computeHealEvasionDamage(combatSummary, targetName, rawDamage, success, saveType);
 
     sendSaveResult(campaignName, targetName, {
         promptId: utils.guid(),
         success,
-        roll: saveRoll?.total ?? 0,
+        roll: saveRollTotal,
         total: saveTotal,
         saveBonus,
-        rawRolls: [saveRoll?.total ?? 0, saveRoll?.total ?? 0],
+        rawRolls: [saveRollTotal, saveRollTotal],
     });
 
-    logSaveEntry(campaignName, featureName, attackerName, targetName, saveDc, saveType, success, saveTotal, [saveRoll?.total ?? 0], saveBonus, `1d20${saveBonus !== 0 ? '+' + saveBonus : ''}`);
+    logSaveEntry(campaignName, featureName, attackerName, targetName, saveDc, saveType, success, saveTotal, [saveRollTotal], saveBonus, `1d20${saveBonus !== 0 ? '+' + saveBonus : ''}`);
 
-    if (finalDamage > 0) {
-        const applyResult = applyDamageToTarget(
-            combatSummary, targetName, finalDamage, [damageType],
-            campaignName, characters, false, attackerName, false
-        );
+    applyAndLogHealNpcDamage({ combatSummary, campaignName, featureName, attackerName, saveDc, saveType, damageExpression, damageType, characters, targetName, success, saveRollTotal, saveBonus, rawDamage, finalDamage, damageRoll });
 
-        addEntry(campaignName, {
-            type: 'roll', characterName: attackerName, rollType: 'save-damage',
-            name: featureName, formula: damageExpression,
-            rolls: damageRoll?.rolls ?? [], total: rawDamage, modifier: damageRoll?.modifier ?? 0,
-            damageType, targetName, saveType, saveDc, dcSuccess: 'half',
-            saveResult: success ? 'success' : 'failure',
-            saveRoll: saveRoll?.total ?? 0, saveBonus,
-            saveRawRolls: [saveRoll?.total ?? 0, saveRoll?.total ?? 0],
-            finalDamage: applyResult?.finalDamage ?? finalDamage,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error('[SaveAttackHealModal] Error logging damage:', e); });
-    }
-
-    return { targetName, success, roll: saveRoll?.total ?? 0, total: saveTotal, saveBonus, rawDamage, finalDamage };
+    return { targetName, success, roll: saveRollTotal, total: saveTotal, saveBonus, rawDamage, finalDamage };
 }
 
 function buildHealLastAttackPayload({ attackerName, damageExpression, damageType, featureName, saveDc, saveType, targets, lastNpcResult }) {
