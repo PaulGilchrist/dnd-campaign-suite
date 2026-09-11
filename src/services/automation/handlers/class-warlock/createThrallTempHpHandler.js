@@ -3,18 +3,57 @@ import { addEntry } from '../../../ui/logService.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 
+function hasCreateThrallFeature(playerStats) {
+    const allFeatures = [
+        ...(playerStats?.class?.class_levels || []).flatMap(cl => (cl.features || [])),
+        ...(playerStats?.class?.subclass?.class_levels || []).flatMap(cl => (cl.features || [])),
+    ];
+    return allFeatures.some(f => f.name === 'Create Thrall');
+}
+
+function computeThrallAbilityModifiers(abilities, level) {
+    const mod = (name) => (abilities.find(a => a.name === name)?.bonus || 0) - Math.floor((level - 1) / 2);
+    return {
+        strength: mod('Strength'),
+        dexterity: mod('Dexterity'),
+        constitution: mod('Constitution'),
+        intelligence: mod('Intelligence'),
+        wisdom: mod('Wisdom'),
+        charisma: mod('Charisma'),
+    };
+}
+
+function evaluateThrallTempHp(expr) {
+    try {
+        const result = new Function(`"use strict"; return (${expr})`)();
+        if (typeof result === 'number' && !isNaN(result)) {
+            return Math.max(0, result);
+        }
+        return 0;
+    } catch (_e) {
+        // If expression evaluation fails, try rolling
+        const dieRoll = rollExpression(expr);
+        return dieRoll?.total || 0;
+    }
+}
+
+function findAberrantCompanion(cs) {
+    return cs.creatures.find(c =>
+        c.name && (
+            c.name.includes('Aberrant Spirit') ||
+            c.name.includes('Aberration') ||
+            c.name.toLowerCase().includes('aberration')
+        )
+    );
+}
+
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation;
     const playerName = playerStats.name;
     const featureName = action.name || 'Create Thrall';
 
     // Check if the feature is available (Warlock level 14+)
-    const allFeatures = [
-        ...(playerStats?.class?.class_levels || []).flatMap(cl => (cl.features || [])),
-        ...(playerStats?.class?.subclass?.class_levels || []).flatMap(cl => (cl.features || [])),
-    ];
-    const hasCreateThrall = allFeatures.some(f => f.name === 'Create Thrall');
-    if (!hasCreateThrall) {
+    if (!hasCreateThrallFeature(playerStats)) {
         return null;
     }
 
@@ -22,33 +61,16 @@ export async function handle(action, playerStats, campaignName) {
     const tempHpExpression = auto.tempHpExpression || 'warlock level + CHA modifier';
     const level = playerStats.level || 1;
     const abilities = Array.isArray(playerStats.abilities) ? playerStats.abilities : [];
-    const abilityModifiers = {
-        strength: (abilities.find(a => a.name === 'Strength')?.bonus || 0) - Math.floor((level - 1) / 2),
-        dexterity: (abilities.find(a => a.name === 'Dexterity')?.bonus || 0) - Math.floor((level - 1) / 2),
-        constitution: (abilities.find(a => a.name === 'Constitution')?.bonus || 0) - Math.floor((level - 1) / 2),
-        intelligence: (abilities.find(a => a.name === 'Intelligence')?.bonus || 0) - Math.floor((level - 1) / 2),
-        wisdom: (abilities.find(a => a.name === 'Wisdom')?.bonus || 0) - Math.floor((level - 1) / 2),
-        charisma: (abilities.find(a => a.name === 'Charisma')?.bonus || 0) - Math.floor((level - 1) / 2),
-    };
+    const abilityModifiers = computeThrallAbilityModifiers(abilities, level);
 
-    let expr = tempHpExpression
+    const expr = tempHpExpression
         .replace(/warlock level/gi, level)
         .replace(/warlock_level/gi, level)
         .replace(/level/gi, level)
         .replace(/CHA modifier/gi, abilityModifiers.charisma)
         .replace(/charisma modifier/gi, abilityModifiers.charisma);
 
-    let tempHp = 0;
-    try {
-        const result = new Function(`"use strict"; return (${expr})`)();
-        if (typeof result === 'number' && !isNaN(result)) {
-            tempHp = Math.max(0, result);
-        }
-    } catch (_e) {
-        // If expression evaluation fails, try rolling
-        const dieRoll = rollExpression(expr);
-        tempHp = dieRoll?.total || 0;
-    }
+    const tempHp = evaluateThrallTempHp(expr);
 
     if (tempHp <= 0) {
         return null;
@@ -61,13 +83,7 @@ export async function handle(action, playerStats, campaignName) {
     }
 
     // Look for the Aberrant Spirit companion
-    const companion = cs.creatures.find(c =>
-        c.name && (
-            c.name.includes('Aberrant Spirit') ||
-            c.name.includes('Aberration') ||
-            c.name.toLowerCase().includes('aberration')
-        )
-    );
+    const companion = findAberrantCompanion(cs);
 
     if (!companion) {
         return null;

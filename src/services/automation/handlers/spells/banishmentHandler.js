@@ -78,6 +78,112 @@ const PERMANENT_BANISHMENT_TYPES = new Set([
     'fiend',
 ]);
 
+async function banishFailingTarget({ campaignName, casterName, action, targetName, dc, targetCreature, saveResult }) {
+    // Apply Incapacitated condition
+    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'incapacitated');
+    setRuntimeValue(targetName, 'activeConditions', [...filtered, 'incapacitated'], campaignName);
+
+    // Store condition metadata
+    const existingMeta = getRuntimeValue(targetName, 'activeConditionMeta', campaignName) || {};
+    setRuntimeValue(targetName, 'activeConditionMeta', {
+        ...existingMeta,
+        incapacitated: {
+            ...(existingMeta.incapacitated || {}),
+            dc,
+            ability: 'cha',
+        },
+    }, campaignName);
+
+    // Check if target is a creature type that gets permanently banished
+    const creatureType = (targetCreature?.monsterType || '').toLowerCase().replace(/\s+/g, '');
+    const isPermanentType = PERMANENT_BANISHMENT_TYPES.has(creatureType);
+    const permanentNote = isPermanentType
+        ? ' (permanent banishment - target will not return)'
+        : '';
+
+    // Add banishment target effect
+    const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+    const existingBanishment = targetEffects.filter(te => te.effect !== 'banishment' || te.target !== targetName || te.source !== casterName);
+    setRuntimeValue('campaign', 'targetEffects', [
+        ...existingBanishment,
+        {
+            effect: 'banishment',
+            target: targetName,
+            source: casterName,
+            duration: 'Concentration, up to 1 minute',
+            permanent: isPermanentType,
+        },
+    ], campaignName);
+
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'failure',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: ['incapacitated'],
+        appliedDamage: 0,
+    });
+
+    // Register expirations: remove condition + remove target effect badge + break concentration
+    addExpiration(casterName, targetName, [
+        { type: 'condition', condition: 'incapacitated' },
+        { type: 'remove_target_effect', effectKey: 'banishment', target: targetName, source: casterName },
+        { type: 'break_concentration', spell: action.name },
+    ], campaignName);
+
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-banishment',
+        targetName,
+        saveDc: dc,
+        saveType: 'CHA',
+        success: false,
+        description: `${targetName} failed CHA save against ${action.name} and is banished.${permanentNote}`,
+    }).catch((e) => { console.error("[banishment] Error:", e); });
+
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: 'Incapacitated',
+        reason: action.name,
+        note: `${targetName} is Incapacitated by ${action.name} (banished to demiplane).${permanentNote}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[banishment] Error:", e); });
+}
+
+async function resolveBanishmentTargets(action, auto, campaignName, casterName) {
+    const banishmentTargets = action.metaCtx?.banishmentTargets;
+    if (banishmentTargets && Array.isArray(banishmentTargets) && banishmentTargets.length > 0) {
+        return { targetNames: banishmentTargets, popup: null };
+    }
+
+    const providedTargetName = auto.targetName || action.targetName;
+    if (providedTargetName) {
+        return { targetNames: [providedTargetName], popup: null };
+    }
+
+    const targetInfo = await resolveTarget(campaignName, casterName);
+    const targetName = targetInfo?.target?.name;
+    if (!targetName) {
+        return {
+            targetNames: null,
+            popup: {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    description: `No target selected. ${action.name} has no effect.`,
+                },
+            },
+        };
+    }
+    return { targetNames: [targetName], popup: null };
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
@@ -97,30 +203,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const casterName = playerStats.name;
 
     // Get target names from metaCtx (multi-target) or single targetName
-    let targetNames;
-    const banishmentTargets = action.metaCtx?.banishmentTargets;
-    if (banishmentTargets && Array.isArray(banishmentTargets) && banishmentTargets.length > 0) {
-        targetNames = banishmentTargets;
-    } else {
-        const providedTargetName = auto.targetName || action.targetName;
-        if (!providedTargetName) {
-            const targetInfo = await resolveTarget(campaignName, casterName);
-            const targetName = targetInfo?.target?.name;
-            if (!targetName) {
-                return {
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: action.name,
-                        description: `No target selected. ${action.name} has no effect.`,
-                    },
-                };
-            }
-            targetNames = [targetName];
-        } else {
-            targetNames = [providedTargetName];
-        }
-    }
+    const { targetNames, popup: targetPopup } = await resolveBanishmentTargets(action, auto, campaignName, casterName);
+    if (targetPopup) return targetPopup;
 
     storeSpellLastAttack(campaignName, {
         casterName,
@@ -201,82 +285,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             savedTargets.push(targetName);
         } else {
             banishedCount++;
-
-            // Apply Incapacitated condition
-            const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-            const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-            const filtered = conditions.filter(c => String(c).toLowerCase() !== 'incapacitated');
-            setRuntimeValue(targetName, 'activeConditions', [...filtered, 'incapacitated'], campaignName);
-
-            // Store condition metadata
-            const existingMeta = getRuntimeValue(targetName, 'activeConditionMeta', campaignName) || {};
-            setRuntimeValue(targetName, 'activeConditionMeta', {
-                ...existingMeta,
-                incapacitated: {
-                    ...(existingMeta.incapacitated || {}),
-                    dc,
-                    ability: 'cha',
-                },
-            }, campaignName);
-
-            // Check if target is a creature type that gets permanently banished
-            const creatureType = (targetCreature?.monsterType || '').toLowerCase().replace(/\s+/g, '');
-            const isPermanentType = PERMANENT_BANISHMENT_TYPES.has(creatureType);
-            const permanentNote = isPermanentType
-                ? ' (permanent banishment - target will not return)'
-                : '';
-
-            // Add banishment target effect
-            const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
-            const existingBanishment = targetEffects.filter(te => te.effect !== 'banishment' || te.target !== targetName || te.source !== casterName);
-            setRuntimeValue('campaign', 'targetEffects', [
-                ...existingBanishment,
-                {
-                    effect: 'banishment',
-                    target: targetName,
-                    source: casterName,
-                    duration: 'Concentration, up to 1 minute',
-                    permanent: isPermanentType,
-                },
-            ], campaignName);
-
-            await addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'failure',
-                roll: saveResult.roll ?? 0,
-                total: saveResult.total ?? 0,
-                conditions: ['incapacitated'],
-                appliedDamage: 0,
-            });
-
-            // Register expirations: remove condition + remove target effect badge + break concentration
-            addExpiration(casterName, targetName, [
-                { type: 'condition', condition: 'incapacitated' },
-                { type: 'remove_target_effect', effectKey: 'banishment', target: targetName, source: casterName },
-                { type: 'break_concentration', spell: action.name },
-            ], campaignName);
-
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                rollType: 'save-banishment',
-                targetName,
-                saveDc: dc,
-                saveType: 'CHA',
-                success: false,
-                description: `${targetName} failed CHA save against ${action.name} and is banished.${permanentNote}`,
-            }).catch((e) => { console.error("[banishment] Error:", e); });
-
-            addEntry(campaignName, {
-                type: 'condition',
-                action: 'applied',
-                characterName: targetName,
-                condition: 'Incapacitated',
-                reason: action.name,
-                note: `${targetName} is Incapacitated by ${action.name} (banished to demiplane).${permanentNote}`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[banishment] Error:", e); });
-
+            await banishFailingTarget({ campaignName, casterName, action, targetName, dc, targetCreature, saveResult });
             banishedTargets.push(targetName);
         }
     }

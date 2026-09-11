@@ -25,6 +25,46 @@ router.get('/api/campaigns/:campaign/:file', asyncHandler((req, res, next) => {
     res.json(JSON.parse(characterData));
 }));
 
+// Renames a character's image file to the target filename, returning the new
+// imagePath when a rename actually happened, or null when nothing changed
+function renameImageFile(campaign, originalImagePath, newImageFileName) {
+    const oldImageFullPath = path.join(process.cwd(), 'public', originalImagePath);
+    if (!fs.existsSync(oldImageFullPath)) return null;
+
+    const newImageFullPath = path.join(campaignImagesDir(campaign), newImageFileName);
+    if (oldImageFullPath === newImageFullPath) return null;
+
+    fs.renameSync(oldImageFullPath, newImageFullPath);
+    return path.join('images', newImageFileName);
+}
+
+// Syncs the character image with the submitted character: clears a removed
+// image, processes a new upload, or renames the existing image to match the
+// character name. requireNameMatch only renames when the current image
+// filename doesn't already match the character name.
+function syncCharacterImage(campaign, character, originalImagePath, requireNameMatch) {
+    if (!character.imagePath && originalImagePath) {
+        // Image was cleared
+        deleteCharacterImage(originalImagePath);
+        character.imagePath = '';
+        return;
+    }
+
+    if (character.image && character.imageName) {
+        // New image uploaded
+        processImageUpload(campaign, character.name, character, originalImagePath);
+        return;
+    }
+
+    if (!originalImagePath || (requireNameMatch && !character.name)) return;
+
+    const expectedImageFileName = `${character.name}${path.extname(originalImagePath)}`;
+    if (requireNameMatch && path.basename(originalImagePath) === expectedImageFileName) return;
+
+    const renamedImagePath = renameImageFile(campaign, originalImagePath, expectedImageFileName);
+    if (renamedImagePath) character.imagePath = renamedImagePath;
+}
+
 // API endpoint to update an existing character in a campaign
 router.put('/api/campaigns/:campaign/:file', asyncHandler((req, res, next) => {
     const { campaign, file } = req.params;
@@ -55,29 +95,8 @@ router.put('/api/campaigns/:campaign/:file', asyncHandler((req, res, next) => {
         // Delete the original character file
         fs.unlinkSync(originalFilePath);
 
-        // Handle image changes
-        if ((!character.imagePath || character.imagePath === '') && originalImagePath) {
-            // Image was cleared
-            deleteCharacterImage(originalImagePath);
-            character.imagePath = '';
-        } else if (character.image && character.imageName) {
-            // New image uploaded
-            processImageUpload(campaign, character.name, character, originalImagePath);
-        } else if (originalImagePath) {
-            // Image unchanged but character renamed — rename the image file
-            const oldImageFullPath = path.join(process.cwd(), 'public', originalImagePath);
-            if (fs.existsSync(oldImageFullPath)) {
-                const ext = path.extname(oldImageFullPath);
-                const newImageFileName = `${character.name}${ext}`;
-                const newCampaignImagesDir = campaignImagesDir(campaign);
-                const newImageFullPath = path.join(newCampaignImagesDir, newImageFileName);
-
-                if (oldImageFullPath !== newImageFullPath) {
-                    fs.renameSync(oldImageFullPath, newImageFullPath);
-                    character.imagePath = path.join('images', newImageFileName);
-                }
-            }
-        }
+        // Image unchanged but character renamed — rename the image file
+        syncCharacterImage(campaign, character, originalImagePath, false);
     } else {
         // Standard update: verify the file exists at the current path
         if (!fs.existsSync(filePath)) {
@@ -86,35 +105,7 @@ router.put('/api/campaigns/:campaign/:file', asyncHandler((req, res, next) => {
 
         // Read the original character to get the imagePath for image cleanup
         originalCharacter = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-        const originalImagePath = originalCharacter.imagePath;
-
-        // Handle image changes
-        if ((!character.imagePath || character.imagePath === '') && originalImagePath) {
-            deleteCharacterImage(originalImagePath);
-            character.imagePath = '';
-        } else if (character.image && character.imageName) {
-            // New image uploaded
-            processImageUpload(campaign, character.name, character, originalImagePath);
-        }
-        else if (originalImagePath && character.name) {
-            // Check if image filename matches the current character name
-            const originalImageFileName = path.basename(originalImagePath);
-            const expectedImageFileName = `${character.name}${path.extname(originalImageFileName)}`;
-            if (originalImageFileName !== expectedImageFileName) {
-                // Image filename doesn't match character name — fix it
-                const oldImageFullPath = path.join(process.cwd(), 'public', originalImagePath);
-                if (fs.existsSync(oldImageFullPath)) {
-                    const newImageFileName = expectedImageFileName;
-                    const newCampaignImagesDir = campaignImagesDir(campaign);
-                    const newImageFullPath = path.join(newCampaignImagesDir, newImageFileName);
-
-                    if (oldImageFullPath !== newImageFullPath) {
-                        fs.renameSync(oldImageFullPath, newImageFullPath);
-                        character.imagePath = path.join('images', newImageFileName);
-                    }
-                }
-            }
-        }
+        syncCharacterImage(campaign, character, originalCharacter.imagePath, true);
     }
 
     // Write the updated character data

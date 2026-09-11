@@ -318,13 +318,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     // Resolve variable damage type from subrace (e.g., Draconic Ancestry Breath Weapon)
-    let resolvedDamageType = auto.damageType || '';
-    if (resolvedDamageType === 'variable') {
-        const subrace = playerStats.race?.subrace;
-        if (subrace?.damage_resistance) {
-            resolvedDamageType = subrace.damage_resistance;
-        }
-    }
+    const resolvedDamageType = resolveSaveAttackDamageType(auto, playerStats);
 
     // Resolve variable shape — default to cone if variable
     let resolvedShape = auto.shape || '';
@@ -381,6 +375,20 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return buildAoeModal(action, auto, playerStats, campaignName, resolvedShape, resolvedDamageType, saveDcValue, dcSuccess);
     }
 
+    return buildSaveAttackRollResult(action, auto, playerStats, resolvedShape, resolvedDamageType, saveDcValue, dcSuccess);
+}
+
+function resolveSaveAttackDamageType(auto, playerStats) {
+    let resolvedDamageType = auto.damageType || '';
+    if (resolvedDamageType !== 'variable') return resolvedDamageType;
+    const subrace = playerStats.race?.subrace;
+    if (subrace?.damage_resistance) {
+        resolvedDamageType = subrace.damage_resistance;
+    }
+    return resolvedDamageType;
+}
+
+function buildSaveAttackRollResult(action, auto, playerStats, resolvedShape, resolvedDamageType, saveDcValue, dcSuccess) {
     const resolvedDamageExpression = auto.damage;
     const scalingEntry = resolveScaling(playerStats, auto.scaling);
     const damageExpression = scalingEntry?.damage || resolvedDamageExpression;
@@ -394,8 +402,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     if (auto.effect) {
         notes.push(getRiderDescription(auto.effect, auto.effectValue));
     }
-
-    const dcSuccessDisplay = dcSuccessLabel(dcSuccess);
 
     return {
         type: 'roll',
@@ -411,7 +417,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 damageType: resolvedDamageType,
                 saveDc: saveDcValue,
                 saveType: auto.saveType || 'DEX',
-                dcSuccess: dcSuccessDisplay,
+                dcSuccess: dcSuccessLabel(dcSuccess),
                 attackerName: playerStats.name,
                 conditionInflicted: auto.conditionInflicted || null,
                 shape: resolvedShape,

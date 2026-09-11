@@ -45,6 +45,24 @@ function computePsychicDamageType(spell, psychicSpellsConfig, damageType) {
     return damageType;
 }
 
+function resolveCastDamage(spell, psychicSpellsConfig) {
+    const damageInfo = resolveSpellDamageWithTypes(spell, spell.level || 1);
+    const formula = damageInfo?.formula || null;
+    const damageType = damageInfo?.primaryType || spell.damage?.damage_type || '';
+    return { formula, damageType, effectiveDamageType: computePsychicDamageType(spell, psychicSpellsConfig, damageType) };
+}
+
+function applyHostileCastSideEffects(spell, playerStats, campaignName) {
+    if (spell.name && spell.name.toLowerCase() !== 'friends') {
+        endFriendsOnHostileAction(playerStats.name, campaignName);
+    }
+    endInvisibilityOnHostileAction(playerStats.name, campaignName);
+
+    if (spell.casting_time === '1 action') {
+        setRuntimeValue(playerStats.name, 'lastActionSpellCast', 1, campaignName);
+    }
+}
+
 // Wrappers for the handled-trigger chain: passThrough returns the handler's
 // `result` when handled; swallow returns undefined (matching bare `return;`).
 const passThrough = (r) => (r.handled ? { value: r.result } : null);
@@ -569,24 +587,13 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
 
     const psychicSpellsConfig = getPsychicSpellsConfig(playerStats);
     applyPsychicComponentReduction(spell, psychicSpellsConfig);
-
-    if (spell.name && spell.name.toLowerCase() !== 'friends') {
-        endFriendsOnHostileAction(playerStats.name, campaignName);
-    }
-    endInvisibilityOnHostileAction(playerStats.name, campaignName);
-
-    if (spell.casting_time === '1 action') {
-        setRuntimeValue(playerStats.name, 'lastActionSpellCast', 1, campaignName);
-    }
+    applyHostileCastSideEffects(spell, playerStats, campaignName);
 
     const fullSpell = await lookupFullSpell(spell, playerStats);
 
     // Spell stats
     const innateSorceryActive = isInnateSorceryActive(playerStats.name, campaignName);
-    const damageInfo = resolveSpellDamageWithTypes(spell, spell.level || 1);
-    const formula = damageInfo?.formula || null;
-    const damageType = damageInfo?.primaryType || spell.damage?.damage_type || '';
-    const effectiveDamageType = computePsychicDamageType(spell, psychicSpellsConfig, damageType);
+    const { formula, damageType, effectiveDamageType } = resolveCastDamage(spell, psychicSpellsConfig);
 
     const cantripSpellAbility = spell.spellCastingAbility || playerStats.spellAbilities?.spellCastingAbility;
     const { spellToHit, spellSaveDc, spellCastingMod } = computeSpellStats(playerStats, cantripSpellAbility);

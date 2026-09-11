@@ -31,41 +31,61 @@ export default function useCharActionsAttackHandlers({
 
     function handleAttackClick(attack) {
         if (cannotAct) {
-            const cloudBlock = (getRuntimeValue('campaign', 'targetEffects', campaignName) || [])
-                .some(te => te && te.effect === 'no_action_and_bonus_action' && te.target === playerName);
-            if (cloudBlock) {
-                addEntry(campaignName, {
-                    type: 'automation blocked',
-                    characterName: playerName,
-                    abilityName: attack?.name || 'Attack',
-                    description: `${playerName} is Poisoned by Stinking Cloud and can't take an Action or Bonus Action — attack refused.`,
-                    timestamp: Date.now(),
-                }).catch((e) => { console.error("[useCharActionsAttackHandlers:log-error]", e); });
-                setPopupHtml('<b>Stinking Cloud</b><br/>You are Poisoned by Stinking Cloud and can\'t take an Action or a Bonus Action until the end of your current turn.<br/><span class="dice-roll-hint">click to dismiss</span>');
-            }
+            reportCannotActAttack(attack);
             return;
         }
-        if (attack?.isPsychicBlade) {
-            const currentRound = getCurrentCombatRound(campaignName);
-            if (attack.type === 'Bonus Action') {
-                const secondBladeRound = Number(getRuntimeValue(playerName, PSY_BLADE_SECOND_ROUND_KEY, campaignName) ?? 0);
-                if (secondBladeRound === currentRound) {
-                    setPopupHtml('<b>Psychic Blade</b><br/>You have already attacked with your second psychic blade this turn. The blade vanishes after the attack — manifest a new one with the Attack action on your next turn.<br/><span class="dice-roll-hint">click to dismiss</span>');
-                    return;
-                }
-                const bladeAttackedRound = Number(getRuntimeValue(playerName, PSY_BLADE_ATTACK_ROUND_KEY, campaignName) ?? 0);
-                if (bladeAttackedRound !== currentRound) {
-                    setPopupHtml('<b>Psychic Blade</b><br/>Your Psychic Blades manifest when you take the Attack action or make an Opportunity Attack. Attack with your manifested blade before making the second-blade bonus attack.<br/><span class="dice-roll-hint">click to dismiss</span>');
-                    return;
-                }
-                setRuntimeValue(playerName, PSY_BLADE_SECOND_ROUND_KEY, currentRound, campaignName);
-            } else {
-                setRuntimeValue(playerName, PSY_BLADE_ATTACK_ROUND_KEY, currentRound, campaignName);
-            }
-        }
+        if (gatePsychicBladeAttack(attack)) return;
         endFriendsOnHostileAction(playerName, campaignName);
         endInvisibilityOnHostileAction(playerName, campaignName);
 
+        if (openRecklessChoiceModal(attack)) return;
+
+        buildCtx(attack).then(ctx => {
+            const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;
+            rollAttack(attack.name, effectiveHitBonus - exhaustionPenalty, ctx);
+        }).catch((e) => { console.error("[CharActions] Error:", e); });
+    }
+
+    function reportCannotActAttack(attack) {
+        const cloudBlock = (getRuntimeValue('campaign', 'targetEffects', campaignName) || [])
+            .some(te => te && te.effect === 'no_action_and_bonus_action' && te.target === playerName);
+        if (cloudBlock) {
+            addEntry(campaignName, {
+                type: 'automation blocked',
+                characterName: playerName,
+                abilityName: attack?.name || 'Attack',
+                description: `${playerName} is Poisoned by Stinking Cloud and can't take an Action or Bonus Action — attack refused.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error("[useCharActionsAttackHandlers:log-error]", e); });
+            setPopupHtml('<b>Stinking Cloud</b><br/>You are Poisoned by Stinking Cloud and can\'t take an Action or a Bonus Action until the end of your current turn.<br/><span class="dice-roll-hint">click to dismiss</span>');
+        }
+    }
+
+    // CLA-274: returns true when the click was refused (popup shown, no roll).
+    function gatePsychicBladeAttack(attack) {
+        if (!attack?.isPsychicBlade) return false;
+        const currentRound = getCurrentCombatRound(campaignName);
+        if (attack.type !== 'Bonus Action') {
+            setRuntimeValue(playerName, PSY_BLADE_ATTACK_ROUND_KEY, currentRound, campaignName);
+            return false;
+        }
+        const secondBladeRound = Number(getRuntimeValue(playerName, PSY_BLADE_SECOND_ROUND_KEY, campaignName) ?? 0);
+        if (secondBladeRound === currentRound) {
+            setPopupHtml('<b>Psychic Blade</b><br/>You have already attacked with your second psychic blade this turn. The blade vanishes after the attack — manifest a new one with the Attack action on your next turn.<br/><span class="dice-roll-hint">click to dismiss</span>');
+            return true;
+        }
+        const bladeAttackedRound = Number(getRuntimeValue(playerName, PSY_BLADE_ATTACK_ROUND_KEY, campaignName) ?? 0);
+        if (bladeAttackedRound !== currentRound) {
+            setPopupHtml('<b>Psychic Blade</b><br/>Your Psychic Blades manifest when you take the Attack action or make an Opportunity Attack. Attack with your manifested blade before making the second-blade bonus attack.<br/><span class="dice-roll-hint">click to dismiss</span>');
+            return true;
+        }
+        setRuntimeValue(playerName, PSY_BLADE_SECOND_ROUND_KEY, currentRound, campaignName);
+        return false;
+    }
+
+    // Opens the Reckless Attack / Brutal Strike chooser when one is owed this
+    // turn. Returns true when the modal consumed the click.
+    function openRecklessChoiceModal(attack) {
         const hasRecklessFeature = specialActions?.some(
             a => a.effect === 'advantage_attacks_advantage_against' && a.trigger === 'first_attack_of_turn'
         );
@@ -90,18 +110,14 @@ export default function useCharActionsAttackHandlers({
 
         if (hasRecklessFeature && !isRecklessActive && !isOfferedThisTurn) {
             setModalState({ recklessAttackModal: { attack, mode: 'full', hasBrutalStrike, brutalStrikeOptions, maxEffects, riderName } });
-            return;
+            return true;
         }
 
         if (hasRecklessFeature && isRecklessActive && hasBrutalStrike && !brutalStrikeUsedThisTurn) {
             setModalState({ recklessAttackModal: { attack, mode: 'brutalOnly', hasBrutalStrike: true, brutalStrikeOptions, maxEffects, riderName } });
-            return;
+            return true;
         }
-
-        buildCtx(attack).then(ctx => {
-            const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;
-            rollAttack(attack.name, effectiveHitBonus - exhaustionPenalty, ctx);
-        }).catch((e) => { console.error("[CharActions] Error:", e); });
+        return false;
     }
 
     function handleRecklessAttackConfirm(attack, brutalStrikeChoice) {

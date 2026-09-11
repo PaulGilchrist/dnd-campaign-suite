@@ -89,6 +89,74 @@ export async function validateLevel(level, ruleset = '5e') {
   return errors;
 }
 
+const validateBasicsStep = async (formData, context) => {
+  const newErrors = {};
+  if (!formData.name?.trim()) {
+    newErrors.name = 'Character name is required';
+  }
+
+  const levelErrors = await validateLevel(formData.level, context.ruleset);
+  Object.assign(newErrors, levelErrors);
+
+  if (!formData.alignment) {
+    newErrors.alignment = 'Alignment is required';
+  }
+  return newErrors;
+};
+
+const validateRaceStep = (formData) => {
+  const newErrors = {};
+  if (!formData.race?.name) {
+    newErrors.race = 'Race is required';
+  }
+  return newErrors;
+};
+
+const validateSubraceStep = (formData, context) => {
+  const newErrors = {};
+  if (!formData.race?.name) return newErrors;
+  const availableSubraces = context.racesData.find(race => race.name === formData.race.name)?.subraces || [];
+  if (availableSubraces.length > 0 && !formData.race.subrace?.name) {
+    newErrors.subrace = 'Subrace is required';
+  }
+  return newErrors;
+};
+
+const validateBackgroundStep = (formData, context) => {
+  const newErrors = {};
+  if (context.ruleset === '2024' && !formData.background) {
+    newErrors.background = 'Background is required';
+  }
+  return newErrors;
+};
+
+const validateClassStep = (formData) => {
+  const newErrors = {};
+  if (!formData.class?.name) {
+    newErrors.class = 'Class is required';
+  }
+  return newErrors;
+};
+
+const validateSubclassStep = (formData, context) => {
+  const newErrors = {};
+  if (!formData.class?.name) return newErrors;
+  const availableSubclasses = context.classSubtypes.find(cs => cs.className === formData.class.name)?.subtypes || [];
+  if (availableSubclasses.length > 0 && !formData.class.subclass?.name) {
+    newErrors.subclass = 'Subclass is required';
+  }
+  return newErrors;
+};
+
+const stepValidators = {
+  2: validateBasicsStep,
+  3: validateRaceStep,
+  4: validateSubraceStep,
+  5: validateBackgroundStep,
+  6: validateClassStep,
+  7: validateSubclassStep,
+};
+
 /**
  * Validate step data (async version that loads rules from JSON)
  * @param {number} step - Current step number
@@ -100,64 +168,9 @@ export async function validateLevel(level, ruleset = '5e') {
  * @returns {Promise<object>} - New errors object
  */
 export async function validateStep(step, formData, errors, racesData = [], classSubtypes = [], ruleset) {
-  const newErrors = {};
-  
-  if (step === 2) {
-    if (!formData.name?.trim()) {
-      newErrors.name = 'Character name is required';
-    }
-    
-    const levelErrors = await validateLevel(formData.level, ruleset);
-    Object.assign(newErrors, levelErrors);
-    
-    if (!formData.alignment) {
-      newErrors.alignment = 'Alignment is required';
-    }
-  }
-  
-  if (step === 3) {
-    if (!formData.race || !formData.race.name) {
-      newErrors.race = 'Race is required';
-    }
-  }
-  
-  if (step === 4) {
-    if (formData.race?.name) {
-      const selectedRace = racesData.find(race => race.name === formData.race.name);
-      const availableSubraces = selectedRace?.subraces || [];
-      if (availableSubraces.length > 0) {
-        if (!formData.race.subrace || !formData.race.subrace.name) {
-          newErrors.subrace = 'Subrace is required';
-        }
-      }
-    }
-  }
-  
-  if (step === 5) {
-    if (ruleset === '2024' && !formData.background) {
-      newErrors.background = 'Background is required';
-    }
-  }
-  
-  if (step === 6) {
-    if (!formData.class || !formData.class.name) {
-      newErrors.class = 'Class is required';
-    }
-  }
-  
-  if (step === 7) {
-    if (formData.class?.name) {
-      const selectedClass = classSubtypes.find(cs => cs.className === formData.class.name);
-      const availableSubclasses = selectedClass?.subtypes || [];
-      if (availableSubclasses.length > 0) {
-        if (!formData.class.subclass || !formData.class.subclass.name) {
-          newErrors.subclass = 'Subclass is required';
-        }
-      }
-    }
-  }
-  
-  return newErrors;
+  const validator = stepValidators[step];
+  if (!validator) return {};
+  return validator(formData, { racesData, classSubtypes, ruleset });
 }
 
 /**

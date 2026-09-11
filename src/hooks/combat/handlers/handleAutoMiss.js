@@ -5,23 +5,13 @@ import { getRuntimeValue, setRuntimeValue } from '../../runtime/useRuntimeState.
 import { hasIgnoreResistance } from '../../../services/combat/automation/automationService.js';
 import { hasPotentCantrip, applyMinDamageAdjustment } from '../loggedDiceRollUtils.js';
 
-async function handlePotentCantripHalfDamage({ deps, name, formula, context }) {
-    const { characterName, campaignName, characters, setPopupHtml, logEntry } = deps;
-    const damageResult = rollExpression(formula);
-    if (!damageResult) return false;
+function resolveAutoMissTargetMaxHp(target) {
+    if (!target) return 0;
+    return target.type === 'player' ? (getRuntimeValue(target.name, 'hitPoints') ?? 0) : target.maxHp ?? 0;
+}
 
-    const adjustedPotentTotal = applyMinDamageAdjustment(damageResult.total, damageResult.rolls, context?.playerStats, context?.damageType);
-    const halfDamage = Math.floor(adjustedPotentTotal / 2);
-    const combatSummary2 = await loadCombatSummary(campaignName);
-    const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, context?.damageType)) || false;
-    const applyResult = await applyDamageToTarget(combatSummary2, context?.targetName, halfDamage, [context?.damageType], campaignName, characters, ignoreResistance, characterName);
-    const target = combatSummary2?.creatures?.find(c => c.name === context?.targetName) || null;
-    const targetMaxHp = target?.type === 'player'
-        ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
-        : target?.maxHp ?? 0;
-    const isCrit = context?.isAutoCrit || false;
-    const displayFormula = isCrit ? formatDamageFormula(formula, damageResult.rolls, true) : formula;
-    logEntry({
+function buildPotentHalfLogEntry({ characterName, name, damageResult, halfDamage, targetName, damageType, displayFormula, isCrit }) {
+    return {
         type: 'roll',
         characterName,
         rollType: 'cantrip-miss-half-damage',
@@ -30,24 +20,27 @@ async function handlePotentCantripHalfDamage({ deps, name, formula, context }) {
         rolls: damageResult.rolls,
         total: halfDamage,
         modifier: damageResult.modifier,
-        damageType: context?.damageType,
-        targetName: context?.targetName,
+        damageType,
+        targetName,
         isPotentCantrip: true,
         isCrit,
-    });
-    setPopupHtml({
+    };
+}
+
+function buildPotentHalfPopup({ name, formula, damageResult, applyResult, targetMaxHp, targetName, damageType, saveDc, saveType, isCrit }) {
+    return {
         type: 'save-damage',
         name,
         formula,
         rolls: damageResult.rolls,
         bonus: damageResult.modifier,
         modifier: damageResult.modifier,
-        damageType: context?.damageType,
-        targetName: context?.targetName,
+        damageType,
+        targetName,
         targetCurrentHp: applyResult?.newHp,
-        targetMaxHp: targetMaxHp,
-        saveDc: context?.saveDc,
-        saveType: context?.saveType,
+        targetMaxHp,
+        saveDc,
+        saveType,
         dcSuccess: 'half',
         total: applyResult?.finalDamage,
         finalDamage: applyResult?.finalDamage,
@@ -55,7 +48,25 @@ async function handlePotentCantripHalfDamage({ deps, name, formula, context }) {
         damageReduced: applyResult?.damageReduced,
         isPotentCantrip: true,
         isCrit,
-    });
+    };
+}
+
+async function handlePotentCantripHalfDamage({ deps, name, formula, context }) {
+    const { characterName, campaignName, characters, setPopupHtml, logEntry } = deps;
+    const { targetName, damageType, playerStats, saveDc, saveType, isAutoCrit } = context || {};
+    const damageResult = rollExpression(formula);
+    if (!damageResult) return false;
+
+    const adjustedPotentTotal = applyMinDamageAdjustment(damageResult.total, damageResult.rolls, playerStats, damageType);
+    const halfDamage = Math.floor(adjustedPotentTotal / 2);
+    const combatSummary2 = await loadCombatSummary(campaignName);
+    const ignoreResistance = (playerStats && hasIgnoreResistance(playerStats, damageType)) || false;
+    const applyResult = await applyDamageToTarget(combatSummary2, targetName, halfDamage, [damageType], campaignName, characters, ignoreResistance, characterName);
+    const target = combatSummary2?.creatures?.find(c => c.name === targetName) || null;
+    const isCrit = isAutoCrit || false;
+    const displayFormula = isCrit ? formatDamageFormula(formula, damageResult.rolls, true) : formula;
+    logEntry(buildPotentHalfLogEntry({ characterName, name, damageResult, halfDamage, targetName, damageType, displayFormula, isCrit }));
+    setPopupHtml(buildPotentHalfPopup({ name, formula, damageResult, applyResult, targetMaxHp: resolveAutoMissTargetMaxHp(target), targetName, damageType, saveDc, saveType, isCrit }));
     return true;
 }
 

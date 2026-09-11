@@ -35,24 +35,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const shieldOrWeaponResult = checkShieldOrWeapon(playerStats, auto, featureName);
     if (shieldOrWeaponResult) return shieldOrWeaponResult;
 
-    const rangeFt = auto.range ? parseInt(auto.range.replace(/[^0-9]/g, '')) || 5 : 5;
-    if (rangeFt != null) {
-        const positions = _mapName ? await resolveMapPositions(campaignName, playerName) : null;
-        if (positions?.attackerPos && positions?.targetPos) {
-            const inRange = await isWithinRange(playerName, attackerName, rangeFt);
-            if (!inRange) {
-                return {
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: featureName,
-                        description: `${attackerName} is out of range.`,
-                        automation: auto,
-                    },
-                };
-            }
-        }
-    }
+    const rangePopup = await checkInterceptionRange(auto, playerName, attackerName, featureName, _mapName, campaignName);
+    if (rangePopup) return rangePopup;
 
     const combatSummary = await getCombatContext(campaignName);
     if (!combatSummary) {
@@ -68,23 +52,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     // Campaign-scoped targetEffects: consumers (MonsterCardModal → conditionEffects
     // targetDisadvantageCount) only read campaign-level targetEffects.
-    const storedEffects = [...getRuntimeValue('campaign', 'targetEffects') || []];
-    const protectionEffect = {
-        effect: 'protection',
-        target: defenderName,
-        source: playerName,
-        duration: 'until_start_of_next_turn',
-        timestamp: Date.now(),
-    };
-    const existingIndex = storedEffects.findIndex(
-        te => te.effect === 'protection' && te.target === defenderName
-    );
-    if (existingIndex === -1) {
-        storedEffects.push(protectionEffect);
-    } else {
-        storedEffects[existingIndex] = protectionEffect;
-    }
-    await setRuntimeValue('campaign', 'targetEffects', storedEffects, campaignName);
+    await upsertProtectionEffect(defenderName, playerName, campaignName);
 
     if (defenderName) {
         addExpiration(playerName, defenderName, [
@@ -141,6 +109,44 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }).catch((e) => { console.error("[interception] Error:", e); });
 
     return result;
+}
+
+async function checkInterceptionRange(auto, playerName, attackerName, featureName, _mapName, campaignName) {
+    const rangeFt = auto.range ? parseInt(auto.range.replace(/[^0-9]/g, '')) || 5 : 5;
+    if (rangeFt == null) return null;
+    const positions = _mapName ? await resolveMapPositions(campaignName, playerName) : null;
+    if (!(positions?.attackerPos && positions?.targetPos)) return null;
+    const inRange = await isWithinRange(playerName, attackerName, rangeFt);
+    if (inRange) return null;
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: featureName,
+            description: `${attackerName} is out of range.`,
+            automation: auto,
+        },
+    };
+}
+
+async function upsertProtectionEffect(defenderName, playerName, campaignName) {
+    const storedEffects = [...getRuntimeValue('campaign', 'targetEffects') || []];
+    const protectionEffect = {
+        effect: 'protection',
+        target: defenderName,
+        source: playerName,
+        duration: 'until_start_of_next_turn',
+        timestamp: Date.now(),
+    };
+    const existingIndex = storedEffects.findIndex(
+        te => te.effect === 'protection' && te.target === defenderName
+    );
+    if (existingIndex === -1) {
+        storedEffects.push(protectionEffect);
+    } else {
+        storedEffects[existingIndex] = protectionEffect;
+    }
+    await setRuntimeValue('campaign', 'targetEffects', storedEffects, campaignName);
 }
 
 function isReactionSpent(usedMark, attackEvent, currentRound) {

@@ -1,13 +1,9 @@
 import { useState, useCallback } from 'react';
-import utils from '../../services/ui/utils.js';
-import { rollD20 } from '../../services/dice/diceRoller.js';
 import { sendConcentrationResult, clearConcentrationPrompt } from '../../services/combat/conditions/savePromptService.js';
 import Subscriber from './Subscriber.jsx';
 import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.js';
-import { getAbilitySaveBonus } from '../../services/combat/conditions/conditionUtils.js';
-import { hasSaveModifier } from '../../services/combat/conditions/conditionEffects.js';
-import { getHolyAuraSaveAdvantage } from './savePromptUtils.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
+import { resolveConcentrationRoll } from './concentrationPromptRoll.js';
 import './ConcentrationPromptModal.css';
 
 function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
@@ -39,90 +35,17 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
   const handleRoll = useCallback(async () => {
     if (!current) return;
 
-    let saveBonus = 0;
-    let saveModifiers = null;
-    try {
-      const character = (characters || []).find(c => {
-        const name = typeof c === 'string' ? c : c.name;
-        return name && utils.getName(name) === utils.getName(current.targetName);
-      });
-      if (character && typeof character !== 'string') {
-        saveBonus = getAbilitySaveBonus(character.computedStats || character, 'con');
-        saveModifiers = character.saveModifiers || character.computedStats?.saveModifiers;
-      }
-    } catch { /* ignore */ }
-
     const aura = await computeAuraBonus({ targetName: current.targetName, characters, campaignName, activeMapName, allCreatures: getCombatSummary(campaignName)?.creatures });
-    const auraBonus = aura.bonus;
-
-    const advantageSources = [];
-    const holyAuraAdvantage = getHolyAuraSaveAdvantage(current, campaignName);
-    const hasAdvantage = holyAuraAdvantage ||
-      hasSaveModifier(saveModifiers, 'concentration_saving_throws', 'CON') ||
-      (saveModifiers && saveModifiers.some(mod =>
-        mod.target === 'saving_throw' &&
-        mod.condition === 'concentration_spell_damage' &&
-        mod.effect === 'advantage' &&
-        mod.abilities && mod.abilities.includes('Constitution')
-      ));
-    if (hasAdvantage && saveModifiers) {
-      saveModifiers.forEach(mod => {
-        if (mod.source && ((mod.target === 'concentration_saving_throws') || (mod.target === 'saving_throw' && mod.condition === 'concentration_spell_damage' && mod.effect === 'advantage' && mod.abilities && mod.abilities.includes('Constitution')))) {
-          if (!advantageSources.includes(mod.source)) {
-            advantageSources.push(mod.source);
-          }
-        }
-      });
-    }
-    if (holyAuraAdvantage && !advantageSources.includes('Holy Aura')) {
-      advantageSources.push('Holy Aura');
-    }
-    const hasDisadvantage = (() => {
-      if (!current.attackerName) return false;
-      const attacker = (characters || []).find(c => {
-        const name = typeof c === 'string' ? c : c.name;
-        return name && utils.getName(name) === utils.getName(current.attackerName);
-      });
-      const attackerModifiers = attacker?.saveModifiers || attacker?.computedStats?.saveModifiers;
-      return attackerModifiers?.some(mod =>
-        mod.condition === 'concentration_breaker' && mod.effect === 'disadvantage'
-      ) ?? false;
-    })();
-    const starryFormBuff = (saveModifiers || []).length > 0 && (() => {
-      const character = (characters || []).find(c => {
-        const name = typeof c === 'string' ? c : c.name;
-        return name && utils.getName(name) === utils.getName(current.targetName);
-      });
-      const buffs = character?.activeBuffs || character?.computedStats?.activeBuffs || [];
-      return buffs.some(b => b.name === 'Starry Form' && b.constellation === 'Dragon');
-    })();
-    let roll;
-    let rawRolls = [rollD20()];
-    if (hasAdvantage && hasDisadvantage) {
-      roll = rawRolls[0];
-    } else if (hasAdvantage) {
-      rawRolls.push(rollD20());
-      roll = Math.max(rawRolls[0], rawRolls[1]);
-    } else if (hasDisadvantage) {
-      rawRolls.push(rollD20());
-      roll = Math.min(rawRolls[0], rawRolls[1]);
-    } else {
-      roll = rawRolls[0];
-    }
-    if (starryFormBuff && roll <= 9) {
-      roll = 10;
-    }
-    const total = roll + saveBonus + auraBonus;
-    const success = total >= current.dc;
-    const bonusDetail = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined;
-    const mode = (hasAdvantage || hasDisadvantage) ? (hasAdvantage ? 'advantage' : 'disadvantage') : 'normal';
+    const { saveBonus, roll, rawRolls, total, success, bonusDetail, mode, advantageSources } =
+      resolveConcentrationRoll({ current, characters, campaignName, auraBonus: aura.bonus, auraSourceName: aura.sourceName });
+    const totalSaveBonus = saveBonus + aura.bonus;
 
     sendConcentrationResult(campaignName, current.targetName, {
       promptId: current.promptId,
       success,
       roll,
       total,
-      saveBonus: saveBonus + auraBonus,
+      saveBonus: totalSaveBonus,
       spellName: current.spellName,
       dc: current.dc,
       mode,
@@ -137,7 +60,7 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
         success,
         roll,
         total,
-        saveBonus: saveBonus + auraBonus,
+        saveBonus: totalSaveBonus,
         bonusDetail,
         spellName: current.spellName,
         dc: current.dc,
@@ -149,7 +72,7 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
 
     setPrompts(prev => prev.map((p, i) =>
       i === 0
-        ? { ...p, result: { success, roll, total, saveBonus: saveBonus + auraBonus, bonusDetail, mode, rawRolls, advantageSources } }
+        ? { ...p, result: { success, roll, total, saveBonus: totalSaveBonus, bonusDetail, mode, rawRolls, advantageSources } }
         : p
     ));
 

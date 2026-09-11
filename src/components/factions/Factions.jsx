@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { flushSync } from 'react-dom';
 import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 import { loadFactions, saveFactions, deleteFaction } from '../../services/campaign/factionsService.js';
@@ -66,7 +67,7 @@ function Factions({ campaignName, onBack }) {
         : [...factions, updated];
 
       await saveFactionsList(updatedFactions);
-      handleCloseModal();
+      flushSync(handleCloseModal);
     } catch (error) {
       console.error('Failed to save faction:', error);
     } finally {

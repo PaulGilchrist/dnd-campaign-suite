@@ -174,6 +174,58 @@ function resolveWardingBondSaveBonus(targetName, campaignName) {
     return wardingBondBuffForSave ? wardingBondBuffForSave.saveBonus : 0;
 }
 
+function stampNpcSaveLastAttack({ attackerName, target, context, campaignName, effectiveD20ForSave, r1, r2, bonus, saveTotal, saveSuccess, saveType, saveDc, actionName }) {
+    setRuntimeValue('campaign', 'lastAttack', {
+        attackerName,
+        targetName: target?.name || context?.targetName,
+        d20: effectiveD20ForSave,
+        d20Rolls: [r1, r2],
+        bonus,
+        total: saveTotal,
+        saveType,
+        saveDc,
+        saveResult: saveSuccess ? 'success' : 'failure',
+        isNatural20: r1 === 20,
+        isNatural1: r1 === 1,
+        attackName: context?.actionName || context?.autoDamageName || context.name,
+        actionName,
+        rollType: 'save',
+        // CLA-324: spell-origin stamp for save-based attacks rolled from the monster card.
+        isSpellDamage: true,
+        saveConditions: context?.saveConditions || [],
+        timestamp: Date.now(),
+    }, campaignName);
+}
+
+function buildNpcSaveLogData({ targetName, characterName, actionName, effectiveD20ForSave, context, saveTotal, bonus, baneSaveRoll, baneSaveDisplayLabel, baneAttackerRoll, baneAttackerDisplayLabel, blessSaveRoll, wardingBondSaveBonus, saveType, saveDc, saveSuccess, attackerName }) {
+    return {
+        type: 'roll',
+        characterName: targetName || characterName,
+        rollType: 'save',
+        name: actionName,
+        rolls: [effectiveD20ForSave],
+        mode: context?.forcedMode || 'normal',
+        total: saveTotal,
+        bonus,
+        baneRoll: baneSaveRoll,
+        baneDisplayLabel: baneSaveDisplayLabel,
+        baneAttackerRoll: baneAttackerRoll,
+        baneAttackerDisplayLabel: baneAttackerDisplayLabel,
+        blessRoll: blessSaveRoll,
+        wardingBondSaveBonus,
+        isNatural20: effectiveD20ForSave === 20,
+        isNatural1: effectiveD20ForSave === 1,
+        targetName: targetName,
+        saveType: saveType,
+        saveDc: saveDc,
+        saveResult: saveSuccess != null ? (saveSuccess ? 'success' : 'failure') : null,
+        attackerName: attackerName,
+        dcSuccess: context?.dcSuccess,
+        timestamp: Date.now(),
+        id: utils.guid(),
+    };
+}
+
 async function processNpcSave(rollType, target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml, saveDc, saveType, attackerName, actionName, targetName) {
     const effectiveD20ForSave = applyCosmicOmenToSave(context.effectiveD20, campaignName);
 
@@ -207,54 +259,10 @@ async function processNpcSave(rollType, target, characterName, campaignName, con
 
     const combatSummary = await loadCombatSummary(campaignName);
     if (saveDc != null && combatSummary) {
-        setRuntimeValue('campaign', 'lastAttack', {
-            attackerName,
-            targetName: target?.name || context?.targetName,
-            d20: effectiveD20ForSave,
-            d20Rolls: [r1, r2],
-            bonus,
-            total: saveTotal,
-            saveType,
-            saveDc,
-            saveResult: saveSuccess ? 'success' : 'failure',
-            isNatural20: r1 === 20,
-            isNatural1: r1 === 1,
-            attackName: context?.actionName || context?.autoDamageName || context.name,
-            actionName,
-            rollType: 'save',
-            // CLA-324: spell-origin stamp for save-based attacks rolled from the monster card.
-            isSpellDamage: true,
-            saveConditions: context?.saveConditions || [],
-            timestamp: Date.now(),
-        }, campaignName);
+        stampNpcSaveLastAttack({ attackerName, target, context, campaignName, effectiveD20ForSave, r1, r2, bonus, saveTotal, saveSuccess, saveType, saveDc, actionName });
     }
 
-    logEntry({
-        type: 'roll',
-        characterName: targetName || characterName,
-        rollType: 'save',
-        name: actionName,
-        rolls: [effectiveD20ForSave],
-        mode: context?.forcedMode || 'normal',
-        total: saveTotal,
-        bonus,
-        baneRoll: baneSaveRoll,
-        baneDisplayLabel: baneSaveDisplayLabel,
-        baneAttackerRoll: baneAttackerRoll,
-        baneAttackerDisplayLabel: baneAttackerDisplayLabel,
-        blessRoll: blessSaveRoll,
-        wardingBondSaveBonus,
-        isNatural20: effectiveD20ForSave === 20,
-        isNatural1: effectiveD20ForSave === 1,
-        targetName: targetName,
-        saveType: saveType,
-        saveDc: saveDc,
-        saveResult: saveSuccess != null ? (saveSuccess ? 'success' : 'failure') : null,
-        attackerName: attackerName,
-        dcSuccess: context?.dcSuccess,
-        timestamp: Date.now(),
-        id: utils.guid(),
-    });
+    logEntry(buildNpcSaveLogData({ targetName, characterName, actionName, effectiveD20ForSave, context, saveTotal, bonus, baneSaveRoll, baneSaveDisplayLabel, baneAttackerRoll, baneAttackerDisplayLabel, blessSaveRoll, wardingBondSaveBonus, saveType, saveDc, saveSuccess, attackerName }));
 
     // Apply save-triggered damage and conditions
     if (context?.autoDamageFormula && saveDc != null) {
@@ -308,43 +316,24 @@ function applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, ap
     }).catch((e) => { console.error("[saveProcessing:log-error]", e); });
 }
 
-async function applySaveDamage(context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters) {
-    const damageFormula = context.autoDamageFormula;
-    const damageType = context?.autoDamageDamageType || 'Slashing';
-    const saveConditions = context?.saveConditions || [];
-    const damageResult = rollExpression(damageFormula);
-    if (!damageResult) return;
-
-    const applyTarget = targetName || characterName;
-    const normalizedSaveType = normalizeSaveType(saveType);
-    const targetConditions = getRuntimeValue(applyTarget, 'activeConditions', campaignName) || [];
-    const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
-    const { targetChar, hasOwnEvasion, hasEvasion } = resolveSaveEvasion({ context, characters, applyTarget, normalizedSaveType, isIncapacitated, campaignName });
-    if (hasEvasion) {
-        logEntry({
-            type: 'roll',
-            characterName: applyTarget,
-            rollType: 'evasion',
-            name: hasOwnEvasion ? 'Evasion' : 'Leading Evasion',
-            targetName: applyTarget,
-            saveType,
-            saveDc,
-            saveResult: saveSuccess ? 'success' : 'failure',
-            dcSuccess: context?.dcSuccess,
-            timestamp: Date.now(),
-            id: utils.guid(),
-        });
-    }
-    const finalDamage = computeDamageAfterEvasion(damageResult.total, saveSuccess, context?.dcSuccess, hasEvasion);
-
-    const attackerChar = (characters || []).find(c => c.name === attackerName);
-    const ignoreResistance = (attackerChar?.computedStats && hasIgnoreResistance(attackerChar.computedStats, damageType)) || false;
-    const combatSummaryForSave = await loadCombatSummary(campaignName);
-    // CLA-324: save-based spell-like attack damage — flag spell-origin for categorical
-    // 'Spell' resistance (Abjurer Spell Resistance).
-    const applyResult = await applyDamageToTarget(combatSummaryForSave, applyTarget, finalDamage, [damageType], campaignName, characters, ignoreResistance, attackerName, false, { isSpellDamage: true });
-
+function logSaveEvasionRoll({ applyTarget, hasOwnEvasion, saveType, saveDc, saveSuccess, context, logEntry }) {
     logEntry({
+        type: 'roll',
+        characterName: applyTarget,
+        rollType: 'evasion',
+        name: hasOwnEvasion ? 'Evasion' : 'Leading Evasion',
+        targetName: applyTarget,
+        saveType,
+        saveDc,
+        saveResult: saveSuccess ? 'success' : 'failure',
+        dcSuccess: context?.dcSuccess,
+        timestamp: Date.now(),
+        id: utils.guid(),
+    });
+}
+
+function buildSaveDamageLogData({ attackerName, context, damageFormula, damageResult, finalDamage, damageType, applyTarget, applyResult, saveSuccess }) {
+    return {
         type: 'roll',
         characterName: attackerName,
         rollType: 'save-damage',
@@ -359,9 +348,11 @@ async function applySaveDamage(context, characterName, campaignName, attackerNam
         saveSuccess,
         timestamp: Date.now(),
         id: utils.guid(),
-    });
+    };
+}
 
-    setPopupHtml({
+function buildSaveDamagePopupData({ context, damageFormula, damageResult, finalDamage, damageType, applyTarget, applyResult, targetName, effectiveD20ForSave, saveTotal, saveSuccess, saveDc, saveType }) {
+    return {
         type: 'save-damage',
         name: context?.actionName || context.name,
         formula: damageFormula,
@@ -380,7 +371,36 @@ async function applySaveDamage(context, characterName, campaignName, attackerNam
         finalDamage: applyResult?.finalDamage,
         damageApplied: true,
         damageReduced: applyResult?.damageReduced,
-    });
+    };
+}
+
+async function applySaveDamage(context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters) {
+    const damageFormula = context.autoDamageFormula;
+    const damageType = context?.autoDamageDamageType || 'Slashing';
+    const saveConditions = context?.saveConditions || [];
+    const damageResult = rollExpression(damageFormula);
+    if (!damageResult) return;
+
+    const applyTarget = targetName || characterName;
+    const normalizedSaveType = normalizeSaveType(saveType);
+    const targetConditions = getRuntimeValue(applyTarget, 'activeConditions', campaignName) || [];
+    const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
+    const { targetChar, hasOwnEvasion, hasEvasion } = resolveSaveEvasion({ context, characters, applyTarget, normalizedSaveType, isIncapacitated, campaignName });
+    if (hasEvasion) {
+        logSaveEvasionRoll({ applyTarget, hasOwnEvasion, saveType, saveDc, saveSuccess, context, logEntry });
+    }
+    const finalDamage = computeDamageAfterEvasion(damageResult.total, saveSuccess, context?.dcSuccess, hasEvasion);
+
+    const attackerChar = (characters || []).find(c => c.name === attackerName);
+    const ignoreResistance = (attackerChar?.computedStats && hasIgnoreResistance(attackerChar.computedStats, damageType)) || false;
+    const combatSummaryForSave = await loadCombatSummary(campaignName);
+    // CLA-324: save-based spell-like attack damage — flag spell-origin for categorical
+    // 'Spell' resistance (Abjurer Spell Resistance).
+    const applyResult = await applyDamageToTarget(combatSummaryForSave, applyTarget, finalDamage, [damageType], campaignName, characters, ignoreResistance, attackerName, false, { isSpellDamage: true });
+
+    logEntry(buildSaveDamageLogData({ attackerName, context, damageFormula, damageResult, finalDamage, damageType, applyTarget, applyResult, saveSuccess }));
+
+    setPopupHtml(buildSaveDamagePopupData({ context, damageFormula, damageResult, finalDamage, damageType, applyTarget, applyResult, targetName, effectiveD20ForSave, saveTotal, saveSuccess, saveDc, saveType }));
 
     applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName });
 }

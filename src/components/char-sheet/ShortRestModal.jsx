@@ -58,25 +58,27 @@ function collectClassResourceLabels(playerStats, campaignName, restoredResources
     }
 }
 
+function isCelestialPatron(playerStats) {
+    return playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron';
+}
+
+function pushTirelessLabel(playerStats, campaignName, restoredResources) {
+    if (playerStats.class?.name !== 'Ranger' || playerStats.level < 10) return;
+    const currentExhaustion = getRuntimeValue(playerStats.name, 'exhaustionLevel', campaignName);
+    if (typeof currentExhaustion === 'number' && currentExhaustion > 0) restoredResources.push('Tireless (exhaustion reduced)');
+}
+
 function collectFeatureRestorationLabels(playerStats, campaignName, ctx, restoredResources) {
     const { arcaneRecoveryRequested, restorationRequested, hasFontOfInspiration } = ctx;
-    const hasImprovedWardingFlare = playerStats.specialActions?.some(f => f.name === 'Improved Warding Flare');
-    if (hasImprovedWardingFlare) restoredResources.push('Warding Flare');
+    const passives = playerStats.automation?.passives ?? [];
+    if (playerStats.specialActions?.some(f => f.name === 'Improved Warding Flare')) restoredResources.push('Warding Flare');
     if (hasFontOfInspiration) restoredResources.push('Bardic Inspiration (Font of Inspiration)');
-    const hasArcaneRecovery = (playerStats.automation?.passives ?? []).some(p => p.type === 'resource_restoration' && p.resourceKey === 'arcaneRecoveryLevels');
-    if (hasArcaneRecovery && arcaneRecoveryRequested) restoredResources.push('Arcane Recovery');
-    const hasBolsteringTreats = (playerStats.automation?.passives ?? []).some(p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats');
-    if (hasBolsteringTreats) restoredResources.push('Bolstering Treats');
+    if (arcaneRecoveryRequested && passives.some(p => p.type === 'resource_restoration' && p.resourceKey === 'arcaneRecoveryLevels')) restoredResources.push('Arcane Recovery');
+    if (passives.some(p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats')) restoredResources.push('Bolstering Treats');
     if (playerStats.class?.name === 'Warlock') restoredResources.push('Pact Magic (Warlock spell slots)');
-    const hasCelestialResilience = playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron';
-    if (hasCelestialResilience && playerStats.specialActions?.some(f => f.name === 'Celestial Resilience')) restoredResources.push('Celestial Resilience (temp HP)');
-    const hasTireless = playerStats.class?.name === 'Ranger' && playerStats.level >= 10;
-    if (hasTireless) {
-        const currentExhaustion = getRuntimeValue(playerStats.name, 'exhaustionLevel', campaignName);
-        if (typeof currentExhaustion === 'number' && currentExhaustion > 0) restoredResources.push('Tireless (exhaustion reduced)');
-    }
-    const hasSorcRestoration = (playerStats.automation?.passives ?? []).some(p => p.type === 'resource_restoration' && p.resourceKey === 'sorcerousRestorationUses');
-    if (hasSorcRestoration && restorationRequested) restoredResources.push('Sorcery Points (Sorcerous Restoration)');
+    if (isCelestialPatron(playerStats) && playerStats.specialActions?.some(f => f.name === 'Celestial Resilience')) restoredResources.push('Celestial Resilience (temp HP)');
+    pushTirelessLabel(playerStats, campaignName, restoredResources);
+    if (restorationRequested && passives.some(p => p.type === 'resource_restoration' && p.resourceKey === 'sorcerousRestorationUses')) restoredResources.push('Sorcery Points (Sorcerous Restoration)');
 }
 
 function buildNaturalRecoveryDetail(playerStats, naturalRecoveryAvailable, naturalRecoverySelections) {

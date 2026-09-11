@@ -1,12 +1,44 @@
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { findLastAttack } from '../../common/damageRollback.js';
+import { infoPopup } from '../../common/infoPopup.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 
 const USES_KEY = 'beguilingDefensesUses';
+const PACT_SLOT_KEY = 'warlockPactMagic';
+
+// Uses gate (1 per Long Rest): a Pact Magic slot can restore a use.
+// Returns { popup } to refuse, or { currentUses, maxUses } to proceed.
+async function gateBeguilingUses(auto, playerName, featureName, campaignName) {
+    const maxUses = auto.uses || 1;
+    const currentUses = Number(getRuntimeValue(playerName, USES_KEY, campaignName) ?? 0);
+
+    if (currentUses < maxUses) return { currentUses, maxUses };
+
+    if (!auto.pactMagicRecharge) {
+        return { popup: infoPopup(featureName, `${featureName} has no uses remaining. Recharges on a Long Rest.`, auto) };
+    }
+
+    const currentPactSlots = Number(getRuntimeValue(playerName, PACT_SLOT_KEY, campaignName) ?? 0);
+    if (currentPactSlots <= 0) {
+        return { popup: infoPopup(featureName, `${featureName} has no uses remaining. Recharges on a Long Rest, or expend a Pact Magic spell slot to restore a use. No Pact Magic slots available.`, auto) };
+    }
+
+    // Spend one Pact Magic slot to restore a use
+    await setRuntimeValue(playerName, PACT_SLOT_KEY, currentPactSlots - 1, campaignName);
+    await setRuntimeValue(playerName, USES_KEY, 0, campaignName);
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: featureName,
+        description: `${playerName} expended a Pact Magic spell slot to restore a use of ${featureName}.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[beguilingDefenses] Error:", e); });
+    return { currentUses: 0, maxUses };
+}
 
 export async function handle(action, playerStats, campaignName, _mapName, _characters) {
     const auto = action.automation;
@@ -31,54 +63,12 @@ export async function handle(action, playerStats, campaignName, _mapName, _chara
     const attackerName = attackResult.attackerName || 'Attacker';
     const totalDamage = attackResult.totalDamage || 0;
     const halfDamage = Math.floor(totalDamage / 2);
+    const damageTypesLabel = (attackEvent.damageTypes || []).length > 0 ? attackEvent.damageTypes.join(', ') : 'unknown';
 
     // 2. Check uses remaining (1 per Long Rest)
-    let currentUses = Number(getRuntimeValue(playerName, USES_KEY, campaignName) ?? 0);
-    const maxUses = auto.uses || 1;
-
-    if (currentUses >= maxUses) {
-        // Check if Pact Magic slot can be spent to restore a use
-        if (auto.pactMagicRecharge) {
-            const pactSlotKey = 'warlockPactMagic';
-            const currentPactSlots = Number(getRuntimeValue(playerName, pactSlotKey, campaignName) ?? 0);
-            if (currentPactSlots > 0) {
-                // Spend one Pact Magic slot to restore a use
-                await setRuntimeValue(playerName, pactSlotKey, currentPactSlots - 1, campaignName);
-
-                // Reset uses counter (restore the use)
-                await setRuntimeValue(playerName, USES_KEY, 0, campaignName);
-                currentUses = 0;
-
-                await addEntry(campaignName, {
-                    type: 'ability_use',
-                    characterName: playerName,
-                    abilityName: featureName,
-                    description: `${playerName} expended a Pact Magic spell slot to restore a use of ${featureName}.`,
-                    timestamp: Date.now(),
-                }).catch((e) => { console.error("[beguilingDefenses] Error:", e); });
-            } else {
-                return {
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: featureName,
-                        description: `${featureName} has no uses remaining. Recharges on a Long Rest, or expend a Pact Magic spell slot to restore a use. No Pact Magic slots available.`,
-                        automation: auto,
-                    },
-                };
-            }
-        } else {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: featureName,
-                    description: `${featureName} has no uses remaining. Recharges on a Long Rest.`,
-                    automation: auto,
-                },
-            };
-        }
-    }
+    const useGate = await gateBeguilingUses(auto, playerName, featureName, campaignName);
+    if (useGate.popup) return useGate.popup;
+    const { currentUses, maxUses } = useGate;
 
     // 3. Increment use counter
     await setRuntimeValue(playerName, USES_KEY, currentUses + 1, campaignName);
@@ -131,7 +121,7 @@ export async function handle(action, playerStats, campaignName, _mapName, _chara
         type: 'ability_use',
         characterName: playerName,
         abilityName: featureName,
-        description: `${playerName} activated ${featureName} against ${attackerName}. Attack dealt ${totalDamage} damage (${(attackEvent.damageTypes || []).length > 0 ? attackEvent.damageTypes.join(', ') : 'unknown'}). Damage halved — ${playerName} healed for ${healedAmount} HP. ${targetName} must make ${saveType} save (DC ${saveDc}) or take ${halfDamage} Psychic damage.`,
+        description: `${playerName} activated ${featureName} against ${attackerName}. Attack dealt ${totalDamage} damage (${damageTypesLabel}). Damage halved — ${playerName} healed for ${healedAmount} HP. ${targetName} must make ${saveType} save (DC ${saveDc}) or take ${halfDamage} Psychic damage.`,
         targetName,
         promptId,
         timestamp: Date.now(),
@@ -201,7 +191,7 @@ export async function handle(action, playerStats, campaignName, _mapName, _chara
 
     // 7. Build the popup description
     let description = `Attacker: <b>${targetName}</b><br/>`;
-    description += `Attack dealt <b>${totalDamage}</b> damage (${(attackEvent.damageTypes || []).length > 0 ? attackEvent.damageTypes.join(', ') : 'unknown'}).<br/>`;
+    description += `Attack dealt <b>${totalDamage}</b> damage (${damageTypesLabel}).<br/>`;
     description += `<b>Damage Halved:</b> You heal for <b>${halfDamage}</b> HP (half of ${totalDamage}).<br/><br/>`;
     description += `<b>Psychic Retaliation:</b> ${targetName} must make a <b>${saveType}</b> saving throw (DC ${saveDc}). On a failure, they take <b>${halfDamage} Psychic damage</b>.<br/><br/>`;
     description += `<em>Uses remaining: ${maxUses - currentUses - 1} / ${maxUses} (Long Rest).</em>`;

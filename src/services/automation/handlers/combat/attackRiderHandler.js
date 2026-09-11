@@ -299,11 +299,8 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     setRuntimeValue(playerStats.name, 'versatileTricksterAction', null, campaignName);
 
     // Check oncePerTurn for Charger feat
-    if (auto.oncePerTurn) {
-        const usedKey = oncePerTurnUsedKey(action);
-        const skip = await checkOncePerTurn(action.name, usedKey, playerStats.name, campaignName);
-        if (skip) return skip;
-    }
+    const skip = await gateRiderOncePerTurn(action, auto, playerStats, campaignName);
+    if (skip) return skip;
 
     setRuntimeValue(playerStats.name, 'pendingRiderChoice', null, campaignName);
 
@@ -315,27 +312,13 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     }
 
     // Validate prerequisites and size limits before applying
-    for (const chosen of chosenOptions) {
-        const validation = validateCunningStrikeOption(chosen, targetName, playerStats, getCombatContextSync);
-        if (!validation.valid) {
-                return {
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: action.name,
-                        automationType: auto.type,
-                        description: `<b>${chosen.name}</b> cannot be used: ${validation.reason}`,
-                        automation: auto,
-                    },
-                };
-        }
+    const invalid = findInvalidChosenOption(chosenOptions, targetName, playerStats);
+    if (invalid) {
+        return riderNotice(action.name, auto, `<b>${invalid.chosen.name}</b> cannot be used: ${invalid.validation.reason}`);
     }
 
     // Mark oncePerTurn as used
-    if (auto.oncePerTurn) {
-        const usedKey = oncePerTurnUsedKey(action);
-        await markOncePerTurn(action.name, usedKey, playerStats, campaignName);
-    }
+    await markRiderOncePerTurnUsed(action, auto, playerStats, campaignName);
 
     // Calculate total cost for Cunning Strike (Sneak Attack dice to forgo)
     const totalCostD6 = chosenOptions.reduce((sum, opt) => {
@@ -350,7 +333,6 @@ export async function applyRiderOption(action, playerStats, campaignName, target
 
     const results = [];
     let versatileTricksterSecondaryTarget = null;
-    let hasVersatileTrickster = false;
 
     // Check if Versatile Trickster is available (Arcane Trickster level 13+)
     const hasVersatileTricksterPassive = (playerStats.automation?.passives || []).some(
@@ -363,7 +345,6 @@ export async function applyRiderOption(action, playerStats, campaignName, target
 
         // If Trip was applied and Versatile Trickster is available, find secondary targets
         if (chosen.effect === 'prone' && hasVersatileTricksterPassive && targetName) {
-            hasVersatileTrickster = true;
             const secondaryTargets = await scanNearbySecondaryTargets(campaignName, targetName);
             if (secondaryTargets.length > 0) {
                 versatileTricksterSecondaryTarget = secondaryTargets;
@@ -372,18 +353,14 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     }
 
     // If Versatile Trickster found secondary Trip targets, set runtime value for modal to pick up
-    if (hasVersatileTrickster && versatileTricksterSecondaryTarget && versatileTricksterSecondaryTarget.length > 0) {
+    if (versatileTricksterSecondaryTarget && versatileTricksterSecondaryTarget.length > 0) {
         setRuntimeValue(playerStats.name, 'versatileTricksterSecondaryTargets', versatileTricksterSecondaryTarget, campaignName);
         setRuntimeValue(playerStats.name, 'versatileTricksterPrimaryTarget', targetName, campaignName);
         setRuntimeValue(playerStats.name, 'versatileTricksterAction', { type: 'versatile_trickster', automation: { type: 'versatile_trickster', casting_time: 'passive' } }, campaignName);
     }
 
     // If Sudden Strike or Mass Fear was applied, find secondary targets for the effect
-    const hasStalkersFlurry = chosenOptions.some(o => o.effect === 'sudden_strike');
-    let stalkersFlurrySecondaryTarget = null;
-    if (hasStalkersFlurry && targetName) {
-        stalkersFlurrySecondaryTarget = await scanNearbySecondaryTargets(campaignName, targetName);
-    }
+    const stalkersFlurrySecondaryTarget = await resolveStalkersFlurrySecondaryTargets(chosenOptions, targetName, campaignName);
 
     if (stalkersFlurrySecondaryTarget && stalkersFlurrySecondaryTarget.length > 0) {
         const stalkerFlurryOptions = chosenOptions.map(o => o.name);
@@ -432,6 +409,32 @@ export async function applyRiderOption(action, playerStats, campaignName, target
             automation: auto,
         },
     };
+}
+
+async function gateRiderOncePerTurn(action, auto, playerStats, campaignName) {
+    if (!auto.oncePerTurn) return null;
+    const usedKey = oncePerTurnUsedKey(action);
+    return await checkOncePerTurn(action.name, usedKey, playerStats.name, campaignName);
+}
+
+async function markRiderOncePerTurnUsed(action, auto, playerStats, campaignName) {
+    if (!auto.oncePerTurn) return;
+    const usedKey = oncePerTurnUsedKey(action);
+    await markOncePerTurn(action.name, usedKey, playerStats, campaignName);
+}
+
+function findInvalidChosenOption(chosenOptions, targetName, playerStats) {
+    for (const chosen of chosenOptions) {
+        const validation = validateCunningStrikeOption(chosen, targetName, playerStats, getCombatContextSync);
+        if (!validation.valid) return { chosen, validation };
+    }
+    return null;
+}
+
+async function resolveStalkersFlurrySecondaryTargets(chosenOptions, targetName, campaignName) {
+    const hasStalkersFlurry = chosenOptions.some(o => o.effect === 'sudden_strike');
+    if (!hasStalkersFlurry || !targetName) return null;
+    return await scanNearbySecondaryTargets(campaignName, targetName);
 }
 
 async function scanNearbySecondaryTargets(campaignName, targetName) {

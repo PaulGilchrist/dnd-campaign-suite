@@ -15,6 +15,91 @@ import { normalizeCastingTime } from '../shared/castingTimeUtils.js';
  * @param {boolean} options.reverseOrder - If true, process items from highest to lowest level (for class features)
  * @returns {Object} Categorized features with actions, bonusActions, reactions, specialActions, characterAdvancement arrays
  */
+const CASTING_TIME_CATEGORY = {
+  '1 action': 'actions',
+  '1 bonus action': 'bonusActions',
+  '1 reaction': 'reactions'
+};
+
+const buildItemSummary = (item, descriptionField) => ({
+  name: item.name,
+  level: item.level ?? null,
+  description: item[descriptionField],
+  details: item.details,
+  automation: item.automation
+});
+
+// Resolve the effective casting time for an item plus whether any of its
+// automation entries is a reaction.
+const resolveCastingTime = (item) => {
+  let castingTime = item.casting_time || item.automation?.casting_time;
+  const automation = Array.isArray(item.automation) && item.automation.length > 0 ? item.automation : null;
+  if (automation && !castingTime) {
+    // CLA-218: multi-automation features may declare 'passive' first
+    // (e.g. Mage Hand Legerdemain: [passive_rule, conditional_advantage,
+    // mage_hand_control/'1 bonus action']). Prefer the first ACTIONABLE
+    // casting time over a leading 'passive' so the row lands in the
+    // section where clicking it dispatches — mirrors the hasReaction
+    // multi-entry scan below (CLA-192 .some/multi-entry family).
+    const actionableAuto = automation.find(a => {
+      const ct = normalizeCastingTime(a?.casting_time || '');
+      return ct && ct !== 'passive';
+    });
+    const firstAuto = actionableAuto || automation.find(a => a?.casting_time);
+    if (firstAuto) {
+      castingTime = firstAuto.casting_time;
+    }
+  }
+  // Check if any automation entry is a reaction (takes priority over passive)
+  const hasReaction = automation ? automation.some(a => normalizeCastingTime(a?.casting_time || '') === '1 reaction') : false;
+  return { castingTime, hasReaction };
+};
+
+const pushUnique = (list, itemSummary) => {
+  if (!list.some(f => f.name === itemSummary.name)) {
+    list.push(itemSummary);
+    return true;
+  }
+  return false;
+};
+
+// Tried in rule order; each target is skipped if it already holds the item,
+// cascading to the next target exactly like the original if/else chain.
+const buildCastingTimeTargets = (ct, hasReaction, itemName, characterAdvancement) => {
+  const targets = [];
+  const mappedCategory = CASTING_TIME_CATEGORY[ct];
+  if (mappedCategory) targets.push(mappedCategory);
+  if (hasReaction) targets.push('reactions');
+  if (ct === 'passive' && characterAdvancement.includes(itemName)) targets.push('characterAdvancement');
+  targets.push('specialActions');
+  return targets;
+};
+
+const categorizeByCastingTime = (categorized, item, itemSummary, characterAdvancement) => {
+  const { castingTime, hasReaction } = resolveCastingTime(item);
+  if (!castingTime) return false;
+  const ct = normalizeCastingTime(castingTime);
+  const targets = buildCastingTimeTargets(ct, hasReaction, item.name, characterAdvancement);
+  for (const target of targets) {
+    if (pushUnique(categorized[target], itemSummary)) return true;
+  }
+  return true;
+};
+
+// Fallback: Categorize based on category definitions (name-based, for features without automation)
+const categorizeByCategoryDefinitions = (categorized, item, itemSummary, defs) => {
+  const { actions, bonusActions, reactions, characterAdvancement } = defs;
+  const targets = [];
+  if (characterAdvancement.includes(item.name)) targets.push('characterAdvancement');
+  if (actions.includes(item.name)) targets.push('actions');
+  if (bonusActions.includes(item.name)) targets.push('bonusActions');
+  if (reactions.includes(item.name)) targets.push('reactions');
+  targets.push('specialActions');
+  for (const target of targets) {
+    if (pushUnique(categorized[target], itemSummary)) return;
+  }
+};
+
 export const categorizeFeatures = (items, categories, options = {}) => {
   const {
     descriptionField = 'description',
@@ -44,73 +129,18 @@ export const categorizeFeatures = (items, categories, options = {}) => {
   // If reverseOrder is true, process from last to first (highest level first)
   const itemsToProcess = reverseOrder ? [...items].reverse() : items;
 
+  const categoryDefs = { actions, bonusActions, reactions, characterAdvancement };
+
   itemsToProcess.forEach(item => {
     if (!item) return;
 
-    const itemSummary = {
-      name: item.name,
-      level: item.level ?? null,
-      description: item[descriptionField],
-      details: item.details,
-      automation: item.automation
-    };
+    const itemSummary = buildItemSummary(item, descriptionField);
 
     // Categorize by casting_time for features that have automations with casting_time
-    let castingTime = item.casting_time || item.automation?.casting_time;
-    let hasReaction = false;
-    if (Array.isArray(item.automation) && item.automation.length > 0) {
-      if (!castingTime) {
-        // CLA-218: multi-automation features may declare 'passive' first
-        // (e.g. Mage Hand Legerdemain: [passive_rule, conditional_advantage,
-        // mage_hand_control/'1 bonus action']). Prefer the first ACTIONABLE
-        // casting time over a leading 'passive' so the row lands in the
-        // section where clicking it dispatches — mirrors the hasReaction
-        // multi-entry scan below (CLA-192 .some/multi-entry family).
-        const actionableAuto = item.automation.find(a => {
-          const ct = normalizeCastingTime(a?.casting_time || '');
-          return ct && ct !== 'passive';
-        });
-        const firstAuto = actionableAuto || item.automation.find(a => a?.casting_time);
-        if (firstAuto) {
-          castingTime = firstAuto.casting_time;
-        }
-      }
-      // Check if any automation entry is a reaction (takes priority over passive)
-      hasReaction = item.automation.some(a => normalizeCastingTime(a?.casting_time || '') === '1 reaction');
-    }
-    if (castingTime) {
-      const ct = normalizeCastingTime(castingTime);
-      if (ct === '1 action' && !categorized.actions.some(f => f.name === item.name)) {
-        categorized.actions.push(itemSummary);
-      } else if (ct === '1 bonus action' && !categorized.bonusActions.some(f => f.name === item.name)) {
-        categorized.bonusActions.push(itemSummary);
-      } else if (ct === '1 reaction' && !categorized.reactions.some(f => f.name === item.name)) {
-        categorized.reactions.push(itemSummary);
-      } else if (hasReaction && !categorized.reactions.some(f => f.name === item.name)) {
-        categorized.reactions.push(itemSummary);
-      } else if (ct === 'passive' && characterAdvancement.includes(item.name) && !categorized.characterAdvancement.some(f => f.name === item.name)) {
-        categorized.characterAdvancement.push(itemSummary);
-      } else if (ct === 'passive' && !categorized.specialActions.some(f => f.name === item.name)) {
-        categorized.specialActions.push(itemSummary);
-      } else if (!categorized.specialActions.some(f => f.name === item.name)) {
-        categorized.specialActions.push(itemSummary);
-      }
-      return;
-    }
+    if (categorizeByCastingTime(categorized, item, itemSummary, characterAdvancement)) return;
 
-    // Fallback: Categorize based on category definitions (name-based, for features without automation)
-    if (characterAdvancement.includes(item.name) && !categorized.characterAdvancement.some(f => f.name === item.name)) {
-      categorized.characterAdvancement.push(itemSummary);
-    } else if (actions.includes(item.name) && !categorized.actions.some(action => action.name === item.name)) {
-      categorized.actions.push(itemSummary);
-    } else if (bonusActions.includes(item.name) && !categorized.bonusActions.some(bonusAction => bonusAction.name === item.name)) {
-      categorized.bonusActions.push(itemSummary);
-    } else if (reactions.includes(item.name) && !categorized.reactions.some(reaction => reaction.name === item.name)) {
-      categorized.reactions.push(itemSummary);
-    } else if (!categorized.specialActions.some(specialAction => specialAction.name === item.name)) {
-      categorized.specialActions.push(itemSummary);
-     }
-   });
+    categorizeByCategoryDefinitions(categorized, item, itemSummary, categoryDefs);
+  });
 
   return categorized;
 };

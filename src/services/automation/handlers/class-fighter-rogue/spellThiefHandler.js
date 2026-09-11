@@ -111,12 +111,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return refuse(`${featureName} — no recent spell cast to respond to.`);
     }
 
-    // Spell-origin: PC spell pipeline stamps rollType 'spell-save'; monster-card
-    // save attacks stamp isSpellDamage (CLA-324) or a saveType/saveDc pair.
-    const spellOrigin = attackEvent.rollType === 'spell-save'
-        || attackEvent.isSpellDamage === true
-        || (attackEvent.saveDc != null && !!attackEvent.saveType);
-    if (!spellOrigin) {
+    if (!isSpellOrigin(attackEvent)) {
         return refuse(`${featureName} — the most recent attack was not a spell cast. No spell to steal.`);
     }
 
@@ -128,9 +123,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return refuse(`${featureName} responds to another creature's spell — you cannot steal from yourself.`);
     }
 
-    const targetsThief = attackEvent.targetName === playerName
-        || (attackEvent.affectedTargets || []).includes(playerName);
-    if (!targetsThief) {
+    if (!didTargetThief(attackEvent, playerName)) {
         return refuse(`${featureName} — the most recent spell did not target you.`);
     }
 
@@ -162,60 +155,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
 
-    addEntry(campaignName, {
-        type: 'roll',
-        name: featureName,
-        characterName: playerName,
-        rollType: 'save-damage',
-        targetName: casterName,
-        saveDc,
-        saveType: auto.saveType || 'INT',
-        saveResult: success ? 'success' : 'failure',
-        total: saveResult.total ?? 0,
-        rolls: [saveResult.roll ?? 0],
-        bonus: saveResult.saveBonus ?? 0,
-        formula: `1d20${saveResult.saveBonus !== 0 ? '+' + saveResult.saveBonus : ''}`,
-        timestamp: Date.now(),
-    }).catch((e) => { console.error("[spellThief] Error:", e); });
+    logThiefSave(campaignName, featureName, playerName, casterName, saveDc, auto, saveResult, success);
 
-    let negationNote = '';
-    if (!success) {
-        // CLA-325: "negate spell" — retroactively roll back the cast's damage,
-        // conditions and target effects via the verified Counterspell consumer
-        // (rollbackSpellEffects works off the monster-card / spell-save lastAttack
-        // stamps, same retroactive-negation model as Shield / Illusory Self).
-        const rolledBack = await rollbackSpellEffects(attackEvent, campaignName, featureName, cs);
+    const negationNote = success
+        ? ''
+        : await stealSpell({ attackEvent, cs, campaignName, featureName, playerName, casterName, spellName, saveDc, isMonsterCaster });
 
-        if (rolledBack.damageHealed > 0 || rolledBack.conditionsRemoved.length > 0 || rolledBack.effectsRemoved > 0) {
-            negationNote = ` ${rolledBack.damageHealed} HP restored, ${rolledBack.conditionsRemoved.length} condition(s) and ${rolledBack.effectsRemoved} effect(s) rolled back.`;
-            addEntry(campaignName, {
-                type: 'ability_use',
-                characterName: playerName,
-                abilityName: featureName,
-                description: `${featureName} negated '${spellName}' — ${rolledBack.damageHealed} HP restored, ${rolledBack.conditionsRemoved.length} condition(s) removed, ${rolledBack.effectsRemoved} target effect(s) cleared.`,
-            }).catch((e) => { console.error("[spellThief] Error:", e); });
-        }
-
-        await addBlockedSpell(playerName, casterName, spellName, campaignName);
-        await addStolenSpell(playerName, casterName, spellName, campaignName);
-
-        // CLA-325 (e) — advisory model (owner decision 2026-09-07): the caster-block key
-        // is recorded and IS enforced on player spell lists (spellCalc2024 filters them),
-        // but there is no monster-path consumer — a blocked MONSTER recasting the stolen
-        // spell is GM-enforced, not engine-enforced. The log states this honestly.
-        const blockNote = isMonsterCaster
-            ? ` ${casterName} is blocked from recasting ${spellName} for 8 hours (recorded; GM-enforced for monsters).`
-            : ` ${casterName} cannot cast ${spellName} for 8 hours.`;
-
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerName,
-            abilityName: featureName,
-            description: `${casterName} failed INT save (DC ${saveDc}). Spell negated.${negationNote} ${playerName} steals ${spellName} for 8 hours.${blockNote}`,
-        }).catch((e) => { console.error("[spellThief] Error:", e); });
-
-        window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-    } else {
+    if (success) {
         addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerName,
@@ -237,6 +183,77 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             automation: auto,
         },
     };
+}
+
+// Spell-origin: PC spell pipeline stamps rollType 'spell-save'; monster-card
+// save attacks stamp isSpellDamage (CLA-324) or a saveType/saveDc pair.
+function isSpellOrigin(attackEvent) {
+    return attackEvent.rollType === 'spell-save'
+        || attackEvent.isSpellDamage === true
+        || (attackEvent.saveDc != null && !!attackEvent.saveType);
+}
+
+function didTargetThief(attackEvent, playerName) {
+    return attackEvent.targetName === playerName
+        || (attackEvent.affectedTargets || []).includes(playerName);
+}
+
+function logThiefSave(campaignName, featureName, playerName, casterName, saveDc, auto, saveResult, success) {
+    addEntry(campaignName, {
+        type: 'roll',
+        name: featureName,
+        characterName: playerName,
+        rollType: 'save-damage',
+        targetName: casterName,
+        saveDc,
+        saveType: auto.saveType || 'INT',
+        saveResult: success ? 'success' : 'failure',
+        total: saveResult.total ?? 0,
+        rolls: [saveResult.roll ?? 0],
+        bonus: saveResult.saveBonus ?? 0,
+        formula: `1d20${saveResult.saveBonus !== 0 ? '+' + saveResult.saveBonus : ''}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[spellThief] Error:", e); });
+}
+
+// CLA-325: "negate spell" — retroactively roll back the cast's damage,
+// conditions and target effects via the verified Counterspell consumer
+// (rollbackSpellEffects works off the monster-card / spell-save lastAttack
+// stamps, same retroactive-negation model as Shield / Illusory Self).
+async function stealSpell({ attackEvent, cs, campaignName, featureName, playerName, casterName, spellName, saveDc, isMonsterCaster }) {
+    const rolledBack = await rollbackSpellEffects(attackEvent, campaignName, featureName, cs);
+
+    let negationNote = '';
+    if (rolledBack.damageHealed > 0 || rolledBack.conditionsRemoved.length > 0 || rolledBack.effectsRemoved > 0) {
+        negationNote = ` ${rolledBack.damageHealed} HP restored, ${rolledBack.conditionsRemoved.length} condition(s) and ${rolledBack.effectsRemoved} effect(s) rolled back.`;
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: featureName,
+            description: `${featureName} negated '${spellName}' — ${rolledBack.damageHealed} HP restored, ${rolledBack.conditionsRemoved.length} condition(s) removed, ${rolledBack.effectsRemoved} target effect(s) cleared.`,
+        }).catch((e) => { console.error("[spellThief] Error:", e); });
+    }
+
+    await addBlockedSpell(playerName, casterName, spellName, campaignName);
+    await addStolenSpell(playerName, casterName, spellName, campaignName);
+
+    // CLA-325 (e) — advisory model (owner decision 2026-09-07): the caster-block key
+    // is recorded and IS enforced on player spell lists (spellCalc2024 filters them),
+    // but there is no monster-path consumer — a blocked MONSTER recasting the stolen
+    // spell is GM-enforced, not engine-enforced. The log states this honestly.
+    const blockNote = isMonsterCaster
+        ? ` ${casterName} is blocked from recasting ${spellName} for 8 hours (recorded; GM-enforced for monsters).`
+        : ` ${casterName} cannot cast ${spellName} for 8 hours.`;
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: featureName,
+        description: `${casterName} failed INT save (DC ${saveDc}). Spell negated.${negationNote} ${playerName} steals ${spellName} for 8 hours.${blockNote}`,
+    }).catch((e) => { console.error("[spellThief] Error:", e); });
+
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+    return negationNote;
 }
 
 export function isBlockedBySpellThief(playerName, casterName, spellName, campaignName) {

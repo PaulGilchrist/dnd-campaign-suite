@@ -123,51 +123,62 @@ function addCasterResources(resources, { playerStats, features, classLevel }) {
   resources.arcaneWardHp = { current: maxWard, max: maxWard }
 }
 
+function resolveActionSurgeMax(playerStats, classLevel, is2024) {
+  if (playerStats.class?.name !== 'Fighter') return 0
+  if (!is2024) return classLevel?.class_specific?.action_surges || 0
+  return playerStats.level >= 17 ? 2 : (playerStats.level >= 2 ? 1 : 0)
+}
+
+function resolveRageMax(playerStats, classLevel, is2024) {
+  if (playerStats.class?.name !== 'Barbarian') return 0
+  return is2024
+    ? (classLevel?.rages || 0)
+    : (classLevel?.class_specific?.rage_count || 0)
+}
+
+function resolvePsionicEnergyMax(classLevel, playerStats) {
+  const majorName = playerStats.class.major?.name || playerStats.class.subclass?.name
+  const hasEnergy = classLevel?.energy && classLevel.energy.required_major === majorName
+  return hasEnergy ? (classLevel?.energy?.energy_die_num || 0) : 0
+}
+
+// CLA-355: Telekinetic Adept (Psi Warrior lv7) Telekinetic Thrust — once per
+// Short or Long Rest (re-arm = null). One use until a rest re-arms it.
+function resolveTelekineticThrustMax(playerStats) {
+  const hasTelekineticThrust = (playerStats.automation?.reactions ?? [])
+    .some(a => a.type === 'telekinetic_thrust')
+  return hasTelekineticThrust ? 1 : 0
+}
+
+function resolveAdrenalineRushMax(playerStats) {
+  const hasAdrenalineRush = (playerStats.automation?.specialActions ?? [])
+    .some(a => a.effect === 'bonus_action_dash')
+  return hasAdrenalineRush ? (playerStats.proficiency || 0) : 0
+}
+
 function addMartialResources(resources, { playerStats, classLevel, is2024 }) {
   const maxSW = classLevel?.second_wind || 0
   resources.secondWindUses = { current: maxSW, max: maxSW }
   resources.secondwindUses = { current: maxSW, max: maxSW }
 
-  const isFighter = playerStats.class?.name === 'Fighter'
-  let maxAS = 0
-  if (isFighter) {
-    if (is2024) {
-      maxAS = playerStats.level >= 17 ? 2 : (playerStats.level >= 2 ? 1 : 0)
-    } else {
-      maxAS = classLevel?.class_specific?.action_surges || 0
-    }
-  }
+  const maxAS = resolveActionSurgeMax(playerStats, classLevel, is2024)
   resources.actionSurgeUses = { current: maxAS, max: maxAS }
   resources.actionsurgeUses = { current: maxAS, max: maxAS }
 
-  const isBarbarian = playerStats.class?.name === 'Barbarian'
-  let maxRage = 0
-  if (isBarbarian) {
-    maxRage = is2024
-      ? (classLevel?.rages || 0)
-      : (classLevel?.class_specific?.rage_count || 0)
-  }
+  const maxRage = resolveRageMax(playerStats, classLevel, is2024)
   resources.ragePoints = { current: maxRage, max: maxRage }
 
   const maxSD = computeSuperiorityDiceMax(playerStats)
   resources.superiorityDice = { current: maxSD, max: maxSD }
 
-  const hasEnergy = classLevel?.energy && classLevel.energy.required_major
-    === (playerStats.class.major?.name || playerStats.class.subclass?.name)
-  const maxPE = hasEnergy ? (classLevel?.energy?.energy_die_num || 0) : 0
+  const maxPE = resolvePsionicEnergyMax(classLevel, playerStats)
   resources.psionicEnergy = { current: maxPE, max: maxPE }
 
-  // CLA-355: Telekinetic Adept (Psi Warrior lv7) Telekinetic Thrust — once per
-  // Short or Long Rest (re-arm = null). One use until a rest re-arms it.
-  const hasTelekineticThrust = (playerStats.automation?.reactions ?? [])
-    .some(a => a.type === 'telekinetic_thrust')
-  const maxTT = hasTelekineticThrust ? 1 : 0
+  const maxTT = resolveTelekineticThrustMax(playerStats)
   resources.telekineticThrustUses = { current: maxTT, max: maxTT }
 
-  const hasAdrenalineRush = (playerStats.automation?.specialActions ?? [])
-    .some(a => a.effect === 'bonus_action_dash')
-  const adrenalineRushMax = hasAdrenalineRush ? (playerStats.proficiency || 0) : 0
-  resources.adrenalineRushUses = { current: adrenalineRushMax, max: adrenalineRushMax }
+  const maxAR = resolveAdrenalineRushMax(playerStats)
+  resources.adrenalineRushUses = { current: maxAR, max: maxAR }
 }
 
 function matchesPatron(playerStats, names) {

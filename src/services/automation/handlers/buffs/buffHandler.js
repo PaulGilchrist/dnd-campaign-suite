@@ -100,15 +100,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     // Tracked uses consumption for temp_buff features that declare uses (e.g., Psychic Veil: 1 use per Long Rest)
-    let usesKey = null;
-    let usesRemaining = null;
-    if (auto?.uses != null || auto?.usesMax != null) {
-        const usesMax = resolveBuffUsesMax(auto, playerStats);
-        usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
-        const gate = await gateBuffUses(action, auto, playerStats, campaignName, usesMax, usesKey);
-        if (gate.popup) return gate.popup;
-        usesRemaining = gate.usesRemaining;
-    }
+    const gate = await gateTrackedBuffUses(action, auto, playerStats, campaignName);
+    if (gate.popup) return gate.popup;
+    const usesKey = gate.usesKey ?? null;
+    const usesRemaining = gate.usesRemaining ?? null;
 
     const { wasActive } = toggleBuff(
         playerStats.name,
@@ -119,25 +114,34 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     );
 
     // Consumption happens on activation only; toggling OFF does not refund the use.
-    let usesAfterActivation = null;
-    if (usesKey != null && !wasActive) {
-        usesAfterActivation = Math.max(0, usesRemaining - 1);
-        await setRuntimeValue(playerStats.name, usesKey, usesAfterActivation, campaignName);
-    }
-
-    if (usesKey != null && !wasActive) {
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: action.name,
-            description: `${playerStats.name} activated ${action.name} (${usesAfterActivation} use${usesAfterActivation !== 1 ? 's' : ''} remaining).`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error('[buffHandler] Tracked buff activation log error:', e); });
-    }
+    const usesAfterActivation = await consumeBuffUse(usesKey, usesRemaining, wasActive, playerStats, action, campaignName);
 
     await applyGenericBuffSideEffects(action, auto, playerStats, targetName, campaignName, wasActive);
 
     return buildBuffTogglePopup(action, auto, playerStats, targetName, wasActive, usesKey, usesAfterActivation);
+}
+
+async function gateTrackedBuffUses(action, auto, playerStats, campaignName) {
+    if (auto?.uses == null && auto?.usesMax == null) return {};
+    const usesMax = resolveBuffUsesMax(auto, playerStats);
+    const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
+    const gate = await gateBuffUses(action, auto, playerStats, campaignName, usesMax, usesKey);
+    if (gate.popup) return { popup: gate.popup };
+    return { usesKey, usesRemaining: gate.usesRemaining };
+}
+
+async function consumeBuffUse(usesKey, usesRemaining, wasActive, playerStats, action, campaignName) {
+    if (usesKey == null || wasActive) return null;
+    const usesAfterActivation = Math.max(0, usesRemaining - 1);
+    await setRuntimeValue(playerStats.name, usesKey, usesAfterActivation, campaignName);
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: action.name,
+        description: `${playerStats.name} activated ${action.name} (${usesAfterActivation} use${usesAfterActivation !== 1 ? 's' : ''} remaining).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[buffHandler] Tracked buff activation log error:', e); });
+    return usesAfterActivation;
 }
 
 function resolveWillingTargetName(auto, playerStats, campaignName) {

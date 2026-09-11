@@ -25,6 +25,80 @@ export function handle(heroismAction, playerStats, campaignName, _mapName) {
     };
 }
 
+function addHeroismTurnStartEffect(targetName, playerStats, tempHpAmount, campaignName) {
+    const targetStats = { ...playerStats, name: targetName };
+    const turnStartEffects = targetStats.turnStartEffects || [];
+    if (turnStartEffects.some(e => e.type === 'heroism_temp_hp')) return;
+    targetStats.turnStartEffects = [...turnStartEffects, {
+        type: 'heroism_temp_hp',
+        name: HEROISM_BUFF_NAME,
+        tempHpAmount: tempHpAmount,
+    }];
+    setRuntimeValue(targetName, 'turnStartEffects', targetStats.turnStartEffects, campaignName);
+}
+
+function syncHeroismTargetEffects(targetName, campaignName) {
+    const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const effects = Array.isArray(storedEffects) ? storedEffects : [];
+    const filteredEffects = effects.filter(te => !(te.effect === 'heroism' && te.source === HEROISM_BUFF_NAME && te.target === targetName));
+    if (filteredEffects.length !== effects.length) {
+        setRuntimeValue('campaign', 'targetEffects', filteredEffects, campaignName);
+    }
+
+    effects.push({
+        target: targetName,
+        effect: 'heroism',
+        source: HEROISM_BUFF_NAME,
+        duration: 'concentration',
+    });
+    effects.push({
+        target: targetName,
+        effect: 'wisdom_save_advantage',
+        source: HEROISM_BUFF_NAME,
+        duration: 'concentration',
+    });
+    setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
+}
+
+async function applyHeroismToTarget(targetName, playerStats, campaignName, casterName, duration, tempHpAmount, combatSummary, dc) {
+    const storedBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
+    const buffs = Array.isArray(storedBuffs) ? storedBuffs : [];
+    const existingHeroismIndex = buffs.findIndex(b => b.name === HEROISM_BUFF_NAME);
+    if (existingHeroismIndex >= 0) {
+        buffs.splice(existingHeroismIndex, 1);
+    }
+
+    buffs.push({
+        name: HEROISM_BUFF_NAME,
+        effect: 'heroism',
+        duration,
+        sourceCharacter: casterName,
+        tempHpAmount: tempHpAmount,
+        conditionImmunity: ['Frightened'],
+    });
+    setRuntimeValue(targetName, 'activeBuffs', buffs, campaignName);
+
+    addHeroismTurnStartEffect(targetName, playerStats, tempHpAmount, campaignName);
+    syncHeroismTargetEffects(targetName, campaignName);
+
+    addExpiration(casterName, targetName, [
+        { type: 'remove_heroism_buff', buffName: HEROISM_BUFF_NAME },
+    ], campaignName);
+
+    if (combatSummary) {
+        addConcentration(combatSummary, casterName, 'Heroism', dc, targetName);
+        window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+    }
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: casterName,
+        abilityName: HEROISM_BUFF_NAME,
+        description: `${casterName} cast ${HEROISM_BUFF_NAME} on ${targetName}. Target is immune to Frightened and gains ${tempHpAmount} temp HP per turn.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[heroism] Error logging:", e); });
+}
+
 export async function applyHeroism(heroismAction, playerStats, campaignName, _mapName, targetNames) {
     if (!targetNames || !Array.isArray(targetNames) || targetNames.length === 0) {
         return null;
@@ -44,85 +118,14 @@ export async function applyHeroism(heroismAction, playerStats, campaignName, _ma
     const combatSummary = getCombatSummary(campaignName);
     const dc = playerStats.spellAbilities?.saveDc || (8 + (playerStats.proficiency || 0));
 
-    let appliedTargets = [];
-
     for (const targetName of targetNames) {
-        const activeBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
-        const buffs = Array.isArray(activeBuffs) ? activeBuffs : [];
-        const existingHeroismIndex = buffs.findIndex(b => b.name === HEROISM_BUFF_NAME);
-        if (existingHeroismIndex >= 0) {
-            buffs.splice(existingHeroismIndex, 1);
-        }
-
-        const buff = {
-            name: HEROISM_BUFF_NAME,
-            effect: 'heroism',
-            duration,
-            sourceCharacter: casterName,
-            tempHpAmount: tempHpAmount,
-            conditionImmunity: ['Frightened'],
-        };
-
-        buffs.push(buff);
-        setRuntimeValue(targetName, 'activeBuffs', buffs, campaignName);
-
-        const targetStats = { ...playerStats, name: targetName };
-        const turnStartEffects = targetStats.turnStartEffects || [];
-        const heroismTurnEffect = {
-            type: 'heroism_temp_hp',
-            name: HEROISM_BUFF_NAME,
-            tempHpAmount: tempHpAmount,
-        };
-        if (!turnStartEffects.some(e => e.type === 'heroism_temp_hp')) {
-            targetStats.turnStartEffects = [...turnStartEffects, heroismTurnEffect];
-            setRuntimeValue(targetName, 'turnStartEffects', targetStats.turnStartEffects, campaignName);
-        }
-
-        const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-        const effects = Array.isArray(storedEffects) ? storedEffects : [];
-        const filteredEffects = effects.filter(te => !(te.effect === 'heroism' && te.source === HEROISM_BUFF_NAME && te.target === targetName));
-        if (filteredEffects.length !== effects.length) {
-            setRuntimeValue('campaign', 'targetEffects', filteredEffects, campaignName);
-        }
-
-        effects.push({
-            target: targetName,
-            effect: 'heroism',
-            source: HEROISM_BUFF_NAME,
-            duration: 'concentration',
-        });
-        effects.push({
-            target: targetName,
-            effect: 'wisdom_save_advantage',
-            source: HEROISM_BUFF_NAME,
-            duration: 'concentration',
-        });
-        setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
-
-        addExpiration(casterName, targetName, [
-            { type: 'remove_heroism_buff', buffName: HEROISM_BUFF_NAME },
-        ], campaignName);
-
-        if (combatSummary) {
-            addConcentration(combatSummary, casterName, 'Heroism', dc, targetName);
-            window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-        }
-
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: casterName,
-            abilityName: HEROISM_BUFF_NAME,
-            description: `${casterName} cast ${HEROISM_BUFF_NAME} on ${targetName}. Target is immune to Frightened and gains ${tempHpAmount} temp HP per turn.`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[heroism] Error logging:", e); });
-
-        appliedTargets.push(targetName);
+        await applyHeroismToTarget(targetName, playerStats, campaignName, casterName, duration, tempHpAmount, combatSummary, dc);
     }
 
-    const targetsList = appliedTargets.join(', ');
-    const popupDescription = appliedTargets.length === 1
-        ? `${appliedTargets[0]} gained Heroism from ${casterName}'s cast: immune to Frightened, ${tempHpAmount} temp HP at start of each turn.`
-        : `${appliedTargets.length} targets gained Heroism: ${targetsList}.`;
+    const targetsList = targetNames.join(', ');
+    const popupDescription = targetNames.length === 1
+        ? `${targetNames[0]} gained Heroism from ${casterName}'s cast: immune to Frightened, ${tempHpAmount} temp HP at start of each turn.`
+        : `${targetNames.length} targets gained Heroism: ${targetsList}.`;
 
     return {
         type: 'popup',

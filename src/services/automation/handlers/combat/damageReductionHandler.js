@@ -2,6 +2,7 @@ import { evaluateAutoExpression } from '../../../combat/automation/automationSer
 import { addEntry } from '../../../ui/logService.js';
 import { setRuntimeValue, getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { findLastAttack } from '../../common/damageRollback.js';
+import { infoPopup } from '../../common/infoPopup.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { applyDamageToTarget, computeDamageAfterSave } from '../../../rules/combat/applyDamage.js';
@@ -106,6 +107,42 @@ function rollReductionExpression(expression, playerStats) {
     return { total: 0, rolls: [], display: '0' };
 }
 
+function triggerRefusal(auto, featureName, playerName, campaignName) {
+    const isFalling = auto.trigger === 'falling';
+    const refusalText = isFalling
+        ? `${featureName}: You are not falling — this Reaction can only be used when you take falling damage.`
+        : `${featureName}: The last attack's damage type does not match the trigger condition (${auto.trigger}).`;
+    addEntry(campaignName, {
+        type: 'automation',
+        characterName: playerName,
+        automationType: isFalling ? 'slow_fall_refused' : 'damage_reduction_refused',
+        name: featureName,
+        description: refusalText,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[damageReduction] Error logging refusal:", e); });
+    return infoPopup(featureName, refusalText, auto);
+}
+
+async function gateFallingReaction(auto, combatContext, playerName, usedRoundKey, featureName, campaignName) {
+    if (auto.trigger !== 'falling') return null;
+    const currentRound = combatContext?.round || 1;
+    const usedRound = Number(getRuntimeValue(playerName, usedRoundKey, campaignName) ?? 0);
+    if (usedRound !== currentRound) {
+        await setRuntimeValue(playerName, usedRoundKey, currentRound, campaignName);
+        return null;
+    }
+    const refusalText = `You have already used ${featureName} this round — your Reaction is spent until your next turn.`;
+    addEntry(campaignName, {
+        type: 'automation',
+        characterName: playerName,
+        automationType: 'slow_fall_refused',
+        name: featureName,
+        description: refusalText,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[damageReduction] Error logging refusal:", e); });
+    return infoPopup(featureName, refusalText, auto);
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -168,26 +205,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     if (!matchesTrigger(lastAttack, auto.trigger)) {
-        const refusalText = auto.trigger === 'falling'
-            ? `${featureName}: You are not falling — this Reaction can only be used when you take falling damage.`
-            : `${featureName}: The last attack's damage type does not match the trigger condition (${auto.trigger}).`;
-        addEntry(campaignName, {
-            type: 'automation',
-            characterName: playerName,
-            automationType: auto.trigger === 'falling' ? 'slow_fall_refused' : 'damage_reduction_refused',
-            name: featureName,
-            description: refusalText,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[damageReduction] Error logging refusal:", e); });
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: refusalText,
-                automation: auto,
-            },
-        };
+        return triggerRefusal(auto, featureName, playerName, campaignName);
     }
 
     // CLA-315: Reaction economy latch for the 'falling' trigger consumers
@@ -197,31 +215,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // navigationHandlers.js).
     const combatContext = await getCombatContext(campaignName);
     const usedRoundKey = `_${featureName.replace(/\s+/g, '_')}_usedRound`;
-    if (auto.trigger === 'falling') {
-        const currentRound = combatContext?.round || 1;
-        const usedRound = Number(getRuntimeValue(playerName, usedRoundKey, campaignName) ?? 0);
-        if (usedRound === currentRound) {
-            const refusalText = `You have already used ${featureName} this round — your Reaction is spent until your next turn.`;
-            addEntry(campaignName, {
-                type: 'automation',
-                characterName: playerName,
-                automationType: 'slow_fall_refused',
-                name: featureName,
-                description: refusalText,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[damageReduction] Error logging refusal:", e); });
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: featureName,
-                    description: refusalText,
-                    automation: auto,
-                },
-            };
-        }
-        await setRuntimeValue(playerName, usedRoundKey, currentRound, campaignName);
-    }
+    const fallingRefusal = await gateFallingReaction(auto, combatContext, playerName, usedRoundKey, featureName, campaignName);
+    if (fallingRefusal) return fallingRefusal;
 
     const totalDamage = lastAttack.totalDamage || 0;
     const primaryDamage = lastAttack.primaryDamage || 0;

@@ -38,6 +38,80 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
+async function removeExhaustion(targetName, campaignName, removedItems) {
+    const currentLevel = getRuntimeValue(targetName, 'exhaustionLevel') || 0;
+    if (currentLevel <= 0) return;
+    const newLevel = Math.max(0, currentLevel - 1);
+    setRuntimeValue(targetName, 'exhaustionLevel', newLevel, campaignName);
+    removedItems.push(`1 Exhaustion level (was ${currentLevel}, now ${newLevel})`);
+}
+
+async function removeConditionSelection(targetName, campaignName, removedItems, selection) {
+    const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+    const filtered = conditions.filter(c => !conditionMatches(String(c), selection.condition));
+    if (filtered.length === conditions.length) return;
+    setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
+    removedItems.push(`${selection.condition} condition`);
+}
+
+async function removeCurse(targetName, campaignName, removedItems) {
+    const activeBuffs = getRuntimeValue(targetName, 'activeBuffs') || [];
+    const cursedBuffs = activeBuffs.filter(b => b.type === 'cursed' || b.cursed);
+    if (cursedBuffs.length === 0) return;
+    const newBuffs = activeBuffs.filter(b => b.type !== 'cursed' && !b.cursed);
+    setRuntimeValue(targetName, 'activeBuffs', newBuffs, campaignName);
+    removedItems.push(`Curse (removed ${cursedBuffs.length} cursed effect(s))`);
+
+    for (const cursedBuff of cursedBuffs) {
+        addEntry(campaignName, {
+            type: 'buff',
+            action: 'removed',
+            characterName: targetName,
+            buffName: cursedBuff.name || 'Curse',
+            reason: 'Greater Restoration',
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[greaterRestoration] Error:", e); });
+    }
+}
+
+async function removeAbilityReduction(targetName, campaignName, removedItems) {
+    const abilityReductions = getRuntimeValue(targetName, 'abilityReductions') || {};
+    const reducedAbilities = Object.keys(abilityReductions);
+    if (reducedAbilities.length === 0) return;
+    const newReductions = {};
+    for (const ability of reducedAbilities) {
+        const removedReduction = abilityReductions[ability];
+        setRuntimeValue(targetName, `${ability}_original`, removedReduction.original, campaignName);
+        const currentVal = getRuntimeValue(targetName, ability);
+        if (currentVal !== removedReduction.original) {
+            setRuntimeValue(targetName, ability, removedReduction.original, campaignName);
+        }
+    }
+    setRuntimeValue(targetName, 'abilityReductions', newReductions, campaignName);
+    removedItems.push(`Ability score reduction(s) on ${reducedAbilities.join(', ')}`);
+}
+
+async function removeHpMaxReduction(targetName, campaignName, removedItems) {
+    const hpMaxReduction = getRuntimeValue(targetName, 'hpMaxReduction') || 0;
+    if (hpMaxReduction <= 0) return;
+    const baseHp = getRuntimeValue(targetName, 'hitPoints') || 0;
+    const currentHp = getRuntimeValue(targetName, 'currentHitPoints') || baseHp;
+    const newBaseHp = baseHp + hpMaxReduction;
+    setRuntimeValue(targetName, 'hitPoints', newBaseHp, campaignName);
+    const newCurrentHp = Math.min(newBaseHp, currentHp + hpMaxReduction);
+    setRuntimeValue(targetName, 'currentHitPoints', newCurrentHp, campaignName);
+    setRuntimeValue(targetName, 'hpMaxReduction', 0, campaignName);
+    removedItems.push(`Hit Point maximum reduction (-${hpMaxReduction} HP max restored)`);
+}
+
+const SELECTION_REMOVERS = {
+    exhaustion: removeExhaustion,
+    condition: removeConditionSelection,
+    curse: removeCurse,
+    ability_reduction: removeAbilityReduction,
+    hp_max_reduction: removeHpMaxReduction,
+};
+
 export async function applyGreaterRestoration(action, playerStats, campaignName, mapName, result) {
     if (!result || !result.targetName) {
         return null;
@@ -48,75 +122,9 @@ export async function applyGreaterRestoration(action, playerStats, campaignName,
     const removedItems = [];
 
     for (const selection of selections) {
-        if (selection.type === 'exhaustion') {
-            const currentLevel = getRuntimeValue(targetName, 'exhaustionLevel') || 0;
-            if (currentLevel > 0) {
-                const newLevel = Math.max(0, currentLevel - 1);
-                setRuntimeValue(targetName, 'exhaustionLevel', newLevel, campaignName);
-                removedItems.push(`1 Exhaustion level (was ${currentLevel}, now ${newLevel})`);
-            }
-        }
-
-        if (selection.type === 'condition') {
-            const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
-            const filtered = conditions.filter(c => !conditionMatches(String(c), selection.condition));
-            if (filtered.length !== conditions.length) {
-                setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
-                removedItems.push(`${selection.condition} condition`);
-            }
-        }
-
-        if (selection.type === 'curse') {
-            const activeBuffs = getRuntimeValue(targetName, 'activeBuffs') || [];
-            const cursedBuffs = activeBuffs.filter(b => b.type === 'cursed' || b.cursed);
-            if (cursedBuffs.length > 0) {
-                const newBuffs = activeBuffs.filter(b => b.type !== 'cursed' && !b.cursed);
-                setRuntimeValue(targetName, 'activeBuffs', newBuffs, campaignName);
-                removedItems.push(`Curse (removed ${cursedBuffs.length} cursed effect(s))`);
-
-                for (const cursedBuff of cursedBuffs) {
-                    addEntry(campaignName, {
-                        type: 'buff',
-                        action: 'removed',
-                        characterName: targetName,
-                        buffName: cursedBuff.name || 'Curse',
-                        reason: 'Greater Restoration',
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error("[greaterRestoration] Error:", e); });
-                }
-            }
-        }
-
-        if (selection.type === 'ability_reduction') {
-            const abilityReductions = getRuntimeValue(targetName, 'abilityReductions') || {};
-            const reducedAbilities = Object.keys(abilityReductions);
-            if (reducedAbilities.length > 0) {
-                const newReductions = {};
-                for (const ability of reducedAbilities) {
-                    const removedReduction = abilityReductions[ability];
-                    setRuntimeValue(targetName, `${ability}_original`, removedReduction.original, campaignName);
-                    const currentVal = getRuntimeValue(targetName, ability);
-                    if (currentVal !== removedReduction.original) {
-                        setRuntimeValue(targetName, ability, removedReduction.original, campaignName);
-                    }
-                }
-                setRuntimeValue(targetName, 'abilityReductions', newReductions, campaignName);
-                removedItems.push(`Ability score reduction(s) on ${reducedAbilities.join(', ')}`);
-            }
-        }
-
-        if (selection.type === 'hp_max_reduction') {
-            const hpMaxReduction = getRuntimeValue(targetName, 'hpMaxReduction') || 0;
-            if (hpMaxReduction > 0) {
-                const baseHp = getRuntimeValue(targetName, 'hitPoints') || 0;
-                const currentHp = getRuntimeValue(targetName, 'currentHitPoints') || baseHp;
-                const newBaseHp = baseHp + hpMaxReduction;
-                setRuntimeValue(targetName, 'hitPoints', newBaseHp, campaignName);
-                const newCurrentHp = Math.min(newBaseHp, currentHp + hpMaxReduction);
-                setRuntimeValue(targetName, 'currentHitPoints', newCurrentHp, campaignName);
-                setRuntimeValue(targetName, 'hpMaxReduction', 0, campaignName);
-                removedItems.push(`Hit Point maximum reduction (-${hpMaxReduction} HP max restored)`);
-            }
+        const removeSelection = SELECTION_REMOVERS[selection.type];
+        if (removeSelection) {
+            await removeSelection(targetName, campaignName, removedItems, selection);
         }
     }
 

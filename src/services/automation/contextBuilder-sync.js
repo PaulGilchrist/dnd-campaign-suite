@@ -475,15 +475,19 @@ async function computeSneakAttackDice(playerStats, attack, targetName, forcedMod
     if (!combatSummary) return 0;
     const targetCreature = combatSummary.creatures?.find(c => c.name === targetName);
     if (!targetCreature) return 0;
+    if (await hasFlankingAlly(combatSummary, playerStats, targetName)) return sneakAttackNumD6;
+    return 0;
+}
+
+async function hasFlankingAlly(combatSummary, playerStats, targetName) {
     for (const c of combatSummary.creatures) {
         if (c.name === playerStats.name || c.name === targetName) continue;
         const friendly = c.type === 'player' || (c.type === 'npc' && c.attitude !== 'hostile');
         if (!friendly) continue;
         if (allyIsIncapacitated(c)) continue;
-        const inRange = await isWithinRange(targetName, c.name, 5);
-        if (inRange) return sneakAttackNumD6;
+        if (await isWithinRange(targetName, c.name, 5)) return true;
     }
-    return 0;
+    return false;
 }
 
 // Ordered forced-mode resolvers — first match wins, mirroring original guard order.

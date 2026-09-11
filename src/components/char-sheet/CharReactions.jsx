@@ -34,12 +34,7 @@ import { resolveSpellDamageAtLevel, isAutoHitSpell, resolveHealExpression } from
 import { signFormatter } from '../../services/ui/formatUtils.js';
 import './CharActions.css'
 
-// Build the reactions list + reaction-spells list immutably from playerStats,
-// active buffs, and dynamic buff/stance grants. Returns the entries the
-// component renders plus the click-through reaction spells.
-function buildReactions({ playerStats, activeBuffs, pwhStance, wardActive, wardDice }) {
-    const reactions = [...(playerStats.reactions || [])];
-
+function appendDynamicReactions(reactions, playerStats, activeBuffs, pwhStance) {
     // Add automation reactions from playerStats.automation.reactions (e.g., Commanding Presence reaction)
     const automationReactions = playerStats.automation?.reactions || [];
     for (const auto of automationReactions) {
@@ -74,31 +69,29 @@ function buildReactions({ playerStats, activeBuffs, pwhStance, wardActive, wardD
             description: 'You can use your Reaction to stand up.',
         });
     }
+}
 
-    // Add Bastion of Law ward reaction if active — replace the action entry
-    // with the spend variant so clicking it triggers handleSpendDice (SPEND
-    // modal) instead of handleBastionOfLaw (CREATE modal).
-    if (wardActive && wardDice.length > 0) {
-        const existingIdx = reactions.findIndex(r => r.name === 'Bastion of Law');
-        if (existingIdx !== -1) {
-            reactions[existingIdx] = {
-                name: 'Bastion of Law',
-                description: `Ward active (${wardDice.length}d8 remaining). Click when you take damage to spend dice and reduce damage.`,
-                automation: {
-                    type: 'bastion_of_law_spend',
-                },
-            };
-        } else {
-            reactions.push({
-                name: 'Bastion of Law',
-                description: `Ward active (${wardDice.length}d8 remaining). Click when you take damage to spend dice and reduce damage.`,
-                automation: {
-                    type: 'bastion_of_law_spend',
-                },
-            });
-        }
+// Add Bastion of Law ward reaction if active — replace the action entry
+// with the spend variant so clicking it triggers handleSpendDice (SPEND
+// modal) instead of handleBastionOfLaw (CREATE modal).
+function applyBastionOfLawReaction(reactions, wardActive, wardDice) {
+    if (!wardActive || wardDice.length === 0) return;
+    const bastionReaction = {
+        name: 'Bastion of Law',
+        description: `Ward active (${wardDice.length}d8 remaining). Click when you take damage to spend dice and reduce damage.`,
+        automation: {
+            type: 'bastion_of_law_spend',
+        },
+    };
+    const existingIdx = reactions.findIndex(r => r.name === 'Bastion of Law');
+    if (existingIdx !== -1) {
+        reactions[existingIdx] = bastionReaction;
+    } else {
+        reactions.push(bastionReaction);
     }
+}
 
+function refreshTrackedReactionDescriptions(reactions, playerStats) {
     // Update Stone's Endurance description based on remaining uses
     const stonesEnduranceCurrent = getRuntimeValue(playerStats.name, 'stonesEnduranceUses');
     const stonesEnduranceUses = stonesEnduranceCurrent != null ? stonesEnduranceCurrent : (playerStats._trackedResources?.stonesEnduranceUses?.current ?? 0);
@@ -118,6 +111,17 @@ function buildReactions({ playerStats, activeBuffs, pwhStance, wardActive, wardD
             ? `When you take damage from a creature within 60 feet of you, you can take a Reaction to deal 1d8 thunder damage to that creature. ${stormsThunderUses} uses remaining. Recharges on a Long Rest.`
             : 'No uses remaining. Uses will reset on the next Long Rest.';
     }
+}
+
+// Build the reactions list + reaction-spells list immutably from playerStats,
+// active buffs, and dynamic buff/stance grants. Returns the entries the
+// component renders plus the click-through reaction spells.
+function buildReactions({ playerStats, activeBuffs, pwhStance, wardActive, wardDice }) {
+    const reactions = [...(playerStats.reactions || [])];
+
+    appendDynamicReactions(reactions, playerStats, activeBuffs, pwhStance);
+    applyBastionOfLawReaction(reactions, wardActive, wardDice);
+    refreshTrackedReactionDescriptions(reactions, playerStats);
 
     const reactionSpellNames = getReactionSpellNames(playerStats);
     let reactionSpells = [];
@@ -130,6 +134,37 @@ function buildReactions({ playerStats, activeBuffs, pwhStance, wardActive, wardD
     }
 
     return { reactions, reactionSpells };
+}
+
+function RedirectForceModals({ modalState, handleRedirectConfirm, handleRedirectSkip, handleEnergyRedirectionConfirm, handleEnergyRedirectionSkip }) {
+    return (
+        <>
+            {modalState.deflectRedirectModal && (
+                <SecondaryTargetModal
+                    title={modalState.deflectRedirectModal.title}
+                    targets={modalState.deflectRedirectModal.targets}
+                    confirmLabel={modalState.deflectRedirectModal.confirmLabel || 'Redirect Force'}
+                    confirmIcon={modalState.deflectRedirectModal.confirmIcon || 'fa-bolt'}
+                    featureDescription={modalState.deflectRedirectModal.featureDescription}
+                    description={modalState.deflectRedirectModal.description}
+                    onTargetSelected={handleRedirectConfirm}
+                    onSkip={handleRedirectSkip}
+                />
+            )}
+            {modalState.energyRedirectionModal && (
+                <SecondaryTargetModal
+                    title={modalState.energyRedirectionModal.title}
+                    targets={modalState.energyRedirectionModal.targets}
+                    confirmLabel={modalState.energyRedirectionModal.confirmLabel || 'Redirect'}
+                    confirmIcon={modalState.energyRedirectionModal.confirmIcon || 'fa-bolt'}
+                    featureDescription={modalState.energyRedirectionModal.featureDescription}
+                    description={modalState.energyRedirectionModal.description}
+                    onTargetSelected={handleEnergyRedirectionConfirm}
+                    onSkip={handleEnergyRedirectionSkip}
+                />
+            )}
+        </>
+    );
 }
 
 function CharReactions({ playerStats, campaignName, cannotAct, mapName, characters }) {
@@ -733,30 +768,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                     onClose={() => setModalState({ boonFateModal: null })}
                 />
             )}
-            {modalState.deflectRedirectModal && (
-                <SecondaryTargetModal
-                    title={modalState.deflectRedirectModal.title}
-                    targets={modalState.deflectRedirectModal.targets}
-                    confirmLabel={modalState.deflectRedirectModal.confirmLabel || 'Redirect Force'}
-                    confirmIcon={modalState.deflectRedirectModal.confirmIcon || 'fa-bolt'}
-                    featureDescription={modalState.deflectRedirectModal.featureDescription}
-                    description={modalState.deflectRedirectModal.description}
-                    onTargetSelected={handleRedirectConfirm}
-                    onSkip={handleRedirectSkip}
-                />
-            )}
-            {modalState.energyRedirectionModal && (
-                <SecondaryTargetModal
-                    title={modalState.energyRedirectionModal.title}
-                    targets={modalState.energyRedirectionModal.targets}
-                    confirmLabel={modalState.energyRedirectionModal.confirmLabel || 'Redirect'}
-                    confirmIcon={modalState.energyRedirectionModal.confirmIcon || 'fa-bolt'}
-                    featureDescription={modalState.energyRedirectionModal.featureDescription}
-                    description={modalState.energyRedirectionModal.description}
-                    onTargetSelected={handleEnergyRedirectionConfirm}
-                    onSkip={handleEnergyRedirectionSkip}
-                />
-            )}
+            <RedirectForceModals modalState={modalState} handleRedirectConfirm={handleRedirectConfirm} handleRedirectSkip={handleRedirectSkip} handleEnergyRedirectionConfirm={handleEnergyRedirectionConfirm} handleEnergyRedirectionSkip={handleEnergyRedirectionSkip} />
             {modalState.stepsOfTheFeyTauntModal && (
                 <StepsOfTheFeyTauntModal
                     {...modalState.stepsOfTheFeyTauntModal}

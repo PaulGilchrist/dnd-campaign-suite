@@ -45,6 +45,71 @@ async function removeConditionsOnTarget(targetName, campaignName, spell, reason)
     }
 }
 
+function requireCreatures(combatSummary) {
+    const x = combatSummary.creatures;
+    if (x == null) {
+        console.error('[massHealService] Missing array:', x);
+        throw new Error('Expected array, got ' + x);
+    }
+    return x;
+}
+
+function getCasterGridPos(combatSummary, casterName) {
+    const casterPos = combatSummary.players?.find(p => p.name === casterName);
+    return casterPos ? { gridX: casterPos.gridX, gridY: casterPos.gridY } : null;
+}
+
+function getCreatureGridPos(combatSummary, name) {
+    const targetPlayer = combatSummary.players?.find(p => p.name === name);
+    const targetNpc = combatSummary.placedItems?.find(i => i.name === name);
+    return {
+        gridX: targetPlayer?.gridX ?? targetNpc?.gridX,
+        gridY: targetPlayer?.gridY ?? targetNpc?.gridY,
+    };
+}
+
+// Nearest creatures within range (grid-aware), else the first N non-caster creatures.
+function collectTargets(combatSummary, casterName, casterGridPos, rangeFt, maxTargets) {
+    const others = requireCreatures(combatSummary).filter(c => c.name !== casterName);
+    if (!casterGridPos) {
+        return others.slice(0, maxTargets);
+    }
+    return others
+        .map(c => {
+            const { gridX, gridY } = getCreatureGridPos(combatSummary, c.name);
+            const dist = (gridX != null && gridY != null)
+                ? getDistanceFeet(casterGridPos, { gridX, gridY })
+                : null;
+            return { creature: c, dist };
+        })
+        .filter(item => isDistanceInRange(item.dist, rangeFt))
+        .sort((a, b) => a.dist - b.dist)
+        .slice(0, maxTargets)
+        .map(item => item.creature);
+}
+
+function resolveTotalPool(spell, slotLevel) {
+    const healAtSlotLevel = spell.heal_at_slot_level;
+    if (!healAtSlotLevel) return 700;
+    const expression = healAtSlotLevel[slotLevel] || healAtSlotLevel[Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b).pop()];
+    if (!expression || expression === 'max') return 700;
+    const parsed = parseInt(expression, 10);
+    if (Number.isNaN(parsed)) {
+        console.error('[massHealService] triggerMassHeal: heal_at_slot_level expression is not a valid number:', expression)
+        throw new Error('heal_at_slot_level expression must be a valid number for mass heal')
+    }
+    return parsed;
+}
+
+function buildHealFormula(totalPool, bonusDetails, targetCount) {
+    const formulaParts = [`${totalPool}`];
+    if (bonusDetails.length > 0) {
+        const bonusParts = bonusDetails.map(d => `${d.amount} ${d.name} × ${targetCount}`).join(' + ');
+        formulaParts.push(`(${bonusParts})`);
+    }
+    return formulaParts.join(' + ');
+}
+
 export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName, _mapName) {
     if (!isMassHeal(spell)) {
         return null;
@@ -57,38 +122,8 @@ export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName,
 
     const casterName = playerStats.name;
     const rangeFt = rangeToFeet(spell.range || '60 feet');
-    const casterPos = combatSummary.players?.find(p => p.name === casterName);
-    const casterGridPos = casterPos ? { gridX: casterPos.gridX, gridY: casterPos.gridY } : null;
-
-    const maxTargets = 10;
-    const targets = [];
-
-    if (casterGridPos) {
-        const sortedCreatures = [...(() => { const x = combatSummary.creatures; if (x == null) { console.error('[massHealService] Missing array:', x); throw new Error('Expected array, got ' + x); } return x; })()]
-            .filter(c => c.name !== casterName)
-            .map(c => {
-                const targetPlayer = combatSummary.players?.find(p => p.name === c.name);
-                const targetNpc = combatSummary.placedItems?.find(i => i.name === c.name);
-                const targetGridX = targetPlayer?.gridX ?? targetNpc?.gridX;
-                const targetGridY = targetPlayer?.gridY ?? targetNpc?.gridY;
-                const dist = (targetGridX != null && targetGridY != null)
-                    ? getDistanceFeet(casterGridPos, { gridX: targetGridX, gridY: targetGridY })
-                    : null;
-                return { creature: c, dist, gridX: targetGridX, gridY: targetGridY };
-            })
-            .filter(item => isDistanceInRange(item.dist, rangeFt))
-            .sort((a, b) => a.dist - b.dist)
-            .slice(0, maxTargets);
-
-        for (const item of sortedCreatures) {
-            targets.push(item.creature);
-        }
-    } else {
-        const eligible = (() => { const x = combatSummary.creatures; if (x == null) { console.error('[massHealService] Missing array:', x); throw new Error('Expected array, got ' + x); } return x; })()
-            .filter(c => c.name !== casterName)
-            .slice(0, maxTargets);
-        targets.push(...eligible);
-    }
+    const casterGridPos = getCasterGridPos(combatSummary, casterName);
+    const targets = collectTargets(combatSummary, casterName, casterGridPos, rangeFt, 10);
 
     if (targets.length === 0) {
         return { noTargets: true };
@@ -100,19 +135,7 @@ export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName,
         throw new Error('slot level is required for mass heal')
       }
       const slotLevel = metaCtx?.slotLevel || spell.level;
-      const healAtSlotLevel = spell.heal_at_slot_level;
-      let totalPool = 700;
-      if (healAtSlotLevel) {
-        const expression = healAtSlotLevel[slotLevel] || healAtSlotLevel[Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b).pop()];
-        if (expression && expression !== 'max') {
-          const parsed = parseInt(expression, 10);
-          if (Number.isNaN(parsed)) {
-            console.error('[massHealService] triggerMassHeal: heal_at_slot_level expression is not a valid number:', expression)
-            throw new Error('heal_at_slot_level expression must be a valid number for mass heal')
-          }
-          totalPool = parsed;
-        }
-    }
+      const totalPool = resolveTotalPool(spell, slotLevel);
     let remainingPool = totalPool;
     const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName);
     if (bonusHeal > 0) {
@@ -134,12 +157,6 @@ export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName,
 
         const newHp = Math.min(maxHp, currentHp + actualHeal);
 
-        const formulaParts = [`${totalPool}`];
-        if (bonusDetails.length > 0) {
-            const bonusParts = bonusDetails.map(d => `${d.amount} ${d.name} × ${targets.length}`).join(' + ');
-            formulaParts.push(`(${bonusParts})`);
-        }
-
         addEntry(campaignName, {
             type: 'hp_change',
             targetName,
@@ -149,7 +166,7 @@ export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName,
             isHealing: true,
             sourceName: casterName,
             note: 'Mass Heal',
-            formula: formulaParts.join(' + '),
+            formula: buildHealFormula(totalPool, bonusDetails, targets.length),
             bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
             timestamp: Date.now(),
         }).catch((e) => { console.error("[massHeal] Error:", e); });

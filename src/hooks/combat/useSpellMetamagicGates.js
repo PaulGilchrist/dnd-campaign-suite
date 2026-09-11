@@ -150,6 +150,33 @@ function showMaterialRequiredPopup(spell, setPopupHtml) {
   });
 }
 
+function isPowerWordSpell(spell) {
+  const lower = spell.name ? spell.name.toLowerCase() : '';
+  return lower === 'power word heal' || lower === 'power word kill';
+}
+
+// Returns true when the multi-target spread consumed the cast (modal opened or
+// pending target selector queued); false to fall through to the normal cast.
+async function handleMultiTargetGate(spell, metaCtx, {
+  campaignName, cfSetPending, characters, freeCastAuthorized, multiTargetSpread, onExecute, playerStats, setSecondaryTargetModal
+}) {
+  const creatureTargets = getCreatureTargets(playerStats?.name, campaignName, characters);
+  if (creatureTargets.length === 0) return false;
+  if (isPowerWordSpell(spell) && setSecondaryTargetModal) {
+    await openPowerWordTargetModal({ spell, metaCtx, creatureTargets, multiTargetSpread, setSecondaryTargetModal, onExecute, playerStats, campaignName, freeCastAuthorized });
+    return true;
+  }
+  cfSetPending('multiTarget', {
+    spell,
+    spellName: spell.name,
+    spellLevel: spell.level || 0,
+    castingTime: spell.casting_time,
+    range: multiTargetSpread.range || '10 ft',
+    creatureTargets,
+  });
+  return true;
+}
+
 export async function gateMetamagic(spell, metaCtx, {
   hasMaterial, setPopupHtml, isSorcerer, playerStats, campaignName, cfSetPending, setSecondaryTargetModal, characters, onExecute
 }) {
@@ -173,26 +200,10 @@ export async function gateMetamagic(spell, metaCtx, {
   });
   if (handled) return;
 
-  const isPowerWordSpell = spell.name && (spell.name.toLowerCase() === 'power word heal' || spell.name.toLowerCase() === 'power word kill');
-  const multiTargetSpread = isPowerWordSpell ? { range: '10 ft' } : getMultiTargetSpreadForSpell(playerStats, spell.name);
-
-  if (multiTargetSpread) {
-    const creatureTargets = getCreatureTargets(playerStats?.name, campaignName, characters);
-    if (creatureTargets.length > 0) {
-      if (isPowerWordSpell && setSecondaryTargetModal) {
-        await openPowerWordTargetModal({ spell, metaCtx, creatureTargets, multiTargetSpread, setSecondaryTargetModal, onExecute, playerStats, campaignName, freeCastAuthorized });
-        return;
-      }
-      cfSetPending('multiTarget', {
-        spell,
-        spellName: spell.name,
-        spellLevel: spell.level || 0,
-        castingTime: spell.casting_time,
-        range: multiTargetSpread.range || '10 ft',
-        creatureTargets,
-      });
-      return;
-    }
+  // CLA-388 etc.: Words-of-Creation / Power Word spells open a second-target flow first.
+  const multiTargetSpread = isPowerWordSpell(spell) ? { range: '10 ft' } : getMultiTargetSpreadForSpell(playerStats, spell.name);
+  if (multiTargetSpread && await handleMultiTargetGate(spell, metaCtx, { campaignName, cfSetPending, characters, freeCastAuthorized, multiTargetSpread, onExecute, playerStats, setSecondaryTargetModal })) {
+    return;
   }
 
   if (!isSorcerer) {

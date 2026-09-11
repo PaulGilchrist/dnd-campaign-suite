@@ -75,6 +75,56 @@ function computeOutcome(rollEvent, rerolledD20, newTotal) {
     }
 }
 
+function buildAttackDescription(rollEvent, rerolledD20, newTotal) {
+    const { d20, bonus, targetAc, hit } = rollEvent;
+    const originalTotal = d20 + bonus;
+
+    let description = `Original roll: d20(${d20}) + ${bonus} = ${originalTotal} vs AC ${targetAc != null ? targetAc : '—'} → ${hit ? 'HIT' : 'MISS'}<br/>`;
+    description += `Reroll with Advantage: d20(${rerolledD20}) + ${bonus} = ${newTotal} vs AC ${targetAc != null ? targetAc : '—'} → ${newTotal >= targetAc ? 'HIT' : 'MISS'}<br/>`;
+
+    if (hit === false && newTotal >= targetAc) {
+        description += `<br/><i>Countercharm turned a miss into a hit!</i>`;
+    } else if (hit === true) {
+        description += `<br/><i>The roll already succeeded — Countercharm has no effect.</i>`;
+    } else {
+        description += `<br/><i>Still a miss.</i>`;
+    }
+    return description;
+}
+
+function buildSaveDescription(rollEvent, rerolledD20, newTotal) {
+    const { d20, bonus, saveDc, saveResult, saveType } = rollEvent;
+    const originalTotal = d20 + bonus;
+    const saveLabel = saveType ? `${saveType} save` : 'save';
+    const oldSuccess = saveResult === 'success';
+    const newSuccess = newTotal >= saveDc;
+
+    let description = `Original ${saveLabel}: d20(${d20}) + ${bonus} = ${originalTotal} vs DC ${saveDc} → ${oldSuccess ? 'Succeeded' : 'Failed'}<br/>`;
+    description += `Reroll with Advantage: d20(${rerolledD20}) + ${bonus} = ${newTotal} vs DC ${saveDc} → ${newSuccess ? 'Succeeded' : 'Failed'}<br/>`;
+
+    if (!oldSuccess && newSuccess) {
+        description += `<br/><i>Countercharm turned a failure into a success!</i>`;
+    } else if (oldSuccess) {
+        description += `<br/><i>The save already succeeded — Countercharm has no effect.</i>`;
+    } else {
+        description += `<br/><i>Still a failure.</i>`;
+    }
+    return description;
+}
+
+function buildCheckDescription(rollEvent, rerolledD20, newTotal) {
+    const { d20, bonus, checkName } = rollEvent;
+    const originalTotal = d20 + bonus;
+
+    let description = `${checkName || 'Ability check'}: d20(${d20}) + ${bonus} = ${originalTotal}<br/>`;
+    description += `Reroll with Advantage: d20(${rerolledD20}) + ${bonus} = <b>${newTotal}</b>`;
+
+    if (newTotal > originalTotal) {
+        description += `<br/><i>The reroll improved the result!</i>`;
+    }
+    return description;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -93,47 +143,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     let description = `<b>${featureName}</b><br/>Target: ${targetName}<br/>`;
 
     if (rollType === 'attack') {
-        const { d20, bonus, targetAc, hit } = rollEvent;
-        const originalTotal = d20 + bonus;
-
-        description += `Original roll: d20(${d20}) + ${bonus} = ${originalTotal} vs AC ${targetAc != null ? targetAc : '\u2014'} → ${hit ? 'HIT' : 'MISS'}<br/>`;
-        description += `Reroll with Advantage: d20(${rerolledD20}) + ${bonus} = ${newTotal} vs AC ${targetAc != null ? targetAc : '\u2014'} → ${newTotal >= targetAc ? 'HIT' : 'MISS'}<br/>`;
-
-        if (hit === false && newTotal >= targetAc) {
-            description += `<br/><i>Countercharm turned a miss into a hit!</i>`;
-        } else if (hit === true) {
-            description += `<br/><i>The roll already succeeded — Countercharm has no effect.</i>`;
-        } else {
-            description += `<br/><i>Still a miss.</i>`;
-        }
+        description += buildAttackDescription(rollEvent, rerolledD20, newTotal);
     } else if (rollType === 'save') {
-        const { d20, bonus, saveDc, saveResult, saveType } = rollEvent;
-        const originalTotal = d20 + bonus;
-        const saveLabel = saveType ? `${saveType} save` : 'save';
-        const oldSuccess = saveResult === 'success';
-        const newSuccess = newTotal >= saveDc;
-
-        description += `Original ${saveLabel}: d20(${d20}) + ${bonus} = ${originalTotal} vs DC ${saveDc} → ${oldSuccess ? 'Succeeded' : 'Failed'}<br/>`;
-        description += `Reroll with Advantage: d20(${rerolledD20}) + ${bonus} = ${newTotal} vs DC ${saveDc} → ${newSuccess ? 'Succeeded' : 'Failed'}<br/>`;
-
-        if (!oldSuccess && newSuccess) {
-            description += `<br/><i>Countercharm turned a failure into a success!</i>`;
-        } else if (oldSuccess) {
-            description += `<br/><i>The save already succeeded — Countercharm has no effect.</i>`;
-        } else {
-            description += `<br/><i>Still a failure.</i>`;
-        }
+        description += buildSaveDescription(rollEvent, rerolledD20, newTotal);
     } else {
-        // check or skill
-        const { d20, bonus, checkName } = rollEvent;
-        const originalTotal = d20 + bonus;
-
-        description += `${checkName || 'Ability check'}: d20(${d20}) + ${bonus} = ${originalTotal}<br/>`;
-        description += `Reroll with Advantage: d20(${rerolledD20}) + ${bonus} = <b>${newTotal}</b>`;
-
-        if (newTotal > originalTotal) {
-            description += `<br/><i>The reroll improved the result!</i>`;
-        }
+        description += buildCheckDescription(rollEvent, rerolledD20, newTotal);
     }
 
     const { outcome, effect } = computeOutcome(rollEvent, rerolledD20, newTotal);

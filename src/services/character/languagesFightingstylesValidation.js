@@ -202,6 +202,30 @@ function addLanguageSource(preSelected, langs) {
     return langs.length;
 }
 
+function countLanguagesFromClassLevels(classLevels, level, countFeature) {
+    let allowed = 0;
+    for (const classLevel of classLevels) {
+        if (classLevel.level <= level && classLevel.features) {
+            for (const feature of classLevel.features) {
+                allowed += countFeature(feature);
+            }
+        }
+    }
+    return allowed;
+}
+
+async function addSubraceLanguageGrants(subraceName, ruleset, preSelected) {
+    const subraceData = await fetchSubraceData(subraceName, ruleset);
+    if (!subraceData) {
+        return 0;
+    }
+    if (subraceData.languages && subraceData.languages.length > 0) {
+        preSelected.push(...subraceData.languages);
+        // Don't add to allowed count if already counted in race
+    }
+    return subraceData.language_options?.choose || 0;
+}
+
 async function getLanguageLimits2024(formData) {
     const className = formData.class?.name || '';
     const raceName = formData.race?.name || '';
@@ -235,15 +259,9 @@ async function getLanguageLimits2024(formData) {
 
     // Also check class_levels for language features (e.g., Ranger "Deft Explorer")
     if (classData?.class_levels) {
-        for (const classLevel of classData.class_levels) {
-            if (classLevel.level <= level && classLevel.features) {
-                for (const feature of classLevel.features) {
-                    if (feature.description?.match(/\blanguages?\b/i)) {
-                        allowed += countLanguagesFrom2024Feature(feature);
-                    }
-                }
-            }
-        }
+        allowed += countLanguagesFromClassLevels(classData.class_levels, level, feature =>
+            feature.description?.match(/\blanguages?\b/i) ? countLanguagesFrom2024Feature(feature) : 0
+        );
     }
 
     return { allowed, preSelected, details: `In 2024 rules, languages come from your race, class, and background.` };
@@ -262,41 +280,24 @@ async function getLanguageLimits5e(formData) {
     let allowed = 0;
     const preSelected = [];
 
-    // Race languages
+    // Race languages and racial language bonuses from JSON
     if (raceData) {
         allowed += addLanguageSource(preSelected, raceData.languages || []);
-    }
-
-    // Racial language bonuses from JSON
-    if (raceData?.language_options) {
-        allowed += raceData.language_options.choose || 1;
+        if (raceData.language_options) {
+            allowed += raceData.language_options.choose || 1;
+        }
     }
 
     // Subrace languages
     if (subraceName) {
-        const subraceData = subraceName ? await fetchSubraceData(subraceName, ruleset) : null;
-        if (subraceData && subraceData.languages && subraceData.languages.length > 0) {
-            preSelected.push(...subraceData.languages);
-            // Don't add to allowed count if already counted in race
-        }
-        if (subraceData?.language_options) {
-            allowed += subraceData.language_options.choose || 0;
-        }
+        allowed += await addSubraceLanguageGrants(subraceName, ruleset, preSelected);
     }
 
-    // Class languages from JSON
+    // Class languages from JSON, plus class_levels language features
     if (classData) {
         allowed += addLanguageSource(preSelected, classData.languages || []);
-    }
-
-    // Check class_levels for language features
-    if (classData?.class_levels) {
-        for (const classLevel of classData.class_levels) {
-            if (classLevel.level <= level && classLevel.features) {
-                for (const feature of classLevel.features) {
-                    allowed += countLanguagesFrom5eClassLevelFeature(feature);
-                }
-            }
+        if (classData.class_levels) {
+            allowed += countLanguagesFromClassLevels(classData.class_levels, level, countLanguagesFrom5eClassLevelFeature);
         }
     }
 

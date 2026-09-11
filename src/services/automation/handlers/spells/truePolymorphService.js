@@ -72,28 +72,26 @@ export async function applyTruePolymorph(spell, metaCtx, playerStats, campaignNa
     }
 }
 
-export async function confirmTruePolymorphTransform({ targetName, creature, casterName, spell, playerStats, campaignName, mode }) {
-    if (mode === 'object_into_creature' && !targetName) {
-        const cs = getCombatSummary(campaignName);
-        let initiativeValue = 0;
-        if (cs?.creatures) {
-            const casterCreature = cs.creatures.find(c => c.name === casterName);
-            if (casterCreature?.initiative !== '' && casterCreature?.initiative !== undefined) {
-                initiativeValue = parseInt(casterCreature.initiative, 10) || 0;
-            }
-            const casterInitBonus = casterCreature?.initiativeBonus || 0;
-            initiativeValue = initiativeValue || (Math.floor(Math.random() * 20) + 1 + casterInitBonus);
-        }
-        return await summonCreatureFromObject(creature.index, casterName, initiativeValue, spell.level || 9, playerStats, campaignName);
+function resolveSummonInitiative(casterName, campaignName) {
+    const cs = getCombatSummary(campaignName);
+    if (!cs?.creatures) return 0;
+    const casterCreature = cs.creatures.find(c => c.name === casterName);
+    let initiativeValue = 0;
+    if (casterCreature?.initiative !== '' && casterCreature?.initiative !== undefined) {
+        initiativeValue = parseInt(casterCreature.initiative, 10) || 0;
     }
+    const casterInitBonus = casterCreature?.initiativeBonus || 0;
+    return initiativeValue || (Math.floor(Math.random() * 20) + 1 + casterInitBonus);
+}
 
-    const cs = await getCombatContext(campaignName);
-    const creatureObj = cs.creatures.find(c => c.name === targetName);
-    if (!creatureObj) {
-        console.error(`[truePolymorphService] Target ${targetName} not found in combat.`);
-        return { ok: false, reason: 'no_target' };
-    }
+async function addCasterConcentration(cs, casterName, concentrationSpellName, playerStats, campaignName) {
+    const concentrationDc = 8 + (playerStats.proficiency || 2) + (playerStats.abilities?.CON?.bonus ?? 0);
+    addConcentration(cs, casterName, concentrationSpellName, concentrationDc);
+    await storage.set('combatSummary', cs, campaignName);
+    setCombatSummaryCache(cs, campaignName);
+}
 
+function applyCreatureForm(creatureObj, creature, targetName, casterName, campaignName) {
     const creatureHp = typeof creature.hit_points === 'number' ? creature.hit_points : 0;
     const creatureAc = typeof creature.armor_class === 'number' ? creature.armor_class : 10;
 
@@ -119,10 +117,9 @@ export async function confirmTruePolymorphTransform({ targetName, creature, cast
 
     setRuntimeValue(targetName, 'tempHp', creatureHp, campaignName);
     setRuntimeValue(targetName, 'polymorphTempHp', creatureHp, campaignName);
+}
 
-    await storage.set('combatSummary', cs, campaignName);
-    setCombatSummaryCache(cs, campaignName);
-
+function stampTruePolymorphEffect(targetName, casterName, creature, mode, campaignName) {
     const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
     const cleaned = targetEffects.filter(te => {
         const teTarget = Array.isArray(te.target) ? te.target[0] : te.target;
@@ -137,13 +134,31 @@ export async function confirmTruePolymorphTransform({ targetName, creature, cast
         mode: mode || 'creature_to_creature',
     });
     setRuntimeValue('campaign', 'targetEffects', cleaned, campaignName, true);
+}
+
+export async function confirmTruePolymorphTransform({ targetName, creature, casterName, spell, playerStats, campaignName, mode }) {
+    if (mode === 'object_into_creature' && !targetName) {
+        const initiativeValue = resolveSummonInitiative(casterName, campaignName);
+        return await summonCreatureFromObject(creature.index, casterName, initiativeValue, spell.level || 9, playerStats, campaignName);
+    }
+
+    const cs = await getCombatContext(campaignName);
+    const creatureObj = cs.creatures.find(c => c.name === targetName);
+    if (!creatureObj) {
+        console.error(`[truePolymorphService] Target ${targetName} not found in combat.`);
+        return { ok: false, reason: 'no_target' };
+    }
+
+    applyCreatureForm(creatureObj, creature, targetName, casterName, campaignName);
+
+    await storage.set('combatSummary', cs, campaignName);
+    setCombatSummaryCache(cs, campaignName);
+
+    stampTruePolymorphEffect(targetName, casterName, creature, mode, campaignName);
 
     const casterCreature = cs.creatures.find(c => c.name === casterName);
     if (casterCreature) {
-        const concentrationDc = 8 + (playerStats.proficiency || 2) + (playerStats.abilities?.CON?.bonus ?? 0);
-        addConcentration(cs, casterName, spell?.name || 'True Polymorph', concentrationDc);
-        await storage.set('combatSummary', cs, campaignName);
-        setCombatSummaryCache(cs, campaignName);
+        await addCasterConcentration(cs, casterName, spell?.name || 'True Polymorph', playerStats, campaignName);
     }
 
     const expirations = getRuntimeValue(casterName, 'pendingExpirations', campaignName);
@@ -232,10 +247,7 @@ export async function applyObjectTransform(targetName, objectType, casterName, s
 
     const casterCreature = cs.creatures.find(c => c.name === casterName);
     if (casterCreature) {
-        const concentrationDc = 8 + (playerStats.proficiency || 2) + (playerStats.abilities?.CON?.bonus ?? 0);
-        addConcentration(cs, casterName, spell?.name || 'True Polymorph', concentrationDc);
-        await storage.set('combatSummary', cs, campaignName);
-        setCombatSummaryCache(cs, campaignName);
+        await addCasterConcentration(cs, casterName, spell?.name || 'True Polymorph', playerStats, campaignName);
     }
 
     addEntry(campaignName, {
@@ -295,11 +307,7 @@ export async function summonCreatureFromObject(monsterIndex, casterName, initiat
 
     cs.creatures.push(creature);
 
-    const concentrationDc = 8 + (playerStats.proficiency || 2) + (playerStats.abilities?.CON?.bonus ?? 0);
-    addConcentration(cs, casterName, 'True Polymorph', concentrationDc);
-
-    await storage.set('combatSummary', cs, campaignName);
-    setCombatSummaryCache(cs, campaignName);
+    await addCasterConcentration(cs, casterName, 'True Polymorph', playerStats, campaignName);
 
     // Sequential await (§6-#18): te POST lands after the cs persist so a racing
     // combatSummary snapshot cannot resurrect a stale targetEffects list.

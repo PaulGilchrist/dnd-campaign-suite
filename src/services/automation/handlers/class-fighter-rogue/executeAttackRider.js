@@ -207,41 +207,8 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
         return applyBrutalStrikeRider(maneuver, targetName, playerStats, campaignName, dieValue, dieDescription, description);
     }
 
-    if (maneuver.saveType && targetName) {
-        const saveDc = buildSaveDc(auto, playerStats);
-        const { promise } = createSaveListener(campaignName, {
-            targetName,
-            saveType: maneuver.saveType,
-            saveDc,
-        });
-
-        const saveResult = await promise;
-        const success = saveResult.success;
-
-        description += ` Target made ${maneuver.saveType} save DC ${saveDc}: ${success ? 'Success' : 'Failure'}.`;
-
-        const saveEffectDesc = await processManeuverSaveResult(maneuver, targetName, saveDc, success, playerStats, campaignName);
-        description += saveEffectDesc;
-    }
-    else if (maneuver.saveType) {
-        const saveDc = buildSaveDc(auto, playerStats);
-        description += buildManeuverSaveDescription(maneuver, saveDc);
-    }
-
-    if (maneuver.effect === 'next_attack_advantage' || maneuver.effect === 'distracting_strike_advantage') {
-        description += ` The next attack against ${targetName || 'the target'} by an ally has Advantage.`;
-        if (targetName) {
-            const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-            const newEffect = {
-                target: targetName,
-                source: playerStats.name,
-                effect: 'distracting_strike_advantage',
-                value: null,
-                duration: 'until_end_of_turn',
-            };
-            await setRuntimeValue('campaign', 'targetEffects', [...storedEffects, newEffect], campaignName);
-        }
-    }
+    description = await applyManeuverSaveOutcome(description, maneuver, auto, targetName, playerStats, campaignName);
+    description = await applyAdvantageRiderEffect(description, maneuver, targetName, playerStats, campaignName);
 
     if (maneuver.effect === 'ally_movement') {
         description += ` Choose a willing ally: that ally can use its Reaction to move up to half its Speed without provoking Opportunity Attacks from ${targetName || 'the target'}.`;
@@ -253,34 +220,10 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
 
     if (maneuver.damageBonus) {
         description += ` Added ${dieValue} to the damage roll.`;
-        // MN-020: the accumulated description already carries the save outcome and
-        // any condition text ("fell Prone") — the log must carry the same full text.
-        const logEntry = {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: maneuver.name,
-            description: `${maneuver.name}: ${description}`,
-        };
-
-        return {
-            type: 'popup',
-            dieValue,
-            payload: {
-                type: 'automation_info',
-                name: maneuver.name,
-                description,
-            },
-            logEntries: [logEntry],
-        };
     }
 
-    const logEntry = {
-        type: 'ability_use',
-        characterName: playerStats.name,
-        abilityName: maneuver.name,
-        description: `${maneuver.name}: ${description}`,
-    };
-
+    // MN-020: the accumulated description already carries the save outcome and
+    // any condition text ("fell Prone") — the log must carry the same full text.
     return {
         type: 'popup',
         dieValue,
@@ -289,6 +232,52 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
             name: maneuver.name,
             description,
         },
-        logEntries: [logEntry],
+        logEntries: [{
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: maneuver.name,
+            description: `${maneuver.name}: ${description}`,
+        }],
     };
+}
+
+async function applyManeuverSaveOutcome(description, maneuver, auto, targetName, playerStats, campaignName) {
+    if (!maneuver.saveType) return description;
+    const saveDc = buildSaveDc(auto, playerStats);
+    if (!targetName) {
+        return description + buildManeuverSaveDescription(maneuver, saveDc);
+    }
+
+    const { promise } = createSaveListener(campaignName, {
+        targetName,
+        saveType: maneuver.saveType,
+        saveDc,
+    });
+
+    const saveResult = await promise;
+    const success = saveResult.success;
+
+    description += ` Target made ${maneuver.saveType} save DC ${saveDc}: ${success ? 'Success' : 'Failure'}.`;
+
+    const saveEffectDesc = await processManeuverSaveResult(maneuver, targetName, saveDc, success, playerStats, campaignName);
+    return description + saveEffectDesc;
+}
+
+async function applyAdvantageRiderEffect(description, maneuver, targetName, playerStats, campaignName) {
+    if (maneuver.effect !== 'next_attack_advantage' && maneuver.effect !== 'distracting_strike_advantage') {
+        return description;
+    }
+    description += ` The next attack against ${targetName || 'the target'} by an ally has Advantage.`;
+    if (targetName) {
+        const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+        const newEffect = {
+            target: targetName,
+            source: playerStats.name,
+            effect: 'distracting_strike_advantage',
+            value: null,
+            duration: 'until_end_of_turn',
+        };
+        await setRuntimeValue('campaign', 'targetEffects', [...storedEffects, newEffect], campaignName);
+    }
+    return description;
 }

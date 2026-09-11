@@ -46,6 +46,41 @@ import { applyMasteryEffect } from '../../services/automation/handlers/combat/we
 import { normalizeAutoDamage } from './useAttackDamageResolution.js';
 
 import './CharActions.css'
+
+function resolveActionSpellRow(spell, playerStats) {
+    const damageType = typeof spell.damage === 'string' ? '' : (spell.damage?.damage_type || '');
+    const resolvedDamage = spell.heal_at_slot_level
+        ? resolveHealExpression(spell, playerStats.level, playerStats.spellAbilities?.modifier || 0)
+        : resolveSpellDamageAtLevel(spell, playerStats.level);
+    const autoHit = isAutoHitSpell(spell);
+    const isSpellAtk = !spell.dc;
+    const hasAttackType = spell.attack_type != null && spell.attack_type !== '';
+    const attackItem = { ...spell, type: 'Action', hitBonus: playerStats.spellAbilities?.toHit, saveDc: spell.dc ? playerStats.spellAbilities.saveDc : null, saveType: spell.dc?.dc_type, saveSuccess: spell.dc?.dc_success, damage: resolvedDamage, damageType };
+    return { damageType, resolvedDamage, autoHit, isSpellAtk, hasAttackType, attackItem };
+}
+
+function renderActionSpellHitCell({ autoHit, isSpellAtk, hasAttackType, cannotAct, conditionAttackMode, toHit, exhaustionPenalty, saveDc, displaySaveDcBonus, dcType, attackItem, handleSpellAttackClick }) {
+    if (autoHit) return <div></div>;
+    if (isSpellAtk) {
+        if (!hasAttackType) return <div></div>;
+        const penalized = exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? ' stat--penalized' : '';
+        return <div className={"clickable" + penalized + (cannotAct ? ' disabled-attack' : '')} onClick={() => handleSpellAttackClick(attackItem)}>{signFormatter.format(toHit - exhaustionPenalty)}</div>;
+    }
+    return <div className="save-dc-display">DC {saveDc + displaySaveDcBonus} {dcType}</div>;
+}
+
+function handleActionSpellDamageClick({ attackItem, spell, isSpellAtk, resolvedDamage, cannotAct, resolveSpellDamage, actionGateMetamagic }) {
+    if (cannotAct) return;
+    // SINGLE ENTRY POINT for action spell casting:
+    // - Save DC spells: resolveSpellDamage (from useActionSpellMetamagic) handles AoE modals + prepareSpellCast
+    // - Non-save-DC spells: actionGateMetamagic is the single entry point (calls prepareSpellCast → spell slots, concentration)
+    // NEVER call actionCastAction, castAction, or executeSpellCast directly from JSX onClick handlers.
+    if (isSpellAtk && spell.saveDc) { resolveSpellDamage(attackItem); return; }
+    if (isSpellAtk) { actionGateMetamagic(spell, {}); return; }
+    if (resolvedDamage) { resolveSpellDamage(attackItem); return; }
+    actionGateMetamagic(spell, {});
+}
+
 const CharActions = function CharActions({ playerStats, campaignName, exhaustionPenalty = 0, conditionAttackMode, conditionEffects, cannotAct, cannotActReason = null, mapName, onBuffsChange, characters, onSpellModalStateChange, spellModalState }) {
     const [actions, setActions] = useState([]);
     const [selectedActionSpell, setSelectedActionSpell] = useState(null);
@@ -438,36 +473,13 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
                         </React.Fragment>;
                     })}
                     {actionSpells.map((spell) => {
-                        const damageType = typeof spell.damage === 'string' ? '' : (spell.damage?.damage_type || '');
-                        const resolvedDamage = spell.heal_at_slot_level
-                            ? resolveHealExpression(spell, playerStats.level, playerStats.spellAbilities?.modifier || 0)
-                            : resolveSpellDamageAtLevel(spell, playerStats.level);
-                        const autoHit = isAutoHitSpell(spell);
-                        const isSpellAtk = !spell.dc;
-                        const hasAttackType = spell.attack_type != null && spell.attack_type !== '';
-                        const attackItem = { ...spell, type: 'Action', hitBonus: playerStats.spellAbilities?.toHit, saveDc: spell.dc ? playerStats.spellAbilities.saveDc : null, saveType: spell.dc?.dc_type, saveSuccess: spell.dc?.dc_success, damage: resolvedDamage, damageType };
+                        const { damageType, resolvedDamage, autoHit, isSpellAtk, hasAttackType, attackItem } = resolveActionSpellRow(spell, playerStats);
                         return <React.Fragment key={spell.name}>
                             <div className='left clickable' onClick={() => handleActionSpellClick(spell.name)}>{spell.name}</div>
                             <div>{spell.level === 0 ? 'Cantrip' : spell.level}</div>
                             <div>{formatRange(spell.range)}</div>
-                            {autoHit
-                                ? <div></div>
-                                : isSpellAtk && hasAttackType
-                                    ? <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => handleSpellAttackClick(attackItem)}>{signFormatter.format(playerStats.spellAbilities?.toHit - exhaustionPenalty)}</div>
-                                    : isSpellAtk && !hasAttackType
-                                        ? <div></div>
-                                        : <div className="save-dc-display">DC {playerStats.spellAbilities?.saveDc + displaySaveDcBonus} {spell.dc?.dc_type}</div>}
-                            <div className={resolvedDamage ? "clickable" : ""} onClick={() => {
-                                if (cannotAct) return;
-                                // SINGLE ENTRY POINT for action spell casting:
-                                // - Save DC spells: resolveSpellDamage (from useActionSpellMetamagic) handles AoE modals + prepareSpellCast
-                                // - Non-save-DC spells: actionGateMetamagic is the single entry point (calls prepareSpellCast → spell slots, concentration)
-                                // NEVER call actionCastAction, castAction, or executeSpellCast directly from JSX onClick handlers.
-                                if (isSpellAtk && spell.saveDc) { resolveSpellDamage(attackItem); return; }
-                                if (isSpellAtk) { actionGateMetamagic(spell, {}); return; }
-                                if (resolvedDamage) { resolveSpellDamage(attackItem); return; }
-                                actionGateMetamagic(spell, {});
-                            }}>{getSpellDamageDisplay(spell)}</div>
+                            {renderActionSpellHitCell({ autoHit, isSpellAtk, hasAttackType, cannotAct, conditionAttackMode, toHit: playerStats.spellAbilities?.toHit, exhaustionPenalty, saveDc: playerStats.spellAbilities?.saveDc, displaySaveDcBonus, dcType: spell.dc?.dc_type, attackItem, handleSpellAttackClick })}
+                            <div className={resolvedDamage ? "clickable" : ""} onClick={() => handleActionSpellDamageClick({ attackItem, spell, isSpellAtk, resolvedDamage, cannotAct, resolveSpellDamage, actionGateMetamagic })}>{getSpellDamageDisplay(spell)}</div>
                             <div className='left'>{damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility')}</div>
                             {is2024Rules && hasWeaponMastery && <div></div>}
                         </React.Fragment>;

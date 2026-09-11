@@ -270,42 +270,14 @@ export async function rollbackSpellEffects(lastAttack, campaignName, featureName
 
     if (targetResults && targetResults.length > 0) {
         for (const tr of targetResults) {
-            if (tr.appliedDamage > 0) {
-                const healResult = applyHealingToTarget(cs, tr.targetName, tr.appliedDamage, campaignName);
-                if (healResult?.newHp != null) {
-                    rolledBack.damageHealed += tr.appliedDamage;
-                    rolledBack.targetsHealed++;
-                }
-            }
-            for (const condition of tr.conditions) {
-                try {
-                    removeCondition(cs, tr.targetName, condition, getRuntimeValue, setRuntimeValue, campaignName);
-                    rolledBack.conditionsRemoved.push({ targetName: tr.targetName, condition });
-                } catch (e) {
-                    console.error(`[${featureName}] Failed to remove condition '${condition}' from ${tr.targetName}:`, e);
-                }
-            }
+            rollbackTarget(cs, tr.targetName, tr.appliedDamage, tr.conditions, rolledBack, featureName, campaignName);
         }
     } else {
         const totalDamage = lastAttack.actualDamage ?? ((lastAttack.primaryDamage || 0) + (lastAttack.secondaryDamage || 0));
         const conditionKeys = lastAttack.statusEffects || [];
 
         for (const targetName of targets) {
-            if (totalDamage > 0) {
-                const healResult = applyHealingToTarget(cs, targetName, totalDamage, campaignName);
-                if (healResult?.newHp != null) {
-                    rolledBack.damageHealed += totalDamage;
-                    rolledBack.targetsHealed++;
-                }
-            }
-            for (const condition of conditionKeys) {
-                try {
-                    removeCondition(cs, targetName, condition, getRuntimeValue, setRuntimeValue, campaignName);
-                    rolledBack.conditionsRemoved.push({ targetName, condition });
-                } catch (e) {
-                    console.error(`[${featureName}] Failed to remove condition '${condition}' from ${targetName}:`, e);
-                }
-            }
+            rollbackTarget(cs, targetName, totalDamage, conditionKeys, rolledBack, featureName, campaignName);
         }
     }
 
@@ -326,6 +298,24 @@ export async function rollbackSpellEffects(lastAttack, campaignName, featureName
     rolledBack.logDescription = `${attackerName}'s spell '${spellName}' was countered — ${damageStr}, ${conditionStr}, ${effectStr} on ${affectedList}.`;
 
     return rolledBack;
+}
+
+function rollbackTarget(cs, targetName, damage, conditions, rolledBack, featureName, campaignName) {
+    if (damage > 0) {
+        const healResult = applyHealingToTarget(cs, targetName, damage, campaignName);
+        if (healResult?.newHp != null) {
+            rolledBack.damageHealed += damage;
+            rolledBack.targetsHealed++;
+        }
+    }
+    for (const condition of conditions) {
+        try {
+            removeCondition(cs, targetName, condition, getRuntimeValue, setRuntimeValue, campaignName);
+            rolledBack.conditionsRemoved.push({ targetName, condition });
+        } catch (e) {
+            console.error(`[${featureName}] Failed to remove condition '${condition}' from ${targetName}:`, e);
+        }
+    }
 }
 
 

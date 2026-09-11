@@ -76,6 +76,48 @@ export async function computeTotalSkilledUsage(formData, skillChoiceSources) {
   return skilledSkillUsage + skilledToolUsage;
 }
 
+function buildToolsByCategory(equipment) {
+  const toolCategories = ["Artisan's Tools", 'Gaming Sets', 'Musical Instrument', 'Other Tools'];
+  const toolsByCategory = {};
+  toolCategories.forEach(cat => {
+    toolsByCategory[cat] = new Set(
+      equipment.filter(e =>
+        e.equipment_category === 'Tools' &&
+        e.tool_category === cat
+      ).map(e => e.name)
+    );
+  });
+  return toolsByCategory;
+}
+
+function applyToolProficiencySource(proficiencyString, categoryLimits, preSelectedTools) {
+  const parsed = parseToolChoiceString?.(proficiencyString);
+  if (parsed?.isChoice) {
+    for (const cat of parsed.categories) {
+      categoryLimits.set(cat, (categoryLimits.get(cat) || 0) + parsed.count);
+    }
+  } else {
+    preSelectedTools.add(proficiencyString);
+  }
+}
+
+// Feats (e.g., Chef grants Cook's Utensils)
+async function collectFeatGrantedTools(selectedFeats, preSelectedTools) {
+  const allFeats = await loadFeatData('2024');
+  for (const featName of selectedFeats) {
+    const feat = allFeats.find(f => f.name === featName || f.index === featName.toLowerCase());
+    if (!feat) continue;
+    const chefBenefit = feat.benefits.find(b =>
+      b.type === 'proficiency' &&
+      b.description &&
+      /cook['\u2019]?\w*\s*utensil/i.test(b.description)
+    );
+    if (chefBenefit) {
+      preSelectedTools.add("Cook's Utensils");
+    }
+  }
+}
+
 /**
  * Computes how many tool proficiency selections are not covered by category limits (i.e., from Skilled)
  * @param {object} formData - The character form data
@@ -96,16 +138,7 @@ export async function computeSkilledToolUsageOnly(formData) {
     return 0;
   }
 
-  const toolCategories = ["Artisan's Tools", 'Gaming Sets', 'Musical Instrument', 'Other Tools'];
-  const toolsByCategory = {};
-  toolCategories.forEach(cat => {
-    toolsByCategory[cat] = new Set(
-      equipment.filter(e =>
-        e.equipment_category === 'Tools' &&
-        e.tool_category === cat
-      ).map(e => e.name)
-    );
-  });
+  const toolsByCategory = buildToolsByCategory(equipment);
 
   // Build category limits and pre-selected tools from class and background
   const categoryLimits = new Map();
@@ -114,47 +147,19 @@ export async function computeSkilledToolUsageOnly(formData) {
   if (backgroundName) {
     const bgData = await fetchBackgroundData(backgroundName, '2024');
     if (bgData?.tool_proficiencies) {
-      const parsed = parseToolChoiceString?.(bgData.tool_proficiencies);
-      if (parsed?.isChoice) {
-        for (const cat of parsed.categories) {
-          categoryLimits.set(cat, (categoryLimits.get(cat) || 0) + parsed.count);
-        }
-      } else {
-        preSelectedTools.add(bgData.tool_proficiencies);
-      }
+      applyToolProficiencySource(bgData.tool_proficiencies, categoryLimits, preSelectedTools);
     }
   }
 
   if (className) {
     const classData = await fetchClassData(className, '2024');
     if (classData?.tool_proficiencies) {
-      const parsed = parseToolChoiceString?.(classData.tool_proficiencies);
-      if (parsed?.isChoice) {
-        for (const cat of parsed.categories) {
-          categoryLimits.set(cat, (categoryLimits.get(cat) || 0) + parsed.count);
-        }
-      } else {
-        preSelectedTools.add(classData.tool_proficiencies);
-      }
+      applyToolProficiencySource(classData.tool_proficiencies, categoryLimits, preSelectedTools);
     }
   }
 
-  // Feats (e.g., Chef grants Cook's Utensils)
   if (formData.feats && formData.feats.length > 0) {
-    const allFeats = await loadFeatData('2024');
-    for (const featName of formData.feats) {
-      const feat = allFeats.find(f => f.name === featName || f.index === featName.toLowerCase());
-      if (feat) {
-        const chefBenefit = feat.benefits.find(b =>
-          b.type === 'proficiency' &&
-          b.description &&
-          /cook['\u2019]?\w*\s*utensil/i.test(b.description)
-        );
-        if (chefBenefit) {
-          preSelectedTools.add("Cook's Utensils");
-        }
-      }
-    }
+    await collectFeatGrantedTools(formData.feats, preSelectedTools);
   }
 
   // Filter out pre-selected and placeholder tools

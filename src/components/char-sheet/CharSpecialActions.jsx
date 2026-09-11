@@ -125,71 +125,13 @@ function buildUniqueSpecialActions(playerStats, fightingStylesMap) {
     return Array.from(new Map(filteredActions.map(action => [action.name, action])).values());
 }
 
-function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, mapName }) {
-    const [teleportModal, setTeleportModal] = useState(null);
-    const [moonlightStepFallback, setMoonlightStepFallback] = useState(null);
-    const [signatureSpellsModal, setSignatureSpellsModal] = useState(null);
-    const [spellMasteryModal, setSpellMasteryModal] = useState(null);
-    const [savantModal, setSavantModal] = useState(null);
-    const [weaponKindMasteryModal, setWeaponKindMasteryModal] = useState(null);
-    const [weaponMasteryChoiceModal, setWeaponMasteryChoiceModal] = useState(null);
-    const [resourcePoolModal, setResourcePoolModal] = useState(null);
-    const [naturalRecoveryModal, setNaturalRecoveryModal] = useState(null);
-    const [circleOfTheLandSpellsModal, setCircleOfTheLandSpellsModal] = useState(null);
-    const [featureChoiceModal, setFeatureChoiceModal] = useState(null);
-    const [aspectOfTheWildsModal, setAspectOfTheWildsModal] = useState(null);
-    const [elementalAffinityModal, setElementalAffinityModal] = useState(null);
-    const [wildMagicSurgeModal, setWildMagicSurgeModal] = useState(null);
-    const [strideModal, setStrideModal] = useState(null);
-    const [epitomeModal, setEpitomeModal] = useState(null);
-    const [destructiveStrideModal, setDestructiveStrideModal] = useState(null);
-    const [destructiveStrideTargetModal, setDestructiveStrideTargetModal] = useState(null);
-    const [quiveringPalmModal, setQuiveringPalmModal] = useState(null);
-    const [celestialResilienceModal, setCelestialResilienceModal] = useState(null);
-    const [fiendishResilienceModal, setFiendishResilienceModal] = useState(null);
-    const [fiendishLegacyModal, setFiendishLegacyModal] = useState(null);
-    const [multiResistanceModal, setMultiResistanceModal] = useState(null);
-    const [stepsOfTheFeyTauntModal, setStepsOfTheFeyTauntModal] = useState(null);
-    const [mistyWandererModal, setMistyWandererModal] = useState(null);
-    const [twinklingConstellationModal, setTwinklingConstellationModal] = useState(null);
-    const [hurlThroughHellModal, setHurlThroughHellModal] = useState(null);
-    const [clairvoyantCombatantModal, setClairvoyantCombatantModal] = useState(null);
-    const [portentModal, setPortentModal] = useState(null);
-    const [replenishingMealModal, setReplenishingMealModal] = useState(null);
-    const [bolsteringTreatsModal, setBolsteringTreatsModal] = useState(null);
-    const [bolsteringPerformanceModal, setBolsteringPerformanceModal] = useState(null);
-    const [encouragingSongModal, setEncouragingSongModal] = useState(null);
-    const [elfishLineageModal, setElfisLineageModal] = useState(null);
-    const [gnomishLineageModal, setGnomishLineageModal] = useState(null);
-    const [feyReinforcementsModal, setFeyReinforcementsModal] = useState(null);
-    const [fightingStylesMap, setFightingStylesMap] = useState(null);
-    const { setPopupHtml } = useDiceRollPopup();
-    const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats?.name, campaignName, {
-        characters,
-        autoDamageSource: 'char-special-actions',
-        autoDamageRoll: async (autoDamage, isCrit) => {
-            const { attack, ctx: ctxOverrides } = normalizeAutoDamage(autoDamage, isCrit, playerStats);
-            await resolveAttackDamageStandalone(attack, ctxOverrides, { playerStats, campaignName, setPopupHtml, rollDamage, setModalState: () => {} });
-            if (autoDamage.ripostePopup) {
-                const payload = autoDamage.ripostePopup;
-                const html = typeof payload === 'string'
-                ? payload
-                : `<b><i class="fa-solid fa-bolt"></i> ${payload.name || 'Combat Superiority'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-                setPopupHtml(html);
-            }
-        },
-    });
-    const {
-        combatSuperiorityModal,
-        setCombatSuperiorityModal,
-        handleCombatSuperiorityConfirm,
-        handleCombatSuperiorityReopenSelection,
-    } = useCombatSuperiorityModal(playerStats, campaignName, rollAttack, rollDamage, setPopupHtml);
+function useReplenishingMeal(playerStats, campaignName, cannotAct, characters, setPopupHtml) {
     const hasReplenishingMeal = (playerStats.automation?.passives ?? []).some(
         p => p.type === 'passive_rule' && p.effect === 'bonus_healing' && p.name === 'Replenishing Meal'
     );
     const replenishingMeals = useRuntimeValue(playerStats.name, 'replenishingMeals', campaignName);
     const replenishingMealMax = hasReplenishingMeal ? 4 + (playerStats.proficiency || 0) : 0;
+    const [replenishingMealModal, setReplenishingMealModal] = useState(null);
     const handleReplenishingMealClick = useCallback(async () => {
         if (cannotAct) return;
         if (!hasReplenishingMeal) return;
@@ -222,11 +164,16 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
         setPopupHtml(html);
         setReplenishingMealModal(null);
     }, [replenishingMealModal, replenishingMeals, replenishingMealMax, campaignName, setPopupHtml, playerStats.name]);
+    return { replenishingMealModal, setReplenishingMealModal, handleReplenishingMealClick, handleReplenishingMealConfirm };
+}
+
+function useBolsteringTreats(playerStats, campaignName, cannotAct, characters, setPopupHtml) {
     const hasBolsteringTreats = (playerStats.automation?.specialActions ?? []).some(
         p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats'
     );
     const chefBolsteringTreats = useRuntimeValue(playerStats.name, 'chefBolsteringTreats', campaignName);
     const bolsteringTreatsMax = hasBolsteringTreats ? (playerStats.proficiency || 0) : 0;
+    const [bolsteringTreatsModal, setBolsteringTreatsModal] = useState(null);
     const handleBolsteringTreatsClick = useCallback(async () => {
         if (cannotAct) return;
         if (!hasBolsteringTreats) return;
@@ -259,6 +206,10 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
         setPopupHtml(html);
         setBolsteringTreatsModal(null);
     }, [bolsteringTreatsModal, chefBolsteringTreats, bolsteringTreatsMax, campaignName, setPopupHtml, playerStats.name]);
+    return { bolsteringTreatsModal, setBolsteringTreatsModal, handleBolsteringTreatsClick, handleBolsteringTreatsConfirm };
+}
+
+function useBrewPoison(playerStats, campaignName, cannotAct, setPopupHtml) {
     const hasPoisonerFeat = (playerStats.automation?.specialActions ?? []).some(
         p => p.type === 'brew_poison' && p.name === 'Brew Poison'
     );
@@ -305,6 +256,133 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
         const html = `<b>Brew Poison</b><br/>Brewed ${max - current} poison dose${max - current !== 1 ? 's' : ''} using a Poisoner's Kit (50 GP, 1 hour). Poison Doses: ${max}/${max}.<br/><span class="dice-roll-hint">click to dismiss</span>`;
         setPopupHtml(html);
     }, [cannotAct, hasPoisonerFeat, poisonDoses, poisonDosesMax, campaignName, setPopupHtml, playerStats.inventory, playerStats.name]);
+    return { handleBrewPoisonClick };
+}
+
+// Feature-choice prompt tables: auto.type → options list shown when no choice stored yet.
+const FEATURE_CHOICE_PROMPTS = {
+    defensive_tactics: ['Escape the Horde', 'Multiattack Defense'],
+    hunter_prey: ['Colossus Slayer', 'Horde Breaker'],
+};
+
+// Opens the feature-choice / animal-aspect modal when the automation needs a
+// choice before running. Returns true when the click was consumed.
+function openChoicePromptIfNeeded(action, auto, playerStats, campaignName, h) {
+    const promptOptions = FEATURE_CHOICE_PROMPTS[auto?.type];
+    if (promptOptions) {
+        const optionKey = `_${action.name.replace(/\s+/g, '_')}_choice`;
+        const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
+        if (!chosenOption) {
+            h.setFeatureChoiceModal({ action, options: promptOptions, optionKey });
+            return true;
+        }
+        return false;
+    }
+    if (auto?.type === 'damage_bonus' && auto.options?.length > 0 && auto.options.every(o => typeof o === 'string')) {
+        const optionKey = `_${action.name.replace(/\s+/g, '_')}_option`;
+        h.setFeatureChoiceModal({ action, options: auto.options, optionKey });
+        return true;
+    }
+    if (auto?.type === 'animal_aspect') {
+        const alreadyUsed = getRuntimeValue(playerStats.name, 'aspectOfTheWildsUsedThisRest', campaignName);
+        if (alreadyUsed) {
+            const html = `<b>Aspect of the Wilds</b><br/>Already chosen this rest. It can be changed after a Long Rest.<br/><span class="dice-roll-hint">click to dismiss</span>`;
+            h.setPopupHtml(html);
+            return true;
+        }
+        h.setAspectOfTheWildsModal(true);
+        return true;
+    }
+    return false;
+}
+
+// Simple click delegations keyed on automation type. Returns true when consumed.
+const AUTOMATION_CLICK_DELEGATES = [
+    { match: (auto) => auto?.type === 'passive_rule' && auto?.effect === 'bonus_healing', run: (h) => h.handleReplenishingMealClick() },
+    { match: (auto) => auto?.type === 'temp_hp_buff' && auto?.craftCount, run: (h) => h.handleBolsteringTreatsClick() },
+    { match: (auto) => auto?.type === 'brew_poison', run: (h) => h.handleBrewPoisonClick() },
+    // CLA-226: the swap UI lives in the Short Rest modal — open it (CharSummary listens).
+    { match: (auto) => auto?.type === 'memorize_spell', run: () => window.dispatchEvent(new CustomEvent('open-short-rest')) },
+];
+
+function delegateAutomationClick(auto, h) {
+    const delegate = AUTOMATION_CLICK_DELEGATES.find(d => d.match(auto));
+    if (!delegate) return false;
+    delegate.run(h);
+    return true;
+}
+
+function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, mapName }) {
+    const [teleportModal, setTeleportModal] = useState(null);
+    const [moonlightStepFallback, setMoonlightStepFallback] = useState(null);
+    const [signatureSpellsModal, setSignatureSpellsModal] = useState(null);
+    const [spellMasteryModal, setSpellMasteryModal] = useState(null);
+    const [savantModal, setSavantModal] = useState(null);
+    const [weaponKindMasteryModal, setWeaponKindMasteryModal] = useState(null);
+    const [weaponMasteryChoiceModal, setWeaponMasteryChoiceModal] = useState(null);
+    const [resourcePoolModal, setResourcePoolModal] = useState(null);
+    const [naturalRecoveryModal, setNaturalRecoveryModal] = useState(null);
+    const [circleOfTheLandSpellsModal, setCircleOfTheLandSpellsModal] = useState(null);
+    const [featureChoiceModal, setFeatureChoiceModal] = useState(null);
+    const [aspectOfTheWildsModal, setAspectOfTheWildsModal] = useState(null);
+    const [elementalAffinityModal, setElementalAffinityModal] = useState(null);
+    const [wildMagicSurgeModal, setWildMagicSurgeModal] = useState(null);
+    const [strideModal, setStrideModal] = useState(null);
+    const [epitomeModal, setEpitomeModal] = useState(null);
+    const [destructiveStrideModal, setDestructiveStrideModal] = useState(null);
+    const [destructiveStrideTargetModal, setDestructiveStrideTargetModal] = useState(null);
+    const [quiveringPalmModal, setQuiveringPalmModal] = useState(null);
+    const [celestialResilienceModal, setCelestialResilienceModal] = useState(null);
+    const [fiendishResilienceModal, setFiendishResilienceModal] = useState(null);
+    const [fiendishLegacyModal, setFiendishLegacyModal] = useState(null);
+    const [multiResistanceModal, setMultiResistanceModal] = useState(null);
+    const [stepsOfTheFeyTauntModal, setStepsOfTheFeyTauntModal] = useState(null);
+    const [mistyWandererModal, setMistyWandererModal] = useState(null);
+    const [twinklingConstellationModal, setTwinklingConstellationModal] = useState(null);
+    const [hurlThroughHellModal, setHurlThroughHellModal] = useState(null);
+    const [clairvoyantCombatantModal, setClairvoyantCombatantModal] = useState(null);
+    const [portentModal, setPortentModal] = useState(null);
+    const [bolsteringPerformanceModal, setBolsteringPerformanceModal] = useState(null);
+    const [encouragingSongModal, setEncouragingSongModal] = useState(null);
+    const [elfishLineageModal, setElfisLineageModal] = useState(null);
+    const [gnomishLineageModal, setGnomishLineageModal] = useState(null);
+    const [feyReinforcementsModal, setFeyReinforcementsModal] = useState(null);
+    const [fightingStylesMap, setFightingStylesMap] = useState(null);
+    const { setPopupHtml } = useDiceRollPopup();
+    const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats?.name, campaignName, {
+        characters,
+        autoDamageSource: 'char-special-actions',
+        autoDamageRoll: async (autoDamage, isCrit) => {
+            const { attack, ctx: ctxOverrides } = normalizeAutoDamage(autoDamage, isCrit, playerStats);
+            await resolveAttackDamageStandalone(attack, ctxOverrides, { playerStats, campaignName, setPopupHtml, rollDamage, setModalState: () => {} });
+            if (autoDamage.ripostePopup) {
+                const payload = autoDamage.ripostePopup;
+                const html = typeof payload === 'string'
+                ? payload
+                : `<b><i class="fa-solid fa-bolt"></i> ${payload.name || 'Combat Superiority'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+                setPopupHtml(html);
+            }
+        },
+    });
+    const {
+        combatSuperiorityModal,
+        setCombatSuperiorityModal,
+        handleCombatSuperiorityConfirm,
+        handleCombatSuperiorityReopenSelection,
+    } = useCombatSuperiorityModal(playerStats, campaignName, rollAttack, rollDamage, setPopupHtml);
+    const {
+        replenishingMealModal,
+        setReplenishingMealModal,
+        handleReplenishingMealClick,
+        handleReplenishingMealConfirm,
+    } = useReplenishingMeal(playerStats, campaignName, cannotAct, characters, setPopupHtml);
+    const {
+        bolsteringTreatsModal,
+        setBolsteringTreatsModal,
+        handleBolsteringTreatsClick,
+        handleBolsteringTreatsConfirm,
+    } = useBolsteringTreats(playerStats, campaignName, cannotAct, characters, setPopupHtml);
+    const { handleBrewPoisonClick } = useBrewPoison(playerStats, campaignName, cannotAct, setPopupHtml);
     const handleBolsteringPerformanceConfirm = useCallback(async (selectedTargets) => {
         if (!bolsteringPerformanceModal) return;
         const result = await confirmBolsteringPerformance(
@@ -439,54 +517,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
     const handleAutomationClick = useCallback(async (action) => {
         if (cannotAct) return;
         const auto = action.automation;
-        if (auto?.type === 'defensive_tactics') {
-            const optionKey = `_${action.name.replace(/\s+/g, '_')}_choice`;
-            const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
-            if (!chosenOption) {
-                setFeatureChoiceModal({ action, options: ['Escape the Horde', 'Multiattack Defense'], optionKey });
-                return;
-            }
-        }
-        if (auto?.type === 'hunter_prey') {
-            const optionKey = `_${action.name.replace(/\s+/g, '_')}_choice`;
-            const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
-            if (!chosenOption) {
-                setFeatureChoiceModal({ action, options: ['Colossus Slayer', 'Horde Breaker'], optionKey });
-                return;
-            }
-        }
-        if (auto?.type === 'damage_bonus' && auto.options?.length > 0 && auto.options.every(o => typeof o === 'string')) {
-            const optionKey = `_${action.name.replace(/\s+/g, '_')}_option`;
-            setFeatureChoiceModal({ action, options: auto.options, optionKey });
-            return;
-        }
-        if (auto?.type === 'animal_aspect') {
-            const alreadyUsed = getRuntimeValue(playerStats.name, 'aspectOfTheWildsUsedThisRest', campaignName);
-            if (alreadyUsed) {
-                const html = `<b>Aspect of the Wilds</b><br/>Already chosen this rest. It can be changed after a Long Rest.<br/><span class="dice-roll-hint">click to dismiss</span>`;
-                setPopupHtml(html);
-                return;
-            }
-            setAspectOfTheWildsModal(true);
-            return;
-        }
-        if (auto?.type === 'passive_rule' && auto?.effect === 'bonus_healing') {
-            handleReplenishingMealClick();
-            return;
-        }
-        if (auto?.type === 'temp_hp_buff' && auto?.craftCount) {
-            handleBolsteringTreatsClick();
-            return;
-        }
-        if (auto?.type === 'brew_poison') {
-            handleBrewPoisonClick();
-            return;
-        }
-        if (auto?.type === 'memorize_spell') {
-            // CLA-226: the swap UI lives in the Short Rest modal — open it (CharSummary listens).
-            window.dispatchEvent(new CustomEvent('open-short-rest'));
-            return;
-        }
+        if (openChoicePromptIfNeeded(action, auto, playerStats, campaignName, { setFeatureChoiceModal, setPopupHtml, setAspectOfTheWildsModal })) return;
+        if (delegateAutomationClick(auto, { handleReplenishingMealClick, handleBolsteringTreatsClick, handleBrewPoisonClick })) return;
         const result = await executeHandler(action, playerStats, campaignName, mapName, characters);
         if (!result) return;
         if (result.type === 'modal') {

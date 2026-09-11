@@ -1,9 +1,8 @@
 import React from 'react';
 import SelectableList from './SelectableList.jsx';
+import FeatItemDetails from './FeatItemDetails.jsx';
 import WarningList from '../common/WarningList.jsx';
-import { validateFeats, getFeatLimits, normalizeFeatDescription, getRaceFeatChoices } from '../../services/character/featValidation.js';
-import { computeFeatBuffs } from '../../services/character/featBuffService.js';
-import { sanitizeHtml } from '../../services/ui/sanitize.js';
+import { validateFeats, getFeatLimits, getRaceFeatChoices } from '../../services/character/featValidation.js';
 
 function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFeats, computedBuffs }) {
   const [warnings, setWarnings] = React.useState([]);
@@ -48,27 +47,8 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
         fetchLimits();
       }, [formData, formData.level, formData.rules]);
 
-    // Render prerequisites
-  const renderPrerequisites = (feat) => {
-            if (!feat.prerequisites) return '';
-            if (Array.isArray(feat.prerequisites)) {
-                return feat.prerequisites
-                    .filter(p => typeof p === 'string' || (typeof p === 'object' && p.name))
-                    .map(p => typeof p === 'string' ? p : (p.name || JSON.stringify(p)))
-                    .join(', ');
-            }
-            return typeof feat.prerequisites === 'string' ? feat.prerequisites : JSON.stringify(feat.prerequisites);
-        };
-
     // Render item function
   const renderItem = (feat, index, { isSelected, isPreSelected, isExpanded, onToggle, onRemove, onToggleExpand, itemCount = 0 }) => {
-    const descData = normalizeFeatDescription(feat);
-    const ruleset = formData.rules || '5e';
-    const featBuffs = isSelected ? computeFeatBuffs(feat, ruleset) : null;
-
-    const hasAbilityIncrease = featBuffs && featBuffs.abilityScoreIncreases.length > 0;
-    const hasProficiencies = featBuffs && featBuffs.proficiencies.length > 0;
-    const hasResistances = featBuffs && featBuffs.resistances.length > 0;
     const isRepeatable = repeatableFeats.some(f => f.name === feat.name);
     const showCountBadge = isRepeatable && itemCount > 1;
         return (
@@ -132,63 +112,13 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
                         </div>
                     </div>
 
-                    <div className="list-item-details">
-                        {isExpanded && (
-                            <div className="list-item-full-details">
-                                {feat.prerequisites && (
-                                    <div className="feat-prerequisites">
-                    <strong>Prerequisites:</strong> {renderPrerequisites(feat)}
-                                    </div>
-                                )}
-                                {descData.text && (
-                                    <div className="feat-description">
-                                        {descData.isHtml ? (
-                                            <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(descData.text) }} />
-                                        ) : (
-                                            descData.text
-                                        )}
-                                    </div>
-                                )}
-                                {isSelected && hasAbilityIncrease && (
-                                  <div className="feat-buffs">
-                                    <strong>Ability Score Increase:</strong>
-                                    {featBuffs.abilityScoreIncreases.map((inc, i) => (
-                                      <span key={i} className="feat-buff-tag">
-                                        {inc.isChoice ? `${inc.name} +${inc.amount} (choice)` : `${inc.name} +${inc.amount}`}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                                {isSelected && hasProficiencies && (
-                                  <div className="feat-buffs">
-                                    <strong>Proficiencies:</strong>
-                                    {featBuffs.proficiencies.map((p, i) => (
-                                      <span key={i} className="feat-buff-tag">{p.name}</span>
-                                    ))}
-                                  </div>
-                                )}
-                                {isSelected && hasResistances && (
-                                  <div className="feat-buffs">
-                                    <strong>Resistances:</strong>
-                                    {featBuffs.resistances.map((r, i) => (
-                                      <span key={i} className="feat-buff-tag">{r}</span>
-                                    ))}
-                                  </div>
-                                )}
-                            </div>
-                        )}
-                        <div className="list-item-full-details">
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                      onToggleExpand();
-                                }}
-                                className="toggle-details-btn"
-                            >
-                                {isExpanded ? 'Show Less' : 'Show More'}
-                            </button>
-                        </div>
-                    </div>
+                    <FeatItemDetails
+                        feat={feat}
+                        isSelected={isSelected}
+                        isExpanded={isExpanded}
+                        onToggleExpand={onToggleExpand}
+                        ruleset={formData.rules || '5e'}
+                    />
                 </div>
             </div>
         );

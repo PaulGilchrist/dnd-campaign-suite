@@ -1,7 +1,8 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { loadManeuvers } from '../../../ui/dataLoader.js';
 import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
-import { getAvailableAttackRiderManeuvers, getAvailableAttackRiderManeuversByTrigger, handleAttackRiderPrompt, handleSkillCheckPrompt } from './combatSuperiorityQueries.js';
+import { getAvailableAttackRiderManeuvers, getAvailableAttackRiderManeuversByTrigger } from './combatSuperiorityQueries.js';
+import * as combatSuperiorityQueries from './combatSuperiorityQueries.js';
 import {
     hasRelentless,
     getRelentlessUsedRound,
@@ -16,6 +17,23 @@ import { executeManeuver } from './executeManeuver.js';
 
 // ── Main Handler (route to specific dispatchers) ────────────────────────
 
+const REACTION_TYPE_DISPATCH = {
+    grant_attack: handleCombatSuperiorityGrantAttack,
+    commanding_presence: handleCombatSuperiorityCommandingPresenceReaction,
+};
+
+const ACTION_TYPE_DISPATCH = {
+    bonus_action: handleCombatSuperiorityBonusAction,
+    sweeping_attack: handleCombatSuperioritySweepingAttack,
+    movement: handleCombatSuperiorityMovement,
+    skill_check: handleCombatSuperioritySkillCheck,
+};
+
+const TRIGGER_DISPATCH = {
+    attack_rider: 'handleAttackRiderPrompt',
+    skill_check: 'handleSkillCheckPrompt',
+};
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
 
@@ -23,40 +41,25 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return executeManeuver(action, playerStats, campaignName, auto.maneuverName);
     }
 
-    if (auto?.actionType === 'bonus_action') {
-        return handleCombatSuperiorityBonusAction(action, playerStats, campaignName, _mapName);
-    }
-
     if (auto?.actionType === 'reaction') {
-        if (auto?.reactionType === 'grant_attack') {
-            return handleCombatSuperiorityGrantAttack(action, playerStats, campaignName, _mapName);
-        }
-        if (auto?.reactionType === 'commanding_presence') {
-            return handleCombatSuperiorityCommandingPresenceReaction(action, playerStats, campaignName, _mapName);
-        }
-        return handleCombatSuperiorityReaction(action, playerStats, campaignName, _mapName);
+        const reactionHandler = REACTION_TYPE_DISPATCH[auto?.reactionType] || handleCombatSuperiorityReaction;
+        return reactionHandler(action, playerStats, campaignName, _mapName);
     }
 
-    if (auto?.actionType === 'sweeping_attack') {
-        return handleCombatSuperioritySweepingAttack(action, playerStats, campaignName, _mapName);
+    const actionHandler = ACTION_TYPE_DISPATCH[auto?.actionType];
+    if (actionHandler) {
+        return actionHandler(action, playerStats, campaignName, _mapName);
     }
 
-    if (auto?.actionType === 'movement') {
-        return handleCombatSuperiorityMovement(action, playerStats, campaignName, _mapName);
+    const triggerHandlerName = auto?.trigger ? TRIGGER_DISPATCH[auto.trigger] : null;
+    if (triggerHandlerName) {
+        return combatSuperiorityQueries[triggerHandlerName](action, playerStats, campaignName, _mapName);
     }
 
-    if (auto?.actionType === 'skill_check') {
-        return handleCombatSuperioritySkillCheck(action, playerStats, campaignName, _mapName);
-    }
+    return showCombatSuperioritySelection(action, auto, playerStats, campaignName);
+}
 
-    if (auto?.trigger === 'attack_rider') {
-        return handleAttackRiderPrompt(action, playerStats, campaignName, _mapName);
-    }
-
-    if (auto?.trigger === 'skill_check') {
-        return handleSkillCheckPrompt(action, playerStats, campaignName, _mapName);
-    }
-
+async function showCombatSuperioritySelection(action, auto, playerStats, campaignName) {
     const allManeuvers = await loadManeuvers(playerStats.rules || '2024');
 
     if (allManeuvers.length === 0) {
@@ -112,60 +115,54 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
 // ── Modal Selection Handler ─────────────────────────────────────────────
 
+const SELECTION_ACTION_DISPATCH = {
+    skill_check: executeSkillCheckManeuver,
+    grant_attack: executeGrantAttackManeuver,
+    movement: executeMovementManeuver,
+    reaction: executeReactionManeuver,
+    bonus_action: executeBonusActionManeuver,
+};
+
+function selectionPopup(action, description) {
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            description,
+        },
+    };
+}
+
+async function handleMultiManeuverSelection(action, playerStats, campaignName, selectedManeuverNames) {
+    if (selectedManeuverNames.length === 0) {
+        await setRuntimeValue(playerStats.name, 'BattleMasterManeuvers_selection', [], campaignName);
+        return selectionPopup(action, 'Battle Master selection cleared.');
+    }
+
+    const allManeuvers = await loadManeuvers(playerStats.rules || '2024');
+    const allNames = allManeuvers.map(m => m.name);
+    const validManeuvers = selectedManeuverNames.filter(name => allNames.includes(name));
+
+    await setRuntimeValue(playerStats.name, 'BattleMasterManeuvers_selection', validManeuvers, campaignName);
+
+    if (validManeuvers.length === 0) {
+        return selectionPopup(action, 'No valid maneuvers selected.');
+    }
+    return selectionPopup(action, `Maneuvers selected: ${validManeuvers.join(', ')}.`);
+}
+
 export async function onCombatSuperioritySelected(action, playerStats, campaignName, selectedManeuverNames, singleUseManeuverName) {
     const auto = action.automation;
 
-    if (Array.isArray(selectedManeuverNames) && selectedManeuverNames.length === 0 && !singleUseManeuverName) {
-        await setRuntimeValue(playerStats.name, 'BattleMasterManeuvers_selection', [], campaignName);
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: 'Battle Master selection cleared.',
-            },
-        };
-    }
-
-    if (Array.isArray(selectedManeuverNames) && selectedManeuverNames.length > 0 && !singleUseManeuverName) {
-        const allManeuvers = await loadManeuvers(playerStats.rules || '2024');
-        const allNames = allManeuvers.map(m => m.name);
-        const validManeuvers = selectedManeuverNames.filter(name => allNames.includes(name));
-
-        await setRuntimeValue(playerStats.name, 'BattleMasterManeuvers_selection', validManeuvers, campaignName);
-
-        if (validManeuvers.length === 0) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: 'No valid maneuvers selected.',
-                },
-            };
-        }
-
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `Maneuvers selected: ${validManeuvers.join(', ')}.`,
-            },
-        };
+    if (Array.isArray(selectedManeuverNames) && !singleUseManeuverName) {
+        return handleMultiManeuverSelection(action, playerStats, campaignName, selectedManeuverNames);
     }
 
     const selectedName = singleUseManeuverName || (selectedManeuverNames && selectedManeuverNames[0]);
 
     if (!selectedName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: 'No maneuver selected.',
-            },
-        };
+        return selectionPopup(action, 'No maneuver selected.');
     }
 
     const stored = getRuntimeValue(playerStats.name, 'BattleMasterManeuvers_selection', campaignName);
@@ -180,27 +177,8 @@ export async function onCombatSuperioritySelected(action, playerStats, campaignN
         return executeAttackRiderManeuver(action, playerStats, campaignName, selectedName, auto?.attackContext || null);
     }
 
-    if (auto?.actionType === 'skill_check') {
-        return executeSkillCheckManeuver(action, playerStats, campaignName, selectedName);
-    }
-
-    if (auto?.actionType === 'grant_attack') {
-        return executeGrantAttackManeuver(action, playerStats, campaignName, selectedName);
-    }
-
-    if (auto?.actionType === 'movement') {
-        return executeMovementManeuver(action, playerStats, campaignName, selectedName);
-    }
-
-    if (auto?.actionType === 'reaction') {
-        return executeReactionManeuver(action, playerStats, campaignName, selectedName);
-    }
-
-    if (auto?.actionType === 'bonus_action') {
-        return executeBonusActionManeuver(action, playerStats, campaignName, selectedName);
-    }
-
-    return executeManeuver(action, playerStats, campaignName, selectedName);
+    const executor = SELECTION_ACTION_DISPATCH[auto?.actionType] || executeManeuver;
+    return executor(action, playerStats, campaignName, selectedName);
 }
 
 // ── Attack Rider Options ────────────────────────────────────────────────

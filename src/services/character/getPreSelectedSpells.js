@@ -228,13 +228,76 @@ function getSubclassSpells(classData, subclassName, charLevel) {
   return spells;
 }
 
-export async function getPreSelectedSpells(formData) {
-  const classSpells = [];
-  const raceCantrips = [];
-  const raceSpells = [];
-  const featSpells = [];
-  const featCantrips = [];
+async function collectClassSpells(className, subclassName, charLevel, version) {
+  const spells = [];
+  const classes = await loadClassData(version);
+  const classData = classes.find(c => c.name === className || c.index === className.toLowerCase());
 
+  if (classData && subclassName) {
+    spells.push(...getSubclassSpells(classData, subclassName, charLevel));
+  }
+
+  if (className === 'Druid' && version === '2024') {
+    spells.push('Speak with Animals');
+  }
+
+  return spells;
+}
+
+function resolveSubrace(races, raceData, subraceName, version) {
+  if (version === '2024') {
+    return (raceData && raceData.subraces ? raceData.subraces.find(s => s.name === subraceName) : null) || null;
+  }
+
+  const subraceMatch = races.find(r => r.name === subraceName || r.index === subraceName.toLowerCase());
+  if (subraceMatch) {
+    return subraceMatch;
+  }
+  return (raceData && raceData.subraces ? raceData.subraces.find(s => s.name === subraceName) : null) || null;
+}
+
+async function collectRaceSpells(raceName, subraceName, version) {
+  const cantrips = [];
+  const spells = [];
+  const races = await loadRaceData(version);
+  const raceData = races.find(r => r.name === raceName || r.index === raceName.toLowerCase());
+
+  if (raceData) {
+    const raceResult = extractRaceSpells(raceData, version);
+    cantrips.push(...raceResult.cantrips);
+    spells.push(...raceResult.spells);
+  }
+
+  if (subraceName) {
+    const subraceData = resolveSubrace(races, raceData, subraceName, version);
+    if (subraceData) {
+      const subraceResult = extractSubraceSpells(subraceData, version);
+      cantrips.push(...subraceResult.cantrips);
+      spells.push(...subraceResult.spells);
+    }
+  }
+
+  return { cantrips, spells };
+}
+
+async function collectFeatSpells(selectedFeats, version) {
+  const cantrips = [];
+  const spells = [];
+  const feats = await loadFeatData(version);
+
+  selectedFeats.forEach(featName => {
+    const featData = feats.find(f => f.name === featName || f.index === featName.toLowerCase());
+    if (featData) {
+      const featResult = extractFeatSpells(featData);
+      spells.push(...featResult.spells);
+      cantrips.push(...featResult.cantrips);
+    }
+  });
+
+  return { cantrips, spells };
+}
+
+export async function getPreSelectedSpells(formData) {
   if (!formData) return [];
 
   const version = formData.rules || '5e';
@@ -245,74 +308,17 @@ export async function getPreSelectedSpells(formData) {
   const raceName = formData.race?.name;
   const subraceName = formData.race?.subrace?.name;
 
-  if (className) {
-    const classes = await loadClassData(version);
-    const classData = classes.find(c => c.name === className || c.index === className.toLowerCase());
-
-    if (classData && subclassName) {
-      const subclassSpells = getSubclassSpells(classData, subclassName, charLevel);
-      classSpells.push(...subclassSpells);
-    }
-
-    if (className === 'Druid' && version === '2024') {
-      classSpells.push('Speak with Animals');
-    }
-  }
-
-  if (raceName) {
-    const races = await loadRaceData(version);
-    const raceData = races.find(r => r.name === raceName || r.index === raceName.toLowerCase());
-
-    if (raceData) {
-      const raceResult = extractRaceSpells(raceData, version);
-      raceCantrips.push(...raceResult.cantrips);
-      raceSpells.push(...raceResult.spells);
-    }
-
-    if (subraceName) {
-      let subraceData = null;
-
-      if (version === '2024') {
-        if (raceData && raceData.subraces) {
-          subraceData = raceData.subraces.find(s => s.name === subraceName);
-        }
-      } else {
-        const subraceMatch = races.find(r => r.name === subraceName || r.index === subraceName.toLowerCase());
-        if (subraceMatch) {
-          subraceData = subraceMatch;
-        } else if (raceData && raceData.subraces) {
-          subraceData = raceData.subraces.find(s => s.name === subraceName);
-        }
-      }
-
-      if (subraceData) {
-        const subraceResult = extractSubraceSpells(subraceData, version);
-        raceCantrips.push(...subraceResult.cantrips);
-        raceSpells.push(...subraceResult.spells);
-      }
-    }
-  }
-
+  const classSpells = className ? await collectClassSpells(className, subclassName, charLevel, version) : [];
+  const raceResult = raceName ? await collectRaceSpells(raceName, subraceName, version) : { cantrips: [], spells: [] };
   const selectedFeats = formData.feats || [];
-  if (selectedFeats.length > 0) {
-    const feats = await loadFeatData(version);
-
-    selectedFeats.forEach(featName => {
-      const featData = feats.find(f => f.name === featName || f.index === featName.toLowerCase());
-      if (featData) {
-        const featResult = extractFeatSpells(featData);
-        featSpells.push(...featResult.spells);
-        featCantrips.push(...featResult.cantrips);
-      }
-    });
-  }
+  const featResult = selectedFeats.length > 0 ? await collectFeatSpells(selectedFeats, version) : { cantrips: [], spells: [] };
 
   const allPreSelected = [
     ...classSpells,
-    ...raceSpells,
-    ...raceCantrips,
-    ...featSpells,
-    ...featCantrips,
+    ...raceResult.spells,
+    ...raceResult.cantrips,
+    ...featResult.spells,
+    ...featResult.cantrips,
   ];
 
   return [...new Set(allPreSelected)];

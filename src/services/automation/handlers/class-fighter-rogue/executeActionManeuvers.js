@@ -504,6 +504,27 @@ export async function executeReactionManeuver(action, playerStats, campaignName,
 
 // ── Commanding Presence Reaction ────────────────────────────────────────
 
+function getCommandingPresenceTargetHp(creature) {
+    if (creature.type === 'player') {
+        return {
+            currentHp: getRuntimeValue(creature.name, 'currentHitPoints') ?? getRuntimeValue(creature.name, 'hitPoints') ?? 0,
+            maxHp: getRuntimeValue(creature.name, 'hitPoints') ?? 0,
+        };
+    }
+    return { currentHp: creature.currentHp ?? creature.maxHp, maxHp: creature.maxHp };
+}
+
+async function collectCommandingPresenceTargets(cs, playerStats, campaignName, rangeFt) {
+    const validTargets = [];
+    for (const creature of cs.creatures) {
+        if (creature.name === playerStats.name) continue;
+        if (await isWithinRange(playerStats.name, creature.name, rangeFt)) {
+            validTargets.push({ ...creature, ...getCommandingPresenceTargetHp(creature) });
+        }
+    }
+    return validTargets;
+}
+
 export async function executeCommandingPresenceReaction(action, playerStats, campaignName, maneuverName) {
     const maneuver = await findManeuver(maneuverName, playerStats.rules);
 
@@ -537,17 +558,7 @@ export async function executeCommandingPresenceReaction(action, playerStats, cam
         }
 
         const rangeFt = auto.reactionRange === '30_ft' ? 30 : 30;
-        const validTargets = [];
-        for (const creature of cs.creatures) {
-            if (creature.name === playerStats.name) continue;
-            const inRange = await isWithinRange(playerStats.name, creature.name, rangeFt);
-            if (inRange) {
-                const hp = creature.type === 'player'
-                    ? { currentHp: getRuntimeValue(creature.name, 'currentHitPoints') ?? getRuntimeValue(creature.name, 'hitPoints') ?? 0, maxHp: getRuntimeValue(creature.name, 'hitPoints') ?? 0 }
-                    : { currentHp: creature.currentHp ?? creature.maxHp, maxHp: creature.maxHp };
-                validTargets.push({ ...creature, ...hp });
-            }
-        }
+        const validTargets = await collectCommandingPresenceTargets(cs, playerStats, campaignName, rangeFt);
 
         if (validTargets.length === 0) {
             return {

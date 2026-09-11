@@ -378,44 +378,50 @@ export function applyGreatWeaponFightingToDamage(rolls, playerStats) {
     return applyGreatWeaponFighting(rolls);
 }
 
+function chosenResistanceGateAllows(auto, playerStats, damageType) {
+    const playerName = playerStats.name;
+    const campaignName = playerStats.campaignName;
+    const chosenDamageType = getRuntimeValue(playerName, 'resistanceChosenDamageType', campaignName);
+    if (!chosenDamageType || chosenDamageType.toLowerCase() !== String(damageType).toLowerCase()) {
+        return false;
+    }
+    return !getRuntimeValue(playerName, 'resistanceUsedThisTurn', campaignName);
+}
+
+function resolveEntryReduction(auto, playerStats) {
+    if (typeof auto.reduction === 'number') return auto.reduction;
+    if (typeof auto.reductionExpression === 'number') return auto.reductionExpression;
+    if (typeof auto.reductionExpression === 'string' && auto.reductionExpression) {
+        return evaluateAutoExpression(auto.reductionExpression, playerStats);
+    }
+    return 0;
+}
+
+function reductionApplies(auto, playerStats, damageType, isWearingHeavyArmor) {
+    if (auto.type !== 'damage_reduction') return false;
+    if (auto.reaction) return false;
+    const damageTypes = auto.damageTypes || [];
+    if (damageTypes.length > 0 && !damageTypes.some(dt => dt.toLowerCase() === String(damageType).toLowerCase())) {
+        return false;
+    }
+    const condition = auto.condition || '';
+    if (condition === 'wearing_heavy_armor' && !isWearingHeavyArmor) {
+        return false;
+    }
+    if (auto.trigger === 'damage_taken_of_chosen_resistance_type') {
+        return chosenResistanceGateAllows(auto, playerStats, damageType);
+    }
+    return true;
+}
+
 export function getDamageReduction(playerStats, damageType, isWearingHeavyArmor) {
     if (!playerStats) return null;
-    const passives = playerStats.automation?.passives || [];
-    const reactions = playerStats.automation?.reactions || [];
-    const specialActions = playerStats.automation?.specialActions || [];
-    const allAutomations = [...passives, ...reactions, ...specialActions];
+    const automation = playerStats.automation || {};
+    const allAutomations = [...(automation.passives || []), ...(automation.reactions || []), ...(automation.specialActions || [])];
     let totalReduction = 0;
     for (const auto of allAutomations) {
-        if (auto.type !== 'damage_reduction') continue;
-        if (auto.reaction) continue;
-        const damageTypes = auto.damageTypes || [];
-        if (damageTypes.length > 0 && !damageTypes.some(dt => dt.toLowerCase() === String(damageType).toLowerCase())) {
-            continue;
-        }
-        const condition = auto.condition || '';
-        if (condition === 'wearing_heavy_armor' && !isWearingHeavyArmor) {
-            continue;
-        }
-        if (auto.trigger === 'damage_taken_of_chosen_resistance_type') {
-            const playerName = playerStats.name;
-            const campaignName = playerStats.campaignName;
-            const chosenDamageType = getRuntimeValue(playerName, 'resistanceChosenDamageType', campaignName);
-            if (!chosenDamageType || chosenDamageType.toLowerCase() !== String(damageType).toLowerCase()) {
-                continue;
-            }
-            const isUsedThisTurn = getRuntimeValue(playerName, 'resistanceUsedThisTurn', campaignName);
-            if (isUsedThisTurn) {
-                continue;
-            }
-        }
-        let reduction = 0;
-        if (typeof auto.reduction === 'number') {
-            reduction = auto.reduction;
-        } else if (typeof auto.reductionExpression === 'number') {
-            reduction = auto.reductionExpression;
-        } else if (typeof auto.reductionExpression === 'string' && auto.reductionExpression) {
-            reduction = evaluateAutoExpression(auto.reductionExpression, playerStats);
-        }
+        if (!reductionApplies(auto, playerStats, damageType, isWearingHeavyArmor)) continue;
+        const reduction = resolveEntryReduction(auto, playerStats);
         if (typeof reduction === 'number' && reduction > 0) {
             totalReduction += reduction;
         }

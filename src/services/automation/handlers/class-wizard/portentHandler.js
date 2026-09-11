@@ -113,9 +113,7 @@ async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
-async function applyPortentChoice(action, playerStats, campaignName, targetName, eventType, eventData, context, chosenDie) {
-    const playerName = playerStats.name;
-
+function consumePortentDie(playerName, chosenDie, campaignName) {
     const portentDice = getPortentDice(playerName, campaignName);
     const dieIndex = portentDice.indexOf(chosenDie);
     let remainingDice;
@@ -127,6 +125,35 @@ async function applyPortentChoice(action, playerStats, campaignName, targetName,
         remainingDice = sortedDice.slice(1);
     }
     setPortentDice(playerName, remainingDice, campaignName);
+    return remainingDice;
+}
+
+async function undoHitDamage(eventData, targetName, campaignName, outcomeNote) {
+    const rawDamage = eventData.primaryDamage || eventData.rawDamage || 0;
+    if (!(rawDamage > 0 && eventData.targetName && eventData.attackerName === targetName)) {
+        return outcomeNote;
+    }
+    const currentHp = getRuntimeValue(eventData.targetName, 'currentHitPoints', campaignName);
+    if (currentHp == null) return outcomeNote;
+    const maxHp = getRuntimeValue(eventData.targetName, 'maxHitPoints', campaignName);
+    const healedHp = Math.min(currentHp + rawDamage, maxHp != null ? maxHp : 99999);
+    setRuntimeValue(eventData.targetName, 'currentHitPoints', healedHp, campaignName);
+    return `${outcomeNote} Undid ${rawDamage} damage.`;
+}
+
+function computeSaveOutcomeNote(context, chosenDie, bonus) {
+    const saveDc = context?.saveDc || null;
+    if (saveDc == null || context?.oldSuccess == null) return null;
+    const newSuccess = chosenDie + bonus >= saveDc;
+    if (context.oldSuccess && !newSuccess) return 'The save now fails!';
+    if (!context.oldSuccess && newSuccess) return 'The save now succeeds!';
+    return null;
+}
+
+async function applyPortentChoice(action, playerStats, campaignName, targetName, eventType, eventData, context, chosenDie) {
+    const playerName = playerStats.name;
+
+    const remainingDice = consumePortentDie(playerName, chosenDie, campaignName);
 
     const { d20: originalD20, bonus } = eventData;
     const label = getEventLabel(eventData, eventType);
@@ -158,29 +185,12 @@ async function applyPortentChoice(action, playerStats, campaignName, targetName,
 
         // Hit→miss: undo damage using lastAttack's rawDamage
         if (eventData.hit && !newHit) {
-            const rawDamage = eventData.primaryDamage || eventData.rawDamage || 0;
-            if (rawDamage > 0 && eventData.targetName && eventData.attackerName === targetName) {
-                const currentHp = getRuntimeValue(eventData.targetName, 'currentHitPoints', campaignName);
-                const maxHp = getRuntimeValue(eventData.targetName, 'maxHitPoints', campaignName);
-                if (currentHp != null) {
-                    const healedHp = Math.min(currentHp + rawDamage, maxHp != null ? maxHp : 99999);
-                    setRuntimeValue(eventData.targetName, 'currentHitPoints', healedHp, campaignName);
-                    outcomeNote = `${outcomeNote} Undid ${rawDamage} damage.`;
-                }
-            }
+            outcomeNote = await undoHitDamage(eventData, targetName, campaignName, outcomeNote);
         }
     } else if (eventType === 'ability') {
         // Portent on ability check — no runtime key update needed, lastAttack is the source of truth
     } else {
-        const saveDc = context?.saveDc || null;
-        const newTotal = chosenDie + bonus;
-        let saveNote = null;
-        if (saveDc != null && context?.oldSuccess != null) {
-            const newSuccess = newTotal >= saveDc;
-            if (context.oldSuccess && !newSuccess) saveNote = 'The save now fails!';
-            else if (!context.oldSuccess && newSuccess) saveNote = 'The save now succeeds!';
-        }
-
+        const saveNote = computeSaveOutcomeNote(context, chosenDie, bonus);
         if (saveNote) outcomeNote = saveNote;
     }
 

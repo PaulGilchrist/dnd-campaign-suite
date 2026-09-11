@@ -174,6 +174,24 @@ async function applyCantripDamage({ cs, campaignName, playerName, targetName, sp
     return finalDamage;
 }
 
+async function resolveCantripRollOutcome(ctx) {
+    const { spell, formula } = ctx;
+    if (!spell.damage || !formula) return { spellDamage: 0, spellRolls: [], outcomeLine: '' };
+
+    const outcome = spell.dc?.dc_type
+        // Save-for-half cantrip: target rolls the save.
+        ? await resolveSaveOutcome({ campaignName: ctx.campaignName, action: ctx.action, playerStats: ctx.playerStats, playerName: ctx.playerName, targetName: ctx.targetName, spell, formula })
+        // Spell attack roll against the target's AC.
+        : await resolveSpellAttackOutcome({ campaignName: ctx.campaignName, playerStats: ctx.playerStats, playerName: ctx.playerName, targetName: ctx.targetName, targetAc: ctx.targetAc, spell, formula, spellDamageType: ctx.spellDamageType });
+
+    const spellDamage = await applyCantripDamage({
+        cs: ctx.cs, campaignName: ctx.campaignName, playerName: ctx.playerName, targetName: ctx.targetName,
+        spellDamage: outcome.spellDamage, spellRolls: outcome.spellRolls, spellDamageType: ctx.spellDamageType,
+        formula, characters: ctx.characters, selectedSpellName: ctx.selectedSpellName,
+    });
+    return { spellDamage, spellRolls: outcome.spellRolls, outcomeLine: outcome.outcomeLine };
+}
+
 // CLA-381: mirrors warMagicSpellHandler.confirmWarMagicSpell minus the spell
 // slot payment — arms the card target, range-checks, rolls the cantrip
 // (spell attack or save), applies damage (lastAttack + hp_change via
@@ -244,31 +262,15 @@ export async function confirmWarMagicCantrip(action, playerStats, campaignName, 
     const targetAc = cs?.creatures?.find(c => c.name === targetName)?.ac || 10;
     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
 
-    let spellDamage = 0;
-    let spellRolls = [];
-    let outcomeLine = '';
+    const { spellDamage, outcomeLine } = await resolveCantripRollOutcome({
+        cs, campaignName, action, playerStats, playerName, targetName, targetAc, spell, formula, spellDamageType, characters, selectedSpellName,
+    });
 
-    if (spell.damage && formula) {
-        if (spell.dc?.dc_type) {
-            const outcome = await resolveSaveOutcome({ campaignName, action, playerStats, playerName, targetName, spell, formula });
-            spellDamage = outcome.spellDamage;
-            spellRolls = outcome.spellRolls;
-            outcomeLine = outcome.outcomeLine;
-        } else {
-            // Spell attack roll against the target's AC.
-            const outcome = await resolveSpellAttackOutcome({ campaignName, playerStats, playerName, targetName, targetAc, spell, formula, spellDamageType });
-            spellDamage = outcome.spellDamage;
-            spellRolls = outcome.spellRolls;
-            outcomeLine = outcome.outcomeLine;
-        }
-
-        spellDamage = await applyCantripDamage({ cs, campaignName, playerName, targetName, spellDamage, spellRolls, spellDamageType, formula, characters, selectedSpellName });
-    }
-
+    const damageLine = spellDamage > 0 ? ` Dealt <b>${spellDamage}</b> ${spellDamageType} damage.` : (spell.damage ? ' No damage dealt.' : '');
     const popupDescription =
         `<b>${action.name}</b>: Cast <b>${selectedSpellName}</b> at <b>${targetName}</b>. ` +
         outcomeLine +
-        (spellDamage > 0 ? ` Dealt <b>${spellDamage}</b> ${spellDamageType} damage.` : (spell.damage ? ' No damage dealt.' : '')) +
+        damageLine +
         '<br/>No spell slot consumed (cantrip).';
 
     return {

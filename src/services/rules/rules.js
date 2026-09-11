@@ -107,6 +107,26 @@ async function applyProficiencyFeatBuffs(playerStats, featBuffs) {
     }
 }
 
+function initActionArrays(playerStats) {
+    playerStats.actions = playerStats.actions || [];
+    playerStats.bonusActions = playerStats.bonusActions || [];
+    playerStats.reactions = playerStats.reactions || [];
+    playerStats.specialActions = playerStats.specialActions || [];
+    playerStats.characterAdvancement = playerStats.characterAdvancement || [];
+    playerStats.expertise = playerStats.expertise || [];
+    if (playerStats.class?.expertise) {
+        playerStats.expertise = [...playerStats.expertise, ...playerStats.class.expertise];
+    }
+}
+
+function applyFightingStyleEffects(playerStats) {
+    applyFightingStyleReactions5e(playerStats);
+    applyFightingStyleReactions2024(playerStats);
+    applyFightingStyleSpecialActions5e(playerStats);
+    applyFightingStyleSpecialActionsUniversal(playerStats);
+    sortActionArrays(playerStats);
+}
+
 function findProcessedAttackRider(playerStats, name) {
     return (playerStats.automation?.passives || []).find(
         p => p.name === name && p.type === 'attack_rider'
@@ -403,26 +423,12 @@ const rules = {
             playerStats.equipment = allEquipment;
         }
 
-        playerStats.actions = playerStats.actions || [];
-        playerStats.bonusActions = playerStats.bonusActions || [];
-        playerStats.reactions = playerStats.reactions || [];
-        playerStats.specialActions = playerStats.specialActions || [];
-        playerStats.characterAdvancement = playerStats.characterAdvancement || [];
-        playerStats.expertise = playerStats.expertise || [];
-        if (playerStats.class?.expertise) {
-            playerStats.expertise = [...playerStats.expertise, ...playerStats.class.expertise];
-        }
+        initActionArrays(playerStats);
 
             [playerStats.actions, playerStats.bonusActions, playerStats.reactions, playerStats.specialActions, playerStats.characterAdvancement] = getActions(playerStats, playerSummary);
 
-        // Apply fighting style reactions and special actions
-        applyFightingStyleReactions5e(playerStats);
-        applyFightingStyleReactions2024(playerStats);
-        applyFightingStyleSpecialActions5e(playerStats);
-        applyFightingStyleSpecialActionsUniversal(playerStats);
-
-        // Sort all action arrays after fighting style additions
-        sortActionArrays(playerStats);
+        // Apply fighting style reactions and special actions, then sort all action arrays
+        applyFightingStyleEffects(playerStats);
 
         const allFeatures = [
             ...playerStats.actions,

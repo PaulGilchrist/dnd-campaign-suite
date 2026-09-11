@@ -67,8 +67,53 @@ function storeLastAttackRoll({ characterName, campaignName, context, effectiveD2
     }, campaignName);
 }
 
+// [recordKey, contextKey, fallback] — fields stamped from context with defaults,
+// in the exact original object key order.
+const LAST_ATTACK_CONTEXT_DEFAULTS = [
+    ['damageType', 'damageType', null],
+    ['damageFormula', 'autoDamageFormula', null],
+    ['damageName', 'autoDamageName', null],
+    ['damageSchool', 'autoDamageSchool', null],
+    ['saveDc', 'saveDc', null],
+    ['saveType', 'saveType', null],
+    ['dcSuccess', 'dcSuccess', null],
+    ['metamagicTwinTarget', 'metamagicTwinTarget', null],
+    ['metamagicHeighten', 'metamagicHeighten', null],
+    ['isCantrip', 'isCantrip', null],
+    ['overchannelActive', 'overchannelActive', null],
+    ['overchannelUseCount', 'overchannelUseCount', null],
+    ['overchannelSpellLevel', 'overchannelSpellLevel', null],
+    ['secondaryFormula', 'autoDamageSecondaryFormula', null],
+    ['secondaryDamageType', 'autoDamageSecondaryDamageType', null],
+    ['rangeReason', 'rangeReason', null],
+    ['coverLevel', 'coverLevel', null],
+    ['coverAcBonus', 'coverAcBonus', 0],
+    ['coverReason', 'coverReason', null],
+    ['resistanceNotice', 'resistanceNotice', null],
+    ['forcedMode', 'forcedMode', null],
+    ['isAutoCrit', 'isAutoCrit', false],
+    ['autoReroll', 'autoReroll', null],
+    ['autoRerollBonus', 'autoRerollBonus', null],
+    ['defensiveDuelistBonus', 'defensiveDuelistBonus', 0],
+    ['baitAndSwitchBonus', 'baitAndSwitchBonus', 0],
+    ['statusEffects', 'statusEffects', null],
+];
+
+function buildDefaultedContextFields(context) {
+    const fields = {};
+    for (const [recordKey, contextKey, fallback] of LAST_ATTACK_CONTEXT_DEFAULTS) {
+        fields[recordKey] = context?.[contextKey] || fallback;
+    }
+    return fields;
+}
+
+function resolveWeaponType(isMelee, damageType) {
+    if (isMelee != null) return isMelee ? 'melee' : 'ranged';
+    return damageType === 'ranged' ? 'ranged' : 'melee';
+}
+
 function storeCampaignLastAttack({ characterName, campaignName, context, targetName, effectiveD20, effectiveD20Roll, r1, r2, finalHit, finalAutoMiss, isCrit, targetAc, effectiveAc, homingStrikesUsed, homingStrikesBonus, homingStrikesAttempted }) {
-    const { name, rollType, effectiveBonus, isMelee, damageType, isUnarmedStrike, autoDamageFormula, autoDamageName, autoDamageSchool, saveDc, saveType, dcSuccess, metamagicTwinTarget, metamagicHeighten, isCantrip, overchannelActive, overchannelUseCount, overchannelSpellLevel, autoDamageSecondaryFormula, autoDamageSecondaryDamageType, rangeReason, coverLevel, coverAcBonus, coverReason, resistanceNotice, forcedMode, isAutoCrit, autoReroll, autoRerollBonus, defensiveDuelistBonus, baitAndSwitchBonus, statusEffects, affectedTargets, isPsychicBlade } = context || {};
+    const { name, rollType, effectiveBonus, isMelee, damageType, isUnarmedStrike, affectedTargets, isPsychicBlade } = context || {};
     setRuntimeValue('campaign', 'lastAttack', {
         attackerName: characterName,
         targetName,
@@ -80,42 +125,14 @@ function storeCampaignLastAttack({ characterName, campaignName, context, targetN
         effectiveAc,
         hit: finalHit,
         isCrit,
-        weaponType: isMelee != null
-            ? (isMelee ? 'melee' : 'ranged')
-            : (damageType === 'ranged' ? 'ranged' : 'melee'),
+        weaponType: resolveWeaponType(isMelee, damageType),
         isUnarmedStrike: isUnarmedStrike || false,
         isAutoMiss: finalAutoMiss,
         isNatural20: effectiveD20Roll === 20,
         isNatural1: effectiveD20Roll === 1,
         attackName: name,
         rollType,
-        damageType: damageType || null,
-        damageFormula: autoDamageFormula || null,
-        damageName: autoDamageName || null,
-        damageSchool: autoDamageSchool || null,
-        saveDc: saveDc || null,
-        saveType: saveType || null,
-        dcSuccess: dcSuccess || null,
-        metamagicTwinTarget: metamagicTwinTarget || null,
-        metamagicHeighten: metamagicHeighten || null,
-        isCantrip: isCantrip || null,
-        overchannelActive: overchannelActive || null,
-        overchannelUseCount: overchannelUseCount || null,
-        overchannelSpellLevel: overchannelSpellLevel || null,
-        secondaryFormula: autoDamageSecondaryFormula || null,
-        secondaryDamageType: autoDamageSecondaryDamageType || null,
-        rangeReason: rangeReason || null,
-        coverLevel: coverLevel || null,
-        coverAcBonus: coverAcBonus || 0,
-        coverReason: coverReason || null,
-        resistanceNotice: resistanceNotice || null,
-        forcedMode: forcedMode || null,
-        isAutoCrit: isAutoCrit || false,
-        autoReroll: autoReroll || null,
-        autoRerollBonus: autoRerollBonus || null,
-        defensiveDuelistBonus: defensiveDuelistBonus || 0,
-        baitAndSwitchBonus: baitAndSwitchBonus || 0,
-        statusEffects: statusEffects || null,
+        ...buildDefaultedContextFields(context),
         affectedTargets: affectedTargets || [targetName],
         // CLA-320: machine-readable Homing Strikes evidence + Psychic
         // Blade trigger stamp so the manual Reactions row can enforce

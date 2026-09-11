@@ -30,34 +30,36 @@ export async function grantCelestialResilience(playerStats, campaignName, source
     };
 
     if (source === 'magical_cunning' || source === 'short_rest' || source === 'long_rest') {
-        const allyTempHp = evaluateAutoExpression(auto.allyTempHpExpression || 'floor(warlock level / 2) + CHA modifier', playerStats);
-        if (typeof allyTempHp === 'number' && allyTempHp > 0) {
-            const maxAllies = auto.maxAllies || 5;
-            const rangeFt = rangeToFeet(auto.range || '60_ft');
-            const allies = [];
-
-            if (rangeFt != null) {
-                const mapPlayers = _mapName ? (await loadMapData(campaignName, _mapName))?.players || [] : [];
-                const combatSummary = getCombatSummary(campaignName);
-                const allCreatures = combatSummary?.creatures || [];
-                const candidates = mapPlayers.length > 0
-                    ? mapPlayers.filter(p => p.name !== playerStats.name)
-                    : allCreatures.filter(c => c.name !== playerStats.name);
-                for (const creature of candidates) {
-                    const inRange = await isWithinRange(playerStats.name, creature.name, rangeFt);
-                    if (inRange) {
-                        allies.push({ name: creature.name, type: creature.type || 'player', currentHp: creature.currentHp || 0, maxHp: creature.maxHp || 0 });
-                    }
-                }
-            }
-
-            result.allyTempHp = allyTempHp;
-            result.maxAllies = maxAllies;
-            result.allies = allies;
-        }
+        await attachAllyGrant(result, playerStats, campaignName, auto, _mapName);
     }
 
     return result;
+}
+
+async function attachAllyGrant(result, playerStats, campaignName, auto, mapName) {
+    const allyTempHp = evaluateAutoExpression(auto.allyTempHpExpression || 'floor(warlock level / 2) + CHA modifier', playerStats);
+    if (typeof allyTempHp !== 'number' || allyTempHp <= 0) return;
+
+    const rangeFt = rangeToFeet(auto.range || '60_ft');
+    const allies = [];
+
+    if (rangeFt != null) {
+        const mapPlayers = mapName ? (await loadMapData(campaignName, mapName))?.players || [] : [];
+        const combatSummary = getCombatSummary(campaignName);
+        const allCreatures = combatSummary?.creatures || [];
+        const candidates = mapPlayers.length > 0
+            ? mapPlayers.filter(p => p.name !== playerStats.name)
+            : allCreatures.filter(c => c.name !== playerStats.name);
+        for (const creature of candidates) {
+            if (await isWithinRange(playerStats.name, creature.name, rangeFt)) {
+                allies.push({ name: creature.name, type: creature.type || 'player', currentHp: creature.currentHp || 0, maxHp: creature.maxHp || 0 });
+            }
+        }
+    }
+
+    result.allyTempHp = allyTempHp;
+    result.maxAllies = auto.maxAllies || 5;
+    result.allies = allies;
 }
 
 export async function handle(action, playerStats, campaignName, _mapName) {

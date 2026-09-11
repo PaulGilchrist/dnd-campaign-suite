@@ -31,6 +31,96 @@ import { getEffectDefinition } from '../../../combat/conditions/targetEffectDefi
  * flammability / 2d4 fire / burn-away.
  */
 
+function stampWebZoneEffects(campaignName, casterName, targets, dc) {
+    const storedZoneEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const zoneEffects = Array.isArray(storedZoneEffects) ? [...storedZoneEffects] : [];
+    for (const zoneTarget of targets) {
+        const webEffect = {
+            target: zoneTarget.name,
+            effect: 'web',
+            source: casterName,
+            dc: dc,
+            duration: 'concentration',
+        };
+        const existingIdx = zoneEffects.findIndex(
+            te => te.target === zoneTarget.name && te.effect === 'web' && te.source === casterName
+        );
+        if (existingIdx >= 0) {
+            zoneEffects[existingIdx] = webEffect;
+        } else {
+            zoneEffects.push(webEffect);
+        }
+    }
+    setRuntimeValue('campaign', 'targetEffects', zoneEffects, campaignName);
+}
+
+function parseWebDurationRounds(auto, action) {
+    const lower = (auto.duration || action.spell?.duration || 'Concentration, up to 1 hour').toLowerCase();
+    const hourMatch = lower.match(/(\d+)\s*_?\s*hour/);
+    if (hourMatch) return parseInt(hourMatch[1], 10) * 600;
+    const minuteMatch = lower.match(/(\d+)\s*_?\s*minute/);
+    if (minuteMatch) return parseInt(minuteMatch[1], 10) * 10;
+    const roundMatch = lower.match(/(\d+)\s*_?round/);
+    if (roundMatch) return parseInt(roundMatch[1], 10);
+    return undefined;
+}
+
+async function restrainWebTarget(campaignName, casterName, targetName, dc, saveResult, durationRounds) {
+    // Apply Restrained condition
+    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'restrained');
+    setRuntimeValue(targetName, 'activeConditions', [...filtered, 'restrained'], campaignName);
+
+    // Store condition metadata with DC and ability for recurring STR save
+    const existingMeta = getRuntimeValue(targetName, 'activeConditionMeta', campaignName) || {};
+    setRuntimeValue(targetName, 'activeConditionMeta', {
+        ...existingMeta,
+        restrained: {
+            ...(existingMeta.restrained || {}),
+            dc,
+            ability: 'str',
+        },
+    }, campaignName);
+
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'failure',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: ['restrained'],
+        appliedDamage: 0,
+    });
+
+    // Add expiration for concentration — Restrained removed when the
+    // spell ends (600 rounds) — ONE merged entry (two sequential
+    // addExpiration calls race server-side, playbook 42ab).
+    addExpiration(casterName, targetName, [
+        { type: 'condition', condition: 'restrained' },
+    ], campaignName, durationRounds);
+
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: 'Restrained',
+        reason: 'Web spell',
+        note: `${targetName} is Restrained by Web: Speed is 0, attack rolls against you have Advantage, your attack rolls have Disadvantage, and you have Disadvantage on Dexterity saving throws. STR save (DC ${dc}) each turn or remain Restrained.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[web] Error:", e); });
+
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-web',
+        targetName,
+        saveDc: dc,
+        saveType: 'DEX',
+        success: false,
+        description: `${targetName} failed DEX save against Web. Becomes Restrained by sticky webbing.`,
+    }).catch((e) => { console.error("[web] Error:", e); });
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
@@ -91,41 +181,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     if (!getEffectDefinition('web')) {
         console.error('[webAreaSaveHandler] "web" missing from targetEffectDefinitions registry');
     }
-    const storedZoneEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-    const zoneEffects = Array.isArray(storedZoneEffects) ? [...storedZoneEffects] : [];
-    for (const zoneTarget of targets) {
-        const webEffect = {
-            target: zoneTarget.name,
-            effect: 'web',
-            source: casterName,
-            dc: dc,
-            duration: 'concentration',
-        };
-        const existingIdx = zoneEffects.findIndex(
-            te => te.target === zoneTarget.name && te.effect === 'web' && te.source === casterName
-        );
-        if (existingIdx >= 0) {
-            zoneEffects[existingIdx] = webEffect;
-        } else {
-            zoneEffects.push(webEffect);
-        }
-    }
-    setRuntimeValue('campaign', 'targetEffects', zoneEffects, campaignName);
+    stampWebZoneEffects(campaignName, casterName, targets, dc);
 
     // Expiration: the zone lasts at most 1 hour (600 rounds — CLA-334
     // minutes-as-rounds encoding) even with sustained concentration; the
     // zone te + tracking key are swept here, concentration loss sweeps the
     // duration:'concentration' tes separately via cleanupConcentrationEffects.
-    const durationRounds = (() => {
-        const lower = (auto.duration || action.spell?.duration || 'Concentration, up to 1 hour').toLowerCase();
-        const hourMatch = lower.match(/(\d+)\s*_?\s*hour/);
-        if (hourMatch) return parseInt(hourMatch[1], 10) * 600;
-        const minuteMatch = lower.match(/(\d+)\s*_?\s*minute/);
-        if (minuteMatch) return parseInt(minuteMatch[1], 10) * 10;
-        const roundMatch = lower.match(/(\d+)\s*_?round/);
-        if (roundMatch) return parseInt(roundMatch[1], 10);
-        return undefined;
-    })();
+    const durationRounds = parseWebDurationRounds(auto, action);
 
     if (durationRounds) {
         addExpiration(casterName, casterName, [
@@ -190,61 +252,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             }).catch((e) => { console.error("[web] Error:", e); });
         } else {
             affectedCount++;
-
-            // Apply Restrained condition
-            const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-            const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-            const filtered = conditions.filter(c => String(c).toLowerCase() !== 'restrained');
-            setRuntimeValue(targetName, 'activeConditions', [...filtered, 'restrained'], campaignName);
-
-            // Store condition metadata with DC and ability for recurring STR save
-            const existingMeta = getRuntimeValue(targetName, 'activeConditionMeta', campaignName) || {};
-            setRuntimeValue(targetName, 'activeConditionMeta', {
-                ...existingMeta,
-                restrained: {
-                    ...(existingMeta.restrained || {}),
-                    dc,
-                    ability: 'str',
-                },
-            }, campaignName);
-
-            await addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'failure',
-                roll: saveResult.roll ?? 0,
-                total: saveResult.total ?? 0,
-                conditions: ['restrained'],
-                appliedDamage: 0,
-            });
-
-            // Add expiration for concentration — Restrained removed when the
-            // spell ends (600 rounds) — ONE merged entry (two sequential
-            // addExpiration calls race server-side, playbook 42ab).
-            addExpiration(casterName, targetName, [
-                { type: 'condition', condition: 'restrained' },
-            ], campaignName, durationRounds);
-
-            addEntry(campaignName, {
-                type: 'condition',
-                action: 'applied',
-                characterName: targetName,
-                condition: 'Restrained',
-                reason: 'Web spell',
-                note: `${targetName} is Restrained by Web: Speed is 0, attack rolls against you have Advantage, your attack rolls have Disadvantage, and you have Disadvantage on Dexterity saving throws. STR save (DC ${dc}) each turn or remain Restrained.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[web] Error:", e); });
-
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                rollType: 'save-web',
-                targetName,
-                saveDc: dc,
-                saveType: 'DEX',
-                success: false,
-                description: `${targetName} failed DEX save against Web. Becomes Restrained by sticky webbing.`,
-            }).catch((e) => { console.error("[web] Error:", e); });
-
+            await restrainWebTarget(campaignName, casterName, targetName, dc, saveResult, durationRounds);
             results.push(`${targetName} is Restrained.`);
         }
     }

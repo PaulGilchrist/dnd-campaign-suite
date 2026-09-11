@@ -271,6 +271,24 @@ const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
 };
 
 /* ─── Fighter ─── */
+function computeActionsurgeMax(playerStats, classLevel) {
+    if (playerStats.rules === '2024') {
+        if (playerStats.level >= 17) return 2;
+        return playerStats.level >= 2 ? 1 : 0;
+    }
+    return classLevel?.class_specific?.action_surges || 0;
+}
+
+function computeSuperiorityStats(playerStats, isBattleMaster) {
+    const hasSuperiorityDice = isBattleMaster || playerStats.class.fightingStyles?.includes('Superior Technique');
+    if (!hasSuperiorityDice) return { hasSuperiorityDice: false, superiorityDiceMax: 0, superiorityDieType: 0 };
+    const superiorityDiceMax = playerStats._trackedResources?.superiorityDice?.max || 0;
+    if (!isBattleMaster) return { hasSuperiorityDice: true, superiorityDiceMax, superiorityDieType: 6 };
+    if (playerStats.level >= 18) return { hasSuperiorityDice: true, superiorityDiceMax, superiorityDieType: 12 };
+    if (playerStats.level >= 10) return { hasSuperiorityDice: true, superiorityDiceMax, superiorityDieType: 10 };
+    return { hasSuperiorityDice: true, superiorityDiceMax, superiorityDieType: 8 };
+}
+
 const FighterFeatures = function FighterFeatures({ playerStats, campaignName, onWeaponMasteryClick }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     const majorName = playerStats.class.major?.name || playerStats.class.subclass?.name;
@@ -299,14 +317,8 @@ const FighterFeatures = function FighterFeatures({ playerStats, campaignName, on
 
     if (!classLevel) return null;
 
-    const actionsurgeMax = playerStats.rules === '2024'
-          ? (playerStats.level >= 17 ? 2 : (playerStats.level >= 2 ? 1 : 0))
-          : (classLevel?.class_specific?.action_surges || 0);
-
-    const hasSuperiorityDice = isBattleMaster || playerStats.class.fightingStyles?.includes('Superior Technique');
-    const superiorityDiceMax = !hasSuperiorityDice ? 0 : (playerStats._trackedResources?.superiorityDice?.max || 0);
-
-    const superiorityDieType = !hasSuperiorityDice ? 0 : (isBattleMaster ? (playerStats.level >= 18 ? 12 : (playerStats.level >= 10 ? 10 : 8)) : 6);
+    const actionsurgeMax = computeActionsurgeMax(playerStats, classLevel);
+    const { hasSuperiorityDice, superiorityDiceMax, superiorityDieType } = computeSuperiorityStats(playerStats, isBattleMaster);
 
     return (
           <div data-testid="char-class-fighter">
@@ -623,18 +635,35 @@ const WarlockFeatures = function WarlockFeatures({ playerStats, campaignName }) 
 };
 
 /* ─── Wizard ─── */
+function computeProjectedWard(playerStats) {
+    const reactions = playerStats.automation?.reactions ?? [];
+    const match = (a) => a.type === 'projected_ward' || a.name === 'Projected Ward';
+    const reaction = reactions.find(match);
+    return { hasProjectedWard: !!reaction, projectedWardRange: reaction?.range || 30 };
+}
+
+function parsePortentDice(portentDice) {
+    try {
+        if (!portentDice) return [];
+        const parsed = typeof portentDice === 'string' ? JSON.parse(portentDice) : portentDice;
+        return Array.isArray(parsed) ? parsed : [];
+    } catch { /* ignore */ return []; }
+}
+
+function computeArcaneWardMax(playerStats) {
+    const passives = playerStats.automation?.passives ?? [];
+    const hasArcaneWard = passives.some(p => p.type === 'arcane_ward' || (p.type === 'passive_rule' && p.effect === 'arcane_ward'));
+    if (!hasArcaneWard) return 0;
+    const intBonus = playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus || 0;
+    return (2 * playerStats.level) + intBonus;
+}
+
 const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
     const wizardFeatures = getClassFeatures(playerStats);
     const hasPortent = (playerStats.specialActions ?? []).some(
         a => a.automation?.type === 'portent'
     );
-    const hasProjectedWard = (playerStats.automation?.reactions ?? []).some(
-        a => a.type === 'projected_ward' || a.name === 'Projected Ward'
-    );
-    const projectedWardReaction = (playerStats.automation?.reactions ?? []).find(
-        a => a.type === 'projected_ward' || a.name === 'Projected Ward'
-    );
-    const projectedWardRange = projectedWardReaction?.range || 30;
+    const { hasProjectedWard, projectedWardRange } = computeProjectedWard(playerStats);
     const portentDice = useRuntimeValue(playerStats.name, 'portentDice', campaignName);
     const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
     const thirdEyeBuff = Array.isArray(activeBuffs) ? (activeBuffs.find(b => b.name === 'The Third Eye') || null) : null;
@@ -644,17 +673,10 @@ const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
         'see_invisibility': 'See Invisibility',
     };
 
-    let parsedDice = [];
-    try {
-        if (portentDice) {
-            const parsed = typeof portentDice === 'string' ? JSON.parse(portentDice) : portentDice;
-            if (Array.isArray(parsed)) parsedDice = parsed;
-        }
-    } catch { /* ignore */ }
+    const parsedDice = parsePortentDice(portentDice);
 
     if ((wizardFeatures?.showWizardFeatures ?? true) === false) return null;
-    const hasArcaneWard = (playerStats.automation?.passives ?? []).some(p => p.type === 'arcane_ward' || (p.type === 'passive_rule' && p.effect === 'arcane_ward'));
-    const wardMax = hasArcaneWard ? (2 * playerStats.level) + (playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus || 0) : 0;
+    const wardMax = computeArcaneWardMax(playerStats);
     return (
           <div data-testid="char-class-wizard">
                <TrackedResourceInput label="Arcane Recovery Levels" resourceKey="arcaneRecoveryLevels" playerName={playerStats.name} getMax={() => wizardFeatures?.arcaneRecoveryLevels || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />

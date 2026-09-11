@@ -74,23 +74,7 @@ async function handleBendFate(action, playerStats, campaignName, _mapName) {
     const isSave = rollType === 'save' || (rollType === 'attack' && lastAttack.saveDc != null && lastAttack.saveResult != null);
     const isCheck = rollType === 'check' || rollType === 'skill';
 
-    let eventLabel;
-    if (isAttack) {
-        eventLabel = `Attack by ${attackerName}`;
-    } else if (isCheck) {
-        eventLabel = `${lastAttack.checkName || 'Ability check'} by ${attackerName}`;
-    } else {
-        const saveLabel = lastAttack.saveType ? lastAttack.saveType.toUpperCase() : 'Save';
-        eventLabel = `${saveLabel} by ${attackerName}`;
-    }
-
-    const originalTotal = (lastAttack.d20 || 0) + (lastAttack.bonus || 0);
-    const hitStatus = isAttack && lastAttack.targetAc != null
-        ? (originalTotal >= lastAttack.targetAc ? 'Hit' : 'Miss')
-        : null;
-    const saveStatus = isSave && lastAttack.saveDc != null
-        ? (originalTotal >= lastAttack.saveDc ? 'Success' : 'Failure')
-        : null;
+    const { eventLabel, hitStatus, saveStatus } = describeBendFateEvent(lastAttack, attackerName, isAttack, isCheck, isSave);
 
     return {
         type: 'modal',
@@ -110,6 +94,28 @@ async function handleBendFate(action, playerStats, campaignName, _mapName) {
             isCheck,
         },
     };
+}
+
+function describeBendFateEvent(lastAttack, attackerName, isAttack, isCheck, isSave) {
+    let eventLabel;
+    if (isAttack) {
+        eventLabel = `Attack by ${attackerName}`;
+    } else if (isCheck) {
+        eventLabel = `${lastAttack.checkName || 'Ability check'} by ${attackerName}`;
+    } else {
+        const saveLabel = lastAttack.saveType ? lastAttack.saveType.toUpperCase() : 'Save';
+        eventLabel = `${saveLabel} by ${attackerName}`;
+    }
+
+    const originalTotal = (lastAttack.d20 || 0) + (lastAttack.bonus || 0);
+    const hitStatus = isAttack && lastAttack.targetAc != null
+        ? (originalTotal >= lastAttack.targetAc ? 'Hit' : 'Miss')
+        : null;
+    const saveStatus = isSave && lastAttack.saveDc != null
+        ? (originalTotal >= lastAttack.saveDc ? 'Success' : 'Failure')
+        : null;
+
+    return { eventLabel, hitStatus, saveStatus };
 }
 
 async function shiftAttackOutcome(action, cs, lastAttack, playerName, attackerName, shift, campaignName) {

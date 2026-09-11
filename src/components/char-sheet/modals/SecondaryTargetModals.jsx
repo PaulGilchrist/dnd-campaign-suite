@@ -1,6 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import SecondaryTargetModal from './shared/SecondaryTargetModal.jsx';
 
+const SECONDARY_MODAL_KEYS = [
+    'sweepingAttackTargetModal',
+    'baitAndSwitchChoiceModal',
+    'commanderStrikeChoiceModal',
+    'rallyChoiceModal',
+    'tricksterBlessingModal',
+    'bardicInspirationTargetModal',
+    'inspiringMovementAllyModal',
+    'oceanicGiftTargetModal',
+    'destructiveStrideTargetModal',
+    'starryChaliceHealModal',
+];
+
 export default function SecondaryTargetModals({
     mergedModalState,
     setModalState,
@@ -39,7 +52,7 @@ export default function SecondaryTargetModals({
 
     const oceanicIsDouble = oceanicDouble || !!oceanicGiftTargetModal?.doubleEmanation;
 
-    if (!sweepingAttackTargetModal && !baitAndSwitchChoiceModal && !commanderStrikeChoiceModal && !rallyChoiceModal && !tricksterBlessingModal && !bardicInspirationTargetModal && !inspiringMovementAllyModal && !oceanicGiftTargetModal && !destructiveStrideTargetModal && !starryChaliceHealModal) {
+    if (!SECONDARY_MODAL_KEYS.some(key => mergedModalState[key])) {
         return null;
     }
 

@@ -448,6 +448,46 @@ function StealthDragonModals({ mergedModalState, setModalState }) {
     );
 }
 
+function LegacyLineageModals({ mergedModalState, setModalState, playerStats, campaignName }) {
+    return (
+        <>
+            {mergedModalState.celestialRevelationModal && (
+                <CelestialRevelationModal
+                    {...mergedModalState.celestialRevelationModal}
+                    onClose={() => setModalState({ celestialRevelationModal: null })}
+                    onSetConditionModal={setModalState}
+                />
+            )}
+            {mergedModalState.fiendishLegacyModal && (
+                <FiendishLegacyModal
+                    {...mergedModalState.fiendishLegacyModal}
+                    onClose={() => setModalState({ fiendishLegacyModal: null })}
+                />
+            )}
+            {mergedModalState.breathWeaponShapeModal && (
+                <BreathWeaponShapeModal
+                    {...mergedModalState.breathWeaponShapeModal}
+                    onClose={() => setModalState({ breathWeaponShapeModal: null })}
+                />
+            )}
+            {mergedModalState.hypnoticPatternShakeModal && (
+                <HypnoticPatternShakeModal
+                    {...mergedModalState.hypnoticPatternShakeModal}
+                    onClose={() => setModalState({ hypnoticPatternShakeModal: null })}
+                />
+            )}
+            {mergedModalState.arcaneWardRestoreModal && (
+                <ArcaneWardRestoreModal
+                    {...mergedModalState.arcaneWardRestoreModal}
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    onClose={() => setModalState({ arcaneWardRestoreModal: null })}
+                />
+            )}
+        </>
+    );
+}
+
 function SecondaryModals({
     mergedModalState,
     setModalState,
@@ -617,39 +657,7 @@ function SecondaryModals({
                 />
             )}
             <ArcaneFeatureModals mergedModalState={mergedModalState} setModalState={setModalState} />
-            {mergedModalState.celestialRevelationModal && (
-                <CelestialRevelationModal
-                    {...mergedModalState.celestialRevelationModal}
-                    onClose={() => setModalState({ celestialRevelationModal: null })}
-                    onSetConditionModal={setModalState}
-                />
-            )}
-            {mergedModalState.fiendishLegacyModal && (
-                <FiendishLegacyModal
-                    {...mergedModalState.fiendishLegacyModal}
-                    onClose={() => setModalState({ fiendishLegacyModal: null })}
-                />
-            )}
-            {mergedModalState.breathWeaponShapeModal && (
-                <BreathWeaponShapeModal
-                    {...mergedModalState.breathWeaponShapeModal}
-                    onClose={() => setModalState({ breathWeaponShapeModal: null })}
-                />
-            )}
-            {mergedModalState.hypnoticPatternShakeModal && (
-                <HypnoticPatternShakeModal
-                    {...mergedModalState.hypnoticPatternShakeModal}
-                    onClose={() => setModalState({ hypnoticPatternShakeModal: null })}
-                />
-            )}
-            {mergedModalState.arcaneWardRestoreModal && (
-                <ArcaneWardRestoreModal
-                    {...mergedModalState.arcaneWardRestoreModal}
-                    playerStats={playerStats}
-                    campaignName={campaignName}
-                    onClose={() => setModalState({ arcaneWardRestoreModal: null })}
-                />
-            )}
+            <LegacyLineageModals mergedModalState={mergedModalState} setModalState={setModalState} playerStats={playerStats} campaignName={campaignName} />
             {combatSuperiorityModal && (
                 <CombatSuperiorityModal
                     {...combatSuperiorityModal}

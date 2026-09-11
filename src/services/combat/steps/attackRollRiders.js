@@ -52,6 +52,16 @@ export function buildAttackRiderManeuversStep() {
   };
 }
 
+function resolveRoundStamp(raw) {
+  return raw && typeof raw === 'object' ? raw.round : raw;
+}
+
+function findCunningStrikePassive(passives) {
+  return passives.find(p => p.name === 'Devious Strikes' && p.type === 'attack_rider') ||
+    passives.find(p => p.name === 'Improved Cunning Strike' && p.type === 'attack_rider') ||
+    passives.find(p => p.name === 'Cunning Strike' && p.type === 'attack_rider');
+}
+
 export function buildCunningStrikeStep() {
   return {
     name: 'cunningStrike',
@@ -69,36 +79,24 @@ export function buildCunningStrikeStep() {
       const sneakDice = buildResult?.sneakAttackDice || 0;
 
       const passives = ctx.playerStats.automation?.passives || [];
-      const csPassive =
-        passives.find(p => p.name === 'Devious Strikes' && p.type === 'attack_rider') ||
-        passives.find(p => p.name === 'Improved Cunning Strike' && p.type === 'attack_rider') ||
-        passives.find(p => p.name === 'Cunning Strike' && p.type === 'attack_rider');
+      const csPassive = findCunningStrikePassive(passives);
       if (csPassive && sneakDice > 0) {
         const round = getCurrentCombatRound(ctx.campaignName);
-        const usedRaw = getRuntimeValue(ctx.playerStats.name, '_CunningStrike_usedRound', ctx.campaignName);
-        const skippedRaw = getRuntimeValue(ctx.playerStats.name, '_cunningStrikeSkippedRound', ctx.campaignName);
-        const usedRound = usedRaw && typeof usedRaw === 'object' ? usedRaw.round : usedRaw;
-        const skippedRound = skippedRaw && typeof skippedRaw === 'object' ? skippedRaw.round : skippedRaw;
+        const usedRound = resolveRoundStamp(getRuntimeValue(ctx.playerStats.name, '_CunningStrike_usedRound', ctx.campaignName));
+        const skippedRound = resolveRoundStamp(getRuntimeValue(ctx.playerStats.name, '_cunningStrikeSkippedRound', ctx.campaignName));
         if (usedRound !== round && skippedRound !== round) {
           const cs = await getCombatContext(ctx.campaignName);
           const target = cs ? getTargetFromAttacker(cs, ctx.playerStats.name) : null;
-          ctx.setAttackRiderModal?.({
+          const modalProps = {
             action: csPassive,
             playerStats: ctx.playerStats,
             campaignName: ctx.campaignName,
             targetName: target?.name || null,
-          });
+          };
+          ctx.setAttackRiderModal?.(modalProps);
           return {
             data: { _cunningStrike: true, sneakDice },
-            modal: {
-              type: 'cunningStrike',
-              props: {
-                action: csPassive,
-                playerStats: ctx.playerStats,
-                campaignName: ctx.campaignName,
-                targetName: target?.name || null,
-              },
-            },
+            modal: { type: 'cunningStrike', props: modalProps },
           };
         }
         if (skippedRound === round) {

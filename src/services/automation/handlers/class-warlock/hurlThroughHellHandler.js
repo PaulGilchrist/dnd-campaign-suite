@@ -7,6 +7,22 @@ import { getCurrentCombatRound } from '../../../encounters/combatData.js';
 const USES_KEY = 'hurlThroughHellUses';
 const TURN_USED_KEY = 'hurlThroughHellTurnUsed';
 
+function findPactSlotLevel(playerStats) {
+    for (let lv = 9; lv >= 1; lv--) {
+        if (playerStats.spellAbilities?.[`spell_slots_level_${lv}`] > 0) {
+            return lv;
+        }
+    }
+    return 0;
+}
+
+function hasPactSlotAvailable(playerStats, playerName, campaignName, auto, currentUses, maxUses, pactSlotLevel) {
+    if (!(currentUses >= maxUses && auto.pactMagicRecharge && pactSlotLevel > 0)) return false;
+    const slotKey = `spell_slots_level_${pactSlotLevel}`;
+    const currentSlots = Number(getRuntimeValue(playerName, slotKey, campaignName) ?? playerStats.spellAbilities?.[slotKey] ?? 0);
+    return currentSlots > 0;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -104,21 +120,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const maxUses = auto.uses || 1;
 
     // Find Pact Magic slot level (highest spell slot level the warlock has)
-    let pactSlotLevel = 0;
-    for (let lv = 9; lv >= 1; lv--) {
-        if (playerStats.spellAbilities?.[`spell_slots_level_${lv}`] > 0) {
-            pactSlotLevel = lv;
-            break;
-        }
-    }
+    const pactSlotLevel = findPactSlotLevel(playerStats);
 
     // Check Pact Magic slot availability if needed
-    let pactSlotsAvailable = false;
-    if (currentUses >= maxUses && auto.pactMagicRecharge && pactSlotLevel > 0) {
-        const slotKey = `spell_slots_level_${pactSlotLevel}`;
-        const currentSlots = Number(getRuntimeValue(playerName, slotKey, campaignName) ?? playerStats.spellAbilities?.[slotKey] ?? 0);
-        pactSlotsAvailable = currentSlots > 0;
-    }
+    const pactSlotsAvailable = hasPactSlotAvailable(playerStats, playerName, campaignName, auto, currentUses, maxUses, pactSlotLevel);
 
     // Check if we can use at all
     const canUse = currentUses < maxUses || (auto.pactMagicRecharge && pactSlotsAvailable);

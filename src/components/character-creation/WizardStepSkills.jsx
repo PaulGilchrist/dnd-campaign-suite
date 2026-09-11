@@ -4,6 +4,43 @@ import './WizardStepSkills.css';
 import { loadSkills } from '../../services/ui/dataLoader.js';
 import { isEqual } from 'lodash';
 
+const getExpertiseBlockReason = (skill, expertiseData, expertiseLimits) => {
+  // Check if this skill is in a feat-restricted list
+  const isFeatRestricted = expertiseLimits?.featExpertiseSkillLists?.some(list =>
+    list.some(s => s.trim() === skill)
+  );
+
+  if (isFeatRestricted) {
+    // Feat-restricted skills can only use feat slots
+    if (!expertiseLimits?.featCount || expertiseLimits.featCount <= 0) {
+      return 'This skill requires a feat expertise slot';
+    }
+    if (expertiseData.featSlotsUsed >= expertiseLimits.featCount) {
+      return 'All feat expertise slots are used';
+    }
+    return null;
+  }
+
+  // Non-restricted skills can use class slots or feat slots
+  const inClassList = !expertiseData.classRestrictedSkills || expertiseData.classRestrictedSkills.has(skill);
+  const hasClassSlots = inClassList && expertiseLimits?.classCount && expertiseLimits.classCount > 0 && expertiseData.classSlotsAvailable > 0;
+  const hasFeatSlots = expertiseLimits?.featCount && expertiseLimits.featCount > 0 && expertiseData.featSlotsUsed < expertiseLimits.featCount;
+
+  if (!inClassList && !hasFeatSlots) {
+    return `Class expertise is limited to: ${[...expertiseData.classRestrictedSkills].join(', ')}`;
+  }
+  if (hasClassSlots || hasFeatSlots) {
+    return null;
+  }
+  if (!expertiseLimits?.classCount || expertiseLimits.classCount <= 0) {
+    if (!expertiseLimits?.featCount || expertiseLimits.featCount <= 0) {
+      return 'This class does not grant expertise slots';
+    }
+    return 'All expertise slots are used';
+  }
+  return 'All class expertise slots are used';
+};
+
 const areEqual = (prevProps, nextProps) => {
   return (
     prevProps.formData === nextProps.formData &&
@@ -67,70 +104,36 @@ const WizardStepSkills = React.memo(function WizardStepSkills({ formData, errors
     };
   }, [formData.expertSkills, expertiseLimits]);
 
+	const showExpertiseFeedbackFor = (message) => {
+		setShowExpertiseFeedback(message);
+		setTimeout(() => setShowExpertiseFeedback(null), 3000);
+	};
+
 	const handleExpertiseToggle = (skill) => {
 		const isCurrentlyExpert = (formData.expertSkills || []).includes(skill);
 
 		if (isCurrentlyExpert) {
-      // Deselecting expertise - remove from expertSkills only
+			// Deselecting expertise - remove from expertSkills only
 			onSkillExpertiseToggle(skill, false);
 			setShowExpertiseFeedback(null);
-			} else {
-			// Elevating to expertise
-			const isCurrentlyProficient = (formData.skillProficiencies || []).includes(skill);
-			if (!isCurrentlyProficient) {
-				setShowExpertiseFeedback(`Please select ${skill} as proficient first`);
-				setTimeout(() => setShowExpertiseFeedback(null), 3000);
-				return;
-				}
+			return;
+		}
 
-        // Check if this skill is in a feat-restricted list
-        const isFeatRestricted = expertiseLimits?.featExpertiseSkillLists?.some(list =>
-          list.some(s => s.trim() === skill)
-        );
+		// Elevating to expertise
+		if (!(formData.skillProficiencies || []).includes(skill)) {
+			showExpertiseFeedbackFor(`Please select ${skill} as proficient first`);
+			return;
+		}
 
-        if (isFeatRestricted) {
-          // Feat-restricted skills can only use feat slots
-          if (!expertiseLimits?.featCount || expertiseLimits.featCount <= 0) {
-            setShowExpertiseFeedback('This skill requires a feat expertise slot');
-            setTimeout(() => setShowExpertiseFeedback(null), 3000);
-            return;
-          }
-          if (expertiseData.featSlotsUsed >= expertiseLimits.featCount) {
-            setShowExpertiseFeedback('All feat expertise slots are used');
-            setTimeout(() => setShowExpertiseFeedback(null), 3000);
-            return;
-          }
-        } else {
-          // Non-restricted skills can use class slots or feat slots
-          const inClassList = !expertiseData.classRestrictedSkills || expertiseData.classRestrictedSkills.has(skill);
-          const hasClassSlots = inClassList && expertiseLimits?.classCount && expertiseLimits.classCount > 0 && expertiseData.classSlotsAvailable > 0;
-          const hasFeatSlots = expertiseLimits?.featCount && expertiseLimits.featCount > 0 && expertiseData.featSlotsUsed < expertiseLimits.featCount;
-          if (!inClassList && !hasFeatSlots) {
-            setShowExpertiseFeedback(`Class expertise is limited to: ${[...expertiseData.classRestrictedSkills].join(', ')}`);
-            setTimeout(() => setShowExpertiseFeedback(null), 3000);
-            return;
-          }
-          if (!hasClassSlots && !hasFeatSlots) {
-            if (!expertiseLimits?.classCount || expertiseLimits.classCount <= 0) {
-              if (!expertiseLimits?.featCount || expertiseLimits.featCount <= 0) {
-                setShowExpertiseFeedback('This class does not grant expertise slots');
-                setTimeout(() => setShowExpertiseFeedback(null), 3000);
-                return;
-              }
-              setShowExpertiseFeedback('All expertise slots are used');
-            } else {
-              setShowExpertiseFeedback('All class expertise slots are used');
-            }
-            setTimeout(() => setShowExpertiseFeedback(null), 3000);
-            return;
-          }
-        }
+		const blockReason = getExpertiseBlockReason(skill, expertiseData, expertiseLimits);
+		if (blockReason) {
+			showExpertiseFeedbackFor(blockReason);
+			return;
+		}
 
-			onSkillExpertiseToggle(skill, true);
-			setShowExpertiseFeedback(`${skill} is now Expert!`);
-			setTimeout(() => setShowExpertiseFeedback(null), 3000);
-			}
-		};
+		onSkillExpertiseToggle(skill, true);
+		showExpertiseFeedbackFor(`${skill} is now Expert!`);
+	};
 
 	const isSkillExpert = (skill) => (formData.expertSkills || []).includes(skill);
 	const isSkillProficient = (skill) => (formData.skillProficiencies || []).includes(skill);

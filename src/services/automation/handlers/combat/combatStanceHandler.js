@@ -196,6 +196,21 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
     };
 }
 
+function stanceRefusal(action, auto, description) {
+    return {
+        popup: {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description,
+                automation: auto,
+            },
+        },
+    };
+}
+
 // Resource gates for stance activation: Wild Heart prerequisite, tracked uses,
 // Channel Divinity, or rage-point pool. Returns { popup } to refuse activation.
 async function consumeStanceResource(action, auto, playerStats, campaignName, isWildHeart, maxUses) {
@@ -206,18 +221,7 @@ async function consumeStanceResource(action, auto, playerStats, campaignName, is
         const activeBuffs = Array.isArray(stored) ? stored : [];
         const hasRageActive = activeBuffs.some(b => b.name === 'Rage');
         if (!hasRageActive) {
-            return {
-                popup: {
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: action.name,
-                        automationType: auto.type,
-                        description: 'Rage of the Wilds requires Rage to be active.',
-                        automation: auto,
-                    },
-                },
-            };
+            return stanceRefusal(action, auto, 'Rage of the Wilds requires Rage to be active.');
         }
         return { currentUses: 0 };
     }
@@ -226,48 +230,34 @@ async function consumeStanceResource(action, auto, playerStats, campaignName, is
         const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
         const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? maxUses);
         if (currentUses <= 0) {
-            return {
-                popup: {
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: action.name,
-                        automationType: auto.type,
-                        description: `${action.name} has been used and cannot be used again until a Long Rest.`,
-                        automation: auto,
-                    },
-                },
-            };
+            return stanceRefusal(action, auto, `${action.name} has been used and cannot be used again until a Long Rest.`);
         }
         await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
         return { currentUses };
     }
 
     if (auto.resourceCost === 'channel_divinity') {
-        const storedCharges = getRuntimeValue(playerName, 'channelDivinityCharges', campaignName);
-        const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
-        const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
-        const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
-
-        if (currentCharges <= 0) {
-            return {
-                popup: {
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: action.name,
-                        automationType: auto.type,
-                        description: 'No Channel Divinity charges remaining.',
-                        automation: auto,
-                    },
-                },
-            };
-        }
-
-        await setRuntimeValue(playerName, 'channelDivinityCharges', currentCharges - 1, campaignName);
-        return { currentUses: 0 };
+        return consumeChannelDivinityCharge(action, auto, playerStats, campaignName, playerName);
     }
 
+    return consumeRagePointResource(action, auto, playerStats, campaignName, playerName);
+}
+
+async function consumeChannelDivinityCharge(action, auto, playerStats, campaignName, playerName) {
+    const storedCharges = getRuntimeValue(playerName, 'channelDivinityCharges', campaignName);
+    const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
+    const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
+    const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
+
+    if (currentCharges <= 0) {
+        return stanceRefusal(action, auto, 'No Channel Divinity charges remaining.');
+    }
+
+    await setRuntimeValue(playerName, 'channelDivinityCharges', currentCharges - 1, campaignName);
+    return { currentUses: 0 };
+}
+
+async function consumeRagePointResource(action, auto, playerStats, campaignName, playerName) {
     const resourceKey = auto.resourceKey || 'ragePoints';
     const storedResource = getRuntimeValue(playerName, resourceKey, campaignName);
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
@@ -278,26 +268,15 @@ async function consumeStanceResource(action, auto, playerStats, campaignName, is
     const currentResource = storedResource != null ? Number(storedResource) : (playerStats._trackedResources?.ragePoints?.current ?? maxRage);
 
     if (currentResource <= 0) {
-        return {
-            popup: {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    automationType: auto.type,
-                    description: `No ${action.name} uses remaining.`,
-                    automation: auto,
-                },
-            },
-        };
+        return stanceRefusal(action, auto, `No ${action.name} uses remaining.`);
     }
 
     await setRuntimeValue(playerName, resourceKey, currentResource - 1, campaignName);
     return { currentUses: 0 };
 }
 
-function buildStanceBuff(action, auto, chosenOption, playerStats, resistanceTypes, isImprovedDuplicity) {
-    const buff = {
+function buildBaseStanceBuff(action, auto, chosenOption, isImprovedDuplicity, resistanceTypes) {
+    return {
         name: action.name,
         effect: auto.effect || 'stance',
         duration: auto.duration || '1_minute',
@@ -312,6 +291,17 @@ function buildStanceBuff(action, auto, chosenOption, playerStats, resistanceType
         reactionSave: null,
         isImprovedDuplicity,
     };
+}
+
+const STANCE_OPTION_EFFECTS = {
+    ice_walk: () => ({ effect: 'ice_walk' }),
+    speed_boost: opt => ({ effect: 'speed_boost', speedBonus: opt.speedBonus || 10 }),
+    fly_speed: () => ({ effect: 'fly_speed_equals_walk_speed', flySpeed: 'equals_walk_speed' }),
+    teleport: opt => ({ effect: 'teleport_ready', teleportDistance: opt.teleportDistance || '30 ft' }),
+};
+
+function buildStanceBuff(action, auto, chosenOption, playerStats, resistanceTypes, isImprovedDuplicity) {
+    const buff = buildBaseStanceBuff(action, auto, chosenOption, isImprovedDuplicity, resistanceTypes);
 
     if (chosenOption && chosenOption.flySpeed) {
         const blockedByArmor = chosenOption.noArmor && isWearingArmor(playerStats);
@@ -323,18 +313,8 @@ function buildStanceBuff(action, auto, chosenOption, playerStats, resistanceType
         buff.flySpeed = auto.flySpeed;
     }
 
-    if (chosenOption && chosenOption.effect === 'ice_walk') {
-        buff.effect = 'ice_walk';
-    } else if (chosenOption && chosenOption.effect === 'speed_boost') {
-        buff.effect = 'speed_boost';
-        buff.speedBonus = chosenOption.speedBonus || 10;
-    } else if (chosenOption && chosenOption.effect === 'fly_speed') {
-        buff.effect = 'fly_speed_equals_walk_speed';
-        buff.flySpeed = 'equals_walk_speed';
-    } else if (chosenOption && chosenOption.effect === 'teleport') {
-        buff.effect = 'teleport_ready';
-        buff.teleportDistance = chosenOption.teleportDistance || '30 ft';
-    }
+    const applyOptionEffect = chosenOption && STANCE_OPTION_EFFECTS[chosenOption.effect];
+    if (applyOptionEffect) Object.assign(buff, applyOptionEffect(chosenOption));
 
     if (auto.reactionSave) {
         buff.reactionSave = auto.reactionSave;

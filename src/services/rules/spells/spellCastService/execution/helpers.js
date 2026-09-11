@@ -97,14 +97,7 @@ export function refundSpellBreakerSlot(playerName, spellLevel, campaignName) {
     setRuntimeValue(playerName, slotKey, currentSlots + 1, campaignName);
 }
 
-// Dispel Magic: resolves the caster ability check (d20 + spellcasting modifier,
-// + Proficiency Bonus with Spell Breaker) vs DC 10 + spell level. CLA-322:
-// logs the check, dispatches `spell-result` with `checkFailed` for popup
-// consumers, and on failure refunds the spent slot via Spell Breaker slot
-// retention keyed by the ACTUAL cast slot level.
-async function triggerDispelMagic(metaCtx, spell, playerStats, campaignName, _mapName) {
-    const profBonus = Math.floor((playerStats.level - 1) / 4 + 2);
-
+function resolveDispelCheckBonus(spell, playerStats, metaCtx, profBonus) {
     const spellCastAbility = spell.spellCastingAbility || playerStats.spellAbilities?.spellCastingAbility;
     let abilityMod = playerStats.spellAbilities?.modifier || 0;
     if (spellCastAbility && playerStats.abilities) {
@@ -120,17 +113,10 @@ async function triggerDispelMagic(metaCtx, spell, playerStats, campaignName, _ma
     // instead of stacking (CLA-322 PB double-count).
     const ctxBonus = typeof metaCtx?.dispelAbilityCheckBonus === 'number' ? metaCtx.dispelAbilityCheckBonus : 0;
     const breakerBonus = Math.max(spellBreaker ? profBonus : 0, ctxBonus);
-    const totalCheckBonus = abilityMod + breakerBonus;
+    return { spellBreaker, totalCheckBonus: abilityMod + breakerBonus };
+}
 
-    const targetName = metaCtx?.targetName || 'unknown target';
-    const spellLevel = metaCtx?.slotLevel || spell.level || 0;
-    const targetDC = 10 + spellLevel;
-
-    const rollResult = rollExpression('1d20');
-    const d20 = rollResult?.rolls?.[0] ?? rollResult?.total ?? 0;
-    const total = d20 + totalCheckBonus;
-    const checkFailed = total < targetDC;
-
+function logDispelCheck(campaignName, playerStats, targetName, d20, totalCheckBonus, total, targetDC, checkFailed) {
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,
@@ -153,16 +139,42 @@ async function triggerDispelMagic(metaCtx, spell, playerStats, campaignName, _ma
         },
         bubbles: true,
     }));
+}
 
-    if (checkFailed && spellBreaker?.slotRetentionSpells?.includes('Dispel Magic') && usesSpellSlot(spell, metaCtx)) {
-        refundSpellBreakerSlot(playerStats.name, spellLevel, campaignName);
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: 'Spell Breaker',
-            description: `Spell Breaker: Dispel Magic failed to stop a spell — spell slot level ${spellLevel} refunded.`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error('[spellCast] Spell Breaker refund log failed:', e); });
+function refundDispelSpellBreakerSlot(spellBreaker, spell, metaCtx, playerStats, spellLevel, campaignName) {
+    if (!spellBreaker?.slotRetentionSpells?.includes('Dispel Magic') || !usesSpellSlot(spell, metaCtx)) return;
+    refundSpellBreakerSlot(playerStats.name, spellLevel, campaignName);
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: 'Spell Breaker',
+        description: `Spell Breaker: Dispel Magic failed to stop a spell — spell slot level ${spellLevel} refunded.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[spellCast] Spell Breaker refund log failed:', e); });
+}
+
+// Dispel Magic: resolves the caster ability check (d20 + spellcasting modifier,
+// + Proficiency Bonus with Spell Breaker) vs DC 10 + spell level. CLA-322:
+// logs the check, dispatches `spell-result` with `checkFailed` for popup
+// consumers, and on failure refunds the spent slot via Spell Breaker slot
+// retention keyed by the ACTUAL cast slot level.
+async function triggerDispelMagic(metaCtx, spell, playerStats, campaignName, _mapName) {
+    const profBonus = Math.floor((playerStats.level - 1) / 4 + 2);
+    const { spellBreaker, totalCheckBonus } = resolveDispelCheckBonus(spell, playerStats, metaCtx, profBonus);
+
+    const targetName = metaCtx?.targetName || 'unknown target';
+    const spellLevel = metaCtx?.slotLevel || spell.level || 0;
+    const targetDC = 10 + spellLevel;
+
+    const rollResult = rollExpression('1d20');
+    const d20 = rollResult?.rolls?.[0] ?? rollResult?.total ?? 0;
+    const total = d20 + totalCheckBonus;
+    const checkFailed = total < targetDC;
+
+    logDispelCheck(campaignName, playerStats, targetName, d20, totalCheckBonus, total, targetDC, checkFailed);
+
+    if (checkFailed) {
+        refundDispelSpellBreakerSlot(spellBreaker, spell, metaCtx, playerStats, spellLevel, campaignName);
     }
 }
 
@@ -349,6 +361,62 @@ async function triggerExpertDivination(spell, metaCtx, playerStats, campaignName
     }
 }
 
+function resolveRegenerateExpression(healAtSlotLevel, slotLevel) {
+    const expression = healAtSlotLevel[slotLevel];
+    if (expression) return expression;
+    const levels = Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b);
+    const highestBelow = levels.filter(l => l <= slotLevel).pop();
+    return highestBelow ? healAtSlotLevel[highestBelow] : expression;
+}
+
+// Rolls the initial Regenerate healing, applies it, and logs the hp_change entry.
+async function applyRegenerateInitialHeal(spell, targetName, caster, campaignName, expression, bonusHeal, bonusDetails) {
+    const maximize = hasHealingMaximizationForTarget(caster, targetName, campaignName);
+    const rerollOnes = hasRerollHealingOnes(caster);
+    let result = maximize ? rollExpressionMaximized(expression) : rollExpression(expression);
+    if (result && rerollOnes && !maximize) {
+        const { displayRolls } = applyHealingRerollOnes(result.rolls, expression);
+        result = { ...result, rolls: displayRolls };
+    }
+    if (!result) return { initialHeal: 0, result };
+
+    const combatSummary = await getCombatContext(campaignName);
+    if (!combatSummary) return { initialHeal: 0, result };
+
+    const creature = combatSummary.creatures.find(c => c.name === targetName);
+    if (creature?.maxHp == null && caster.hitPoints == null) {
+        console.error('[spellCast] applyRegenerateSpell: max HP is missing for both creature and caster')
+        throw new Error('max HP is required for regenerate spell')
+    }
+    const maxHp = creature?.maxHp || caster.hitPoints;
+    const currentHp = creature?.currentHp ?? getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? maxHp;
+    const healAmount = result.total + bonusHeal;
+    const initialHeal = Math.min(healAmount, maxHp - currentHp);
+    if (initialHeal > 0) {
+        applyHealingToTarget(combatSummary, targetName, initialHeal, campaignName);
+    }
+    const formulaParts = [expression];
+    if (bonusDetails.length > 0) {
+        const bonusParts = bonusDetails.map(d => `${d.amount} ${d.name}`).join(' + ');
+        formulaParts.push(`(${bonusParts})`);
+    }
+    addEntry(campaignName, {
+        type: 'hp_change',
+        targetName,
+        delta: initialHeal,
+        currentHp: Math.min(maxHp, currentHp + initialHeal),
+        maxHp,
+        isHealing: true,
+        sourceName: caster.name,
+        note: spell.name,
+        formula: formulaParts.join(' + '),
+        bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[spellCast] Error:", e); });
+
+    return { initialHeal, result };
+}
+
 async function applyRegenerateSpell(spell, target, caster, campaignName) {
     const targetName = target.name;
     const casterName = caster.name;
@@ -362,62 +430,17 @@ async function applyRegenerateSpell(spell, target, caster, campaignName) {
         console.error('[spellCast] applyRegenerateSpell: heal_at_slot_level is not an object');
         throw new Error('heal_at_slot_level must be an object');
     }
-    let expression = healAtSlotLevel[slotLevel];
-    if (!expression) {
-        const levels = Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b);
-        const highestBelow = levels.filter(l => l <= slotLevel).pop();
-        if (highestBelow) {
-            expression = healAtSlotLevel[highestBelow];
-        }
-    }
+    const expression = resolveRegenerateExpression(healAtSlotLevel, slotLevel);
 
     const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(caster, caster.proficiency || 0, caster.level || 1, slotLevel, campaignName);
+
+    // Apply initial healing
     let initialHeal = 0;
     let result = null;
-    // Apply initial healing
     if (expression) {
-        const maximize = hasHealingMaximizationForTarget(caster, targetName, campaignName);
-        const rerollOnes = hasRerollHealingOnes(caster);
-        result = maximize ? rollExpressionMaximized(expression) : rollExpression(expression);
-        if (result && rerollOnes && !maximize) {
-            const { displayRolls } = applyHealingRerollOnes(result.rolls, expression);
-            result = { ...result, rolls: displayRolls };
-        }
-        if (result) {
-            const combatSummary = await getCombatContext(campaignName);
-            if (combatSummary) {
-                const creature = combatSummary.creatures.find(c => c.name === targetName);
-                if (creature?.maxHp == null && caster.hitPoints == null) {
-                    console.error('[spellCast] applyRegenerateSpell: max HP is missing for both creature and caster')
-                    throw new Error('max HP is required for regenerate spell')
-                }
-                const maxHp = creature?.maxHp || caster.hitPoints;
-                const currentHp = creature?.currentHp ?? getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? maxHp;
-                const healAmount = result.total + bonusHeal;
-                initialHeal = Math.min(healAmount, maxHp - currentHp);
-                if (initialHeal > 0) {
-                    applyHealingToTarget(combatSummary, targetName, initialHeal, campaignName);
-                }
-                const formulaParts = [expression];
-                if (bonusDetails.length > 0) {
-                    const bonusParts = bonusDetails.map(d => `${d.amount} ${d.name}`).join(' + ');
-                    formulaParts.push(`(${bonusParts})`);
-                }
-                addEntry(campaignName, {
-                    type: 'hp_change',
-                    targetName,
-                    delta: initialHeal,
-                    currentHp: Math.min(maxHp, currentHp + initialHeal),
-                    maxHp,
-                    isHealing: true,
-                    sourceName: casterName,
-                    note: spell.name,
-                    formula: formulaParts.join(' + '),
-                    bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
-                    timestamp: Date.now(),
-                }).catch((e) => { console.error("[spellCast] Error:", e); });
-            }
-        }
+        const healed = await applyRegenerateInitialHeal(spell, targetName, caster, campaignName, expression, bonusHeal, bonusDetails);
+        initialHeal = healed.initialHeal;
+        result = healed.result;
     }
 
     // Set up turn-start healing: store regenerateActive on the target

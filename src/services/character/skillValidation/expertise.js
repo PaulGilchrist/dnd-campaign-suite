@@ -23,7 +23,17 @@ export async function getExpertiseLimits(formData, allFeats) {
     return getExpertiseLimitsNoClassData(formData, allFeats, className);
   }
 
-  // Search through class levels for expertise features
+  const { totalCount, restrictedLists } = collectClassExpertise(classData, formData, ruleset, level);
+
+  return buildExpertiseResult(formData, allFeats, totalCount, restrictedLists);
+}
+
+/**
+ * Searches class levels (and 2024 majors / 5e subclass levels) for
+ * expertise features granted up to the given level.
+ * @returns {{ totalCount: number, restrictedLists: Array<Array<string>>|null }}
+ */
+function collectClassExpertise(classData, formData, ruleset, level) {
   let totalCount = 0;
   const classExpertiseSkillLists = [];
   let hasUnrestrictedClassSource = false;
@@ -52,44 +62,48 @@ export async function getExpertiseLimits(formData, allFeats) {
     }
   }
 
+  const subclass = formData.class?.subclass?.name;
   // Also check subclass/majors features for 2024
-  if (ruleset === '2024' && classData.majors) {
-    const subclass = formData.class?.subclass?.name;
-    if (subclass) {
-      const subclassData = classData.majors.find(m => m.name === subclass);
-      if (subclassData?.features) {
-        for (const feature of subclassData.features) {
-          if (feature.level <= level) {
-            consumeExpertiseFeature(feature);
-          }
-        }
-      }
-    }
+  if (ruleset === '2024' && classData.majors && subclass) {
+    consumeExpertiseFromMajors(classData.majors, subclass, level, consumeExpertiseFeature);
   }
-
   // For 5e, also check subclasses
-  if (ruleset === '5e' && classData.subclasses) {
-    const subclass = formData.class?.subclass?.name;
-    if (subclass) {
-      const subclassData = classData.subclasses.find(s => s.name === subclass);
-      if (subclassData?.class_levels) {
-        for (const classLevel of subclassData.class_levels) {
-          if (classLevel.level <= level) {
-            const features = classLevel.features || [];
-            for (const feature of features) {
-              consumeExpertiseFeature(feature);
-            }
-          }
-        }
-      }
-    }
+  if (ruleset === '5e' && classData.subclasses && subclass) {
+    consumeExpertiseFromSubclasses(classData.subclasses, subclass, level, consumeExpertiseFeature);
   }
 
   const restrictedLists = (!hasUnrestrictedClassSource && classExpertiseSkillLists.length > 0)
     ? classExpertiseSkillLists
     : null;
 
-  return buildExpertiseResult(formData, allFeats, totalCount, restrictedLists);
+  return { totalCount, restrictedLists };
+}
+
+function consumeExpertiseFromMajors(majors, subclass, level, consumeExpertiseFeature) {
+  const subclassData = majors.find(m => m.name === subclass);
+  if (!subclassData?.features) {
+    return;
+  }
+  for (const feature of subclassData.features) {
+    if (feature.level <= level) {
+      consumeExpertiseFeature(feature);
+    }
+  }
+}
+
+function consumeExpertiseFromSubclasses(subclasses, subclass, level, consumeExpertiseFeature) {
+  const subclassData = subclasses.find(s => s.name === subclass);
+  if (!subclassData?.class_levels) {
+    return;
+  }
+  for (const classLevel of subclassData.class_levels) {
+    if (classLevel.level <= level) {
+      const features = classLevel.features || [];
+      for (const feature of features) {
+        consumeExpertiseFeature(feature);
+      }
+    }
+  }
 }
 
 /**

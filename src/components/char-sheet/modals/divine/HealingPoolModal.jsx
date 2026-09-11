@@ -170,10 +170,91 @@ function HealingLogSection({ log }) {
     );
 }
 
+function HealingPoolMain({ loading, safePool, safeMax, isDicePool, dieType, resolvedTargetName, targetCurrentHp, targetMaxHp, bloodiedOnly, isTargetBloodied, healAmount, setHealAmount, applyHeal, effectiveMaxDicePerUse, rolledFaces, accumulatedTotal, applyDiceHeal, hasRestoringTouch, curableEntries, selectedConditions, toggleCondition, applyBatchCure, applyCure, batchTotalCost, cureCost, alsoCures, log, handleClose, featureName }) {
+    return (
+        <div className="short-rest-modal" onClick={(e) => e.stopPropagation()}>
+            <h3><i className="fas fa-hands-helping"></i> {featureName}</h3>
+
+            {loading && (
+                <div className="short-rest-section" style={{ textAlign: 'center', padding: '1em' }}>
+                    <i className="fas fa-spinner fa-spin"></i> Loading...
+                </div>
+            )}
+
+            {!loading && <>
+            <div className="short-rest-section">
+                <p>Pool: <b>{safePool}</b> / {safeMax} {isDicePool ? `d${dieType}` : 'HP'}</p>
+            </div>
+
+            {!isDicePool && (
+                <HealingApplySection
+                    resolvedTargetName={resolvedTargetName}
+                    targetCurrentHp={targetCurrentHp}
+                    targetMaxHp={targetMaxHp}
+                    bloodiedOnly={bloodiedOnly}
+                    isTargetBloodied={isTargetBloodied}
+                    safePool={safePool}
+                    healAmount={healAmount}
+                    setHealAmount={setHealAmount}
+                    applyHeal={applyHeal}
+                />
+            )}
+
+            {isDicePool && (
+                <HealingDiceSection
+                    resolvedTargetName={resolvedTargetName}
+                    targetCurrentHp={targetCurrentHp}
+                    targetMaxHp={targetMaxHp}
+                    effectiveMaxDicePerUse={effectiveMaxDicePerUse}
+                    safePool={safePool}
+                    rolledFaces={rolledFaces}
+                    accumulatedTotal={accumulatedTotal}
+                    dieType={dieType}
+                    applyDiceHeal={applyDiceHeal}
+                />
+            )}
+
+            <ConditionCureSections
+                hasRestoringTouch={hasRestoringTouch}
+                curableEntries={curableEntries}
+                selectedConditions={selectedConditions}
+                toggleCondition={toggleCondition}
+                applyBatchCure={applyBatchCure}
+                applyCure={applyCure}
+                safePool={safePool}
+                batchTotalCost={batchTotalCost}
+                resolvedTargetName={resolvedTargetName}
+                cureCost={cureCost}
+                alsoCures={alsoCures}
+            />
+
+            {log.length > 0 && <HealingLogSection log={log} />}
+
+            <div className="short-rest-actions">
+                <button className="char-btn" onClick={handleClose}>
+                    <i className="fa-solid fa-check"></i> Done
+                </button>
+            </div>
+            </>}
+        </div>
+    );
+}
+
+function resolveHealingPoolResourceKey(resourceKeyProp, isDicePool, featureName) {
+    return resourceKeyProp || (isDicePool ? featureName.toLowerCase().replace(/\s+/g, '') + 'Pool' : 'layOnHandsPool');
+}
+
+function buildCurableEntries(alsoCures, restoringTouchConditions, targetConditions) {
+    const allCurableEntries = [...(alsoCures || []), ...(restoringTouchConditions || [])];
+    return allCurableEntries
+        .map(name => ({ key: resolveConditionKey(name), label: conditionLabel(name) }))
+        .filter(entry => entry.key && targetConditions.some(c => conditionMatches(c, entry.key)));
+}
+
 function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay On Hands', poolMax: poolMaxProp = 0, _poolExpression, isDicePool = false, dieType = null, resourceKey: resourceKeyProp, alsoCures, cureCost, restoringTouchConditions, bloodiedOnly = false, maxDicePerUse: maxDicePerUseProp = '', creatureTargets, resourceCost = '', onClose }) {
     const layOnHandsPoolMax = 5 * (playerStats.level || 1);
     const effectivePoolMax = isDicePool ? poolMaxProp : layOnHandsPoolMax;
-    const effectiveResourceKey = resourceKeyProp || (isDicePool ? featureName.toLowerCase().replace(/\s+/g, '') + 'Pool' : 'layOnHandsPool');
+    const effectiveResourceKey = resolveHealingPoolResourceKey(resourceKeyProp, isDicePool, featureName);
 
     const { current: poolRemaining, max: poolMaxFromHook, update: setPoolRemaining } = useTrackedResource(
         effectiveResourceKey,
@@ -294,10 +375,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
     }, [resolvedTargetName, combatSummary]);
 
     const targetConditions = getTargetConditions();
-    const allCurableEntries = [...(alsoCures || []), ...(restoringTouchConditions || [])];
-    const curableEntries = allCurableEntries
-        .map(name => ({ key: resolveConditionKey(name), label: conditionLabel(name) }))
-        .filter(entry => entry.key && targetConditions.some(c => conditionMatches(c, entry.key)));
+    const curableEntries = buildCurableEntries(alsoCures, restoringTouchConditions, targetConditions);
 
     const hasRestoringTouch = restoringTouchConditions && restoringTouchConditions.length > 0;
 
@@ -513,71 +591,37 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                     />
                 </div>
             ) : (
-            <div className="short-rest-modal" onClick={(e) => e.stopPropagation()}>
-                <h3><i className="fas fa-hands-helping"></i> {featureName}</h3>
-
-                {loading && (
-                    <div className="short-rest-section" style={{ textAlign: 'center', padding: '1em' }}>
-                        <i className="fas fa-spinner fa-spin"></i> Loading...
-                    </div>
-                )}
-
-                {!loading && <>
-                <div className="short-rest-section">
-                    <p>Pool: <b>{safePool}</b> / {safeMax} {isDicePool ? `d${dieType}` : 'HP'}</p>
-                </div>
-
-                {!isDicePool && (
-                    <HealingApplySection
-                        resolvedTargetName={resolvedTargetName}
-                        targetCurrentHp={targetCurrentHp}
-                        targetMaxHp={targetMaxHp}
-                        bloodiedOnly={bloodiedOnly}
-                        isTargetBloodied={isTargetBloodied}
-                        safePool={safePool}
-                        healAmount={healAmount}
-                        setHealAmount={setHealAmount}
-                        applyHeal={applyHeal}
-                    />
-                )}
-
-                {isDicePool && (
-                    <HealingDiceSection
-                        resolvedTargetName={resolvedTargetName}
-                        targetCurrentHp={targetCurrentHp}
-                        targetMaxHp={targetMaxHp}
-                        effectiveMaxDicePerUse={effectiveMaxDicePerUse}
-                        safePool={safePool}
-                        rolledFaces={rolledFaces}
-                        accumulatedTotal={accumulatedTotal}
-                        dieType={dieType}
-                        applyDiceHeal={applyDiceHeal}
-                    />
-                )}
-
-                <ConditionCureSections
-                    hasRestoringTouch={hasRestoringTouch}
-                    curableEntries={curableEntries}
-                    selectedConditions={selectedConditions}
-                    toggleCondition={toggleCondition}
-                    applyBatchCure={applyBatchCure}
-                    applyCure={applyCure}
-                    safePool={safePool}
-                    batchTotalCost={batchTotalCost}
-                    resolvedTargetName={resolvedTargetName}
-                    cureCost={cureCost}
-                    alsoCures={alsoCures}
-                />
-
-                {log.length > 0 && <HealingLogSection log={log} />}
-
-                <div className="short-rest-actions">
-                    <button className="char-btn" onClick={handleClose}>
-                        <i className="fa-solid fa-check"></i> Done
-                    </button>
-                </div>
-                </>}
-            </div>
+            <HealingPoolMain
+                loading={loading}
+                safePool={safePool}
+                safeMax={safeMax}
+                isDicePool={isDicePool}
+                dieType={dieType}
+                resolvedTargetName={resolvedTargetName}
+                targetCurrentHp={targetCurrentHp}
+                targetMaxHp={targetMaxHp}
+                bloodiedOnly={bloodiedOnly}
+                isTargetBloodied={isTargetBloodied}
+                healAmount={healAmount}
+                setHealAmount={setHealAmount}
+                applyHeal={applyHeal}
+                effectiveMaxDicePerUse={effectiveMaxDicePerUse}
+                rolledFaces={rolledFaces}
+                accumulatedTotal={accumulatedTotal}
+                applyDiceHeal={applyDiceHeal}
+                hasRestoringTouch={hasRestoringTouch}
+                curableEntries={curableEntries}
+                selectedConditions={selectedConditions}
+                toggleCondition={toggleCondition}
+                applyBatchCure={applyBatchCure}
+                applyCure={applyCure}
+                batchTotalCost={batchTotalCost}
+                cureCost={cureCost}
+                alsoCures={alsoCures}
+                log={log}
+                handleClose={handleClose}
+                featureName={featureName}
+            />
             )}
         </div>
     );

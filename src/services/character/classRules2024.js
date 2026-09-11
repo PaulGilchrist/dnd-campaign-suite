@@ -5,6 +5,68 @@ import utils from '../ui/utils.js';
 
 const featureCategories = getCategories('2024');
 
+// 2024 classes have weapon_proficiencies, armor_training, and tool_proficiencies as strings
+const WEAPON_PROFICIENCY_MAP = {
+    'Simple weapons': ['Simple Weapons'],
+    'Simple and Martial weapons': ['Simple Weapons', 'Martial Weapons'],
+    'Simple weapons and Martial weapons that have the Light property': ['Simple Weapons', 'Light Martial Weapons'],
+    'Simple weapons and Martial weapons that have the Finesse or Light property': ['Simple Weapons', 'Finesse Martial Weapons', 'Light Martial Weapons']
+};
+
+const ARMOR_PROFICIENCY_MAP = {
+    'Light armor': ['Light Armor'],
+    'Light armor and Shields': ['Light Armor', 'Shields'],
+    'Light and Medium armor and Shields': ['Light Armor', 'Medium Armor', 'Shields'],
+    'Light, Medium, and Heavy armor and Shields': ['Light Armor', 'Medium Armor', 'Heavy Armor', 'Shields']
+};
+
+// Handle major (subclass in 2024) — check for both 'major' (2024) and 'subclass' (legacy) naming
+function resolveMajor(characterClass, majorName) {
+    if (!majorName) {
+        return null;
+    }
+    const major = characterClass.majors?.find((candidate) => candidate.name === majorName);
+    return major ? cloneDeep(major) : { name: majorName, features: [] };
+}
+
+// Convert string proficiencies to array format for consistency with rules engine
+function buildProficiencies(characterClass, playerSummary) {
+    const proficiencies = [];
+
+    if (characterClass.weapon_proficiencies) {
+        proficiencies.push(...(WEAPON_PROFICIENCY_MAP[characterClass.weapon_proficiencies] || []));
+    }
+
+    if (characterClass.armor_training && characterClass.armor_training !== 'None') {
+        proficiencies.push(...(ARMOR_PROFICIENCY_MAP[characterClass.armor_training] || []));
+    }
+
+    // If it starts with "Choose", the player has already selected their tools in character JSON
+    if (characterClass.tool_proficiencies && !characterClass.tool_proficiencies.startsWith('Choose')) {
+        proficiencies.push(characterClass.tool_proficiencies);
+    }
+
+    // If it starts with "Choose", the player has already selected their skills in character JSON
+    // Otherwise, parse skills like "History, Insight, Medicine, Persuasion, or Religion"
+    const skillString = characterClass.skill_proficiencies || characterClass.skill_proficiencies_choices;
+    if (skillString && !skillString.startsWith('Choose')) {
+        const skills = skillString.split(',').map(skill => skill.trim().replace(' or ', ''));
+        proficiencies.push(...skills.map(skill => `Skill: ${skill}`));
+    }
+
+    // Divine Order: Protector grants Martial weapons and Heavy armor
+    if (playerSummary.class?.divineOrder === 'Protector' && characterClass.name === 'Cleric') {
+        proficiencies.push('Martial Weapons', 'Heavy Armor');
+    }
+
+    // Primal Order: Warden grants Martial weapons and Medium armor
+    if (playerSummary.class?.primalOrder === 'Warden' && characterClass.name === 'Druid') {
+        proficiencies.push('Martial Weapons', 'Medium Armor');
+    }
+
+    return proficiencies;
+}
+
 const classRules = {
     getClass: (allClasses, playerSummary) => {
         let characterClass = cloneDeep(allClasses.find((characterClass) => characterClass.name === playerSummary.class.name));
@@ -25,19 +87,7 @@ const classRules = {
            // Restore class_levels after merge (they may have been overwritten)
         characterClass.class_levels = classLevels;
 
-           // Handle major (subclass in 2024)
-           // Check for both 'major' (2024 format) and 'subclass' (legacy format)
-        let majorName = playerSummary.class.major?.name || playerSummary.class.subclass?.name;
-        if (majorName) {
-            const major = characterClass.majors?.find((major) => major.name === majorName);
-            if (major) {
-                characterClass.major = cloneDeep(major);
-               } else {
-                characterClass.major = { name: majorName, features: [] };
-               }
-           } else {
-            characterClass.major = null;
-           }
+        characterClass.major = resolveMajor(characterClass, playerSummary.class.major?.name || playerSummary.class.subclass?.name);
 
         delete characterClass.majors;
 
@@ -50,66 +100,9 @@ const classRules = {
                });
            }
 
-           // Convert string proficiencies to array format for consistency with rules engine
-           // 2024 classes have weapon_proficiencies, armor_training, and tool_proficiencies as strings
-        characterClass.proficiencies = [];
+        characterClass.proficiencies = buildProficiencies(characterClass, playerSummary);
 
-           // Parse weapon proficiencies
-        if (characterClass.weapon_proficiencies) {
-            const weaponMap = {
-                   'Simple weapons': ['Simple Weapons'],
-                   'Simple and Martial weapons': ['Simple Weapons', 'Martial Weapons'],
-                   'Simple weapons and Martial weapons that have the Light property': ['Simple Weapons', 'Light Martial Weapons'],
-                   'Simple weapons and Martial weapons that have the Finesse or Light property': ['Simple Weapons', 'Finesse Martial Weapons', 'Light Martial Weapons']
-               };
-            const weapons = weaponMap[characterClass.weapon_proficiencies] || [];
-            characterClass.proficiencies = [...characterClass.proficiencies, ...weapons];
-           }
-
-           // Parse armor training
-        if (characterClass.armor_training && characterClass.armor_training !== 'None') {
-            const armorMap = {
-                   'Light armor': ['Light Armor'],
-                   'Light armor and Shields': ['Light Armor', 'Shields'],
-                   'Light and Medium armor and Shields': ['Light Armor', 'Medium Armor', 'Shields'],
-                   'Light, Medium, and Heavy armor and Shields': ['Light Armor', 'Medium Armor', 'Heavy Armor', 'Shields']
-               };
-            const armor = armorMap[characterClass.armor_training] || [];
-            characterClass.proficiencies = [...characterClass.proficiencies, ...armor];
-           }
-
-           // Parse tool proficiencies
-             // If it starts with "Choose", the player has already selected their tools in character JSON
-           // Otherwise, it's an automatic tool proficiency
-        if (characterClass.tool_proficiencies) {
-            if (!characterClass.tool_proficiencies.startsWith('Choose')) {
-                characterClass.proficiencies = [...characterClass.proficiencies, characterClass.tool_proficiencies];
-               }
-           }
-
-            // Parse skill proficiencies
-              // If it starts with "Choose", the player has already selected their skills in character JSON
-              // Otherwise, parse the skill list into "Skill: Name" format
-         if (characterClass.skill_proficiencies || characterClass.skill_proficiencies_choices) {
-             const skillString = characterClass.skill_proficiencies || characterClass.skill_proficiencies_choices;
-             if (!skillString.startsWith('Choose')) {
-                      // Parse skills like "History, Insight, Medicine, Persuasion, or Religion"
-                 const skills = skillString.split(',').map(skill => skill.trim().replace(' or ', ''));
-                 characterClass.proficiencies = [...characterClass.proficiencies, ...skills.map(skill => `Skill: ${skill}`)];
-                }
-            }
-
-            // Divine Order: Protector grants Martial weapons and Heavy armor
-            if (playerSummary.class?.divineOrder === 'Protector' && characterClass.name === 'Cleric') {
-                characterClass.proficiencies = [...characterClass.proficiencies, 'Martial Weapons', 'Heavy Armor'];
-            }
-
-            // Primal Order: Warden grants Martial weapons and Medium armor
-            if (playerSummary.class?.primalOrder === 'Warden' && characterClass.name === 'Druid') {
-                characterClass.proficiencies = [...characterClass.proficiencies, 'Martial Weapons', 'Medium Armor'];
-            }
-
-            return characterClass;
+             return characterClass;
        },
     getDruidMaxWildShapeChallengeRating(playerStats) {
              // 2024 Rules: Use beast_max_cr from class_levels

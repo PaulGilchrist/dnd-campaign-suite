@@ -30,23 +30,40 @@ async function isTargetBeast(targetName, campaignName) {
     return true;
 }
 
-export async function triggerDominateBeast(spell, metaCtx, playerStats, campaignName, mapName) {
-    const isDominateBeast = (spell.name || '').toLowerCase() === 'dominate beast';
-    if (!isDominateBeast) return null;
+function dominateInfoPopup(description) {
+    return { type: 'popup', payload: { type: 'automation_info', name: 'Dominate Beast', description } };
+}
 
-    let targetName = metaCtx?.targetName;
-    if (!targetName) {
-        const cs = await getCombatContext(campaignName);
-        if (cs?.creatures && cs.creatures.length > 0) {
-            const attackerTarget = getTargetFromAttacker(cs, playerStats.name);
-            if (attackerTarget) targetName = attackerTarget.name;
-        }
-        if (!targetName) {
-            console.error(`[dominateBeastService] No target selected for Dominate Beast by ${playerStats.name}. Caster has no target in initiative view.`);
-        }
+async function resolveDominateTarget(playerStats, campaignName) {
+    const cs = await getCombatContext(campaignName);
+    if (cs?.creatures && cs.creatures.length > 0) {
+        const attackerTarget = getTargetFromAttacker(cs, playerStats.name);
+        if (attackerTarget) return attackerTarget.name;
     }
+    console.error(`[dominateBeastService] No target selected for Dominate Beast by ${playerStats.name}. Caster has no target in initiative view.`);
+    return null;
+}
+
+function refundDominateBeastSlot(playerStats, refundLevel, campaignName) {
+    const slotKey = `spell_slots_level_${refundLevel}`;
+    const currentSlots = getRuntimeValue(playerStats.name, slotKey);
+    if (currentSlots != null && currentSlots >= 0) {
+        setRuntimeValue(playerStats.name, slotKey, currentSlots + 1, campaignName);
+    }
+}
+
+async function targetIsNotFullHealth(targetName, campaignName) {
+    const cs = await getCombatContext(campaignName);
+    const targetCreature = cs?.creatures?.find(c => c.name === targetName);
+    return targetCreature && targetCreature.currentHp != null && targetCreature.maxHp != null && targetCreature.currentHp < targetCreature.maxHp;
+}
+
+export async function triggerDominateBeast(spell, metaCtx, playerStats, campaignName, mapName) {
+    if ((spell.name || '').toLowerCase() !== 'dominate beast') return null;
+
+    const targetName = metaCtx?.targetName || await resolveDominateTarget(playerStats, campaignName);
     if (!targetName) {
-        return { type: 'popup', payload: { type: 'automation_info', name: 'Dominate Beast', description: 'No target selected for Dominate Beast.' } };
+        return dominateInfoPopup('No target selected for Dominate Beast.');
     }
 
     // Check: Target is not a Beast
@@ -58,19 +75,12 @@ export async function triggerDominateBeast(spell, metaCtx, playerStats, campaign
             abilityName: 'Dominate Beast',
             description: `${playerStats.name} casts Dominate Beast on ${targetName} but it has no effect — ${targetName} is not a Beast.`,
         }).catch((e) => { console.error("[dominateBeastService:log-error]", e); });
-        const refundLevel = metaCtx?.slotLevel || spell.level || 4;
-        const slotKey = `spell_slots_level_${refundLevel}`;
-        const currentSlots = getRuntimeValue(playerStats.name, slotKey);
-        if (currentSlots != null && currentSlots >= 0) {
-            setRuntimeValue(playerStats.name, slotKey, currentSlots + 1, campaignName);
-        }
-        return { type: 'popup', payload: { type: 'automation_info', name: 'Dominate Beast', description: `No effect. ${targetName} is not a Beast. Spell slot refunded.` } };
+        refundDominateBeastSlot(playerStats, metaCtx?.slotLevel || spell.level || 4, campaignName);
+        return dominateInfoPopup(`No effect. ${targetName} is not a Beast. Spell slot refunded.`);
     }
 
     // Check if target is at full health to determine if target gets advantage on save
-    const cs = await getCombatContext(campaignName);
-    const targetCreature = cs?.creatures?.find(c => c.name === targetName);
-    const targetNotFullHealth = targetCreature && targetCreature.currentHp != null && targetCreature.maxHp != null && targetCreature.currentHp < targetCreature.maxHp;
+    const targetNotFullHealth = await targetIsNotFullHealth(targetName, campaignName);
 
     const spellSaveDc = metaCtx?.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
     const slotLevel = metaCtx?.slotLevel || spell.level || 4;
@@ -88,10 +98,9 @@ export async function triggerDominateBeast(spell, metaCtx, playerStats, campaign
     };
 
     try {
-        const result = await executeHandler(action, playerStats, campaignName, mapName);
-        return result;
+        return await executeHandler(action, playerStats, campaignName, mapName);
     } catch (e) {
         console.error('[dominateBeastService] Failed to execute Dominate Beast handler:', e);
-        return { type: 'popup', payload: { type: 'automation_info', name: 'Dominate Beast', description: `Failed to execute Dominate Beast.` } };
+        return dominateInfoPopup('Failed to execute Dominate Beast.');
     }
 }

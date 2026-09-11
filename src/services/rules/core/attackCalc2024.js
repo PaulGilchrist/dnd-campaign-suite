@@ -380,6 +380,37 @@ function findSwiftQuiverBow(allEquipment, equippedWeapons) {
     return null;
 }
 
+function resolveSwiftQuiverStats(bowWeapon, dexMod, proficiency) {
+    const rawRange = bowWeapon?.weapon?.range?.long || bowWeapon?.weapon?.range?.normal || '80_ft';
+    const damageDie = bowWeapon?.weapon?.damage?.damage_dice || '1d8';
+    const damageType = bowWeapon?.weapon?.damage?.damage_type || 'Piercing';
+    return {
+        range: rawRange.replace(/_ft$/, '').replace(/_ft/g, ' ft'),
+        damageType,
+        damage: `${damageDie}+${dexMod}`,
+        hitBonusFormula: `To Hit Bonus = Dexterity Modifier (${dexMod}) + Proficiency (${proficiency})`,
+        damageFormula: `Damage Formula = ${damageDie} + Dexterity Modifier (${dexMod})`,
+    };
+}
+
+function buildSwiftQuiverAttack(name, toHit, stats) {
+    return {
+        name,
+        attackType: 'ranged',
+        isRanged: true,
+        range: stats.range,
+        toHit,
+        hitBonusFormula: stats.hitBonusFormula,
+        damageFormula: stats.damageFormula,
+        damage: stats.damage,
+        damageType: stats.damageType,
+        abilityName: 'Dexterity',
+        actionType: 'Bonus Action',
+        properties: ['Ammunition'],
+        isSwiftQuiver: true,
+    };
+}
+
 /**
  * Swift Quiver: two bonus action ranged attacks while concentration is active.
  * @param {Array} allEquipment
@@ -397,32 +428,12 @@ function buildSwiftQuiverAttacks(allEquipment, playerStats, proficiency) {
     const dexMod = dex?.bonus || 0;
     const toHit = dexMod + proficiency;
     const bowWeapon = findSwiftQuiverBow(allEquipment ?? [], playerStats.inventory?.equipped ?? []);
-    const range = bowWeapon?.weapon?.range?.long || bowWeapon?.weapon?.range?.normal || '80_ft';
-    const damageDie = bowWeapon?.weapon?.damage?.damage_dice || '1d8';
-    const damageType = bowWeapon?.weapon?.damage?.damage_type || 'Piercing';
-    const hitBonusFormula = `To Hit Bonus = Dexterity Modifier (${dexMod}) + Proficiency (${proficiency})`;
-    const damageFormula = `Damage Formula = ${damageDie} + Dexterity Modifier (${dexMod})`;
-    const damage = `${damageDie}+${dexMod}`;
+    const stats = resolveSwiftQuiverStats(bowWeapon, dexMod, proficiency);
 
-    const attacks = [];
-    for (let i = 0; i < 2; i++) {
-        attacks.push({
-            name: i === 0 ? 'Swift Quiver (1st Attack)' : 'Swift Quiver (2nd Attack)',
-            attackType: 'ranged',
-            isRanged: true,
-            range: range.replace(/_ft$/, '').replace(/_ft/g, ' ft'),
-            toHit,
-            hitBonusFormula,
-            damageFormula,
-            damage,
-            damageType,
-            abilityName: 'Dexterity',
-            actionType: 'Bonus Action',
-            properties: ['Ammunition'],
-            isSwiftQuiver: true,
-        });
-    }
-    return attacks;
+    return [
+        buildSwiftQuiverAttack('Swift Quiver (1st Attack)', toHit, stats),
+        buildSwiftQuiverAttack('Swift Quiver (2nd Attack)', toHit, stats),
+    ];
 }
 
 /**

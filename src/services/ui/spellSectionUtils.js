@@ -4,6 +4,28 @@ const actionCastingTimes = ['1 action', '1 Action', 'action', 'Action'];
 const bonusActionCastingTimes = ['1 bonus action', '1 Bonus Action', 'bonus action', 'Bonus Action'];
 const reactionCastingTimes = ['1 reaction', '1 Reaction', 'reaction', 'Reaction'];
 
+const bonusActionFeatureTypes = ['free_spell', 'fey_reinforcements'];
+const specialActionFeatureTypes = ['free_spell', 'fey_reinforcements', 'misty_wanderer'];
+
+function isPrepared(spell) {
+    return spell.prepared === 'Always' || spell.prepared === 'Prepared';
+}
+
+function collectActiveFeatureSpells(features, allowedTypes, playerName, campaignName, requireBonusCastingTime) {
+    const names = new Set();
+    for (const feature of features) {
+        if (!allowedTypes.includes(feature.type)) continue;
+        if (!feature.spell) continue;
+        if (requireBonusCastingTime && !(feature.casting_time && bonusActionCastingTimes.includes(feature.casting_time))) continue;
+        if (!isFeatureActive(feature.name, playerName, campaignName)) continue;
+        const spellNames = Array.isArray(feature.spell) ? feature.spell : [feature.spell];
+        for (const sn of spellNames) {
+            names.add(sn);
+        }
+    }
+    return names;
+}
+
 function isElderChampionActive(playerName, campaignName) {
     try {
         const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
@@ -30,7 +52,7 @@ export function getActionSpellNames(playerStats, campaignName) {
     const names = new Set();
     for (const spell of playerStats.spellAbilities?.spells || []) {
         if (!actionCastingTimes.includes(spell.casting_time)) continue;
-        if (spell.prepared !== 'Always' && spell.prepared !== 'Prepared') continue;
+        if (!isPrepared(spell)) continue;
         if (!spell.damage && !spell.heal_at_slot_level) continue;
         names.add(spell.name);
     }
@@ -46,35 +68,14 @@ export function getBonusActionSpellNames(playerStats, campaignName) {
     const elderActive = isElderChampionActive(playerStats.name, campaignName);
     const names = new Set();
     for (const spell of playerStats.spellAbilities?.spells || []) {
-        const isBonusAction = bonusActionCastingTimes.includes(spell.casting_time);
-        const isActionSpellSwift = elderActive && actionCastingTimes.includes(spell.casting_time);
-        if (!isBonusAction && !isActionSpellSwift) continue;
-        if (spell.prepared !== 'Always' && spell.prepared !== 'Prepared') continue;
+        const castsAsBonus = bonusActionCastingTimes.includes(spell.casting_time)
+            || (elderActive && actionCastingTimes.includes(spell.casting_time));
+        if (!castsAsBonus || !isPrepared(spell)) continue;
         names.add(spell.name);
     }
-    const bonusActions = playerStats.automation?.bonusActions || [];
-    for (const feature of bonusActions) {
-        if (feature.type !== 'free_spell' && feature.type !== 'fey_reinforcements') continue;
-        if (!feature.spell) continue;
-        if (!feature.casting_time || !bonusActionCastingTimes.includes(feature.casting_time)) continue;
-        const featureName = feature.name;
-        if (!isFeatureActive(featureName, playerStats.name, campaignName)) continue;
-        const spellNames = Array.isArray(feature.spell) ? feature.spell : [feature.spell];
-        for (const sn of spellNames) {
-            names.add(sn);
-        }
-    }
-    const specialActions = playerStats.automation?.specialActions || [];
-    for (const feature of specialActions) {
-        if (feature.type !== 'free_spell' && feature.type !== 'fey_reinforcements' && feature.type !== 'misty_wanderer') continue;
-        if (!feature.spell) continue;
-        const featureName = feature.name;
-        if (!isFeatureActive(featureName, playerStats.name, campaignName)) continue;
-        const spellNames = Array.isArray(feature.spell) ? feature.spell : [feature.spell];
-        for (const sn of spellNames) {
-            names.add(sn);
-        }
-    }
+    const playerName = playerStats.name;
+    for (const sn of collectActiveFeatureSpells(playerStats.automation?.bonusActions || [], bonusActionFeatureTypes, playerName, campaignName, true)) names.add(sn);
+    for (const sn of collectActiveFeatureSpells(playerStats.automation?.specialActions || [], specialActionFeatureTypes, playerName, campaignName, false)) names.add(sn);
     return names;
 }
 
@@ -86,7 +87,7 @@ export function getReactionSpellNames(playerStats) {
     const names = new Set();
     for (const spell of playerStats.spellAbilities?.spells || []) {
         if (!reactionCastingTimes.includes(spell.casting_time)) continue;
-        if (spell.prepared !== 'Always' && spell.prepared !== 'Prepared') continue;
+        if (!isPrepared(spell)) continue;
         names.add(spell.name);
     }
     return names;

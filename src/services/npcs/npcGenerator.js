@@ -118,36 +118,34 @@ function scaleDamage(baseDice, cr) {
   return `${num}d${die}${mod}`;
 }
 
-function generateStatBlock(role) {
+const CR_ROLL_TABLE = [
+  [0.25, 0],
+  [0.45, 0.125],
+  [0.60, 0.25],
+  [0.72, 0.5],
+  [0.82, 1],
+  [0.89, 2],
+  [0.94, 3],
+  [0.97, 4],
+];
+
+function rollChallengeRating() {
   const crRoll = Math.random();
-  let cr;
-  if (crRoll < 0.25) cr = 0;
-  else if (crRoll < 0.45) cr = 0.125;
-  else if (crRoll < 0.60) cr = 0.25;
-  else if (crRoll < 0.72) cr = 0.5;
-  else if (crRoll < 0.82) cr = 1;
-  else if (crRoll < 0.89) cr = 2;
-  else if (crRoll < 0.94) cr = 3;
-  else if (crRoll < 0.97) cr = 4;
-  else cr = 5;
+  const entry = CR_ROLL_TABLE.find(([threshold]) => crRoll < threshold);
+  return entry ? entry[1] : 5;
+}
 
-  const crNum = cr;
-  const profBonus = crNum >= 9 ? 4 : crNum >= 4 ? 3 : 2;
-  const abilityScore = 10 + Math.floor(crNum * 1.5) + (Math.random() > 0.5 ? 1 : 0);
-  const hpRange = getHPRange(crNum);
-  const hp = randomInt(hpRange[0], hpRange[1]);
-  const acRange = getACRange(crNum);
-  const ac = randomInt(acRange[0], acRange[1]);
-  const atkBonus = profBonus + Math.max(0, Math.floor(crNum * 0.7));
-  const isCaster = /wizard|sorcerer|warlock|cleric|druid|bard|mage|priest/i.test(role);
+function rollSpeeds(crNum) {
   const speed = { walk: '30 ft.' };
-
   if (crNum >= 2 && Math.random() > 0.75) {
     const extraSpeeds = ['fly', 'swim', 'climb', 'burrow'];
     const extra = pick(extraSpeeds);
     speed[extra] = '30 ft.';
   }
+  return speed;
+}
 
+function rollAbilityScores(crNum, abilityScore, isCaster) {
   const primaryAbilities = ['str', 'dex'];
   if (isCaster) primaryAbilities.push('int', 'wis', 'cha');
   const primaryAbility = pick(primaryAbilities);
@@ -158,62 +156,109 @@ function generateStatBlock(role) {
   const secondary = pick(others);
   abilityScores[secondary] = 10 + Math.floor(crNum);
   abilityScores.con = Math.max(abilityScores.con, 10 + Math.floor(crNum * 0.8));
+  return abilityScores;
+}
 
+function buildHitDice(crNum, con) {
   const hitDiceNum = Math.max(1, Math.floor(crNum * 2) + 1);
   const hitDiceDie = crNum >= 3 ? 8 : 6;
-  const conMod = Math.floor((abilityScores.con - 10) / 2);
-  const hitDice = `${hitDiceNum}d${hitDiceDie}${conMod > 0 ? '+' + conMod * hitDiceNum : ''}`;
+  const conMod = Math.floor((con - 10) / 2);
+  return `${hitDiceNum}d${hitDiceDie}${conMod > 0 ? '+' + conMod * hitDiceNum : ''}`;
+}
 
+function rangedRange(name) {
+  if (name === 'Longbow') return '150/600 ft.';
+  if (name.includes('Heavy')) return '100/400 ft.';
+  return '80/320 ft.';
+}
+
+function formatMod(mod) {
+  if (mod === 0) return '';
+  return mod > 0 ? '+' + mod : String(mod);
+}
+
+function buildSpellAction(crNum, atkBonus) {
+  const template = pick(SPELL_ACTION_TEMPLATES);
+  const idx = Math.floor(Math.random() * template.names.length);
+  const dice = scaleDamage(template.damageDice[idx], crNum);
+  const dmgNum = rollDiceString(dice);
+  return {
+    name: template.names[idx],
+    attack_bonus: '',
+    damage_dice_primary: '',
+    damage_type_primary: '',
+    description: `Spell Attack Roll: +${atkBonus}, range ${crNum >= 2 ? '60 ft.' : '30 ft.'}. Hit: ${dmgNum} (${dice}) ${template.type} damage.`
+  };
+}
+
+function buildRangedAction(crNum, atkBonus) {
+  const template = pick(RANGED_TEMPLATES);
+  const idx = Math.floor(Math.random() * template.names.length);
+  const dice = scaleDamage(template.damageDice[idx], crNum);
+  const dmgNum = rollDiceString(dice);
+  const range = rangedRange(template.names[idx]);
+  return {
+    name: template.names[idx],
+    attack_bonus: `+${atkBonus}`,
+    damage_dice_primary: dice,
+    damage_type_primary: template.type,
+    description: `Ranged Attack Roll: +${atkBonus}, range ${range}. Hit: ${dmgNum} (${dice}) ${template.type} damage.`
+  };
+}
+
+function buildMeleeAction(crNum, atkBonus, abilityScore) {
+  const template = pick(WEAPON_ACTION_TEMPLATES);
+  const idx = Math.floor(Math.random() * template.names.length);
+  const dice = scaleDamage(template.damageDice[idx], crNum);
+  const dmgNum = rollDiceString(dice);
+  const modStr = formatMod(Math.floor((abilityScore - 10) / 2));
+  return {
+    name: template.names[idx],
+    attack_bonus: `+${atkBonus}`,
+    damage_dice_primary: modStr ? `${dice}${modStr}` : dice,
+    damage_type_primary: template.type,
+    description: `Melee Attack Roll: +${atkBonus}, reach 5 ft. Hit: ${dmgNum} (${dice}${modStr}) ${template.type} damage.`
+  };
+}
+
+function chooseActionBuilder(templateRoll, isCaster) {
+  if (isCaster && templateRoll > 0.4) return buildSpellAction;
+  if (templateRoll > 0.6) return buildRangedAction;
+  return buildMeleeAction;
+}
+
+function buildActions(crNum, isCaster, atkBonus, abilityScore) {
   const actions = [];
   const actionsCount = crNum >= 3 ? 3 : crNum >= 1 ? 2 : 1;
   for (let i = 0; i < actionsCount; i++) {
-    const templateRoll = Math.random();
-    if (isCaster && templateRoll > 0.4) {
-      const template = pick(SPELL_ACTION_TEMPLATES);
-      const idx = Math.floor(Math.random() * template.names.length);
-      const dice = scaleDamage(template.damageDice[idx], crNum);
-      const dmgNum = rollDiceString(dice);
-      actions.push({
-        name: template.names[idx],
-        attack_bonus: '',
-        damage_dice_primary: '',
-        damage_type_primary: '',
-        description: `Spell Attack Roll: +${atkBonus}, range ${crNum >= 2 ? '60 ft.' : '30 ft.'}. Hit: ${dmgNum} (${dice}) ${template.type} damage.`
-      });
-    } else if (templateRoll > 0.6) {
-      const template = pick(RANGED_TEMPLATES);
-      const idx = Math.floor(Math.random() * template.names.length);
-      const dice = scaleDamage(template.damageDice[idx], crNum);
-      const dmgNum = rollDiceString(dice);
-      const range = template.names[idx] === 'Longbow' ? '150/600 ft.' : template.names[idx].includes('Heavy') ? '100/400 ft.' : '80/320 ft.';
-      actions.push({
-        name: template.names[idx],
-        attack_bonus: `+${atkBonus}`,
-        damage_dice_primary: dice,
-        damage_type_primary: template.type,
-        description: `Ranged Attack Roll: +${atkBonus}, range ${range}. Hit: ${dmgNum} (${dice}) ${template.type} damage.`
-      });
-    } else {
-      const template = pick(WEAPON_ACTION_TEMPLATES);
-      const idx = Math.floor(Math.random() * template.names.length);
-      const dice = scaleDamage(template.damageDice[idx], crNum);
-      const dmgNum = rollDiceString(dice);
-      const primaryMod = Math.floor((abilityScore - 10) / 2);
-      const modStr = primaryMod !== 0 ? (primaryMod > 0 ? '+' + primaryMod : String(primaryMod)) : '';
-      actions.push({
-        name: template.names[idx],
-        attack_bonus: `+${atkBonus}`,
-        damage_dice_primary: modStr ? `${dice}${modStr}` : dice,
-        damage_type_primary: template.type,
-        description: `Melee Attack Roll: +${atkBonus}, reach 5 ft. Hit: ${dmgNum} (${dice}${modStr}) ${template.type} damage.`
-      });
-    }
+    const builder = chooseActionBuilder(Math.random(), isCaster);
+    actions.push(builder(crNum, atkBonus, abilityScore));
   }
+  return actions;
+}
 
-  const traits = [];
+function rollTraits(crNum) {
   if (crNum >= 1 && Math.random() > 0.5) {
-    traits.push(pick(TRAIT_POOL));
+    return [pick(TRAIT_POOL)];
   }
+  return [];
+}
+
+function generateStatBlock(role) {
+  const crNum = rollChallengeRating();
+  const profBonus = crNum >= 9 ? 4 : crNum >= 4 ? 3 : 2;
+  const abilityScore = 10 + Math.floor(crNum * 1.5) + (Math.random() > 0.5 ? 1 : 0);
+  const hpRange = getHPRange(crNum);
+  const hp = randomInt(hpRange[0], hpRange[1]);
+  const acRange = getACRange(crNum);
+  const ac = randomInt(acRange[0], acRange[1]);
+  const atkBonus = profBonus + Math.max(0, Math.floor(crNum * 0.7));
+  const isCaster = /wizard|sorcerer|warlock|cleric|druid|bard|mage|priest/i.test(role);
+  const speed = rollSpeeds(crNum);
+  const abilityScores = rollAbilityScores(crNum, abilityScore, isCaster);
+  const hitDice = buildHitDice(crNum, abilityScores.con);
+  const actions = buildActions(crNum, isCaster, atkBonus, abilityScore);
+  const traits = rollTraits(crNum);
 
   return {
     armorClass: ac,

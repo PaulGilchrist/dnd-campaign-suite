@@ -37,6 +37,39 @@ function saveConditions(name, campaignName, conditions) {
 
 export { EXHAUSTION_LEVELS }
 
+// Check saveModifiers directly for Powerful Build (same logic as conditionSaveService)
+function hasPowerfulBuildGrappleAdvantage(playerStats) {
+  const saveModifiers = playerStats?.saveModifiers || playerStats?.computedStats?.saveModifiers
+  return saveModifiers?.some(mod =>
+    mod.target === 'ability_check' && mod.effect === 'advantage' && mod.abilities?.includes('STR') && mod.condition === 'powerful_build_grapple_escape'
+  )
+}
+
+function computeConditionSaveAdvantage(playerStats, campaignName, conditionEffects, conditionKey) {
+  let hasAdvantage = hasSaveAdvantage(conditionEffects, conditionKey, conditionEffects?.restoreBalance)
+    || (conditionKey === 'grappled' && (conditionEffects?.strCheckAdvantage || (conditionEffects?.abilityCheckAdvantageAbilities && conditionEffects.abilityCheckAdvantageAbilities.includes('STR'))))
+
+  if (isAuraOfPurityActive(playerStats.name, campaignName)
+      && getAuraOfPuritySaveAdvantageConditions(playerStats.name, campaignName).includes(conditionKey)) {
+      hasAdvantage = true
+  }
+
+  if (conditionKey === 'grappled' && hasPowerfulBuildGrappleAdvantage(playerStats)) {
+    hasAdvantage = true
+  }
+  return hasAdvantage
+}
+
+function rollConditionSaveDice(hasAdvantage) {
+  if (hasAdvantage) {
+    const roll1 = rollD20()
+    const roll2 = rollD20()
+    return { roll1, roll2, finalRoll: Math.max(roll1, roll2), mode: 'advantage' }
+  }
+  const roll1 = rollD20()
+  return { roll1, roll2: 0, finalRoll: roll1, mode: 'normal' }
+}
+
 function CharConditions({ playerStats, campaignName, activeMapName, characters, exhaustionLevel, onConditionsChange, conditionEffects }) {
   const [activeConditions, setActiveConditions] = React.useState(() =>
     loadConditions(playerStats.name, campaignName)
@@ -87,37 +120,10 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
     const saveLabel = getAbilityLabel(saveAbility)
     const conditionLabel = conditionKey === 'speed_zero' ? 'Speed 0' : conditionKey.charAt(0).toUpperCase() + conditionKey.slice(1)
     const saveBonus = getAbilitySaveBonus(playerStats, saveAbility)
-    let hasAdvantage = hasSaveAdvantage(conditionEffects, conditionKey, conditionEffects?.restoreBalance)
-      || (conditionKey === 'grappled' && (conditionEffects?.strCheckAdvantage || (conditionEffects?.abilityCheckAdvantageAbilities && conditionEffects.abilityCheckAdvantageAbilities.includes('STR'))))
+    const hasAdvantage = computeConditionSaveAdvantage(playerStats, campaignName, conditionEffects, conditionKey)
 
-    if (isAuraOfPurityActive(playerStats.name, campaignName)
-        && getAuraOfPuritySaveAdvantageConditions(playerStats.name, campaignName).includes(conditionKey)) {
-        hasAdvantage = true
-    }
-
-    // Check saveModifiers directly for Powerful Build (same logic as conditionSaveService)
-    if (conditionKey === 'grappled') {
-      const saveModifiers = playerStats?.saveModifiers || playerStats?.computedStats?.saveModifiers
-      const powerfulBuildAdvantage = saveModifiers?.some(mod =>
-        mod.target === 'ability_check' && mod.effect === 'advantage' && mod.abilities?.includes('STR') && mod.condition === 'powerful_build_grapple_escape'
-      )
-      if (powerfulBuildAdvantage) {
-        hasAdvantage = true
-      }
-    }
-
-    let roll1, roll2, finalRoll, mode
-    if (hasAdvantage) {
-      roll1 = rollD20()
-      roll2 = rollD20()
-      finalRoll = Math.max(roll1, roll2)
-      mode = 'advantage'
-    } else {
-      roll1 = rollD20()
-      roll2 = 0
-      finalRoll = roll1
-      mode = 'normal'
-    }
+    const { roll1, roll2, finalRoll, mode } = rollConditionSaveDice(hasAdvantage)
+    const rolls = hasAdvantage ? [roll1, roll2] : [roll1]
 
     const aura = await computeAuraBonus({ targetName: playerStats.name, characters, campaignName, activeMapName, allCreatures: combatSummary?.creatures })
     const auraBonus = aura.bonus
@@ -131,7 +137,7 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
       characterName: playerStats.name,
       rollType: 'save',
       name: `${saveLabel} (${conditionLabel})`,
-      rolls: hasAdvantage ? [roll1, roll2] : [roll1],
+      rolls,
       mode,
       total,
       bonus: saveBonus + auraBonus,
@@ -147,7 +153,7 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
       type: 'd20',
       rollType: 'condition-save',
       name: `${saveLabel} (DC ${meta.dc})`,
-      rolls: hasAdvantage ? [roll1, roll2] : [roll1],
+      rolls,
       bonus: saveBonus + auraBonus,
       bonusDetail,
       total,

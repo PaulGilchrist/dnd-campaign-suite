@@ -7,6 +7,121 @@ import './ResourcePoolModal.css'
 const FWD_USED_KEY = 'wildResurgenceFwdUsedRound'
 const REV_USED_KEY = 'wildResurgenceReversedThisRest'
 
+function ForwardConversionSection({ fwdHasConversion, fwdPrereqsMet, currentWS, currentSlots, maxSlots, selectedLevel, setSelectedLevel, canForward, handleForward }) {
+  if (!fwdHasConversion) return null
+  return (
+    <div className="resource-pool-section">
+      <h4>Spell Slot &rarr; Wild Shape</h4>
+      <p className="resource-pool-hint">Expend a spell slot to regain one use of Wild Shape. Once per turn, when you have no uses left.</p>
+      {!fwdPrereqsMet && currentWS > 0 ? (
+        <p className="resource-pool-blocked">
+          You have {currentWS} Wild Shape use{currentWS > 1 ? 's' : ''} remaining. Use must be 0 to convert.
+        </p>
+      ) : !fwdPrereqsMet && currentWS === 0 ? (
+        <p className="resource-pool-blocked">Already used this conversion this round.</p>
+      ) : (
+        <>
+          <table className="resource-pool-table">
+            <thead>
+              <tr><th>Level</th><th>Available</th><th>Select</th></tr>
+            </thead>
+            <tbody>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(lvl => (
+                <tr key={`fwd-${lvl}`} className={currentSlots[lvl] === 0 ? 'resource-pool-dim' : ''}>
+                  <td>{lvl}</td>
+                  <td>{currentSlots[lvl]} / {maxSlots[lvl]}</td>
+                  <td>
+                    <input
+                      type="radio"
+                      name="slotLevel"
+                      checked={selectedLevel === lvl}
+                      disabled={currentSlots[lvl] === 0}
+                      onChange={() => setSelectedLevel(lvl)}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="resource-pool-actions">
+            <button className="char-btn" onClick={handleForward} disabled={!canForward}>
+              <i className="fa-solid fa-check"></i> Expend Level {selectedLevel} Slot
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function ArchdruidConversionSection({ isArchdruid, currentWS, currentSlots, maxSlots, archdruidUses, setArchdruidUses, archdruidTargetLevel, archdruidCanConvert, handleArchdruidConvert }) {
+  if (!isArchdruid) return null
+  return (
+    <div className="resource-pool-section">
+      <h4>Nature Magician</h4>
+      <p className="resource-pool-hint">Convert Wild Shape uses into a spell slot. Each use contributes 2 spell levels (max level 9).</p>
+      {currentWS === 0 ? (
+        <p className="resource-pool-blocked">You have no Wild Shape uses remaining.</p>
+      ) : (
+        <>
+          <table className="resource-pool-table">
+            <thead>
+              <tr><th>Uses</th><th>Slot Level</th><th>Available</th><th>Select</th></tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: Math.min(currentWS, 4) }, (_, i) => i + 1).map(n => {
+                const lvl = Math.min(n * 2, 9)
+                return (
+                  <tr key={`arch-${n}`} className={currentSlots[lvl] === 0 || n > currentWS ? 'resource-pool-dim' : ''}>
+                    <td>{n}</td>
+                    <td>{lvl}</td>
+                    <td>{currentSlots[lvl]} / {maxSlots[lvl]}</td>
+                    <td>
+                      <input
+                        type="radio"
+                        name="archdruidUses"
+                        checked={archdruidUses === n}
+                        disabled={currentSlots[lvl] === 0 || n > currentWS}
+                        onChange={() => setArchdruidUses(n)}
+                      />
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <div className="resource-pool-actions">
+            <button className="char-btn" onClick={handleArchdruidConvert} disabled={!archdruidCanConvert}>
+              <i className="fa-solid fa-check"></i> Convert {archdruidUses} Wild Shape &rarr; Level {archdruidTargetLevel} Slot
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function ReverseConversionSection({ isArchdruid, revHasConversion, revPrereqsMet, currentWS, handleReverse }) {
+  if (!revHasConversion || isArchdruid) return null
+  return (
+    <div className="resource-pool-section">
+      <h4>Wild Shape &rarr; Spell Slot</h4>
+      <p className="resource-pool-hint">Expend one Wild Shape use to regain a level 1 spell slot. Once per Long Rest.</p>
+      {!revPrereqsMet && currentWS === 0 ? (
+        <p className="resource-pool-blocked">You have no Wild Shape uses remaining.</p>
+      ) : !revPrereqsMet ? (
+        <p className="resource-pool-blocked">Already used this conversion this Long Rest.</p>
+      ) : (
+        <div className="resource-pool-actions">
+          <button className="char-btn" onClick={handleReverse}>
+            <i className="fa-solid fa-check"></i> Convert 1 Wild Shape &rarr; Level 1 Slot
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ResourcePoolModal({ playerStats, campaignName, automation, onClose }) {
   const name = playerStats.name
   const conversion = automation.conversion || ''
@@ -113,111 +228,11 @@ function ResourcePoolModal({ playerStats, campaignName, automation, onClose }) {
         <h3><i className="fas fa-leaf"></i> Wild Resurgence</h3>
         <p className="resource-pool-subtitle">Convert between Wild Shape uses and spell slots</p>
 
-        {fwdHasConversion && (
-          <div className="resource-pool-section">
-            <h4>Spell Slot &rarr; Wild Shape</h4>
-            <p className="resource-pool-hint">Expend a spell slot to regain one use of Wild Shape. Once per turn, when you have no uses left.</p>
-            {!fwdPrereqsMet && currentWS > 0 ? (
-              <p className="resource-pool-blocked">
-                You have {currentWS} Wild Shape use{currentWS > 1 ? 's' : ''} remaining. Use must be 0 to convert.
-              </p>
-            ) : !fwdPrereqsMet && currentWS === 0 ? (
-              <p className="resource-pool-blocked">Already used this conversion this round.</p>
-            ) : (
-              <>
-                <table className="resource-pool-table">
-                  <thead>
-                    <tr><th>Level</th><th>Available</th><th>Select</th></tr>
-                  </thead>
-                  <tbody>
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(lvl => (
-                      <tr key={`fwd-${lvl}`} className={currentSlots[lvl] === 0 ? 'resource-pool-dim' : ''}>
-                        <td>{lvl}</td>
-                        <td>{currentSlots[lvl]} / {maxSlots[lvl]}</td>
-                        <td>
-                          <input
-                            type="radio"
-                            name="slotLevel"
-                            checked={selectedLevel === lvl}
-                            disabled={currentSlots[lvl] === 0}
-                            onChange={() => setSelectedLevel(lvl)}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className="resource-pool-actions">
-                  <button className="char-btn" onClick={handleForward} disabled={!canForward}>
-                    <i className="fa-solid fa-check"></i> Expend Level {selectedLevel} Slot
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
+        <ForwardConversionSection fwdHasConversion={fwdHasConversion} fwdPrereqsMet={fwdPrereqsMet} currentWS={currentWS} currentSlots={currentSlots} maxSlots={maxSlots} selectedLevel={selectedLevel} setSelectedLevel={setSelectedLevel} canForward={canForward} handleForward={handleForward} />
 
-        {isArchdruid && (
-          <div className="resource-pool-section">
-            <h4>Nature Magician</h4>
-            <p className="resource-pool-hint">Convert Wild Shape uses into a spell slot. Each use contributes 2 spell levels (max level 9).</p>
-            {currentWS === 0 ? (
-              <p className="resource-pool-blocked">You have no Wild Shape uses remaining.</p>
-            ) : (
-              <>
-                <table className="resource-pool-table">
-                  <thead>
-                    <tr><th>Uses</th><th>Slot Level</th><th>Available</th><th>Select</th></tr>
-                  </thead>
-                  <tbody>
-                    {Array.from({ length: Math.min(currentWS, 4) }, (_, i) => i + 1).map(n => {
-                      const lvl = Math.min(n * 2, 9)
-                      return (
-                        <tr key={`arch-${n}`} className={currentSlots[lvl] === 0 || n > currentWS ? 'resource-pool-dim' : ''}>
-                          <td>{n}</td>
-                          <td>{lvl}</td>
-                          <td>{currentSlots[lvl]} / {maxSlots[lvl]}</td>
-                          <td>
-                            <input
-                              type="radio"
-                              name="archdruidUses"
-                              checked={archdruidUses === n}
-                              disabled={currentSlots[lvl] === 0 || n > currentWS}
-                              onChange={() => setArchdruidUses(n)}
-                            />
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-                <div className="resource-pool-actions">
-                  <button className="char-btn" onClick={handleArchdruidConvert} disabled={!archdruidCanConvert}>
-                    <i className="fa-solid fa-check"></i> Convert {archdruidUses} Wild Shape &rarr; Level {archdruidTargetLevel} Slot
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
+        <ArchdruidConversionSection isArchdruid={isArchdruid} currentWS={currentWS} currentSlots={currentSlots} maxSlots={maxSlots} archdruidUses={archdruidUses} setArchdruidUses={setArchdruidUses} archdruidTargetLevel={archdruidTargetLevel} archdruidCanConvert={archdruidCanConvert} handleArchdruidConvert={handleArchdruidConvert} />
 
-        {!isArchdruid && revHasConversion && (
-          <div className="resource-pool-section">
-            <h4>Wild Shape &rarr; Spell Slot</h4>
-            <p className="resource-pool-hint">Expend one Wild Shape use to regain a level 1 spell slot. Once per Long Rest.</p>
-            {!revPrereqsMet && currentWS === 0 ? (
-              <p className="resource-pool-blocked">You have no Wild Shape uses remaining.</p>
-            ) : !revPrereqsMet ? (
-              <p className="resource-pool-blocked">Already used this conversion this Long Rest.</p>
-            ) : (
-              <div className="resource-pool-actions">
-                <button className="char-btn" onClick={handleReverse}>
-                  <i className="fa-solid fa-check"></i> Convert 1 Wild Shape &rarr; Level 1 Slot
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+        <ReverseConversionSection isArchdruid={isArchdruid} revHasConversion={revHasConversion} revPrereqsMet={revPrereqsMet} currentWS={currentWS} handleReverse={handleReverse} />
 
         <div className="resource-pool-actions resource-pool-cancel">
           <button className="char-btn" onClick={onClose}>

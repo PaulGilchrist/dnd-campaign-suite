@@ -38,6 +38,82 @@ import ConcentrationPromptModal from './components/common/ConcentrationPromptMod
 import ConditionChoiceModal from './components/common/ConditionChoiceModal.jsx';
 import BardicInspirationReactionModal from './components/common/BardicInspirationReactionModal.jsx';
 
+function handleCharacterKeyEvent(event, { setCharacters, activeCharacter, setActiveCharacter }) {
+  if (event.key.startsWith('character-delete-')) {
+    const file = event.key.replace(/^character-delete-.+-/, '');
+    setCharacters(prev => prev.filter(c => `${c.name.replace(/[^a-zA-Z0-9]/g, '_')}.json` !== file));
+  } else if (!event.key.startsWith('character-create-')) {
+    const updated = event.data;
+    setCharacters(prev => {
+      const idx = prev.findIndex(c => c.name === updated.name);
+      if (idx === -1) return prev;
+      const next = [...prev];
+      next[idx] = updated;
+      return next;
+    });
+    if (activeCharacter && activeCharacter.name === updated.name) {
+      setActiveCharacter(updated);
+    }
+  }
+}
+
+function handlePipelineKeyEvent(event, campaignName) {
+  const prefix = `pipeline-${campaignName}-`;
+  if (!event.key.startsWith(prefix)) return;
+  const actualKey = event.key.slice(prefix.length);
+  setRuntimeObject(actualKey, event.data, campaignName, true);
+}
+
+function redispatchSaveResult(promptId, data) {
+  const pending = peekPendingSavePrompt(promptId);
+  if (pending) {
+    console.debug(`[saveDebug] App.handleRuntimeEvent SSE saveResult: re-dispatching save-result for "${promptId}" with merged pending data`, { pendingKeys: Object.keys(pending) });
+    window.dispatchEvent(new CustomEvent('save-result', { detail: { ...pending, ...data } }));
+    return;
+  }
+  const listenerPrompts = getRuntimeValue('campaign', 'pendingSaveListenerPrompts') || [];
+  if (listenerPrompts.includes(promptId)) {
+    console.debug(`[saveDebug] App.handleRuntimeEvent SSE saveResult: re-dispatching save-result for pending listener prompt "${promptId}"`);
+    window.dispatchEvent(new CustomEvent('save-result', { detail: data }));
+  } else {
+    console.debug(`[saveDebug] App.handleRuntimeEvent SSE saveResult: no pending prompt "${promptId}", skipping re-dispatch`);
+  }
+}
+
+function applyStoreUpdate(storeKey, data, campaignName) {
+  // Campaign-level keys: SSE key is "change-{campaign}-{key}" -> store in campaign store
+  // Character keys: SSE key is "change-{campaign}-{characterName}" -> apply full object to character store
+  if (isCampaignKey(storeKey)) {
+    const campaignStore = getStore('campaign');
+    campaignStore.set(storeKey, data);
+    notify('campaign');
+  } else {
+    setRuntimeObject(storeKey, data, campaignName, true);
+  }
+}
+
+function handleChangeKeyEvent(event, campaignName, pendingPromptIdRef) {
+  if (!event.data || typeof event.data !== 'object') return;
+  const prefix = `change-${campaignName}-`;
+  if (!event.key.startsWith(prefix)) return;
+  const storeKey = event.key.slice(prefix.length);
+  if (storeKey.startsWith('saveResult-') || storeKey.startsWith('savePrompt-') || storeKey.startsWith('savePromptCleared-')) {
+    console.debug(`[saveDebug] App.handleRuntimeEvent SSE change received`, { key: event.key, storeKey, data: event.data });
+  }
+  if (storeKey.startsWith('saveResult-') && event.data.promptId) {
+    redispatchSaveResult(event.data.promptId, event.data);
+  }
+  if ('biPrompt' in event.data) {
+    pendingPromptIdRef.current = event.data.biPrompt?.promptId || null;
+    return;
+  }
+  if (pendingPromptIdRef.current && 'biPromptCleared' in event.data) {
+    return;
+  }
+  pendingPromptIdRef.current = null;
+  applyStoreUpdate(storeKey, event.data, campaignName);
+}
+
 function App() {
   const appData = useAppData();
   const { abilityScores, classes, classes2024, equipment, magicItems, magicItems2024, races, races2024, spells, spells2024 } = appData;
@@ -409,72 +485,14 @@ function App() {
   const handleRuntimeEvent = useCallback((event) => {
     if (event.key == null || event.data == null) return;
     if (event.key.startsWith('character-')) {
-      if (event.key.startsWith('character-delete-')) {
-        const file = event.key.replace(/^character-delete-.+-/, '');
-        setCharacters(prev => prev.filter(c => `${c.name.replace(/[^a-zA-Z0-9]/g, '_')}.json` !== file));
-      } else if (!event.key.startsWith('character-create-')) {
-        const updated = event.data;
-        setCharacters(prev => {
-          const idx = prev.findIndex(c => c.name === updated.name);
-          if (idx === -1) return prev;
-          const next = [...prev];
-          next[idx] = updated;
-          return next;
-        });
-        if (activeCharacter && activeCharacter.name === updated.name) {
-          setActiveCharacter(updated);
-        }
-      }
+      handleCharacterKeyEvent(event, { setCharacters, activeCharacter, setActiveCharacter });
       return;
     }
     if (event.key.startsWith('pipeline-')) {
-      const prefix = `pipeline-${campaignName}-`;
-      if (!event.key.startsWith(prefix)) return;
-      const actualKey = event.key.slice(prefix.length);
-      setRuntimeObject(actualKey, event.data, campaignName, true);
+      handlePipelineKeyEvent(event, campaignName);
       return;
     }
-    if (!event.key.startsWith('change-')) return;
-    if (!event.data || typeof event.data !== 'object') return;
-    const prefix = `change-${campaignName}-`;
-    if (!event.key.startsWith(prefix)) return;
-    const storeKey = event.key.slice(prefix.length);
-    if (storeKey.startsWith('saveResult-') || storeKey.startsWith('savePrompt-') || storeKey.startsWith('savePromptCleared-')) {
-      console.debug(`[saveDebug] App.handleRuntimeEvent SSE change received`, { key: event.key, storeKey, data: event.data });
-    }
-    if (storeKey.startsWith('saveResult-') && event.data?.promptId) {
-      const pending = peekPendingSavePrompt(event.data.promptId);
-      if (pending) {
-        console.debug(`[saveDebug] App.handleRuntimeEvent SSE saveResult: re-dispatching save-result for "${event.data.promptId}" with merged pending data`, { pendingKeys: Object.keys(pending) });
-        window.dispatchEvent(new CustomEvent('save-result', { detail: { ...pending, ...event.data } }));
-      } else {
-        const listenerPrompts = getRuntimeValue('campaign', 'pendingSaveListenerPrompts') || [];
-        if (listenerPrompts.includes(event.data.promptId)) {
-          console.debug(`[saveDebug] App.handleRuntimeEvent SSE saveResult: re-dispatching save-result for pending listener prompt "${event.data.promptId}"`);
-          window.dispatchEvent(new CustomEvent('save-result', { detail: event.data }));
-        } else {
-          console.debug(`[saveDebug] App.handleRuntimeEvent SSE saveResult: no pending prompt "${event.data.promptId}", skipping re-dispatch`);
-        }
-      }
-    }
-    if (event.data && typeof event.data === 'object' && 'biPrompt' in event.data) {
-      pendingPromptIdRef.current = event.data.biPrompt?.promptId || null;
-      return;
-    }
-    if (pendingPromptIdRef.current && event.data && typeof event.data === 'object' && 'biPromptCleared' in event.data) {
-      return;
-    }
-    pendingPromptIdRef.current = null;
-
-    // Campaign-level keys: SSE key is "change-{campaign}-{key}" -> store in campaign store
-    // Character keys: SSE key is "change-{campaign}-{characterName}" -> apply full object to character store
-    if (isCampaignKey(storeKey)) {
-        const campaignStore = getStore('campaign');
-        campaignStore.set(storeKey, event.data);
-        notify('campaign');
-    } else {
-        setRuntimeObject(storeKey, event.data, campaignName, true);
-    }
+    handleChangeKeyEvent(event, campaignName, pendingPromptIdRef);
   }, [campaignName, setCharacters, activeCharacter, setActiveCharacter]);
 
   const handleDeleteCharacter = async (characterName) => {

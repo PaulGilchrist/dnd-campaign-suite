@@ -172,6 +172,13 @@ function PsychicDamageCheckbox({ usePsychicDamage, onTogglePsychicDamage }) {
   );
 }
 
+// CLA-252: Phantasmal Creatures free cast — spectral Illusion version, halved HP.
+function computeIsPhantasmalFreeCast(playerStats, spell, freeCastAuthorized) {
+  if (!freeCastAuthorized) return false;
+  const phantasmalPassive = playerStats?.automation?.passives?.find(p => p.type === 'phantasmal_creatures');
+  return !!phantasmalPassive && (phantasmalPassive.freeCastSpells || []).includes(spell.name);
+}
+
 function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, upcastLevels = [], playerLevel = 1 }) {
   const isCantrip = spell.level === 0;
   const slotDmg = spell.damage?.damage_at_slot_level;
@@ -189,8 +196,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
   const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, spell.name, gateSpellLevel, playerStats, campaignName);
 
   // CLA-252: Phantasmal Creatures free cast — spectral Illusion version, halved HP.
-  const phantasmalPassive = playerStats?.automation?.passives?.find(p => p.type === 'phantasmal_creatures');
-  const isPhantasmalFreeCast = freeCastAuthorized && !!phantasmalPassive && (phantasmalPassive.freeCastSpells || []).includes(spell.name);
+  const isPhantasmalFreeCast = computeIsPhantasmalFreeCast(playerStats, spell, freeCastAuthorized);
 
   // CLA-308: Shadow Arts — per-spell once-per-Long-Rest slotless free cast counter
   // (null = fresh) for the remaining-uses note on the popup.

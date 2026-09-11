@@ -37,6 +37,8 @@ import { createConcentrationHandlers } from './createConcentrationHandlers.js'
 import { createEffectAdderHandlers } from './createEffectAdderHandlers.js'
 import { createAutoBreakConditionHandler } from './createAutoBreakConditionHandler.js'
 import { isSecondTurnEntry } from '../../services/combat/thiefsReflexesService.js'
+import { buildDisplayCreature } from './displayCreatureUtils.js'
+import InitiativeLoot from './InitiativeLoot.jsx'
 
 function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapName, onViewCharacter }) {
     const [combatSummary, setCombatSummary] = React.useState(null)
@@ -83,53 +85,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
     const displayCreatures = React.useMemo(() => {
         if (!combatSummary || !combatSummary.creatures) return []
-        const creatures = combatSummary.creatures.map(c => {
-            // CLA-360: structural second-turn entries resolve live state via the holder's real name.
-            const lookupName = c.holderName || c.name
-            const runtimeConditions = getRuntimeValue(lookupName, 'activeConditions') || []
-            const conditionMeta = getRuntimeValue(lookupName, 'activeConditionMeta') || {}
-            const csConditions = c.conditions || []
-            const conditions = runtimeConditions.map((key, i) => {
-                const condKey = String(key).toLowerCase()
-                const meta = conditionMeta[condKey]
-                const csMatch = csConditions.find(cs => String(cs.key).toLowerCase() === condKey)
-                return {
-                    id: `runtime-${key}-${i}`,
-                    key,
-                    label: csMatch?.label || (key === 'speed_zero' ? 'Speed 0' : key.charAt(0).toUpperCase() + key.slice(1)),
-                    dc: (meta?.dc ?? csMatch?.dc) || 0,
-                    ability: (meta?.ability ?? csMatch?.ability) || 'con',
-                }
-            })
-            if (c.type !== 'player') {
-                return {
-                    ...c,
-                    conditions,
-                }
-            }
-            const character = characters.find(ch => utils.getName(ch.name) === lookupName)
-            const stats = character?.computedStats || character
-            const maxHp = getRuntimeValue(lookupName, 'hitPoints') ?? stats?.hitPoints ?? 0
-            const currentHp = getRuntimeValue(lookupName, 'currentHitPoints') ?? maxHp
-            const activeBuffs = getRuntimeValue(lookupName, 'activeBuffs') || []
-            const shieldOfFaithBonus = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shield_of_faith') ? 2 : 0
-            const wardingBondBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.effect === 'warding_bond' && b.acBonus) : null
-            const wardingBondBonus = wardingBondBuff ? Number(wardingBondBuff.acBonus) || 0 : 0
-            const barkskinActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'barkskin')
-            const circleFormsAC = c.wildShapeSource ? (getRuntimeValue(c.name, 'circleFormsAC') ?? null) : null
-            const ac = circleFormsAC ?? (barkskinActive ? 17 : (stats?.armorClass ?? 10) + shieldOfFaithBonus + wardingBondBonus)
-            return {
-                ...c,
-                imagePath: character?.imagePath || '',
-                ac,
-                resistances: stats?.resistances || [],
-                immunities: stats?.immunities || [],
-                currentHp,
-                maxHp,
-                conditions,
-            }
-        })
-        return creatures
+        return combatSummary.creatures.map(c => buildDisplayCreature(c, characters))
     }, [combatSummary, characters])
 
     React.useEffect(() => {
@@ -637,74 +593,19 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                   <button onClick={handlePreviousCreature} disabled={isPrevDisabledValue}>← Prev</button>
                   <button onClick={handleNextCreature}>Next →</button>
               </div>
-              <div className='initiative-loot-section'>
-                  <div className='initiative-loot-header'>
-                      <i className="fa-solid fa-gem"></i>&nbsp; Loot
-                      {(lootData.lootEntries.length > 0 || lootTextValue.length > 0) && (
-                        <button
-                          className='initiative-btn initiative-btn-secondary'
-                          onClick={handleClearLoot}
-                          title="Clear loot suggestions"
-                        >
-                          <i className="fa-solid fa-xmark"></i>
-                        </button>
-                      )}
-                  </div>
-                  <button
-                    className='initiative-btn initiative-btn-loot'
-                    onClick={handleGenerateLoot}
-                    disabled={generatingLoot}
-                    title="Generate loot from defeated monsters in combat"
-                  >
-                    <i className="fa-solid fa-coins"></i>&nbsp; {generatingLoot ? 'Generating...' : 'Generate Loot'}
-                  </button>
-                  {(lootData.lootEntries.length > 0 || lootTextValue.length > 0) && (
-                    <>
-                      <textarea
-                        className='initiative-loot-textarea'
-                        value={lootTextValue || lootData.lootEntries.join('\n')}
-                        onChange={(e) => setLootTextValue(e.target.value)}
-                        placeholder="Loot will appear here..."
-                        rows={6}
-                      />
-                      {lootData.totalEncounterXp > 0 && (
-                        <div className='initiative-xp-summary'>
-                          <span className='initiative-xp-label'>
-                            <i className="fa-solid fa-star"></i>&nbsp; Encounter XP: {lootData.totalEncounterXp.toLocaleString()} total &middot; {Math.floor(lootData.totalEncounterXp / (characters && characters.length > 0 ? characters.length : 1))} per character
-                          </span>
-                          {showAwardLoot && (
-                            <div className='initiative-award-loot-actions'>
-                              <button
-                                className='initiative-btn initiative-btn-complete'
-                                onClick={handleAwardLoot}
-                                disabled={awardingLoot}
-                                title="Award loot and XP to party"
-                              >
-                                <i className="fa-solid fa-trophy"></i>{awardingLoot ? 'Awarding...' : 'Award Loot'}
-                              </button>
-                              <button
-                                className='initiative-btn initiative-btn-secondary'
-                                onClick={() => setShowAwardLoot(false)}
-                                title="Cancel"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          )}
-                          {!showAwardLoot && lootTextValue.length > 0 && (
-                            <button
-                              className='initiative-btn initiative-btn-loot'
-                              onClick={() => setShowAwardLoot(true)}
-                              title="Award loot and XP to party"
-                            >
-                              <i className="fa-solid fa-trophy"></i>Award Loot
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </>
-                  )}
-              </div>
+              <InitiativeLoot
+                lootData={lootData}
+                generatingLoot={generatingLoot}
+                lootTextValue={lootTextValue}
+                setLootTextValue={setLootTextValue}
+                showAwardLoot={showAwardLoot}
+                setShowAwardLoot={setShowAwardLoot}
+                awardingLoot={awardingLoot}
+                handleGenerateLoot={handleGenerateLoot}
+                handleAwardLoot={handleAwardLoot}
+                handleClearLoot={handleClearLoot}
+                characters={characters}
+              />
             {viewingMonster && (
                 <MonsterCardModal
                     monster={viewingMonster}

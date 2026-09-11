@@ -37,6 +37,33 @@ async function removeConditionsOnTarget(targetName, campaignName, spell, reason)
     }
 }
 
+function resolveTotalHealPool(action, slotLevel) {
+    const healAtSlotLevel = action.spell?.heal_at_slot_level;
+    if (!healAtSlotLevel) return 700;
+    const expression = healAtSlotLevel[slotLevel] || healAtSlotLevel[Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b).pop()];
+    if (!expression || expression === 'max') return 700;
+    const parsed = parseInt(expression, 10);
+    return Number.isNaN(parsed) ? 700 : parsed;
+}
+
+async function collectAlliesInRange(combatSummary, playerName, rangeFt) {
+    const allyNames = getAllyList(playerName);
+    const allyList = Array.isArray(allyNames) && allyNames.length > 0 ? allyNames : [];
+    const effectiveAllies = allyList.length > 1 || (allyList.length === 1 && allyList[0] !== playerName)
+        ? allyList
+        : combatSummary.creatures?.map(c => c.name) || [];
+
+    const eligible = [];
+    for (const allyName of effectiveAllies) {
+        const creature = combatSummary.creatures?.find(c => c.name === allyName);
+        if (!creature) continue;
+        if (await isWithinRange(playerName, allyName, rangeFt)) {
+            eligible.push(creature);
+        }
+    }
+    return eligible;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -47,33 +74,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     if (!combatSummary) return null;
 
     const slotLevel = auto?.slotLevel || action.spell?.level || 9;
-    const healAtSlotLevel = action.spell?.heal_at_slot_level;
-    let totalPool = 700;
-    if (healAtSlotLevel) {
-        const expression = healAtSlotLevel[slotLevel] || healAtSlotLevel[Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b).pop()];
-        if (expression && expression !== 'max') {
-            const parsed = parseInt(expression, 10);
-            if (!Number.isNaN(parsed)) totalPool = parsed;
-        }
-    }
+    const totalPool = resolveTotalHealPool(action, slotLevel);
 
     const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName);
     void (totalPool + (bonusHeal > 0 ? bonusHeal * maxTargets : 0));
 
-    const allyNames = getAllyList(playerName);
-    const allyList = Array.isArray(allyNames) && allyNames.length > 0 ? allyNames : [];
-    const effectiveAllies = allyList.length > 1 || (allyList.length === 1 && allyList[0] !== playerName)
-        ? allyList
-        : combatSummary.creatures?.map(c => c.name) || [];
-    const eligible = [];
-
-    for (const allyName of effectiveAllies) {
-        const creature = combatSummary.creatures?.find(c => c.name === allyName);
-        if (!creature) continue;
-        if (await isWithinRange(playerName, allyName, rangeFt)) {
-            eligible.push(creature);
-        }
-    }
+    const eligible = await collectAlliesInRange(combatSummary, playerName, rangeFt);
 
     if (eligible.length === 0) {
         return {

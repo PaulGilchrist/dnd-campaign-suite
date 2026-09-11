@@ -29,10 +29,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const maxTargets = auto.maxTargets === 'all' ? Infinity : Math.max(1, chaMod);
     const maxTargetsText = Number.isFinite(maxTargets) ? maxTargets : 'all';
 
-    const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
-    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
-    const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
-    const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
+    const currentCharges = resolveChannelDivinityCharges(playerStats);
 
     if (gatedByChannelDivinityCharges && currentCharges <= 0) {
         return {
@@ -91,14 +88,23 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             saveType,
             rangeFeet,
             maxTargets,
-            durationRounds: (() => {
-                const lower = (auto.duration || '').toLowerCase();
-                if (lower.startsWith('1_minute')) return 10;
-                if (lower.startsWith('until_end_of_next_turn')) return 2;
-                const match = lower.match(/(\d+)_round/);
-                if (match) return parseInt(match[1], 10);
-                return undefined;
-            })(),
+            durationRounds: resolveDurationRounds(auto),
          },
      };
+}
+
+function resolveChannelDivinityCharges(playerStats) {
+    const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
+    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+    const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
+    return storedCharges != null ? Number(storedCharges) : maxCharges;
+}
+
+function resolveDurationRounds(auto) {
+    const lower = (auto.duration || '').toLowerCase();
+    if (lower.startsWith('1_minute')) return 10;
+    if (lower.startsWith('until_end_of_next_turn')) return 2;
+    const match = lower.match(/(\d+)_round/);
+    if (match) return parseInt(match[1], 10);
+    return undefined;
 }

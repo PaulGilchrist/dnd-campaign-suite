@@ -117,18 +117,11 @@ export function createMassHealHandler(config) {
         let totalHealed = 0;
 
         for (const targetName of finalTargets) {
-            if (useCurrentRound) {
-                const affectedKey = `prayerOfHealing_lastUsedRound_${targetName}`;
-                const usedRound = getRuntimeValue(targetName, affectedKey, campaignName);
-                if (usedRound && usedRound === currentRound) {
-                    continue;
-                }
-            }
+            if (alreadyHealedThisRound(targetName, campaignName, currentRound, useCurrentRound)) continue;
 
-            const maxHp = combatSummary?.creatures?.find(c => c.name === targetName)?.maxHp || playerStats.hitPoints || 0;
-            const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
-            const currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
-            const rollResult = (maximize || hasHealingMaximizationForTarget(playerStats, targetName, campaignName)) ? rollExpressionMaximized(healExpression) : rollExpression(healExpression);
+            const maxHp = resolveTargetMaxHp(combatSummary, playerStats, targetName);
+            const currentHp = resolveStoredCurrentHp(targetName, campaignName, maxHp);
+            const rollResult = rollMassHealDice(healExpression, maximize, playerStats, targetName, campaignName);
             if (!rollResult) continue;
 
             const targetHealAmount = rollResult.total + bonusHeal;
@@ -136,18 +129,15 @@ export function createMassHealHandler(config) {
 
             if (actualHeal > 0) {
                 applyHealingToTarget(combatSummary, targetName, actualHeal, campaignName);
-                if (useCurrentRound) {
-                    const affectedKey = `prayerOfHealing_lastUsedRound_${targetName}`;
-                    setRuntimeValue(targetName, affectedKey, currentRound, campaignName);
-                }
+                stampHealedThisRound(targetName, campaignName, currentRound, useCurrentRound);
             }
 
             const newHp = Math.min(maxHp, currentHp + actualHeal);
 
+            const joinedBonuses = joinBonusDetails(bonusDetails, ' + ');
             const formulaParts = [healExpression];
-            if (bonusDetails.length > 0) {
-                const bonusParts = bonusDetails.map(d => `${d.amount} ${d.name}`).join(' + ');
-                formulaParts.push(`(${bonusParts})`);
+            if (joinedBonuses) {
+                formulaParts.push(`(${joinedBonuses})`);
             }
 
             await addEntry(campaignName, {
@@ -185,10 +175,39 @@ export function createMassHealHandler(config) {
                 results: results.map(r => ({ targetName: r.targetName, healAmount: r.healAmount, rolls: r.rolls })),
                 totalHealed: totalHealed,
                 bonusHeal: bonusHeal || 0,
-                bonusHealDetail: bonusDetails && bonusDetails.length > 0 ? bonusDetails.map(d => `${d.amount} ${d.name}`).join(', ') : '',
+                bonusHealDetail: joinBonusDetails(bonusDetails, ', '),
             },
         };
     }
 
     return { handle, confirmFn };
+}
+
+function alreadyHealedThisRound(targetName, campaignName, currentRound, useCurrentRound) {
+    if (!useCurrentRound) return false;
+    const usedRound = getRuntimeValue(targetName, `prayerOfHealing_lastUsedRound_${targetName}`, campaignName);
+    return Boolean(usedRound && usedRound === currentRound);
+}
+
+function stampHealedThisRound(targetName, campaignName, currentRound, useCurrentRound) {
+    if (!useCurrentRound) return;
+    setRuntimeValue(targetName, `prayerOfHealing_lastUsedRound_${targetName}`, currentRound, campaignName);
+}
+
+function resolveTargetMaxHp(combatSummary, playerStats, targetName) {
+    return combatSummary?.creatures?.find(c => c.name === targetName)?.maxHp || playerStats.hitPoints || 0;
+}
+
+function resolveStoredCurrentHp(targetName, campaignName, fallbackMaxHp) {
+    const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
+    return storedHp != null && storedHp !== '' ? Number(storedHp) : fallbackMaxHp;
+}
+
+function rollMassHealDice(healExpression, maximize, playerStats, targetName, campaignName) {
+    if (maximize || hasHealingMaximizationForTarget(playerStats, targetName, campaignName)) return rollExpressionMaximized(healExpression);
+    return rollExpression(healExpression);
+}
+
+function joinBonusDetails(bonusDetails, separator) {
+    return bonusDetails && bonusDetails.length > 0 ? bonusDetails.map(d => `${d.amount} ${d.name}`).join(separator) : '';
 }

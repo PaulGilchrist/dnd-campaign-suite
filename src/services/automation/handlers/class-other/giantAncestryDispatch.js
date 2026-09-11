@@ -6,6 +6,7 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { getRuntimeUsesKey } from './giantAncestryOptions.js';
+import { ancestryNoUsesPopup, frostsChillAttackerGate, stormsThunderTargetGate } from './giantAncestryUtils.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
@@ -166,67 +167,14 @@ export async function handleFrostsChill(action, playerStats, campaignName, optio
     const usesMax = playerStats.proficiency || 0;
     const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
 
-    if (currentUses <= 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} has no uses remaining. Uses will reset on the next Long Rest.`,
-                automation: action.automation,
-            },
-        };
-    }
+    const noUses = ancestryNoUsesPopup(optName, action.automation, currentUses);
+    if (noUses) return noUses;
 
     const lastAttack = await findLastAttack(campaignName);
-    if (!lastAttack?.attackEvent) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} requires a recent attack. Use it after hitting a creature.`,
-                automation: action.automation,
-            },
-        };
-    }
-
-    if (lastAttack.attackerName !== playerStats.name) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} can only be used after you make an attack. Wait for your turn.`,
-                automation: action.automation,
-            },
-        };
-    }
-
-    if (lastAttack.attackEvent.rollType !== 'attack') {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} can only be used after an attack roll.`,
-                automation: action.automation,
-            },
-        };
-    }
+    const gateRefusal = frostsChillAttackerGate(optName, action.automation, playerStats, lastAttack);
+    if (gateRefusal) return gateRefusal;
 
     const targetName = lastAttack.targetName;
-    if (!targetName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} requires a target. No target found from the last attack.`,
-                automation: action.automation,
-            },
-        };
-    }
 
     const damageResult = rollExpression(opt.damage);
     const damageType = opt.damageType || 'Cold';
@@ -554,68 +502,14 @@ export async function handleStormsThunder(action, playerStats, campaignName, _ma
     const usesMax = playerStats.proficiency || 0;
     const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
 
-    if (currentUses <= 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} has no uses remaining. Uses will reset on the next Long Rest.`,
-                automation: action.automation,
-            },
-        };
-    }
+    const noUses = ancestryNoUsesPopup(optName, action.automation, currentUses);
+    if (noUses) return noUses;
 
     const lastAttack = await findLastAttack(campaignName);
-    if (!lastAttack?.attackEvent) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} requires a recent attack where you were the target and took damage.`,
-                automation: action.automation,
-            },
-        };
-    }
-
-    if (lastAttack.targetName !== playerStats.name) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} can only be used when you were the target of the attack and took damage.`,
-                automation: action.automation,
-            },
-        };
-    }
-
-    const totalDamage = lastAttack.totalDamage || 0;
-    if (totalDamage <= 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} requires that you took damage from the attack. No damage was dealt.`,
-                automation: action.automation,
-            },
-        };
-    }
+    const gateRefusal = stormsThunderTargetGate(optName, action.automation, playerStats, lastAttack);
+    if (gateRefusal) return gateRefusal;
 
     const attackerName = lastAttack.attackerName;
-    if (!attackerName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} requires a target. No attacker found from the last attack.`,
-                automation: action.automation,
-            },
-        };
-    }
 
     // CLA-337: 60-ft trigger gate — the attacker must be within the trait's
     // range. Canonical isWithinRange helper (rangeCheck.js): strict token

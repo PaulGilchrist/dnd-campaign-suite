@@ -41,10 +41,34 @@ async function gateStunningStrike({ action, auto, playerName, campaignName, getR
     return { armed: true, round: stunningStrikeRound, blocked: false };
 }
 
+const FOCUS_COST_SKIP_FEATURES = ['Hand of Healing', 'Flurry of Blows', 'Heightened Flurry of Blows'];
+
+function shouldSkipFocusPointCost(action, hasFlurryHealingHarm, cloakActive) {
+    // Skip FP cost for Hand of Healing / Flurry of Blows with Flurry of Healing and Harm,
+    // or for Flurry of Blows when Cloak of Shadows (Shadow Flurry) is active.
+    if (hasFlurryHealingHarm && FOCUS_COST_SKIP_FEATURES.includes(action.name)) return true;
+    return cloakActive && action.name !== 'Hand of Healing' && FOCUS_COST_SKIP_FEATURES.includes(action.name);
+}
+
+function resolveCurrentFocusPoints(playerStats, campaignName, getRuntimeValue) {
+    const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+    const maxFP = classLevel?.focus_points || getClassFeatures(playerStats)?.maxFocusPoints || 0;
+    const storedFP = getRuntimeValue(playerStats.name, 'focusPoints', campaignName);
+    return storedFP != null ? Number(storedFP) : (playerStats._trackedResources?.focusPoints?.current ?? maxFP);
+}
+
+async function markStunningStrikeUsed({ playerStats, playerName, campaignName, action, stunningStrikeRound, setRuntimeValue, addEntry, getRuntimeValue }) {
+    await setRuntimeValue(playerStats.name, '_StunningStrike_usedRound', { round: stunningStrikeRound, activeCreature: playerName }, campaignName);
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: action.name,
+        description: `${action.name} — expended 1 ${playerStats.rules === '2024' ? 'Focus Point' : 'ki point'} to attempt to stun ${getRuntimeValue('campaign', 'lastAttack', campaignName)?.targetName || 'target'}.`,
+    }).catch((e) => { console.error("[useCharActionsAutomation:log-error]", e); });
+}
+
 async function spendMonkFocusPoint({ action, auto, playerStats, playerName, campaignName, cloakActive, hasFlurryHealingHarm, stunningStrikeArmed, stunningStrikeRound, getRuntimeValue, setRuntimeValue, setPopupHtml, addEntry }) {
     // Spend 1 focus point for monk Ki features before dispatching
-    // Skip FP cost for Hand of Healing and Flurry of Blows when Flurry of Healing and Harm is active
-    // Skip FP cost for Flurry of Blows when Cloak of Shadows (Shadow Flurry) is active
     // Skip pre-spend for 2024 patient_defense: patientDefenseHandler is the sole FP
     // writer (focus mode spends 1 FP, plain Disengage spends none) — pre-spending here
     // double-charged and blocked the plain-Disengage fallback (CLA-247)
@@ -54,13 +78,8 @@ async function spendMonkFocusPoint({ action, auto, playerStats, playerName, camp
     if (!(MONK_KI_FEATURES.includes(action.name) && auto?.type !== 'patient_defense' && auto?.type !== 'step_of_the_wind')) {
         return true;
     }
-    const skipFP = (hasFlurryHealingHarm && (action.name === 'Hand of Healing' || action.name === 'Flurry of Blows' || action.name === 'Heightened Flurry of Blows'))
-        || (cloakActive && (action.name === 'Flurry of Blows' || action.name === 'Heightened Flurry of Blows'));
-    if (skipFP) return true;
-    const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-    const maxFP = classLevel?.focus_points || getClassFeatures(playerStats)?.maxFocusPoints || 0;
-    const storedFP = getRuntimeValue(playerStats.name, 'focusPoints', campaignName);
-    const currentFP = storedFP != null ? Number(storedFP) : (playerStats._trackedResources?.focusPoints?.current ?? maxFP);
+    if (shouldSkipFocusPointCost(action, hasFlurryHealingHarm, cloakActive)) return true;
+    const currentFP = resolveCurrentFocusPoints(playerStats, campaignName, getRuntimeValue);
     if (currentFP <= 0) {
         setPopupHtml(`<b>${action.name}</b><br/>No ${playerStats.rules === '2024' ? "Focus Points" : 'ki points'} remaining.`);
         return false;
@@ -68,13 +87,7 @@ async function spendMonkFocusPoint({ action, auto, playerStats, playerName, camp
     await setRuntimeValue(playerStats.name, 'focusPoints', currentFP - 1, campaignName);
     window.dispatchEvent(new CustomEvent('focus-points-updated'));
     if (stunningStrikeArmed) {
-        await setRuntimeValue(playerStats.name, '_StunningStrike_usedRound', { round: stunningStrikeRound, activeCreature: playerName }, campaignName);
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerName,
-            abilityName: action.name,
-            description: `${action.name} — expended 1 ${playerStats.rules === '2024' ? 'Focus Point' : 'ki point'} to attempt to stun ${getRuntimeValue('campaign', 'lastAttack', campaignName)?.targetName || 'target'}.`,
-        }).catch((e) => { console.error("[useCharActionsAutomation:log-error]", e); });
+        await markStunningStrikeUsed({ playerStats, playerName, campaignName, action, stunningStrikeRound, setRuntimeValue, addEntry, getRuntimeValue });
     }
     return true;
 }

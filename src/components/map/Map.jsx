@@ -58,6 +58,32 @@ import useRuler from './hooks/useRuler';
 import useSpellHandlers from './hooks/useSpellHandlers';
 import useMapDrops from './hooks/useMapDrops';
 import { CELL_SIZE, TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_SELECT, TOOL_ROOM } from '../../config/mapConfig';
+import {
+    SelectionPreviewRect,
+    RoomShape,
+    SelectionOutline,
+    MovePreview,
+    SelectedWalls,
+    SelectedItemHighlights,
+} from './MapSelectionLayers.jsx';
+
+function getCursor({ panning, rulerMode, tool, moveOffset }) {
+    if (panning) return 'grabbing';
+    if (rulerMode) return 'crosshair';
+    if (tool === TOOL_NONE) return 'grab';
+    if (tool === TOOL_SELECT) return moveOffset ? 'grabbing' : 'crosshair';
+    if (tool === TOOL_ROOM) return 'crosshair';
+    return 'default';
+}
+
+function buildPendingOverlay(spellDraft, spellMode, shapeParams) {
+    if (!spellDraft) return null;
+    return { ...spellDraft, shape: spellMode, ...shapeParams, id: 'pending' };
+}
+
+function getRooms(mapData) {
+    return mapData?.rooms || [];
+}
 
 function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncounterCreated, onPoiEntered }) {
     const [gridSize, setGridSize] = useState(30);
@@ -347,7 +373,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
                 onClick={(e) => { if (e.button === 0) handleCloseMenu(); handleRoomClick(e, mapData, tool); }}
-                style={{ cursor: panning ? 'grabbing' : rulerMode ? 'crosshair' : (tool === TOOL_NONE ? 'grab' : tool === TOOL_SELECT ? (moveOffset ? 'grabbing' : 'crosshair') : tool === TOOL_ROOM ? 'crosshair' : 'default') }}
+                style={{ cursor: getCursor({ panning, rulerMode, tool, moveOffset }) }}
             >
                 <defs>
                     <BarrelSVG id="barrel" />
@@ -414,150 +440,37 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     isLocalhost={isLocalhost}
                 />
 
-                {selectStart.current && selectionRect && (() => {
-                    const { minX, maxX, minY, maxY } = selectionRect;
-                    return (
-                        <rect
-                            x={minX * CELL_SIZE}
-                            y={minY * CELL_SIZE}
-                            width={(maxX - minX + 1) * CELL_SIZE}
-                            height={(maxY - minY + 1) * CELL_SIZE}
-                            className="selection-preview"
-                        />
-                    );
-                })()}
+                <SelectionPreviewRect visible={selectStart.current} rect={selectionRect} className="selection-preview" />
 
-                {roomDrawRect && (() => {
-                    const { minX, maxX, minY, maxY } = roomDrawRect;
-                    return (
-                        <rect
-                            x={minX * CELL_SIZE}
-                            y={minY * CELL_SIZE}
-                            width={(maxX - minX + 1) * CELL_SIZE}
-                            height={(maxY - minY + 1) * CELL_SIZE}
-                            className="room-draw-preview"
-                        />
-                    );
-                })()}
+                <SelectionPreviewRect rect={roomDrawRect} className="room-draw-preview" />
 
-                {(mapData?.rooms || []).map(room => {
-                    const r = room.rect;
-                    const isSelected = selectedRoom && selectedRoom.id === room.id;
-                    const typeClass = 'room-type-' + (room.type || 'common');
-                    return (
-                        <g key={'room-' + room.id}>
-                            <rect
-                                x={r.x * CELL_SIZE}
-                                y={r.y * CELL_SIZE}
-                                width={r.w * CELL_SIZE}
-                                height={r.h * CELL_SIZE}
-                                className={`room-highlight ${typeClass} ${isSelected ? 'room-selected' : ''}`}
-                            />
-                            {(tool === TOOL_NONE || tool === TOOL_SELECT) && (
-                                <rect
-                                    x={r.x * CELL_SIZE}
-                                    y={r.y * CELL_SIZE}
-                                    width={r.w * CELL_SIZE}
-                                    height={r.h * CELL_SIZE}
-                                    fill="transparent"
-                                    className="room-hit-area"
-                                />
-                            )}
-                            <text
-                                x={(r.x + r.w / 2) * CELL_SIZE}
-                                y={(r.y + r.h / 2) * CELL_SIZE}
-                                className="room-label"
-                                textAnchor="middle"
-                                dominantBaseline="central"
-                            >
-                                {room.label || room.type || 'common'}
-                            </text>
-                        </g>
-                    );
-                })}
+                {getRooms(mapData).map(room => (
+                    <RoomShape
+                        key={'room-' + room.id}
+                        room={room}
+                        tool={tool}
+                        selectedRoom={selectedRoom}
+                    />
+                ))}
 
-                {!selectStart.current && !moveStartGrid.current && (selectedWalls.size > 0 || selectedItems.size > 0) && (() => {
-                    let mnX = Infinity, mxX = -Infinity, mnY = Infinity, mxY = -Infinity;
-                    for (const key of selectedWalls) {
-                        const [x, y] = key.split(',').map(Number);
-                        mnX = Math.min(mnX, x); mxX = Math.max(mxX, x);
-                        mnY = Math.min(mnY, y); mxY = Math.max(mxY, y);
-                    }
-                    for (const id of selectedItems) {
-                        const item = placedItems.find(i => i.id === id);
-                        if (item) {
-                            mnX = Math.min(mnX, item.gridX); mxX = Math.max(mxX, item.gridX);
-                            mnY = Math.min(mnY, item.gridY); mxY = Math.max(mxY, item.gridY);
-                        }
-                    }
-                    if (mnX === Infinity) return null;
-                    return (
-                        <rect
-                            x={mnX * CELL_SIZE}
-                            y={mnY * CELL_SIZE}
-                            width={(mxX - mnX + 1) * CELL_SIZE}
-                            height={(mxY - mnY + 1) * CELL_SIZE}
-                            className="selection-outline"
-                        />
-                    );
-                })()}
+                <SelectionOutline
+                    selectionActive={selectStart.current}
+                    moveActive={moveStartGrid.current}
+                    selectedWalls={selectedWalls}
+                    selectedItems={selectedItems}
+                    placedItems={placedItems}
+                />
 
-                {selectedWalls.size > 0 && Array.from(selectedWalls).map(key => {
-                    const [gx, gy] = key.split(',').map(Number);
-                    return (
-                        <rect
-                            key={`sel-wall-${key}`}
-                            x={gx * CELL_SIZE}
-                            y={gy * CELL_SIZE}
-                            width={CELL_SIZE}
-                            height={CELL_SIZE}
-                            className="selection-wall"
-                        />
-                    );
-                })()}
+                <SelectedWalls selectedWalls={selectedWalls} />
 
-                {selectedItems.size > 0 && placedItems.filter(item => selectedItems.has(item.id)).map(item => {
-                    const w = (item.type === 'table' || item.type === 'bed' || item.type === 'altar' || item.type === 'bookshelf')
-                        && item.rotation !== 90 && item.rotation !== 270 ? CELL_SIZE * 2 : CELL_SIZE;
-                    const h = (item.type === 'table' || item.type === 'bed' || item.type === 'altar' || item.type === 'bookshelf')
-                        && (item.rotation === 90 || item.rotation === 270) ? CELL_SIZE * 2 : CELL_SIZE;
-                    return (
-                        <rect
-                            key={`sel-item-${item.id}`}
-                            x={item.gridX * CELL_SIZE}
-                            y={item.gridY * CELL_SIZE}
-                            width={w}
-                            height={h}
-                            className="selection-item-highlight"
-                        />
-                    );
-                })()}
+                <SelectedItemHighlights selectedItems={selectedItems} placedItems={placedItems} />
 
-                {moveOffset && (moveOffset.dx !== 0 || moveOffset.dy !== 0) && (selectedWalls.size > 0 || selectedItems.size > 0) && (() => {
-                    let mnX = Infinity, mxX = -Infinity, mnY = Infinity, mxY = -Infinity;
-                    for (const key of selectedWalls) {
-                        const [x, y] = key.split(',').map(Number);
-                        mnX = Math.min(mnX, x); mxX = Math.max(mxX, x);
-                        mnY = Math.min(mnY, y); mxY = Math.max(mxY, y);
-                    }
-                    for (const id of selectedItems) {
-                        const item = placedItems.find(i => i.id === id);
-                        if (item) {
-                            mnX = Math.min(mnX, item.gridX); mxX = Math.max(mxX, item.gridX);
-                            mnY = Math.min(mnY, item.gridY); mxY = Math.max(mxY, item.gridY);
-                        }
-                    }
-                    if (mnX === Infinity) return null;
-                    return (
-                        <rect
-                            x={(mnX + moveOffset.dx) * CELL_SIZE}
-                            y={(mnY + moveOffset.dy) * CELL_SIZE}
-                            width={(mxX - mnX + 1) * CELL_SIZE}
-                            height={(mxY - mnY + 1) * CELL_SIZE}
-                            className="selection-preview"
-                        />
-                    );
-                })()}
+                <MovePreview
+                    moveOffset={moveOffset}
+                    selectedWalls={selectedWalls}
+                    selectedItems={selectedItems}
+                    placedItems={placedItems}
+                />
 
                 <ItemContextMenu
                     selectedItem={selectedItem}
@@ -594,7 +507,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
 
                 <SpellOverlayRenderer
                     overlays={overlays}
-                    pendingOverlay={spellDraft ? { ...spellDraft, shape: spellMode, ...shapeParams, id: 'pending' } : null}
+                    pendingOverlay={buildPendingOverlay(spellDraft, spellMode, shapeParams)}
                 />
 
                 <RulerOverlay

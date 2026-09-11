@@ -22,6 +22,51 @@ export async function restoreBaseAttackAfterBash(playerStats, campaignName) {
   await setRuntimeValue(playerStats.name, '_shieldBashBaseAttack', null, campaignName);
 }
 
+function hasShieldEquipped(playerStats) {
+  return playerStats.inventory?.equipped?.some(itemName => {
+    const { baseName } = parseMagicItemName(itemName);
+    const eq = playerStats.equipment?.find(e => e.name === baseName);
+    return eq && (eq.armor_category === 'Shield' || eq.equipment_category === 'Shield');
+  });
+}
+
+function isShieldBashAttackValid(lastAttack, playerStats) {
+  return !!lastAttack?.hit &&
+    lastAttack.attackerName === playerStats.name &&
+    lastAttack.weaponType === 'melee' &&
+    !!lastAttack.targetName;
+}
+
+function resolveShieldBashSaveDc(passives, hasNewStyle, playerStats) {
+  const shieldBashPassive = hasNewStyle
+    ? passives.find(p => p.type === 'attack_rider' && p.effect === 'push_or_prone')
+    : passives.find(p => p.type === 'attack_rider' && p.trigger === 'melee_hit_with_shield_equipped');
+
+  if (shieldBashPassive?.automation) {
+    return buildSaveDc(shieldBashPassive.automation, playerStats);
+  }
+  return 8 + (playerStats.abilities?.find(a => a.name === 'Strength')?.bonus || 0) + (playerStats.proficiency || 0);
+}
+
+function logShieldBashSaveResult(ctx, saveResult, targetName, saveDc, success) {
+  addEntry(ctx.campaignName, {
+    type: 'roll',
+    name: 'Shield Bash',
+    characterName: ctx.playerStats.name,
+    rollType: 'save-damage',
+    targetName,
+    saveDc,
+    saveType: 'STR',
+    saveResult: success ? 'success' : 'failure',
+    total: saveResult.total ?? 0,
+    rolls: [saveResult.roll ?? 0],
+    bonus: saveResult.saveBonus ?? 0,
+    formula: `1d20${saveResult.saveBonus !== 0 ? '+' + saveResult.saveBonus : ''}`,
+    description: `${targetName} ${success ? 'succeeded' : 'failed'} the STR save (DC ${saveDc}).${!success ? ' Shield Bash effect applied.' : ''}`,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error("[shieldBash:log-error]", e); });
+}
+
 export const shieldBash = {
   name: 'shieldBash',
   condition: (ctx) => !!ctx.playerStats.automation?.passives,
@@ -41,24 +86,15 @@ export const shieldBash = {
     // Validate lastAttack: must be player's melee weapon attack that hit
     const lastAttack = await getRuntimeValue('campaign', 'lastAttack', ctx.campaignName);
 
-    if (!lastAttack?.hit) return { data: prevData };
-    if (lastAttack.attackerName !== ctx.playerStats.name) return { data: prevData };
-    if (lastAttack.weaponType !== 'melee') return { data: prevData };
+    if (!isShieldBashAttackValid(lastAttack, ctx.playerStats)) return { data: prevData };
 
     const targetName = lastAttack.targetName;
-    if (!targetName) return { data: prevData };
 
     // FT-074: target must be within 5 ft (lenient true when gridless/unplaced)
     const withinFive = await isWithinRange(ctx.playerStats.name, targetName, 5);
     if (!withinFive) return { data: prevData };
 
-    // Check shield equipped
-    const hasShield = ctx.playerStats.inventory?.equipped?.some(itemName => {
-      const { baseName } = parseMagicItemName(itemName);
-      const eq = ctx.playerStats.equipment?.find(e => e.name === baseName);
-      return eq && (eq.armor_category === 'Shield' || eq.equipment_category === 'Shield');
-    });
-    if (!hasShield) return { data: prevData };
+    if (!hasShieldEquipped(ctx.playerStats)) return { data: prevData };
 
     // Check oncePerTurn with skip support
     const usedKey = '_Shield_Bash_usedRound';
@@ -67,13 +103,7 @@ export const shieldBash = {
     if (skipResult) return { data: prevData };
 
     // Build save DC: 8 + STR modifier + proficiency bonus
-    const shieldBashPassive = hasNewStyle
-      ? passives.find(p => p.type === 'attack_rider' && p.effect === 'push_or_prone')
-      : passives.find(p => p.type === 'attack_rider' && p.trigger === 'melee_hit_with_shield_equipped');
-
-    const saveDc = shieldBashPassive?.automation
-      ? buildSaveDc(shieldBashPassive.automation, ctx.playerStats)
-      : 8 + (ctx.playerStats.abilities?.find(a => a.name === 'Strength')?.bonus || 0) + (ctx.playerStats.proficiency || 0);
+    const saveDc = resolveShieldBashSaveDc(passives, hasNewStyle, ctx.playerStats);
 
     // FT-082 collateral: resolving the bash save overwrites campaign lastAttack
     // with a save record ({attackName:'Shield Bash', damageType:null}), which
@@ -106,22 +136,7 @@ export const shieldBash = {
     const saveResult = await promise;
     const success = saveResult.success;
 
-    addEntry(ctx.campaignName, {
-      type: 'roll',
-      name: 'Shield Bash',
-      characterName: ctx.playerStats.name,
-      rollType: 'save-damage',
-      targetName,
-      saveDc,
-      saveType: 'STR',
-      saveResult: success ? 'success' : 'failure',
-      total: saveResult.total ?? 0,
-      rolls: [saveResult.roll ?? 0],
-      bonus: saveResult.saveBonus ?? 0,
-      formula: `1d20${saveResult.saveBonus !== 0 ? '+' + saveResult.saveBonus : ''}`,
-      description: `${targetName} ${success ? 'succeeded' : 'failed'} the STR save (DC ${saveDc}).${!success ? ' Shield Bash effect applied.' : ''}`,
-      timestamp: Date.now(),
-    }).catch((e) => { console.error("[shieldBash:log-error]", e); });
+    logShieldBashSaveResult(ctx, saveResult, targetName, saveDc, success);
 
     if (success) {
       // FT-082 collateral: put the base slashing attack back as lastAttack.

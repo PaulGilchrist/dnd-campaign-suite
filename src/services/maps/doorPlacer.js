@@ -8,6 +8,11 @@
  * - Deduplicating and pairing doors
  */
 
+const SECRET_DOOR_CHANCE = {
+  default: 0.1,
+  deadEnd: 0.3,
+};
+
 export function placeDoors(rooms, gridSize, rng, corridorCells, grid) {
   const finalDoors = [];
 
@@ -16,83 +21,75 @@ export function placeDoors(rooms, gridSize, rng, corridorCells, grid) {
     const spans = findRoomDoorSpans(room, gridSize, corridorCells);
 
     for (let s = 0; s < spans.length; s++) {
-      const span = spans[s];
-      const isNorthSouth = span.side === 'n' || span.side === 's';
-      const spanWidth = isNorthSouth ? span.x2 - span.x1 + 1 : span.y2 - span.y1 + 1;
-
-      const positions = [];
-      if (spanWidth === 1) {
-        const pos = spanCenter(span);
-        positions.push({ x: pos.x, y: pos.y });
-      }
-
-      for (let pi = 0; pi < positions.length; pi++) {
-        const pos = positions[pi];
-
-        if (positions.length === 1) {
-          const hasWallNeighbor =
-            (pos.x > 0 && grid[pos.y][pos.x - 1]) ||
-            (pos.x < gridSize - 1 && grid[pos.y][pos.x + 1]) ||
-            (pos.y > 0 && grid[pos.y - 1][pos.x]) ||
-            (pos.y < gridSize - 1 && grid[pos.y + 1][pos.x]);
-          if (!hasWallNeighbor) continue;
-        }
-
-        const rotation = isNorthSouth ? 90 : 0;
-
-        let doorType;
-        if (positions.length > 1) {
-          doorType = 'door';
-        } else {
-          const secretRoll = rng();
-          if (room._deadEndCap) {
-            doorType = secretRoll < 0.3 ? 'secretDoor' : 'door';
-          } else {
-            doorType = secretRoll < 0.1 ? 'secretDoor' : 'door';
-          }
-        }
-
-        finalDoors.push({
-          x: pos.x,
-          y: pos.y,
-          rotation: rotation,
-          doorType: doorType,
-        });
-      }
+      const door = placeSpanDoor(spans[s], room, gridSize, grid, rng);
+      if (door) finalDoors.push(door);
     }
   }
 
-  // Deduplicate doors by position
+  return { trimmedDoors: removeAdjacentDuplicates(dedupeByPosition(finalDoors)) };
+}
+
+function placeSpanDoor(span, room, gridSize, grid, rng) {
+  const isNorthSouth = span.side === 'n' || span.side === 's';
+  const spanWidth = isNorthSouth ? span.x2 - span.x1 + 1 : span.y2 - span.y1 + 1;
+  if (spanWidth !== 1) return null;
+
+  const pos = spanCenter(span);
+  if (!hasWallNeighbor(pos, gridSize, grid)) return null;
+
+  return {
+    x: pos.x,
+    y: pos.y,
+    rotation: isNorthSouth ? 90 : 0,
+    doorType: rollDoorType(room, rng),
+  };
+}
+
+function rollDoorType(room, rng) {
+  const chance = room._deadEndCap ? SECRET_DOOR_CHANCE.deadEnd : SECRET_DOOR_CHANCE.default;
+  return rng() < chance ? 'secretDoor' : 'door';
+}
+
+function hasWallNeighbor(pos, gridSize, grid) {
+  return (
+    (pos.x > 0 && grid[pos.y][pos.x - 1]) ||
+    (pos.x < gridSize - 1 && grid[pos.y][pos.x + 1]) ||
+    (pos.y > 0 && grid[pos.y - 1][pos.x]) ||
+    (pos.y < gridSize - 1 && grid[pos.y + 1][pos.x])
+  );
+}
+
+function dedupeByPosition(doors) {
   const seenDoorPos = {};
   const uniqueDoors = [];
-  for (let d = 0; d < finalDoors.length; d++) {
-    const key = finalDoors[d].x + ',' + finalDoors[d].y;
+  for (let d = 0; d < doors.length; d++) {
+    const key = doors[d].x + ',' + doors[d].y;
     if (!seenDoorPos[key]) {
       seenDoorPos[key] = true;
-      uniqueDoors.push(finalDoors[d]);
+      uniqueDoors.push(doors[d]);
     }
   }
+  return uniqueDoors;
+}
 
-  // Remove adjacent duplicate doors
-  const doorPosSet2 = {};
+function removeAdjacentDuplicates(uniqueDoors) {
+  const doorPosSet = {};
   for (const d of uniqueDoors) {
-    doorPosSet2[d.x + ',' + d.y] = d;
+    doorPosSet[d.x + ',' + d.y] = d;
   }
-  const toRemoveAdj = new Set();
+  const toRemove = new Set();
   for (const d of uniqueDoors) {
-    if (toRemoveAdj.has(d.x + ',' + d.y)) continue;
+    if (toRemove.has(d.x + ',' + d.y)) continue;
     const rightKey = (d.x + 1) + ',' + d.y;
-    if (doorPosSet2[rightKey] && !toRemoveAdj.has(rightKey)) {
-      toRemoveAdj.add(rightKey);
+    if (doorPosSet[rightKey] && !toRemove.has(rightKey)) {
+      toRemove.add(rightKey);
     }
     const bottomKey = d.x + ',' + (d.y + 1);
-    if (doorPosSet2[bottomKey] && !toRemoveAdj.has(bottomKey)) {
-      toRemoveAdj.add(bottomKey);
+    if (doorPosSet[bottomKey] && !toRemove.has(bottomKey)) {
+      toRemove.add(bottomKey);
     }
   }
-  const trimmedDoors = uniqueDoors.filter(d => !toRemoveAdj.has(d.x + ',' + d.y));
-
-  return { trimmedDoors };
+  return uniqueDoors.filter(d => !toRemove.has(d.x + ',' + d.y));
 }
 
 function findRoomDoorSpans(room, gridSize, corridorCells) {

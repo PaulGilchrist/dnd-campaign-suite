@@ -12,43 +12,40 @@ import { createSseObservers } from './sseObservers.js';
  * @param {object} playerStats - The acting character's computed stats
  * @returns {object} pipeline - A configured pipeline (call pipeline.run() to execute)
  */
-export function buildPipelineForAction(action, playerStats) {
-  const pipeline = createPipeline();
-
+function registerObservers(pipeline, campaignName) {
   // Register log observers
-  const observers = createObservers();
-  for (const obs of observers) {
+  for (const obs of createObservers()) {
     pipeline.observe(obs.event, obs.handler);
   }
 
   // Register SSE observers
-  const campaignName = playerStats?.campaignName || '';
-  if (campaignName) {
-    const sseObservers = createSseObservers(campaignName);
-    for (const obs of sseObservers) {
-      pipeline.observe(obs.event, obs.handler);
-    }
+  if (!campaignName) return;
+  for (const obs of createSseObservers(campaignName)) {
+    pipeline.observe(obs.event, obs.handler);
   }
+}
 
-  // Register steps based on action type
+function selectStepBuilders(action) {
   const hasDamage = action?.damage || action?.hasDamage || action?.damageExpression;
   const isAttackRoll = action?.type === 'weapon_attack' || action?.weaponType || (hasDamage && !action?.autoDamageSchool && !action?.spellType);
   const isDirectSpell = action?.type === 'spell' || action?.spellType || action?.autoDamageSchool;
 
-  if (isAttackRoll) {
-    const steps = buildAttackRollDamageSteps();
-    for (const step of steps) {
-      pipeline.step(step);
-    }
-  } else if (isDirectSpell) {
-    const steps = buildDirectSpellDamageSteps();
-    for (const step of steps) {
-      pipeline.step(step);
-    }
-  } else if (hasDamage) {
-    // Generic: anything with damage that isn't weapon or spell
-    const steps = buildGenericSteps();
-    for (const step of steps) {
+  if (isAttackRoll) return buildAttackRollDamageSteps;
+  if (isDirectSpell) return buildDirectSpellDamageSteps;
+  // Generic: anything with damage that isn't weapon or spell
+  if (hasDamage) return buildGenericSteps;
+  return null;
+}
+
+export function buildPipelineForAction(action, playerStats) {
+  const pipeline = createPipeline();
+
+  registerObservers(pipeline, playerStats?.campaignName || '');
+
+  // Register steps based on action type
+  const buildSteps = selectStepBuilders(action);
+  if (buildSteps) {
+    for (const step of buildSteps()) {
       pipeline.step(step);
     }
   }

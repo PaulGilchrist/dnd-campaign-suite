@@ -248,6 +248,78 @@ function queuePlayerSavePrompt({ campaignName, targetName, saveType, saveDc, pla
     return null;
 }
 
+function applyAttunementSaveDamage({ detail, targetName, success, saveBonus, rawDamage, combatSummary, logEntry, setResults, elementData, campaignName, playerName }) {
+    const damageRoll = rollExpression(elementData.damage);
+    const damageAfterSave = computeDamageAfterSave(rawDamage, success, elementData.dcSuccess);
+    const targetCreature = combatSummary.creatures.find(c => c.name === targetName);
+    const resResult = computeDamageAfterResistancesWithDetails(
+        damageAfterSave, [elementData.damageType], (targetCreature?.resistances || []), (targetCreature?.immunities || [])
+    );
+    const finalDamage = resResult.finalDamage;
+
+    const characters = combatSummary.creatures.filter(c => c.type === 'player') || [];
+    applyDamageToTarget(
+        combatSummary, targetName, finalDamage, [elementData.damageType],
+        campaignName, characters, false, playerName, false
+    );
+
+    logEntry.formula = elementData.damage;
+    logEntry.rolls = damageRoll?.rolls ?? [];
+    logEntry.total = rawDamage;
+    logEntry.modifier = damageRoll?.modifier ?? 0;
+    logEntry.damageType = elementData.damageType;
+    logEntry.finalDamage = finalDamage;
+
+    addEntry(campaignName, logEntry).catch((e) => {
+        console.error('[ElementalAttunementModal] Error logging player save:', e);
+    });
+
+    setResults(prev => [...prev, {
+        targetName,
+        success,
+        roll: detail.roll ?? 0,
+        total: detail.total ?? 0,
+        saveBonus,
+        rawDamage,
+        finalDamage,
+        formula: elementData.damage,
+        rolls: damageRoll?.rolls ?? [],
+        damageType: elementData.damageType,
+    }]);
+}
+
+function applyAttunementSaveEffect({ detail, targetName, success, saveBonus, setResults, elementData, campaignName, playerName, actionName, chosenElement, saveType, saveDc }) {
+    if (!success && elementData?.effect === 'speed_reduction') {
+        const activeConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+        const speedReductionActive = activeConditions.includes('speed_reduction');
+        const newConditions = speedReductionActive
+            ? activeConditions
+            : [...activeConditions, 'speed_reduction'];
+        setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
+    }
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: actionName,
+        description: `${actionName} (${chosenElement}) on <strong>${targetName}</strong>: ${success ? 'saved' : 'failed'} ${saveType} save (DC ${saveDc}). ${success ? 'No effect.' : 'Speed reduced by 15 ft.'}`,
+        saveRoll: detail.roll ?? 0,
+        saveBonus,
+        saveTotal: detail.total ?? 0,
+        saveDc,
+        saveSuccess: success,
+    }).catch((e) => { console.error('[ElementalAttunementModal] Error logging player effect:', e); });
+
+    setResults(prev => [...prev, {
+        targetName,
+        success,
+        roll: detail.roll ?? 0,
+        total: detail.total ?? 0,
+        saveBonus,
+        effect: elementData?.effect,
+    }]);
+}
+
 function ElementalAttunementModal({ action, playerStats, campaignName, mapName, activeOverlay, onClose }) {
     const [phase, setPhase] = useState('element');
     const [chosenElement, setChosenElement] = useState(null);
@@ -430,72 +502,9 @@ function ElementalAttunementModal({ action, playerStats, campaignName, mapName, 
             };
 
             if (elementData?.damage) {
-                const damageRoll = rollExpression(elementData.damage);
-                const damageAfterSave = computeDamageAfterSave(rawDamage, success, elementData.dcSuccess);
-                const resResult = computeDamageAfterResistancesWithDetails(
-                    damageAfterSave, [elementData.damageType], (combatSummary.creatures.find(c => c.name === targetName)?.resistances || []), (combatSummary.creatures.find(c => c.name === targetName)?.immunities || [])
-                );
-                const finalDamage = resResult.finalDamage;
-
-                const characters = combatSummary.creatures.filter(c => c.type === 'player') || [];
-                applyDamageToTarget(
-                    combatSummary, targetName, finalDamage, [elementData.damageType],
-                    campaignName, characters, false, playerStats.name, false
-                );
-
-                logEntry.formula = elementData.damage;
-                logEntry.rolls = damageRoll?.rolls ?? [];
-                logEntry.total = rawDamage;
-                logEntry.modifier = damageRoll?.modifier ?? 0;
-                logEntry.damageType = elementData.damageType;
-                logEntry.finalDamage = finalDamage;
-
-                addEntry(campaignName, logEntry).catch((e) => {
-                    console.error('[ElementalAttunementModal] Error logging player save:', e);
-                });
-
-                setResults(prev => [...prev, {
-                    targetName,
-                    success,
-                    roll: detail.roll ?? 0,
-                    total: detail.total ?? 0,
-                    saveBonus,
-                    rawDamage,
-                    finalDamage,
-                    formula: elementData.damage,
-                    rolls: damageRoll?.rolls ?? [],
-                    damageType: elementData.damageType,
-                }]);
+                applyAttunementSaveDamage({ detail, targetName, success, saveBonus, rawDamage, combatSummary, logEntry, setResults, elementData, campaignName, playerName: playerStats.name });
             } else {
-                if (!success && elementData?.effect === 'speed_reduction') {
-                    const activeConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-                    const speedReductionActive = activeConditions.includes('speed_reduction');
-                    const newConditions = speedReductionActive
-                        ? activeConditions
-                        : [...activeConditions, 'speed_reduction'];
-                    setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
-                }
-
-                addEntry(campaignName, {
-                    type: 'ability_use',
-                    characterName: playerStats.name,
-                    abilityName: action.name,
-                    description: `${action.name} (${chosenElement}) on <strong>${targetName}</strong>: ${success ? 'saved' : 'failed'} ${saveType} save (DC ${saveDc}). ${success ? 'No effect.' : 'Speed reduced by 15 ft.'}`,
-                    saveRoll: detail.roll ?? 0,
-                    saveBonus,
-                    saveTotal: detail.total ?? 0,
-                    saveDc,
-                    saveSuccess: success,
-                }).catch((e) => { console.error('[ElementalAttunementModal] Error logging player effect:', e); });
-
-                setResults(prev => [...prev, {
-                    targetName,
-                    success,
-                    roll: detail.roll ?? 0,
-                    total: detail.total ?? 0,
-                    saveBonus,
-                    effect: elementData?.effect,
-                }]);
+                applyAttunementSaveEffect({ detail, targetName, success, saveBonus, setResults, elementData, campaignName, playerName: playerStats.name, actionName: action.name, chosenElement, saveType, saveDc });
             }
 
             setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));

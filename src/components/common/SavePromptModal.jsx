@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import utils from '../../services/ui/utils.js';
 import { rollD20, rollExpression } from '../../services/dice/diceRoller.js';
 import { sendSaveResult, clearSavePrompt } from '../../services/combat/conditions/savePromptService.js';
@@ -199,6 +199,196 @@ function buildLastAttackData(current, { finalRoll, roll1, roll2, saveBonus, aura
       secondaryTotal: current.secondaryRawDamage || 0,
     } : {}),
     timestamp: Date.now(),
+  };
+}
+
+// Full save-roll resolution: evasion, advantage/disadvantage, dice, and all
+// bonus contributions (aura, cosmic omen, bane, bless, warding bond).
+async function computeSaveRollOutcome({ current, characters, campaignName, activeMapName, hasSelectedEvasion, forceRollTo20 }) {
+  const { saveBonus, saveModifiers, activeConditions } = resolveTargetSaveBonus(current, characters, campaignName);
+
+  const aura = await computeAuraBonus({ targetName: current.targetName, characters, campaignName, activeMapName, allCreatures: getCombatSummary(campaignName)?.creatures });
+  const auraBonus = aura.bonus;
+
+  const { isIncapacitated, hasOwnEvasion } = getEvasionContext(current, characters, campaignName);
+  const hasEvasion = hasOwnEvasion || (!hasOwnEvasion && !isIncapacitated && hasSelectedEvasion) || isCircleOfPowerActive(current.targetName, campaignName);
+
+  const hasDisadvantage = getSaveDisadvantage(current, campaignName);
+  const hasAdvantage = computeSaveAdvantage({ current, campaignName, hasDisadvantage, saveModifiers, activeConditions, characters });
+
+  const roll1 = forceRollTo20 ? 20 : rollD20();
+  const roll2 = (hasDisadvantage || hasAdvantage) ? rollD20() : roll1;
+  const finalRoll = hasDisadvantage ? Math.min(roll1, roll2) : hasAdvantage ? Math.max(roll1, roll2) : roll1;
+  const { bonus: cosmicOmenAppliedBonus, detail: cosmicOmenDetail } = consumeCosmicOmen(campaignName);
+
+  const allTargetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+
+  // Bane: apply -1d4 penalty to saving throws for cursed targets
+  const baneSaveDie = rollEffectDie(allTargetEffects, current.targetName, 'bane_penalty');
+  const baneSaveRoll = baneSaveDie ? baneSaveDie.total : null;
+  const baneSavePenalty = baneSaveDie ? -baneSaveDie.total : 0;
+
+  // Bane on attacker: grant +1d4 to the target's save when the attacker is cursed by Bane
+  const baneAttackerDie = current.attackerName ? rollEffectDie(allTargetEffects, current.attackerName, 'bane_penalty') : null;
+  const baneAttackerBonus = baneAttackerDie ? baneAttackerDie.total : 0;
+  const baneAttackerRoll = baneAttackerDie ? baneAttackerDie.total : null;
+
+  // Bless: add 1d4 to saving throws
+  const blessSaveDie = rollEffectDie(allTargetEffects, current.targetName, 'bless_bonus');
+  const blessSaveBonus = blessSaveDie ? blessSaveDie.total : 0;
+  const blessSaveRoll = blessSaveDie ? blessSaveDie.total : null;
+
+  // Warding Bond: +1 flat bonus to saving throws
+  const wardingBondSaveBonus = findWardingBondSaveBonus(current, campaignName);
+
+  const total = finalRoll + saveBonus + auraBonus + cosmicOmenAppliedBonus + baneSavePenalty + blessSaveBonus + baneAttackerBonus + wardingBondSaveBonus;
+  const success = total >= current.saveDc;
+  const auraBonusStr = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined;
+  const bonusDetail = buildBonusDetail({ auraBonusStr, cosmicOmenDetail, baneSaveRoll, baneAttackerRoll, blessSaveRoll, wardingBondSaveBonus });
+  const rollMode = hasDisadvantage ? 'disadvantage' : hasAdvantage ? 'advantage' : 'normal';
+  const saveBonusTotal = saveBonus + auraBonus + cosmicOmenAppliedBonus + baneSavePenalty + blessSaveBonus + baneAttackerBonus + wardingBondSaveBonus;
+
+  return {
+    hasEvasion, finalRoll, roll1, roll2, saveBonus, auraBonus, cosmicOmenAppliedBonus, total, success,
+    result: { success, roll: finalRoll, total, saveBonus: saveBonusTotal, bonusDetail, rawRolls: [roll1, roll2], mode: rollMode, baneRoll: baneSaveRoll, blessRoll: blessSaveRoll, baneAttackerRoll: baneAttackerRoll },
+  };
+}
+
+function buildResultDispatchDetail(campaignName, current, result, saveBonus, rawRolls, rollMode, evasionActive) {
+  return {
+    promptId: current.promptId,
+    targetName: current.targetName,
+    saveType: current.saveType,
+    saveDc: current.saveDc,
+    success: result.success,
+    roll: result.roll,
+    total: result.total,
+    saveBonus,
+    bonusDetail: result.bonusDetail,
+    rawDamage: current.rawDamage,
+    dcSuccess: current.dcSuccess,
+    rawRolls,
+    mode: rollMode,
+    evasionActive,
+  };
+}
+
+function computePromptDisplayState(current, campaignName) {
+  return {
+    abilityLabel: current ? (current.saveType || '').toUpperCase() : '',
+    promptHasDisadvantage: current ? getSaveDisadvantage(current, campaignName) : false,
+    promptHasAdvantage: current ? (!!current.advantage || getHolyAuraSaveAdvantage(current, campaignName)) : false,
+  };
+}
+
+function findTargetCharacter(current, characters) {
+  if (!current) return null;
+  return (characters || []).find(c => {
+    const name = typeof c === 'string' ? c : c.name;
+    return name && utils.getName(name) === utils.getName(current.targetName);
+  }) || null;
+}
+
+function appendSavePrompt(prev, event, prefix) {
+  if (prev.some(p => p.promptId === event.data.promptId)) return prev;
+  const { sourceAttackerName, attackerName: eventDataAttackerName, targetName: dataTargetName, ...restData } = event.data;
+  const targetName = dataTargetName || event.key.slice(prefix.length) || null;
+  const newPrompt = { targetName, attackerName: eventDataAttackerName || sourceAttackerName, ...restData };
+
+  console.debug(`[saveDebug] SavePromptModal.handleEvent SSE prompt received`, { promptId: newPrompt.promptId, targetName: newPrompt.targetName, sourceName: newPrompt.sourceName, saveType: newPrompt.saveType, saveDc: newPrompt.saveDc, keys: Object.keys(newPrompt) });
+  return [...prev, newPrompt];
+}
+
+// Shared submit path for Dismiss/Done with a resolved result.
+function submitResultAndClear(campaignName, current, result, { includeBaneRoll, evasionActive, sendExtra, advance }) {
+  const saveBonus = result.saveBonus;
+  const rollMode = result.mode || 'normal';
+  const rawRolls = result.rawRolls || [result.roll];
+
+  sendSaveResult(campaignName, current.targetName, {
+    promptId: current.promptId,
+    success: result.success,
+    roll: result.roll,
+    total: result.total,
+    saveBonus,
+    rawRolls,
+    mode: rollMode,
+    bonusDetail: result.bonusDetail,
+    ...sendExtra,
+  });
+
+  window.dispatchEvent(new CustomEvent('save-result', {
+    detail: {
+      ...buildResultDispatchDetail(campaignName, current, result, saveBonus, rawRolls, rollMode, evasionActive),
+      ...(includeBaneRoll ? { baneRoll: result.baneRoll } : {}),
+    },
+  }));
+
+  clearSavePrompt(campaignName, current.targetName);
+  advance();
+}
+
+// Reroll submit path: posts the rerolled result, logs it, updates combat
+// summary, restores HP on success, and clears the prompt.
+function createSubmitSaveResult(campaignName, setPrompts) {
+  return (saveData) => {
+    const {
+      promptId, targetName, success, roll, total, saveBonus, rawRolls, mode, bonusDetail,
+      saveType, saveDc, condition, sourceName, damageFormula, damageType, rawDamage, dcSuccess,
+      secondaryFormula, secondaryDamageType, secondaryRawDamage,
+      note, healingName, healingNote,
+    } = saveData;
+
+    sendSaveResult(campaignName, targetName, {
+      promptId, success, roll, total, saveBonus, rawRolls, mode, bonusDetail,
+    });
+    setPrompts(prev => prev.map((p, i) =>
+      i === 0
+        ? { ...p, result: { success, roll, total, saveBonus, bonusDetail, rawRolls, mode } }
+        : p
+    ));
+
+    addEntry(campaignName, {
+      type: 'roll', rollType: 'save-damage', name: sourceName || 'Unknown',
+      formula: damageFormula || '', rolls: [roll], total,
+      modifier: saveBonus, damageType: damageType || null, targetName,
+      saveType: saveType || null, saveDc, saveResult: success ? 'success' : 'failure',
+      saveRoll: roll, saveBonus, saveRawRolls: rawRolls, finalDamage: null,
+      note: note || 'save_reroll', timestamp: Date.now(),
+    }).catch((e) => { console.error('[SavePromptModal] Error logging reroll:', e); });
+
+    const cs = getCombatSummary(campaignName);
+    if (cs) {
+      cs.lastAttack = {
+        ...cs.lastAttack, d20: roll, d20Rolls: rawRolls, bonus: saveBonus, total,
+        saveType: saveType || null, saveDc, saveResult: success ? 'success' : 'failure',
+        saveConditions: condition ? [condition] : [], timestamp: Date.now(),
+        ...(secondaryFormula ? {
+          secondaryFormula, secondaryDamageType: secondaryDamageType || null,
+          secondaryRawDamage: secondaryRawDamage || 0, secondaryTotal: secondaryRawDamage || 0,
+        } : {}),
+      };
+      storage.set('combatSummary', cs, campaignName);
+    }
+
+    if (success && rawDamage > 0) {
+      const lastAttack = getRuntimeValue('campaign', 'lastAttack', campaignName);
+      const actualDamageApplied = lastAttack?.finalDamage ?? lastAttack?.primaryDamage ?? rawDamage;
+      const damageToRestore = dcSuccess === 'half' ? Math.ceil(actualDamageApplied / 2) : actualDamageApplied;
+      const currentHp = getRuntimeValue(targetName, 'hitPoints', campaignName);
+      const maxHp = getRuntimeValue(targetName, 'maxHitPoints', campaignName) ?? (currentHp + actualDamageApplied);
+      const restoredHp = Math.min(maxHp, (currentHp ?? 0) + damageToRestore);
+      setRuntimeValue(targetName, 'hitPoints', restoredHp, campaignName);
+
+      addEntry(campaignName, {
+        type: 'roll', characterName: targetName, rollType: 'healing',
+        name: healingName || 'Save Reroll', rolls: [], total: damageToRestore,
+        modifier: 0, damageType: null, targetName, finalDamage: null,
+        note: healingNote || 'save_reroll_hp_restore', timestamp: Date.now(),
+      }).catch((e) => { console.error('[SavePromptModal] Error logging HP restore:', e); });
+    }
+
+    clearSavePrompt(campaignName, targetName);
   };
 }
 
@@ -403,16 +593,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
     if (!event.key || event.data == null) return;
     const prefix = `change-${campaignName}-savePrompt-`;
     if (!event.key.startsWith(prefix)) return;
-
-    setPrompts(prev => {
-      if (prev.some(p => p.promptId === event.data.promptId)) return prev;
-      const { sourceAttackerName, attackerName: eventDataAttackerName, targetName: dataTargetName, ...restData } = event.data;
-      const targetName = dataTargetName || event.key.slice(prefix.length) || null;
-      const newPrompt = { targetName, attackerName: eventDataAttackerName || sourceAttackerName, ...restData };
-
-      console.debug(`[saveDebug] SavePromptModal.handleEvent SSE prompt received`, { promptId: newPrompt.promptId, targetName: newPrompt.targetName, sourceName: newPrompt.sourceName, saveType: newPrompt.saveType, saveDc: newPrompt.saveDc, keys: Object.keys(newPrompt) });
-      return [...prev, newPrompt];
-     });
+    setPrompts(prev => appendSavePrompt(prev, event, prefix));
    }, [campaignName]);
 
   const handleClearedEvent = useCallback((event) => {
@@ -420,113 +601,38 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
     const prefix = `change-${campaignName}-savePromptCleared-`;
     if (!event.key.startsWith(prefix)) return;
     if (!event.data?.promptId) return;
-
     getPendingSavePrompt(event.data.promptId);
     getPendingPopupSetter(event.data.promptId);
-
     setPrompts(prev => prev.filter(p => p.promptId !== event.data.promptId));
   }, [campaignName]);
 
   const handleDismiss = useCallback(() => {
-    if (current) {
-      const result = current.result;
-      if (result) {
-        const saveBonus = result.saveBonus;
-        const rollMode = result.mode || 'normal';
-        const rawRolls = result.rawRolls || [result.roll];
-
-        sendSaveResult(campaignName, current.targetName, {
-          promptId: current.promptId,
-          success: result.success,
-          roll: result.roll,
-          total: result.total,
-          saveBonus,
-          rawRolls,
-          mode: rollMode,
-          bonusDetail: result.bonusDetail,
-        });
-
-        window.dispatchEvent(new CustomEvent('save-result', {
-          detail: {
-            promptId: current.promptId,
-            targetName: current.targetName,
-            saveType: current.saveType,
-            saveDc: current.saveDc,
-            success: result.success,
-            roll: result.roll,
-            total: result.total,
-            saveBonus,
-            bonusDetail: result.bonusDetail,
-            rawDamage: current.rawDamage,
-            dcSuccess: current.dcSuccess,
-            rawRolls,
-            mode: rollMode,
-            evasionActive: lastEvasionState,
-          },
-        }));
-      }
-      clearSavePrompt(campaignName, current.targetName);
-      advance();
+    if (!current) return;
+    if (current.result) {
+      submitResultAndClear(campaignName, current, current.result, { includeBaneRoll: false, evasionActive: lastEvasionState, advance });
+      return;
     }
+    clearSavePrompt(campaignName, current.targetName);
+    advance();
   }, [campaignName, current, lastEvasionState, advance]);
 
   const handleRollSave = useCallback(async () => {
     if (!current) return;
 
-    const { saveBonus, saveModifiers, activeConditions } = resolveTargetSaveBonus(current, characters, campaignName);
-
-    const aura = await computeAuraBonus({ targetName: current.targetName, characters, campaignName, activeMapName, allCreatures: getCombatSummary(campaignName)?.creatures });
-    const auraBonus = aura.bonus;
-
-    const { isIncapacitated, hasOwnEvasion } = getEvasionContext(current, characters, campaignName);
-    const hasSelectedEvasion = !hasOwnEvasion && !isIncapacitated && selectedAlliesRef.current.has(current.targetName);
-    const hasEvasion = hasOwnEvasion || hasSelectedEvasion || isCircleOfPowerActive(current.targetName, campaignName);
+    const { hasEvasion, ...roll } = await computeSaveRollOutcome({
+      current, characters, campaignName, activeMapName,
+      hasSelectedEvasion: selectedAlliesRef.current.has(current.targetName),
+      forceRollTo20: forceRollTo20Ref.current,
+    });
     setLastEvasionState(hasEvasion);
-
-    const hasDisadvantage = getSaveDisadvantage(current, campaignName);
-    const hasAdvantage = computeSaveAdvantage({ current, campaignName, hasDisadvantage, saveModifiers, activeConditions, characters });
-
-    const roll1 = forceRollTo20Ref.current ? 20 : rollD20();
-    const roll2 = (hasDisadvantage || hasAdvantage) ? rollD20() : roll1;
-    const finalRoll = hasDisadvantage ? Math.min(roll1, roll2) : hasAdvantage ? Math.max(roll1, roll2) : roll1;
-    const { bonus: cosmicOmenAppliedBonus, detail: cosmicOmenDetail } = consumeCosmicOmen(campaignName);
-
-    const allTargetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-
-    // Bane: apply -1d4 penalty to saving throws for cursed targets
-    const baneSaveDie = rollEffectDie(allTargetEffects, current.targetName, 'bane_penalty');
-    const baneSaveRoll = baneSaveDie ? baneSaveDie.total : null;
-    const baneSavePenalty = baneSaveDie ? -baneSaveDie.total : 0;
-
-    // Bane on attacker: grant +1d4 to the target's save when the attacker is cursed by Bane
-    const baneAttackerDie = current.attackerName ? rollEffectDie(allTargetEffects, current.attackerName, 'bane_penalty') : null;
-    const baneAttackerBonus = baneAttackerDie ? baneAttackerDie.total : 0;
-    const baneAttackerRoll = baneAttackerDie ? baneAttackerDie.total : null;
-
-    // Bless: add 1d4 to saving throws
-    const blessSaveDie = rollEffectDie(allTargetEffects, current.targetName, 'bless_bonus');
-    const blessSaveBonus = blessSaveDie ? blessSaveDie.total : 0;
-    const blessSaveRoll = blessSaveDie ? blessSaveDie.total : null;
-
-    // Warding Bond: +1 flat bonus to saving throws
-    const wardingBondSaveBonus = findWardingBondSaveBonus(current, campaignName);
-
-    const total = finalRoll + saveBonus + auraBonus + cosmicOmenAppliedBonus + baneSavePenalty + blessSaveBonus + baneAttackerBonus + wardingBondSaveBonus;
-    const success = total >= current.saveDc;
-    const auraBonusStr = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined;
-    const bonusDetail = buildBonusDetail({ auraBonusStr, cosmicOmenDetail, baneSaveRoll, baneAttackerRoll, blessSaveRoll, wardingBondSaveBonus });
-
-    const rollMode = hasDisadvantage ? 'disadvantage' : hasAdvantage ? 'advantage' : 'normal';
 
     const cs = getCombatSummary(campaignName);
     if (cs) {
-      storage.set('lastAttack', buildLastAttackData(current, { finalRoll, roll1, roll2, saveBonus, auraBonus, cosmicOmenAppliedBonus, total, success }), campaignName);
+      storage.set('lastAttack', buildLastAttackData(current, roll), campaignName);
     }
 
     setPrompts(prev => prev.map((p, i) =>
-      i === 0
-        ? { ...p, result: { success, roll: finalRoll, total, saveBonus: saveBonus + auraBonus + cosmicOmenAppliedBonus + baneSavePenalty + blessSaveBonus + baneAttackerBonus + wardingBondSaveBonus, bonusDetail, rawRolls: [roll1, roll2], mode: rollMode, baneRoll: baneSaveRoll, blessRoll: blessSaveRoll, baneAttackerRoll: baneAttackerRoll } }
-        : p
+      i === 0 ? { ...p, result: roll.result } : p
     ));
 
     forceRollTo20Ref.current = false;
@@ -539,44 +645,12 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
       advance();
       return;
     }
-
-    const saveBonus = result.saveBonus;
-    const rollMode = result.mode || 'normal';
-    const rawRolls = result.rawRolls || [result.roll];
-
-    sendSaveResult(campaignName, current.targetName, {
-      promptId: current.promptId,
-      success: result.success,
-      roll: result.roll,
-      total: result.total,
-      saveBonus,
-      rawRolls,
-      mode: rollMode,
-      bonusDetail: result.bonusDetail,
-      baneRoll: result.baneRoll,
+    submitResultAndClear(campaignName, current, result, {
+      includeBaneRoll: true,
+      evasionActive: lastEvasionState,
+      sendExtra: { baneRoll: result.baneRoll },
+      advance,
     });
-
-    window.dispatchEvent(new CustomEvent('save-result', {
-      detail: {
-        promptId: current.promptId,
-        targetName: current.targetName,
-        saveType: current.saveType,
-        saveDc: current.saveDc,
-        success: result.success,
-        roll: result.roll,
-        total: result.total,
-        saveBonus,
-        bonusDetail: result.bonusDetail,
-        baneRoll: result.baneRoll,
-        rawDamage: current.rawDamage,
-        dcSuccess: current.dcSuccess,
-        rawRolls,
-        mode: rollMode,
-        evasionActive: lastEvasionState,
-      },
-    }));
-    clearSavePrompt(campaignName, current.targetName);
-    advance();
   }, [campaignName, current, lastEvasionState, advance]);
 
   const handleEvasionConfirm = useCallback((selectedNames) => {
@@ -589,9 +663,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
     setEvasionSelection(null);
   }, []);
 
-  const abilityLabel = current ? (current.saveType || '').toUpperCase() : '';
-  const promptHasDisadvantage = current ? getSaveDisadvantage(current, campaignName) : false;
-  const promptHasAdvantage = current ? (!!current.advantage || getHolyAuraSaveAdvantage(current, campaignName)) : false;
+  const { abilityLabel, promptHasDisadvantage, promptHasAdvantage } = computePromptDisplayState(current, campaignName);
   const queueCount = prompts.length;
   const hasResult = current?.result != null;
 
@@ -599,10 +671,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
     setRerollUsedForSave(false);
   }, [current?.promptId]);
 
-  const targetCharacter = current && (characters || []).find(c => {
-    const name = typeof c === 'string' ? c : c.name;
-    return name && utils.getName(name) === utils.getName(current.targetName);
-  });
+  const targetCharacter = findTargetCharacter(current, characters);
 
   const rageDamageBonus = targetCharacter?.class?.class_levels?.[(targetCharacter.level || 1) - 1]?.rage_damage ?? 2;
   const {
@@ -611,65 +680,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
     indomitableUses, indomitableMaxUses, indomitableRerollBonus,
   } = computeRerollAvailability(current, targetCharacter, campaignName);
 
-  const submitSaveResult = useCallback((saveData) => {
-    const {
-      promptId, targetName, success, roll, total, saveBonus, rawRolls, mode, bonusDetail,
-      saveType, saveDc, condition, sourceName, damageFormula, damageType, rawDamage, dcSuccess,
-      secondaryFormula, secondaryDamageType, secondaryRawDamage,
-      note, healingName, healingNote,
-    } = saveData;
-
-    sendSaveResult(campaignName, targetName, {
-      promptId, success, roll, total, saveBonus, rawRolls, mode, bonusDetail,
-    });
-    setPrompts(prev => prev.map((p, i) =>
-      i === 0
-        ? { ...p, result: { success, roll, total, saveBonus, bonusDetail, rawRolls, mode } }
-        : p
-    ));
-
-    addEntry(campaignName, {
-      type: 'roll', rollType: 'save-damage', name: sourceName || 'Unknown',
-      formula: damageFormula || '', rolls: [roll], total,
-      modifier: saveBonus, damageType: damageType || null, targetName,
-      saveType: saveType || null, saveDc, saveResult: success ? 'success' : 'failure',
-      saveRoll: roll, saveBonus, saveRawRolls: rawRolls, finalDamage: null,
-      note: note || 'save_reroll', timestamp: Date.now(),
-    }).catch((e) => { console.error('[SavePromptModal] Error logging reroll:', e); });
-
-    const cs = getCombatSummary(campaignName);
-    if (cs) {
-      cs.lastAttack = {
-        ...cs.lastAttack, d20: roll, d20Rolls: rawRolls, bonus: saveBonus, total,
-        saveType: saveType || null, saveDc, saveResult: success ? 'success' : 'failure',
-        saveConditions: condition ? [condition] : [], timestamp: Date.now(),
-        ...(secondaryFormula ? {
-          secondaryFormula, secondaryDamageType: secondaryDamageType || null,
-          secondaryRawDamage: secondaryRawDamage || 0, secondaryTotal: secondaryRawDamage || 0,
-        } : {}),
-      };
-      storage.set('combatSummary', cs, campaignName);
-    }
-
-    if (success && rawDamage > 0) {
-      const lastAttack = getRuntimeValue('campaign', 'lastAttack', campaignName);
-      const actualDamageApplied = lastAttack?.finalDamage ?? lastAttack?.primaryDamage ?? rawDamage;
-      const damageToRestore = dcSuccess === 'half' ? Math.ceil(actualDamageApplied / 2) : actualDamageApplied;
-      const currentHp = getRuntimeValue(targetName, 'hitPoints', campaignName);
-      const maxHp = getRuntimeValue(targetName, 'maxHitPoints', campaignName) ?? (currentHp + actualDamageApplied);
-      const restoredHp = Math.min(maxHp, (currentHp ?? 0) + damageToRestore);
-      setRuntimeValue(targetName, 'hitPoints', restoredHp, campaignName);
-
-      addEntry(campaignName, {
-        type: 'roll', characterName: targetName, rollType: 'healing',
-        name: healingName || 'Save Reroll', rolls: [], total: damageToRestore,
-        modifier: 0, damageType: null, targetName, finalDamage: null,
-        note: healingNote || 'save_reroll_hp_restore', timestamp: Date.now(),
-      }).catch((e) => { console.error('[SavePromptModal] Error logging HP restore:', e); });
-    }
-
-    clearSavePrompt(campaignName, targetName);
-  }, [campaignName]);
+  const submitSaveResult = useMemo(() => createSubmitSaveResult(campaignName, setPrompts), [campaignName]);
 
   const handleFanaticalFocus = useCallback(async () => {
     if (!fanaticalFocusAvailable || !current) return;

@@ -42,111 +42,39 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
     const isMonkAttacker = lastAttack?.attackerName === playerName;
     const isUnarmedStrike = lastAttack?.attackName === 'Unarmed Strike';
-    const attackHit = lastAttack?.saveResult === 'success' || lastAttack?.hit === true || lastAttack?.total >= (lastAttack?.targetAc || 10);
+    const attackHit = didLastAttackHit(lastAttack);
 
     if (!isMonkAttacker) {
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerName,
-            abilityName: action.name,
-            description: `${action.name} — Last attack was not made by ${playerName}.`,
-        }).catch((e) => { console.error("[quiveringPalmHandler:log-error]", e); });
-
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                automationType: auto.type,
-                description: `${action.name} — Last attack was not made by you.`,
-                automation: auto,
-            },
-        };
+        return refusal(action, auto, playerName, campaignName,
+            `${action.name} — Last attack was not made by ${playerName}.`,
+            `${action.name} — Last attack was not made by you.`);
     }
 
     if (!isUnarmedStrike) {
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerName,
-            abilityName: action.name,
-            description: `${action.name} — Last attack was not an Unarmed Strike.`,
-        }).catch((e) => { console.error("[quiveringPalmHandler:log-error]", e); });
-
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                automationType: auto.type,
-                description: `${action.name} — Last attack was not an Unarmed Strike.`,
-                automation: auto,
-            },
-        };
+        return refusal(action, auto, playerName, campaignName,
+            `${action.name} — Last attack was not an Unarmed Strike.`);
     }
 
     if (!attackHit) {
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerName,
-            abilityName: action.name,
-            description: `${action.name} — Last Unarmed Strike did not hit.`,
-        }).catch((e) => { console.error("[quiveringPalmHandler:log-error]", e); });
-
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                automationType: auto.type,
-                description: `${action.name} — Last Unarmed Strike did not hit.`,
-                automation: auto,
-            },
-        };
+        return refusal(action, auto, playerName, campaignName,
+            `${action.name} — Last Unarmed Strike did not hit.`);
     }
 
     if (!targetName) {
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerName,
-            abilityName: action.name,
-            description: `${action.name} — No target selected.`,
-        }).catch((e) => { console.error("[quiveringPalmHandler:log-error]", e); });
-
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                automationType: auto.type,
-                description: `${action.name} — No target selected.`,
-                automation: auto,
-            },
-        };
+        return refusal(action, auto, playerName, campaignName,
+            `${action.name} — No target selected.`);
     }
 
     const cost = auto.cost?.amount || 3;
     const resource = auto.cost?.resource || 'kiPoints';
-    const maxResource = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.focus_points || 0;
+    const resourceLabel = resource === 'focusPoints' ? 'Focus Points' : 'Ki Points';
+    const maxResource = monkFocusPointMax(playerStats);
     const currentResource = Number(getRuntimeValue(playerName, resource, campaignName) ?? maxResource);
 
     if (currentResource < cost) {
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerName,
-            abilityName: action.name,
-            description: `${action.name} — Not enough ${resource === 'focusPoints' ? 'Focus Points' : 'Ki Points'}. ${currentResource}/${cost} required.`,
-        }).catch((e) => { console.error("[quiveringPalmHandler:log-error]", e); });
-
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                automationType: auto.type,
-                description: `Not enough ${resource === 'focusPoints' ? 'Focus Points' : 'Ki Points'}. ${currentResource}/${cost} required.`,
-                automation: auto,
-            },
-        };
+        return refusal(action, auto, playerName, campaignName,
+            `${action.name} — Not enough ${resourceLabel}. ${currentResource}/${cost} required.`,
+            `Not enough ${resourceLabel}. ${currentResource}/${cost} required.`);
     }
 
     await setRuntimeValue(playerName, resource, currentResource - cost, campaignName);
@@ -184,6 +112,34 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             automation: auto,
         },
     };
+}
+
+function refusal(action, auto, playerName, campaignName, logDescription, popupDescription = logDescription) {
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: action.name,
+        description: logDescription,
+    }).catch((e) => { console.error("[quiveringPalmHandler:log-error]", e); });
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            automationType: auto.type,
+            description: popupDescription,
+            automation: auto,
+        },
+    };
+}
+
+function didLastAttackHit(lastAttack) {
+    return lastAttack?.saveResult === 'success' || lastAttack?.hit === true || lastAttack?.total >= (lastAttack?.targetAc || 10);
+}
+
+function monkFocusPointMax(playerStats) {
+    return playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.focus_points || 0;
 }
 
 export async function applyShockwave(action, playerStats, campaignName, targetName) {
@@ -224,38 +180,11 @@ export async function applyShockwave(action, playerStats, campaignName, targetNa
     const rawDamage = damageRoll?.total || 0;
     const finalDamage = success ? Math.floor(rawDamage / 2) : rawDamage;
 
-    const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-    const cs = getCombatSummary(campaignName);
+    applyShockwaveDamage(campaignName, playerName, targetName, finalDamage, damageType);
 
-    if (cs) {
-        const applyResult = applyDamageToTarget(cs, targetName, finalDamage, [damageType], campaignName, characters, false, playerName);
-        const actualDamage = applyResult?.finalDamage ?? finalDamage;
-        if (actualDamage !== finalDamage) {
-            console.error(`[quiveringPalm] Damage adjusted by resistances: ${finalDamage} → ${actualDamage}`);
-        }
-    }
-
-    addEntry(campaignName, {
-        type: 'roll',
-        name: action.name,
-        characterName: playerName,
-        rollType: 'save-damage',
-        targetName,
-        saveDc,
-        saveType,
-        saveResult: success ? 'success' : 'failure',
-        saveRoll: saveResult.roll ?? 0,
-        saveBonus: saveResult.saveBonus ?? 0,
-        saveFormula: `1d20${saveResult.saveBonus !== 0 ? '+' + saveResult.saveBonus : ''}`,
-        formula: damageExpression,
-        rolls: damageRoll?.rolls || [],
-        total: rawDamage,
-        modifier: damageRoll?.modifier || 0,
-        damageType,
-        finalDamage,
-        description: `${action.name} — ${targetName} ${success ? 'succeeded' : 'failed'} the CON save (DC ${saveDc}). ${success ? 'Half damage' : 'Full damage'}: **${finalDamage}** ${damageType} damage.`,
-        timestamp: Date.now(),
-    }).catch((e) => { console.error('[quiveringPalm] Error:', e); });
+    addEntry(campaignName, buildShockwaveResultLog(action, {
+        playerName, targetName, saveDc, saveType, success, saveResult, damageRoll, rawDamage, finalDamage, damageType, damageExpression,
+    })).catch((e) => { console.error('[quiveringPalm] Error:', e); });
 
     const diceDisplay = damageRoll?.rolls?.length > 0 ? ` (${damageRoll.rolls.join(', ')})` : '';
 
@@ -278,6 +207,41 @@ export async function applyShockwave(action, playerStats, campaignName, targetNa
             saveRoll: saveResult.roll ?? 0,
             saveBonus: saveResult.saveBonus ?? 0,
         },
+    };
+}
+
+function applyShockwaveDamage(campaignName, playerName, targetName, finalDamage, damageType) {
+    const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
+    const cs = getCombatSummary(campaignName);
+    if (!cs) return;
+    const applyResult = applyDamageToTarget(cs, targetName, finalDamage, [damageType], campaignName, characters, false, playerName);
+    const actualDamage = applyResult?.finalDamage ?? finalDamage;
+    if (actualDamage !== finalDamage) {
+        console.error(`[quiveringPalm] Damage adjusted by resistances: ${finalDamage} → ${actualDamage}`);
+    }
+}
+
+function buildShockwaveResultLog(action, { playerName, targetName, saveDc, saveType, success, saveResult, damageRoll, rawDamage, finalDamage, damageType, damageExpression }) {
+    return {
+        type: 'roll',
+        name: action.name,
+        characterName: playerName,
+        rollType: 'save-damage',
+        targetName,
+        saveDc,
+        saveType,
+        saveResult: success ? 'success' : 'failure',
+        saveRoll: saveResult.roll ?? 0,
+        saveBonus: saveResult.saveBonus ?? 0,
+        saveFormula: `1d20${saveResult.saveBonus !== 0 ? '+' + saveResult.saveBonus : ''}`,
+        formula: damageExpression,
+        rolls: damageRoll?.rolls || [],
+        total: rawDamage,
+        modifier: damageRoll?.modifier || 0,
+        damageType,
+        finalDamage,
+        description: `${action.name} — ${targetName} ${success ? 'succeeded' : 'failed'} the CON save (DC ${saveDc}). ${success ? 'Half damage' : 'Full damage'}: **${finalDamage}** ${damageType} damage.`,
+        timestamp: Date.now(),
     };
 }
 

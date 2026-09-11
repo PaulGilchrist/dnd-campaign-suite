@@ -6,6 +6,8 @@
 import { loadEquipment, fetchBackgroundData, fetchClassData, loadFeatData } from '../ui/dataLoader.js';
 import { getMajorFeatureProficiencyChoices } from './majorFeatureChoices.js';
 
+const ALL_TOOL_CATEGORIES = ["Artisan's Tools", 'Gaming Sets', 'Musical Instrument', 'Other Tools'];
+
 const CATEGORY_NORMALIZATION = {
     "Gaming Set": "Gaming Sets",
     "Gaming Sets": "Gaming Sets",
@@ -151,6 +153,101 @@ export function computeSkilledToolUsage(categoryLimits, selectedTools, allTools,
     return Math.max(0, userSelectedTools.length - categoryCovered);
 }
 
+function addCategoryLimit(categoryLimits, category, count) {
+    categoryLimits.set(category, (categoryLimits.get(category) || 0) + count);
+}
+
+function applyParsedProficiency(categoryLimits, preSelected, rawValue, parsed) {
+    if (parsed.isChoice) {
+        for (const cat of parsed.categories) {
+            addCategoryLimit(categoryLimits, cat, parsed.count);
+        }
+    } else {
+        preSelected.add(rawValue);
+    }
+}
+
+async function applyBackgroundGrants(categoryLimits, preSelected, backgroundName) {
+    if (!backgroundName) return;
+    const bgData = await fetchBackgroundData(backgroundName, '2024');
+    if (bgData?.tool_proficiencies) {
+        applyParsedProficiency(categoryLimits, preSelected, bgData.tool_proficiencies, parseToolChoiceString(bgData.tool_proficiencies));
+    }
+}
+
+async function applyClassGrants(categoryLimits, preSelected, className) {
+    if (!className) return;
+    const classData = await fetchClassData(className, '2024');
+    if (classData?.tool_proficiencies) {
+        applyParsedProficiency(categoryLimits, preSelected, classData.tool_proficiencies, parseToolChoiceString(classData.tool_proficiencies));
+    }
+}
+
+// Chef: auto-selects Cook's Utensils (fixed tool, no choice limit)
+function isChefFeat(feat) {
+    return feat.benefits.some(b =>
+        b.type === 'proficiency' &&
+        b.description &&
+        /cook['\u2019]?\w*\s*utensil/i.test(b.description)
+    );
+}
+
+async function applyFeatGrants(categoryLimits, preSelected, selectedFeats) {
+    if (selectedFeats.length === 0) return 0;
+    let skilledUsesAvailable = 0;
+    const featData = await loadFeatData('2024');
+    for (const featName of selectedFeats) {
+        const feat = featData.find(f => f.name === featName || f.index === featName.toLowerCase());
+        if (!feat) continue;
+
+        if (isChefFeat(feat)) {
+            preSelected.add("Cook's Utensils");
+            continue;
+        }
+
+        const toolProf = parseFeatToolProficiency(feat);
+        if (!toolProf) continue;
+
+        if (toolProf.isAny) {
+            // Skilled: tracks as a shared pool, not spread across categories
+            if (featName === 'Skilled') {
+                skilledUsesAvailable += toolProf.count;
+            } else {
+                // Other isAny grants (if any) apply to all tool categories
+                for (const cat of ALL_TOOL_CATEGORIES) {
+                    addCategoryLimit(categoryLimits, cat, toolProf.count);
+                }
+            }
+        } else {
+            for (const cat of toolProf.categories) {
+                addCategoryLimit(categoryLimits, cat, toolProf.count);
+            }
+        }
+    }
+    return skilledUsesAvailable;
+}
+
+// Major feature grants with feature-level proficiency_choices
+// (e.g., Battle Master's Student of War: +1 Artisan's Tools)
+async function applyMajorFeatureGrants(categoryLimits, formData) {
+    const majorChoices = await getMajorFeatureProficiencyChoices(formData);
+    if (majorChoices.length === 0) return;
+    const equipment = await loadEquipment();
+    const categoryByToolName = new Map(
+        equipment.filter(e => e.equipment_category === 'Tools').map(e => [e.name, normalizeCategory(e.tool_category)])
+    );
+    for (const mc of majorChoices) {
+        const toolNames = mc.from.filter(e => e.startsWith('Tool: ')).map(e => e.substring(6).trim());
+        if (toolNames.length === 0) continue;
+        const categories = [...new Set(toolNames.map(n => categoryByToolName.get(n)).filter(Boolean))];
+        if (categories.length === 1) {
+            addCategoryLimit(categoryLimits, categories[0], mc.choose);
+        } else {
+            console.error(`Major feature "${mc.featureName}" grants tools across multiple categories (${categories.join(', ')}); category-limit model cannot express a mixed pool.`);
+        }
+    }
+}
+
 /**
  * Aggregates tool proficiency grants by category
  * Returns a map of category -> total count from all sources
@@ -159,9 +256,6 @@ export function computeSkilledToolUsage(categoryLimits, selectedTools, allTools,
  */
 export async function getToolLimitsByCategory(formData) {
     const ruleset = formData.rules || '5e';
-    const className = formData.class?.name || '';
-    const backgroundName = formData.background || '';
-    const selectedFeats = formData.feats || [];
 
     if (ruleset !== '2024') {
         return { categoryLimits: new Map(), preSelected: [], skilledUsesAvailable: 0 };
@@ -169,99 +263,11 @@ export async function getToolLimitsByCategory(formData) {
 
     const categoryLimits = new Map();
     const preSelected = new Set();
-    let skilledUsesAvailable = 0;
 
-    // Background
-    if (backgroundName) {
-        const bgData = await fetchBackgroundData(backgroundName, '2024');
-        if (bgData?.tool_proficiencies) {
-            const parsed = parseToolChoiceString(bgData.tool_proficiencies);
-            if (parsed.isChoice) {
-                for (const cat of parsed.categories) {
-                    categoryLimits.set(cat, (categoryLimits.get(cat) || 0) + parsed.count);
-                }
-            } else {
-                preSelected.add(bgData.tool_proficiencies);
-            }
-        }
-    }
-
-    // Class
-    if (className) {
-        const classData = await fetchClassData(className, '2024');
-        if (classData?.tool_proficiencies) {
-            const parsed = parseToolChoiceString(classData.tool_proficiencies);
-            if (parsed.isChoice) {
-                for (const cat of parsed.categories) {
-                    categoryLimits.set(cat, (categoryLimits.get(cat) || 0) + parsed.count);
-                }
-            } else {
-                preSelected.add(classData.tool_proficiencies);
-            }
-        }
-    }
-
-    // Feats
-    if (selectedFeats.length > 0) {
-        const featData = await loadFeatData('2024');
-        for (const featName of selectedFeats) {
-            const feat = featData.find(f => f.name === featName || f.index === featName.toLowerCase());
-            if (feat) {
-                // Chef: auto-selects Cook's Utensils (fixed tool, no choice limit)
-                const chefBenefit = feat.benefits.find(b =>
-                    b.type === 'proficiency' &&
-                    b.description &&
-                    /cook['\u2019]?\w*\s*utensil/i.test(b.description)
-                );
-                if (chefBenefit) {
-                    preSelected.add("Cook's Utensils");
-                    continue;
-                }
-
-                const toolProf = parseFeatToolProficiency(feat);
-                if (toolProf) {
-                    if (toolProf.isAny) {
-                        // Skilled: tracks as a shared pool, not spread across categories
-                        const isSkilled = featName === 'Skilled';
-                        if (isSkilled) {
-                            skilledUsesAvailable += toolProf.count;
-                        } else {
-                            // Other isAny grants (if any) apply to all tool categories
-                            const toolCategories = ["Artisan's Tools", 'Gaming Sets', 'Musical Instrument', 'Other Tools'];
-                            for (const cat of toolCategories) {
-                                categoryLimits.set(cat, (categoryLimits.get(cat) || 0) + toolProf.count);
-                            }
-                        }
-                    } else {
-                        for (const cat of toolProf.categories) {
-                            categoryLimits.set(cat, (categoryLimits.get(cat) || 0) + toolProf.count);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Major feature grants with feature-level proficiency_choices
-    // (e.g., Battle Master's Student of War: +1 Artisan's Tools)
-    const majorChoices = await getMajorFeatureProficiencyChoices(formData);
-    if (majorChoices.length > 0) {
-        const equipment = await loadEquipment();
-        const categoryByToolName = new Map(
-            equipment.filter(e => e.equipment_category === 'Tools').map(e => [e.name, normalizeCategory(e.tool_category)])
-        );
-        for (const mc of majorChoices) {
-            const toolNames = mc.from.filter(e => e.startsWith('Tool: ')).map(e => e.substring(6).trim());
-            if (toolNames.length === 0) continue;
-            const categories = [...new Set(toolNames.map(n => categoryByToolName.get(n)).filter(Boolean))];
-            if (categories.length === 1) {
-                const cat = categories[0];
-                categoryLimits.set(cat, (categoryLimits.get(cat) || 0) + mc.choose);
-            } else {
-                console.error(`Major feature "${mc.featureName}" grants tools across multiple categories (${categories.join(', ')}); category-limit model cannot express a mixed pool.`);
-            }
-        }
-    }
+    await applyBackgroundGrants(categoryLimits, preSelected, formData.background || '');
+    await applyClassGrants(categoryLimits, preSelected, formData.class?.name || '');
+    const skilledUsesAvailable = await applyFeatGrants(categoryLimits, preSelected, formData.feats || []);
+    await applyMajorFeatureGrants(categoryLimits, formData);
 
     return { categoryLimits, preSelected: Array.from(preSelected), skilledUsesAvailable };
 }
@@ -286,7 +292,7 @@ export async function validateTools(formData) {
     const userSelectedTools = selectedTools.filter(t => !preSelectedSet.has(t) && !isPlaceholder(t));
 
     // Load all tools and categorize them
-    const toolCategories = ["Artisan's Tools", 'Gaming Sets', 'Musical Instrument', 'Other Tools'];
+    const toolCategories = ALL_TOOL_CATEGORIES;
     const toolsByCategory = {};
     for (const cat of toolCategories) {
         const tools = await getToolsByCategory(cat);

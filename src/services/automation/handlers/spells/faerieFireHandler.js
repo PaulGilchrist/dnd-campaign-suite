@@ -19,6 +19,99 @@ import storage from '../../../ui/storage.js';
  * - Concentration, up to 1 minute
  */
 
+function hasDexImmunity(target) {
+    const targetImmunities = target.weaknessesAndResistivities?.immunities || [];
+    if (!Array.isArray(targetImmunities) || targetImmunities.length === 0) return false;
+    return targetImmunities.some(
+        imm => String(imm).toLowerCase() === 'dex' || String(imm).toLowerCase() === 'dexterity'
+    );
+}
+
+async function outlineTarget(campaignName, casterName, targetName, dc, saveResult) {
+    // Track the faerie fire effect with concentration duration for cleanup
+    const targetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const effects = Array.isArray(targetEffects) ? [...targetEffects] : [];
+    const faerieEffect = {
+        target: targetName,
+        effect: 'faerie_fire',
+        source: casterName,
+        duration: 'concentration',
+    };
+    const existingIdx = effects.findIndex(
+        te => te.target === targetName && te.effect === 'faerie_fire'
+    );
+    if (existingIdx >= 0) {
+        effects[existingIdx] = faerieEffect;
+    } else {
+        effects.push(faerieEffect);
+    }
+    setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
+
+    // Add activeBuffs entry on the target for UI display
+    const storedBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName);
+    const activeBuffs = Array.isArray(storedBuffs) ? storedBuffs : [];
+    const newBuffs = activeBuffs.filter(b => b.name !== 'Faerie Fire');
+    newBuffs.push({
+        name: 'Faerie Fire',
+        effect: 'faerie_fire',
+        duration: 'Concentration, up to 1 minute',
+        source: casterName,
+        conditionImmunity: ['invisible'],
+    });
+    setRuntimeValue(targetName, 'activeBuffs', newBuffs, campaignName);
+
+    // Register expiration so the effect clears on initiative roll, short rest, and long rest
+    addExpiration(casterName, targetName, [
+        { type: 'remove_faerie_fire' },
+    ], campaignName);
+
+    // Remove invisible condition — Faerie Fire prevents benefiting from invisibility
+    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const filteredConditions = conditions.filter(c => String(c).toLowerCase() !== 'invisible');
+    if (filteredConditions.length !== conditions.length) {
+        setRuntimeValue(targetName, 'activeConditions', filteredConditions, campaignName);
+        addEntry(campaignName, {
+            type: 'condition',
+            action: 'removed',
+            characterName: targetName,
+            condition: 'Invisible',
+            reason: 'Faerie Fire spell — affected creatures can\'t benefit from invisibility',
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[faerieFire] Error:", e); });
+    }
+
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'failure',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: ['faerie_fire'],
+        appliedDamage: 0,
+    });
+
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: 'Faerie Fire',
+        reason: 'Faerie Fire spell',
+        note: `${targetName} is outlined by Faerie Fire: sheds Dim Light in 10-foot radius, is immune to the Invisible condition, and attack rolls against it have Advantage.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[faerieFire] Error:", e); });
+
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-faerie-fire',
+        targetName,
+        saveDc: dc,
+        saveType: 'DEX',
+        success: false,
+        description: `${targetName} failed DEX save against Faerie Fire. Outlined in light.`,
+    }).catch((e) => { console.error("[faerieFire] Error:", e); });
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
@@ -79,22 +172,16 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         const targetName = target.name;
 
         // Check for DEX immunity on each target individually
-        const targetImmunities = target.weaknessesAndResistivities?.immunities || [];
-        if (Array.isArray(targetImmunities) && targetImmunities.length > 0) {
-            const hasDEXImmunity = targetImmunities.some(
-                imm => String(imm).toLowerCase() === 'dex' || String(imm).toLowerCase() === 'dexterity'
-            );
-            if (hasDEXImmunity) {
-                addEntry(campaignName, {
-                    type: 'ability_use',
-                    characterName: casterName,
-                    abilityName: action.name,
-                    description: `${targetName} is immune to Faerie Fire (DEX immunity).`,
-                }).catch((e) => { console.error("[faerieFire] Error:", e); });
-                results.push(`${targetName} is immune.`);
-                immuneCount++;
-                continue;
-            }
+        if (hasDexImmunity(target)) {
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName: casterName,
+                abilityName: action.name,
+                description: `${targetName} is immune to Faerie Fire (DEX immunity).`,
+            }).catch((e) => { console.error("[faerieFire] Error:", e); });
+            results.push(`${targetName} is immune.`);
+            immuneCount++;
+            continue;
         }
 
         const { promptId, promise } = createSaveListener(campaignName, {
@@ -137,90 +224,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             }).catch((e) => { console.error("[faerieFire] Error:", e); });
         } else {
             affectedCount++;
-
-            // Track the faerie fire effect with concentration duration for cleanup
-            const targetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-            const effects = Array.isArray(targetEffects) ? [...targetEffects] : [];
-            const faerieEffect = {
-                target: targetName,
-                effect: 'faerie_fire',
-                source: casterName,
-                duration: 'concentration',
-            };
-            const existingIdx = effects.findIndex(
-                te => te.target === targetName && te.effect === 'faerie_fire'
-            );
-            if (existingIdx >= 0) {
-                effects[existingIdx] = faerieEffect;
-            } else {
-                effects.push(faerieEffect);
-            }
-            setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
-
-            // Add activeBuffs entry on the target for UI display
-            const storedBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName);
-            const activeBuffs = Array.isArray(storedBuffs) ? storedBuffs : [];
-            const newBuffs = activeBuffs.filter(b => b.name !== 'Faerie Fire');
-            newBuffs.push({
-                name: 'Faerie Fire',
-                effect: 'faerie_fire',
-                duration: 'Concentration, up to 1 minute',
-                source: casterName,
-                conditionImmunity: ['invisible'],
-            });
-            setRuntimeValue(targetName, 'activeBuffs', newBuffs, campaignName);
-
-            // Register expiration so the effect clears on initiative roll, short rest, and long rest
-            addExpiration(casterName, targetName, [
-                { type: 'remove_faerie_fire' },
-            ], campaignName);
-
-            // Remove invisible condition — Faerie Fire prevents benefiting from invisibility
-            const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-            const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-            const filteredConditions = conditions.filter(c => String(c).toLowerCase() !== 'invisible');
-            if (filteredConditions.length !== conditions.length) {
-                setRuntimeValue(targetName, 'activeConditions', filteredConditions, campaignName);
-                addEntry(campaignName, {
-                    type: 'condition',
-                    action: 'removed',
-                    characterName: targetName,
-                    condition: 'Invisible',
-                    reason: 'Faerie Fire spell — affected creatures can\'t benefit from invisibility',
-                    timestamp: Date.now(),
-                }).catch((e) => { console.error("[faerieFire] Error:", e); });
-            }
-
-            await addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'failure',
-                roll: saveResult.roll ?? 0,
-                total: saveResult.total ?? 0,
-                conditions: ['faerie_fire'],
-                appliedDamage: 0,
-            });
-
-            addEntry(campaignName, {
-                type: 'condition',
-                action: 'applied',
-                characterName: targetName,
-                condition: 'Faerie Fire',
-                reason: 'Faerie Fire spell',
-                note: `${targetName} is outlined by Faerie Fire: sheds Dim Light in 10-foot radius, is immune to the Invisible condition, and attack rolls against it have Advantage.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[faerieFire] Error:", e); });
-
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                rollType: 'save-faerie-fire',
-                targetName,
-                saveDc: dc,
-                saveType: 'DEX',
-                success: false,
-                description: `${targetName} failed DEX save against Faerie Fire. Outlined in light.`,
-            }).catch((e) => { console.error("[faerieFire] Error:", e); });
-
+            await outlineTarget(campaignName, casterName, targetName, dc, saveResult);
             results.push(`${targetName} is outlined.`);
         }
     }

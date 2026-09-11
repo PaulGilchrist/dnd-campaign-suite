@@ -182,6 +182,17 @@ function buildWrathResultsHtml(action, saveDc, damageFormula, damageResult, resu
     return resultsHtml;
 }
 
+function resolveWrathWisdomAndDc(isAllyAttack, playerName, playerStats, campaignName) {
+    if (isAllyAttack) {
+        return {
+            wisMod: Number(getRuntimeValue(playerName, 'wrathOfTheSeaWisMod', campaignName)) || 1,
+            saveDc: Number(getRuntimeValue(playerName, 'wrathOfTheSeaDc', campaignName)) || 0,
+        };
+    }
+    const wisBonus = playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0;
+    return { wisMod: wisBonus || 1, saveDc: 8 + wisBonus + (playerStats.proficiency || 0) };
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const isAllyAttack = auto?.allyAttack === true;
@@ -213,19 +224,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return refusal(action, playerName, campaignName, `It is ${activeName}'s turn — Wrath of the Sea is a Bonus Action on your own turn.`);
     }
 
-    const wisMod = isAllyAttack
-        ? (Number(getRuntimeValue(playerName, 'wrathOfTheSeaWisMod', campaignName)) || 1)
-        : (playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 1);
+    const { wisMod, saveDc } = resolveWrathWisdomAndDc(isAllyAttack, playerName, playerStats, campaignName);
 
     const diceCount = Math.max(1, wisMod);
     const damageFormula = `${diceCount}d6`;
     const damageResult = rollExpression(damageFormula);
 
     if (!damageResult) return null;
-
-    const saveDc = isAllyAttack
-        ? (Number(getRuntimeValue(playerName, 'wrathOfTheSeaDc', campaignName)) || 0)
-        : (8 + (playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0) + (playerStats.proficiency || 0));
 
     const combatSummary = await loadCombatSummary(campaignName);
     const target = getTargetFromAttacker(combatSummary, playerName);

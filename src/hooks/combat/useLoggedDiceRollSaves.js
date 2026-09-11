@@ -147,6 +147,64 @@ function isShieldBlockingMagicMissile(targetActiveBuffs, pending) {
     return isShieldActive && !!isMagicMissile;
 }
 
+function logQuickRollEvasion(pending, target, saveResult, saveType, evasionFlags, circleOfPowerAdvantage, logEntry) {
+    const { hasOwnEvasion, hasSelectedEvasion } = evasionFlags;
+    logEntry({
+        type: 'roll',
+        characterName: pending.targetName,
+        rollType: 'evasion',
+        name: hasOwnEvasion ? 'Evasion' : hasSelectedEvasion ? 'Evasion' : circleOfPowerAdvantage ? 'Circle of Power' : 'Leading Evasion',
+        targetName: pending.targetName,
+        saveType,
+        saveDc: pending.saveDc,
+        saveResult: saveResult.success ? 'success' : 'failure',
+        dcSuccess: pending.dcSuccess,
+        timestamp: Date.now(),
+        id: utils.guid(),
+    });
+}
+
+async function adjustQuickRollCantripDamage(finalDamage, pending, saveResult, campaignName, characterName) {
+    const isCantripFlag = pending.isCantrip || false;
+    if (hasBlessedStrikesOptions(pending) && isCantripFlag && saveResult.success && pending.dcSuccess === 'none') {
+        return Math.floor(pending.rawDamage / 2);
+    }
+    if (isCantripFlag && !saveResult.success && pending.dcSuccess === 'none') {
+        await grantMissedCantripTempHp(pending, campaignName, characterName);
+    }
+    return finalDamage;
+}
+
+function buildQuickRollSavePopup({ pending, target, saveResult, finalDamage, applyResult, saveDc, saveType, baneSave, baneAttacker }) {
+    return {
+        type: 'save-damage',
+        name: pending.name,
+        formula: pending.formula,
+        rolls: pending.rolls,
+        total: finalDamage,
+        bonus: 0,
+        modifier: pending.modifier,
+        damageType: pending.damageType,
+        targetName: target.name,
+        targetCurrentHp: applyResult?.newHp,
+        targetMaxHp: target.type === 'player'
+            ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
+            : target.maxHp,
+        saveDc,
+        saveType,
+        dcSuccess: pending.dcSuccess,
+        saveResult,
+        finalDamage: applyResult?.finalDamage,
+        damageApplied: true,
+        damageReduced: applyResult?.damageReduced,
+        baneRoll: baneSave.roll,
+        baneDisplayLabel: baneSave.displayLabel,
+        baneAttackerRoll: baneAttacker.roll,
+        baneAttackerDisplayLabel: baneAttacker.displayLabel,
+        blessRoll: null,
+    };
+}
+
 export function createSaves(deps) {
     const { characterName, campaignName, setPopupHtml, logEntry, logAndShow, pendingSaves, charactersRef } = deps;
 
@@ -286,36 +344,17 @@ export function createSaves(deps) {
 
         const normalizedSaveType = normalizeSaveType(saveType);
         const evasionFlags = resolveEvasionFlags(pending, targetChar, normalizedSaveType, selectedAllies, circleOfPowerAdvantage, charactersRef.current || [], campaignName);
-        const { hasEvasion, hasOwnEvasion, hasSelectedEvasion } = evasionFlags;
-        let finalDamage = computeDamageAfterEvasion(pending.rawDamage, saveResult.success, pending.dcSuccess, hasEvasion);
+        let finalDamage = computeDamageAfterEvasion(pending.rawDamage, saveResult.success, pending.dcSuccess, evasionFlags.hasEvasion);
 
-        if (hasEvasion) {
-            logEntry({
-                type: 'roll',
-                characterName: pending.targetName,
-                rollType: 'evasion',
-                name: hasOwnEvasion ? 'Evasion' : hasSelectedEvasion ? 'Evasion' : circleOfPowerAdvantage ? 'Circle of Power' : 'Leading Evasion',
-                targetName: pending.targetName,
-                saveType,
-                saveDc: pending.saveDc,
-                saveResult: saveResult.success ? 'success' : 'failure',
-                dcSuccess: pending.dcSuccess,
-                timestamp: Date.now(),
-                id: utils.guid(),
-            });
+        if (evasionFlags.hasEvasion) {
+            logQuickRollEvasion(pending, target, saveResult, saveType, evasionFlags, circleOfPowerAdvantage, logEntry);
         }
 
         if (isShieldBlockingMagicMissile(targetActiveBuffs, pending)) {
             finalDamage = 0;
         }
 
-        const isCantripFlag = pending.isCantrip || false;
-        if (hasBlessedStrikesOptions(pending) && isCantripFlag && saveResult.success && pending.dcSuccess === 'none') {
-            finalDamage = Math.floor(pending.rawDamage / 2);
-        }
-        if (isCantripFlag && !saveResult.success && pending.dcSuccess === 'none') {
-            await grantMissedCantripTempHp(pending, campaignName, characterName);
-        }
+        finalDamage = await adjustQuickRollCantripDamage(finalDamage, pending, saveResult, campaignName, characterName);
         const ignoreResistance = (pending.playerStats && hasIgnoreResistance(pending.playerStats, pending.damageType)) || false;
         const allCharacters = charactersRef.current || [];
         const applyResult = await applyDamageToTarget(combatSummary, pending.targetName, finalDamage, [pending.damageType], campaignName, allCharacters, ignoreResistance, pending.attackerName || characterName);
@@ -332,33 +371,7 @@ export function createSaves(deps) {
             saveBonus: saveResult.bonus,
         });
 
-        setPopupHtml({
-            type: 'save-damage',
-            name: pending.name,
-            formula: pending.formula,
-            rolls: pending.rolls,
-            total: finalDamage,
-            bonus: 0,
-            modifier: pending.modifier,
-            damageType: pending.damageType,
-            targetName: target.name,
-            targetCurrentHp: applyResult?.newHp,
-            targetMaxHp: target.type === 'player'
-                ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
-                : target.maxHp,
-            saveDc,
-            saveType,
-            dcSuccess: pending.dcSuccess,
-            saveResult,
-            finalDamage: applyResult?.finalDamage,
-            damageApplied: true,
-            damageReduced: applyResult?.damageReduced,
-            baneRoll: baneSave.roll,
-            baneDisplayLabel: baneSave.displayLabel,
-            baneAttackerRoll: baneAttacker.roll,
-            baneAttackerDisplayLabel: baneAttacker.displayLabel,
-            blessRoll: null,
-        });
+        setPopupHtml(buildQuickRollSavePopup({ pending, target, saveResult, finalDamage, applyResult, saveDc, saveType, baneSave, baneAttacker }));
     }
 
     return {

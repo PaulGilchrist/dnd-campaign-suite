@@ -4,6 +4,33 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import SecondaryTargetModal from './SecondaryTargetModal.jsx';
 import '../../CharSheet.css';
 
+const RIDER_EFFECT_LABELS = [
+    [opt => opt.effect === 'disadvantage_on_next_save', () => 'Disadvantage on next save'],
+    [opt => opt.noOpportunityAttacks && !opt.movement, () => 'Cannot make Opportunity Attacks'],
+    [opt => opt.effect === 'next_attack_advantage', opt => `+${opt.value || '5'} to next attack`],
+    [opt => opt.effect === 'push_15ft', () => 'Push 15 ft'],
+    [opt => opt.effect === 'push', opt => `Push ${opt.value || 10} ft`],
+    [opt => opt.effect === 'speed_reduction', () => 'Speed reduced by 15 ft'],
+    [opt => opt.effect === 'sudden_strike', () => 'Make another attack vs. different creature within 5 ft'],
+    [opt => opt.effect === 'mass_fear', () => 'Target + creatures within 10 ft make WIS save or be Frightened'],
+    [opt => opt.effect === 'prone', () => 'Target makes DEX save or gains Prone condition'],
+    [opt => opt.effect === 'poisoned', () => 'Target makes CON save or becomes Poisoned (1 min, repeating)'],
+    [opt => opt.effect === 'no_opportunity_attacks' && opt.movement, opt => `Move up to ${opt.movement} without provoking OAs`],
+    [opt => opt.effect === 'daze', () => 'Target makes CON save or on next turn can only do one of: move, action, or Bonus Action'],
+    [opt => opt.effect === 'unconscious', () => 'Target makes CON save or becomes Unconscious (1 min, repeating)'],
+    [opt => opt.effect === 'blinded', () => 'Target makes DEX save or becomes Blinded (until end of its next turn)'],
+    [opt => opt.effect === 'damage_bonus', opt => `${opt.damageExpression || '1d6'} damage`],
+    [opt => opt.cost, opt => `Cost: ${opt.cost} Sneak Attack dice`],
+];
+
+function describeRiderOptionEffects(opt) {
+    const effects = [];
+    for (const [match, label] of RIDER_EFFECT_LABELS) {
+        if (match(opt)) effects.push(label(opt));
+    }
+    return effects;
+}
+
 function AttackRiderModal({ action, playerStats, campaignName, targetName, onClose }) {
     const [selected, setSelected] = useState(null);
     const [selectedMulti, setSelectedMulti] = useState([]);
@@ -237,23 +264,7 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
                     <p dangerouslySetInnerHTML={{ __html: labelText }}></p>
                     <div style={{ textAlign: 'left', marginTop: '12px' }}>
                         {options.map((opt, i) => {
-                            const effects = [];
-                            if (opt.effect === 'disadvantage_on_next_save') effects.push('Disadvantage on next save');
-                            if (opt.noOpportunityAttacks && !opt.movement) effects.push('Cannot make Opportunity Attacks');
-                            if (opt.effect === 'next_attack_advantage') effects.push(`+${opt.value || '5'} to next attack`);
-                            if (opt.effect === 'push_15ft') effects.push('Push 15 ft');
-                            if (opt.effect === 'push') effects.push(`Push ${opt.value || 10} ft`);
-                            if (opt.effect === 'speed_reduction') effects.push('Speed reduced by 15 ft');
-                            if (opt.effect === 'sudden_strike') effects.push('Make another attack vs. different creature within 5 ft');
-                            if (opt.effect === 'mass_fear') effects.push('Target + creatures within 10 ft make WIS save or be Frightened');
-                            if (opt.effect === 'prone') effects.push('Target makes DEX save or gains Prone condition');
-                            if (opt.effect === 'poisoned') effects.push('Target makes CON save or becomes Poisoned (1 min, repeating)');
-                            if (opt.effect === 'no_opportunity_attacks' && opt.movement) effects.push(`Move up to ${opt.movement} without provoking OAs`);
-                            if (opt.effect === 'daze') effects.push('Target makes CON save or on next turn can only do one of: move, action, or Bonus Action');
-                            if (opt.effect === 'unconscious') effects.push('Target makes CON save or becomes Unconscious (1 min, repeating)');
-                            if (opt.effect === 'blinded') effects.push('Target makes DEX save or becomes Blinded (until end of its next turn)');
-                            if (opt.effect === 'damage_bonus') effects.push(`${opt.damageExpression || '1d6'} damage`);
-                            if (opt.cost) effects.push(`Cost: ${opt.cost} Sneak Attack dice`);
+                            const effects = describeRiderOptionEffects(opt);
                             const isSelected = multiSelect ? selectedMulti.includes(opt.name) : selected === opt.name;
                             const inputType = multiSelect ? 'checkbox' : 'radio';
                             const inputChecked = isSelected;

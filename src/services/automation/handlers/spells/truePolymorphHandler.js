@@ -54,6 +54,151 @@ export async function resolveTruePolymorphMaxCR(targetName, campaignName, charac
     return DEFAULT_MAX_CR;
 }
 
+function refusalPopup(action, description) {
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            description,
+        },
+    };
+}
+
+function logTransformRefusal(campaignName, casterName, action, targetName, reason) {
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: casterName,
+        abilityName: action.name,
+        description: `${casterName} casts ${action.name} on ${targetName}, but ${reason}.`,
+    }).catch((e) => { console.error("[truePolymorph] Error:", e); });
+}
+
+async function gateTruePolymorphTarget(action, casterName, targetName, targetCreature, campaignName) {
+    const existingEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const alreadyTransformed = existingEffects.some(te => {
+        const teTarget = Array.isArray(te.target) ? te.target[0] : te.target;
+        return teTarget === targetName && (te.effect === TRUE_POLYMORPH_EFFECT || te.effect === 'polymorph' || te.effect === 'object_transform');
+    });
+    if (alreadyTransformed) {
+        logTransformRefusal(campaignName, casterName, action, targetName, `${targetName} is already transformed`);
+        return refusalPopup(action, `${targetName} is already transformed.`);
+    }
+
+    if (getTargetCurrentHp(targetName, targetCreature, campaignName) <= 0) {
+        logTransformRefusal(campaignName, casterName, action, targetName, `a creature with 0 hit points can't be transformed`);
+        return refusalPopup(action, `${action.name} has no effect on a creature with 0 hit points.`);
+    }
+
+    if (isShapechanger(targetName, targetCreature)) {
+        logTransformRefusal(campaignName, casterName, action, targetName, `shapechangers are unaffected`);
+        return refusalPopup(action, `${action.name} has no effect on a shapechanger.`);
+    }
+
+    return null;
+}
+
+async function runTransformationSave(action, campaignName, casterName, targetName, dc) {
+    const { promptId, promise } = createSaveListener(campaignName, {
+        targetName,
+        saveType: 'WIS',
+        saveDc: dc,
+        dcSuccess: 'none',
+        disadvantage: !!action.metaCtx?.metamagicHeighten,
+    });
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: casterName,
+        abilityName: action.name,
+        description: `${casterName} casts ${action.name} on ${targetName}! ${targetName} must make a WIS save (DC ${dc}) or be transformed.`,
+        promptId,
+    }).catch((e) => { console.error("[truePolymorph] Error:", e); });
+
+    const saveResult = await promise;
+
+    if (saveResult.success) {
+        await addTargetResult(campaignName, {
+            targetName,
+            saveResult: 'success',
+            roll: saveResult.roll ?? 0,
+            total: saveResult.total ?? 0,
+            conditions: [],
+            appliedDamage: 0,
+        });
+        addEntry(campaignName, {
+            type: 'save_result',
+            characterName: casterName,
+            rollType: 'save-polymorph',
+            targetName,
+            saveDc: dc,
+            saveType: 'WIS',
+            success: true,
+            description: `${targetName} succeeded on WIS save against ${action.name}.`,
+        }).catch((e) => { console.error("[truePolymorph] Error:", e); });
+        return refusalPopup(action, `${targetName} resisted the transformation.`);
+    }
+
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-polymorph',
+        targetName,
+        saveDc: dc,
+        saveType: 'WIS',
+        success: false,
+        description: `${targetName} failed WIS save against ${action.name} and is transformed.`,
+    }).catch((e) => { console.error("[truePolymorph] Error:", e); });
+
+    return null;
+}
+
+function buildModePopup(mode, action, targetName, casterName, campaignName, maxCR) {
+    if (mode === 'object_into_creature') {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'true_polymorph_select',
+                targetName,
+                maxCR: 9,
+                casterName,
+                campaignName,
+                spell: action.spell,
+                spellLevel: action.spellSlotLevel,
+                mode: 'object_into_creature',
+            },
+        };
+    }
+
+    if (mode === 'creature_to_object') {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'true_polymorph_object',
+                targetName,
+                casterName,
+                campaignName,
+                spell: action.spell,
+                spellLevel: action.spellSlotLevel,
+            },
+        };
+    }
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'true_polymorph_select',
+            targetName,
+            maxCR,
+            casterName,
+            campaignName,
+            spell: action.spell,
+            spellLevel: action.spellSlotLevel,
+            mode: 'creature_to_creature',
+        },
+    };
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
@@ -87,172 +232,21 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const targetCreature = cs.creatures.find(c => c.name === targetName);
 
     if (targetName && targetCreature) {
-        const existingEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-        const alreadyTransformed = existingEffects.some(te => {
-            const teTarget = Array.isArray(te.target) ? te.target[0] : te.target;
-            return teTarget === targetName && (te.effect === TRUE_POLYMORPH_EFFECT || te.effect === 'polymorph' || te.effect === 'object_transform');
-        });
-        if (alreadyTransformed) {
-            addEntry(campaignName, {
-                type: 'ability_use',
-                characterName: casterName,
-                abilityName: action.name,
-                description: `${casterName} casts ${action.name} on ${targetName}, but ${targetName} is already transformed.`,
-            }).catch((e) => { console.error("[truePolymorph] Error:", e); });
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: `${targetName} is already transformed.`,
-                },
-            };
-        }
-
-        if (getTargetCurrentHp(targetName, targetCreature, campaignName) <= 0) {
-            addEntry(campaignName, {
-                type: 'ability_use',
-                characterName: casterName,
-                abilityName: action.name,
-                description: `${casterName} casts ${action.name} on ${targetName}, but a creature with 0 hit points can't be transformed.`,
-            }).catch((e) => { console.error("[truePolymorph] Error:", e); });
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: `${action.name} has no effect on a creature with 0 hit points.`,
-                },
-            };
-        }
-
-        const targetIsShapechanger = isShapechanger(targetName, targetCreature);
-        if (targetIsShapechanger) {
-            addEntry(campaignName, {
-                type: 'ability_use',
-                characterName: casterName,
-                abilityName: action.name,
-                description: `${casterName} casts ${action.name} on ${targetName}, but shapechangers are unaffected.`,
-            }).catch((e) => { console.error("[truePolymorph] Error:", e); });
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: `${action.name} has no effect on a shapechanger.`,
-                },
-            };
-        }
+        const refusal = await gateTruePolymorphTarget(action, casterName, targetName, targetCreature, campaignName);
+        if (refusal) return refusal;
 
         const allies = getAllyList(casterName);
         const isAlly = allies.some(n => utils.getName(n) === utils.getName(targetName));
 
         if (!isAlly) {
-            const { promptId, promise } = createSaveListener(campaignName, {
-                targetName,
-                saveType: 'WIS',
-                saveDc: dc,
-                dcSuccess: 'none',
-                disadvantage: !!action.metaCtx?.metamagicHeighten,
-            });
-
-            addEntry(campaignName, {
-                type: 'ability_use',
-                characterName: casterName,
-                abilityName: action.name,
-                description: `${casterName} casts ${action.name} on ${targetName}! ${targetName} must make a WIS save (DC ${dc}) or be transformed.`,
-                promptId,
-            }).catch((e) => { console.error("[truePolymorph] Error:", e); });
-
-            const saveResult = await promise;
-
-            if (saveResult.success) {
-                await addTargetResult(campaignName, {
-                    targetName,
-                    saveResult: 'success',
-                    roll: saveResult.roll ?? 0,
-                    total: saveResult.total ?? 0,
-                    conditions: [],
-                    appliedDamage: 0,
-                });
-                addEntry(campaignName, {
-                    type: 'save_result',
-                    characterName: casterName,
-                    rollType: 'save-polymorph',
-                    targetName,
-                    saveDc: dc,
-                    saveType: 'WIS',
-                    success: true,
-                    description: `${targetName} succeeded on WIS save against ${action.name}.`,
-                }).catch((e) => { console.error("[truePolymorph] Error:", e); });
-                return {
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: action.name,
-                        description: `${targetName} resisted the transformation.`,
-                    },
-                };
-            }
-
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                rollType: 'save-polymorph',
-                targetName,
-                saveDc: dc,
-                saveType: 'WIS',
-                success: false,
-                description: `${targetName} failed WIS save against ${action.name} and is transformed.`,
-            }).catch((e) => { console.error("[truePolymorph] Error:", e); });
+            const resisted = await runTransformationSave(action, campaignName, casterName, targetName, dc);
+            if (resisted) return resisted;
         }
 
         const characters = action.metaCtx?.characters || [];
         const maxCR = await resolveTruePolymorphMaxCR(targetName, campaignName, characters);
 
-        if (mode === 'object_into_creature') {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'true_polymorph_select',
-                    targetName,
-                    maxCR: 9,
-                    casterName,
-                    campaignName,
-                    spell: action.spell,
-                    spellLevel: action.spellSlotLevel,
-                    mode: 'object_into_creature',
-                },
-            };
-        }
-
-        if (mode === 'creature_to_object') {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'true_polymorph_object',
-                    targetName,
-                    casterName,
-                    campaignName,
-                    spell: action.spell,
-                    spellLevel: action.spellSlotLevel,
-                },
-            };
-        }
-
-        return {
-            type: 'popup',
-            payload: {
-                type: 'true_polymorph_select',
-                targetName,
-                maxCR,
-                casterName,
-                campaignName,
-                spell: action.spell,
-                spellLevel: action.spellSlotLevel,
-                mode: 'creature_to_creature',
-            },
-        };
+        return buildModePopup(mode, action, targetName, casterName, campaignName, maxCR);
     }
 
     if (mode === 'object_into_creature') {

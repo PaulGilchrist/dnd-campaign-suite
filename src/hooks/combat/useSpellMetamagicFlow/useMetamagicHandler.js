@@ -4,6 +4,31 @@ import { isFreeCastAuthorized } from '../../../services/rules/spells/spellPrepar
 import { prepareSpellCast } from '../../../services/rules/spells/spellPreparationService.js'
 import { getConsumedMaterial, consumeMaterial } from '../../../services/rules/spells/materialComponents.js'
 
+const METAMAGIC_CONTEXT_FLAGS = {
+  'Heightened Spell': 'metamagicHeighten',
+  'Careful Spell': 'metamagicCareful',
+  'Distant Spell': 'metamagicDistant',
+}
+
+function buildMetamagicContext(pending, result, usePsionicPayment) {
+  const metaCtx = { ...pending._metaCtx }
+  if (result?.options) {
+    for (const [option, flagKey] of Object.entries(METAMAGIC_CONTEXT_FLAGS)) {
+      if (result.options.includes(option)) metaCtx[flagKey] = true
+    }
+    if (result.options.includes('Twinned Spell') && result.twinTarget) metaCtx.metamagicTwinTarget = result.twinTarget
+  }
+  if (usePsionicPayment) {
+    metaCtx.psionicSpell = true
+  }
+  return metaCtx
+}
+
+// CLA-312: gate free-cast authorization on the EFFECTIVE cast level.
+function resolveGateLevel(spell, spellLevel) {
+  return (spell?.isUpcast && spell?.upcastLevel) || (spell?.level ?? spellLevel ?? 0)
+}
+
 export function useMetamagicHandler(playerStats, campaignName, cfClearPending, getPending, onExecute) {
   const handleConfirm = async (result) => {
     const pending = getPending('metamagic')
@@ -44,21 +69,11 @@ export function useMetamagicHandler(playerStats, campaignName, cfClearPending, g
       timestamp: Date.now(),
     }).catch((e) => { console.error("[useMetamagicHandler:log-error]", e); })
 
-    const metaCtx = { ...pending._metaCtx }
-    if (result?.options) {
-      if (result.options.includes('Heightened Spell')) metaCtx.metamagicHeighten = true
-      if (result.options.includes('Careful Spell')) metaCtx.metamagicCareful = true
-      if (result.options.includes('Twinned Spell') && result.twinTarget) metaCtx.metamagicTwinTarget = result.twinTarget
-      if (result.options.includes('Distant Spell')) metaCtx.metamagicDistant = true
-    }
-    if (usePsionicPayment) {
-      metaCtx.psionicSpell = true
-    }
+    const metaCtx = buildMetamagicContext(pending, result, usePsionicPayment)
 
     const isUpcast = pending.spell?.isUpcast
     const upcastLevel = pending.spell?.upcastLevel
-    // CLA-312: gate free-cast authorization on the EFFECTIVE cast level.
-    const gateLevel = (isUpcast && upcastLevel) || (pending.spell?.level ?? pending.spellLevel ?? 0)
+    const gateLevel = resolveGateLevel(pending.spell, pending.spellLevel)
     const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, pending.spellName, gateLevel, playerStats, campaignName)
     const result2 = await prepareSpellCast(pending.spell, metaCtx, {
       playerName: playerStats.name,

@@ -17,6 +17,24 @@ const USED_ROUND_KEY = '_ShadowyDodge_usedRound';
 // Identity of the triggering attack instance: the campaign lastAttack is the
 // single source of truth; damage application stamps timestamp on it, misses may
 // lack one, so fall back to roll signature + attacker.
+async function appendDodgeOutcome(hit, finalHit, attackerName, playerName, campaignName, featureName) {
+    if (hit === true && finalHit === false) {
+        let text = `<br/><i>The attack now misses due to Disadvantage!</i>`;
+        const damageRolledBack = await rollbackDamage(attackerName, playerName, campaignName, featureName);
+        if (damageRolledBack > 0) {
+            text += `<br/>Damage negated: ${damageRolledBack} HP restored.`;
+        }
+        return { text, damageRolledBack };
+    }
+    if (hit === true && finalHit === true) {
+        return { text: `<br/><i>The attack still hits despite Disadvantage.</i>`, damageRolledBack: 0 };
+    }
+    if (hit === false) {
+        return { text: `<br/><i>The attack already missed — Disadvantage has no additional effect.</i>`, damageRolledBack: 0 };
+    }
+    return { text: '', damageRolledBack: 0 };
+}
+
 function attackIdentity(attackEvent, attackerName) {
     if (attackEvent?.timestamp != null) return String(attackEvent.timestamp);
     return `d20:${attackEvent?.d20 ?? '?'}+${attackEvent?.bonus ?? 0}:${attackerName ?? ''}`;
@@ -76,18 +94,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     description += `Original roll: d20(${d20}) + ${bonus} = ${d20 + bonus} vs AC ${ac != null ? ac : '—'} → <b>${hit ? 'HIT' : 'MISS'}</b><br/>`;
     description += `Disadvantage (second d20: ${secondD20}): d20(${finalD20}) + ${bonus} = ${finalD20 + bonus} vs AC ${ac != null ? ac : '—'} → <b>${finalHit == null ? 'N/A' : finalHit ? 'HIT' : 'MISS'}</b><br/>`;
 
-    let damageRolledBack = 0;
-    if (hit === true && finalHit === true) {
-        description += `<br/><i>The attack still hits despite Disadvantage.</i>`;
-    } else if (hit === true && finalHit === false) {
-        description += `<br/><i>The attack now misses due to Disadvantage!</i>`;
-        damageRolledBack = await rollbackDamage(attackerName, playerName, campaignName, featureName);
-        if (damageRolledBack > 0) {
-            description += `<br/>Damage negated: ${damageRolledBack} HP restored.`;
-        }
-    } else if (hit === false) {
-        description += `<br/><i>The attack already missed — Disadvantage has no additional effect.</i>`;
-    }
+    const outcome = await appendDodgeOutcome(hit, finalHit, attackerName, playerName, campaignName, featureName);
+    description += outcome.text;
+    const damageRolledBack = outcome.damageRolledBack;
 
     description += `<br/>Teleported 30 feet to an unoccupied space you can see.`;
 

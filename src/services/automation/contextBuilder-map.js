@@ -60,20 +60,23 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
             }
 
              // Resolve accumulated map-based adv/dis counts
-            if (base.forcedMode === undefined && (base._mapAdv || base._mapDis || base._rangeDis || base._meleeDis)) {
-                const totalMapAdv = base._mapAdv || 0;
-                const totalMapDis = (base._mapDis || 0) + (base._rangeDis || 0) + (base._meleeDis || 0);
-                if (totalMapAdv > totalMapDis) {
-                    base.forcedMode = 'advantage';
-                } else if (totalMapDis > totalMapAdv) {
-                    base.forcedMode = 'disadvantage';
-                }
-            }
+            resolveMapMode(base);
 
             return base;
         });
     })
         .catch(() => basePromise);
+}
+
+function resolveMapMode(base) {
+    if (base.forcedMode !== undefined) return;
+    const totalMapAdv = base._mapAdv || 0;
+    const totalMapDis = (base._mapDis || 0) + (base._rangeDis || 0) + (base._meleeDis || 0);
+    if (totalMapAdv > totalMapDis) {
+        base.forcedMode = 'advantage';
+    } else if (totalMapDis > totalMapAdv) {
+        base.forcedMode = 'disadvantage';
+    }
 }
 
 // Cover level values mirror COVER in rules/combat/coverService.js
@@ -99,6 +102,28 @@ function getAuraSourceForSmiteCover(playerStats, mapData) {
 async function checkInAuraOfProtection(auraSource, targetName, playerStats) {
     const auraRange = hasAuraOfProtection(playerStats) ? 30 : 10;
     return await isWithinRange(auraSource.name, targetName, auraRange);
+}
+
+function hasBulwarkCoverAgainst(mapData, targetName) {
+    if (!mapData?.players) return false;
+    return mapData.players.some(player => {
+        if (!getRuntimeValue(player.name, 'bulwarkOfForceActive')) return false;
+        const bulwarkTargets = getRuntimeValue(player.name, 'bulwarkOfForceTargets') || [];
+        return bulwarkTargets.includes(targetName);
+    });
+}
+
+async function hasSmiteOfProtectionCover(playerStats, mapData, targetName, campaignName) {
+    const smiteCoverActive = getRuntimeValue(playerStats.name, 'smiteOfProtectionActive', campaignName);
+    if (!smiteCoverActive) return false;
+    const auraSource = getAuraSourceForSmiteCover(playerStats, mapData);
+    if (!auraSource) return false;
+    return await checkInAuraOfProtection(auraSource, targetName, playerStats);
+}
+
+function getBaitAndSwitchBonus(targetName, campaignName) {
+    if (!getRuntimeValue(targetName, 'baitAndSwitchActive', campaignName)) return 0;
+    return Number(getRuntimeValue(targetName, 'baitAndSwitchBonus', campaignName) || 0);
 }
 
 function resolveTargetPosition(mapData, cs, attackerName, attackerPlayer) {
@@ -203,30 +228,15 @@ async function applyCoverModifiers(base, attack, attackerPlayer, targetPos, mapD
     }
 
     // Check Bulwark of Force half cover — any PC with the buff can grant cover to the target
-    if (coverResult.acBonus < 2 && mapData?.players) {
-        for (const player of mapData.players) {
-            const bulwarkActive = getRuntimeValue(player.name, 'bulwarkOfForceActive');
-            if (!bulwarkActive) continue;
-            const bulwarkTargets = getRuntimeValue(player.name, 'bulwarkOfForceTargets') || [];
-            if (bulwarkTargets.includes(base.targetName)) {
-                coverResult = { level: 'half', acBonus: 2 };
-                base.coverReason = 'Bulwark of Force';
-                break;
-            }
-        }
+    if (coverResult.acBonus < 2 && hasBulwarkCoverAgainst(mapData, base.targetName)) {
+        coverResult = { level: 'half', acBonus: 2 };
+        base.coverReason = 'Bulwark of Force';
     }
 
     // Check Smite of Protection half cover (allies within Aura of Protection range)
-    const smiteCoverActive = getRuntimeValue(playerStats.name, 'smiteOfProtectionActive', campaignName);
-    if (smiteCoverActive && coverResult.acBonus < 2) {
-        const auraSource = getAuraSourceForSmiteCover(playerStats, mapData);
-        if (auraSource) {
-            const inAura = await checkInAuraOfProtection(auraSource, base.targetName, playerStats);
-            if (inAura) {
-                coverResult = { level: 'half', acBonus: 2 };
-                base.coverReason = 'Smite of Protection';
-            }
-        }
+    if (coverResult.acBonus < 2 && await hasSmiteOfProtectionCover(playerStats, mapData, base.targetName, campaignName)) {
+        coverResult = { level: 'half', acBonus: 2 };
+        base.coverReason = 'Smite of Protection';
     }
 
     // Check Defensive Duelist AC bonus (2024 rules)
@@ -238,12 +248,9 @@ async function applyCoverModifiers(base, attack, attackerPlayer, targetPos, mapD
     }
 
     // Check Bait and Switch AC bonus (2024 rules)
-    const baitAndSwitchActive = getRuntimeValue(base.targetName, 'baitAndSwitchActive', campaignName);
-    if (baitAndSwitchActive) {
-        const baitAndSwitchBonus = Number(getRuntimeValue(base.targetName, 'baitAndSwitchBonus', campaignName) || 0);
-        if (baitAndSwitchBonus > coverResult.acBonus) {
-            coverResult.acBonus = baitAndSwitchBonus;
-        }
+    const baitAndSwitchBonus = getBaitAndSwitchBonus(base.targetName, campaignName);
+    if (baitAndSwitchBonus > coverResult.acBonus) {
+        coverResult.acBonus = baitAndSwitchBonus;
     }
 
     if (coverResult.level === 'full') {

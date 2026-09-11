@@ -6,6 +6,46 @@ import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 
+async function buildCreatureTargets(playerName, campaignName, mapName, rangeFt) {
+    const creatureTargets = [];
+    const allyList = getAllyList(playerName);
+    const hasAllyList = allyList.length > 1;
+
+    if (!mapName || rangeFt == null) {
+        // No map: include all allies + self (assume in range)
+        for (const allyName of allyList) {
+            if (hasAllyList && allyName !== playerName) {
+                creatureTargets.push({ name: allyName, type: 'player' });
+            }
+        }
+        creatureTargets.push({ name: playerName, type: 'player' });
+        return creatureTargets;
+    }
+
+    const mapPlayers = (await loadMapData(campaignName, mapName))?.players || [];
+
+    if (hasAllyList) {
+        for (const allyName of allyList) {
+            if (allyName === playerName) continue;
+            if (await isWithinRange(playerName, allyName, rangeFt)) {
+                creatureTargets.push({ name: allyName, type: 'player' });
+            }
+        }
+    } else {
+        for (const p of mapPlayers) {
+            if (p.name === playerName) continue;
+            if (creatureTargets.length >= 10) break;
+            if (await isWithinRange(playerName, p.name, rangeFt)) {
+                creatureTargets.push({ name: p.name, type: 'player' });
+            }
+        }
+    }
+
+    // Include self
+    creatureTargets.push({ name: playerName, type: 'player' });
+    return creatureTargets;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -63,48 +103,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    // Get ally list from selectedAllies
-    const allyList = getAllyList(playerName);
-    const hasAllyList = allyList.length > 1;
-
     // Build target list using allies within range
     const rangeFt = rangeToFeet(auto.range || '30 ft');
-    const creatureTargets = [];
-
-    if (_mapName && rangeFt != null) {
-        const mapPlayers = (await loadMapData(campaignName, _mapName))?.players || [];
-
-        if (hasAllyList) {
-            for (const allyName of allyList) {
-                if (allyName === playerName) continue;
-                const inRange = await isWithinRange(playerName, allyName, rangeFt);
-                if (inRange) {
-                    creatureTargets.push({ name: allyName, type: 'player' });
-                }
-            }
-        } else {
-            for (const p of mapPlayers) {
-                if (p.name === playerName) continue;
-                if (creatureTargets.length >= 10) break;
-                const inRange = await isWithinRange(playerName, p.name, rangeFt);
-                if (inRange) {
-                    creatureTargets.push({ name: p.name, type: 'player' });
-                }
-            }
-        }
-
-        // Include self
-        creatureTargets.push({ name: playerName, type: 'player' });
-    } else {
-        // No map: include all allies + self (assume in range)
-        if (hasAllyList) {
-            for (const allyName of allyList) {
-                if (allyName === playerName) continue;
-                creatureTargets.push({ name: allyName, type: 'player' });
-            }
-        }
-        creatureTargets.push({ name: playerName, type: 'player' });
-    }
+    const creatureTargets = await buildCreatureTargets(playerName, campaignName, _mapName, rangeFt);
 
     // Dispatch CustomEvent to show modal
     window.dispatchEvent(new CustomEvent('inspiring-smite-pending', {

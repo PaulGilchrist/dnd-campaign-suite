@@ -81,93 +81,9 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
         description += buildManeuverSaveDescription(maneuver, saveDc);
     }
 
-    if (maneuver.effect === 'next_attack_advantage' || maneuver.effect === 'distracting_strike_advantage') {
-        description += ` The next attack against ${targetName || 'the target'} by an ally has Advantage.`;
-        if (targetName) {
-            const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-            const newEffect = {
-                target: targetName,
-                source: playerStats.name,
-                effect: 'distracting_strike_advantage',
-                value: null,
-                duration: 'until_end_of_turn',
-            };
-            await setRuntimeValue('campaign', 'targetEffects', [...storedEffects, newEffect], campaignName);
-        }
-    }
-
-    if (maneuver.effect === 'ally_movement') {
-        description += ` An ally can use its Reaction to move up to half its Speed without provoking Opportunity Attacks.`;
-    }
-
-    if (maneuver.actionType === 'grant_attack') {
-        description += ` Choose a willing ally to add ${dieValue} to their next attack's damage roll.`;
-        return buildGrantAttackModal(maneuver, auto, description, dieValue, playerStats, campaignName);
-    }
-
-    if (maneuver.effect === 'ac_bonus_and_swap') {
-        description += ` You or an ally gains +${dieValue} AC until the start of your next turn.`;
-        return buildBaitAndSwitchModal(maneuver, auto, description, dieValue, playerStats, campaignName);
-    }
-
-    if (maneuver.effect === 'ac_bonus_disengage') {
-        description += ` You take the Disengage action and gain +${dieValue} AC until the start of your next turn.`;
-        await setRuntimeValue(playerStats.name, 'baitAndSwitchActive', true, campaignName);
-        await setRuntimeValue(playerStats.name, 'baitAndSwitchBonus', dieValue, campaignName);
-        await setRuntimeValue(playerStats.name, 'baitAndSwitchSource', maneuver.name, campaignName);
-        await addExpiration(playerStats.name, playerStats.name, [
-            { type: 'bait_and_switch_clear' }
-        ], campaignName, undefined, playerStats.name);
-    }
-
-    if (maneuver.effect === 'advantage_and_damage') {
-        await setRuntimeValue(playerStats.name, 'feintingAttackDieValue', dieValue, campaignName);
-        const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-        const currentRound = getCurrentCombatRound();
-        const newEffect = {
-            target: playerStats.name,
-            source: maneuver.name,
-            effect: 'next_attack_advantage',
-            vexTarget: targetName || null,
-            value: null,
-            duration: 'until_end_of_turn',
-            appliedRound: currentRound,
-        };
-        await setRuntimeValue('campaign', 'targetEffects', [...storedEffects, newEffect], campaignName);
-        addExpiration(playerStats.name, playerStats.name, [
-            { type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: maneuver.name, target: playerStats.name }
-        ], campaignName, 2);
-        description += ` You have Advantage on your next attack roll against the target. If it hits, add ${dieValue} to the damage roll.`;
-    }
-
-    if (maneuver.effect === 'dash_and_damage') {
-        await setRuntimeValue(playerStats.name, 'lungingAttackDieValue', dieValue, campaignName);
-        description += ` You take the Dash action. Add ${dieValue} to the damage roll of your next melee hit this turn.`;
-    }
-
-    if (maneuver.effect === 'temp_hp') {
-        return buildRallyModal(maneuver, description, dieValue, playerStats, campaignName);
-    }
-
-    if (maneuver.effect === 'damage_reduction') {
-        description += await runDamageReduction(maneuver, playerStats, dieValue, campaignName);
-    }
-
-    if (maneuver.effect === 'melee_attack_reaction') {
-        return runRiposte(maneuver, auto, description, targetName, dieValue, superiorityDieSize, playerStats, campaignName);
-    }
-
-    if (maneuver.effect === 'secondary_damage') {
-        return runSweepingAttack(maneuver, auto, dieDescription, dieValue, targetName, playerStats, campaignName);
-    }
-
-    if (maneuver.effect === 'attack_roll_bonus') {
-        description += ` Add ${dieValue} to the attack roll.`;
-    }
-
-    if (maneuver.actionType === 'skill_check') {
-        description += ` Add ${dieValue} to the ability check.`;
-    }
+    const stepOutcome = await runManeuverSteps(description, maneuver, { auto, targetName, dieValue, dieDescription, superiorityDieSize, playerStats, campaignName });
+    description = stepOutcome.description;
+    if (stepOutcome.result) return stepOutcome.result;
 
     const logEntry = {
         type: 'ability_use',
@@ -188,6 +104,123 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
         },
         logEntries: [logEntry],
     };
+}
+
+// Ordered maneuver effect steps — first match appends/returns, multiple
+// text-append steps may run for one maneuver (mirrors the original if chain).
+const RUNNER_STEPS = [
+    {
+        test: m => m.effect === 'next_attack_advantage' || m.effect === 'distracting_strike_advantage',
+        run: (m, d, ctx) => applyNextAttackAdvantage(m, ctx.targetName, ctx.playerStats, ctx.campaignName),
+    },
+    {
+        test: m => m.effect === 'ally_movement',
+        run: () => ` An ally can use its Reaction to move up to half its Speed without provoking Opportunity Attacks.`,
+    },
+    {
+        test: m => m.actionType === 'grant_attack',
+        run: async (m, d, ctx) => buildGrantAttackModal(m, ctx.auto, d + ` Choose a willing ally to add ${ctx.dieValue} to their next attack's damage roll.`, ctx.dieValue, ctx.playerStats, ctx.campaignName),
+    },
+    {
+        test: m => m.effect === 'ac_bonus_and_swap',
+        run: async (m, d, ctx) => buildBaitAndSwitchModal(m, ctx.auto, d + ` You or an ally gains +${ctx.dieValue} AC until the start of your next turn.`, ctx.dieValue, ctx.playerStats, ctx.campaignName),
+    },
+    {
+        test: m => m.effect === 'ac_bonus_disengage',
+        run: async (m, d, ctx) => {
+            await setRuntimeValue(ctx.playerStats.name, 'baitAndSwitchActive', true, ctx.campaignName);
+            await setRuntimeValue(ctx.playerStats.name, 'baitAndSwitchBonus', ctx.dieValue, ctx.campaignName);
+            await setRuntimeValue(ctx.playerStats.name, 'baitAndSwitchSource', m.name, ctx.campaignName);
+            await addExpiration(ctx.playerStats.name, ctx.playerStats.name, [
+                { type: 'bait_and_switch_clear' }
+            ], ctx.campaignName, undefined, ctx.playerStats.name);
+            return ` You take the Disengage action and gain +${ctx.dieValue} AC until the start of your next turn.`;
+        },
+    },
+    {
+        test: m => m.effect === 'advantage_and_damage',
+        run: (m, d, ctx) => applyAdvantageAndDamage(m, ctx.targetName, ctx.dieValue, ctx.playerStats, ctx.campaignName),
+    },
+    {
+        test: m => m.effect === 'dash_and_damage',
+        run: async (m, d, ctx) => {
+            await setRuntimeValue(ctx.playerStats.name, 'lungingAttackDieValue', ctx.dieValue, ctx.campaignName);
+            return ` You take the Dash action. Add ${ctx.dieValue} to the damage roll of your next melee hit this turn.`;
+        },
+    },
+    {
+        test: m => m.effect === 'temp_hp',
+        run: (m, d, ctx) => buildRallyModal(m, d, ctx.dieValue, ctx.playerStats, ctx.campaignName),
+    },
+    {
+        test: m => m.effect === 'damage_reduction',
+        run: (m, d, ctx) => runDamageReduction(m, ctx.playerStats, ctx.dieValue, ctx.campaignName),
+    },
+    {
+        test: m => m.effect === 'melee_attack_reaction',
+        run: (m, d, ctx) => runRiposte(m, ctx.auto, d, ctx.targetName, ctx.dieValue, ctx.superiorityDieSize, ctx.playerStats, ctx.campaignName),
+    },
+    {
+        test: m => m.effect === 'secondary_damage',
+        run: (m, d, ctx) => runSweepingAttack(m, ctx.auto, ctx.dieDescription, ctx.dieValue, ctx.targetName, ctx.playerStats, ctx.campaignName),
+    },
+    {
+        test: m => m.effect === 'attack_roll_bonus',
+        run: (m, d, ctx) => ` Add ${ctx.dieValue} to the attack roll.`,
+    },
+    {
+        test: m => m.actionType === 'skill_check',
+        run: (m, d, ctx) => ` Add ${ctx.dieValue} to the ability check.`,
+    },
+];
+
+async function runManeuverSteps(description, maneuver, ctx) {
+    for (const step of RUNNER_STEPS) {
+        if (!step.test(maneuver)) continue;
+        const outcome = await step.run(maneuver, description, ctx);
+        if (typeof outcome === 'string') {
+            description += outcome;
+        } else if (outcome) {
+            return { description, result: outcome };
+        }
+    }
+    return { description };
+}
+
+async function applyNextAttackAdvantage(maneuver, targetName, playerStats, campaignName) {
+    let description = ` The next attack against ${targetName || 'the target'} by an ally has Advantage.`;
+    if (targetName) {
+        const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+        const newEffect = {
+            target: targetName,
+            source: playerStats.name,
+            effect: 'distracting_strike_advantage',
+            value: null,
+            duration: 'until_end_of_turn',
+        };
+        await setRuntimeValue('campaign', 'targetEffects', [...storedEffects, newEffect], campaignName);
+    }
+    return description;
+}
+
+async function applyAdvantageAndDamage(maneuver, targetName, dieValue, playerStats, campaignName) {
+    await setRuntimeValue(playerStats.name, 'feintingAttackDieValue', dieValue, campaignName);
+    const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const currentRound = getCurrentCombatRound();
+    const newEffect = {
+        target: playerStats.name,
+        source: maneuver.name,
+        effect: 'next_attack_advantage',
+        vexTarget: targetName || null,
+        value: null,
+        duration: 'until_end_of_turn',
+        appliedRound: currentRound,
+    };
+    await setRuntimeValue('campaign', 'targetEffects', [...storedEffects, newEffect], campaignName);
+    addExpiration(playerStats.name, playerStats.name, [
+        { type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: maneuver.name, target: playerStats.name }
+    ], campaignName, 2);
+    return ` You have Advantage on your next attack roll against the target. If it hits, add ${dieValue} to the damage roll.`;
 }
 
 // Effects that carry no explicit target suffix in the maneuver description.

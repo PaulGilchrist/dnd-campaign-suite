@@ -132,100 +132,9 @@ export async function processStinkingCloudAreaSave(casterName, targetName, campa
     const saveResult = await promise;
 
     if (!saveResult.success) {
-        const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-        const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-        const filtered = conditions.filter(c => String(c).toLowerCase() !== 'poisoned');
-        setRuntimeValue(targetName, 'activeConditions', [...filtered, 'poisoned'], campaignName);
-
-        const existingMeta = getRuntimeValue(targetName, 'activeConditionMeta', campaignName) || {};
-        setRuntimeValue(targetName, 'activeConditionMeta', {
-            ...existingMeta,
-            poisoned: {
-                ...(existingMeta.poisoned || {}),
-                dc: tracking.saveDc,
-                ability: 'con',
-                source: 'stinking_cloud',
-            },
-        }, campaignName);
-
-        await addTargetResult(campaignName, {
-            targetName,
-            saveResult: 'failure',
-            roll: saveResult.roll ?? 0,
-            total: saveResult.total ?? 0,
-            conditions: ['poisoned'],
-            appliedDamage: 0,
-        });
-
-        if (!getEffectDefinition(BLOCK_TE_EFFECT)) {
-            console.error(`[stinkingCloudHandler] "${BLOCK_TE_EFFECT}" missing from targetEffectDefinitions registry`);
-        }
-        registerTargetEffect(campaignName, targetName, BLOCK_TE_EFFECT, casterName, {
-            duration: 'until_end_of_current_turn',
-            reason: 'Poisoned by Stinking Cloud (can\'t take an Action or Bonus Action)',
-        });
-
-        addEntry(campaignName, {
-            type: 'save_result',
-            characterName: casterName,
-            rollType: 'save-stinking-cloud',
-            targetName,
-            saveDc: tracking.saveDc,
-            saveType: 'CON',
-            success: false,
-            description: `${targetName} failed its turn-start CON save (DC ${tracking.saveDc}) against Stinking Cloud and is Poisoned until the end of the current turn — can't take an Action or Bonus Action.`,
-        }).catch((e) => { console.error("[stinkingCloudAreaSave] Error:", e); });
-
-        addEntry(campaignName, {
-            type: 'condition',
-            action: 'applied',
-            characterName: targetName,
-            condition: 'Poisoned',
-            reason: 'Stinking Cloud (turn start)',
-            note: `${targetName} is Poisoned by Stinking Cloud. While Poisoned, the creature can't take an Action or Bonus Action.`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[stinkingCloudAreaSave] Error:", e); });
+        await applyStinkingCloudPoison(campaignName, casterName, targetName, tracking.saveDc, saveResult);
     } else {
-        const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-        const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-        if (conditions.some(c => String(c).toLowerCase() === 'poisoned')) {
-            setRuntimeValue(targetName, 'activeConditions',
-                conditions.filter(c => String(c).toLowerCase() !== 'poisoned'), campaignName);
-            addEntry(campaignName, {
-                type: 'condition',
-                action: 'removed',
-                characterName: targetName,
-                condition: 'Poisoned',
-                reason: 'Stinking Cloud (turn-start save succeeded)',
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[stinkingCloudAreaSave] Error:", e); });
-        }
-
-        const tes = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
-        const remaining = tes.filter(te => !(te.effect === BLOCK_TE_EFFECT && te.target === targetName && te.source === casterName));
-        if (remaining.length !== tes.length) {
-            setRuntimeValue('campaign', 'targetEffects', remaining, campaignName);
-        }
-
-        await addTargetResult(campaignName, {
-            targetName,
-            saveResult: 'success',
-            roll: saveResult.roll ?? 0,
-            total: saveResult.total ?? 0,
-            conditions: [],
-            appliedDamage: 0,
-        });
-
-        addEntry(campaignName, {
-            type: 'save_result',
-            characterName: casterName,
-            rollType: 'save-stinking-cloud',
-            targetName,
-            saveDc: tracking.saveDc,
-            saveType: 'CON',
-            success: true,
-            description: `${targetName} succeeded on its turn-start CON save (DC ${tracking.saveDc}) against Stinking Cloud.`,
-        }).catch((e) => { console.error("[stinkingCloudAreaSave] Error:", e); });
+        await clearStinkingCloudPoison(campaignName, casterName, targetName, tracking.saveDc, saveResult);
     }
 
     return {
@@ -236,6 +145,105 @@ export async function processStinkingCloudAreaSave(casterName, targetName, campa
             description: `${targetName} ${saveResult.success ? 'succeeded' : 'failed'} the CON save (DC ${tracking.saveDc}) at turn start. ${saveResult.success ? 'Unaffected.' : 'Poisoned until the end of the current turn — can\'t take an Action or Bonus Action.'}`,
         },
     };
+}
+
+async function applyStinkingCloudPoison(campaignName, casterName, targetName, saveDc, saveResult) {
+    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'poisoned');
+    setRuntimeValue(targetName, 'activeConditions', [...filtered, 'poisoned'], campaignName);
+
+    const existingMeta = getRuntimeValue(targetName, 'activeConditionMeta', campaignName) || {};
+    setRuntimeValue(targetName, 'activeConditionMeta', {
+        ...existingMeta,
+        poisoned: {
+            ...(existingMeta.poisoned || {}),
+            dc: saveDc,
+            ability: 'con',
+            source: 'stinking_cloud',
+        },
+    }, campaignName);
+
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'failure',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: ['poisoned'],
+        appliedDamage: 0,
+    });
+
+    if (!getEffectDefinition(BLOCK_TE_EFFECT)) {
+        console.error(`[stinkingCloudHandler] "${BLOCK_TE_EFFECT}" missing from targetEffectDefinitions registry`);
+    }
+    registerTargetEffect(campaignName, targetName, BLOCK_TE_EFFECT, casterName, {
+        duration: 'until_end_of_current_turn',
+        reason: 'Poisoned by Stinking Cloud (can\'t take an Action or Bonus Action)',
+    });
+
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-stinking-cloud',
+        targetName,
+        saveDc,
+        saveType: 'CON',
+        success: false,
+        description: `${targetName} failed its turn-start CON save (DC ${saveDc}) against Stinking Cloud and is Poisoned until the end of the current turn — can't take an Action or Bonus Action.`,
+    }).catch((e) => { console.error("[stinkingCloudAreaSave] Error:", e); });
+
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: 'Poisoned',
+        reason: 'Stinking Cloud (turn start)',
+        note: `${targetName} is Poisoned by Stinking Cloud. While Poisoned, the creature can't take an Action or Bonus Action.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[stinkingCloudAreaSave] Error:", e); });
+}
+
+async function clearStinkingCloudPoison(campaignName, casterName, targetName, saveDc, saveResult) {
+    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    if (conditions.some(c => String(c).toLowerCase() === 'poisoned')) {
+        setRuntimeValue(targetName, 'activeConditions',
+            conditions.filter(c => String(c).toLowerCase() !== 'poisoned'), campaignName);
+        addEntry(campaignName, {
+            type: 'condition',
+            action: 'removed',
+            characterName: targetName,
+            condition: 'Poisoned',
+            reason: 'Stinking Cloud (turn-start save succeeded)',
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[stinkingCloudAreaSave] Error:", e); });
+    }
+
+    const tes = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+    const remaining = tes.filter(te => !(te.effect === BLOCK_TE_EFFECT && te.target === targetName && te.source === casterName));
+    if (remaining.length !== tes.length) {
+        setRuntimeValue('campaign', 'targetEffects', remaining, campaignName);
+    }
+
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'success',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: [],
+        appliedDamage: 0,
+    });
+
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-stinking-cloud',
+        targetName,
+        saveDc,
+        saveType: 'CON',
+        success: true,
+        description: `${targetName} succeeded on its turn-start CON save (DC ${saveDc}) against Stinking Cloud.`,
+    }).catch((e) => { console.error("[stinkingCloudAreaSave] Error:", e); });
 }
 
 export async function handle(action, playerStats, campaignName, _mapName) {

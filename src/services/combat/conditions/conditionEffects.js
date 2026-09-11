@@ -588,6 +588,13 @@ function applyTargetEffect(effects, te, attackerSenses) {
   // tracked for cleanup or escape attempts only — no direct stat modification here.
 }
 
+// Protection from Poison: Advantage on saving throws to avoid or end the Poisoned condition
+function applyProtectionFromPoisonAdvantage(effects, conditionSet, isProtectionFromPoisonActive) {
+  if (!isProtectionFromPoisonActive || !conditionSet.has('poisoned')) return;
+  effects.saveAdvantageCount = (effects.saveAdvantageCount || 0) + 1;
+  effects.saveAdvantageReasons = [...(effects.saveAdvantageReasons || []), 'Protection from Poison'];
+}
+
 function computeConditionEffects(conditions = [], saveModifiers = [], targetEffects = [], isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, seeInvisibilityActive = false, attackerName = null, isLivingLegendActive = false, isElderChampionActive = false, isElderChampionAttackerActive = false, holyAuraTargets = [], isProtectionFromPoisonActive = false, isTranceOfOrderActive = false, hasPowerfulBuild = false, attackerSenses = null) {
   const effects = buildBaseEffects()
 
@@ -607,11 +614,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     : saveModifiers;
   applySaveModifiers(effects, activeSaveModifiers, null, null, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, conditions, attackerName, isLivingLegendActive, isElderChampionActive, isElderChampionAttackerActive, holyAuraTargets, isProtectionFromPoisonActive, isTranceOfOrderActive, hasPowerfulBuild);
 
-  // Protection from Poison: Advantage on saving throws to avoid or end the Poisoned condition
-  if (isProtectionFromPoisonActive && conditionSet.has('poisoned')) {
-    effects.saveAdvantageCount = (effects.saveAdvantageCount || 0) + 1;
-    effects.saveAdvantageReasons = [...(effects.saveAdvantageReasons || []), 'Protection from Poison'];
-  }
+  applyProtectionFromPoisonAdvantage(effects, conditionSet, isProtectionFromPoisonActive);
 
   const conditionCtx = {
     seeInvisibilityActive,

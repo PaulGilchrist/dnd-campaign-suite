@@ -63,62 +63,69 @@ export async function buildAttackContextForDamage(attackContext, playerName, cam
             loadNPCs(campaignName),
          ]);
 
-        const attackerPlayer = mapData?.players?.find(p => p.name === playerName);
-        if (attackerPlayer) {
-            const targetPos = await resolveTargetPosition(mapData, playerName, attackerPlayer, campaignName);
-
-            const numericRange = rangeToFeet(attackContext.range) || 0;
-            const isRanged = numericRange > 8;
-
-            if (targetPos) {
-                const distanceFt = getDistanceFeet(
-                    { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
-                    targetPos
-                 );
-                const rangeResult = computeRangeEffect(isRanged ? numericRange : attackContext.range, distanceFt, {});
-                if (rangeResult.mode === 'disadvantage') {
-                    return { ...buildSyncCtx(targetName, resistanceNotice, attackContext, playerName), forcedMode: 'disadvantage', rangeReason: rangeResult.reason };
-                 } else if (rangeResult.mode === 'miss') {
-                    return { ...buildSyncCtx(targetName, resistanceNotice, attackContext, playerName), isAutoMiss: true, rangeReason: rangeResult.reason };
-                 }
-             }
-
-            if (isRanged && !targetPos) {
-                const nearbyThreats = (mapData?.placedItems || [])
-                    .filter(i => i.type === 'npc')
-                    .map(i => {
-                        const npcData = npcs?.find(n => n.name === i.name || n.name === i.name?.replace(/\s+\d+$/, ''));
-                        return { ...i, attitude: npcData?.attitude };
-                     })
-                    .filter(i => isHostileNPC(i))
-                    .map(i => ({ gridX: i.gridX, gridY: i.gridY, name: i.name }));
-
-                const meleeResult = computeMeleeProximityEffect(true, attackerPlayer, nearbyThreats, {});
-                if (meleeResult.mode === 'disadvantage') {
-                    return { ...buildSyncCtx(targetName, resistanceNotice, attackContext, playerName), forcedMode: 'disadvantage', rangeReason: meleeResult.reason };
-                 }
-            }
-
-            if (isRanged && targetPos && !rangeToFeet(attackContext.range)) {
-                const walls = mapData?.walls || new Set();
-                const coverResult = computeCover(
-                    { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
-                    { gridX: targetPos.gridX, gridY: targetPos.gridY },
-                    walls,
-                    mapData?.placedItems || [],
-                 );
-                if (coverResult.level === 'full') {
-                    return { ...buildSyncCtx(targetName, resistanceNotice, attackContext, playerName), isAutoMiss: true, coverReason: 'Target has full cover' };
-                 } else if (coverResult.acBonus > 0) {
-                    return { ...buildSyncCtx(targetName, resistanceNotice, attackContext, playerName), coverAcBonus: coverResult.acBonus, coverLevel: coverResult.level };
-                 }
-             }
-         }
-
-        return buildSyncCtx(targetName, resistanceNotice, attackContext, playerName);
+        return await computeMapAwareContext(mapData, npcs, attackContext, playerName, campaignName, targetName, resistanceNotice);
      } catch {
         return buildSyncCtx(targetName, resistanceNotice, attackContext, playerName);
      }
+}
+
+async function computeMapAwareContext(mapData, npcs, attackContext, playerName, campaignName, targetName, resistanceNotice) {
+    const base = buildSyncCtx(targetName, resistanceNotice, attackContext, playerName);
+    const attackerPlayer = mapData?.players?.find(p => p.name === playerName);
+    if (!attackerPlayer) return base;
+
+    const targetPos = await resolveTargetPosition(mapData, playerName, attackerPlayer, campaignName);
+    const numericRange = rangeToFeet(attackContext.range) || 0;
+    const isRanged = numericRange > 8;
+
+    if (targetPos) {
+        const distanceFt = getDistanceFeet(
+            { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
+            targetPos
+         );
+        const rangeResult = computeRangeEffect(isRanged ? numericRange : attackContext.range, distanceFt, {});
+        if (rangeResult.mode === 'disadvantage') {
+            return { ...base, forcedMode: 'disadvantage', rangeReason: rangeResult.reason };
+         }
+        if (rangeResult.mode === 'miss') {
+            return { ...base, isAutoMiss: true, rangeReason: rangeResult.reason };
+         }
+     }
+
+    if (isRanged && !targetPos) {
+        const meleeResult = computeMeleeProximityEffect(true, attackerPlayer, collectHostileThreats(mapData, npcs), {});
+        if (meleeResult.mode === 'disadvantage') {
+            return { ...base, forcedMode: 'disadvantage', rangeReason: meleeResult.reason };
+         }
+     }
+
+    if (isRanged && targetPos && !rangeToFeet(attackContext.range)) {
+        const coverResult = computeCover(
+            { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
+            { gridX: targetPos.gridX, gridY: targetPos.gridY },
+            mapData?.walls || new Set(),
+            mapData?.placedItems || [],
+         );
+        if (coverResult.level === 'full') {
+            return { ...base, isAutoMiss: true, coverReason: 'Target has full cover' };
+         }
+        if (coverResult.acBonus > 0) {
+            return { ...base, coverAcBonus: coverResult.acBonus, coverLevel: coverResult.level };
+         }
+     }
+
+    return base;
+}
+
+function collectHostileThreats(mapData, npcs) {
+    return (mapData?.placedItems || [])
+        .filter(i => i.type === 'npc')
+        .map(i => {
+            const npcData = npcs?.find(n => n.name === i.name || n.name === i.name?.replace(/\s+\d+$/, ''));
+            return { ...i, attitude: npcData?.attitude };
+         })
+        .filter(i => isHostileNPC(i))
+        .map(i => ({ gridX: i.gridX, gridY: i.gridY, name: i.name }));
 }
 
 function buildSyncCtx(targetName, resistanceNotice, attackContext, attackerName) {

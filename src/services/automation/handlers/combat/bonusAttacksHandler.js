@@ -386,6 +386,22 @@ function logFlurryStrikeRolls(attackResult, ctx) {
     }
 }
 
+function resolveFlurryHealingHarm(playerStats, campaignName) {
+    const hasFlurryHealingHarm = playerStats.specialActions?.some(f => f.name === "Flurry of Healing and Harm");
+    let flurryHealingHarmUses = 0;
+    let handOfHarmAuto = null;
+
+    if (hasFlurryHealingHarm) {
+        flurryHealingHarmUses = Number(getRuntimeValue(playerStats.name, 'flurryHealingHarmUses', campaignName) || 0);
+        const handOfHarmAction = playerStats.specialActions?.find(a => a.name === "Hand of Harm");
+        if (handOfHarmAction) {
+            handOfHarmAuto = handOfHarmAction.automation;
+        }
+    }
+
+    return { hasFlurryHealingHarm, flurryHealingHarmUses, handOfHarmAuto };
+}
+
 export async function applyFlurryOfBlows(action, playerStats, campaignName, _mapName, distribution, numAttacks, healingTarget = null) {
     const playerName = playerStats.name;
     const featureName = action.name;
@@ -410,17 +426,9 @@ export async function applyFlurryOfBlows(action, playerStats, campaignName, _map
 
     const openHandFeature = playerStats.automation?.actions?.find(a => a.type === 'open_hand_technique');
 
-    const hasFlurryHealingHarm = playerStats.specialActions?.some(f => f.name === "Flurry of Healing and Harm");
-    let flurryHealingHarmUses = 0;
-    let handOfHarmAuto = null;
-
-    if (hasFlurryHealingHarm) {
-        flurryHealingHarmUses = Number(getRuntimeValue(playerStats.name, 'flurryHealingHarmUses', campaignName) || 0);
-        const handOfHarmAction = playerStats.specialActions?.find(a => a.name === "Hand of Harm");
-        if (handOfHarmAction) {
-            handOfHarmAuto = handOfHarmAction.automation;
-        }
-    }
+    const flurryHarmSetup = resolveFlurryHealingHarm(playerStats, campaignName);
+    const { hasFlurryHealingHarm, handOfHarmAuto } = flurryHarmSetup;
+    let flurryHealingHarmUses = flurryHarmSetup.flurryHealingHarmUses;
 
     for (const [targetName, attackCount] of Object.entries(distribution)) {
         if (!attackCount || attackCount <= 0) continue;

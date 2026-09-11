@@ -86,47 +86,24 @@ function getAllyHitDieSize(playerStats) {
     return 4
 }
 
-function resolveDiceExpression(expression, playerStats, slotLevel) {
-    if (!expression) return expression
+function buildDiceTokenValues(playerStats, slotLevel) {
     const prof = playerStats?.proficiency || 0
     const level = playerStats?.level || 1
-    slotLevel = slotLevel || 1
-    const rageDamage = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.rage_damage ?? 2
-    const bardicDie = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.bardic_die || 6
-    const superiorityDie = getSuperiorityDieSize(playerStats)
-    const psionicEnergyDie = getPsionicEnergyDieSize(playerStats)
-    const martialArtsDie = playerStats?.class?.class_levels?.find(cl => cl.level === playerStats.level)?.martial_arts_die || 4
-    const favoredEnemy = playerStats?.class?.class_levels?.find(cl => cl.level === playerStats.level)?.favored_enemy || 0
-    const allyHitDie = getAllyHitDieSize(playerStats)
-    let expr = expression
-        .replace(/bardic_inspiration_die/g, bardicDie)
-        .replace(/proficiency_bonus_d4/g, `${Math.max(1, prof)}d4`)
-        .replace(/proficiency_bonus/g, prof)
-        .replace(/monk level/gi, level)
-        .replace(/monk_level/gi, level)
-        .replace(/fighter_level/gi, level)
-        .replace(/fighter level/gi, level)
-        .replace(/paladin level/gi, level)
-        .replace(/barbarian_level/gi, level)
-        .replace(/barbarian level/gi, level)
-        .replace(/bard level/gi, level)
-        .replace(/rage_damage_d6/g, `${rageDamage}d6`)
-        .replace(/rage_damage/g, rageDamage)
-        .replace(/cleric_level/gi, level)
-        .replace(/cleric level/gi, level)
-        .replace(/druid_level/gi, level)
-        .replace(/superiority_die/g, superiorityDie)
-        .replace(/psionic_energy_die/g, psionicEnergyDie)
-        .replace(/martial_arts_die/g, martialArtsDie)
-        .replace(/favored_enemy/gi, favoredEnemy)
-        .replace(/ally_hit_die/g, allyHitDie)
-        .replace(/rogue_level/gi, level)
-        .replace(/warlock_level/gi, level)
-        .replace(/warlock level/gi, level)
-        .replace(/spell_slot_level/g, slotLevel)
-        .replace(/\blevel\b/gi, level)
+    const classLevels = playerStats?.class?.class_levels || []
+    const levelEntry = classLevels[(playerStats.level || 1) - 1] || {}
+    const currentEntry = classLevels.find(cl => cl.level === playerStats.level) || {}
     const abilities = playerStats?.abilities || []
-    const abilityModifiers = {
+    return {
+        prof,
+        level,
+        slotLevel: slotLevel || 1,
+        rageDamage: levelEntry.rage_damage ?? 2,
+        bardicDie: levelEntry.bardic_die || 6,
+        superiorityDie: getSuperiorityDieSize(playerStats),
+        psionicEnergyDie: getPsionicEnergyDieSize(playerStats),
+        martialArtsDie: currentEntry.martial_arts_die || 4,
+        favoredEnemy: currentEntry.favored_enemy || 0,
+        allyHitDie: getAllyHitDieSize(playerStats),
         strength: getAbilityModifier(abilities, 'strength'),
         dexterity: getAbilityModifier(abilities, 'dexterity'),
         constitution: getAbilityModifier(abilities, 'constitution'),
@@ -134,13 +111,56 @@ function resolveDiceExpression(expression, playerStats, slotLevel) {
         wisdom: getAbilityModifier(abilities, 'wisdom'),
         charisma: getAbilityModifier(abilities, 'charisma'),
     }
-    expr = expr
-        .replace(/STR modifier/gi, abilityModifiers.strength)
-        .replace(/DEX modifier/gi, abilityModifiers.dexterity)
-        .replace(/CON modifier/gi, abilityModifiers.constitution)
-        .replace(/INT modifier/gi, abilityModifiers.intelligence)
-        .replace(/WIS modifier/gi, abilityModifiers.wisdom)
-        .replace(/CHA modifier/gi, abilityModifiers.charisma)
+}
+
+// Ordered [regex, value] token pairs — order is significant (e.g.
+// proficiency_bonus_d4 must resolve before proficiency_bonus, rage_damage_d6
+// before rage_damage, spell_slot_level before the generic \blevel\b, and
+// ability modifiers last).
+function buildDiceTokenPairs(v) {
+    return [
+        [/bardic_inspiration_die/g, v.bardicDie],
+        [/proficiency_bonus_d4/g, `${Math.max(1, v.prof)}d4`],
+        [/proficiency_bonus/g, v.prof],
+        [/monk level/gi, v.level],
+        [/monk_level/gi, v.level],
+        [/fighter_level/gi, v.level],
+        [/fighter level/gi, v.level],
+        [/paladin level/gi, v.level],
+        [/barbarian_level/gi, v.level],
+        [/barbarian level/gi, v.level],
+        [/bard level/gi, v.level],
+        [/rage_damage_d6/g, `${v.rageDamage}d6`],
+        [/rage_damage/g, v.rageDamage],
+        [/cleric_level/gi, v.level],
+        [/cleric level/gi, v.level],
+        [/druid_level/gi, v.level],
+        [/superiority_die/g, v.superiorityDie],
+        [/psionic_energy_die/g, v.psionicEnergyDie],
+        [/martial_arts_die/g, v.martialArtsDie],
+        [/favored_enemy/gi, v.favoredEnemy],
+        [/ally_hit_die/g, v.allyHitDie],
+        [/rogue_level/gi, v.level],
+        [/warlock_level/gi, v.level],
+        [/warlock level/gi, v.level],
+        [/spell_slot_level/g, v.slotLevel],
+        [/\blevel\b/gi, v.level],
+        [/STR modifier/gi, v.strength],
+        [/DEX modifier/gi, v.dexterity],
+        [/CON modifier/gi, v.constitution],
+        [/INT modifier/gi, v.intelligence],
+        [/WIS modifier/gi, v.wisdom],
+        [/CHA modifier/gi, v.charisma],
+    ]
+}
+
+function resolveDiceExpression(expression, playerStats, slotLevel) {
+    if (!expression) return expression
+    const tokens = buildDiceTokenPairs(buildDiceTokenValues(playerStats, slotLevel))
+    let expr = expression
+    for (const [token, value] of tokens) {
+        expr = expr.replace(token, value)
+    }
     return expr
 }
 

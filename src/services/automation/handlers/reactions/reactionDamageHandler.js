@@ -125,21 +125,8 @@ export async function handle(action, playerStats, campaignName, _mapName, charac
     }
 
     if (auto?.trigger === 'creature_enters_reach_while_holding_polearm') {
-        const lastAttackResult = await findLastAttack(campaignName);
-        const lastAttack = lastAttackResult.attackEvent;
-        const weaponName = lastAttack?.damageName || lastAttack?.attackName;
-        const hasWeapon = await isPolearmWeapon(weaponName);
-        if (!hasWeapon) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: `${action.name} requires you to be holding a Quarterstaff, Spear, or a weapon with the Heavy and Reach properties.`,
-                    automation: auto,
-                },
-            };
-        }
+        const refusal = await gatePolearmReachTrigger(action, auto, campaignName);
+        if (refusal) return refusal;
     }
 
     if (auto?.trigger === 'damage_taken_of_chosen_resistance_type') {
@@ -147,53 +134,7 @@ export async function handle(action, playerStats, campaignName, _mapName, charac
     }
 
     if (!auto.saveType) {
-        const lastAttackResult = await findLastAttack(campaignName);
-        const targetName = lastAttackResult.attackerName || null;
-
-        if (auto.trigger === 'damage_from_adjacent_creature') {
-            const refusal = await gateAdjacentDamageReaction(action, auto, playerStats, lastAttackResult, campaignName);
-            if (refusal) return refusal;
-        }
-
-        const meleeAttacks = (playerStats.attacks || []).filter(
-            a => a.type === 'Action' && a.range === MELEE_REACH_FEET
-        );
-        const attack = meleeAttacks.length > 0 ? meleeAttacks[0] : (playerStats.attacks || [])[0];
-
-        if (!attack) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: `${action.name}: No melee attack available.`,
-                    automation: auto,
-                },
-            };
-        }
-
-        if (auto.trigger === 'damage_from_adjacent_creature') {
-            const combatContext = await getCombatContext(campaignName);
-            const currentRound = combatContext?.round || 1;
-            await setRuntimeValue(playerStats.name, ADJACENT_DAMAGE_REACTION_ROUND_KEY, currentRound, campaignName);
-            addEntry(campaignName, {
-                type: 'ability_use',
-                characterName: playerStats.name,
-                abilityName: action.name,
-                description: `${playerStats.name} used ${action.name} (Reaction) — melee attack against ${targetName} in response to the ${lastAttackResult.totalDamage} damage taken from them.`,
-                targetName,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[reactionDamage] Error logging ability_use:', e); });
-        }
-
-        return {
-            type: 'attack_roll',
-            payload: {
-                attack,
-                targetName,
-                sourceName: action.name,
-            },
-        };
+        return await handleMeleeReactionAttack(action, auto, playerStats, campaignName);
     }
 
     const targetInfo = await resolveTarget(campaignName, playerStats.name);
@@ -224,9 +165,10 @@ export async function handle(action, playerStats, campaignName, _mapName, charac
     }
 
     const saveDc = buildSaveDc(auto, playerStats);
+    const saveType = auto.saveType || 'CON';
     const { promptId } = createSaveListener(campaignName, {
         targetName,
-        saveType: auto.saveType || 'CON',
+        saveType,
         saveDc,
     });
 
@@ -234,7 +176,7 @@ export async function handle(action, playerStats, campaignName, _mapName, charac
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: action.name,
-        description: `${action.name} triggered — ${targetName} must make ${auto.saveType || 'CON'} save (DC ${saveDc})`,
+        description: `${action.name} triggered — ${targetName} must make ${saveType} save (DC ${saveDc})`,
         promptId,
     }).catch((e) => { console.error("[reactionDamage] Error:", e); });
 
@@ -300,8 +242,75 @@ export async function handle(action, playerStats, campaignName, _mapName, charac
             type: 'automation_info',
             name: action.name,
             targetName,
-            description: `${targetName} must make a ${auto.saveType || 'CON'} saving throw (DC ${saveDc}).`,
+            description: `${targetName} must make a ${saveType} saving throw (DC ${saveDc}).`,
             automation: auto,
+        },
+    };
+}
+
+async function gatePolearmReachTrigger(action, auto, campaignName) {
+    const lastAttackResult = await findLastAttack(campaignName);
+    const lastAttack = lastAttackResult.attackEvent;
+    const weaponName = lastAttack?.damageName || lastAttack?.attackName;
+    const hasWeapon = await isPolearmWeapon(weaponName);
+    if (hasWeapon) return null;
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            description: `${action.name} requires you to be holding a Quarterstaff, Spear, or a weapon with the Heavy and Reach properties.`,
+            automation: auto,
+        },
+    };
+}
+
+async function handleMeleeReactionAttack(action, auto, playerStats, campaignName) {
+    const lastAttackResult = await findLastAttack(campaignName);
+    const targetName = lastAttackResult.attackerName || null;
+
+    if (auto.trigger === 'damage_from_adjacent_creature') {
+        const refusal = await gateAdjacentDamageReaction(action, auto, playerStats, lastAttackResult, campaignName);
+        if (refusal) return refusal;
+    }
+
+    const meleeAttacks = (playerStats.attacks || []).filter(
+        a => a.type === 'Action' && a.range === MELEE_REACH_FEET
+    );
+    const attack = meleeAttacks.length > 0 ? meleeAttacks[0] : (playerStats.attacks || [])[0];
+
+    if (!attack) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${action.name}: No melee attack available.`,
+                automation: auto,
+            },
+        };
+    }
+
+    if (auto.trigger === 'damage_from_adjacent_creature') {
+        const combatContext = await getCombatContext(campaignName);
+        const currentRound = combatContext?.round || 1;
+        await setRuntimeValue(playerStats.name, ADJACENT_DAMAGE_REACTION_ROUND_KEY, currentRound, campaignName);
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: action.name,
+            description: `${playerStats.name} used ${action.name} (Reaction) — melee attack against ${targetName} in response to the ${lastAttackResult.totalDamage} damage taken from them.`,
+            targetName,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[reactionDamage] Error logging ability_use:', e); });
+    }
+
+    return {
+        type: 'attack_roll',
+        payload: {
+            attack,
+            targetName,
+            sourceName: action.name,
         },
     };
 }

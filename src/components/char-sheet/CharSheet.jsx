@@ -160,6 +160,48 @@ function injectBardicInspirationFeatures(stats, playerSummary, campaignName) {
     }
 }
 
+// Movement-affecting passives: Aquatic Affinity, Second-Storywork, Athlete, Roving
+async function applyMovementPassives(stats, playerName, campaignName) {
+    // Apply Aquatic Affinity passive (Circle of the Sea level 6 swim speed + emanation range)
+    const aquaticAffinityPassive = findPassive(stats, p => p.effect === 'aquatic_affinity');
+    if (aquaticAffinityPassive) {
+        if (!stats.swimSpeed) {
+            stats.swimSpeed = stats.race?.subrace?.speed || stats.race?.speed || 30;
+        }
+        await setRuntimeValue(playerName, 'aquaticAffinityEmanationRange', 10, campaignName);
+    }
+
+    // Apply Second-Storywork passive (Rogue level 3: climb speed = walk speed, jump uses DEX)
+    const secondStoryworkPassive = findPassive(stats, p => p.effect === 'second_storywork');
+    if (secondStoryworkPassive) {
+        const speed = stats.race?.subrace?.speed || stats.race?.speed || 30;
+        if (!stats.climbSpeed) {
+            stats.climbSpeed = speed;
+        }
+    }
+
+    // Apply Athlete feat: climb speed equal to speed
+    const athleteClimbPassive = findPassive(stats, p => p.effect === 'climb_speed');
+    if (athleteClimbPassive && !stats.climbSpeed) {
+        stats.climbSpeed = stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30;
+    }
+
+    // Apply Roving (Ranger level 6): climb speed and swim speed equal to walking speed
+    if (findPassive(stats, p => p.name === 'Roving')) {
+        applyRovingSpeeds(stats);
+    }
+
+    // Expose Athlete Hop Up flag: stand from prone with only 5 ft of movement
+    if (findPassive(stats, p => p.effect === 'stand_from_prone')) {
+        stats.athleteStandFromProne = true;
+    }
+
+    // Expose Athlete Jumping flag: running jump requires only 5 ft of movement
+    if (findPassive(stats, p => p.effect === 'reduced_running_jump_requirement')) {
+        stats.athleteReducedJumpRequirement = true;
+    }
+}
+
 function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters }) {
     const [playerStats, setPlayerStats] = React.useState(null);
     const [charActionsModalState, setCharActionsModalState] = React.useState({});
@@ -248,44 +290,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             applyPreparedSpells(stats, playerSummary);
             applyAspectOfTheWilds(stats, getRuntimeValue(playerSummary.name, 'aspectOfTheWildsOption'));
 
-            // Apply Aquatic Affinity passive (Circle of the Sea level 6 swim speed + emanation range)
-            const aquaticAffinityPassive = findPassive(stats, p => p.effect === 'aquatic_affinity');
-            if (aquaticAffinityPassive) {
-                if (!stats.swimSpeed) {
-                    stats.swimSpeed = stats.race?.subrace?.speed || stats.race?.speed || 30;
-                }
-                await setRuntimeValue(playerSummary.name, 'aquaticAffinityEmanationRange', 10, campaignName);
-            }
-
-            // Apply Second-Storywork passive (Rogue level 3: climb speed = walk speed, jump uses DEX)
-            const secondStoryworkPassive = findPassive(stats, p => p.effect === 'second_storywork');
-            if (secondStoryworkPassive) {
-                const speed = stats.race?.subrace?.speed || stats.race?.speed || 30;
-                if (!stats.climbSpeed) {
-                    stats.climbSpeed = speed;
-                }
-            }
-
-            // Apply Athlete feat: climb speed equal to speed
-            const athleteClimbPassive = findPassive(stats, p => p.effect === 'climb_speed');
-            if (athleteClimbPassive && !stats.climbSpeed) {
-                stats.climbSpeed = stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30;
-            }
-
-            // Apply Roving (Ranger level 6): climb speed and swim speed equal to walking speed
-            if (findPassive(stats, p => p.name === 'Roving')) {
-                applyRovingSpeeds(stats);
-            }
-
-            // Expose Athlete Hop Up flag: stand from prone with only 5 ft of movement
-            if (findPassive(stats, p => p.effect === 'stand_from_prone')) {
-                stats.athleteStandFromProne = true;
-            }
-
-            // Expose Athlete Jumping flag: running jump requires only 5 ft of movement
-            if (findPassive(stats, p => p.effect === 'reduced_running_jump_requirement')) {
-                stats.athleteReducedJumpRequirement = true;
-            }
+            await applyMovementPassives(stats, playerSummary.name, campaignName);
 
             injectBardicInspirationFeatures(stats, playerSummary, campaignName);
 

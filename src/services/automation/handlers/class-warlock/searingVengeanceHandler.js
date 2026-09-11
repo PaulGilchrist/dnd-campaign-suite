@@ -185,17 +185,7 @@ export async function confirmSearingVengeance(automation, playerStats, campaignN
     await setRuntimeValue(targetName, 'activeConditions', [], campaignName);
 
     // Roll damage once: 2d8 + CHA modifier (canonical CHA resolution via abilities bonus)
-    const damageExpr = automation.damageExpression || '2d8 + CHA modifier';
-    const chaModRaw = evaluateAutoExpression('CHA modifier', playerStats);
-    const chaMod = typeof chaModRaw === 'number' && !isNaN(chaModRaw) ? chaModRaw : 0;
-    if (typeof chaModRaw !== 'number') {
-        console.error('[searingVengeance] CHA modifier did not resolve to a number:', chaModRaw);
-    }
-    const diceBase = damageExpr.replace(/\s*\+?\s*CHA modifier\b/i, '').trim() || '2d8';
-    const resolvedExpression = chaMod >= 0 ? `${diceBase}+${chaMod}` : `${diceBase}${chaMod}`;
-    const damageResult = rollExpression(resolvedExpression);
-    const damageAmount = damageResult?.total || 0;
-    const rollDisplay = damageResult?.rolls?.length > 0 ? `(${damageResult.rolls.join(', ')})` : '';
+    const { damageExpr, damageResult, damageAmount, rollDisplay } = rollSearingDamage(automation, playerStats);
 
     // Apply damage and blinded condition to each selected creature
     for (const creatureName of selectedTargets) {
@@ -241,6 +231,21 @@ export async function confirmSearingVengeance(automation, playerStats, campaignN
             automation,
         },
     };
+}
+
+function rollSearingDamage(automation, playerStats) {
+    const damageExpr = automation.damageExpression || '2d8 + CHA modifier';
+    const chaModRaw = evaluateAutoExpression('CHA modifier', playerStats);
+    const chaMod = typeof chaModRaw === 'number' && !isNaN(chaModRaw) ? chaModRaw : 0;
+    if (typeof chaModRaw !== 'number') {
+        console.error('[searingVengeance] CHA modifier did not resolve to a number:', chaModRaw);
+    }
+    const diceBase = damageExpr.replace(/\s*\+?\s*CHA modifier\b/i, '').trim() || '2d8';
+    const resolvedExpression = chaMod >= 0 ? `${diceBase}+${chaMod}` : `${diceBase}${chaMod}`;
+    const damageResult = rollExpression(resolvedExpression);
+    const damageAmount = damageResult?.total || 0;
+    const rollDisplay = damageResult?.rolls?.length > 0 ? `(${damageResult.rolls.join(', ')})` : '';
+    return { damageExpr, damageResult, damageAmount, rollDisplay };
 }
 
 async function applySearingVengeanceToCreature(cs, { creatureName, damageAmount, damageResult, damageExpr, campaignName, characters, playerName, name, automation }) {

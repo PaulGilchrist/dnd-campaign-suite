@@ -316,71 +316,86 @@ export async function getSpellSources(formData, version = '5e') {
  * @param {string} version - '5e' or '2024'
  * @returns {Promise<object>} - { warnings: array, valid: boolean }
  */
-export async function validateSpells(formData, selectedSpells, allSpells, version = '5e', grantedSpells = []) {
-  const warnings = [];
-  const selectedSpellNames = selectedSpells || [];
-  
-  if (selectedSpellNames.length === 0) {
-    return { warnings, valid: true };
-   }
-  
-  // Get all spell sources for this character
-  const sources = await getSpellSources(formData, version);
-  
-  // Build list of allowed spells from all sources
+// Allowed-spells set from every non-class source (race/background/feat grants,
+// explicitly granted spells, and feat-chosen spells — these never trigger the
+// "outside class list" warning).
+function buildAllowedSpells(sources, formData, grantedSpells) {
   const allowedSpells = new Set();
-  
-  // Add class spell list access
-  if (sources.class.isSpellcaster) {
-     // Class spells will be validated by checking if the spell is on the class's list
-    // We don't add all spells here, we check individually below
-   }
-  
-  // Add race-granted spells
+
   sources.race.spells.forEach(spell => allowedSpells.add(spell));
   sources.race.cantrips.forEach(spell => allowedSpells.add(spell));
-  
-  // Add background-granted spells
   sources.background.spells.forEach(spell => allowedSpells.add(spell));
   sources.background.cantrips.forEach(spell => allowedSpells.add(spell));
-  
-  // Add feat-granted spells
   sources.feats.grantedSpells.forEach(spell => allowedSpells.add(spell));
   sources.feats.grantedCantrips.forEach(spell => allowedSpells.add(spell));
-  
-  // Add any explicitly granted spells (auto-assigned from subclass/race/subrace/feats)
+
+  // Any explicitly granted spells (auto-assigned from subclass/race/subrace/feats)
   grantedSpells.forEach(spell => allowedSpells.add(spell));
-  
-  // Add Magic Initiate spells — they are granted by the feat and should not trigger the "outside class list" warning
+
+  // Magic Initiate spells — granted by the feat
   (formData.magicInitiateInstances || []).forEach(inst => {
     if (inst.cantrips?.[0]) allowedSpells.add(inst.cantrips[0]);
     if (inst.cantrips?.[1]) allowedSpells.add(inst.cantrips[1]);
     if (inst.level1Spell) allowedSpells.add(inst.level1Spell);
   });
-  
-  // Add Fey Touched spells — they are granted by the feat and should not trigger the "outside class list" warning
+
+  // Fey Touched / Shadow Touched spells — granted by the feat
   if (formData.feyTouchedSpell) {
     allowedSpells.add(formData.feyTouchedSpell);
   }
-  
-  // Add Shadow Touched spells — they are granted by the feat and should not trigger the "outside class list" warning
   if (formData.shadowTouchedSpell) {
     allowedSpells.add(formData.shadowTouchedSpell);
   }
-  
-  // Check if Bard has Magical Secrets (2024) — load class data once
+
+  return allowedSpells;
+}
+
+// 2024 Bard Magical Secrets level entry (class data loaded once), or null.
+async function getMagicalSecretsLevelEntry(className, version, formData) {
+  if (className !== 'Bard' || version !== '2024') return null;
+  const classData = await loadClassData(version);
+  const bardData = classData.find(c => c.name === className || c.index === 'bard');
+  if (!bardData) return null;
+  return bardData.class_levels?.find(entry => entry.level === formData.level) || null;
+}
+
+// Is this spell allowed for the character by class, half/third-caster proxy,
+// subclass spell list, or 2024 Bard Magical Secrets?
+function isSpellAllowedByClass(spellData, spellClasses, ctx) {
+  const { className, isMagicalSecretsBard, magicalSecretsLevelEntry } = ctx;
+  const MONK_SUBCLASS_SPELLS = ['Darkness', 'Darkvision', 'Pass Without Trace', 'Silence'];
+  if (spellClasses.includes(className)) return true;
+  if ((className === 'Fighter' || className === 'Rogue') && spellClasses.includes('Wizard')) return true;
+  if (className === 'Monk' && MONK_SUBCLASS_SPELLS.includes(spellData.name)) return true;
+
+  // 2024 Bard Magical Secrets: allow spells from Bard, Cleric, Druid, and Wizard lists
+  const magicalSecretsCount = magicalSecretsLevelEntry?.class_specific?.magical_secrets;
+  if (isMagicalSecretsBard && magicalSecretsCount != null && magicalSecretsCount > 0 &&
+    ['Bard', 'Cleric', 'Druid', 'Wizard'].some(c => spellClasses.includes(c))) return true;
+
+  return false;
+}
+
+export async function validateSpells(formData, selectedSpells, allSpells, version = '5e', grantedSpells = []) {
+  const warnings = [];
+  const selectedSpellNames = selectedSpells || [];
+
+  if (selectedSpellNames.length === 0) {
+    return { warnings, valid: true };
+   }
+
+  // Get all spell sources for this character
+  const sources = await getSpellSources(formData, version);
+
+  // Allowed spells from all granted (non-class) sources; class spell-list membership
+  // is checked per spell below (we don't add all class spells to the set).
+  const allowedSpells = buildAllowedSpells(sources, formData, grantedSpells);
+
   const className = sources.class.name;
   const isMagicalSecretsBard = className === 'Bard' && version === '2024';
-  let magicalSecretsLevelEntry = null;
-  if (isMagicalSecretsBard) {
-    const classData = await loadClassData(version);
-    const bardData = classData.find(c => c.name === className || c.index === 'bard');
-    if (bardData) {
-      magicalSecretsLevelEntry = bardData.class_levels?.find(entry => entry.level === formData.level);
-    }
-  }
-  const magicalSecretsClasses = ['Bard', 'Cleric', 'Druid', 'Wizard'];
-  
+  const magicalSecretsLevelEntry = await getMagicalSecretsLevelEntry(className, version, formData);
+  const classCheckCtx = { className, isMagicalSecretsBard, magicalSecretsLevelEntry };
+
   // Check each selected spell
   const spellsOutsideClassList = [];
 
@@ -393,41 +408,29 @@ export async function validateSpells(formData, selectedSpells, allSpells, versio
        });
       continue;
      }
-    
+
     const spellClasses = spellData.classes || [];
     const _spellLevel = spellData.level !== undefined ? spellData.level : 0;
     void _spellLevel;
-    
-    // Check if spell is allowed by class
-    const isClassSpell = spellClasses.includes(className) ||
-       (className === 'Fighter' && spellClasses.includes('Wizard')) ||
-       (className === 'Rogue' && spellClasses.includes('Wizard')) ||
-       (className === 'Monk' && ['Darkness', 'Darkvision', 'Pass Without Trace', 'Silence'].includes(spellData.name));
-    // 2024 Bard Magical Secrets: allow spells from Bard, Cleric, Druid, and Wizard lists
-    const isMagicalSecretsSpell = isMagicalSecretsBard && 
-      magicalSecretsLevelEntry?.class_specific?.magical_secrets != null && 
-      magicalSecretsLevelEntry.class_specific.magical_secrets > 0 &&
-      magicalSecretsClasses.some(c => spellClasses.includes(c));
-    const isGrantedSpell = allowedSpells.has(spellName);
-    
-      // If not a class spell and not granted by another source and not a Magical Secrets spell, collect it
-    if (!isClassSpell && !isGrantedSpell && !isMagicalSecretsSpell) {
+
+    // If not a class spell and not granted by another source and not a Magical Secrets spell, collect it
+    if (!isSpellAllowedByClass(spellData, spellClasses, classCheckCtx) && !allowedSpells.has(spellName)) {
       spellsOutsideClassList.push(spellName);
      }
    }
 
-    // Add a single consolidated warning for all spells outside the class list
-  if (spellsOutsideClassList.length > 0) {
+     // Add a single consolidated warning for all spells outside the class list
+   if (spellsOutsideClassList.length > 0) {
     const count = spellsOutsideClassList.length;
     const spellText = count === 1 ? 'Spell' : 'Spell(s)';
         warnings.push({
       message: `${spellText} (${count}) chosen outside of the class spell list.`,
           type: 'warning'
          });
-   }
+    }
   // Note: Spell limit validation is handled in the UI by showing exceeded counts in red
   // We don't add redundant warnings here since the summary already shows this visually
-  
+
   return {
     warnings,
     valid: warnings.filter(w => w.type === 'warning').length === 0

@@ -5,6 +5,32 @@ import { isPsionicSpell, hasPsionicSorcery } from '../../services/rules/spells/m
 import { prepareSpellCast, isFreeCastAuthorized } from '../../services/rules/spells/spellPreparationService.js'
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
 
+const AREA_SHAPES = ['emanation', 'cone', 'line', 'sphere', 'cube', 'cylinder', 'square', 'circle', 'wall', 'cage', 'floor', 'area'];
+
+function parseAoERangeFeet(range) {
+    if (range === 'Self') return 0
+    if (typeof range === 'number') return range
+    return parseInt(String(range).replace(/[^0-9]/g, '')) || 0
+}
+
+function showSaveAttackAoeModal(attack, playerStats, campaignName, setModalState) {
+    const aoeShape = attack.area_of_effect?.shape || attack.area_of_effect?.type
+    if (!aoeShape || !AREA_SHAPES.includes(String(aoeShape).toLowerCase()) || !setModalState) return false
+    setModalState({ saveAttackAoeModal: {
+        action: { name: attack.name, automation: {}, spell: attack },
+        playerStats,
+        campaignName,
+        shape: aoeShape,
+        range: parseAoERangeFeet(attack.range || '15 feet'),
+        damage: attack.damage || '0',
+        damageType: attack.damageType || '',
+        saveType: attack.saveType || 'DEX',
+        saveDc: attack.saveDc || playerStats.spellAbilities?.saveDc,
+        dcSuccess: attack.saveSuccess === 0 ? 'none' : (attack.saveSuccess === 0.5 ? 'half' : attack.saveSuccess),
+    }})
+    return true
+}
+
 export function useActionSpellMetamagic({
     playerStats,
     campaignName,
@@ -160,44 +186,14 @@ export function useActionSpellMetamagic({
     }
 
     const resolveSpellDamage = async (attack) => {
+        if (showSaveAttackAoeModal(attack, playerStats, campaignName, setModalState)) return
 
-        const aoe = attack.area_of_effect;
-        const aoeShape = aoe?.shape || aoe?.type;
-        const isAreaShape = aoeShape ? ['emanation','cone','line','sphere','cube','cylinder','square','circle','wall','cage','floor','area'].includes(String(aoeShape).toLowerCase()) : false;
-        if (isAreaShape && setModalState) {
-            const saveDcValue = attack.saveDc || playerStats.spellAbilities?.saveDc;
-            const dcSuccessValue = attack.saveSuccess === 0 ? 'none' : (attack.saveSuccess === 0.5 ? 'half' : attack.saveSuccess);
-            const damageExpression = attack.damage || '0';
-            const damageType = attack.damageType || '';
-            const saveType = attack.saveType || 'DEX';
-            const range = attack.range || '15 feet';
-            const rangeFeet = range === 'Self' ? 0 : (typeof range === 'number' ? range : parseInt(String(range).replace(/[^0-9]/g, '')) || 0);
-            setModalState({ saveAttackAoeModal: {
-                action: { name: attack.name, automation: {}, spell: attack },
-                playerStats,
-                campaignName,
-                shape: aoeShape,
-                range: rangeFeet,
-                damage: damageExpression,
-                damageType,
-                saveType,
-                saveDc: saveDcValue,
-                dcSuccess: dcSuccessValue,
-            }});
-            return;
-        }
-
+        const spell = playerStats.spellAbilities?.spells?.find(s => s.name === attack.name)
         if (!isBonusSorcerer) {
-            const spell = playerStats.spellAbilities?.spells?.find(s => s.name === attack.name);
-            if (!spell) {
-                await castNoSpellAttack(attack)
-                return;
-            }
-            await castKnownSpell(attack, spell)
+            if (!spell) await castNoSpellAttack(attack)
+            else await castKnownSpell(attack, spell)
             return;
         }
-
-        const spell = playerStats.spellAbilities?.spells?.find(s => s.name === attack.name);
         if (!spell) {
             handleAttackClick(attack);
             return;

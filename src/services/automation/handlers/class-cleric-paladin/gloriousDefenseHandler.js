@@ -49,53 +49,58 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     description += `Original roll: d20(${d20}) + ${bonus} = ${d20 + bonus} vs AC ${ac != null ? ac : '—'} → <b>${hit ? 'HIT' : 'MISS'}</b><br/>`;
     description += `With CHA modifier (${chaMod}): d20(${d20}) + ${bonus} = ${d20 + bonus} vs AC ${newAc != null ? newAc : '—'} → <b>${wouldHit == null ? 'N/A' : wouldHit ? 'HIT' : 'MISS'}</b><br/>`;
 
-    let damageRolledBack = 0;
-
     if (originalHit && wouldHit === false) {
-        description += `<br/><i>The attack now misses due to your Glorious Defense!</i>`;
-        damageRolledBack = await rollbackDamage(attackerName, targetName, campaignName, featureName);
-        if (damageRolledBack > 0) {
-            description += `<br/>Damage negated: ${damageRolledBack} HP restored to ${targetName}.`;
-        }
+        return await blockAndCounterattack({ auto, playerStats, playerName, campaignName, featureName, targetName, attackerName, chaMod, currentUses, description });
+    }
 
-        // Decrement uses
-        await setRuntimeValue(playerName, USES_KEY, currentUses - 1, campaignName);
-
-        // Find the Paladin's main melee weapon for the counterattack
-        const meleeAttacks = filterMeleeAttacks(playerStats.attacks);
-        const attack = meleeAttacks.length > 0 ? meleeAttacks[0] : (playerStats.attacks || [])[0];
-
-        if (!attack) {
-            return infoPopup(featureName, `${description}<br/><br/>No melee attack available for the counterattack.`, auto);
-        }
-
-        await addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerName,
-            abilityName: featureName,
-            description: `${playerName} used ${featureName} to protect ${targetName} from ${attackerName} — the attack misses due to the CHA modifier (${chaMod}) and ${playerName} makes a melee counterattack. ${damageRolledBack > 0 ? `${damageRolledBack} damage was negated.` : ''}`,
-            targetName: attackerName,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error(`[${featureName}] Error:`, e); });
-
-        return {
-            type: 'attack_roll',
-            payload: {
-                attack,
-                targetName: attackerName,
-                sourceName: featureName,
-            },
-        };
-    } else if (originalHit && wouldHit === true) {
+    if (originalHit && wouldHit === true) {
         description += `<br/><i>The attack still hits despite your Glorious Defense.</i>`;
         return infoPopup(featureName, description, auto);
-    } else if (!originalHit) {
+    }
+    if (!originalHit) {
         description += `<br/><i>The attack already missed — Glorious Defense has no additional effect.</i>`;
         return infoPopup(featureName, description, auto);
     }
 
     // Fallback
     return infoPopup(featureName, description, auto);
+}
+
+async function blockAndCounterattack({ auto, playerStats, playerName, campaignName, featureName, targetName, attackerName, chaMod, currentUses, description }) {
+    description += `<br/><i>The attack now misses due to your Glorious Defense!</i>`;
+    const damageRolledBack = await rollbackDamage(attackerName, targetName, campaignName, featureName);
+    if (damageRolledBack > 0) {
+        description += `<br/>Damage negated: ${damageRolledBack} HP restored to ${targetName}.`;
+    }
+
+    // Decrement uses
+    await setRuntimeValue(playerName, USES_KEY, currentUses - 1, campaignName);
+
+    // Find the Paladin's main melee weapon for the counterattack
+    const meleeAttacks = filterMeleeAttacks(playerStats.attacks);
+    const attack = meleeAttacks.length > 0 ? meleeAttacks[0] : (playerStats.attacks || [])[0];
+
+    if (!attack) {
+        return infoPopup(featureName, `${description}<br/><br/>No melee attack available for the counterattack.`, auto);
+    }
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: featureName,
+        description: `${playerName} used ${featureName} to protect ${targetName} from ${attackerName} — the attack misses due to the CHA modifier (${chaMod}) and ${playerName} makes a melee counterattack. ${damageRolledBack > 0 ? `${damageRolledBack} damage was negated.` : ''}`,
+        targetName: attackerName,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error(`[${featureName}] Error:`, e); });
+
+    return {
+        type: 'attack_roll',
+        payload: {
+            attack,
+            targetName: attackerName,
+            sourceName: featureName,
+        },
+    };
 }
 
 export function hasGloriousDefenseActive(playerStats) {

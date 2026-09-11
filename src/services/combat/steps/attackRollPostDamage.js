@@ -34,6 +34,85 @@ export function buildFeatureRidersStep() {
   };
 }
 
+const DAMAGE_TYPE_BREAK = Symbol('damage-type-break');
+
+async function applyDamageTypeModifiers(ctx, ps, dmgMods) {
+  for (const mod of dmgMods) {
+    const key = `_${mod.name.replace(/\s+/g, '_')}_usedRound`;
+    const round = getCurrentCombatRound(ctx.campaignName);
+    if (mod.oncePerTurn && getRuntimeValue(ps.name, key, ctx.campaignName) === round) continue;
+    const stored = getRuntimeValue(ps.name, 'empoweredStrikesDamageType', ctx.campaignName);
+    if (stored) { ctx.attack.damageType = stored; setRuntimeValue(ps.name, 'empoweredStrikesDamageType', null, ctx.campaignName); return DAMAGE_TYPE_BREAK; }
+    if (mod.options?.length > 0) {
+      return await resolveDamageTypeModifierChoice(ctx, mod, ps);
+    }
+  }
+  return undefined;
+}
+
+async function resolveDamageTypeModifierChoice(ctx, mod, ps) {
+  const normalOption = mod.options.find(o => o.name !== 'Force');
+  const forceOption = mod.options.find(o => o.name === 'Force');
+  let chosenType = normalOption?.damageType || ctx.attack.damageType;
+
+  const cs = await getCombatContext(ctx.campaignName);
+  const target = cs ? getTargetFromAttacker(cs, ps.name) : null;
+
+  if (target && normalOption && forceOption) {
+    const lower = normalOption.damageType.toLowerCase();
+    const isImmune = target.immunities?.some(i => i.toLowerCase() === lower);
+    const isResisted = target.resistances?.some(r => r.toLowerCase() === lower);
+
+    if (isImmune || isResisted) {
+      chosenType = forceOption.damageType;
+      ctx.attack.damageType = chosenType;
+      const reason = isImmune ? 'immune to' : 'resists';
+      addEntry(ctx.campaignName, {
+        type: 'ability_use',
+        characterName: ps.name,
+        abilityName: mod.name,
+        description: `${mod.name} — auto-selected ${chosenType} damage (${target.name} ${reason} ${normalOption.damageType})`,
+        targetName: target.name,
+      }).catch((e) => { console.error("[attackRollPostDamage:log-error]", e); });
+
+      ctx.attack.damageType = chosenType;
+      return {
+        data: { formula: ctx.formula, total: ctx.total, rolls: [...(ctx.rolls || [])] },
+        popup: `<b>${mod.name}</b><br/>${target.name} ${reason} ${normalOption.damageType} — using <b>${chosenType}</b>`,
+      };
+    }
+  }
+
+  return {
+    data: { formula: ctx.formula, total: ctx.total, rolls: [...(ctx.rolls || [])], _damageTypeModifier: mod },
+    modal: { type: 'damageTypeChoice', props: { title: `${mod.name} — Damage Type`, types: mod.options.map(o => o.name) } },
+  };
+}
+
+async function resolveUnarmedRiderOption(ctx, rider, ps, damage) {
+  const optKey = `_${rider.name.replace(/\s+/g, '_')}_selectedOption`;
+  const stored = getRuntimeValue(ps.name, optKey, ctx.campaignName);
+  if (stored) {
+    const opt = rider.options.find(o => o.name === stored);
+    if (opt?.effect === 'damage_bonus') {
+      const rr = rollExpression(opt.damageExpression);
+      if (rr) {
+        damage.formula += ` + ${opt.damageExpression} [${opt.damageType || 'same_as_weapon'}]`;
+        damage.total += rr.total;
+        damage.rolls = [...damage.rolls, ...rr.rolls];
+      }
+      setRuntimeValue(ps.name, optKey, null, ctx.campaignName);
+    }
+    return null;
+  }
+  if (rider.options?.length > 0) {
+    return {
+      modal: { type: 'damageTypeChoice', props: { title: `${rider.name} — Enhanced Unarmed Strike`, types: rider.options.map(o => o.name) } },
+    };
+  }
+  return null;
+}
+
 export function buildDamageTypeModifiersStep() {
   return {
     name: 'damageTypeModifiers',
@@ -41,85 +120,23 @@ export function buildDamageTypeModifiersStep() {
     emit: 'dmg_type:modified',
     condition: (ctx) => ctx.attack?.weaponType === 'unarmed' && !!ctx.playerStats.automation?.passives,
     handler: async (ctx) => {
-      let formula = ctx.formula;
-      let total = ctx.total;
-      let rolls = [...(ctx.rolls || [])];
+      const damage = { formula: ctx.formula, total: ctx.total, rolls: [...(ctx.rolls || [])] };
       const ps = ctx.playerStats;
 
       const dmgMods = ps.automation.passives.filter(a => a.type === 'damage_type_modifier' && a.trigger === 'unarmed_strike_hit');
-      for (const mod of dmgMods) {
-        const key = `_${mod.name.replace(/\s+/g, '_')}_usedRound`;
-        const round = getCurrentCombatRound(ctx.campaignName);
-        if (mod.oncePerTurn && getRuntimeValue(ps.name, key, ctx.campaignName) === round) continue;
-        const stored = getRuntimeValue(ps.name, 'empoweredStrikesDamageType', ctx.campaignName);
-        if (stored) { ctx.attack.damageType = stored; setRuntimeValue(ps.name, 'empoweredStrikesDamageType', null, ctx.campaignName); break; }
-        if (mod.options?.length > 0) {
-          const normalOption = mod.options.find(o => o.name !== 'Force');
-          const forceOption = mod.options.find(o => o.name === 'Force');
-          let chosenType = normalOption?.damageType || ctx.attack.damageType;
-
-          const cs = await getCombatContext(ctx.campaignName);
-          const target = cs ? getTargetFromAttacker(cs, ps.name) : null;
-
-          if (target && normalOption && forceOption) {
-            const lower = normalOption.damageType.toLowerCase();
-            const isImmune = target.immunities?.some(i => i.toLowerCase() === lower);
-            const isResisted = target.resistances?.some(r => r.toLowerCase() === lower);
-
-            if (isImmune || isResisted) {
-              chosenType = forceOption.damageType;
-              ctx.attack.damageType = chosenType;
-              const reason = isImmune ? 'immune to' : 'resists';
-              addEntry(ctx.campaignName, {
-                type: 'ability_use',
-                characterName: ps.name,
-                abilityName: mod.name,
-                description: `${mod.name} — auto-selected ${chosenType} damage (${target.name} ${reason} ${normalOption.damageType})`,
-                targetName: target.name,
-              }).catch((e) => { console.error("[attackRollPostDamage:log-error]", e); });
-
-              ctx.attack.damageType = chosenType;
-              return {
-                data: { formula, total, rolls },
-                popup: `<b>${mod.name}</b><br/>${target.name} ${reason} ${normalOption.damageType} — using <b>${chosenType}</b>`,
-              };
-            }
-          }
-
-          return {
-            data: { formula, total, rolls, _damageTypeModifier: mod },
-            modal: { type: 'damageTypeChoice', props: { title: `${mod.name} — Damage Type`, types: mod.options.map(o => o.name) } },
-          };
-        }
-      }
+      const modsOutcome = await applyDamageTypeModifiers(ctx, ps, dmgMods);
+      if (modsOutcome && modsOutcome !== DAMAGE_TYPE_BREAK) return modsOutcome;
 
       const riders = ps.automation.passives.filter(a => a.type === 'attack_rider' && a.trigger === 'unarmed_strike_hit' && a.chooseOne && a.options?.length > 0);
       for (const rider of riders) {
         const key = `_${rider.name.replace(/\s+/g, '_')}_usedRound`;
         const round = getCurrentCombatRound(ctx.campaignName);
         if (rider.oncePerTurn && getRuntimeValue(ps.name, key, ctx.campaignName) === round) continue;
-        const stored = getRuntimeValue(ps.name, `_${rider.name.replace(/\s+/g, '_')}_selectedOption`, ctx.campaignName);
-        if (stored) {
-          const opt = rider.options.find(o => o.name === stored);
-          if (opt?.effect === 'damage_bonus') {
-            const rr = rollExpression(opt.damageExpression);
-            if (rr) {
-              formula += ` + ${opt.damageExpression} [${opt.damageType || 'same_as_weapon'}]`;
-              total += rr.total;
-              rolls = [...rolls, ...rr.rolls];
-            }
-            setRuntimeValue(ps.name, `_${rider.name.replace(/\s+/g, '_')}_selectedOption`, null, ctx.campaignName);
-          }
-          continue;
-        }
-        if (rider.options?.length > 0) {
-          return {
-            modal: { type: 'damageTypeChoice', props: { title: `${rider.name} — Enhanced Unarmed Strike`, types: rider.options.map(o => o.name) } },
-          };
-        }
+        const outcome = await resolveUnarmedRiderOption(ctx, rider, ps, damage);
+        if (outcome) return outcome;
       }
 
-      return { data: { formula, total, rolls } };
+      return { data: { ...damage } };
     },
   };
 }

@@ -9,6 +9,7 @@ import { useCustomHandlers } from './useCustomHandlers.js'
 import { useAreaEffectHandlers } from './useAreaEffectHandlers.js'
 import { useComplexSpellHandlers } from './useComplexSpellHandlers.js'
 import { hasMaterial } from '../../../services/rules/spells/materialComponents.js'
+import { buildPendingStates } from './pendingStates.js'
 
 export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setSecondaryTargetModal, characters = [], setPopupHtml) {
   const isSorcerer = playerStats?.class?.name === 'Sorcerer'
@@ -116,69 +117,23 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
   }, [isSorcerer, playerStats, campaignName, onExecute, cfSetPending, setSecondaryTargetModal, characters, setPopupHtml])
 
   // Pending state getters
-  const pendingMetamagic = getPending('metamagic')
-  const pendingMultiTarget = getPending('multiTarget')
-  const pendingAid = getPending('aid')
-  const pendingBane = getPending('bane')
-  const pendingBless = getPending('bless')
-  const pendingFaerieFire = getPending('faerieFire')
-  const pendingHolyAura = getPending('holyAura')
-  const pendingBeaconOfHope = getPending('beaconOfHope')
-  const pendingSlow = getPending('slow')
-  const pendingHaste = getPending('haste')
-  const pendingEnhanceAbility = getPending('enhanceAbility')
-  const pendingBarkskin = getPending('barkskin')
-  const pendingInvisibility = getPending('invisibility')
-  const pendingGreaterInvisibility = getPending('greaterInvisibility')
-  const pendingFeignDeath = getPending('feignDeath')
-  const pendingHeal = getPending('heal')
-  const pendingHeroesFeast = getPending('heroesFeast')
-  const pendingGreaterRestoration = getPending('greaterRestoration')
-  const pendingLesserRestoration = getPending('lesserRestoration')
-  const pendingMageArmor = getPending('mageArmor')
-  const pendingShieldOfFaith = getPending('shieldOfFaith')
-  const pendingProtectionFromEvilAndGood = getPending('protectionFromEvilAndGood')
-  const pendingProtectionFromPoison = getPending('protectionFromPoison')
-  const pendingStoneSkin = getPending('stoneSkin')
-  const pendingProtectionFromEnergy = getPending('protectionFromEnergy')
-  const pendingResistance = getPending('resistance')
-  const pendingRemoveCurse = getPending('removeCurse')
-  const pendingMagicMissile = getPending('magicMissile')
-  const pendingPassWithoutTrace = getPending('passWithoutTrace')
-  const pendingGlobe = getPending('globe')
-  const pendingForcecage = getPending('forcecage')
-  const pendingAntimagicField = getPending('antimagicField')
-  const pendingRegenerate = getPending('regenerate')
-  const pendingHealingWord = getPending('healingWord')
-  const pendingCureWounds = getPending('cureWounds')
-  const pendingStinkingCloud = getPending('stinkingCloud')
-  const pendingWeb = getPending('web')
-  const pendingAnimalFriendship = getPending('animalFriendship')
-  const pendingAuraOfLife = getPending('auraOfLife')
-  const pendingAuraOfPurity = getPending('auraOfPurity')
-  const pendingCircleOfPower = getPending('circleOfPower')
-  const pendingCompulsion = getPending('compulsion')
-  const pendingAuraOfVitality = getPending('auraOfVitality')
-  const pendingForesight = getPending('foresight')
-  const pendingLongstrider = getPending('longstrider')
-  const pendingSpareTheDying = getPending('spareTheDying')
-  const pendingPrismaticSpray = getPending('prismatic_spray')
-  const pendingConfusion = getPending('confusion')
-  const pendingRevivify = getPending('revivify')
-  const pendingSanctuary = getPending('sanctuary')
-  const pendingSleetStorm = getPending('sleetStorm')
-  const pendingHoldMonster = getPending('holdMonster')
-  const pendingHoldPerson = getPending('holdPerson')
-  const pendingPolymorph = getPending('polymorph')
-  const pendingShapechange = getPending('shapechange')
-  const pendingAnimalShapes = getPending('animalShapes')
-  const pendingTruePolymorph = getPending('truePolymorph')
-  const pendingCharmPerson = getPending('charmPerson')
-  const pendingCharmMonster = getPending('charmMonster')
-  const pendingBanishment = getPending('banishment')
-  const pendingHeroism = getPending('heroism')
-  const pendingHex = getPending('hex')
-  const _pendingDeathWard = getPending('deathWard')
+  const {
+    pendingMetamagic, pendingMultiTarget, pendingAid, pendingBane, pendingBless,
+    pendingFaerieFire, pendingHolyAura, pendingBeaconOfHope, pendingSlow, pendingHaste,
+    pendingEnhanceAbility, pendingBarkskin, pendingInvisibility, pendingGreaterInvisibility,
+    pendingFeignDeath, pendingHeal, pendingHeroesFeast, pendingGreaterRestoration,
+    pendingLesserRestoration, pendingMageArmor, pendingShieldOfFaith,
+    pendingProtectionFromEvilAndGood, pendingProtectionFromPoison, pendingStoneSkin,
+    pendingProtectionFromEnergy, pendingResistance, pendingRemoveCurse, pendingMagicMissile,
+    pendingPassWithoutTrace, pendingGlobe, pendingForcecage, pendingAntimagicField,
+    pendingRegenerate, pendingHealingWord, pendingCureWounds, pendingStinkingCloud, pendingWeb,
+    pendingAnimalFriendship, pendingAuraOfLife, pendingAuraOfPurity, pendingCircleOfPower,
+    pendingCompulsion, pendingAuraOfVitality, pendingForesight, pendingLongstrider,
+    pendingSpareTheDying, pendingPrismaticSpray, pendingConfusion, pendingRevivify,
+    pendingSanctuary, pendingSleetStorm, pendingHoldMonster, pendingHoldPerson, pendingPolymorph,
+    pendingShapechange, pendingAnimalShapes, pendingTruePolymorph, pendingCharmPerson,
+    pendingCharmMonster, pendingBanishment, pendingHeroism, pendingHex, pendingDeathWard,
+  } = buildPendingStates(getPending)
 
   return {
     pendingMetamagic, pendingMultiTarget, pendingAid, pendingBane, pendingShapechange, pendingBless, pendingFaerieFire,
@@ -205,7 +160,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
     pendingCharmPerson, handleCharmPersonConfirm, handleCharmPersonSkip,
     pendingCharmMonster, handleCharmMonsterConfirm, handleCharmMonsterSkip,
     pendingBanishment, handleBanishmentConfirm, handleBanishmentSkip,
-    pendingDeathWard: _pendingDeathWard, handleDeathWardConfirm, handleDeathWardSkip,
+    pendingDeathWard, handleDeathWardConfirm, handleDeathWardSkip,
     pendingHeroism, handleHeroismConfirm, handleHeroismSkip,
     pendingHex, handleHexConfirm, handleHexSkip,
     handleAnimalFriendshipConfirm, handleAnimalFriendshipSkip,

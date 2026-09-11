@@ -1,17 +1,15 @@
+function resolveTempBuffUsesMax(auto, playerStats) {
+    if (auto.uses === 'proficiency_bonus') return playerStats.proficiency || 0;
+    if (typeof auto.uses !== 'string' || !auto.uses.endsWith('_level')) return auto.uses || null;
+    const className = auto.uses.replace('_level', '');
+    if (playerStats.class?.name?.toLowerCase() === className) return playerStats.level;
+    return playerStats.class?.levels || playerStats.level || 0;
+}
+
 export const tempHandlers = {
     'temp_buff': (feature, playerStats) => {
         const auto = feature.automation
-        let usesMax = auto.uses || null;
-        if (auto.uses === 'proficiency_bonus') {
-            usesMax = playerStats.proficiency || 0;
-        } else if (typeof auto.uses === 'string' && auto.uses.endsWith('_level')) {
-            const className = auto.uses.replace('_level', '');
-            if (playerStats.class?.name?.toLowerCase() === className) {
-                usesMax = playerStats.level;
-            } else {
-                usesMax = playerStats.class?.levels || playerStats.level || 0;
-            }
-        }
+        const usesMax = resolveTempBuffUsesMax(auto, playerStats);
         return {
             type: 'temp_buff',
             name: feature.name,
