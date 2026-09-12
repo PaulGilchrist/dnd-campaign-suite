@@ -92,14 +92,14 @@ describe('useModalHandlers - flurry of blows', () => {
             // Modal is cleared first
             expect(deps.setModalState).toHaveBeenNthCalledWith(1, { flurryOfBlowsModal: null });
             // Then handler is called with correct args
-            expect(applyFlurryOfBlows).toHaveBeenCalledWith(
-                { name: 'Flurry of Blows' },
-                { name: 'TestMonk' },
-                'test-campaign',
-                'test-map',
-                'target1',
-                2
-            );
+            expect(applyFlurryOfBlows).toHaveBeenCalledWith({
+                action: { name: 'Flurry of Blows' },
+                playerStats: { name: 'TestMonk' },
+                campaignName: 'test-campaign',
+                _mapName: 'test-map',
+                distribution: 'target1',
+                numAttacks: 2,
+            });
             // Popup is set from handler result
             expect(deps.setPopupHtml).toHaveBeenCalledWith('Flurry hit 1d6!');
         });

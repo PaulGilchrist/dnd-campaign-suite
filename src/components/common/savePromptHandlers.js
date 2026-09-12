@@ -30,7 +30,7 @@ function doReroll({ campaignName, characters, activeMapName, current, extraBonus
   });
 }
 
-function submitReroll(submitSaveResult, result, current, bonusDetail, note, healingName, healingNote) {
+function submitReroll({ submitSaveResult, result, current, bonusDetail, note, healingName, healingNote }) {
   submitSaveResult({
     promptId: current.promptId, targetName: current.targetName, success: result.success,
     roll: result.finalRoll, total: result.total, saveBonus: result.saveBonus,
@@ -49,7 +49,7 @@ export function createFanaticalFocusHandler({ campaignName, characters, activeMa
     setRerollUsedForSave(true);
     setRuntimeValue(current.targetName, 'fanaticalFocusUsed', true, campaignName);
     const result = await doReroll({ campaignName, characters, activeMapName, current, extraBonus: rageDamageBonus });
-    submitReroll(submitSaveResult, result, current, `(+${rageDamageBonus} Fanatical Focus)`, 'fanatical_focus_reroll', 'Fanatical Focus', 'fanatical_focus_hp_restore');
+    submitReroll({ submitSaveResult, result, current, bonusDetail: `(+${rageDamageBonus} Fanatical Focus)`, note: 'fanatical_focus_reroll', healingName: 'Fanatical Focus', healingNote: 'fanatical_focus_hp_restore' });
   };
 }
 
@@ -59,7 +59,7 @@ export function createDisciplinedSurvivorHandler({ campaignName, current, curren
     setRerollUsedForSave(true);
     setRuntimeValue(current.targetName, 'focusPoints', currentFocusPoints - 1, campaignName);
     const result = await doReroll({ campaignName: null, characters: [], activeMapName: null, current, extraBonus: 0 });
-    submitReroll(submitSaveResult, result, current, '(-1 Focus Point)', 'disciplined_survivor_reroll', 'Disciplined Survivor', 'disciplined_survivor_hp_restore');
+    submitReroll({ submitSaveResult, result, current, bonusDetail: '(-1 Focus Point)', note: 'disciplined_survivor_reroll', healingName: 'Disciplined Survivor', healingNote: 'disciplined_survivor_hp_restore' });
   };
 }
 
@@ -96,7 +96,7 @@ export function createIndomitableHandler({ campaignName, characters, activeMapNa
     if (currentUses >= max) return;
     setRuntimeValue(current.targetName, 'indomitableUses', currentUses + 1, campaignName);
     const result = await doReroll({ campaignName, characters, activeMapName, current, extraBonus: rerollBonus });
-    submitReroll(submitSaveResult, result, current, `(+${rerollBonus} Indomitable)`, 'indomitable_reroll', 'Indomitable', 'indomitable_hp_restore');
+    submitReroll({ submitSaveResult, result, current, bonusDetail: `(+${rerollBonus} Indomitable)`, note: 'indomitable_reroll', healingName: 'Indomitable', healingNote: 'indomitable_hp_restore' });
     const saveLabel = (current.saveType || 'Save').toUpperCase();
     addEntry(campaignName, {
       type: 'ability_use', characterName: current.targetName, abilityName: 'Indomitable',
@@ -111,6 +111,6 @@ export function createLivingLegendHandler({ campaignName, characters, activeMapN
     if (!livingLegendAvailable || !current) return;
     setRerollUsedForSave(true);
     const result = await doReroll({ campaignName, characters, activeMapName, current, extraBonus: 0 });
-    submitReroll(submitSaveResult, result, current, undefined, 'living_legend_reroll', 'Living Legend', 'living_legend_hp_restore');
+    submitReroll({ submitSaveResult, result, current, bonusDetail: undefined, note: 'living_legend_reroll', healingName: 'Living Legend', healingNote: 'living_legend_hp_restore' });
   };
 }

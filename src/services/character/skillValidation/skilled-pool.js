@@ -101,6 +101,14 @@ function applyToolProficiencySource(proficiencyString, categoryLimits, preSelect
   }
 }
 
+async function applySourceToolProficiencyLimits(name, fetchFn, categoryLimits, preSelectedTools) {
+  if (!name) return;
+  const data = await fetchFn(name, '2024');
+  if (data?.tool_proficiencies) {
+    applyToolProficiencySource(data.tool_proficiencies, categoryLimits, preSelectedTools);
+  }
+}
+
 // Feats (e.g., Chef grants Cook's Utensils)
 async function collectFeatGrantedTools(selectedFeats, preSelectedTools) {
   const allFeats = await loadFeatData('2024');
@@ -144,19 +152,8 @@ export async function computeSkilledToolUsageOnly(formData) {
   const categoryLimits = new Map();
   const preSelectedTools = new Set();
 
-  if (backgroundName) {
-    const bgData = await fetchBackgroundData(backgroundName, '2024');
-    if (bgData?.tool_proficiencies) {
-      applyToolProficiencySource(bgData.tool_proficiencies, categoryLimits, preSelectedTools);
-    }
-  }
-
-  if (className) {
-    const classData = await fetchClassData(className, '2024');
-    if (classData?.tool_proficiencies) {
-      applyToolProficiencySource(classData.tool_proficiencies, categoryLimits, preSelectedTools);
-    }
-  }
+  await applySourceToolProficiencyLimits(backgroundName, fetchBackgroundData, categoryLimits, preSelectedTools);
+  await applySourceToolProficiencyLimits(className, fetchClassData, categoryLimits, preSelectedTools);
 
   if (formData.feats && formData.feats.length > 0) {
     await collectFeatGrantedTools(formData.feats, preSelectedTools);

@@ -17,16 +17,20 @@
  * @param {Object} config.bonusSource - Object containing bonus_skill_proficiencies and/or bonus_proficiencies (e.g., class.subclass or class.major)
  * @returns {Array} [proficienciesAllowed, proficiencies] - Allowed count and sorted array of proficiency names
  */
-export const getProficiencies = (playerStats, skill = true, getProficiencyChoiceCount, config) => {
-    let proficienciesAllowed = 0;
-
-    // Base proficiencies from class and race starting proficiencies
-    let proficiencies = [
+function baseProficiencies(playerStats) {
+    return [
         ...new Set([
             ...(playerStats.class.proficiencies || []),
             ...(playerStats.race.starting_proficiencies || [])
         ])
     ];
+}
+
+export const getProficiencies = (playerStats, skill = true, getProficiencyChoiceCount, config) => {
+    let proficienciesAllowed = 0;
+
+    // Base proficiencies from class and race starting proficiencies
+    let proficiencies = baseProficiencies(playerStats);
 
     // Add rule-specific race proficiencies (e.g., race.traits and race.subrace for 5e, empty for 2024)
     const raceProficiencies = config.raceProficiencies(playerStats);

@@ -1,3 +1,4 @@
+import { get } from 'lodash';
 import { REQUIRED_FIELDS } from './constants.js';
 import { loadValidationRules, getCachedPointBuyCosts } from '../services/ui/dataLoader.js';
 
@@ -27,8 +28,10 @@ export async function getPointBuyCosts(ruleset = '5e') {
  * @param {object} ability - Ability object with baseScore, featIncrease, backgroundIncrease, miscIncrease
  * @returns {number} - Total score
  */
+const getBaseScore = (ability) => parseInt(ability.baseScore) || 8;
+
 const calculateTotalScore = (ability) => {
-  const base = parseInt(ability.baseScore) || 8;
+  const base = getBaseScore(ability);
   const feat = parseInt(ability.featIncrease) || 0;
   const bg = parseInt(ability.backgroundIncrease) || 0;
   const misc = parseInt(ability.miscIncrease) || 0;
@@ -43,29 +46,35 @@ const calculateTotalScore = (ability) => {
  * @param {number} level - Character level
  * @returns {Promise<object>} - Errors object
  */
+const resolveAbilityThresholds = (rules, level) => {
+  const maxTotalRule = level >= 20
+    ? { path: 'ability_score_max.level_20', fallback: 24 }
+    : { path: 'point_buy.max_total_score', fallback: 20 };
+  return {
+    minBase: get(rules, 'point_buy.min_base_score') ?? 8,
+    maxBase: get(rules, 'point_buy.max_base_score') ?? 15,
+    maxTotal: get(rules, maxTotalRule.path) ?? maxTotalRule.fallback,
+  };
+};
+
+const abilityScoreChecks = (ability, baseScore, totalScore, thresholds) => [
+  { key: 'baseScore', failed: baseScore < thresholds.minBase, message: `Base score must be at least ${thresholds.minBase}` },
+  { key: 'baseScore', failed: baseScore > thresholds.maxBase, message: `Base score cannot exceed ${thresholds.maxBase} (point buy max)` },
+  { key: 'totalScore', failed: totalScore > thresholds.maxTotal, message: `Total score (base + improvements + misc) cannot exceed ${thresholds.maxTotal}` },
+  { key: 'miscIncrease', failed: parseInt(ability.miscIncrease) < 0, message: 'Misc bonus must be 0 or above' },
+];
+
 export async function validateAbility(ability, index, ruleset = '5e', level = 1) {
   const rules = await loadValidationRules(ruleset);
   const errors = {};
-  const baseScore = parseInt(ability.baseScore) || 8;
+  const baseScore = getBaseScore(ability);
   const totalScore = calculateTotalScore(ability);
-  
-  const minBase = rules.point_buy?.min_base_score ?? 8;
-  const maxBase = rules.point_buy?.max_base_score ?? 15;
-  const maxTotal = level >= 20 
-    ? (rules.ability_score_max?.level_20 ?? 24)
-    : (rules.point_buy?.max_total_score ?? 20);
+  const thresholds = resolveAbilityThresholds(rules, level);
 
-  if (baseScore < minBase) {
-    errors.baseScore = `Base score must be at least ${minBase}`;
-  }
-  if (baseScore > maxBase) {
-    errors.baseScore = `Base score cannot exceed ${maxBase} (point buy max)`;
-  }
-  if (totalScore > maxTotal) {
-    errors.totalScore = `Total score (base + improvements + misc) cannot exceed ${maxTotal}`;
-  }
-  if (parseInt(ability.miscIncrease) < 0) {
-    errors.miscIncrease = 'Misc bonus must be 0 or above';
+  for (const check of abilityScoreChecks(ability, baseScore, totalScore, thresholds)) {
+    if (check.failed) {
+      errors[check.key] = check.message;
+    }
   }
 
   return errors;

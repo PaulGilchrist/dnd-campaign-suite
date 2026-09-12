@@ -322,13 +322,13 @@ describe('buildDirectSpellDamageSteps - spellProceedToDamage', () => {
         modifier: 0,
       });
       const result = await steps[5].handler(ctx);
-      expect(ctx.proceedWithDamage).toHaveBeenCalledWith(
-        { name: 'Fireball' },
-        '8d6',
-        28,
-        [6, 5, 4, 3, 6, 2, 1, 1],
-        0,
-      );
+      expect(ctx.proceedWithDamage).toHaveBeenCalledWith({
+        attack: { name: 'Fireball' },
+        formula: '8d6',
+        total: 28,
+        rolls: [6, 5, 4, 3, 6, 2, 1, 1],
+        modifier: 0,
+      });
       expect(result).toEqual({ data: { _done: true } });
     });
 

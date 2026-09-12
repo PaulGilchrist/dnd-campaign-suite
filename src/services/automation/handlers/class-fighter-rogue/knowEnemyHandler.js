@@ -44,7 +44,7 @@ function buildIravLines(irvInfo) {
     return text;
 }
 
-function buildUserDescription(action, auto, targetName, irvInfo, iravLines, usedRelentless, dieValue) {
+function buildUserDescription({ action, auto, targetName, irvInfo, iravLines, usedRelentless, dieValue }) {
     let description = `${action.name}: Expend 1 Superiority Die to discern enemy strengths and weaknesses.\n`;
     if (usedRelentless) {
         description += `Rolled d${dieValue} for ${dieValue} (Relentless).\n`;
@@ -115,7 +115,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const irvInfo = await resolveTargetIRV(targetName);
     const iravLines = irvInfo ? buildIravLines(irvInfo) : '';
 
-    const description = buildUserDescription(action, auto, targetName, irvInfo, iravLines, usedRelentless, dieValue);
+    const description = buildUserDescription({ action, auto, targetName, irvInfo, iravLines, usedRelentless, dieValue });
     const logDescription = buildLogDescription(playerStats.name, auto, targetName, usedRelentless, dieValue, iravLines);
 
     addEntry(campaignName, {

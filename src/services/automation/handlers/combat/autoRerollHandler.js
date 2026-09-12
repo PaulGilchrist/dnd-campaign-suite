@@ -243,7 +243,7 @@ async function handleSavingThrowReroll(action, auto, playerName, playerStats, la
     return result;
 }
 
-async function bardicAttackOutcome(action, playerName, playerStats, lastAttack, campaignName, biDieRoll, bardicDieSize) {
+async function bardicAttackOutcome({ action, playerName, playerStats, lastAttack, campaignName, biDieRoll, bardicDieSize }) {
     const { d20, bonus: atkBonus, targetAc, hit } = lastAttack;
     const ac = targetAc;
     const modifiedD20 = d20 + biDieRoll;
@@ -267,7 +267,7 @@ function bardicAbilityCheckOutcome(action, playerName, lastAttack, biDieRoll, ba
     return { logDescription, result };
 }
 
-async function handleBardicInspiration(action, auto, playerName, playerStats, lastAttack, campaignName, bardicDieSize) {
+async function handleBardicInspiration({ action, auto, playerName, playerStats, lastAttack, campaignName, bardicDieSize }) {
     const usesMax = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.bardic_inspiration_uses
         ?? (playerStats.proficiency || 0);
 
@@ -288,7 +288,7 @@ async function handleBardicInspiration(action, auto, playerName, playerStats, la
     }
 
     const { logDescription, result } = attackFresh
-        ? await bardicAttackOutcome(action, playerName, playerStats, lastAttack, campaignName, biDieRoll, bardicDieSize)
+        ? await bardicAttackOutcome({ action, playerName, playerStats, lastAttack, campaignName, biDieRoll, bardicDieSize })
         : bardicAbilityCheckOutcome(action, playerName, lastAttack, biDieRoll, bardicDieSize);
 
     if (usesMax > 0) {
@@ -308,7 +308,7 @@ async function handleBardicInspiration(action, auto, playerName, playerStats, la
     return result;
 }
 
-async function handleHomingStrikes(action, auto, playerName, playerStats, lastAttack, campaignName, { usesKey, currentUses, defaultMax }) {
+function homingStrikeRefusal(action, auto, lastAttack, playerName) {
     const attackFresh = lastAttack?.rollType === 'attack' && lastAttack.hit === false && lastAttack.attackerName === playerName;
     if (!attackFresh) {
         return infoPopup(action.name, `${action.name}: No recent missed attack found — Homing Strikes can only be used when one of your own attack rolls misses.`, auto);
@@ -322,6 +322,12 @@ async function handleHomingStrikes(action, auto, playerName, playerStats, lastAt
     if (lastAttack.homingStrikesAttempted || lastAttack.homingStrikesUsed) {
         return infoPopup(action.name, `${action.name}: Homing Strikes has already resolved this attack roll. Manifest a new Psychic Blade and attack again.`, auto);
     }
+    return null;
+}
+
+async function handleHomingStrikes({ action, auto, playerName, playerStats, lastAttack, campaignName, usesKey, currentUses, defaultMax }) {
+    const refusal = homingStrikeRefusal(action, auto, lastAttack, playerName);
+    if (refusal) return refusal;
 
     const psionicDieSize = evaluateAutoExpression('psionic_energy_die', playerStats);
     const dieRoll = Math.floor(Math.random() * psionicDieSize) + 1;
@@ -365,7 +371,7 @@ async function handleHomingStrikes(action, auto, playerName, playerStats, lastAt
     return result;
 }
 
-function buildPsionicAttackRerollText(playerName, actionName, lastAttack, dieRoll, psionicDieSize, currentUses, defaultMax) {
+function buildPsionicAttackRerollText({ playerName, actionName, lastAttack, dieRoll, psionicDieSize, currentUses, defaultMax }) {
     const { d20, bonus: atkBonus, targetAc, hit } = lastAttack;
     const ac = targetAc;
     const modifiedD20 = d20 + dieRoll;
@@ -393,7 +399,7 @@ async function handlePsionicEnergyDie(action, auto, playerName, playerStats, las
     // die is expended ONLY if the boosted total turns the miss into a hit.
     const isHomingStrikes = auto.trigger === 'psychic_blade_miss' || auto.condition === 'psychic_blade_miss';
     if (isHomingStrikes) {
-        return handleHomingStrikes(action, auto, playerName, playerStats, lastAttack, campaignName, { usesKey, currentUses, defaultMax });
+        return handleHomingStrikes({ action, auto, playerName, playerStats, lastAttack, campaignName, usesKey, currentUses, defaultMax });
     }
 
     const psionicDieSize = evaluateAutoExpression('psionic_energy_die', playerStats);
@@ -408,7 +414,7 @@ async function handlePsionicEnergyDie(action, auto, playerName, playerStats, las
     let logDescription;
     let result;
     if (attackFresh) {
-        logDescription = buildPsionicAttackRerollText(playerName, action.name, lastAttack, dieRoll, psionicDieSize, currentUses, defaultMax);
+        logDescription = buildPsionicAttackRerollText({ playerName, actionName: action.name, lastAttack, dieRoll, psionicDieSize, currentUses, defaultMax });
         result = await handleAttackRoll(action, dieRoll, lastAttack, playerStats, campaignName);
     } else {
         const { d20, bonus: checkBonus, checkName } = lastAttack;
@@ -433,7 +439,7 @@ async function handlePsionicEnergyDie(action, auto, playerName, playerStats, las
     return result;
 }
 
-async function handleBonusReroll(action, auto, playerName, playerStats, lastAttack, campaignName, _mapName) {
+async function handleBonusReroll({ action, auto, playerName, playerStats, lastAttack, campaignName, _mapName }) {
     const bonus = Number(auto.bonus);
 
     const costError = await consumeResourceCost(auto, playerStats, campaignName);
@@ -519,7 +525,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const bardicDieSize = getBardicDieSize(playerStats);
 
     if (bardicDieSize > 0 && auto.bonusExpression === 'bardic_inspiration_die') {
-        return handleBardicInspiration(action, auto, playerName, playerStats, lastAttack, campaignName, bardicDieSize);
+        return handleBardicInspiration({ action, auto, playerName, playerStats, lastAttack, campaignName, bardicDieSize });
     }
 
     if (auto.bonusExpression === 'psionic_energy_die') {
@@ -527,7 +533,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     if (auto.bonus != null) {
-        return handleBonusReroll(action, auto, playerName, playerStats, lastAttack, campaignName, _mapName);
+        return handleBonusReroll({ action, auto, playerName, playerStats, lastAttack, campaignName, _mapName });
     }
 
     return automationInfoPopup(action);

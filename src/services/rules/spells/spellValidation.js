@@ -236,20 +236,65 @@ function extractFeatSpells(featData) {
  * @param {string} version - '5e' or '2024'
  * @returns {Promise<object>} - Object containing all spell sources
  */
+async function applyRaceSpellSource(sources, formData, version) {
+  const races = await loadRaceData(version);
+  const raceData = races.find(r => r.name === formData.race.name);
+  const raceSpells = extractRaceSpells(raceData, version);
+
+  sources.race.spells = raceSpells.spells;
+  sources.race.cantrips = raceSpells.cantrips;
+}
+
+async function applyBackgroundSpellSource(sources, formData, version) {
+  const backgrounds = await loadBackgroundData(version);
+  const backgroundData = backgrounds.find(b => b.name === formData.background.name);
+  const backgroundSpells = extractBackgroundSpells(backgroundData, version);
+
+  sources.background.spells = backgroundSpells.spells;
+  sources.background.cantrips = backgroundSpells.cantrips;
+}
+
+async function applyFeatSpellSources(sources, formData, version) {
+  const feats = await loadFeatData(version);
+
+  formData.feats.forEach(featName => {
+    const featData = feats.find(f => f.name === featName);
+    if (featData) {
+      const featSpells = extractFeatSpells(featData, version);
+
+      sources.feats.grantedSpells.push(...featSpells.spells);
+      sources.feats.grantedCantrips.push(...featSpells.cantrips);
+      sources.feats.spellListAccess.push(...featSpells.spellListAccess);
+    }
+  });
+}
+
+async function applyClassSpellSource(sources, formData, version) {
+  const classes = await loadClassData(version);
+  const classData = classes.find(c => c.name === formData.class.name);
+
+  sources.class.isSpellcaster = true;
+  sources.class.spellList = classData ? [formData.class.name] : [];
+}
+
+function sourceName(block) {
+  return block?.name || '';
+}
+
 export async function getSpellSources(formData, version = '5e') {
   const sources = {
     class: {
-      name: formData.class?.name || '',
+      name: sourceName(formData.class),
       spellList: [],
       isSpellcaster: false
     },
     race: {
-      name: formData.race?.name || '',
+      name: sourceName(formData.race),
       spells: [],
       cantrips: []
     },
     background: {
-      name: formData.background?.name || '',
+      name: sourceName(formData.background),
       spells: [],
       cantrips: []
     },
@@ -262,47 +307,22 @@ export async function getSpellSources(formData, version = '5e') {
   
   // Get class spell list
   if (formData.class?.name) {
-    const classes = await loadClassData(version);
-    const classData = classes.find(c => c.name === formData.class.name);
-    
-    sources.class.isSpellcaster = true;
-    sources.class.spellList = classData ? [formData.class.name] : [];
+    await applyClassSpellSource(sources, formData, version);
   }
   
   // Get race spells
   if (formData.race?.name) {
-    const races = await loadRaceData(version);
-    const raceData = races.find(r => r.name === formData.race.name);
-    const raceSpells = extractRaceSpells(raceData, version);
-    
-    sources.race.spells = raceSpells.spells;
-    sources.race.cantrips = raceSpells.cantrips;
+    await applyRaceSpellSource(sources, formData, version);
   }
   
   // Get background spells
   if (formData.background?.name) {
-    const backgrounds = await loadBackgroundData(version);
-    const backgroundData = backgrounds.find(b => b.name === formData.background.name);
-    const backgroundSpells = extractBackgroundSpells(backgroundData, version);
-    
-    sources.background.spells = backgroundSpells.spells;
-    sources.background.cantrips = backgroundSpells.cantrips;
+    await applyBackgroundSpellSource(sources, formData, version);
   }
   
   // Get feat spells
   if (formData.feats && formData.feats.length > 0) {
-    const feats = await loadFeatData(version);
-    
-    formData.feats.forEach(featName => {
-      const featData = feats.find(f => f.name === featName);
-      if (featData) {
-        const featSpells = extractFeatSpells(featData, version);
-        
-        sources.feats.grantedSpells.push(...featSpells.spells);
-        sources.feats.grantedCantrips.push(...featSpells.cantrips);
-        sources.feats.spellListAccess.push(...featSpells.spellListAccess);
-      }
-    });
+    await applyFeatSpellSources(sources, formData, version);
   }
   
   return sources;

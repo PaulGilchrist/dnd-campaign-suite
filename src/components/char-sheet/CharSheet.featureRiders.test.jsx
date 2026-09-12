@@ -624,7 +624,7 @@ describe('handlePsiBolsteredKnack', () => {
     const stats = createPlayerStats({ skillProficiencies: ['Arcana'] });
     const popupHtml = { name: 'Arcana', rollType: 'skill', rolls: [4], bonus: 3 };
 
-    await handlePsiBolsteredKnack(stats, campaignName, popupHtml, 5, 6, true);
+    await handlePsiBolsteredKnack({ playerStats: stats, campaignName, popupHtml, dieValue: 5, dieSize: 6, success: true });
 
     expect(mockStore.get('Test Character:psionicEnergy')).toBe(2);
     expect(addEntry).toHaveBeenCalled();
@@ -638,7 +638,7 @@ describe('handlePsiBolsteredKnack', () => {
     const stats = createPlayerStats({ skillProficiencies: ['Arcana'] });
     const popupHtml = { name: 'Arcana', rollType: 'skill', rolls: [4], bonus: 3 };
 
-    await handlePsiBolsteredKnack(stats, campaignName, popupHtml, 5, 6, false);
+    await handlePsiBolsteredKnack({ playerStats: stats, campaignName, popupHtml, dieValue: 5, dieSize: 6, success: false });
 
     expect(mockStore.get('Test Character:psionicEnergy')).toBe(3);
     expect(addEntry).toHaveBeenCalled();

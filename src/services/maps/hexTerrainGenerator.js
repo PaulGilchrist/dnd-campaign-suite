@@ -34,8 +34,8 @@ export function generateHexTerrain({ gridSize = 30, seed, weights } = {}) {
   const moistureMap = {};
 
   for (const { q, r } of allHexes) {
-    const elevation = sampleFractal(elevationOctaveGrids, octaves, q, r, hexCols, hexRows, baseResolution);
-    const moisture = sampleFractal(moistureOctaveGrids, octaves, q, r, hexCols, hexRows, baseResolution);
+    const elevation = sampleFractal({ octaveGrids: elevationOctaveGrids, octaves, q, r, hexCols, hexRows, baseResolution });
+    const moisture = sampleFractal({ octaveGrids: moistureOctaveGrids, octaves, q, r, hexCols, hexRows, baseResolution });
     const key = hexKey(q, r);
     elevationMap[key] = elevation;
     moistureMap[key] = moisture;
@@ -130,7 +130,7 @@ function sampleNoiseGrid(grid, q, r, hexCols, hexRows) {
   return top + (bottom - top) * fy;
 }
 
-function sampleFractal(octaveGrids, octaves, q, r, hexCols, hexRows, baseResolution) {
+function sampleFractal({ octaveGrids, octaves, q, r, hexCols, hexRows, baseResolution }) {
   let value = 0;
   for (let i = 0; i < octaveGrids.length; i++) {
     const grid = octaveGrids[i];
@@ -209,6 +209,21 @@ function applyBeaches(terrain, hexCols, hexRows) {
   }
 }
 
+function floodLowGround(terrain, elevationMap, visited, hexCols, hexRows) {
+  const waterThreshold = 0.4;
+  for (let r = 0; r < hexRows; r++) {
+    for (let q = 0; q < hexCols; q++) {
+      const key = hexKey(q, r);
+      if (terrain[key] === 'water') continue;
+      if (visited.has(key)) continue;
+      const elev = elevationMap[key];
+      if (elev != null && elev < waterThreshold) {
+        terrain[key] = 'water';
+      }
+    }
+  }
+}
+
 function fillLakes(terrain, elevationMap, hexCols, hexRows) {
   const visited = new Set();
   const queue = [];
@@ -238,18 +253,7 @@ function fillLakes(terrain, elevationMap, hexCols, hexRows) {
     }
   }
 
-  const waterThreshold = 0.4;
-  for (let r = 0; r < hexRows; r++) {
-    for (let q = 0; q < hexCols; q++) {
-      const key = hexKey(q, r);
-      if (terrain[key] === 'water') continue;
-      if (visited.has(key)) continue;
-      const elev = elevationMap[key];
-      if (elev != null && elev < waterThreshold) {
-        terrain[key] = 'water';
-      }
-    }
-  }
+  floodLowGround(terrain, elevationMap, visited, hexCols, hexRows);
 }
 
 function generateRivers(elevationMap, moistureMap, terrain, hexCols, hexRows) {

@@ -86,6 +86,16 @@ export async function handle(action, playerStats, campaignName) {
     };
 }
 
+function resolveGhoulInitiative(casterCreature) {
+    const rawInit = casterCreature?.initiative;
+    let initiativeValue = 0;
+    if (rawInit !== '' && rawInit !== undefined) {
+        initiativeValue = parseInt(rawInit, 10) || 0;
+    }
+    const casterInitBonus = casterCreature?.initiativeBonus || 0;
+    return initiativeValue || (Math.floor(Math.random() * 20) + 1 + casterInitBonus);
+}
+
 export async function confirmCreateUndead(action, playerStats, campaignName, { ghoulCount }) {
     if (!playerStats) {
         return {
@@ -143,13 +153,7 @@ export async function confirmCreateUndead(action, playerStats, campaignName, { g
     }
 
     const casterCreature = combatSummary.creatures.find(c => c.name === casterName);
-    let initiativeValue = 0;
-    if (casterCreature?.initiative !== '' && casterCreature?.initiative !== undefined) {
-        initiativeValue = parseInt(casterCreature.initiative, 10) || 0;
-    }
-
-    const casterInitBonus = casterCreature?.initiativeBonus || 0;
-    initiativeValue = initiativeValue || (Math.floor(Math.random() * 20) + 1 + casterInitBonus);
+    const initiativeValue = resolveGhoulInitiative(casterCreature);
 
     let targetEffects = getTargetEffects();
     const creatureNames = [];

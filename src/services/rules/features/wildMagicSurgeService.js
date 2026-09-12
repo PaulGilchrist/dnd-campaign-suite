@@ -46,6 +46,36 @@ export function getFeatsOfChaosFeature(playerStats) {
     return passives.find(p => p.type === 'feats_of_chaos' && p.condition === 'feats_of_chaos_active');
 }
 
+async function executeWildMagicSurgeAction(surgeFeature, playerStats, campaignName, mapName, { autoSurge, markOnce }) {
+    const surgeTable = playerStats.wildMagicSurgeTable;
+    if (surgeTable == null) {
+        console.error('[wildMagicSurgeService] Missing array:', surgeTable);
+        throw new Error('Expected array, got ' + surgeTable);
+    }
+
+    const action = {
+        name: surgeFeature.name,
+        automation: {
+            type: 'wild_magic_surge',
+            trigger: 'after_sorcerer_spell_slot',
+            oncePerTurn: surgeFeature.oncePerTurn || false,
+            ...(autoSurge ? { autoSurge: true } : {}),
+        },
+        wildMagicSurgeTable: surgeTable,
+    };
+
+    try {
+        const result = await executeHandler(action, playerStats, campaignName, mapName);
+        if (result && markOnce) {
+            await markOncePerTurn('Wild Magic Surge', 'surgeUsedRound', playerStats, campaignName);
+        }
+        return result || null;
+    } catch (e) {
+        console.error(`[wildMagicSurge] Failed to execute surge for ${surgeFeature.name}:`, e);
+        throw e;
+    }
+}
+
 export async function triggerWildMagicSurge(spell, metaCtx, playerStats, campaignName, mapName) {
     if (!playerStats) return null;
     if (!isSorcererSpell(spell, playerStats)) return null;
@@ -61,73 +91,16 @@ export async function triggerWildMagicSurge(spell, metaCtx, playerStats, campaig
 
     const featsOfChaos = getFeatsOfChaosFeature(playerStats);
     const featsOfChaosActive = getRuntimeValue(playerStats.name, 'featsOfChaosActive', campaignName) === true;
+    const surgeFeature = surgeFeatures[0];
 
     if (featsOfChaos && featsOfChaosActive) {
-        const usesKey = 'featsOfChaosUses';
         await setRuntimeValue(playerStats.name, 'featsOfChaosActive', false, campaignName, true);
-        await setRuntimeValue(playerStats.name, usesKey, 1, campaignName, true);
-
-        const surgeFeature = surgeFeatures[0];
-        const surgeTable = playerStats.wildMagicSurgeTable;
-        if (surgeTable == null) {
-            console.error('[wildMagicSurgeService] Missing array:', surgeTable);
-            throw new Error('Expected array, got ' + surgeTable);
-        }
-
-        const action = {
-            name: surgeFeature.name,
-            automation: {
-                type: 'wild_magic_surge',
-                trigger: 'after_sorcerer_spell_slot',
-                oncePerTurn: surgeFeature.oncePerTurn || false,
-                autoSurge: true,
-            },
-            wildMagicSurgeTable: surgeTable,
-        };
-
-        try {
-            const result = await executeHandler(action, playerStats, campaignName, mapName);
-            if (result) {
-                return result;
-            }
-        } catch (e) {
-            console.error(`[wildMagicSurge] Failed to execute surge for ${surgeFeature.name}:`, e);
-            throw e;
-        }
-
-        return null;
+        await setRuntimeValue(playerStats.name, 'featsOfChaosUses', 1, campaignName, true);
+        return await executeWildMagicSurgeAction(surgeFeature, playerStats, campaignName, mapName, { autoSurge: true, markOnce: false });
     }
 
-    const surgeFeature = surgeFeatures[0];
     const skip = await checkOncePerTurn('Wild Magic Surge', 'surgeUsedRound', playerStats.name, campaignName);
     if (skip) return null;
 
-    const surgeTable = playerStats.wildMagicSurgeTable;
-    if (surgeTable == null) {
-        console.error('[wildMagicSurgeService] Missing array:', surgeTable);
-        throw new Error('Expected array, got ' + surgeTable);
-    }
-
-    const action = {
-        name: surgeFeature.name,
-        automation: {
-            type: 'wild_magic_surge',
-            trigger: 'after_sorcerer_spell_slot',
-            oncePerTurn: surgeFeature.oncePerTurn || false,
-        },
-        wildMagicSurgeTable: surgeTable,
-    };
-
-    try {
-        const result = await executeHandler(action, playerStats, campaignName, mapName);
-        if (result) {
-            await markOncePerTurn('Wild Magic Surge', 'surgeUsedRound', playerStats, campaignName);
-            return result;
-        }
-    } catch (e) {
-        console.error(`[wildMagicSurge] Failed to execute surge for ${surgeFeature.name}:`, e);
-        throw e;
-    }
-
-    return null;
+    return await executeWildMagicSurgeAction(surgeFeature, playerStats, campaignName, mapName, { autoSurge: false, markOnce: true });
 }

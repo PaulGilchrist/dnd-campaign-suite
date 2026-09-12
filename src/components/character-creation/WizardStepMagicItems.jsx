@@ -5,42 +5,44 @@ import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import './WizardStepMagicItems.css';
 
 const BASE_ATTUNEMENT_LIMIT = 3;
+const USE_MAGIC_DEVICE = 'Use Magic Device';
+
+// CLA-374: the wizard stores the subclass under class.subclass (5e) and
+// class.major (2024 majors) — accept either name.
+function findChosenSubclass(classData, classSubtypes) {
+    if (!classData?.name || !classSubtypes) {
+        return null;
+    }
+
+    const selectedClass = classSubtypes.find(cs => cs.className === classData.name);
+    if (!selectedClass) {
+        return null;
+    }
+
+    const subclassName = classData.subclass?.name || classData.major?.name;
+    if (!subclassName) {
+        return null;
+    }
+
+    return selectedClass.subtypes?.find(s => s.name === subclassName) || null;
+}
+
+// CLA-374: 5e subclasses nest level-gated features under class_levels[];
+// 2024 majors carry them flat on features[] — scan both shapes.
+function hasUseMagicDevice(subclass, characterLevel) {
+    const nested = (subclass.class_levels || []).some(cl => {
+        return cl.level <= characterLevel && (cl.features || []).some(f => f.name === USE_MAGIC_DEVICE);
+    });
+    const flat = (subclass.features || []).some(f => f.name === USE_MAGIC_DEVICE && (f.level || 1) <= characterLevel);
+    return nested || flat;
+}
 
 function calculateAttunementLimit(formData, classSubtypes) {
-    if (!formData?.class?.name || !classSubtypes) {
+    const subclass = findChosenSubclass(formData?.class, classSubtypes);
+    if (!subclass || !hasUseMagicDevice(subclass, formData.level || 1)) {
         return BASE_ATTUNEMENT_LIMIT;
     }
-
-    const selectedClass = classSubtypes.find(cs => cs.className === formData.class.name);
-    if (!selectedClass) {
-        return BASE_ATTUNEMENT_LIMIT;
-    }
-
-    // CLA-374: the wizard stores the subclass under class.subclass (5e) and
-    // class.major (2024 majors) — accept either name.
-    const subclassName = formData.class.subclass?.name || formData.class.major?.name;
-    if (!subclassName) {
-        return BASE_ATTUNEMENT_LIMIT;
-    }
-
-    const subclass = selectedClass.subtypes?.find(s => s.name === subclassName);
-    if (!subclass) {
-        return BASE_ATTUNEMENT_LIMIT;
-    }
-
-    const characterLevel = formData.level || 1;
-
-    // CLA-374: 5e subclasses nest level-gated features under class_levels[];
-    // 2024 majors carry them flat on features[] — scan both shapes.
-    const hasUseMagicDevice = (subclass.class_levels || []).some(cl => {
-        return cl.features?.some(f => f.name === 'Use Magic Device' && cl.level <= characterLevel);
-    }) || (subclass.features || []).some(f => f.name === 'Use Magic Device' && (f.level || 1) <= characterLevel);
-
-    if (hasUseMagicDevice) {
-        return BASE_ATTUNEMENT_LIMIT + 1;
-    }
-
-    return BASE_ATTUNEMENT_LIMIT;
+    return BASE_ATTUNEMENT_LIMIT + 1;
 }
 
 function WizardStepMagicItems({ formData, allMagicItems, classSubtypes, onArrayFieldChange }) {

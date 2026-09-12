@@ -277,7 +277,7 @@ function addLargeRoomBed(room, placedItems, rng, gridSize, usedWalls) {
   usedWalls.push(wall);
 }
 
-function addLargeRoomBookshelf(room, placedItems, rng, gridSize, grid, finalDoors, usedWalls) {
+function addLargeRoomBookshelf({ room, placedItems, rng, gridSize, grid, finalDoors, usedWalls }) {
   const walls = ['n', 's', 'w', 'e'].filter(function (w) {
     return !usedWalls.includes(w);
   });
@@ -341,7 +341,7 @@ function addLargeRoomFurniture(room, placedItems, rng, gridSize, grid, finalDoor
   }
 
   if (rng() < 0.3) {
-    addLargeRoomBookshelf(room, placedItems, rng, gridSize, grid, finalDoors, usedWalls);
+    addLargeRoomBookshelf({ room, placedItems, rng, gridSize, grid, finalDoors, usedWalls });
   }
 
   placeRoomTrap(room, placedItems, rng, grid, gridSize);

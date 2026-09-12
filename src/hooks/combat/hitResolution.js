@@ -248,6 +248,12 @@ async function applyUnerringStrike(state, { characterName, campaignName, context
     return true;
 }
 
+function computeDeathStrikeSaveDc(ps) {
+    const prof = ps?.proficiency || 0;
+    const dexAbility = ps?.abilities?.find(a => a.name === 'Dexterity');
+    return 8 + (dexAbility?.bonus || 0) + prof;
+}
+
 async function maybeStoreDeathStrike(characterName, campaignName, context, targetName) {
     const cs2 = await getCombatContext(campaignName);
     const currentRound2 = getCurrentCombatRound(campaignName);
@@ -256,18 +262,13 @@ async function maybeStoreDeathStrike(characterName, campaignName, context, targe
     if (playerCreature2 && playerCreature2.hasActed) return;
     const targetName2 = targetName || getTargetFromAttacker(cs2, characterName)?.name;
     if (!targetName2) return;
-    const ps = context?.playerStats;
-    const prof = ps?.proficiency || 0;
-    const dexAbility = ps?.abilities?.find(a => a.name === 'Dexterity');
-    const dexMod = dexAbility?.bonus || 0;
-    const saveDc = 8 + dexMod + prof;
     const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
     const deathStrikeEffect = {
         target: targetName2,
         source: 'Death Strike',
         effect: 'death_strike',
         saveType: 'CON',
-        saveDc: saveDc,
+        saveDc: computeDeathStrikeSaveDc(context?.playerStats),
         saveAbility: 'DEX',
         damageDoubled: true,
     };

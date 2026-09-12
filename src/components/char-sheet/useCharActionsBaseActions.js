@@ -311,7 +311,7 @@ export default function useCharActionsBaseActions({
         return targetStrBonus;
     }
 
-    async function applyGrappleSuccess(target, cs, useAbility, checkBonus, rollTotal, d20Val, targetStrBonus) {
+    async function applyGrappleSuccess({ target, cs, useAbility, checkBonus, rollTotal, d20Val, targetStrBonus }) {
         const combatSummary = cs;
         if (combatSummary?.creatures) {
             const targetCreature = combatSummary.creatures.find(c => c.name === target.name);
@@ -366,7 +366,7 @@ export default function useCharActionsBaseActions({
         const targetStrBonus = await resolveTargetStrBonus(target, cs);
         const success = rollTotal > targetStrBonus;
         if (success) {
-            await applyGrappleSuccess(target, cs, useAbility, checkBonus, rollTotal, d20Val, targetStrBonus);
+            await applyGrappleSuccess({ target, cs, useAbility, checkBonus, rollTotal, d20Val, targetStrBonus });
         } else {
             await reportGrappleFailure(useAbility, checkBonus, rollTotal, d20Val, targetStrBonus);
         }

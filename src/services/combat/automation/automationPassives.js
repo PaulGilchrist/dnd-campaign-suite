@@ -138,7 +138,7 @@ function describeHealingBonus(passive, bonus, requirePositive) {
 
 // Effects 'bonus_healing' and 'max_hp_increase'/'fortified_health' are mutually
 // exclusive on a single passive, so the branches never both fire for one entry.
-function healingPassiveContribution(passive, stats, prof, level, slotLevel, campaignName, requirePositive) {
+function healingPassiveContribution({ passive, stats, prof, level, slotLevel, campaignName, requirePositive }) {
     if (passive.type !== 'passive_rule') return null;
     if (passive.effect === 'bonus_healing' && passive.bonusExpression) {
         return describeHealingBonus(passive, evaluateAutoExpression(passive.bonusExpression, stats, prof, level, slotLevel), requirePositive);
@@ -157,7 +157,7 @@ export function resolveHealingBonuses(playerStats, prof, level, slotLevel, campa
     const passives = playerStats.automation?.passives || [];
     let totalBonus = 0;
     for (const passive of passives) {
-        const contribution = healingPassiveContribution(passive, playerStats, prof, level, slotLevel, campaignName, false);
+        const contribution = healingPassiveContribution({ passive, stats: playerStats, prof, level, slotLevel, campaignName, requirePositive: false });
         if (contribution) totalBonus += contribution.amount;
     }
     return totalBonus;
@@ -168,7 +168,7 @@ export function resolveHealingBonusesWithDetails(playerStats, prof, level, slotL
     let totalBonus = 0;
     const details = [];
     const applyContribution = (stats, passive) => {
-        const contribution = healingPassiveContribution(passive, stats, prof, level, slotLevel, campaignName, true);
+        const contribution = healingPassiveContribution({ passive, stats, prof, level, slotLevel, campaignName, requirePositive: true });
         if (!contribution) return;
         totalBonus += contribution.amount;
         details.push(contribution);

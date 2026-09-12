@@ -4,8 +4,10 @@ import { getCsAndTargets, extractMaxTargets, resolveHumanoids, resolveBeasts, ma
 import { isCreatureDead } from '../../services/shared/hpModifier.js';
 
 // ── Spell gate handlers ──────────────────────────────────────────────────────
+// All gates take a single options object:
+// { spell, campaignName, cfSetPending, playerStats, metaCtx, characters, isSorcerer, setPopupHtml }
 
-function gateForesight(spell, campaignName, cfSetPending, playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateForesight({ spell, campaignName, cfSetPending, playerStats }) {
   const { creatureTargets } = getCsAndTargets(campaignName, { includeCaster: true, casterName: playerStats.name });
   if (creatureTargets.length > 0) {
     cfSetPending('foresight', makePending('foresight', spell, { range: spell.range || 'Touch', creatureTargets }));
@@ -14,7 +16,7 @@ function gateForesight(spell, campaignName, cfSetPending, playerStats, _metaCtx,
   return false;
 }
 
-function gateSanctuary(spell, campaignName, cfSetPending, playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateSanctuary({ spell, campaignName, cfSetPending, playerStats }) {
   const { creatureTargets } = getCsAndTargets(campaignName, { includeCaster: true, casterName: playerStats.name });
   if (creatureTargets.length > 0) {
     cfSetPending('sanctuary', makePending('sanctuary', spell, { range: spell.range || '30 feet', creatureTargets }));
@@ -23,7 +25,7 @@ function gateSanctuary(spell, campaignName, cfSetPending, playerStats, _metaCtx,
   return false;
 }
 
-function gateProtectionFromEvilAndGood(spell, campaignName, cfSetPending, playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateProtectionFromEvilAndGood({ spell, campaignName, cfSetPending, playerStats }) {
   const { creatureTargets } = getCsAndTargets(campaignName, { includeCaster: true, casterName: playerStats.name });
   if (creatureTargets.length > 0) {
     cfSetPending('protectionFromEvilAndGood', makePending('protectionFromEvilAndGood', spell, { range: spell.range || 'Touch', creatureTargets }));
@@ -32,7 +34,7 @@ function gateProtectionFromEvilAndGood(spell, campaignName, cfSetPending, player
   return false;
 }
 
-function gateProtectionFromPoison(spell, campaignName, cfSetPending, playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateProtectionFromPoison({ spell, campaignName, cfSetPending, playerStats }) {
   const { creatureTargets } = getCsAndTargets(campaignName, { includeCaster: true, casterName: playerStats.name });
   if (creatureTargets.length > 0) {
     cfSetPending('protectionFromPoison', makePending('protectionFromPoison', spell, { range: spell.range || 'Touch', creatureTargets }));
@@ -41,7 +43,7 @@ function gateProtectionFromPoison(spell, campaignName, cfSetPending, playerStats
   return false;
 }
 
-function gateStoneSkin(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateStoneSkin({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('stoneSkin', makePending('stoneSkin', spell, { range: spell.range || 'Touch', creatureTargets }));
@@ -50,7 +52,7 @@ function gateStoneSkin(spell, campaignName, cfSetPending, _playerStats, _metaCtx
   return false;
 }
 
-function gateHoldMonster(spell, campaignName, cfSetPending, playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateHoldMonster({ spell, campaignName, cfSetPending, playerStats }) {
   const { creatureTargets } = getCsAndTargets(campaignName, { excludeCaster: true, casterName: playerStats.name });
   if (creatureTargets.length > 0) {
     cfSetPending('holdMonster', makePending('holdMonster', spell, {
@@ -63,7 +65,7 @@ function gateHoldMonster(spell, campaignName, cfSetPending, playerStats, _metaCt
   return false;
 }
 
-async function gateHoldPerson(spell, campaignName, cfSetPending, playerStats) {
+async function gateHoldPerson({ spell, campaignName, cfSetPending, playerStats }) {
   const targets = await resolveHumanoids(campaignName, playerStats.name);
   if (targets.length > 0) {
     cfSetPending('holdPerson', makePending('holdPerson', spell, {
@@ -76,7 +78,7 @@ async function gateHoldPerson(spell, campaignName, cfSetPending, playerStats) {
   return false;
 }
 
-function gatePolymorph(spell, campaignName, cfSetPending, _playerStats, _metaCtx, characters, _isSorcerer) {
+function gatePolymorph({ spell, campaignName, cfSetPending, characters }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('polymorph', makePending('polymorph', spell, {
@@ -90,7 +92,7 @@ function gatePolymorph(spell, campaignName, cfSetPending, _playerStats, _metaCtx
   return false;
 }
 
-function gateShapechange(spell, campaignName, cfSetPending, playerStats, metaCtx, characters, isSorcerer) {
+function gateShapechange({ spell, campaignName, cfSetPending, playerStats, characters, isSorcerer }) {
   if (!isSorcerer) return false;
   const { creatureTargets } = getCsAndTargets(campaignName, { includeCaster: true, casterName: playerStats.name });
   if (creatureTargets.length > 0) {
@@ -105,7 +107,7 @@ function gateShapechange(spell, campaignName, cfSetPending, playerStats, metaCtx
   return false;
 }
 
-function gateAnimalShapes(spell, campaignName, cfSetPending, playerStats, _metaCtx, characters, _isSorcerer) {
+function gateAnimalShapes({ spell, campaignName, cfSetPending, playerStats, characters }) {
   const allies = getAllyList(playerStats.name);
   const cs = getCombatSummary(campaignName);
   if (!cs?.creatures) {
@@ -126,7 +128,7 @@ function gateAnimalShapes(spell, campaignName, cfSetPending, playerStats, _metaC
   return false;
 }
 
-function gateTruePolymorph(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateTruePolymorph({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('truePolymorph', makePending('truePolymorph', spell, {
@@ -138,7 +140,7 @@ function gateTruePolymorph(spell, campaignName, cfSetPending, _playerStats, _met
   return false;
 }
 
-async function gateCharmPerson(spell, campaignName, cfSetPending, playerStats) {
+async function gateCharmPerson({ spell, campaignName, cfSetPending, playerStats }) {
   const targets = await resolveHumanoids(campaignName, playerStats.name);
   if (targets.length > 0) {
     cfSetPending('charmPerson', makePending('charmPerson', spell, {
@@ -151,7 +153,7 @@ async function gateCharmPerson(spell, campaignName, cfSetPending, playerStats) {
   return false;
 }
 
-function gateCharmMonster(spell, campaignName, cfSetPending, playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateCharmMonster({ spell, campaignName, cfSetPending, playerStats }) {
   const { creatureTargets } = getCsAndTargets(campaignName, { excludeCaster: true, casterName: playerStats.name });
   if (creatureTargets.length > 0) {
     cfSetPending('charmMonster', makePending('charmMonster', spell, {
@@ -164,7 +166,7 @@ function gateCharmMonster(spell, campaignName, cfSetPending, playerStats, _metaC
   return false;
 }
 
-function gateBanishment(spell, campaignName, cfSetPending, playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateBanishment({ spell, campaignName, cfSetPending, playerStats }) {
   const { creatureTargets } = getCsAndTargets(campaignName, { excludeCaster: true, casterName: playerStats.name });
   if (creatureTargets.length > 0) {
     cfSetPending('banishment', makePending('banishment', spell, {
@@ -177,7 +179,7 @@ function gateBanishment(spell, campaignName, cfSetPending, playerStats, _metaCtx
   return false;
 }
 
-function gatePrismaticSpray(spell, campaignName, cfSetPending, playerStats, _metaCtx, _characters, _isSorcerer) {
+function gatePrismaticSpray({ spell, campaignName, cfSetPending, playerStats }) {
   const { creatureTargets } = getCsAndTargets(campaignName, { excludeCaster: true, casterName: playerStats.name });
   if (creatureTargets.length > 0) {
     cfSetPending('prismatic_spray', makePending('prismatic_spray', spell, {
@@ -190,7 +192,7 @@ function gatePrismaticSpray(spell, campaignName, cfSetPending, playerStats, _met
   return false;
 }
 
-function gateLesserRestoration(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateLesserRestoration({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('lesserRestoration', makePending('lesserRestoration', spell, { range: spell.range || 'Touch', creatureTargets }));
@@ -199,7 +201,7 @@ function gateLesserRestoration(spell, campaignName, cfSetPending, _playerStats, 
   return false;
 }
 
-function gateGreaterRestoration(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateGreaterRestoration({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('greaterRestoration', makePending('greaterRestoration', spell, { range: spell.range || 'Touch', creatureTargets }));
@@ -208,7 +210,7 @@ function gateGreaterRestoration(spell, campaignName, cfSetPending, _playerStats,
   return false;
 }
 
-function gateRemoveCurse(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateRemoveCurse({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('removeCurse', makePending('removeCurse', spell, { range: spell.range || 'Touch', creatureTargets }));
@@ -217,7 +219,7 @@ function gateRemoveCurse(spell, campaignName, cfSetPending, _playerStats, _metaC
   return false;
 }
 
-function gateAid(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateAid({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('aid', makePending('aid', spell, { range: spell.range || '30 feet', maxTargets: 3, creatureTargets }));
@@ -226,7 +228,7 @@ function gateAid(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _cha
   return false;
 }
 
-function gateBane(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateBane({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('bane', makePending('bane', spell, { range: spell.range || '30 feet', maxTargets: 3, creatureTargets }));
@@ -235,7 +237,7 @@ function gateBane(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _ch
   return false;
 }
 
-function gateBless(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateBless({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('bless', makePending('bless', spell, { range: spell.range || '30 feet', maxTargets: 3, creatureTargets }));
@@ -244,7 +246,7 @@ function gateBless(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _c
   return false;
 }
 
-function gateHolyAura(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateHolyAura({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('holyAura', makePending('holyAura', spell, {
@@ -257,7 +259,7 @@ function gateHolyAura(spell, campaignName, cfSetPending, _playerStats, _metaCtx,
   return false;
 }
 
-function gateFaerieFire(spell, campaignName, cfSetPending, playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateFaerieFire({ spell, campaignName, cfSetPending, playerStats }) {
   const { creatureTargets } = getCsAndTargets(campaignName, { excludeCaster: true, casterName: playerStats.name });
   if (creatureTargets.length > 0) {
     cfSetPending('faerieFire', makePending('faerieFire', spell, {
@@ -270,7 +272,7 @@ function gateFaerieFire(spell, campaignName, cfSetPending, playerStats, _metaCtx
   return false;
 }
 
-function gateSlow(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateSlow({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('slow', makePending('slow', spell, { range: spell.range || '50 feet', creatureTargets }));
@@ -279,7 +281,7 @@ function gateSlow(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _ch
   return false;
 }
 
-function gateHaste(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateHaste({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('haste', makePending('haste', spell, { range: spell.range || '30 feet', creatureTargets }));
@@ -288,7 +290,7 @@ function gateHaste(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _c
   return false;
 }
 
-function gateEnhanceAbility(spell, campaignName, cfSetPending, playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateEnhanceAbility({ spell, campaignName, cfSetPending, playerStats }) {
   const { creatureTargets } = getCsAndTargets(campaignName, { includeCaster: true, casterName: playerStats.name });
   if (creatureTargets.length > 0) {
     cfSetPending('enhanceAbility', makePending('enhanceAbility', spell, { range: spell.range || 'Touch', creatureTargets }));
@@ -297,7 +299,7 @@ function gateEnhanceAbility(spell, campaignName, cfSetPending, playerStats, _met
   return false;
 }
 
-function gateBarkskin(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateBarkskin({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('barkskin', makePending('barkskin', spell, { range: spell.range || 'Touch', creatureTargets }));
@@ -306,7 +308,7 @@ function gateBarkskin(spell, campaignName, cfSetPending, _playerStats, _metaCtx,
   return false;
 }
 
-function gateInvisibility(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateInvisibility({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('invisibility', makePending('invisibility', spell, { range: spell.range || 'Touch', creatureTargets }));
@@ -315,7 +317,7 @@ function gateInvisibility(spell, campaignName, cfSetPending, _playerStats, _meta
   return false;
 }
 
-function gateGreaterInvisibility(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateGreaterInvisibility({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('greaterInvisibility', makePending('greaterInvisibility', spell, { range: spell.range || 'Touch', creatureTargets }));
@@ -324,7 +326,7 @@ function gateGreaterInvisibility(spell, campaignName, cfSetPending, _playerStats
   return false;
 }
 
-function gateFeignDeath(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateFeignDeath({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('feignDeath', makePending('feignDeath', spell, { range: spell.range || 'Touch', creatureTargets }));
@@ -333,7 +335,7 @@ function gateFeignDeath(spell, campaignName, cfSetPending, _playerStats, _metaCt
   return false;
 }
 
-function gateHeal(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateHeal({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('heal', makePending('heal', spell, { range: spell.range || '60 feet', creatureTargets }));
@@ -342,7 +344,7 @@ function gateHeal(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _ch
   return false;
 }
 
-function gateLongstrider(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateLongstrider({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('longstrider', makePending('longstrider', spell, { range: spell.range || 'Touch', creatureTargets }));
@@ -373,7 +375,7 @@ function gateSpareTheDying({ spell, campaignName, cfSetPending, playerStats, set
   return true;
 }
 
-function gatePassWithoutTrace(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gatePassWithoutTrace({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('passWithoutTrace', makePending('passWithoutTrace', spell, { range: spell.range || 'Self', creatureTargets }));
@@ -382,7 +384,7 @@ function gatePassWithoutTrace(spell, campaignName, cfSetPending, _playerStats, _
   return false;
 }
 
-function gateBeaconOfHope(spell, campaignName, cfSetPending, _playerStats, _metaCtx, characters, _isSorcerer) {
+function gateBeaconOfHope({ spell, campaignName, cfSetPending, characters }) {
   let { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length === 0 && characters.length > 0) {
     creatureTargets = characters.map(c => c.name);
@@ -394,7 +396,7 @@ function gateBeaconOfHope(spell, campaignName, cfSetPending, _playerStats, _meta
   return false;
 }
 
-function gateHeroesFeast(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateHeroesFeast({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('heroesFeast', makePending('heroesFeast', spell, {
@@ -407,7 +409,7 @@ function gateHeroesFeast(spell, campaignName, cfSetPending, _playerStats, _metaC
   return false;
 }
 
-function gateMageArmor(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateMageArmor({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('mageArmor', makePending('mageArmor', spell, { range: spell.range || 'Touch', creatureTargets }));
@@ -416,7 +418,7 @@ function gateMageArmor(spell, campaignName, cfSetPending, _playerStats, _metaCtx
   return false;
 }
 
-function gateProtectionFromEnergy(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateProtectionFromEnergy({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('protectionFromEnergy', makePending('protectionFromEnergy', spell, {
@@ -429,7 +431,7 @@ function gateProtectionFromEnergy(spell, campaignName, cfSetPending, _playerStat
   return false;
 }
 
-function gateResistance(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateResistance({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('resistance', makePending('resistance', spell, {
@@ -442,7 +444,7 @@ function gateResistance(spell, campaignName, cfSetPending, _playerStats, _metaCt
   return false;
 }
 
-function gateMagicMissile(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateMagicMissile({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     const slotLevel = spell.level || 1;
@@ -458,7 +460,7 @@ function gateMagicMissile(spell, campaignName, cfSetPending, _playerStats, _meta
   return false;
 }
 
-function gateGlobe(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateGlobe({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('globe', makePending('globe', spell, { range: spell.range || 'Self', creatureTargets }));
@@ -467,7 +469,7 @@ function gateGlobe(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _c
   return false;
 }
 
-function gateAntimagicField(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateAntimagicField({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('antimagicField', makePending('antimagicField', spell, { range: spell.range || 'Self (10-foot radius)', creatureTargets }));
@@ -476,7 +478,7 @@ function gateAntimagicField(spell, campaignName, cfSetPending, _playerStats, _me
   return false;
 }
 
-function gateForcecage(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateForcecage({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('forcecage', makePending('forcecage', spell, { range: spell.range || '100 feet', creatureTargets }));
@@ -485,7 +487,7 @@ function gateForcecage(spell, campaignName, cfSetPending, _playerStats, _metaCtx
   return false;
 }
 
-function gateStinkingCloud(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateStinkingCloud({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('stinkingCloud', makePending('stinkingCloud', spell, { range: spell.range || '90 feet', creatureTargets }));
@@ -494,7 +496,7 @@ function gateStinkingCloud(spell, campaignName, cfSetPending, _playerStats, _met
   return false;
 }
 
-function gateConfusion(spell, campaignName, cfSetPending, _playerStats, metaCtx, _characters, _isSorcerer) {
+function gateConfusion({ spell, campaignName, cfSetPending, metaCtx }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('confusion', makePending('confusion', spell, {
@@ -508,7 +510,7 @@ function gateConfusion(spell, campaignName, cfSetPending, _playerStats, metaCtx,
   return false;
 }
 
-function gateWeb(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateWeb({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('web', makePending('web', spell, { range: spell.range || '60 feet', creatureTargets }));
@@ -517,7 +519,7 @@ function gateWeb(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _cha
   return false;
 }
 
-function gateSleetStorm(spell, campaignName, cfSetPending, _playerStats, metaCtx, _characters, _isSorcerer) {
+function gateSleetStorm({ spell, campaignName, cfSetPending, metaCtx }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('sleetStorm', makePending('sleetStorm', spell, {
@@ -530,7 +532,7 @@ function gateSleetStorm(spell, campaignName, cfSetPending, _playerStats, metaCtx
   return false;
 }
 
-async function gateAnimalFriendship(spell, campaignName, cfSetPending) {
+async function gateAnimalFriendship({ spell, campaignName, cfSetPending }) {
   const beastTargets = await resolveBeasts(campaignName);
   if (beastTargets.length > 0) {
     cfSetPending('animalFriendship', makePending('animalFriendship', spell, {
@@ -543,7 +545,7 @@ async function gateAnimalFriendship(spell, campaignName, cfSetPending) {
   return false;
 }
 
-function gateRegenerate(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateRegenerate({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('regenerate', makePending('regenerate', spell, { range: spell.range || 'Touch', creatureTargets }));
@@ -552,7 +554,7 @@ function gateRegenerate(spell, campaignName, cfSetPending, _playerStats, _metaCt
   return false;
 }
 
-function gateHealingWord(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateHealingWord({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('healingWord', makePending('healingWord', spell, { range: spell.range || '60 feet', creatureTargets }));
@@ -561,7 +563,7 @@ function gateHealingWord(spell, campaignName, cfSetPending, _playerStats, _metaC
   return false;
 }
 
-function gateCureWounds(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateCureWounds({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('cureWounds', makePending('cureWounds', spell, { range: spell.range || 'Touch', creatureTargets }));
@@ -595,7 +597,7 @@ function gateRevivify({ spell, campaignName, cfSetPending, playerStats, setPopup
   return true;
 }
 
-function gateAuraOfLife(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateAuraOfLife({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('auraOfLife', makePending('auraOfLife', spell, { range: spell.range || '30 feet', creatureTargets }));
@@ -604,7 +606,7 @@ function gateAuraOfLife(spell, campaignName, cfSetPending, _playerStats, _metaCt
   return false;
 }
 
-function gateAuraOfPurity(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateAuraOfPurity({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('auraOfPurity', makePending('auraOfPurity', spell, { range: spell.range || '30 feet', creatureTargets }));
@@ -613,7 +615,7 @@ function gateAuraOfPurity(spell, campaignName, cfSetPending, _playerStats, _meta
   return false;
 }
 
-function gateCircleOfPower(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateCircleOfPower({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('circleOfPower', makePending('circleOfPower', spell, { range: spell.range || '30 feet', creatureTargets }));
@@ -622,7 +624,7 @@ function gateCircleOfPower(spell, campaignName, cfSetPending, _playerStats, _met
   return false;
 }
 
-function gateCompulsion(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateCompulsion({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('compulsion', makePending('compulsion', spell, { range: spell.range || '30 feet', creatureTargets }));
@@ -631,7 +633,7 @@ function gateCompulsion(spell, campaignName, cfSetPending, _playerStats, _metaCt
   return false;
 }
 
-function gateAuraOfVitality(spell, campaignName, cfSetPending, _playerStats, metaCtx, _characters, _isSorcerer) {
+function gateAuraOfVitality({ spell, campaignName, cfSetPending, metaCtx }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     const extra = metaCtx?.freeCastUsed ? { isFreeCast: true } : {};
@@ -645,7 +647,7 @@ function gateAuraOfVitality(spell, campaignName, cfSetPending, _playerStats, met
   return false;
 }
 
-function gateDeathWard(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateDeathWard({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('deathWard', makePending('deathWard', spell, { range: spell.range || 'Touch', creatureTargets }));
@@ -654,7 +656,7 @@ function gateDeathWard(spell, campaignName, cfSetPending, _playerStats, _metaCtx
   return false;
 }
 
-function gateHeroism(spell, campaignName, cfSetPending, _playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateHeroism({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
     cfSetPending('heroism', makePending('heroism', spell, { range: spell.range || 'Touch', creatureTargets }));
@@ -663,7 +665,7 @@ function gateHeroism(spell, campaignName, cfSetPending, _playerStats, _metaCtx, 
   return false;
 }
 
-function gateHex(spell, campaignName, cfSetPending, playerStats, _metaCtx, _characters, _isSorcerer) {
+function gateHex({ spell, campaignName, cfSetPending, playerStats }) {
   const { creatureTargets } = getCsAndTargets(campaignName, { excludeCaster: true, casterName: playerStats.name });
   if (creatureTargets.length > 0) {
     cfSetPending('hex', makePending('hex', spell, {
@@ -711,9 +713,7 @@ const spellGateMap = {
   'feign death': gateFeignDeath,
   'heal': gateHeal,
   'longstrider': gateLongstrider,
-  'spare the dying': (...args) => gateSpareTheDying({
-    spell: args[0], campaignName: args[1], cfSetPending: args[2], playerStats: args[3], setPopupHtml: args[7],
-  }),
+  'spare the dying': gateSpareTheDying,
   'pass without trace': gatePassWithoutTrace,
   'beacon of hope': gateBeaconOfHope,
   "heroes' feast": gateHeroesFeast,
@@ -732,9 +732,7 @@ const spellGateMap = {
   'regenerate': gateRegenerate,
   'healing word': gateHealingWord,
   'cure wounds': gateCureWounds,
-  'revivify': (...args) => gateRevivify({
-    spell: args[0], campaignName: args[1], cfSetPending: args[2], playerStats: args[3], setPopupHtml: args[7],
-  }),
+  'revivify': gateRevivify,
   'aura of life': gateAuraOfLife,
   'aura of purity': gateAuraOfPurity,
   'circle of power': gateCircleOfPower,
@@ -753,5 +751,5 @@ export function tryGateSpell(spellName, campaignName, cfSetPending, extra = {}) 
   if (!handler) return false;
 
   const { spell, metaCtx, playerStats, characters, isSorcerer, setPopupHtml } = extra;
-  return handler(spell, campaignName, cfSetPending, playerStats, metaCtx, characters, isSorcerer, setPopupHtml);
+  return handler({ spell, campaignName, cfSetPending, playerStats, metaCtx, characters, isSorcerer, setPopupHtml });
 }

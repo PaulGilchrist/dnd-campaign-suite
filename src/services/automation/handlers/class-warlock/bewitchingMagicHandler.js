@@ -14,6 +14,14 @@ function bewitchingRefusal(action, auto) {
     };
 }
 
+function passesBewitchingGate(lastAttack, playerName, action) {
+    if (!lastAttack) return false;
+    if (lastAttack.attackerName !== playerName) return false;
+    // Check spell school is enchantment or illusion
+    const school = (lastAttack.spellSchool || action.school || lastAttack.damageSchool || '').toLowerCase();
+    return school === 'enchantment' || school === 'illusion';
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -24,19 +32,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
 
-    // Check lastAttack exists
-    if (!lastAttack) {
-        return bewitchingRefusal(action, auto);
-    }
-
-    // Check attacker is the warlock
-    if (lastAttack.attackerName !== playerName) {
-        return bewitchingRefusal(action, auto);
-    }
-
-    // Check spell school is enchantment or illusion
-    const school = (lastAttack.spellSchool || action.school || lastAttack.damageSchool || '').toLowerCase();
-    if (school !== 'enchantment' && school !== 'illusion') {
+    if (!passesBewitchingGate(lastAttack, playerName, action)) {
         return bewitchingRefusal(action, auto);
     }
 

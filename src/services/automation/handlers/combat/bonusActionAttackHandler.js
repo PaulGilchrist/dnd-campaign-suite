@@ -106,7 +106,7 @@ async function resolveDisengageLeg(action, playerStats, campaignName) {
 // declared no trigger, so nothing ever produced an attack_roll. Any uses-bearing
 // bonus_action_attack row that reaches here (War Priest is the only one in app
 // data) now resolves a real weapon attack mirroring the verified Pole Strike shape.
-async function resolveWarPriestLeg(action, playerStats, campaignName, usesKey, usesMax, refusal, logRefusal) {
+async function resolveWarPriestLeg({ action, playerStats, campaignName, usesKey, usesMax, refusal, logRefusal }) {
     const cs = await getCombatContext(campaignName);
     const target = getTargetFromAttacker(cs, playerStats.name);
     const targetName = target?.name || null;
@@ -220,7 +220,7 @@ export async function handle(action, playerStats, campaignName, _mapName, _allEq
     }
 
     if (usesMax > 0) {
-        return resolveWarPriestLeg(action, playerStats, campaignName, usesKey, usesMax, refusal, logRefusal);
+        return resolveWarPriestLeg({ action, playerStats, campaignName, usesKey, usesMax, refusal, logRefusal });
     }
 
     return automationInfoPopup(action);

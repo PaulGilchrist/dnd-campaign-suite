@@ -110,6 +110,36 @@ function clearDominatedExpirations(creature, campaignName) {
     setRuntimeValue(creature.name, 'pendingExpirations', filteredExpirations, campaignName)
 }
 
+function resolveRound(combatSummary, fallback) {
+    return combatSummary?.round ?? fallback
+}
+
+function creaturesOrEmpty(combatSummary) {
+    return combatSummary?.creatures || []
+}
+
+function ConditionSavePopup({ popup, onClose }) {
+    return (
+        <Popup onClickOrKeyDown={onClose}>
+            <DiceRollResult
+                name={popup.condition ? `${popup.condition} — ${popup.name}` : popup.name}
+                type={popup.type}
+                rolls={popup.rolls}
+                bonus={popup.bonus}
+                targetName={popup.targetName}
+                targetAc={popup.targetAc}
+                hit={popup.hit}
+                forcedMode={popup.forcedMode}
+                starryDragonFloor={popup.starryDragonFloor}
+            >
+            </DiceRollResult>
+            <div className={`condition-save-result ${popup.success ? 'condition-save-success' : 'condition-save-failure'}`}>
+                {popup.success ? 'SAVE SUCCESSFUL' : 'SAVE FAILED'} (DC {popup.dc})
+            </div>
+        </Popup>
+    )
+}
+
 function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapName, onViewCharacter }) {
     const [combatSummary, setCombatSummary] = React.useState(null)
     const setCombatSummaryG = useSSEEqualityGuard(setCombatSummary)
@@ -133,9 +163,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     const [viewingMonsterCreatureName, setViewingMonsterCreatureName] = useSyncedState('campaign', 'combat-ui-viewingMonsterCreatureName', null, campaignName)
     const carouselRef = React.useRef(null)
     const combatSummaryRef = React.useRef(null)
-    const roundRef = React.useRef(combatSummary?.round ?? 1)
+    const roundRef = React.useRef(resolveRound(combatSummary, 1))
     combatSummaryRef.current = combatSummary
-    roundRef.current = combatSummary?.round ?? roundRef.current
+    roundRef.current = resolveRound(combatSummary, roundRef.current)
 
     React.useEffect(() => {
         setCombatSummaryCache(combatSummary, campaignName)
@@ -264,7 +294,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         setCombatSummary,
         setActiveCreatureName,
         characters,
-        numOfNpc: combatSummary?.creatures?.filter(c => c.type === 'npc').length ?? 0,
+        numOfNpc: creaturesOrEmpty(combatSummary).filter(c => c.type === 'npc').length ?? 0,
         isLocalhost,
     }), [combatSummary, campaignName, campaignNpcs, overlays, isLocalhost, characters])
 
@@ -532,7 +562,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
              <>
              <h4>Initiative (round {combatSummary.round})</h4>
              <div className='carousel-container' ref={carouselRef}>
-                  {displayCreatures?.map((creature) => {
+                  {displayCreatures.map((creature) => {
                     const isActive = creature.name === activeCreatureName
                     const character = characters.find(ch => utils.getName(ch.name) === (creature.holderName || creature.name))
                     const stats = character?.computedStats || character
@@ -629,27 +659,14 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                     initialTab={effectAdderTab}
                     onCancel={() => setEffectAdderTarget(null)}
                     onApply={handleApplyEffect}
-                    creatures={combatSummary?.creatures || []}
+                    creatures={creaturesOrEmpty(combatSummary)}
                 />
             )}
             {conditionPopup && (
-                <Popup onClickOrKeyDown={() => setConditionPopup(null)}>
-                    <DiceRollResult
-                        name={conditionPopup.condition ? `${conditionPopup.condition} — ${conditionPopup.name}` : conditionPopup.name}
-                        type={conditionPopup.type}
-                        rolls={conditionPopup.rolls}
-                        bonus={conditionPopup.bonus}
-                        targetName={conditionPopup.targetName}
-                        targetAc={conditionPopup.targetAc}
-                        hit={conditionPopup.hit}
-                        forcedMode={conditionPopup.forcedMode}
-                        starryDragonFloor={conditionPopup.starryDragonFloor}
-                    >
-                    </DiceRollResult>
-                    <div className={`condition-save-result ${conditionPopup.success ? 'condition-save-success' : 'condition-save-failure'}`}>
-                        {conditionPopup.success ? 'SAVE SUCCESSFUL' : 'SAVE FAILED'} (DC {conditionPopup.dc})
-                    </div>
-                </Popup>
+                <ConditionSavePopup
+                    popup={conditionPopup}
+                    onClose={() => setConditionPopup(null)}
+                />
             )}
             </>
             ) : null}

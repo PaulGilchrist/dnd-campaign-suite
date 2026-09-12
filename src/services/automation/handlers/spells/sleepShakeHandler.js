@@ -81,6 +81,54 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
+function shakeConditionEntry(campaignName, targetName, condition) {
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'removed',
+        characterName: targetName,
+        condition,
+        reason: 'Shake Asleep (Sleep spell)',
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[sleepShake] Error:", e); });
+}
+
+async function shakeOutPlayer(targetName, campaignName) {
+    const conditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const condArray = Array.isArray(conditions) ? conditions : [];
+    const filtered = condArray.filter(c => {
+        const cl = String(c).toLowerCase();
+        return cl !== 'incapacitated' && cl !== 'unconscious';
+    });
+    if (filtered.length !== condArray.length) {
+        setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
+        for (const cond of ['incapacitated', 'unconscious']) {
+            if (!filtered.some(f => String(f).toLowerCase() === cond)) {
+                shakeConditionEntry(campaignName, targetName, cond.charAt(0).toUpperCase() + cond.slice(1));
+            }
+        }
+    }
+}
+
+function shakeOutCreature(targetName, campaignName) {
+    const conditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const condArray = Array.isArray(conditions) ? conditions : [];
+    const hadIncapacitated = condArray.some(c => String(c).toLowerCase() === 'incapacitated');
+    const hadUnconscious = condArray.some(c => String(c).toLowerCase() === 'unconscious');
+    const filtered = condArray.filter(c => {
+        const cl = String(c).toLowerCase();
+        return cl !== 'incapacitated' && cl !== 'unconscious';
+    });
+    if (filtered.length !== condArray.length) {
+        setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
+    }
+    if (hadIncapacitated) {
+        shakeConditionEntry(campaignName, targetName, 'Incapacitated');
+    }
+    if (hadUnconscious) {
+        shakeConditionEntry(campaignName, targetName, 'Unconscious');
+    }
+}
+
 export async function handleConfirm(action, playerStats, campaignName, _mapName, targetName) {
     if (!targetName) return null;
 
@@ -90,59 +138,9 @@ export async function handleConfirm(action, playerStats, campaignName, _mapName,
     const creature = combatSummary?.creatures?.find(c => c.name === targetName);
 
     if (creature?.type === 'player') {
-        const conditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-        const condArray = Array.isArray(conditions) ? conditions : [];
-        const filtered = condArray.filter(c => {
-            const cl = String(c).toLowerCase();
-            return cl !== 'incapacitated' && cl !== 'unconscious';
-        });
-        if (filtered.length !== condArray.length) {
-            setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
-            for (const cond of ['incapacitated', 'unconscious']) {
-                if (!filtered.some(f => String(f).toLowerCase() === cond)) {
-                    addEntry(campaignName, {
-                        type: 'condition',
-                        action: 'removed',
-                        characterName: targetName,
-                        condition: cond.charAt(0).toUpperCase() + cond.slice(1),
-                        reason: 'Shake Asleep (Sleep spell)',
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error("[sleepShake] Error:", e); });
-                }
-            }
-        }
+        await shakeOutPlayer(targetName, campaignName);
     } else if (creature) {
-        const conditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-        const condArray = Array.isArray(conditions) ? conditions : [];
-        const hadIncapacitated = condArray.some(c => String(c).toLowerCase() === 'incapacitated');
-        const hadUnconscious = condArray.some(c => String(c).toLowerCase() === 'unconscious');
-        const filtered = condArray.filter(c => {
-            const cl = String(c).toLowerCase();
-            return cl !== 'incapacitated' && cl !== 'unconscious';
-        });
-        if (filtered.length !== condArray.length) {
-            setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
-        }
-        if (hadIncapacitated) {
-            addEntry(campaignName, {
-                type: 'condition',
-                action: 'removed',
-                characterName: targetName,
-                condition: 'Incapacitated',
-                reason: 'Shake Asleep (Sleep spell)',
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[sleepShake] Error:", e); });
-        }
-        if (hadUnconscious) {
-            addEntry(campaignName, {
-                type: 'condition',
-                action: 'removed',
-                characterName: targetName,
-                condition: 'Unconscious',
-                reason: 'Shake Asleep (Sleep spell)',
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[sleepShake] Error:", e); });
-        }
+        shakeOutCreature(targetName, campaignName);
     }
 
     addEntry(campaignName, {

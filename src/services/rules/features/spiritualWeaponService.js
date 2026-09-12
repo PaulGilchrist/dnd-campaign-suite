@@ -40,6 +40,33 @@ function dropQueuedForceExpiry(casterName, campaignName) {
     }
 }
 
+function resolveSpiritualWeaponSlotLevel(spell, slotLevel) {
+    return slotLevel || spell.level || 2;
+}
+
+function resolveSpiritualWeaponDamageFormula(formula) {
+    return formula || '1d8 + 3';
+}
+
+function buildSpiritualWeaponForceBuff(spell, casterName, forceMarkerName, appearsInRange, slotLevel, damageFormula, campaignName) {
+    return {
+        name: FORCE_BUFF_NAME,
+        effect: FORCE_EFFECT,
+        spell: FORCE_BUFF_NAME,
+        duration: spell.duration || 'Concentration, up to 1 minute',
+        concentration: !!spell.concentration,
+        slotLevel,
+        damageFormula,
+        damageType: spell.damage?.damage_type || 'Force',
+        forceMarkerName,
+        moveRangeFt: MOVE_RANGE_FT,
+        attackRangeFt: ATTACK_RANGE_FT,
+        appearsRangeFt: APPEARS_RANGE_FT,
+        appearsInRange,
+        activatedRound: getCurrentCombatRound(campaignName),
+    };
+}
+
 export async function activateSpiritualWeaponForce(spell, playerStats, campaignName, { slotLevel, formula } = {}) {
     const casterName = playerStats.name;
     const forceMarkerName = `${FORCE_MARKER_NAME} (${casterName})`;
@@ -54,22 +81,7 @@ export async function activateSpiritualWeaponForce(spell, playerStats, campaignN
     const targetName = casterCreature?.targetName || null;
     const appearsInRange = targetName ? await isWithinRange(casterName, targetName, APPEARS_RANGE_FT) : true;
 
-    const buff = {
-        name: FORCE_BUFF_NAME,
-        effect: FORCE_EFFECT,
-        spell: FORCE_BUFF_NAME,
-        duration: spell.duration || 'Concentration, up to 1 minute',
-        concentration: !!spell.concentration,
-        slotLevel: slotLevel || spell.level || 2,
-        damageFormula: formula || '1d8 + 3',
-        damageType: spell.damage?.damage_type || 'Force',
-        forceMarkerName,
-        moveRangeFt: MOVE_RANGE_FT,
-        attackRangeFt: ATTACK_RANGE_FT,
-        appearsRangeFt: APPEARS_RANGE_FT,
-        appearsInRange,
-        activatedRound: getCurrentCombatRound(campaignName),
-    };
+    const buff = buildSpiritualWeaponForceBuff(spell, casterName, forceMarkerName, appearsInRange, resolveSpiritualWeaponSlotLevel(spell, slotLevel), resolveSpiritualWeaponDamageFormula(formula), campaignName);
 
     const stored = getRuntimeValue(casterName, 'activeBuffs', campaignName);
     const buffs = Array.isArray(stored) ? stored : [];

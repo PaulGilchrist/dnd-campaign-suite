@@ -18,7 +18,7 @@ export default function useModalHandlers({
         setModalState({ weaponMasteryModal: null });
         if (pendingDamage) {
             const { attack, formula, total, rolls, modifier } = pendingDamage;
-            proceedWithDamage(attack, formula, total, rolls, modifier);
+            proceedWithDamage({ attack, formula, total, rolls, modifier });
             setPendingDamage(null);
         }
     };
@@ -42,7 +42,7 @@ export default function useModalHandlers({
         setRuntimeValue(playerName, '_divineFuryUsedRound', currentRound, campaignName);
         setModalState({ divineFuryChoice: null });
         setPendingDamage(null);
-        proceedWithDamage(attack, newFormula, newTotal, newRolls, modifier);
+        proceedWithDamage({ attack, formula: newFormula, total: newTotal, rolls: newRolls, modifier });
     };
 
     const handleDivineFurySkip = () => {
@@ -54,7 +54,7 @@ export default function useModalHandlers({
         const { attack, formula, total, rolls, modifier } = pending;
         setModalState({ divineFuryChoice: null });
         setPendingDamage(null);
-        proceedWithDamage(attack, formula, total, rolls, modifier);
+        proceedWithDamage({ attack, formula, total, rolls, modifier });
     };
 
     const handleGenericDamageTypeChoice = (chosenType) => {
@@ -72,7 +72,7 @@ export default function useModalHandlers({
         }
         setModalState({ damageTypeChoice: null });
         setPendingDamage(null);
-        proceedWithDamage(attack, newFormula, newTotal, newRolls, modifier);
+        proceedWithDamage({ attack, formula: newFormula, total: newTotal, rolls: newRolls, modifier });
     };
 
     const handleGenericDamageTypeSkip = () => {
@@ -84,7 +84,7 @@ export default function useModalHandlers({
         const { attack, formula, total, rolls, modifier } = pending;
         setModalState({ damageTypeChoice: null });
         setPendingDamage(null);
-        proceedWithDamage(attack, formula, total, rolls, modifier);
+        proceedWithDamage({ attack, formula, total, rolls, modifier });
     };
 
     const handleDamageTypeModifierChoice = (chosenType) => {
@@ -102,7 +102,7 @@ export default function useModalHandlers({
         const newFormula = formula.replace(/\[[^\]]+\]/, `[${chosenType.toLowerCase()}]`);
         setModalState({ damageTypeChoice: null });
         setPendingDamage(null);
-        proceedWithDamage(attack, newFormula, total, rolls, modifier);
+        proceedWithDamage({ attack, formula: newFormula, total, rolls, modifier });
     };
 
     const handleDamageTypeModifierSkip = () => {
@@ -118,7 +118,7 @@ export default function useModalHandlers({
         }
         setModalState({ damageTypeChoice: null });
         setPendingDamage(null);
-        proceedWithDamage(attack, formula, total, rolls, modifier);
+        proceedWithDamage({ attack, formula, total, rolls, modifier });
     };
 
     const handleEnhancedUnarmedChoice = (chosenOptionName) => {
@@ -140,14 +140,14 @@ export default function useModalHandlers({
                     setRuntimeValue(playerStats.name, usedKey, getCurrentCombatRound(campaignName), campaignName);
                     setModalState({ damageTypeChoice: null });
                     setPendingDamage(null);
-                    proceedWithDamage(attack, newFormula, newTotal, newRolls, rider);
+                    proceedWithDamage({ attack, formula: newFormula, total: newTotal, rolls: newRolls, modifier: rider });
                     return;
                 }
             }
         }
         setModalState({ damageTypeChoice: null });
         setPendingDamage(null);
-        proceedWithDamage(attack, formula, total, rolls, rider);
+        proceedWithDamage({ attack, formula, total, rolls, modifier: rider });
     };
 
     const handleEnhancedUnarmedSkip = () => {
@@ -163,7 +163,7 @@ export default function useModalHandlers({
         }
         setModalState({ damageTypeChoice: null });
         setPendingDamage(null);
-        proceedWithDamage(attack, formula, total, rolls, rider);
+        proceedWithDamage({ attack, formula, total, rolls, modifier: rider });
     };
 
     const handleFeatureChoiceConfirm = (chosenOption) => {
@@ -228,7 +228,7 @@ export default function useModalHandlers({
                             showHp: true,
                             onTargetSelected: async (selectedTarget) => {
                                 setModalState({ secondaryTargetModal: null });
-                                await executeFlurryWithHealing(action, playerStats, campaignName, mapName, numAttacks, result.distribution, selectedTarget);
+                                await executeFlurryWithHealing({ action, playerStats, campaignName, mapName, numAttacks, distribution: result.distribution, healingTarget: selectedTarget });
                             },
                             onSkip: () => {
                                 setModalState({ secondaryTargetModal: null });
@@ -241,7 +241,7 @@ export default function useModalHandlers({
             }
         }
 
-        const applyResult = await applyFlurryOfBlows(action, playerStats, campaignName, mapName, result.distribution, numAttacks);
+        const applyResult = await applyFlurryOfBlows({ action, playerStats, campaignName, _mapName: mapName, distribution: result.distribution, numAttacks });
         if (!applyResult) return;
 
         if (applyResult.handOfHarmSavePromises && applyResult.handOfHarmSavePromises.length > 0) {
@@ -272,8 +272,8 @@ export default function useModalHandlers({
         }
     };
 
-    const executeFlurryWithHealing = async (action, playerStats, campaignName, mapName, numAttacks, distribution, healingTarget) => {
-        const applyResult = await applyFlurryOfBlows(action, playerStats, campaignName, mapName, distribution, numAttacks, healingTarget);
+    const executeFlurryWithHealing = async ({ action, playerStats, campaignName, mapName, numAttacks, distribution, healingTarget }) => {
+        const applyResult = await applyFlurryOfBlows({ action, playerStats, campaignName, _mapName: mapName, distribution, numAttacks, healingTarget });
         if (!applyResult) return;
 
         if (applyResult.handOfHarmSavePromises && applyResult.handOfHarmSavePromises.length > 0) {
@@ -305,7 +305,7 @@ export default function useModalHandlers({
     };
 
     const executeFlurryWithoutHealing = async (action, playerStats, campaignName, mapName, numAttacks, distribution) => {
-        const applyResult = await applyFlurryOfBlows(action, playerStats, campaignName, mapName, distribution, numAttacks);
+        const applyResult = await applyFlurryOfBlows({ action, playerStats, campaignName, _mapName: mapName, distribution, numAttacks });
         if (!applyResult) return;
 
         if (applyResult.openHandTargets && applyResult.openHandTargets.length > 0) {

@@ -1,22 +1,20 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
 
+function hasFeatureNamed(allFeatures, name) {
+    for (const feature of allFeatures) {
+        if (feature?.name === name) return true;
+    }
+    return false;
+}
+
 export function checkUndyingSentinel(creature, playerComputed, campaignName) {
     const rawAllFeatures = playerComputed?.allFeatures;
     if (rawAllFeatures == null || !Array.isArray(rawAllFeatures)) {
         return { intercepted: false };
     }
-    const allFeatures = rawAllFeatures;
-    let hasUndyingSentinel = false;
 
-    for (const feature of allFeatures) {
-        if (feature?.name === 'Undying Sentinel') {
-            hasUndyingSentinel = true;
-            break;
-        }
-    }
-
-    if (!hasUndyingSentinel) {
+    if (!hasFeatureNamed(rawAllFeatures, 'Undying Sentinel')) {
         return { intercepted: false };
     }
 

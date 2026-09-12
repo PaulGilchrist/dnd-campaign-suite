@@ -214,7 +214,7 @@ function computeSpellStats(playerStats, cantripSpellAbility) {
 }
 
 // Generic spell cast log
-async function logGenericSpellCast(spell, fullSpell, playerStats, campaignName, getTargetInfo, spellSaveDc, damageType, formula) {
+async function logGenericSpellCast({ spell, fullSpell, playerStats, campaignName, getTargetInfo, spellSaveDc, damageType, formula }) {
     if (spell.name === 'Hex') return;
     const resolvedTarget = await getTargetInfo();
     const resolvedTargetName = resolvedTarget?.name || null;
@@ -290,7 +290,7 @@ async function runNoDamagePath(spell, { fullSpell, metaCtx, playerStats, campaig
         async () => passThrough(await handleCompelledDuel(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName)),
         async () => passThrough(await handleGlobeOfInvulnerability(spell, metaCtx, playerStats, campaignName, mapName)),
         async () => passThrough(await handleForcecage(spell, metaCtx, playerStats, campaignName, mapName)),
-        () => passThrough(handleSilence(spell, fullSpell, metaCtx, spellSaveDc, playerStats, campaignName, null, (cn) => getCombatSummary(cn))),
+        () => passThrough(handleSilence({ spell, metaCtx, playerStats, campaignName, getCombatSummary: (cn) => getCombatSummary(cn) })),
         async () => swallow(await handleStinkingCloud(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
         async () => swallow(await handleSleetStorm(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
         async () => passThrough(await handleFaerieFire(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
@@ -318,7 +318,7 @@ async function runNoDamagePath(spell, { fullSpell, metaCtx, playerStats, campaig
 
     // Generic healing path
     if (spell.heal_at_slot_level) {
-        return { handled: true, value: await runGenericHealPath(spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, spellCastingMod) };
+        return { handled: true, value: await runGenericHealPath({ spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, spellCastingMod }) };
     }
 
     triggerHealingWord(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
@@ -437,7 +437,7 @@ async function resolveGenericHeal(spell, target, metaCtx, playerStats, campaignN
 }
 
 // Generic healing path (spell.heal_at_slot_level) — returns genericHealResult.
-async function runGenericHealPath(spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, spellCastingMod) {
+async function runGenericHealPath({ spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, spellCastingMod }) {
     const explicitTarget = metaCtx?.targetName ? { name: metaCtx.targetName } : null;
     const target = explicitTarget || await getTargetInfo();
     let genericHealResult = null;
@@ -618,7 +618,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     const cantripSpellAbility = spell.spellCastingAbility || playerStats.spellAbilities?.spellCastingAbility;
     const { spellToHit, spellSaveDc, spellCastingMod } = computeSpellStats(playerStats, cantripSpellAbility);
 
-    await logGenericSpellCast(spell, fullSpell, playerStats, campaignName, getTargetInfo, spellSaveDc, damageType, formula);
+    await logGenericSpellCast({ spell, fullSpell, playerStats, campaignName, getTargetInfo, spellSaveDc, damageType, formula });
 
     // --- Power Word Heal/Kill, modal spells, generic automation (early returns) ---
     const earlyResult = await runTriggerChain([
@@ -627,10 +627,10 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         () => passThrough(handleMassSuggestion(spell, spellSaveDc, playerStats, campaignName)),
         () => passThrough(handleCalmEmotions(fullSpell, spellSaveDc, playerStats, campaignName, metaCtx)),
         () => passThrough(handleHypnoticPatternEarly(fullSpell, spellSaveDc, playerStats, campaignName, metaCtx, innateSorceryActive)),
-        () => { const r = handleConfusionEarly(fullSpell, spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName, (s, m, p, c, mp) => triggerConfusion(s, m, p, c, mp)); return r.handled ? { value: r.result?.result } : null; },
+        () => { const r = handleConfusionEarly({ fullSpell, spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName, triggerConfusion: (s, m, p, c, mp) => triggerConfusion(s, m, p, c, mp) }); return r.handled ? { value: r.result?.result } : null; },
         () => passThrough(handleShapechange(fullSpell, metaCtx, playerStats, campaignName, mapName, characters)),
         () => passThrough(handleSleep(fullSpell, spellSaveDc, playerStats, campaignName, metaCtx, characters)),
-        async () => { const r = await handleGenericAutomation(spell, executeHandler, (sp, mc, ps, cn) => triggerArcaneWard(sp, mc, ps, cn), playerStats, campaignName, mapName, characters, metaCtx); return r.handled ? { value: r.result || undefined } : null; },
+        async () => { const r = await handleGenericAutomation({ spell, executeHandler, playerStats, campaignName, mapName, characters, metaCtx }); return r.handled ? { value: r.result || undefined } : null; },
     ]);
     if (earlyResult) return earlyResult.value;
 

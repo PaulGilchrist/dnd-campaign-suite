@@ -146,15 +146,15 @@ describe('createRollConditionSaveHandler', () => {
 
             await handler('Alice', { key: 'blinded', label: 'Blinded', dc: 10, ability: 'con' });
 
-            expect(rollConditionSave).toHaveBeenCalledWith(
-                { name: 'Alice', type: 'player' },
-                { key: 'blinded', label: 'Blinded', dc: 10, ability: 'con' },
-                mockCharacters,
-                mockCampaignNpcs,
-                'test-campaign',
-                'test-map',
-                expect.any(Function),
-            );
+            expect(rollConditionSave).toHaveBeenCalledWith({
+                creature: { name: 'Alice', type: 'player' },
+                condition: { key: 'blinded', label: 'Blinded', dc: 10, ability: 'con' },
+                characters: mockCharacters,
+                campaignNpcs: mockCampaignNpcs,
+                campaignName: 'test-campaign',
+                mapName: 'test-map',
+                getName: expect.any(Function),
+            });
             expect(removeCondition).toHaveBeenCalledWith(
                 mockCombatSummary, 'Alice', { key: 'blinded', label: 'Blinded', dc: 10, ability: 'con' },
                 expect.any(Function), expect.any(Function), 'test-campaign'
@@ -183,15 +183,15 @@ describe('createRollConditionSaveHandler', () => {
 
             await handler('Goblin', { key: 'frightened', label: 'Frightened', dc: 10, ability: 'wis' });
 
-            expect(rollConditionSave).toHaveBeenCalledWith(
-                { name: 'Goblin', type: 'npc' },
-                expect.any(Object),
-                expect.any(Array),
-                expect.any(Array),
-                'test-campaign',
-                'test-map',
-                expect.any(Function),
-            );
+            expect(rollConditionSave).toHaveBeenCalledWith({
+                creature: { name: 'Goblin', type: 'npc' },
+                condition: expect.any(Object),
+                characters: expect.any(Array),
+                campaignNpcs: expect.any(Array),
+                campaignName: 'test-campaign',
+                mapName: 'test-map',
+                getName: expect.any(Function),
+            });
         });
     });
 

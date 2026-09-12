@@ -15,6 +15,19 @@ function conditionMatches(c, targetCondition) {
     return (typeof c === 'string' ? c.toLowerCase() : '').trim() === (typeof targetCondition === 'string' ? targetCondition.toLowerCase() : '').trim();
 }
 
+function mergeConditionKeys(runtimeConditions, creatureConditions) {
+    const csKeys = creatureConditions.map(c => c.key);
+    const seen = new Set(runtimeConditions.map(c => String(c).toLowerCase()));
+    const merged = [...runtimeConditions];
+    for (const key of csKeys) {
+        if (!seen.has(key.toLowerCase())) {
+            merged.push(key);
+            seen.add(key.toLowerCase());
+        }
+    }
+    return merged;
+}
+
 function resolveConditionKey(name) {
     const lower = typeof name === 'string' ? name.toLowerCase().trim() : '';
     for (const c of CONDITIONS) {
@@ -273,14 +286,14 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
     const effectivePoolMax = resolveEffectivePoolMax(isDicePool, poolMaxProp, playerStats.level);
     const effectiveResourceKey = resolveHealingPoolResourceKey(resourceKeyProp, isDicePool, featureName);
 
-    const { current: poolRemaining, max: poolMaxFromHook, update: setPoolRemaining } = useTrackedResource(
-        effectiveResourceKey,
-        playerStats.name,
-        () => effectivePoolMax,
-        [playerStats, isDicePool ? poolMaxProp : playerStats.level],
+    const { current: poolRemaining, max: poolMaxFromHook, update: setPoolRemaining } = useTrackedResource({
+        storageKey: effectiveResourceKey,
+        playerName: playerStats.name,
+        maxGetter: () => effectivePoolMax,
+        deps: [playerStats, isDicePool ? poolMaxProp : playerStats.level],
         campaignName,
         playerStats
-    );
+    });
     const [healAmount, setHealAmount] = React.useState(1);
     const [log, setLog] = React.useState([]);
     const [selectedConditions, setSelectedConditions] = React.useState([]);
@@ -366,20 +379,9 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
 
         if (combatSummary) {
             try {
-                if (combatSummary) {
-                    const creature = combatSummary.creatures?.find(c => utils.getName(c.name) === utils.getName(resolvedTargetName));
-                    if (creature && Array.isArray(creature.conditions)) {
-                        const csKeys = creature.conditions.map(c => c.key);
-                        const seen = new Set(runtimeConditions.map(c => String(c).toLowerCase()));
-                        const merged = [...runtimeConditions];
-                        for (const key of csKeys) {
-                            if (!seen.has(key.toLowerCase())) {
-                                merged.push(key);
-                                seen.add(key.toLowerCase());
-                            }
-                        }
-                        return merged;
-                    }
+                const creature = combatSummary.creatures?.find(c => utils.getName(c.name) === utils.getName(resolvedTargetName));
+                if (creature && Array.isArray(creature.conditions)) {
+                    return mergeConditionKeys(runtimeConditions, creature.conditions);
                 }
             } catch { /* ignore */ }
         }

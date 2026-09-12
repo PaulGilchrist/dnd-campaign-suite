@@ -19,7 +19,7 @@ function resolveNoSaveFormulas(spell, metaCtx, playerStats) {
     };
 }
 
-function buildNoSaveAttackContext(spell, metaCtx, playerStats, target, damageType, rollCtx, formulas, damageRollResult) {
+function buildNoSaveAttackContext({ spell, metaCtx, playerStats, target, damageType, rollCtx, formulas, damageRollResult }) {
     const attackCtx = {
         attackName: spell.name,
         targetName: target?.name,
@@ -71,7 +71,7 @@ async function handleNoSavePath({ spell, metaCtx, playerStats, campaignName, map
     await activateSpiritualWeaponIfNeeded(spell, metaCtx, playerStats, campaignName, formulas.finalFormula);
 
     const damageRollResult = rollExpression(formulas.overchannelFormula);
-    const attackCtx = buildNoSaveAttackContext(spell, metaCtx, playerStats, target, damageType, rollCtx, formulas, damageRollResult);
+    const attackCtx = buildNoSaveAttackContext({ spell, metaCtx, playerStats, target, damageType, rollCtx, formulas, damageRollResult });
     rollAttack(spell.name, spellToHit, attackCtx);
 }
 

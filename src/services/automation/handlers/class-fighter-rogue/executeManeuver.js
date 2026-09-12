@@ -162,7 +162,7 @@ const RUNNER_STEPS = [
     },
     {
         test: m => m.effect === 'secondary_damage',
-        run: (m, d, ctx) => runSweepingAttack(m, ctx.auto, ctx.dieDescription, ctx.dieValue, ctx.targetName, ctx.playerStats, ctx.campaignName),
+        run: (m, d, ctx) => runSweepingAttack({ maneuver: m, auto: ctx.auto, dieDescription: ctx.dieDescription, dieValue: ctx.dieValue, targetName: ctx.targetName, playerStats: ctx.playerStats, campaignName: ctx.campaignName }),
     },
     {
         test: m => m.effect === 'attack_roll_bonus',
@@ -453,13 +453,13 @@ async function runRiposte({ maneuver, auto, description, targetName, dieValue, s
 // creature's AC. The die is already expended above. Stash the pending
 // payload (RAW combatants — CLA-326 crash lesson) so executeSweepingAttack
 // can run the AC test + apply damage on confirm. No phantom damage claim.
-async function runSweepingAttack(maneuver, auto, dieDescription, dieValue, targetName, playerStats, campaignName) {
+async function runSweepingAttack({ maneuver, auto, dieDescription, dieValue, targetName, playerStats, campaignName }) {
     const cs = await getCombatContext(campaignName);
-    const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
-    const damageType = lastAttack?.damageType || maneuver.damageType || (console.error('[MN-018] Sweeping Attack: no original attack damageType in lastAttack'), 'Slashing');
-    const attackBonus = lastAttack?.bonus || 0;
-    const originalTotal = lastAttack?.total ?? attackBonus;
-    const originalD20Roll = lastAttack?.d20Roll ?? (originalTotal - attackBonus);
+    const lastAttack = (await getRuntimeValue('campaign', 'lastAttack', campaignName)) || {};
+    const damageType = lastAttack.damageType || maneuver.damageType || (console.error('[MN-018] Sweeping Attack: no original attack damageType in lastAttack'), 'Slashing');
+    const attackBonus = lastAttack.bonus || 0;
+    const originalTotal = lastAttack.total ?? attackBonus;
+    const originalD20Roll = lastAttack.d20Roll ?? (originalTotal - attackBonus);
 
     const candidates = (cs?.creatures || []).filter(c =>
         c.name !== targetName && c.name !== playerStats.name

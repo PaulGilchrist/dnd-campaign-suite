@@ -74,7 +74,7 @@ function logConditionSave({ campaignName, creatureName, roll, bonus, bonusDetail
     }).catch((e) => { console.error("[combatLogging] Error:", e); })
 }
 
-function logHpChange(campaignName, targetName, delta, currentHp, maxHp, isHealing, isUnconscious) {
+function logHpChange({ campaignName, targetName, delta, currentHp, maxHp, isHealing, isUnconscious }) {
     return addEntry(campaignName, {
         type: 'hp_change',
         targetName,

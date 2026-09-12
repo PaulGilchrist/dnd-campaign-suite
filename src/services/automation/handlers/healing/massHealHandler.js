@@ -107,7 +107,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
-export async function confirmMassHeal(action, playerStats, campaignName, distribution, totalPool, bonusHeal, bonusDetails) {
+export async function confirmMassHeal({ action, playerStats, campaignName, distribution, totalPool, bonusHeal: _bonusHeal, bonusDetails }) {
     const playerName = playerStats.name;
     const combatSummary = await getCombatContext(campaignName);
     const results = [];

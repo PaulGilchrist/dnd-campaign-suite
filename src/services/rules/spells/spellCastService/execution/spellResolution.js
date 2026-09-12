@@ -183,7 +183,7 @@ function resolveSpellResolution(spell, metaCtx, playerStats, campaignName, getTa
     return result;
 }
 
-function logGenericSpellCast(spell, playerStats, campaignName, getTargetInfo, fullSpell, damageType, formula, spellSaveDc) {
+function logGenericSpellCast({ spell, playerStats, campaignName, getTargetInfo, fullSpell, damageType, formula, spellSaveDc }) {
     if (spell.name !== 'Hex') {
         return (async () => {
             const resolvedTarget = await getTargetInfo();

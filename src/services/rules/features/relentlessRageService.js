@@ -40,20 +40,21 @@ function evaluateHealExpression(expression, playerComputed) {
     return playerComputed?.level || 1;
 }
 
+function findRelentlessRageAutomation(allFeatures) {
+    for (const feature of allFeatures) {
+        if (feature?.name === 'Relentless Rage' && feature?.automation) {
+            return feature.automation;
+        }
+    }
+    return null;
+}
+
 export function checkRelentlessRage(creature, playerComputed, campaignName) {
     const rawAllFeatures = playerComputed?.allFeatures;
     if (rawAllFeatures == null || !Array.isArray(rawAllFeatures)) {
         return { intercepted: false };
     }
-    const allFeatures = rawAllFeatures;
-    let featureAutomation = null;
-
-    for (const feature of allFeatures) {
-        if (feature?.name === 'Relentless Rage' && feature?.automation) {
-            featureAutomation = feature.automation;
-            break;
-        }
-    }
+    const featureAutomation = findRelentlessRageAutomation(rawAllFeatures);
 
     if (!featureAutomation) {
         return { intercepted: false };

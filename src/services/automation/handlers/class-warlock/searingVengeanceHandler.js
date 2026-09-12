@@ -209,15 +209,7 @@ export async function confirmSearingVengeance(automation, playerStats, campaignN
     }
 
     // Log healing
-    await addEntry(campaignName, {
-        type: 'hp_change',
-        characterName: playerName,
-        targetName: targetName,
-        delta: actualHeal,
-        currentHp: healResult?.newHp ?? getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? 0,
-        maxHp: healResult?.maxHp ?? targetMaxHp,
-        isHealing: true,
-    }).catch((e) => { console.error("[searingVengeance] Error:", e); });
+    await logSearingHeal(campaignName, playerName, targetName, healResult, actualHeal, targetMaxHp);
 
     // Log ability use with heal + burst amounts
     await addEntry(campaignName, {
@@ -237,6 +229,18 @@ export async function confirmSearingVengeance(automation, playerStats, campaignN
             automation,
         },
     };
+}
+
+async function logSearingHeal(campaignName, playerName, targetName, healResult, actualHeal, targetMaxHp) {
+    await addEntry(campaignName, {
+        type: 'hp_change',
+        characterName: playerName,
+        targetName: targetName,
+        delta: actualHeal,
+        currentHp: healResult?.newHp ?? getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? 0,
+        maxHp: healResult?.maxHp ?? targetMaxHp,
+        isHealing: true,
+    }).catch((e) => { console.error("[searingVengeance] Error:", e); });
 }
 
 function rollSearingDamage(automation, playerStats) {

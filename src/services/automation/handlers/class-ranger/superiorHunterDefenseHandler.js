@@ -55,7 +55,8 @@ function resolveResistedDamage(lastAttack, primaryDamage) {
     return { damageType, rawDamage, resistedAmount };
 }
 
-async function logHunterDefenseHeal(campaignName, playerName, playerStats, featureName, actualHeal, resistedAmount, damageType) {
+async function logHunterDefenseHeal({ campaignName, playerName, playerStats, featureName, actualHeal, resistedAmount, damageType }) {
+    if (actualHeal <= 0) return;
     const currentHp = getRuntimeValue(playerName, 'currentHitPoints', campaignName) ?? playerStats.computedStats?.currentHp ?? 0;
     const maxHp = getRuntimeValue(playerName, 'hitPoints', campaignName) ?? playerStats.computedStats?.maxHp ?? 0;
     await addEntry(campaignName, {
@@ -68,6 +69,26 @@ async function logHunterDefenseHeal(campaignName, playerName, playerStats, featu
         sourceName: featureName,
         note: `${Math.floor(resistedAmount / 2)} HP from ${resistedAmount} ${damageType} damage halved by resistance`,
     }).catch((e) => { console.error("[superiorHunterDefense] Error logging heal:", e); });
+}
+
+function refusalPopup(featureName, refusalText, refusalType, playerName, campaignName, auto) {
+    addEntry(campaignName, {
+        type: 'automation',
+        characterName: playerName,
+        automationType: refusalType,
+        name: featureName,
+        description: refusalText,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[superiorHunterDefense] Error logging refusal:", e); });
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: featureName,
+            description: refusalText,
+            automation: auto,
+        },
+    };
 }
 
 export async function handle(action, playerStats, campaignName) {
@@ -122,24 +143,7 @@ export async function handle(action, playerStats, campaignName) {
     const usedRoundKey = '_Superior_Hunters_Defense_usedRound';
     const usedRound = Number(getRuntimeValue(playerName, usedRoundKey, campaignName) ?? 0);
     if (usedRound === currentRound) {
-        const refusalText = `You have already used ${featureName} this round — your Reaction is spent until your next turn.`;
-        addEntry(campaignName, {
-            type: 'automation',
-            characterName: playerName,
-            automationType: 'superior_hunters_defense_refused',
-            name: featureName,
-            description: refusalText,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[superiorHunterDefense] Error logging refusal:", e); });
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: refusalText,
-                automation: auto,
-            },
-        };
+        return refusalPopup(featureName, `You have already used ${featureName} this round — your Reaction is spent until your next turn.`, 'superior_hunters_defense_refused', playerName, campaignName, auto);
     }
 
     // CLA-371: Serialize the latch — stamp at the TRIGGER, before any spend
@@ -188,9 +192,7 @@ export async function handle(action, playerStats, campaignName) {
 
     const healText = actualHeal > 0 ? ` Retroactively healed for ${actualHeal} HP (${Math.floor(resistedAmount / 2)} from ${resistedAmount} ${damageType} damage halved by resistance).` : '';
 
-    if (actualHeal > 0) {
-        await logHunterDefenseHeal(campaignName, playerName, playerStats, featureName, actualHeal, resistedAmount, damageType);
-    }
+    await logHunterDefenseHeal({ campaignName, playerName, playerStats, featureName, actualHeal, resistedAmount, damageType });
 
     await addEntry(campaignName, {
         type: 'ability_use',

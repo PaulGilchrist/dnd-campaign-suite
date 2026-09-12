@@ -79,19 +79,21 @@ export async function handleBardicInspiration(playerStats, campaignName, popupHt
     const biDie = getRuntimeValue(playerName, 'bardicInspirationDie', campaignName);
     if (!biDie) return;
     const grantedBy = getRuntimeValue(playerName, 'bardicInspirationGrantedBy', campaignName) || 'unknown';
-    const checkName = popupHtml?.name || 'Ability Check';
-    const d20 = popupHtml?.rolls?.[0] || 0;
-    const bonus = popupHtml?.bonus || 0;
-    const modifier = popupHtml?.modifier || 0;
+    const ph = popupHtml || {};
+    const checkName = ph.name || 'Ability Check';
+    const d20 = ph.rolls?.[0] || 0;
+    const bonus = ph.bonus || 0;
+    const modifier = ph.modifier || 0;
+    const dieSize = ph.dieSize || 'd6';
     const originalTotal = d20 + bonus + modifier;
     const modifiedTotal = originalTotal + biDie;
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
         abilityName: 'Bardic Inspiration',
-        description: `${playerName} used Bardic Inspiration (1d${popupHtml?.dieSize || 'd6'}): +${biDie} to ${checkName} (d20 ${d20} + ${bonus + modifier} = ${originalTotal} → ${modifiedTotal}). Inspiration granted by ${grantedBy}.`,
+        description: `${playerName} used Bardic Inspiration (1d${dieSize}): +${biDie} to ${checkName} (d20 ${d20} + ${bonus + modifier} = ${originalTotal} → ${modifiedTotal}). Inspiration granted by ${grantedBy}.`,
         dieValue: biDie,
-        dieSize: popupHtml?.dieSize || 'd6',
+        dieSize,
         timestamp: Date.now(),
     });
     setRuntimeValue(playerName, 'bardicInspirationDie', null, campaignName);
@@ -114,11 +116,16 @@ export async function handleBiDefenseCombatSummary(playerStats, campaignName, { 
     }
 }
 
+function resolveBardicInspirationUses(biUsesRaw, playerStats) {
+    if (typeof biUsesRaw === 'object' && biUsesRaw !== null) return biUsesRaw.current;
+    if (biUsesRaw != null) return Number(biUsesRaw);
+    return playerStats?._trackedResources?.bardicInspirationUses?.current ?? 0;
+}
+
 export async function handleBardicInspirationOffense(playerStats, campaignName, characters, dieValue, dieSize) {
     if (!playerStats) return;
     const playerName = playerStats.name;
-    const biUsesRaw = getRuntimeValue(playerName, 'bardicInspirationUses', campaignName);
-    const biUsesNum = (typeof biUsesRaw === 'object' && biUsesRaw !== null) ? biUsesRaw.current : (biUsesRaw != null ? Number(biUsesRaw) : (playerStats?._trackedResources?.bardicInspirationUses?.current ?? 0));
+    const biUsesNum = resolveBardicInspirationUses(getRuntimeValue(playerName, 'bardicInspirationUses', campaignName), playerStats);
     if (biUsesNum > 0) {
         await setRuntimeValue(playerName, 'bardicInspirationUses', biUsesNum - 1, campaignName);
     }
@@ -248,6 +255,18 @@ export async function handleSavageAttacker(playerStats, campaignName, characters
     };
 }
 
+function buildSavageRerollPopup(popupHtml, popupTotal, newRolls, damageDelta) {
+    const updatedPopup = {
+        ...popupHtml,
+        total: popupTotal,
+        adjustedTotal: popupTotal,
+        rolls: newRolls,
+    };
+    if (popupHtml?.finalDamage !== undefined) updatedPopup.finalDamage = popupHtml.finalDamage + damageDelta;
+    if (popupHtml?.targetCurrentHp !== undefined) updatedPopup.targetCurrentHp = popupHtml.targetCurrentHp - damageDelta;
+    return updatedPopup;
+}
+
 export async function handleSavageAttackerChoice(playerStats, campaignName, characters, popupHtml, setPopupHtml, choiceData) {
     if (!playerStats || !campaignName || !choiceData) return null;
 
@@ -275,15 +294,7 @@ export async function handleSavageAttackerChoice(playerStats, campaignName, char
         });
 
         const newPopupTotal = rawDamage + Math.max(0, damageDifference);
-        const updatedPopup = {
-            ...popupHtml,
-            total: newPopupTotal,
-            adjustedTotal: newPopupTotal,
-            rolls: newRolls,
-        };
-        if (popupHtml?.finalDamage !== undefined) updatedPopup.finalDamage = popupHtml.finalDamage + Math.max(0, damageDifference);
-        if (popupHtml?.targetCurrentHp !== undefined) updatedPopup.targetCurrentHp = popupHtml.targetCurrentHp - Math.max(0, damageDifference);
-        setPopupHtml(updatedPopup);
+        setPopupHtml(buildSavageRerollPopup(popupHtml, newPopupTotal, newRolls, Math.max(0, damageDifference)));
 
         return { kept: 'reroll', damageDifference };
     }
@@ -407,12 +418,13 @@ export async function handleSuperiorityManeuver(playerStats, campaignName, setPo
 
         await setRuntimeValue(playerStats.name, 'superiorityDice', superiorityDice - 1, campaignName);
 
-        const skillName = popupHtml?.name || 'Ability Check';
-        const oldTotal = popupHtml?.rolls?.[0] + (popupHtml?.bonus || 0);
+        const ph = popupHtml || {};
+        const skillName = ph.name || 'Ability Check';
+        const oldTotal = ph.rolls?.[0] + (ph.bonus || 0);
         const newTotal = oldTotal + dieValue;
 
         // Update initiative tracker if this was an initiative roll
-        if (skillName === 'Initiative' || popupHtml?.rollType === 'initiative') {
+        if (skillName === 'Initiative' || ph.rollType === 'initiative') {
             await adjustInitiativeTrackerForManeuver(campaignName, playerStats.name, newTotal);
             window.dispatchEvent(new CustomEvent('initiative-rolled', {
                 detail: { characterName: playerStats.name, roll: newTotal },
@@ -471,7 +483,7 @@ async function expendPsiEnergyOnSuccess(campaignName, name, success) {
     }
 }
 
-export async function handlePsiBolsteredKnack(playerStats, campaignName, popupHtml, dieValue, dieSize, success, setPopupHtml) {
+export async function handlePsiBolsteredKnack({ playerStats, campaignName, popupHtml, dieValue, dieSize, success, setPopupHtml }) {
     if (!playerStats) return;
     const name = playerStats.name;
     const popupName = popupHtml?.name || 'Ability Check';

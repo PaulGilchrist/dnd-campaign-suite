@@ -257,7 +257,7 @@ export async function rollbackSpellEffects(lastAttack, campaignName, featureName
         return { targetsHealed: 0, conditionsRemoved: [], effectsRemoved: 0, damageHealed: 0, logDescription: '' };
     }
 
-    let rolledBack = {
+    const rolledBack = {
         targetsHealed: 0,
         conditionsRemoved: [],
         effectsRemoved: 0,
@@ -265,21 +265,9 @@ export async function rollbackSpellEffects(lastAttack, campaignName, featureName
         logDescription: '',
     };
 
-    const targetResults = lastAttack.targetResults;
     const targets = lastAttack.affectedTargets || [lastAttack.targetName];
 
-    if (targetResults && targetResults.length > 0) {
-        for (const tr of targetResults) {
-            rollbackTarget(cs, tr.targetName, tr.appliedDamage, tr.conditions, rolledBack, featureName, campaignName);
-        }
-    } else {
-        const totalDamage = lastAttack.actualDamage ?? ((lastAttack.primaryDamage || 0) + (lastAttack.secondaryDamage || 0));
-        const conditionKeys = lastAttack.statusEffects || [];
-
-        for (const targetName of targets) {
-            rollbackTarget(cs, targetName, totalDamage, conditionKeys, rolledBack, featureName, campaignName);
-        }
-    }
+    rollbackAllTargets(cs, lastAttack, targets, rolledBack, featureName, campaignName);
 
     const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
     const filtered = storedEffects.filter(te => !(te.target && targets.includes(te.target) && te.source === attackerName));
@@ -304,7 +292,25 @@ function buildRollbackLogDescription(attackerName, spellName, targets, rolledBac
     return `${attackerName}'s spell '${spellName}' was countered — ${damageStr}, ${conditionStr}, ${effectStr} on ${affectedList}.`;
 }
 
-function rollbackTarget(cs, targetName, damage, conditions, rolledBack, featureName, campaignName) {
+function rollbackAllTargets(cs, lastAttack, targets, rolledBack, featureName, campaignName) {
+    const targetResults = lastAttack.targetResults;
+
+    if (targetResults && targetResults.length > 0) {
+        for (const tr of targetResults) {
+            rollbackTarget({ cs, targetName: tr.targetName, damage: tr.appliedDamage, conditions: tr.conditions, rolledBack, featureName, campaignName });
+        }
+        return;
+    }
+
+    const totalDamage = lastAttack.actualDamage ?? ((lastAttack.primaryDamage || 0) + (lastAttack.secondaryDamage || 0));
+    const conditionKeys = lastAttack.statusEffects || [];
+
+    for (const targetName of targets) {
+        rollbackTarget({ cs, targetName, damage: totalDamage, conditions: conditionKeys, rolledBack, featureName, campaignName });
+    }
+}
+
+function rollbackTarget({ cs, targetName, damage, conditions, rolledBack, featureName, campaignName }) {
     if (damage > 0) {
         const healResult = applyHealingToTarget(cs, targetName, damage, campaignName);
         if (healResult?.newHp != null) {

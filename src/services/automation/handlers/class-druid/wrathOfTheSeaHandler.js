@@ -135,6 +135,12 @@ async function resolveNpcSaveAndDamage({ action, combatSummary, target, playerNa
         pushed,
     };
 
+    await logNpcSaveAndDamage({ action, playerName, damageFormula, damageResult, target, saveDc, saveSuccess, saveRoll, saveBonus, actualDamage, pushed, pushDistanceFt, campaignName });
+
+    return result;
+}
+
+async function logNpcSaveAndDamage({ action, playerName, damageFormula, damageResult, target, saveDc, saveSuccess, saveRoll, saveBonus, actualDamage, pushed, pushDistanceFt, campaignName }) {
     await addEntry(campaignName, {
         type: 'roll',
         characterName: playerName,
@@ -154,15 +160,13 @@ async function resolveNpcSaveAndDamage({ action, combatSummary, target, playerNa
         saveBonus,
         saveRawRolls: [saveRoll, saveRoll],
         finalDamage: actualDamage,
-        pushedDistanceFt: (!saveSuccess && canBePushed) ? pushDistanceFt : 0,
+        pushedDistanceFt: pushed ? pushDistanceFt : 0,
         note: 'combined_save_damage_roll',
         timestamp: Date.now(),
     }).catch((e) => { console.error('[wrathOfTheSea] Log error:', e); });
-
-    return result;
 }
 
-function buildWrathResultsHtml(action, saveDc, damageFormula, damageResult, results, playerPrompts, pushDistanceFt) {
+function buildWrathResultsHtml({ action, saveDc, damageFormula, damageResult, results, playerPrompts, pushDistanceFt }) {
     let resultsHtml = `<b>${action.name} used!</b><br/><br/>`;
     resultsHtml += `<b>Save DC: ${saveDc}</b> (CON)<br/><br/>`;
     resultsHtml += `<b>Rolls:</b> ${damageFormula} = ${damageResult.total} Cold damage<br/><br/>`;
@@ -300,7 +304,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         window.dispatchEvent(new CustomEvent('combat-summary-updated'));
     }
 
-    const resultsHtml = buildWrathResultsHtml(action, saveDc, damageFormula, damageResult, results, playerPrompts, pushDistanceFt);
+    const resultsHtml = buildWrathResultsHtml({ action, saveDc, damageFormula, damageResult, results, playerPrompts, pushDistanceFt });
 
     return {
         type: 'popup',

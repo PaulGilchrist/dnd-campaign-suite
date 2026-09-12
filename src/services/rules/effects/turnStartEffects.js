@@ -479,6 +479,33 @@ function isCreatureGrappled(creature) {
     });
 }
 
+async function damageGrappledCreature(creature, activeName, damage, damageType, campaignName) {
+    const creatureName = utils.getName(creature.name);
+    const creatureCurrentHp = creature.hit_points?.current ?? creature.currentHp;
+    if (creatureCurrentHp == null) {
+        console.error(`[expirations] Grapple: hit_points.current not found for creature ${creature.name}`);
+        throw new Error(`Grapple: hit_points.current not found for creature ${creature.name}`);
+    }
+    const currentHp = creatureCurrentHp;
+    const newHp = Math.max(0, currentHp - damage);
+    if (creature.hit_points == null || typeof creature.hit_points !== 'object') {
+        console.error('expirations: expected hit_points to be an object, got', typeof creature.hit_points, 'for', creature.name);
+        throw new Error('Missing object: hit_points for ' + creature.name);
+    }
+    creature.hit_points.current = newHp;
+    if (creature.currentHp != null) {
+        creature.currentHp = newHp;
+    }
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: activeName,
+        abilityName: 'Unarmed Fighting',
+        description: `Unarmed Fighting grapple damage: ${damage} ${damageType.toLowerCase()} to ${creatureName}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[expirations] Error:", e); });
+}
+
 async function applyGrappleDamageTurnStart(activeName, playerStats, effect, campaignName) {
     const combatSummary = getCombatSummary(campaignName);
     if (!combatSummary) return;
@@ -502,29 +529,7 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
         if (!isCreatureGrappled(creature)) continue;
 
         try {
-            const creatureCurrentHp = creature.hit_points?.current ?? creature.currentHp;
-            if (creatureCurrentHp == null) {
-                console.error(`[expirations] Grapple: hit_points.current not found for creature ${creature.name}`);
-                throw new Error(`Grapple: hit_points.current not found for creature ${creature.name}`);
-            }
-            const currentHp = creatureCurrentHp;
-            const newHp = Math.max(0, currentHp - damage);
-            if (creature.hit_points == null || typeof creature.hit_points !== 'object') {
-                console.error('expirations: expected hit_points to be an object, got', typeof creature.hit_points, 'for', creature.name);
-                throw new Error('Missing object: hit_points for ' + creature.name);
-            }
-            creature.hit_points.current = newHp;
-            if (creature.currentHp != null) {
-                creature.currentHp = newHp;
-            }
-
-            await addEntry(campaignName, {
-                type: 'ability_use',
-                characterName: activeName,
-                abilityName: 'Unarmed Fighting',
-                description: `Unarmed Fighting grapple damage: ${damage} ${damageType.toLowerCase()} to ${creatureName}`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[expirations] Error:", e); });
+            await damageGrappledCreature(creature, activeName, damage, damageType, campaignName);
         } catch (error) { console.error(`[expirations] Unarmed Fighting grapple damage failed for ${creatureName}:`, error); }
     }
 

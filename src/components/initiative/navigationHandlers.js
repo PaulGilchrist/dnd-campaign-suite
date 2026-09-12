@@ -81,6 +81,19 @@ function runRoundWrapHousekeeping({ updatedSummary, creatures, campaignName, rou
     }
 }
 
+// Shared turn-start gate: arm the round-scoped gate key, persist it, and run
+// turn-start effects for the newly active creature (BUG CLA-198). Returns the
+// summary to persist — turn-start effects may have cached a damaged copy.
+async function applyTurnStartGate({ gateKey, newActiveName, characters, campaignName, lastAppliedTurnStartCreatureRef, updatedSummary }) {
+    lastAppliedTurnStartCreatureRef.current = gateKey
+    setRuntimeValue('__initiative__', 'lastAppliedTurnStartCreature', gateKey, campaignName)
+    storage.set('lastAppliedTurnStartCreature', gateKey, campaignName)
+    updatedSummary.lastAppliedTurnStartCreature = gateKey
+    const newActiveChar = characters.find(ch => ch.name === newActiveName || ch.name.startsWith(newActiveName + ' '))
+    await applyTurnStartEffects(newActiveName, newActiveChar?.computedStats || newActiveChar, campaignName, characters)
+    return getCombatSummary(campaignName) || updatedSummary
+}
+
 // BUG CLA-307: run the OUTGOING owner's turn-END pass (Self-Restoration
 // condition_removal) BEFORE the new active creature's turn-start effects, so the
 // owner's Charmed/Frightened/Poisoned vanish at the end of their own turn, not at
@@ -142,15 +155,9 @@ export function createNextCreatureHandler({
         const shouldApply = lastAppliedTurnStartCreatureRef.current !== gateKey && !isSecondTurnEntry(newActiveEntry)
         let finalSummary = updatedSummary
         if (shouldApply) {
-            lastAppliedTurnStartCreatureRef.current = gateKey
-            setRuntimeValue('__initiative__', 'lastAppliedTurnStartCreature', gateKey, campaignName)
-            storage.set('lastAppliedTurnStartCreature', gateKey, campaignName)
-            updatedSummary.lastAppliedTurnStartCreature = gateKey
-            const newActiveChar = characters.find(ch => ch.name === newActiveName || ch.name.startsWith(newActiveName + ' '))
-            await applyTurnStartEffects(newActiveName, newActiveChar?.computedStats || newActiveChar, campaignName, characters)
             // Turn-start effects may have persisted damaged copies to the cache —
             // persist the cache (round + damage) last so nothing stale overwrites it.
-            finalSummary = getCombatSummary(campaignName) || updatedSummary
+            finalSummary = await applyTurnStartGate({ gateKey, newActiveName, characters, campaignName, lastAppliedTurnStartCreatureRef, updatedSummary })
         }
         storage.set('combatSummary', finalSummary, campaignName)
         setCombatSummary(cloneDeep(finalSummary))
@@ -200,13 +207,7 @@ export function createPreviousCreatureHandler({
         const shouldApply = lastAppliedTurnStartCreatureRef.current !== gateKey && !secondTurnTarget
         let finalSummary = updatedSummary
         if (shouldApply) {
-            lastAppliedTurnStartCreatureRef.current = gateKey
-            setRuntimeValue('__initiative__', 'lastAppliedTurnStartCreature', gateKey, campaignName)
-            storage.set('lastAppliedTurnStartCreature', gateKey, campaignName)
-            updatedSummary.lastAppliedTurnStartCreature = gateKey
-            const newActiveChar = characters.find(ch => ch.name === newActiveName || ch.name.startsWith(newActiveName + ' '))
-            await applyTurnStartEffects(newActiveName, newActiveChar?.computedStats || newActiveChar, campaignName, characters)
-            finalSummary = getCombatSummary(campaignName) || updatedSummary
+            finalSummary = await applyTurnStartGate({ gateKey, newActiveName, characters, campaignName, lastAppliedTurnStartCreatureRef, updatedSummary })
         }
         storage.set('combatSummary', finalSummary, campaignName)
         setCombatSummary(cloneDeep(finalSummary))

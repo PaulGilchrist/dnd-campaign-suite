@@ -37,32 +37,30 @@ export function getAffectedCreatures(overlay, players, placedItems, combatSummar
   return affected;
 }
 
+function resolveNpcSaveDisadvantage(creature, campaignName, damageType, heightenTarget) {
+  const coronaResult = getCoronaSaveDisadvantage({
+    targetName: creature.name,
+    campaignName,
+    damageType,
+    skipRangeCheck: true,
+  });
+  if (coronaResult.disadvantage) return true;
+  if (heightenTarget && creature.name === heightenTarget) return true;
+  const targetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+  const idx = targetEffects.findIndex(te => te.target === creature.name && te.effect === 'disadvantage_on_next_save');
+  if (idx !== -1) {
+    targetEffects.splice(idx, 1);
+    setRuntimeValue('campaign', 'targetEffects', [...targetEffects], campaignName);
+    return true;
+  }
+  return false;
+}
+
 export function processAoeNpcs({ combatSummary, affected, rawDamage, damageType, saveDc, saveType, dcSuccess, campaignName, attackerName, characters, heightenTarget }) {
   const results = [];
   for (const { creature } of affected) {
     if (creature.type !== 'npc') continue;
-    let disadvantage = false;
-    const coronaResult = getCoronaSaveDisadvantage({
-      targetName: creature.name,
-      campaignName,
-      damageType,
-      skipRangeCheck: true,
-    });
-    if (coronaResult.disadvantage) {
-      disadvantage = true;
-    }
-    if (!disadvantage && heightenTarget && creature.name === heightenTarget) {
-      disadvantage = true;
-    }
-    if (!disadvantage) {
-      const targetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-      const idx = targetEffects.findIndex(te => te.target === creature.name && te.effect === 'disadvantage_on_next_save');
-      if (idx !== -1) {
-        disadvantage = true;
-        targetEffects.splice(idx, 1);
-        setRuntimeValue('campaign', 'targetEffects', [...targetEffects], campaignName);
-      }
-    }
+    const disadvantage = resolveNpcSaveDisadvantage(creature, campaignName, damageType, heightenTarget);
     const advantage = isCircleOfPowerActive(creature.name, campaignName);
     const saveResult = rollSaveForCreature(creature, saveType, saveDc, disadvantage, advantage);
     const isSoulstitchProtected = hasSoulstitchProtection(creature.name, attackerName, campaignName);

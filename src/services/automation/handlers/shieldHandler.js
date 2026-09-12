@@ -4,6 +4,30 @@ import { getCombatContext } from '../../rules/combat/damageUtils.js';
 import { findAttackRollAgainstTarget, rollbackDamage } from '../common/damageRollback.js';
 import { addEntry } from '../../ui/logService.js';
 
+async function rollbackNegatedAttack(playerName, buffName, campaignName, attackResult) {
+    if (!attackResult.attackEvent) return;
+
+    const { d20, bonus, targetAc } = attackResult.attackEvent;
+    const rollTotal = d20 + bonus;
+    const wouldMissWithShield = targetAc != null && (rollTotal < targetAc + 5);
+
+    if (!wouldMissWithShield || !attackResult.attackerName) return;
+
+    const rawDamage = attackResult.attackEvent.rawDamage || 0;
+    if (rawDamage <= 0) return;
+
+    const healResult = await rollbackDamage(attackResult.attackerName, playerName, campaignName, buffName);
+    if (healResult <= 0) return;
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: 'Shield',
+        description: `${buffName} retroactively negates ${attackResult.attackerName}'s attack — ${playerName} is healed for ${healResult} HP.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[shield] Error:", e); });
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -24,28 +48,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         const cs = await getCombatContext(campaignName);
         if (cs) {
             const attackResult = await findAttackRollAgainstTarget(playerName, campaignName);
-
-            if (attackResult.attackEvent) {
-                const { d20, bonus, targetAc } = attackResult.attackEvent;
-                const rollTotal = d20 + bonus;
-                const wouldMissWithShield = targetAc != null && (rollTotal < targetAc + 5);
-
-                if (wouldMissWithShield && attackResult.attackerName) {
-                    const rawDamage = attackResult.attackEvent.rawDamage || 0;
-                    if (rawDamage > 0) {
-                        const healResult = await rollbackDamage(attackResult.attackerName, playerName, campaignName, buffName);
-                        if (healResult > 0) {
-                            await addEntry(campaignName, {
-                                type: 'ability_use',
-                                characterName: playerName,
-                                abilityName: 'Shield',
-                                description: `${buffName} retroactively negates ${attackResult.attackerName}'s attack — ${playerName} is healed for ${healResult} HP.`,
-                                timestamp: Date.now(),
-                            }).catch((e) => { console.error("[shield] Error:", e); });
-                        }
-                    }
-                }
-            }
+            await rollbackNegatedAttack(playerName, buffName, campaignName, attackResult);
         }
     }
 

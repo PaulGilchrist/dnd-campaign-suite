@@ -82,7 +82,7 @@ export function endAnimalFriendshipEarly(casterName, targetName, campaignName) {
     }).catch((e) => { console.error("[animalFriendshipHandler:log-error]", e); });
 }
 
-async function applyAnimalFriendshipCharm(campaignName, casterName, action, targetName, dc, saveResult, affectedTargets) {
+async function applyAnimalFriendshipCharm({ campaignName, casterName, action: _action, targetName, dc, saveResult, affectedTargets }) {
     // Apply charmed condition
     const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
     const conditions = Array.isArray(storedConditions) ? storedConditions : [];
@@ -208,7 +208,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             }).catch((e) => { console.error("[animalFriendship] Error:", e); });
         } else {
             affectedCount++;
-            await applyAnimalFriendshipCharm(campaignName, casterName, action, targetName, dc, saveResult, affectedTargets);
+            await applyAnimalFriendshipCharm({ campaignName, casterName, action, targetName, dc, saveResult, affectedTargets });
         }
     }
 

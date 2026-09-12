@@ -219,7 +219,7 @@ describe('logHpChange', () => {
     });
 
     it('posts an hp_change entry with correct fields', () => {
-        logHpChange(campaignName, 'Orc', -5, 20, 30, false, false);
+        logHpChange({ campaignName, targetName: 'Orc', delta: -5, currentHp: 20, maxHp: 30, isHealing: false, isUnconscious: false });
 
         const entry = capturedEntry();
         expect(entry).toEqual({
@@ -234,7 +234,7 @@ describe('logHpChange', () => {
     });
 
     it('posts an hp_change entry for healing', () => {
-        logHpChange(campaignName, 'Ally', 10, 25, 30, true, false);
+        logHpChange({ campaignName, targetName: 'Ally', delta: 10, currentHp: 25, maxHp: 30, isHealing: true, isUnconscious: false });
 
         const entry = capturedEntry();
         expect(entry).toEqual({
@@ -249,7 +249,7 @@ describe('logHpChange', () => {
     });
 
     it('posts an hp_change entry with isUnconscious flag', () => {
-        logHpChange(campaignName, 'Orc', -15, 0, 30, false, true);
+        logHpChange({ campaignName, targetName: 'Orc', delta: -15, currentHp: 0, maxHp: 30, isHealing: false, isUnconscious: true });
 
         const entry = capturedEntry();
         expect(entry.isUnconscious).toBe(true);
@@ -305,7 +305,7 @@ describe('error handling', () => {
 
     it('logHpChange does not throw when addEntry rejects', async () => {
         mockAddEntry.mockRejectedValueOnce(new Error('network error'));
-        await expect(logHpChange(campaignName, 'Orc', -5, 20, 30, false, false)).resolves.toBeUndefined();
+        await expect(logHpChange({ campaignName, targetName: 'Orc', delta: -5, currentHp: 20, maxHp: 30, isHealing: false, isUnconscious: false })).resolves.toBeUndefined();
     });
 
     it('logNpcThreshold does not throw when addEntry rejects', async () => {

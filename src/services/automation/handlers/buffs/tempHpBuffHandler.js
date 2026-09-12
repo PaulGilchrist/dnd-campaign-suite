@@ -233,7 +233,7 @@ export async function handleMantleOfInspiration(action, playerStats, campaignNam
     };
 }
 
-export async function confirmMantleOfInspiration(action, playerStats, campaignName, selectedTargets, dieRoll, bardicDieSize, tempHp) {
+export async function confirmMantleOfInspiration({ action, playerStats, campaignName, selectedTargets, dieRoll, bardicDieSize, tempHp }) {
     const auto = action.automation;
     const playerName = playerStats.name;
     const finalTargets = (selectedTargets || []).slice(0, Math.max(1, getAbilityModifier(playerStats, 'Charisma')));

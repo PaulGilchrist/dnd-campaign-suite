@@ -354,7 +354,7 @@ function SaveAttackAoeModal({
 
         const results = [];
         const prompts = [];
-        const characters = combatSummary?.creatures?.filter(c => c.type === 'player') || [];
+        const characters = combatSummary.creatures.filter(c => c.type === 'player');
         const scalingEntry = resolveScaling(playerStats, action.automation?.scaling);
         const resolvedDamage = scalingEntry?.damage || damage;
 
@@ -422,6 +422,8 @@ function SaveAttackAoeModal({
     }
 
     function applyPlayerSaveDamage({ campaignName, combatSummary, playerStats, actionName, targetName, detail, success, saveBonus, saveDc, saveType, dcSuccess, damageType, rawDamage, targetDamageFormula, damageRoll, finalDamage, isRadiantSoulTarget, radiantSoulChaMod, radiantSoulFlagKey }) {
+        const saveResult = success ? 'success' : 'failure';
+        const detailRoll = detail.roll ?? 0;
         addEntry(campaignName, {
             type: 'roll',
             characterName: playerStats.name,
@@ -430,9 +432,9 @@ function SaveAttackAoeModal({
             targetName,
             saveDc: saveDc,
             saveType: saveType,
-            saveResult: success ? 'success' : 'failure',
+            saveResult,
             total: detail.total ?? 0,
-            rolls: [detail.roll ?? 0],
+            rolls: [detailRoll],
             bonus: saveBonus,
             formula: `1d20${saveBonus !== 0 ? '+' + saveBonus : ''}`,
             timestamp: Date.now(),
@@ -467,10 +469,10 @@ function SaveAttackAoeModal({
             saveType: saveType,
             saveDc: saveDc,
             dcSuccess: dcSuccess,
-            saveResult: success ? 'success' : 'failure',
-            saveRoll: detail.roll ?? 0,
+            saveResult,
+            saveRoll: detailRoll,
             saveBonus,
-            saveRawRolls: [detail.roll ?? 0, detail.roll ?? 0],
+            saveRawRolls: [detailRoll, detailRoll],
             finalDamage: finalDamage,
             timestamp: Date.now(),
         }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging player damage:', e); });

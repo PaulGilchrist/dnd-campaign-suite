@@ -256,6 +256,18 @@ function gateBloodied(action, playerStats) {
 // Refusal gates for self-healing: hit dice cost, bloodied-only, tracked uses,
 // and current-HP preconditions. Returns { popup } to refuse, or the resolved
 // uses bookkeeping to continue.
+function gateTrackedUses(action, auto, playerStats, campaignName) {
+    const usesKey = usesKeyFor(action, auto);
+    const maxFromTracked = playerStats?._trackedResources?.[usesKey]?.max;
+    const maxUses = maxFromTracked ?? auto.usesMax ?? auto.uses ?? 1;
+    const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? maxUses);
+
+    if (currentUses <= 0) {
+        return { popup: infoPopup(action, `${action.name} has no uses remaining. Recharges on a ${auto.recharge === 'long_rest' ? 'Long Rest' : 'Short Rest'}.`) };
+    }
+    return { popup: null, usesKey, maxUses, currentUses };
+}
+
 function gateSelfHealing(action, auto, playerStats, campaignName, isHitDieRoll, hitDiceCost) {
     if (isHitDieRoll && hitDiceCost > 0) {
         const popup = gateHitDiceCost(action, playerStats, campaignName, hitDiceCost);
@@ -267,24 +279,15 @@ function gateSelfHealing(action, auto, playerStats, campaignName, isHitDieRoll, 
         if (popup) return { popup };
     }
 
-    let usesKey;
-    let maxUses = 1;
-    let currentUses = 1;
-    if (!isHitDieRoll) {
-        usesKey = usesKeyFor(action, auto);
-        const maxFromTracked = playerStats?._trackedResources?.[usesKey]?.max;
-        maxUses = maxFromTracked ?? auto.usesMax ?? auto.uses ?? 1;
-        currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? maxUses);
+    const uses = isHitDieRoll
+        ? { popup: null, usesKey: undefined, maxUses: 1, currentUses: 1 }
+        : gateTrackedUses(action, auto, playerStats, campaignName);
+    if (uses.popup) return { popup: uses.popup };
 
-        if (currentUses <= 0) {
-            return { popup: infoPopup(action, `${action.name} has no uses remaining. Recharges on a ${auto.recharge === 'long_rest' ? 'Long Rest' : 'Short Rest'}.`) };
-        }
-    }
-
-    const hpPopup = selfHealingHpRefusal(action, playerStats, campaignName, isHitDieRoll, currentUses);
+    const hpPopup = selfHealingHpRefusal(action, playerStats, campaignName, isHitDieRoll, uses.currentUses);
     if (hpPopup) return { popup: hpPopup };
 
-    return { popup: null, usesKey, maxUses, currentUses };
+    return uses;
 }
 
 function selfHealingHpRefusal(action, playerStats, campaignName, isHitDieRoll, currentUses) {
@@ -408,7 +411,7 @@ async function handleSelfHealing(action, auto, playerStats, campaignName, slotLe
     return infoPopup(action, description);
 }
 
-async function handleUsesExpressionHealing(action, auto, playerStats, campaignName, slotLevel, targetName, { usesKey, currentUses, maxUses }) {
+async function handleUsesExpressionHealing({ action, auto, playerStats, campaignName, slotLevel, targetName, usesKey, currentUses, maxUses }) {
     const resolvedExpression = resolveDiceExpression(auto.healExpression, playerStats, slotLevel);
     const maximize = hasHealingMaximizationForTarget(playerStats, targetName, campaignName);
     const rerollOnes = hasRerollHealingOnes(playerStats);
@@ -506,7 +509,7 @@ async function handleUsesHealing(action, auto, playerStats, campaignName, slotLe
     const targetName = targetInfo?.target?.name || playerStats.name;
 
     if (auto.healExpression) {
-        return handleUsesExpressionHealing(action, auto, playerStats, campaignName, slotLevel, targetName, { usesKey, currentUses, maxUses });
+        return handleUsesExpressionHealing({ action, auto, playerStats, campaignName, slotLevel, targetName, usesKey, currentUses, maxUses });
     }
 
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);

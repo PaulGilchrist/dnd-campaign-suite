@@ -279,6 +279,22 @@ function buildBrutalStrikeEffect(option, playerName, targetName) {
 }
 
 // Brutal Strike: add extra damage dice when active
+function applyBrutalStrikeEffectChoices(brutalStrikeRider, playerName, targetName, campaignName) {
+    const effectChoices = getRuntimeValue(playerName, '_brutalStrikeEffects', campaignName) || [];
+    if (effectChoices.length === 0) return;
+
+    let storedEffects = campaignTargetEffects();
+    const riderOptions = brutalStrikeRider.options || [];
+    for (const choiceName of effectChoices) {
+        const option = riderOptions.find(o => o.name === choiceName);
+        if (!option) continue;
+        if (option.effect === 'disadvantage_on_next_save' || option.effect === 'next_attack_bonus') {
+            storedEffects = [...storedEffects, buildBrutalStrikeEffect(option, playerName, targetName)];
+        }
+    }
+    setRuntimeValue('campaign', 'targetEffects', storedEffects, campaignName);
+}
+
 function applyBrutalStrikeEffects(playerName, targetName, playerStats, campaignName) {
     if (!getRuntimeValue(playerName, '_brutalStrikeActive', campaignName)) return null;
     const allAutomation = [...(playerStats.automation?.actions || []), ...(playerStats.automation?.passives || [])];
@@ -297,19 +313,7 @@ function applyBrutalStrikeEffects(playerName, targetName, playerStats, campaignN
     ).map(te => JSON.stringify(te));
 
     // Apply chosen effects to targetEffects
-    const effectChoices = getRuntimeValue(playerName, '_brutalStrikeEffects', campaignName) || [];
-    if (effectChoices.length > 0) {
-        let storedEffects = campaignTargetEffects();
-        const riderOptions = brutalStrikeRider.options || [];
-        for (const choiceName of effectChoices) {
-            const option = riderOptions.find(o => o.name === choiceName);
-            if (!option) continue;
-            if (option.effect === 'disadvantage_on_next_save' || option.effect === 'next_attack_bonus') {
-                storedEffects = [...storedEffects, buildBrutalStrikeEffect(option, playerName, targetName)];
-            }
-        }
-        setRuntimeValue('campaign', 'targetEffects', storedEffects, campaignName);
-    }
+    applyBrutalStrikeEffectChoices(brutalStrikeRider, playerName, targetName, campaignName);
 
     // Consume pre-existing next_attack_bonus effects (Sundering Blow consumed on this attack)
     if (preExistingBonusKeys.length > 0) {
@@ -547,7 +551,7 @@ async function resolveAttackModeResolvers({ playerName, playerStats, targetName,
 }
 
 // Accumulate target-condition-driven adv/dis (ordered) onto the running counts.
-async function accumulateTargetAdvDis(adv, dis, playerName, playerStats, targetName, buffScanAdv, campaignName) {
+async function accumulateTargetAdvDis({ adv, dis, playerName, playerStats, targetName, buffScanAdv, campaignName }) {
     adv += buffScanAdv;
     if (targetName) {
         adv += countTargetConditionAdvantage(targetName, campaignName);
@@ -603,7 +607,7 @@ export async function buildAttackContextSync(attack, playerStats, campaignName, 
         const buffScan = scanBuffsForAdvantage(activeBuffs);
         const ramActive = buffScan.ramActive;
         if (forcedMode === undefined) {
-            ({ adv, dis } = await accumulateTargetAdvDis(adv, dis, playerName, playerStats, targetName, buffScan.adv, campaignName));
+            ({ adv, dis } = await accumulateTargetAdvDis({ adv, dis, playerName, playerStats, targetName, buffScanAdv: buffScan.adv, campaignName }));
             // Resolve accumulated adv/dis to forcedMode (they cancel per rules)
             forcedMode = resolveAdvantageMode(adv, dis);
         }

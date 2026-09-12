@@ -237,6 +237,48 @@ function MonsterCardDescription({ monster }) {
   );
 }
 
+function DefenseTextRow({ label, value }) {
+  return (
+    <div className="mc-defense-row">
+      <span className="mc-defense-label">{label}</span>
+      <span>{value}</span>
+    </div>
+  );
+}
+
+function DefenseModifierRow({ label, entries, labelFor, onSelect }) {
+  return (
+    <div className="mc-defense-row">
+      <span className="mc-defense-label">{label}</span>
+      <span>
+        {Object.entries(entries).map(([name, s], idx) => (
+          <span key={name}>
+            {idx > 0 && ', '}
+            <span className="mc-dice-link" onClick={() => onSelect(name, s.modifier)} role="button" tabIndex={0}>
+              {labelFor ? labelFor(name) : name} {s.modifier >= 0 ? '+' : ''}{s.modifier}
+            </span>
+          </span>
+        ))}
+      </span>
+    </div>
+  );
+}
+
+function formatLanguages(languages) {
+  return Array.isArray(languages) ? languages.join(', ') : languages;
+}
+
+function MonsterDamageTraits({ irv }) {
+  return (
+    <>
+      {hasEntries(irv.vulnerabilities) && <DefenseTextRow label="Damage Vuln." value={irv.vulnerabilities.join(', ')} />}
+      {hasEntries(irv.resistances) && <DefenseTextRow label="Damage Resist." value={irv.resistances.join(', ')} />}
+      {hasEntries(irv.immunities) && <DefenseTextRow label="Damage Imm" value={irv.immunities.join(', ')} />}
+      {hasEntries(irv.conditionImmunities) && <DefenseTextRow label="Condition Imm" value={irv.conditionImmunities.join(', ')} />}
+    </>
+  );
+}
+
 function MonsterCardDefenses({ monster, monsterName, campaignName, handleSaveThrow, handleSkillCheck }) {
   const currentCs = getCombatSummary(campaignName);
   const summaryCreature = currentCs?.creatures?.find(c => c.name === monsterName);
@@ -247,82 +289,16 @@ function MonsterCardDefenses({ monster, monsterName, campaignName, handleSaveThr
 
   return (
     <div className="mc-defenses">
-      {hasEntries(saves) && (
-        <div className="mc-defense-row">
-          <span className="mc-defense-label">Saving Throws</span>
-          <span>
-            {Object.entries(saves).map(([ab, s], idx) => (
-              <span key={ab}>
-                {idx > 0 && ', '}
-                <span className="mc-dice-link" onClick={() => handleSaveThrow(ab, s.modifier)} role="button" tabIndex={0}>
-                  {saveAbilityAbbr(ab)} {s.modifier >= 0 ? '+' : ''}{s.modifier}
-                </span>
-              </span>
-            ))}
-          </span>
-        </div>
-      )}
-      {hasEntries(monster.skills) && (
-        <div className="mc-defense-row">
-          <span className="mc-defense-label">Skills</span>
-          <span>
-            {Object.entries(monster.skills).map(([name, s], idx) => (
-              <span key={name}>
-                {idx > 0 && ', '}
-                <span className="mc-dice-link" onClick={() => handleSkillCheck(name, s.modifier)} role="button" tabIndex={0}>
-                  {name} {s.modifier >= 0 ? '+' : ''}{s.modifier}
-                </span>
-              </span>
-            ))}
-          </span>
-        </div>
-      )}
-      {hasSenseEntries(monster.senses) && (
-        <div className="mc-defense-row">
-          <span className="mc-defense-label">Senses</span>
-          <span>{formatSenses(monster.senses)}</span>
-        </div>
-      )}
-      {monster.languages && (
-        <div className="mc-defense-row">
-          <span className="mc-defense-label">Languages</span>
-          <span>{Array.isArray(monster.languages) ? monster.languages.join(', ') : monster.languages}</span>
-        </div>
-      )}
-      {hasEntries(irv.vulnerabilities) && (
-        <div className="mc-defense-row">
-          <span className="mc-defense-label">Damage Vuln.</span>
-          <span>{irv.vulnerabilities.join(', ')}</span>
-        </div>
-      )}
-      {hasEntries(irv.resistances) && (
-        <div className="mc-defense-row">
-          <span className="mc-defense-label">Damage Resist.</span>
-          <span>{irv.resistances.join(', ')}</span>
-        </div>
-      )}
-      {hasEntries(irv.immunities) && (
-        <div className="mc-defense-row">
-          <span className="mc-defense-label">Damage Imm</span>
-          <span>{irv.immunities.join(', ')}</span>
-        </div>
-      )}
-      {hasEntries(irv.conditionImmunities) && (
-        <div className="mc-defense-row">
-          <span className="mc-defense-label">Condition Imm</span>
-          <span>{irv.conditionImmunities.join(', ')}</span>
-        </div>
-      )}
+      {hasEntries(saves) && <DefenseModifierRow label="Saving Throws" entries={saves} labelFor={saveAbilityAbbr} onSelect={handleSaveThrow} />}
+      {hasEntries(monster.skills) && <DefenseModifierRow label="Skills" entries={monster.skills} onSelect={handleSkillCheck} />}
+      {hasSenseEntries(monster.senses) && <DefenseTextRow label="Senses" value={formatSenses(monster.senses)} />}
+      {monster.languages && <DefenseTextRow label="Languages" value={formatLanguages(monster.languages)} />}
+      <MonsterDamageTraits irv={irv} />
       <div className="mc-defense-row mc-defense-cr">
         <span className="mc-defense-label">CR</span>
         <span>{monster.challenge_rating} ({monster.xp?.toLocaleString()} XP)</span>
       </div>
-      {monster.legendary_resistance != null && (
-        <div className="mc-defense-row">
-          <span className="mc-defense-label">Legendary Resist.</span>
-          <span>{monster.legendary_resistance}/day</span>
-        </div>
-      )}
+      {monster.legendary_resistance != null && <DefenseTextRow label="Legendary Resist." value={`${monster.legendary_resistance}/day`} />}
     </div>
   );
 }

@@ -37,7 +37,7 @@ export async function processAttackAfterResult({ hit, isAutoMiss: _isAutoMiss, t
 
     // Graze damage
     if (context?.grazeDamage && targetName && !finalHit && !finalAutoMiss) {
-        await processGrazeDamage(context, targetName, characterName, campaignName, characters, logEntry, setPopupHtml);
+        await processGrazeDamage({ context, targetName, characterName, campaignName, characters, logEntry, setPopupHtml });
     }
 
     // Vex/distracting strike/sap clearing on hit — each reads original effects and writes independently (matches original behavior)
@@ -285,7 +285,7 @@ function buildGrazePopupData({ context, targetName, grazeFormula, grazeDamageAmo
     };
 }
 
-async function processGrazeDamage(context, targetName, characterName, campaignName, characters, logEntry, setPopupHtml) {
+async function processGrazeDamage({ context, targetName, characterName, campaignName, characters, logEntry, setPopupHtml }) {
     const grazeAbilityMod = context?.grazeAbilityMod || 0;
     const grazeDamageAmount = Math.max(0, grazeAbilityMod);
     if (grazeDamageAmount <= 0) return;

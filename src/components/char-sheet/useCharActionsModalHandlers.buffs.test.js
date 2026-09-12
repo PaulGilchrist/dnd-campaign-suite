@@ -191,15 +191,15 @@ describe('useCharActionsModalHandlers - buffs', () => {
       };
       const handlers = getHandlers(modalState);
       await handlers.handleMantleOfInspirationConfirm(['Ally1']);
-      expect(confirmMantleOfInspiration).toHaveBeenCalledWith(
-        modalState.mantleOfInspirationTarget.action,
-        modalState.mantleOfInspirationTarget.playerStats,
-        modalState.mantleOfInspirationTarget.campaignName,
-        ['Ally1'],
-        7,
-        'd8',
-        5
-      );
+      expect(confirmMantleOfInspiration).toHaveBeenCalledWith({
+        action: modalState.mantleOfInspirationTarget.action,
+        playerStats: modalState.mantleOfInspirationTarget.playerStats,
+        campaignName: modalState.mantleOfInspirationTarget.campaignName,
+        selectedTargets: ['Ally1'],
+        dieRoll: 7,
+        bardicDieSize: 'd8',
+        tempHp: 5,
+      });
       expect(mockSetModalState).toHaveBeenCalledWith({ mantleOfInspirationTarget: null });
     });
 

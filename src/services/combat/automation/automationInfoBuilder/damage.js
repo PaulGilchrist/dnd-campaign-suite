@@ -19,6 +19,19 @@ const DAMAGE_BONUS_DEFAULTS = {
     abilityIncreased: '',
 }
 
+function isHunterMarkedBeastRanger(playerStats) {
+    const isRanger = playerStats.class?.name === 'Ranger'
+    const hasBestialFury = (playerStats.class?.major?.features || []).some(f => f.name === 'Bestial Fury')
+    return isRanger && hasBestialFury && playerStats.concentration?.spell === "Hunter's Mark"
+}
+
+function hunterMarkStrikeExpression(playerStats, fallback) {
+    const highestSlotLevel = [7, 5, 3, 1].find(lv => playerStats.spellAbilities?.[`spell_slots_level_${lv}`] > 0)
+    if (!highestSlotLevel) return fallback
+    if (playerStats.level >= 20) return '1d10'
+    return ({ 1: '1d6', 3: '1d8', 5: '1d10', 7: '1d12' })[highestSlotLevel] || '1d6'
+}
+
 function resolveScaledExpression(auto, playerStats) {
     let resolvedExpr = auto.damageExpression || '';
     if (!auto.scaling) return resolvedExpr;
@@ -158,28 +171,9 @@ export const damageHandlers = {
 
     'primal_companion_double_strike_damage': (feature, playerStats) => {
         const auto = feature.automation
-        const isRanger = playerStats.class?.name === 'Ranger'
-        const hasBestialFury = (playerStats.class?.major?.features || []).some(f => f.name === 'Bestial Fury')
         let damageExpression = auto.damageExpression || ''
-
-        if (isRanger && hasBestialFury && playerStats.concentration?.spell === "Hunter's Mark") {
-            const slotLevels = [7, 5, 3, 1]
-            let highestSlotLevel = null
-            for (const lv of slotLevels) {
-                const key = `spell_slots_level_${lv}`
-                if (playerStats.spellAbilities?.[key] > 0) {
-                    highestSlotLevel = lv
-                    break
-                }
-            }
-            if (highestSlotLevel) {
-                if (playerStats.level >= 20) {
-                    damageExpression = '1d10'
-                } else {
-                    const dieMap = { 1: '1d6', 3: '1d8', 5: '1d10', 7: '1d12' }
-                    damageExpression = dieMap[highestSlotLevel] || '1d6'
-                }
-            }
+        if (isHunterMarkedBeastRanger(playerStats)) {
+            damageExpression = hunterMarkStrikeExpression(playerStats, damageExpression)
         }
 
         return {

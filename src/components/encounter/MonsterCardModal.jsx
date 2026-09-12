@@ -262,7 +262,7 @@ function resolveAttackerActionBlock(attackerConditions, monsterTargetEffects, ca
   return true;
 }
 
-function buildTargetEffectData(target, targetComputed, targetConditions, targetSaveModifiers, allTargetEffects, campaignName, getAttackerCreature) {
+function buildTargetEffectData({ target, targetComputed, targetConditions, targetSaveModifiers, allTargetEffects, campaignName, getAttackerCreature }) {
   const targetRiderForTarget = allTargetEffects.filter(te => te.target === target?.name);
   const targetEffectData = computeConditionEffects({ conditions: targetConditions, saveModifiers: targetSaveModifiers, targetEffects: targetRiderForTarget });
   applyElusive(targetEffectData, target, targetComputed, targetConditions);
@@ -272,6 +272,10 @@ function buildTargetEffectData(target, targetComputed, targetConditions, targetS
 
 function hasPassiveRule(computedStats, effect) {
   return computedStats?.automation?.passives?.some(p => p.type === 'passive_rule' && p.effect === effect);
+}
+
+function hasMonsterPassive(monsterCharacter, effect) {
+  return hasPassiveRule(monsterCharacter?.computedStats, effect);
 }
 
 function resolveCurrentAllies(storedAllies, monsterName) {
@@ -290,6 +294,14 @@ function blockStinkingCloudAction(campaignName, monsterName, name) {
     description: `${monsterName} is Poisoned by Stinking Cloud and can't take an Action or Bonus Action — ${name} refused.`,
     timestamp: Date.now(),
   }).catch((e) => { console.error('[MonsterCardModal] Error:', e); });
+}
+
+function hasRayOfEnfeebleOn(targetEffects, monsterName) {
+  return targetEffects?.some(te => te.target === monsterName && te.effect === 'ray_of_enfeeble_debuff');
+}
+
+function rayDisadvantageContext(applies) {
+  return applies ? { forcedMode: 'disadvantage' } : undefined;
 }
 
 function MonsterAttackPopup({ popupHtml, campaignName, monsterName, setPopupHtml, onQuickRoll }) {
@@ -343,8 +355,8 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   const inspiringMoveNoOA = useRuntimeValue(monsterName, 'inspiringMovementNoOA', campaignName);
   const remarkableNoOA = useRuntimeValue(monsterName, 'remarkableAthleteNoOA', campaignName);
   const monsterCharacter = characters?.find(c => c.name === monsterName);
-  const speedyOpportunityDisadvantage = hasPassiveRule(monsterCharacter?.computedStats, 'opportunity_attacks_disadvantage');
-  const speedyDifficultTerrainIgnore = hasPassiveRule(monsterCharacter?.computedStats, 'ignore_difficult_terrain_on_dash');
+  const speedyOpportunityDisadvantage = hasMonsterPassive(monsterCharacter, 'opportunity_attacks_disadvantage');
+  const speedyDifficultTerrainIgnore = hasMonsterPassive(monsterCharacter, 'ignore_difficult_terrain_on_dash');
   const monsterActiveBuffs = getRuntimeValue(monsterName, 'activeBuffs') || [];
   const shieldOfFaithBonus = computeShieldOfFaithBonus(monsterActiveBuffs);
 
@@ -488,7 +500,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const attackerEffects = computeConditionEffects({ conditions: attackerConditions, saveModifiers: targetSaveModifiers, targetEffects: monsterTargetEffects, attackerSenses: monsterSensesArray })
     if (resolveAttackerActionBlock(attackerConditions, monsterTargetEffects, campaignName, monsterName, name)) return;
 
-    const targetEffectData = buildTargetEffectData(target, targetComputed, targetConditions, targetSaveModifiers, allTargetEffects, campaignName, getAttackerCreature);
+    const targetEffectData = buildTargetEffectData({ target, targetComputed, targetConditions, targetSaveModifiers, allTargetEffects, campaignName, getAttackerCreature });
 
     const effectiveBonus = bonus + (targetEffectData.riderAttackBonus || 0);
 
@@ -543,18 +555,14 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
 
   const handleAbilityCheck = (abbr, mod) => {
     const fullName = abilityNameMap[abbr] || abbr.toUpperCase();
-    const isStr = abbr === 'str';
-    const rayDebuffOnMonster = monsterTargetEffects?.some(te => te.target === monsterName && te.effect === 'ray_of_enfeeble_debuff');
-    const context = isStr && rayDebuffOnMonster ? { forcedMode: 'disadvantage' } : undefined;
+    const context = rayDisadvantageContext(abbr === 'str' && hasRayOfEnfeebleOn(monsterTargetEffects, monsterName));
     rollAbilityCheck(fullName, mod, context);
   };
 
   const handleSaveThrow = (ability, mod) => rollSavingThrow(saveAbilityAbbr(ability), mod);
 
   const handleSkillCheck = (name, mod) => {
-    const rayDebuffOnMonster = monsterTargetEffects?.some(te => te.target === monsterName && te.effect === 'ray_of_enfeeble_debuff');
-    const isAthletics = name === 'Athletics';
-    const context = isAthletics && rayDebuffOnMonster ? { forcedMode: 'disadvantage' } : undefined;
+    const context = rayDisadvantageContext(name === 'Athletics' && hasRayOfEnfeebleOn(monsterTargetEffects, monsterName));
     rollSkillCheck(name, mod, context);
   };
 

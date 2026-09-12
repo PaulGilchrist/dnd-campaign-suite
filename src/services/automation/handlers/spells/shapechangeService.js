@@ -151,26 +151,28 @@ function revertShapechangeTempHp(targetName, campaignName) {
     }
 }
 
+function revertShapechangeCreature(cs, targetName) {
+    if (!cs?.creatures) return { changed: false, caster: null };
+    const creature = cs.creatures.find(c => c.name === targetName);
+    if (!creature?.shapechangeSource) return { changed: false, caster: null };
+
+    const caster = creature.shapechangeSource;
+    const original = creature.shapechangeOriginal || {};
+    creature.maxHp = original.maxHp;
+    creature.ac = original.ac;
+    if (original.speed !== undefined) creature.speed = original.speed;
+    delete creature.shapechangeSource;
+    delete creature.shapechangeOriginal;
+    delete creature.shapechangeForm;
+    delete creature.formName;
+    return { changed: true, caster };
+}
+
 export function revertShapechange(targetName, campaignName) {
     const cs = getCombatSummary(campaignName);
-    let shapechangeCaster = null;
-    let changed = false;
+    const { changed, caster } = revertShapechangeCreature(cs, targetName);
+    let shapechangeCaster = caster;
 
-    if (cs?.creatures) {
-        const creature = cs.creatures.find(c => c.name === targetName);
-        if (creature?.shapechangeSource) {
-            shapechangeCaster = creature.shapechangeSource;
-            const original = creature.shapechangeOriginal || {};
-            creature.maxHp = original.maxHp;
-            creature.ac = original.ac;
-            if (original.speed !== undefined) creature.speed = original.speed;
-            delete creature.shapechangeSource;
-            delete creature.shapechangeOriginal;
-            delete creature.shapechangeForm;
-            delete creature.formName;
-            changed = true;
-        }
-    }
     if (changed && cs) {
         storage.set('combatSummary', cs, campaignName);
         setCombatSummaryCache(cs, campaignName);

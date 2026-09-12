@@ -77,18 +77,18 @@ export default function useCharActionsModalHandlers({
 
     async function handleRallyChoiceConfirm(targetName, modalData) {
         if (!targetName || !modalData) return;
-        const result = await executeRallyChoice(
-            {
+        const result = await executeRallyChoice({
+            action: {
                 dieValue: modalData.dieValue,
                 maneuverName: modalData.maneuverName,
             },
-            modalData.playerStats,
-            modalData.campaignName,
-            targetName,
-            modalData.totalHp,
-            modalData.extraHp,
-            modalData.description
-        );
+            playerStats: modalData.playerStats,
+            campaignName: modalData.campaignName,
+            chosenName: targetName,
+            totalHp: modalData.totalHp,
+            extraHp: modalData.extraHp,
+            description: modalData.description,
+        });
         if (result.payload) {
             setPopupHtml(result.payload);
         }
@@ -142,8 +142,8 @@ export default function useCharActionsModalHandlers({
 
     async function handleMassHealConfirm(distribution) {
         if (!distribution || !modalState.massHealModal) return;
-        const { action, playerStats, campaignName } = modalState.massHealModal;
-        const result = await confirmMassHeal(action, playerStats, campaignName, distribution, modalState.massHealModal.totalPool, modalState.massHealModal.bonusHeal, modalState.massHealModal.bonusDetails);
+        const { action, playerStats, campaignName, totalPool, bonusHeal, bonusDetails } = modalState.massHealModal;
+        const result = await confirmMassHeal({ action, playerStats, campaignName, distribution, totalPool, bonusHeal, bonusDetails });
         if (result?.payload) {
             setPopupHtml(result.payload);
         }
@@ -276,15 +276,16 @@ export default function useCharActionsModalHandlers({
 
     async function handleMantleOfInspirationConfirm(selectedTargets) {
         if (!selectedTargets || !modalState.mantleOfInspirationTarget) return;
-        const result = await confirmMantleOfInspiration(
-            modalState.mantleOfInspirationTarget.action,
-            modalState.mantleOfInspirationTarget.playerStats,
-            modalState.mantleOfInspirationTarget.campaignName,
+        const mantleModal = modalState.mantleOfInspirationTarget;
+        const result = await confirmMantleOfInspiration({
+            action: mantleModal.action,
+            playerStats: mantleModal.playerStats,
+            campaignName: mantleModal.campaignName,
             selectedTargets,
-            modalState.mantleOfInspirationTarget.dieRoll,
-            modalState.mantleOfInspirationTarget.bardicDieSize,
-            modalState.mantleOfInspirationTarget.tempHp
-        );
+            dieRoll: mantleModal.dieRoll,
+            bardicDieSize: mantleModal.bardicDieSize,
+            tempHp: mantleModal.tempHp,
+        });
         if (result?.payload) {
             setPopupHtml(result.payload);
         }
@@ -430,7 +431,7 @@ export default function useCharActionsModalHandlers({
         setModalState({ oceanicGiftTargetModal: null });
         if (!selectedAllyName) return;
         const isDouble = doubleOverride ?? doubleEmanation;
-        const result = await confirmOceanicGift(action, ogPlayerStats, ogCampaignName, selectedAllyName, spellSaveDc, wisMod, isDouble);
+        const result = await confirmOceanicGift({ action, playerStats: ogPlayerStats, campaignName: ogCampaignName, selectedAllyName, spellSaveDc, wisMod, doubleEmanation: isDouble });
         if (!result) return;
         if (result.type === 'popup') {
             setPopupHtml(result.payload);

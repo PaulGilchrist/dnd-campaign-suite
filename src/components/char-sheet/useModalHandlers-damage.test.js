@@ -102,13 +102,13 @@ describe('useModalHandlers - damage type handlers', () => {
             handleDivineFuryDamageType('Radiant');
             expect(deps.setModalState).toHaveBeenCalledWith({ divineFuryChoice: null });
             expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
-            expect(deps.proceedWithDamage).toHaveBeenCalledWith(
-                expect.any(Object),
-                '1d8 + 1d8 [radiant]',
-                9,
-                [5, 4],
-                0
-            );
+            expect(deps.proceedWithDamage).toHaveBeenCalledWith({
+                attack: expect.any(Object),
+                formula: '1d8 + 1d8 [radiant]',
+                total: 9,
+                rolls: [5, 4],
+                modifier: 0,
+            });
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestFighter',
                 '_divineFuryUsedRound',
@@ -150,13 +150,13 @@ describe('useModalHandlers - damage type handlers', () => {
                 3,
                 'test-campaign'
             );
-            expect(deps.proceedWithDamage).toHaveBeenLastCalledWith(
-                expect.any(Object),
-                '2d6 + 1d6 [thunder]',
-                10,
-                [3, 4, 3],
-                1
-            );
+            expect(deps.proceedWithDamage).toHaveBeenLastCalledWith({
+                    attack: expect.any(Object),
+                    formula: '2d6 + 1d6 [thunder]',
+                    total: 10,
+                    rolls: [3, 4, 3],
+                    modifier: 1,
+                });
         });
     });
 
@@ -178,13 +178,13 @@ describe('useModalHandlers - damage type handlers', () => {
             handleDivineFurySkip();
             expect(deps.setModalState).toHaveBeenCalledWith({ divineFuryChoice: null });
             expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
-            expect(deps.proceedWithDamage).toHaveBeenCalledWith(
-                { name: 'Fury of the Gods' },
-                '1d8+3',
-                10,
-                [5, 5],
-                3
-            );
+            expect(deps.proceedWithDamage).toHaveBeenCalledWith({
+                attack: { name: 'Fury of the Gods' },
+                formula: '1d8+3',
+                total: 10,
+                rolls: [5, 5],
+                modifier: 3,
+            });
             expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
@@ -233,13 +233,13 @@ describe('useModalHandlers - damage type handlers', () => {
                 1,
                 'test-campaign'
             );
-            expect(deps.proceedWithDamage).toHaveBeenCalledWith(
-                expect.any(Object),
-                '1d8 + 1d8 [thunder]',
-                9,
-                [5, 4],
-                0
-            );
+            expect(deps.proceedWithDamage).toHaveBeenCalledWith({
+                attack: expect.any(Object),
+                formula: '1d8 + 1d8 [thunder]',
+                total: 9,
+                rolls: [5, 4],
+                modifier: 0,
+            });
             expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
         });
 
@@ -259,13 +259,13 @@ describe('useModalHandlers - damage type handlers', () => {
             const { handleGenericDamageTypeChoice } = useModalHandlers(deps);
             handleGenericDamageTypeChoice('Fire');
             expect(deps.setModalState).toHaveBeenCalledWith({ damageTypeChoice: null });
-            expect(deps.proceedWithDamage).toHaveBeenCalledWith(
-                expect.any(Object),
-                '1d6 + 1d6 [fire]',
-                8,
-                [5, 3],
-                0
-            );
+            expect(deps.proceedWithDamage).toHaveBeenCalledWith({
+                attack: expect.any(Object),
+                formula: '1d6 + 1d6 [fire]',
+                total: 8,
+                rolls: [5, 3],
+                modifier: 0,
+            });
             expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
             expect(setRuntimeValue).not.toHaveBeenCalled();
         });
@@ -311,13 +311,13 @@ describe('useModalHandlers - damage type handlers', () => {
             handleGenericDamageTypeSkip();
             expect(deps.setModalState).toHaveBeenCalledWith({ damageTypeChoice: null });
             expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
-            expect(deps.proceedWithDamage).toHaveBeenCalledWith(
-                { name: 'Extra Damage' },
-                '1d6',
-                5,
-                [5],
-                0
-            );
+            expect(deps.proceedWithDamage).toHaveBeenCalledWith({
+                attack: { name: 'Extra Damage' },
+                formula: '1d6',
+                total: 5,
+                rolls: [5],
+                modifier: 0,
+            });
         });
 
         it('returns early when no pending damage', () => {
@@ -371,13 +371,13 @@ describe('useModalHandlers - damage type handlers', () => {
             const { handleDamageTypeModifierChoice } = useModalHandlers(deps);
             handleDamageTypeModifierChoice('Force');
             expect(deps.pendingDamage.attack.damageType).toBe('force');
-            expect(deps.proceedWithDamage).toHaveBeenCalledWith(
-                deps.pendingDamage.attack,
-                '1d12+3 [force] + 3d6 [fire]',
-                31,
-                [31],
-                3
-            );
+            expect(deps.proceedWithDamage).toHaveBeenCalledWith({
+                attack: deps.pendingDamage.attack,
+                formula: '1d12+3 [force] + 3d6 [fire]',
+                total: 31,
+                rolls: [31],
+                modifier: 3,
+            });
         });
 
         it('returns early when no pending damage', () => {
@@ -508,13 +508,13 @@ describe('useModalHandlers - damage type handlers', () => {
             handleEnhancedUnarmedChoice('Damage Bonus');
             expect(deps.setModalState).toHaveBeenCalledWith({ damageTypeChoice: null });
             expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
-            expect(deps.proceedWithDamage).toHaveBeenCalledWith(
-                expect.any(Object),
-                expect.stringContaining('1d4'),
-                expect.any(Number),
-                expect.any(Array),
-                null
-            );
+            expect(deps.proceedWithDamage).toHaveBeenCalledWith({
+                attack: expect.any(Object),
+                formula: expect.stringContaining('1d4'),
+                total: expect.any(Number),
+                rolls: expect.any(Array),
+                modifier: null,
+            });
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestFighter',
                 '_Unarmed_Fighting_usedRound',
@@ -542,13 +542,13 @@ describe('useModalHandlers - damage type handlers', () => {
             handleEnhancedUnarmedChoice('Other Option');
             expect(deps.setModalState).toHaveBeenCalledWith({ damageTypeChoice: null });
             expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
-            expect(deps.proceedWithDamage).toHaveBeenCalledWith(
-                expect.any(Object),
-                '1d4',
-                5,
-                [5],
-                null
-            );
+            expect(deps.proceedWithDamage).toHaveBeenCalledWith({
+                attack: expect.any(Object),
+                formula: '1d4',
+                total: 5,
+                rolls: [5],
+                modifier: null,
+            });
             expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
@@ -570,13 +570,13 @@ describe('useModalHandlers - damage type handlers', () => {
             const { handleEnhancedUnarmedChoice } = useModalHandlers(deps);
             handleEnhancedUnarmedChoice('Nonexistent Option');
             expect(deps.setModalState).toHaveBeenCalledWith({ damageTypeChoice: null });
-            expect(deps.proceedWithDamage).toHaveBeenCalledWith(
-                expect.any(Object),
-                '1d4',
-                5,
-                [5],
-                null
-            );
+            expect(deps.proceedWithDamage).toHaveBeenCalledWith({
+                attack: expect.any(Object),
+                formula: '1d4',
+                total: 5,
+                rolls: [5],
+                modifier: null,
+            });
             expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
@@ -599,13 +599,13 @@ describe('useModalHandlers - damage type handlers', () => {
             const { handleEnhancedUnarmedChoice } = useModalHandlers(deps);
             handleEnhancedUnarmedChoice('Damage Bonus');
             expect(deps.setModalState).toHaveBeenCalledWith({ damageTypeChoice: null });
-            expect(deps.proceedWithDamage).toHaveBeenCalledWith(
-                expect.any(Object),
-                '1d4',
-                5,
-                [5],
-                null
-            );
+            expect(deps.proceedWithDamage).toHaveBeenCalledWith({
+                attack: expect.any(Object),
+                formula: '1d4',
+                total: 5,
+                rolls: [5],
+                modifier: null,
+            });
             expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
@@ -636,13 +636,13 @@ describe('useModalHandlers - damage type handlers', () => {
             rollExpression.mockReturnValue({ total: 3, rolls: [3], modifier: 0 });
             const { handleEnhancedUnarmedChoice } = useModalHandlers(deps);
             handleEnhancedUnarmedChoice('Damage Bonus');
-            expect(deps.proceedWithDamage).toHaveBeenLastCalledWith(
-                expect.any(Object),
-                expect.stringContaining('1d4'),
-                8,
-                [5, 3],
-                'some-rider-value'
-            );
+            expect(deps.proceedWithDamage).toHaveBeenLastCalledWith({
+                    attack: expect.any(Object),
+                    formula: expect.stringContaining('1d4'),
+                    total: 8,
+                    rolls: [5, 3],
+                    modifier: 'some-rider-value',
+                });
         });
     });
 

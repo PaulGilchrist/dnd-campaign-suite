@@ -11,7 +11,7 @@
 import { pick } from './rng.js';
 import { rectCenter } from './bspTree.js';
 
-export function placeItems(rooms, placedItems, gridSize, rng, grid, trimmedDoors, corridorCells) {
+export function placeItems({ rooms, placedItems, gridSize, rng, grid, trimmedDoors, corridorCells }) {
   const npcNames = ['Goblin', 'Skeleton', 'Orc', 'Bandit', 'Spider', 'Zombie'];
   const npcRots = [0, 90, 180, 270];
 

@@ -65,23 +65,14 @@ function withRayReduction(applyResult, rayReduction) {
     return rayReduction > 0 ? { ...applyResult, rayOfEnfeebleReduction: rayReduction } : applyResult;
 }
 
-async function rollAndApplySecondaryPlainDamage({ context, combatSummary, target, reducedTotal, damageType, ignoreResistance, rayReduction, characters, campaignName, characterName, name }) {
-    if (!context?.autoDamageSecondaryFormula) {
-        const primaryApplyResult = await applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: characterName, suppressHpLog: true });
-        return { applyResult: withRayReduction(primaryApplyResult, rayReduction), secondaryResult: null, secondaryFinalDamage: 0 };
-    }
-    const secondaryFormula = context.autoDamageSecondaryFormula;
-    const secondaryName = context.autoDamageSecondaryName || name;
-    const secondaryDamageType = context.autoDamageSecondaryDamageType;
+async function rollAndApplySecondaryDamage({ combatSummary, target, context, secondaryFormula, secondaryName, secondaryDamageType, damageSequenceId, campaignName, characters, characterName }) {
     const secondaryRollResult = context?.isAutoCrit ? rollExpressionDoubled(secondaryFormula) : rollExpression(secondaryFormula);
-    if (!secondaryRollResult) return { applyResult: null, secondaryResult: null, secondaryFinalDamage: 0 };
+    if (!secondaryRollResult) return null;
 
-    let secondaryTotal = computeGwfAdjustedSecondaryTotal(secondaryRollResult, context?.playerStats, secondaryDamageType);
+    const secondaryTotal = computeGwfAdjustedSecondaryTotal(secondaryRollResult, context?.playerStats, secondaryDamageType);
     const secondaryRawDamage = secondaryTotal;
     const secondaryIgnoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, secondaryDamageType)) || false;
-    const damageSequenceId = `seq_${Date.now()}_${Math.random()}`;
-    const multiAttackOptions = { damageSequenceId };
-    const secondaryApplyResultData = await applyDamageToTarget(combatSummary, target.name, secondaryRawDamage, [secondaryDamageType], campaignName, characters, { ignoreResistance: secondaryIgnoreResistance, attackerName: characterName, suppressHpLog: true, ...{ ...multiAttackOptions, skipConcentration: true } });
+    const secondaryApplyResultData = await applyDamageToTarget(combatSummary, target.name, secondaryRawDamage, [secondaryDamageType], campaignName, characters, { ignoreResistance: secondaryIgnoreResistance, attackerName: characterName, suppressHpLog: true, damageSequenceId, skipConcentration: true });
     const secondaryFinalDamage = secondaryApplyResultData?.finalDamage ?? secondaryRawDamage;
     if (secondaryApplyResultData && secondaryApplyResultData.finalDamage > 0) {
         endInvisibilityOnHostileAction(characterName, campaignName);
@@ -96,11 +87,25 @@ async function rollAndApplySecondaryPlainDamage({ context, combatSummary, target
         finalDamage: secondaryFinalDamage,
         resistanceDetails: secondaryApplyResultData?.resistanceDetails || [],
     };
+    return { secondaryResult, secondaryFinalDamage };
+}
 
-    const totalConcentrationDamage = reducedTotal + secondaryRawDamage;
-    const primaryApplyResult = await applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: characterName, suppressHpLog: true, ...{ ...multiAttackOptions, concentrationTotalDamage: totalConcentrationDamage } });
+async function rollAndApplySecondaryPlainDamage({ context, combatSummary, target, reducedTotal, damageType, ignoreResistance, rayReduction, characters, campaignName, characterName, name }) {
+    if (!context?.autoDamageSecondaryFormula) {
+        const primaryApplyResult = await applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: characterName, suppressHpLog: true });
+        return { applyResult: withRayReduction(primaryApplyResult, rayReduction), secondaryResult: null, secondaryFinalDamage: 0 };
+    }
+    const secondaryFormula = context.autoDamageSecondaryFormula;
+    const secondaryName = context.autoDamageSecondaryName || name;
+    const secondaryDamageType = context.autoDamageSecondaryDamageType;
+    const damageSequenceId = `seq_${Date.now()}_${Math.random()}`;
+    const secondaryOutcome = await rollAndApplySecondaryDamage({ combatSummary, target, context, secondaryFormula, secondaryName, secondaryDamageType, damageSequenceId, campaignName, characters, characterName });
+    if (!secondaryOutcome) return { applyResult: null, secondaryResult: null, secondaryFinalDamage: 0 };
+
+    const totalConcentrationDamage = reducedTotal + secondaryOutcome.secondaryResult.total;
+    const primaryApplyResult = await applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: characterName, suppressHpLog: true, damageSequenceId, concentrationTotalDamage: totalConcentrationDamage });
     clearReTriggeredSequence(damageSequenceId);
-    return { applyResult: withRayReduction(primaryApplyResult, rayReduction), secondaryResult, secondaryFinalDamage };
+    return { applyResult: withRayReduction(primaryApplyResult, rayReduction), secondaryResult: secondaryOutcome.secondaryResult, secondaryFinalDamage: secondaryOutcome.secondaryFinalDamage };
 }
 
 function waitForSaveResult(promptId) {

@@ -116,7 +116,7 @@ function resolveDispelCheckBonus(spell, playerStats, metaCtx, profBonus) {
     return { spellBreaker, totalCheckBonus: abilityMod + breakerBonus };
 }
 
-function logDispelCheck(campaignName, playerStats, targetName, d20, totalCheckBonus, total, targetDC, checkFailed) {
+function logDispelCheck({ campaignName, playerStats, targetName, d20, totalCheckBonus, total, targetDC, checkFailed }) {
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,
@@ -171,7 +171,7 @@ async function triggerDispelMagic(metaCtx, spell, playerStats, campaignName, _ma
     const total = d20 + totalCheckBonus;
     const checkFailed = total < targetDC;
 
-    logDispelCheck(campaignName, playerStats, targetName, d20, totalCheckBonus, total, targetDC, checkFailed);
+    logDispelCheck({ campaignName, playerStats, targetName, d20, totalCheckBonus, total, targetDC, checkFailed });
 
     if (checkFailed) {
         refundDispelSpellBreakerSlot(spellBreaker, spell, metaCtx, playerStats, spellLevel, campaignName);
@@ -509,7 +509,7 @@ function resolveIgnoreResistance(playerStats) {
     return passives.some(p => p.type === 'auto_effect' && p.effect === 'ignore_resistance');
 }
 
-function applyMissileDamage(combatSummary, targetName, totalTargetDamage, damageType, campaignName, characters, casterName, playerStats) {
+function applyMissileDamage({ combatSummary, targetName, totalTargetDamage, damageType, campaignName, characters, casterName, playerStats }) {
     const isShieldActive = getRuntimeValue(targetName, 'activeBuffs', campaignName)?.some(b => b.effect === 'shield');
     if (isShieldActive) {
         return { finalDamage: 0, damageReduced: true, isShieldActive };
@@ -526,7 +526,7 @@ function applyMissileDamage(combatSummary, targetName, totalTargetDamage, damage
     };
 }
 
-function logMagicMissileSpell(campaignName, casterName, spell, slotLevel, numMissiles, missileDamage, damageType, logEntries) {
+function logMagicMissileSpell({ campaignName, casterName, spell, slotLevel, numMissiles, missileDamage, damageType, logEntries }) {
     const allMissileDamage = logEntries.reduce((sum, e) => sum + e.total, 0);
     const allFinalDamage = logEntries.reduce((sum, e) => sum + e.finalDamage, 0);
     rollExpression(`${numMissiles}× ${missileDamage}`);
@@ -573,7 +573,7 @@ async function executeMagicMissile(spell, metaCtx, { rollDamage, playerStats, ge
         const { missileRolls, totalTargetDamage } = rollTargetMissiles(missileDamage, missileCount);
         if (totalTargetDamage <= 0) continue;
 
-        const { finalDamage, damageReduced, isShieldActive } = applyMissileDamage(combatSummary, targetName, totalTargetDamage, damageType, campaignName, characters, casterName, playerStats);
+        const { finalDamage, damageReduced, isShieldActive } = applyMissileDamage({ combatSummary, targetName, totalTargetDamage, damageType, campaignName, characters, casterName, playerStats });
 
         const missileFormula = missileCount === 1 ? missileDamage : `${missileCount}× ${missileDamage}`;
 
@@ -603,7 +603,7 @@ async function executeMagicMissile(spell, metaCtx, { rollDamage, playerStats, ge
     }
 
     if (logEntries.length > 0) {
-        logMagicMissileSpell(campaignName, casterName, spell, slotLevel, numMissiles, missileDamage, damageType, logEntries);
+        logMagicMissileSpell({ campaignName, casterName, spell, slotLevel, numMissiles, missileDamage, damageType, logEntries });
     }
 }
 

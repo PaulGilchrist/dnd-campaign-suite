@@ -427,6 +427,13 @@ function SummaryProficiencyColumn({ playerStats, ctx, exhaustionLevel, effective
     );
 }
 
+function readBadgeCreatures(campaignName, playerName) {
+    const rawCreaturesForBadges = getCombatSummary(campaignName)?.creatures;
+    const allCreaturesForBadges = rawCreaturesForBadges || [];
+    const concentrationForBadges = allCreaturesForBadges.find(c => c.name === playerName)?.concentration ?? null;
+    return { rawCreaturesForBadges, allCreaturesForBadges, concentrationForBadges };
+}
+
 function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters, onLongRest, exhaustionLevel, conditionEffects, onConditionsChange, auraComboEffects }) {
     const { setPopupHtml } = useDiceRollPopup();
     const { rollInitiative } = useLoggedDiceRoll(playerStats.name, campaignName, { characters });
@@ -476,13 +483,13 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const coverRefreshCampaign = useSyncedState('campaign', 'coverRefresh', 0, campaignName);
     void [coverRefresh, bulwarkOfForceActive, naturesSanctuaryActive, bulwarkOfForceTargets, naturesSanctuaryCreatures, mantleOfMajestyActive, unbreakableMajestyActive, coverRefreshCampaign];
 
-    const { current: hasInspiration, update: setHasInspiration } = useTrackedResource(
-        'hasInspiration',
-        playerStats.name,
-        () => false,
-        [playerStats],
+    const { current: hasInspiration, update: setHasInspiration } = useTrackedResource({
+        storageKey: 'hasInspiration',
+        playerName: playerStats.name,
+        maxGetter: () => false,
+        deps: [playerStats],
         campaignName
-    );
+    });
     const handleToggleInspiration = () => {
         const newValue = !hasInspiration;
         setHasInspiration(newValue);
@@ -528,11 +535,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const rawConditionMeta = useRuntimeValue(playerStats.name, 'activeConditionMeta');
     const conditionObjects = React.useMemo(() => buildConditionObjects(rawConditions, rawConditionMeta), [rawConditions, rawConditionMeta]);
 
-    const rawCombatSummary = getCombatSummary(campaignName);
-    const rawCreaturesForBadges = rawCombatSummary?.creatures;
-    const allCreaturesForBadges = rawCreaturesForBadges || [];
-    const playerCreatureForBadges = allCreaturesForBadges.find(c => c.name === playerStats.name);
-    const concentrationForBadges = playerCreatureForBadges?.concentration ?? null;
+    const { rawCreaturesForBadges, allCreaturesForBadges, concentrationForBadges } = readBadgeCreatures(campaignName, playerStats.name);
     const wildShapeActiveChar = isBuffActive(playerStats.name, 'Wild Shape', campaignName);
     const isMajestyActiveChar = isUnbreakableMajestyActive(playerStats.name, campaignName);
     const majestyDcChar = isMajestyActiveChar ? getUnbreakableMajestySaveDc(playerStats.name, campaignName) : 0;

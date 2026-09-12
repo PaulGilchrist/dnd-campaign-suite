@@ -8,6 +8,17 @@ import './CharSummary.css'
 
 const EMPTY_TRACK = [false, false, false]
 
+function LastRollResult({ lastRoll }) {
+    return (
+        <div className={`death-saves-result ${lastRoll.success ? 'death-saves-result--success' : 'death-saves-result--failure'}`}>
+            <span className="death-saves-roll-value">({lastRoll.roll})</span>
+            {lastRoll.isNat1 && <span className="death-saves-nat death-saves-nat--1">NAT 1</span>}
+            {lastRoll.isNat20 && <span className="death-saves-nat death-saves-nat--20">NAT 20</span>}
+            <span className="death-saves-result-label">{lastRoll.success ? 'Success' : 'Failure'}</span>
+        </div>
+    )
+}
+
 function DeathSavingThrows({ playerStats, campaignName, isLocalhost }) {
     const name = playerStats.name
     const storedSaves = useRuntimeValue(name, 'deathSaves', campaignName)
@@ -74,8 +85,9 @@ function DeathSavingThrows({ playerStats, campaignName, isLocalhost }) {
 
         const totalSuccesses = result.newSaves.filter(Boolean).length;
         const totalFailures = result.newFailures.filter(Boolean).length;
+        const isSuccess = result.result === 'success' || result.result === 'nat20' || result.result === 'stable';
 
-        setLastRoll({ roll: result.roll, success: result.result === 'success' || result.result === 'nat20' || result.result === 'stable', isNat20: result.isNat20, isNat1: result.isNat1 });
+        setLastRoll({ roll: result.roll, success: isSuccess, isNat20: result.isNat20, isNat1: result.isNat1 });
         setTimeout(() => setLastRoll(null), 2000);
 
         logEntry({
@@ -86,7 +98,7 @@ function DeathSavingThrows({ playerStats, campaignName, isLocalhost }) {
             hasAdvantage: result.rolls?.length === 2,
             isNatural20: result.isNat20,
             isNatural1: result.isNat1,
-            success: result.result === 'success' || result.result === 'nat20' || result.result === 'stable',
+            success: isSuccess,
             totalSuccesses,
             totalFailures,
         });
@@ -157,14 +169,7 @@ function DeathSavingThrows({ playerStats, campaignName, isLocalhost }) {
                     </div>
                 </div>
             )}
-            {lastRoll && (
-                <div className={`death-saves-result ${lastRoll.success ? 'death-saves-result--success' : 'death-saves-result--failure'}`}>
-                    <span className="death-saves-roll-value">({lastRoll.roll})</span>
-                    {lastRoll.isNat1 && <span className="death-saves-nat death-saves-nat--1">NAT 1</span>}
-                    {lastRoll.isNat20 && <span className="death-saves-nat death-saves-nat--20">NAT 20</span>}
-                    <span className="death-saves-result-label">{lastRoll.success ? 'Success' : 'Failure'}</span>
-                </div>
-            )}
+            {lastRoll && <LastRollResult lastRoll={lastRoll} />}
             <div className="death-saves-track">
                 <span className="death-saves-label">Successes: </span>
                 {saves.map((s, i) => (

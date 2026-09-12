@@ -75,10 +75,11 @@ function computeNeedsTwinTarget(hasTwinned, creatureTargets, twinTarget) {
 }
 
 export default function MetamagicPopup({ spell, playerStats, campaignName, onConfirm, onSkip }) {
+  const playerStatsName = playerStats?.name;
   const spellLevel = spell?.level || 0;
   const currentSP = Number(playerStats._metamagicCurrentSP) || 0;
   const options = getPreCastOptions(playerStats, currentSP, spellLevel);
-  const maxPerSpell = getMaxMetamagicPerSpell(playerStats, playerStats?.name);
+  const maxPerSpell = getMaxMetamagicPerSpell(playerStats, playerStatsName);
   const isPsionicSpell = !!playerStats._isPsionicSpell;
   const psionicCost = Number(playerStats._psionicCost) || 0;
 
@@ -87,8 +88,8 @@ export default function MetamagicPopup({ spell, playerStats, campaignName, onCon
   const [psionicActive, setPsionicActive] = useState(false);
   const creatureTargets = getCreatureTargets(campaignName);
 
-  const apotheosisActive = hasArcaneApotheosis(playerStats, playerStats?.name);
-  const { totalCost, waivedName } = computeMetamagicCost(selected, options, playerStats, playerStats?.name);
+  const apotheosisActive = hasArcaneApotheosis(playerStats, playerStatsName);
+  const { totalCost, waivedName } = computeMetamagicCost(selected, options, playerStats, playerStatsName);
 
   const { grandTotalCost, remainingAfter, canAffordGrand, psionicAffordable } = computePsionicState({ psionicActive, psionicCost, totalCost, currentSP });
   const canSelectMore = selected.length < maxPerSpell;
@@ -147,7 +148,7 @@ export default function MetamagicPopup({ spell, playerStats, campaignName, onCon
   const isAffordable = (opt) => {
        if (apotheosisActive) {
            const nextSelection = selected.includes(opt.name) ? [...selected] : [...selected, opt.name];
-           return computeMetamagicCost(nextSelection, options, playerStats, playerStats?.name).totalCost + (psionicActive ? psionicCost : 0) <= currentSP;
+           return computeMetamagicCost(nextSelection, options, playerStats, playerStatsName).totalCost + (psionicActive ? psionicCost : 0) <= currentSP;
          }
     const costSoFar = selected
        .filter(n => n !== opt.name)

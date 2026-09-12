@@ -179,6 +179,10 @@ function buildDualWielderAttack(offHandWeapon, offMagicBonus, bonus, abilityName
  * @param {Object} ctx
  * @returns {Object[]}
  */
+function isDuelingStyle(fightingStyles2024, meleeCount, rangedCount) {
+    return fightingStyles2024.includes('Dueling') && meleeCount === 1 && rangedCount === 0;
+}
+
 function buildMeleeAttacks(ctx) {
     const { allEquipment, playerStats, fightingStyles2024, rangedCount } = ctx;
     const attacks = [];
@@ -188,7 +192,7 @@ function buildMeleeAttacks(ctx) {
     const bonus = Math.max(ctx.strength.bonus, ctx.dexterity.bonus);
     const abilityName = ctx.strength.bonus > ctx.dexterity.bonus ? 'Strength' : 'Dexterity';
     const duelCtx = { ...ctx, bonus, abilityName };
-    const isDueling = fightingStyles2024.includes('Dueling') && meleeWeaponNames.length === 1 && rangedCount === 0;
+    const isDueling = isDuelingStyle(fightingStyles2024, meleeWeaponNames.length, rangedCount);
 
     // Separate non-light and light melee weapons
     const nonLightMelee = meleeWeaponNames.filter(name => {
@@ -381,9 +385,10 @@ function findSwiftQuiverBow(allEquipment, equippedWeapons) {
 }
 
 function resolveSwiftQuiverStats(bowWeapon, dexMod, proficiency) {
-    const rawRange = bowWeapon?.weapon?.range?.long || bowWeapon?.weapon?.range?.normal || '80_ft';
-    const damageDie = bowWeapon?.weapon?.damage?.damage_dice || '1d8';
-    const damageType = bowWeapon?.weapon?.damage?.damage_type || 'Piercing';
+    const weapon = bowWeapon?.weapon;
+    const rawRange = weapon?.range?.long || weapon?.range?.normal || '80_ft';
+    const damageDie = weapon?.damage?.damage_dice || '1d8';
+    const damageType = weapon?.damage?.damage_type || 'Piercing';
     return {
         range: rawRange.replace(/_ft$/, '').replace(/_ft/g, ' ft'),
         damageType,

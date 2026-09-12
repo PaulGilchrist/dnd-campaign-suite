@@ -201,7 +201,7 @@ async function applyDeflectHeal({ cs, actualHeal, playerName, campaignName, play
         healedAmount = healResult?.actualHeal ?? 0;
     }
     if (healedAmount > 0) {
-        await logDeflectHeal(playerName, campaignName, playerStats, featureName, healedAmount, reductionRoll, totalDamage);
+        await logDeflectHeal({ playerName, campaignName, playerStats, featureName, healedAmount, reductionRoll, totalDamage });
     }
     return healedAmount;
 }
@@ -285,7 +285,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
-async function logDeflectHeal(playerName, campaignName, playerStats, featureName, healedAmount, reductionRoll, totalDamage) {
+async function logDeflectHeal({ playerName, campaignName, playerStats, featureName, healedAmount, reductionRoll, totalDamage }) {
     const currentHp = getRuntimeValue(playerName, 'currentHitPoints', campaignName) ?? playerStats.computedStats?.currentHp ?? 0;
     const maxHp = getRuntimeValue(playerName, 'hitPoints', campaignName) ?? playerStats.computedStats?.maxHp ?? 0;
     await addEntry(campaignName, {
@@ -503,19 +503,7 @@ async function handleZeroOnSuccess(action, playerStats, campaignName) {
         timestamp: Date.now(),
     }).catch((e) => { console.error("[interveneShield] Error logging:", e); });
 
-    if (actualHeal > 0) {
-        const currentHp = getRuntimeValue(playerName, 'currentHitPoints', campaignName) ?? playerStats.computedStats?.currentHp ?? 0;
-        const maxHp = getRuntimeValue(playerName, 'hitPoints', campaignName) ?? playerStats.computedStats?.maxHp ?? 0;
-        await addEntry(campaignName, {
-            type: 'hp_change',
-            targetName: playerName,
-            delta: actualHeal,
-            currentHp,
-            maxHp,
-            isHealing: true,
-            abilityName: featureName,
-        }).catch((e) => { console.error("[interveneShield] Error logging heal:", e); });
-    }
+    await logInterveneShieldHeal(campaignName, playerName, playerStats, featureName, actualHeal);
 
     return {
         type: 'popup',
@@ -527,4 +515,19 @@ async function handleZeroOnSuccess(action, playerStats, campaignName) {
             automation: auto,
         },
     };
+}
+
+async function logInterveneShieldHeal(campaignName, playerName, playerStats, featureName, actualHeal) {
+    if (actualHeal <= 0) return;
+    const currentHp = getRuntimeValue(playerName, 'currentHitPoints', campaignName) ?? playerStats.computedStats?.currentHp ?? 0;
+    const maxHp = getRuntimeValue(playerName, 'hitPoints', campaignName) ?? playerStats.computedStats?.maxHp ?? 0;
+    await addEntry(campaignName, {
+        type: 'hp_change',
+        targetName: playerName,
+        delta: actualHeal,
+        currentHp,
+        maxHp,
+        isHealing: true,
+        abilityName: featureName,
+    }).catch((e) => { console.error("[interveneShield] Error logging heal:", e); });
 }

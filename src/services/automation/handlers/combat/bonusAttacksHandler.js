@@ -162,7 +162,7 @@ function buildFlurryTargetSnapshots(cs, playerName) {
     return targetSnapshots;
 }
 
-async function applyFlurryAttackDamage(cs, targetName, damageFormula, damageType, isCrit, campaignName, playerName) {
+async function applyFlurryAttackDamage({ cs, targetName, damageFormula, damageType, isCrit, campaignName, playerName }) {
     const rollFn = isCrit ? rollExpressionDoubled : rollExpression;
     const rollResult = rollFn(damageFormula);
     const rawDamage = rollResult?.total || 0;
@@ -301,7 +301,7 @@ async function resolveFlurryHitStrike(ctx) {
         flurryHealingHarmUses = outcome.flurryHealingHarmUses;
         damageResult = outcome.damageResult;
     } else {
-        const outcome = await applyFlurryAttackDamage(cs, targetName, damageFormula, damageType, isCrit, campaignName, playerName);
+        const outcome = await applyFlurryAttackDamage({ cs, targetName, damageFormula, damageType, isCrit, campaignName, playerName });
         damageResult = outcome.damageResult;
         finalDamage = outcome.finalDamage;
         ctx.totalDamageRef.value += finalDamage;
@@ -414,7 +414,22 @@ function attachPendingOpenHandTargets(result, pendingOpenHandTargets) {
     }));
 }
 
-export async function applyFlurryOfBlows(action, playerStats, campaignName, _mapName, distribution, numAttacks, healingTarget = null) {
+function rollFlurryAttackRoll(d20Roll, attackBonus, ac) {
+    const totalAttack = d20Roll + attackBonus;
+    const isCrit = DEBUG_FORCE_CRIT || d20Roll === 20;
+    const isAutoMiss = d20Roll === 1;
+    const hit = isAutoMiss ? false : (totalAttack >= ac);
+    return { totalAttack, isCrit, hit };
+}
+
+function buildFlurryAbilityDesc(playerName, featureName, numAttacks, totalDamage, hasFlurryHealingHarm) {
+    if (hasFlurryHealingHarm) {
+        return `${playerName} used ${featureName} (Flurry of Healing and Harm), making ${numAttacks} strikes. Total damage: ${totalDamage}.`;
+    }
+    return `${playerName} used ${featureName}, making ${numAttacks} unarmed strikes. Total damage dealt: ${totalDamage}.`;
+}
+
+export async function applyFlurryOfBlows({ action, playerStats, campaignName, _mapName, distribution, numAttacks, healingTarget = null }) {
     const playerName = playerStats.name;
     const featureName = action.name;
 
@@ -448,11 +463,7 @@ export async function applyFlurryOfBlows(action, playerStats, campaignName, _map
 
         for (let i = 0; i < attackCount; i++) {
             const d20Roll = rollD20();
-            const totalAttack = d20Roll + attackBonus;
-            const ac = snapshot.ac;
-            const isCrit = DEBUG_FORCE_CRIT || d20Roll === 20;
-            const isAutoMiss = d20Roll === 1;
-            const hit = isAutoMiss ? false : (totalAttack >= ac);
+            const { totalAttack, isCrit, hit } = rollFlurryAttackRoll(d20Roll, attackBonus, snapshot.ac);
 
             let damageResult = null;
 
@@ -472,7 +483,7 @@ export async function applyFlurryOfBlows(action, playerStats, campaignName, _map
                 attackNumber: i + 1,
                 d20Roll,
                 totalAttack,
-                ac,
+                ac: snapshot.ac,
                 hit,
                 isCrit,
                 damageResult,
@@ -486,10 +497,7 @@ export async function applyFlurryOfBlows(action, playerStats, campaignName, _map
         }
     }
 
-    let abilityDesc = `${playerName} used ${featureName}, making ${numAttacks} unarmed strikes. Total damage dealt: ${totalDamageRef.value}.`;
-    if (hasFlurryHealingHarm) {
-        abilityDesc = `${playerName} used ${featureName} (Flurry of Healing and Harm), making ${numAttacks} strikes. Total damage: ${totalDamageRef.value}.`;
-    }
+    const abilityDesc = buildFlurryAbilityDesc(playerName, featureName, numAttacks, totalDamageRef.value, hasFlurryHealingHarm);
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,

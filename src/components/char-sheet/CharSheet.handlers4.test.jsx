@@ -174,7 +174,7 @@ describe('handlePuncture', () => {
       mockCampaignName,
       [],
       { modifier: -1, damageType: 'Piercing' },
-      setPopupHtml,
+        setPopupHtml,
       punctureData
     );
 
@@ -250,7 +250,7 @@ describe('handleSavageAttacker', () => {
       mockCampaignName,
       [],
       { modifier: 0, damageType: 'Slashing' },
-      setPopupHtml,
+        setPopupHtml,
       savageData
     );
 
@@ -281,7 +281,7 @@ describe('handleSavageAttacker', () => {
       mockCampaignName,
       [],
       { modifier: 0, damageType: 'Slashing', finalDamage: 10, targetCurrentHp: 22 },
-      setPopupHtml,
+        setPopupHtml,
       {
         keep: 'reroll',
         originalRolls: [4, 6],
@@ -468,7 +468,7 @@ describe('handleTacticalMind', () => {
       mockPlayerStats,
       mockCampaignName,
       { name: 'Athletics Check', rolls: [15], bonus: 3, tacticalMindDie: 7, tacticalSuccess: true },
-      setPopupHtml
+        setPopupHtml
     );
 
     const { addEntry } = await import('../../services/ui/logService.js');
@@ -487,7 +487,7 @@ describe('handleTacticalMind', () => {
       mockPlayerStats,
       mockCampaignName,
       { name: 'Athletics Check', rolls: [19], bonus: 3, success: true, tacticalMindDie: 7, tacticalSuccess: true },
-      setPopupHtml
+        setPopupHtml
     );
 
     const { addEntry } = await import('../../services/ui/logService.js');
@@ -570,7 +570,7 @@ describe('handleSuperiorityManeuver', () => {
     await handleSuperiorityManeuver(
       mockPlayerStats,
       mockCampaignName,
-      setPopupHtml,
+        setPopupHtml,
       { name: 'Athletics Check', rolls: [15], bonus: 3 },
       'Nonexistent Maneuver',
       8
@@ -590,7 +590,7 @@ describe('handleSuperiorityManeuver', () => {
     await handleSuperiorityManeuver(
       mockPlayerStats,
       mockCampaignName,
-      setPopupHtml,
+        setPopupHtml,
       { name: 'Athletics Check', rolls: [15], bonus: 3 },
       'Pushing Attack',
       8
@@ -616,7 +616,7 @@ describe('handleSuperiorityManeuver', () => {
     await handleSuperiorityManeuver(
       mockPlayerStats,
       mockCampaignName,
-      setPopupHtml,
+        setPopupHtml,
       { name: 'Initiative', rolls: [15], bonus: 3 },
       'Pushing Attack',
       8
@@ -636,7 +636,7 @@ describe('handleSuperiorityManeuver', () => {
     await handleSuperiorityManeuver(
       mockPlayerStats,
       mockCampaignName,
-      setPopupHtml,
+        setPopupHtml,
       { name: 'Athletics Check', rolls: [15], bonus: 3 },
       'Pushing Attack',
       8
@@ -673,14 +673,14 @@ describe('handlePsiBolsteredKnack', () => {
     const { getRuntimeValue, setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
     getRuntimeValue.mockReturnValue(3);
 
-    await handlePsiBolsteredKnack(
-      soulknifeStats,
-      mockCampaignName,
-      failedSkillPopup,
-      5,
-      8,
-      true
-    );
+    await handlePsiBolsteredKnack({
+        playerStats: soulknifeStats,
+        campaignName: mockCampaignName,
+        popupHtml: failedSkillPopup,
+        dieValue: 5,
+        dieSize: 8,
+        success: true
+      });
 
     expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'psionicEnergy', 2, mockCampaignName);
     const { addEntry } = await import('../../services/ui/logService.js');
@@ -692,14 +692,14 @@ describe('handlePsiBolsteredKnack', () => {
     const { getRuntimeValue, setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
     getRuntimeValue.mockReturnValue(3);
 
-    await handlePsiBolsteredKnack(
-      soulknifeStats,
-      mockCampaignName,
-      failedSkillPopup,
-      5,
-      8,
-      false
-    );
+    await handlePsiBolsteredKnack({
+        playerStats: soulknifeStats,
+        campaignName: mockCampaignName,
+        popupHtml: failedSkillPopup,
+        dieValue: 5,
+        dieSize: 8,
+        success: false
+      });
 
     expect(setRuntimeValue).not.toHaveBeenCalledWith('Test Character', 'psionicEnergy', 2, mockCampaignName);
     const { addEntry } = await import('../../services/ui/logService.js');
@@ -712,14 +712,14 @@ describe('handlePsiBolsteredKnack', () => {
     const { getRuntimeValue, setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
     getRuntimeValue.mockReturnValue(0);
 
-    await handlePsiBolsteredKnack(
-      soulknifeStats,
-      mockCampaignName,
-      failedSkillPopup,
-      5,
-      8,
-      true
-    );
+    await handlePsiBolsteredKnack({
+        playerStats: soulknifeStats,
+        campaignName: mockCampaignName,
+        popupHtml: failedSkillPopup,
+        dieValue: 5,
+        dieSize: 8,
+        success: true
+      });
 
     expect(setRuntimeValue).not.toHaveBeenCalled();
     const { addEntry } = await import('../../services/ui/logService.js');
@@ -732,14 +732,14 @@ describe('handlePsiBolsteredKnack', () => {
     const { getRuntimeValue, setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
     getRuntimeValue.mockReturnValue(4);
 
-    await handlePsiBolsteredKnack(
-      soulknifeStats,
-      mockCampaignName,
-      { name: "Thieves' Tools", rollType: 'check', rolls: [2], bonus: 5 },
-      6,
-      10,
-      true
-    );
+    await handlePsiBolsteredKnack({
+        playerStats: soulknifeStats,
+        campaignName: mockCampaignName,
+        popupHtml: { name: "Thieves' Tools", rollType: 'check', rolls: [2], bonus: 5 },
+        dieValue: 6,
+        dieSize: 10,
+        success: true
+      });
 
     expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'psionicEnergy', 3, mockCampaignName);
     const { addEntry } = await import('../../services/ui/logService.js');
@@ -751,15 +751,15 @@ describe('handlePsiBolsteredKnack', () => {
     getRuntimeValue.mockReturnValue(5);
     const setPopupHtml = vi.fn();
 
-    await handlePsiBolsteredKnack(
-      soulknifeStats,
-      mockCampaignName,
-      { name: 'Arcana', rollType: 'skill', rolls: [3], bonus: 0 },
-      4,
-      10,
-      false,
-      setPopupHtml
-    );
+    await handlePsiBolsteredKnack({
+        playerStats: soulknifeStats,
+        campaignName: mockCampaignName,
+        popupHtml: { name: 'Arcana', rollType: 'skill', rolls: [3], bonus: 0 },
+        dieValue: 4,
+        dieSize: 10,
+        success: false,
+        setPopupHtml
+      });
 
     expect(setRuntimeValue).not.toHaveBeenCalled();
     expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
@@ -774,15 +774,15 @@ describe('handlePsiBolsteredKnack', () => {
     getRuntimeValue.mockReturnValue(5);
     const setPopupHtml = vi.fn();
 
-    await handlePsiBolsteredKnack(
-      soulknifeStats,
-      mockCampaignName,
-      { name: 'Intelligence', rollType: 'check', rolls: [8], bonus: -1 },
-      4,
-      10,
-      false,
-      setPopupHtml
-    );
+    await handlePsiBolsteredKnack({
+        playerStats: soulknifeStats,
+        campaignName: mockCampaignName,
+        popupHtml: { name: 'Intelligence', rollType: 'check', rolls: [8], bonus: -1 },
+        dieValue: 4,
+        dieSize: 10,
+        success: false,
+        setPopupHtml
+      });
 
     expect(setRuntimeValue).not.toHaveBeenCalled();
     expect(setPopupHtml).toHaveBeenCalled();
@@ -793,15 +793,15 @@ describe('handlePsiBolsteredKnack', () => {
     getRuntimeValue.mockReturnValue(5);
     const setPopupHtml = vi.fn();
 
-    await handlePsiBolsteredKnack(
-      soulknifeStats,
-      mockCampaignName,
-      { name: 'Athletics', rollType: 'skill', rolls: [15], bonus: 3, success: true },
-      4,
-      10,
-      true,
-      setPopupHtml
-    );
+    await handlePsiBolsteredKnack({
+        playerStats: soulknifeStats,
+        campaignName: mockCampaignName,
+        popupHtml: { name: 'Athletics', rollType: 'skill', rolls: [15], bonus: 3, success: true },
+        dieValue: 4,
+        dieSize: 10,
+        success: true,
+        setPopupHtml
+      });
 
     expect(setRuntimeValue).not.toHaveBeenCalled();
     const { addEntry } = await import('../../services/ui/logService.js');

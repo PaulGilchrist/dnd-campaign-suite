@@ -340,7 +340,7 @@ async function spendUse(playerName, budget, campaignName) {
 const refused = (response) => ({ refused: true, response });
 const applied = (response, attackerName = null) => ({ refused: false, response, attackerName });
 
-async function handleAttacksVsAlly(action, auto, playerStats, playerName, campaignName, _mapName, combatSummary) {
+async function handleAttacksVsAlly({ action, auto, playerStats, playerName, campaignName, _mapName, combatSummary }) {
     const attackResult = await findLastAttack(campaignName);
     const attackEvent = attackResult.attackEvent;
     if (!attackEvent) {
@@ -394,7 +394,7 @@ async function handleAttacksVsAlly(action, auto, playerStats, playerName, campai
 // the verified pre-hit te producers (CLA-377 Vicious Mockery, Sap, Tumble):
 // gate the trigger, spend one use, and write te disadvantage_next_attack so
 // the attacker's next attack roll resolves with forcedMode:'disadvantage'.
-async function handleWardingFlare(action, auto, playerName, featureName, campaignName, _mapName, combatSummary) {
+async function handleWardingFlare({ action, auto, playerName, featureName, campaignName, _mapName, combatSummary }) {
     const refusalTag = featureName.toLowerCase().replace(/\s+/g, '_') + '_refused';
     const refuse = (description) => {
         addEntry(campaignName, {
@@ -524,7 +524,7 @@ async function logAttacksVsAllyTail(playerName, featureName, campaignName, resul
     return result;
 }
 
-async function logWardingFlareTail(action, playerStats, playerName, featureName, campaignName, attackerName, result) {
+async function logWardingFlareTail({ action: _action, playerStats, playerName, featureName, campaignName, attackerName, result }) {
     const defenderName = result?.defenderName;
     if (defenderName) {
         const tempHpAmount = await applyImprovedWardingFlare(playerStats, campaignName, defenderName);
@@ -579,9 +579,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     let outcome;
 
     if (effect === 'disadvantage_on_attacks_vs_ally') {
-        outcome = await handleAttacksVsAlly(action, auto, playerStats, playerName, campaignName, _mapName, combatSummary);
+        outcome = await handleAttacksVsAlly({ action, auto, playerStats, playerName, campaignName, _mapName, combatSummary });
     } else if (effect === 'disadvantage_on_attack_roll') {
-        outcome = await handleWardingFlare(action, auto, playerName, featureName, campaignName, _mapName, combatSummary);
+        outcome = await handleWardingFlare({ action, auto, playerName, featureName, campaignName, _mapName, combatSummary });
     } else if (effect === 'teleport_and_slow') {
         outcome = applied(await handleTeleportAndSlow(action, playerStats, campaignName, _mapName));
     } else {
@@ -599,7 +599,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     if (effect === 'disadvantage_on_attack_roll') {
-        return logWardingFlareTail(action, playerStats, playerName, featureName, campaignName, outcome.attackerName, outcome.response);
+        return logWardingFlareTail({ action, playerStats, playerName, featureName, campaignName, attackerName: outcome.attackerName, result: outcome.response });
     }
 
     addEntry(campaignName, {

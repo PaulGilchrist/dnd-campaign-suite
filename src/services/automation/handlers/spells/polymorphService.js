@@ -166,26 +166,28 @@ function revertPolymorphTempHp(targetName, campaignName) {
     }
 }
 
+function revertPolymorphCreature(cs, targetName) {
+    if (!cs?.creatures) return { changed: false, caster: null };
+    const creature = cs.creatures.find(c => c.name === targetName);
+    if (!creature?.polymorphSource) return { changed: false, caster: null };
+
+    const caster = creature.polymorphSource;
+    const original = creature.polymorphOriginal || {};
+    creature.maxHp = original.maxHp;
+    creature.ac = original.ac;
+    if (original.speed !== undefined) creature.speed = original.speed;
+    delete creature.polymorphSource;
+    delete creature.polymorphOriginal;
+    delete creature.polymorphBeast;
+    delete creature.beastName;
+    return { changed: true, caster };
+}
+
 export function revertPolymorph(targetName, campaignName) {
     const cs = getCombatSummary(campaignName);
-    let polymorphCaster = null;
-    let changed = false;
+    const { changed, caster } = revertPolymorphCreature(cs, targetName);
+    let polymorphCaster = caster;
 
-    if (cs?.creatures) {
-        const creature = cs.creatures.find(c => c.name === targetName);
-        if (creature?.polymorphSource) {
-            polymorphCaster = creature.polymorphSource;
-            const original = creature.polymorphOriginal || {};
-            creature.maxHp = original.maxHp;
-            creature.ac = original.ac;
-            if (original.speed !== undefined) creature.speed = original.speed;
-            delete creature.polymorphSource;
-            delete creature.polymorphOriginal;
-            delete creature.polymorphBeast;
-            delete creature.beastName;
-            changed = true;
-        }
-    }
     if (changed && cs) {
         storage.set('combatSummary', cs, campaignName);
         setCombatSummaryCache(cs, campaignName);

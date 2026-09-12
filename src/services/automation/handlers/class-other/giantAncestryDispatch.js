@@ -72,7 +72,7 @@ export async function handleFiresBurn(action, playerStats, campaignName, option)
 
     await logAncestryDamageRoll({ campaignName, playerStats, optName, targetName, damageType, actualDamage, formula: opt.damage, damageResult });
 
-    return ancestryDamagePopup(optName, opt.damage, damageResult, actualDamage, targetName, newHp, damageType);
+    return ancestryDamagePopup({ optName, formula: opt.damage, damageResult, actualDamage, targetName, newHp, damageType });
 }
 
 export async function handleFrostsChill(action, playerStats, campaignName, option) {
@@ -103,7 +103,7 @@ export async function handleFrostsChill(action, playerStats, campaignName, optio
     await logAncestryDamageRoll({ campaignName, playerStats, optName, targetName, damageType, actualDamage, formula: opt.damage, damageResult });
     await logSpeedReductionCondition(campaignName, playerStats, optName, targetName, speedReduction);
 
-    return ancestryDamagePopup(optName, opt.damage, damageResult, actualDamage, targetName, newHp, damageType);
+    return ancestryDamagePopup({ optName, formula: opt.damage, damageResult, actualDamage, targetName, newHp, damageType });
 }
 
 export async function handleHillsTumble(action, playerStats, campaignName, option) {
@@ -227,7 +227,7 @@ export async function handleHillsTumble(action, playerStats, campaignName, optio
     };
 }
 
-async function applyStonesEnduranceHeal(action, playerStats, campaignName, optName, opt, uses, totalDamage) {
+async function applyStonesEnduranceHeal({ action, playerStats, campaignName, optName, opt, uses, totalDamage }) {
     const { usesKey, currentUses, usedRoundKey, currentRound } = uses;
     const enduranceRoll = rollExpression('1d12');
     const conMod = playerStats.abilities?.find(a => a.name === 'Constitution')?.bonus || 0;
@@ -299,7 +299,7 @@ export async function handleStonesEndurance(action, playerStats, campaignName, o
         return stonesEnduranceRoundRefusal(campaignName, playerStats, optName, action.automation);
     }
 
-    return applyStonesEnduranceHeal(action, playerStats, campaignName, optName, opt, { usesKey, currentUses, usedRoundKey, currentRound }, totalDamage);
+    return applyStonesEnduranceHeal({ action, playerStats, campaignName, optName, opt, uses: { usesKey, currentUses, usedRoundKey, currentRound }, totalDamage });
 }
 
 export async function handleStormsThunder(action, playerStats, campaignName, _mapName, option) {
@@ -344,5 +344,5 @@ export async function handleStormsThunder(action, playerStats, campaignName, _ma
 
     await logAncestryDamageRoll({ campaignName, playerStats, optName, targetName: attackerName, damageType, actualDamage, formula, damageResult });
 
-    return ancestryDamagePopup(optName, formula, damageResult, actualDamage, attackerName, newHp, damageType);
+    return ancestryDamagePopup({ optName, formula, damageResult, actualDamage, targetName: attackerName, newHp, damageType });
 }

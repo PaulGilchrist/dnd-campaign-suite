@@ -66,7 +66,7 @@ function applyStarryDragonFloor(roll, dragonConstellationActive) {
     return dragonConstellationActive && roll <= 9 ? 10 : roll
 }
 
-async function rollConditionSave(creature, condition, characters, campaignNpcs, campaignName, mapName, getName) {
+async function rollConditionSave({ creature, condition, characters, campaignNpcs, campaignName, mapName, getName }) {
     const saveBonus = await getCreatureSaveBonus(creature, condition.ability, characters, campaignNpcs, getName)
     const aura = await computeAuraBonus({ targetName: creature.name, characters, campaignName, activeMapName: mapName, allCreatures: getCombatSummary(campaignName)?.creatures })
     const auraBonus = aura.bonus

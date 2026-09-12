@@ -484,7 +484,7 @@ function CharSheetContent({
     }, [playerStats, campaignName, setPopupHtml, popupHtml]);
 
     const handlePsiBolsteredKnackWrapped = React.useCallback(async ({ dieValue, dieSize, success }) => {
-        await handlePsiBolsteredKnack(playerStats, campaignName, popupHtml, dieValue, dieSize, success, setPopupHtml);
+        await handlePsiBolsteredKnack({ playerStats, campaignName, popupHtml, dieValue, dieSize, success, setPopupHtml });
     }, [playerStats, campaignName, popupHtml, setPopupHtml]);
 
     const handleShieldOfFaithTargetSelected = React.useCallback(async (targetName) => {
@@ -632,7 +632,7 @@ function CharSheetContent({
                 <div className='no-print'><CharCharacterAdvancement playerStats={playerStats} campaignName={campaignName}></CharCharacterAdvancement></div>
             </div>
         </React.Fragment>
-                {renderPopup(popupHtml, setPopupHtml, isLocalhost, playerStats, campaignName, characters, popupHandlers)}
+                {renderPopup({ popupHtml, setPopupHtml, isLocalhost, playerStats, campaignName, characters, popupHandlers })}
                 {popupHtml?.type === 'shield_of_faith_target_selection' && (
                     <ShieldOfFaithTargetSelectionModal popupHtml={popupHtml} setPopupHtml={setPopupHtml} playerStats={playerStats} campaignName={campaignName} handleShieldOfFaithTargetSelected={handleShieldOfFaithTargetSelected} />
                 )}

@@ -228,15 +228,15 @@ describe('useCharActionsModalHandlers - combat superiority', () => {
         description: 'Rally description',
       });
       await handlers.handleRallyChoiceConfirm('Ally2', modalData);
-      expect(executeRallyChoice).toHaveBeenCalledWith(
-        { dieValue: 10, maneuverName: 'Rally the Brave' },
-        modalData.playerStats,
-        modalData.campaignName,
-        'Ally2',
-        20,
-        5,
-        'Rally description'
-      );
+      expect(executeRallyChoice).toHaveBeenCalledWith({
+        action: { dieValue: 10, maneuverName: 'Rally the Brave' },
+        playerStats: modalData.playerStats,
+        campaignName: modalData.campaignName,
+        chosenName: 'Ally2',
+        totalHp: 20,
+        extraHp: 5,
+        description: 'Rally description',
+      });
       expect(mockSetModalState).toHaveBeenCalledWith({ rallyChoiceModal: null });
     });
 

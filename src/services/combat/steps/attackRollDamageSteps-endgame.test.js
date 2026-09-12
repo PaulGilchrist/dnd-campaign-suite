@@ -333,15 +333,15 @@ describe('buildAttackRollDamageSteps - overchannel, proceedToDamage', () => {
         });
         const result = await steps[17].handler(ctx);
 
-        expect(ctx.proceedWithDamage).toHaveBeenCalledWith(
-          { name: 'Greataxe', damage: '1d12' },
-          '1d12+4',
-          16,
-          [12, 4],
-          4,
-          undefined,
-          ctx,
-        );
+        expect(ctx.proceedWithDamage).toHaveBeenCalledWith({
+          attack: { name: 'Greataxe', damage: '1d12' },
+          formula: '1d12+4',
+          total: 16,
+          rolls: [12, 4],
+          modifier: 4,
+          critLabels: undefined,
+          pipelineCtx: ctx,
+        });
         expect(result.data._done).toBe(true);
       });
 

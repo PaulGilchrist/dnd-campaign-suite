@@ -38,7 +38,7 @@ vi.mock('../../common/CreatureBadge.jsx', () => ({ default: ({ label }) => <span
 vi.mock('../../initiative/ConditionEffectBadges.jsx', () => ({ default: () => <div data-testid="condition-effect-badges">Badges</div> }));
 
 vi.mock('../../../hooks/runtime/useTrackedResource.js', () => ({
-    default: vi.fn((key, name, init, _deps, _campaign) => ({ current: init(), update: vi.fn() })),
+    default: vi.fn(({ maxGetter }) => ({ current: maxGetter(), update: vi.fn() })),
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({

@@ -56,19 +56,18 @@ function grappledTargetActive(ctx) {
   return false;
 }
 
+function incapacitatedCreature(creature) {
+  return !!creature.conditions && creature.conditions.some(c => normalizeConditionKey(c) === 'incapacitated');
+}
+
 function mountedAndTargetSmaller(ctx) {
-  const { combatContext } = ctx;
+  const combatContext = ctx.combatContext;
   if (!combatContext || !combatContext.creatures) return false;
   const attackerName = combatContext.activeCreatureName || combatContext.attackerName;
   if (!attackerName) return false;
   const attackerCreature = combatContext.creatures.find(c => c.name === attackerName);
-  if (!attackerCreature) return false;
-  if (!attackerCreature.isMounted) return false;
-  const isNotIncapacitated = !attackerCreature.conditions || !attackerCreature.conditions.some(c => {
-    const cStr = typeof c === 'object' ? String(c.key || '') : String(c);
-    return ['incapacitated'].includes(cStr.toLowerCase());
-  });
-  if (!isNotIncapacitated) return false;
+  if (!attackerCreature?.isMounted) return false;
+  if (incapacitatedCreature(attackerCreature)) return false;
   const targetName = attackerCreature.targetName;
   if (!targetName) return false;
   const targetCreature = combatContext.creatures.find(c => c.name === targetName);
@@ -76,8 +75,7 @@ function mountedAndTargetSmaller(ctx) {
   const mountSizeIdx = SIZE_ORDER.indexOf(attackerCreature.mountSize || 'Medium');
   const targetSizeIdx = SIZE_ORDER.indexOf(targetCreature.size || 'Medium');
   if (mountSizeIdx === -1 || targetSizeIdx === -1) return false;
-  if (targetSizeIdx >= mountSizeIdx) return false;
-  return attackerCreature.rangeToTarget == null || attackerCreature.rangeToTarget <= 5;
+  return targetSizeIdx < mountSizeIdx && (attackerCreature.rangeToTarget == null || attackerCreature.rangeToTarget <= 5);
 }
 
 function targetActsAfterAttacker(ctx) {

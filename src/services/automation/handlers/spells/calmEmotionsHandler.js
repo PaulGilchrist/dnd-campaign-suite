@@ -259,48 +259,18 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
         if (saveResult.success) {
             savedCount++;
-            await addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'success',
-                roll: saveResult.roll ?? 0,
-                total: saveResult.total ?? 0,
-                conditions: [],
-                appliedDamage: 0,
-            });
-            await addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                rollType: 'save-calm-emotions',
-                targetName,
-                saveDc: dc,
-                saveType: 'CHA',
-                success: true,
-                description: `${targetName} succeeded on CHA save against Calm Emotions.`,
-            }).catch((e) => { console.error('[calmEmotions] Error:', e); });
+            await recordCalmTargetResult(campaignName, targetName, saveResult, 'success');
+            await logCalmEmotionsSave(campaignName, casterName, targetName, dc, true,
+                `${targetName} succeeded on CHA save against Calm Emotions.`);
         } else {
             affectedCount++;
             // Default to immunity path for non-interactive route
             await applyCalmEmotionsImmunity({ targetName, casterName, campaignName, dc });
 
-            await addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'failure',
-                roll: saveResult.roll ?? 0,
-                total: saveResult.total ?? 0,
-                conditions: [],
-                appliedDamage: 0,
-            });
+            await recordCalmTargetResult(campaignName, targetName, saveResult, 'failure');
 
-            await addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                rollType: 'save-calm-emotions',
-                targetName,
-                saveDc: dc,
-                saveType: 'CHA',
-                success: false,
-                description: `${targetName} failed CHA save against Calm Emotions. Granted immunity to Charmed/Frightened.`,
-            }).catch((e) => { console.error('[calmEmotions] Error:', e); });
+            await logCalmEmotionsSave(campaignName, casterName, targetName, dc, false,
+                `${targetName} failed CHA save against Calm Emotions. Granted immunity to Charmed/Frightened.`);
 
             results.push(`${targetName} is immune to Charmed and Frightened.`);
         }
@@ -318,4 +288,28 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             description: summary,
         },
     };
+}
+
+async function recordCalmTargetResult(campaignName, targetName, saveResult, saveOutcome) {
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: saveOutcome,
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: [],
+        appliedDamage: 0,
+    });
+}
+
+async function logCalmEmotionsSave(campaignName, casterName, targetName, dc, success, description) {
+    await addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-calm-emotions',
+        targetName,
+        saveDc: dc,
+        saveType: 'CHA',
+        success,
+        description,
+    }).catch((e) => { console.error('[calmEmotions] Error:', e); });
 }

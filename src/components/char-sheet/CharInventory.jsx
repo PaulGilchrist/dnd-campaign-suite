@@ -6,6 +6,29 @@ import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { loadEquipment } from '../../services/ui/dataLoader.js';
 import './CharInventory.css'
 
+const buildPropertyLines = (item) => {
+    const properties = [];
+    if (item.cost) {
+        properties.push(`<b>Cost:</b> ${item.cost.quantity} ${item.cost.unit}`);
+    }
+    if (item.weight) {
+        properties.push(`<b>Weight:</b> ${item.weight}`);
+    }
+    if (item.equipment_category) {
+        properties.push(`<b>Category:</b> ${item.equipment_category}`);
+    }
+    if (item.ability) {
+        properties.push(`<b>Ability:</b> ${item.ability}`);
+    }
+    if (item.utilize) {
+        properties.push(`<b>Utilize:</b> ${item.utilize}`);
+    }
+    if (item.craft) {
+        properties.push(`<b>Craft:</b> ${item.craft}`);
+    }
+    return properties;
+};
+
 function CharInventory({ playerStats }) {
     const { popupHtml, setPopupHtml } = usePopup(() => null);
     
@@ -54,27 +77,9 @@ function CharInventory({ playerStats }) {
                     descriptionHtml = item.desc.map(desc => desc || '').join('<br/><br/>');
                 }
                 let html = `<b>${item.name}</b><br/>${descriptionHtml}`;
-                
-                const properties = [];
-                if(item.cost) {
-                    properties.push(`<b>Cost:</b> ${item.cost.quantity} ${item.cost.unit}`);
-                }
-                if(item.weight) {
-                    properties.push(`<b>Weight:</b> ${item.weight}`);
-                }
-                if(item.equipment_category) {
-                    properties.push(`<b>Category:</b> ${item.equipment_category}`);
-                }
-                if(item.ability) {
-                    properties.push(`<b>Ability:</b> ${item.ability}`);
-                }
-                if(item.utilize) {
-                    properties.push(`<b>Utilize:</b> ${item.utilize}`);
-                }
-                if(item.craft) {
-                    properties.push(`<b>Craft:</b> ${item.craft}`);
-                }
-                
+
+                const properties = buildPropertyLines(item);
+
                 if(properties.length > 0) {
                     html += `<br/>${properties.join('<br/>')}`;
                 }

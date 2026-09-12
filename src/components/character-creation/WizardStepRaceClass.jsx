@@ -1,6 +1,25 @@
 
 import CascadingSelect from './CascadingSelect.jsx';
 
+function OrderSelect({ label, options, value, error, onChange }) {
+  return (
+    <div className="form-group">
+      <label>{label} *</label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={error ? 'error' : ''}
+      >
+        <option value="">Select a {label}</option>
+        {options.map(option => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
+      {error && <span className="error-message">{error}</span>}
+    </div>
+  );
+}
+
 function WizardStepRaceClass({ 
   formData, 
   errors, 
@@ -13,8 +32,18 @@ function WizardStepRaceClass({
   const isCleric2024 = ruleset === '2024' && selectedClass === 'Cleric';
   const isDruid2024 = ruleset === '2024' && selectedClass === 'Druid';
 
-  const divineOrderOptions = isCleric2024 ? ['Protector', 'Thaumaturge'] : [];
-  const primalOrderOptions = isDruid2024 ? ['Magician', 'Warden'] : [];
+  const setClassField = (field, value) =>
+    onInputChange('class', { ...formData.class, [field]: value });
+
+  const selectSubraces = (selectedRace) => {
+    const found = racesData.find(race => race.name === selectedRace);
+    return found ? found.subraces : [];
+  };
+
+  const selectSubclasses = (selected) => {
+    const found = classSubtypes.find(cs => cs.className === selected);
+    return found ? found.subtypes : [];
+  };
 
   return (
     <div className="wizard-step">
@@ -24,10 +53,7 @@ function WizardStepRaceClass({
         label="Race"
         childLabel="Subrace"
         options={racesData}
-        subOptionsSelector={(selectedRace) => {
-          const found = racesData.find(race => race.name === selectedRace);
-          return found ? found.subraces : [];
-        }}
+        subOptionsSelector={selectSubraces}
         fieldName="race"
         childFieldName="subrace"
         errorKey="subrace"
@@ -44,10 +70,7 @@ function WizardStepRaceClass({
         childLabel="Subclass"
         optionsKey="className"
         options={classSubtypes}
-        subOptionsSelector={(selectedClass) => {
-          const found = classSubtypes.find(cs => cs.className === selectedClass);
-          return found ? found.subtypes : [];
-        }}
+        subOptionsSelector={selectSubclasses}
         fieldName="class"
         childFieldName="subclass"
         errorKey="subclass"
@@ -60,37 +83,23 @@ function WizardStepRaceClass({
       />
 
       {isCleric2024 && (
-        <div className="form-group">
-          <label>Divine Order *</label>
-          <select
-            value={formData.class?.divineOrder || ''}
-            onChange={(e) => onInputChange('class', { ...formData.class, divineOrder: e.target.value })}
-            className={errors['divineOrder'] ? 'error' : ''}
-          >
-            <option value="">Select a Divine Order</option>
-            {divineOrderOptions.map(option => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
-          {errors['divineOrder'] && <span className="error-message">{errors['divineOrder']}</span>}
-        </div>
+        <OrderSelect
+          label="Divine Order"
+          options={['Protector', 'Thaumaturge']}
+          value={formData.class?.divineOrder || ''}
+          error={errors['divineOrder']}
+          onChange={(value) => setClassField('divineOrder', value)}
+        />
       )}
 
       {isDruid2024 && (
-        <div className="form-group">
-          <label>Primal Order *</label>
-          <select
-            value={formData.class?.primalOrder || ''}
-            onChange={(e) => onInputChange('class', { ...formData.class, primalOrder: e.target.value })}
-            className={errors['primalOrder'] ? 'error' : ''}
-          >
-            <option value="">Select a Primal Order</option>
-            {primalOrderOptions.map(option => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
-          {errors['primalOrder'] && <span className="error-message">{errors['primalOrder']}</span>}
-        </div>
+        <OrderSelect
+          label="Primal Order"
+          options={['Magician', 'Warden']}
+          value={formData.class?.primalOrder || ''}
+          error={errors['primalOrder']}
+          onChange={(value) => setClassField('primalOrder', value)}
+        />
       )}
       
     </div>

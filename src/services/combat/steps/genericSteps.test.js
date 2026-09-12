@@ -173,13 +173,13 @@ describe('buildGenericSteps', () => {
           modifier: 2,
         });
         const result = await steps[2].handler(ctx);
-        expect(ctx.proceedWithDamage).toHaveBeenCalledWith(
-          { name: 'Test' },
-          '1d6+2',
-          8,
-          [6],
-          2,
-        );
+        expect(ctx.proceedWithDamage).toHaveBeenCalledWith({
+          attack: { name: 'Test' },
+          formula: '1d6+2',
+          total: 8,
+          rolls: [6],
+          modifier: 2,
+        });
         expect(result).toEqual({ data: { _done: true } });
       });
 

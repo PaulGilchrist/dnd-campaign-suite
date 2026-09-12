@@ -143,30 +143,7 @@ function build5eDetails({ fromClass, fromRace, fromBackground, totalAllowed, fea
   return details;
 }
 
-async function getSkillLimits2024(formData, allFeats, ctx) {
-  // 2024 rules: Class gives choice, Race gives choice(s) via traits, Background gives specific skills
-  let { fromClass, fromRace, fromBackground } = ctx;
-
-  if (ctx.className) {
-    const classData = await fetchClassData(ctx.className, '2024');
-    fromClass = parseSkillProficiencies(classData, '2024');
-  }
-
-  if (ctx.raceName) {
-    const raceData = await fetchRaceData(ctx.raceName, '2024');
-    fromRace = parseSkillProficiencies(raceData, '2024');
-  }
-
-  if (ctx.backgroundName) {
-    const backgroundData = await fetchBackgroundData(ctx.backgroundName, '2024');
-    fromBackground = parseSkillProficiencies(backgroundData, '2024');
-  }
-
-  const totalAllowed = fromClass.count + fromRace.count + fromBackground.count;
-  const featProfs = await countFeatProficiencyChoices(formData, allFeats);
-  const finalTotal = totalAllowed + featProfs;
-
-  // Build skillChoiceSources array with restricted pools
+async function build2024ChoiceSources(formData, allFeats, fromClass, fromRace, fromBackground) {
   const skillChoiceSources = [];
   const raceChoiceSources = [];
   // Background skills (non-choice) are always allowed
@@ -223,6 +200,36 @@ async function getSkillLimits2024(formData, allFeats, ctx) {
       featName: 'Skill Expert',
     });
   }
+
+  return { skillChoiceSources, raceChoiceSources, raceFeatSources, featChoiceData };
+}
+
+async function getSkillLimits2024(formData, allFeats, ctx) {
+  // 2024 rules: Class gives choice, Race gives choice(s) via traits, Background gives specific skills
+  let { fromClass, fromRace, fromBackground } = ctx;
+
+  if (ctx.className) {
+    const classData = await fetchClassData(ctx.className, '2024');
+    fromClass = parseSkillProficiencies(classData, '2024');
+  }
+
+  if (ctx.raceName) {
+    const raceData = await fetchRaceData(ctx.raceName, '2024');
+    fromRace = parseSkillProficiencies(raceData, '2024');
+  }
+
+  if (ctx.backgroundName) {
+    const backgroundData = await fetchBackgroundData(ctx.backgroundName, '2024');
+    fromBackground = parseSkillProficiencies(backgroundData, '2024');
+  }
+
+  const totalAllowed = fromClass.count + fromRace.count + fromBackground.count;
+  const featProfs = await countFeatProficiencyChoices(formData, allFeats);
+  const finalTotal = totalAllowed + featProfs;
+
+  // Build skillChoiceSources array with restricted pools
+  const { skillChoiceSources, raceChoiceSources, raceFeatSources, featChoiceData } =
+    await build2024ChoiceSources(formData, allFeats, fromClass, fromRace, fromBackground);
 
   // Major feature grants with feature-level proficiency_choices
   // (e.g., Battle Master's Student of War: +1 skill from Fighter skills)

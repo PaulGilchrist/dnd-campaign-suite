@@ -25,7 +25,7 @@ function canUseShapeOverlay(shape, gridX, gridY) {
   return !!shape && gridX != null && gridY != null;
 }
 
-function shapeOverlayCovers(shape, gridX, gridY, targetPos, rangeFeet, coneAngle, widthFt) {
+function shapeOverlayCovers({ shape, gridX, gridY, targetPos, rangeFeet, coneAngle, widthFt }) {
   const tempOverlay = createOverlay(shape, gridX, gridY, 0, {
     radiusFt: rangeFeet,
     sizeFt: rangeFeet,
@@ -155,7 +155,7 @@ function AreaEffectTargetModalBase({
       const targetPos = findTargetGridPosition(mapData, c.name);
       if (!targetPos) return true;
       if (canUseShapeOverlay(shape, attackerGridX, attackerGridY)) {
-        return shapeOverlayCovers(shape, attackerGridX, attackerGridY, targetPos, rangeFeet, coneAngle, widthFt);
+        return shapeOverlayCovers({ shape, gridX: attackerGridX, gridY: attackerGridY, targetPos, rangeFeet, coneAngle, widthFt });
       }
       return isDistanceInRange(getDistanceFeet(attackerPos, { gridX: targetPos.gridX, gridY: targetPos.gridY }), rangeFeet);
     });

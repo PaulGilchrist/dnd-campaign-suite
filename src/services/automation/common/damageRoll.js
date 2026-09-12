@@ -63,13 +63,13 @@ export async function buildAttackContextForDamage(attackContext, playerName, cam
             loadNPCs(campaignName),
          ]);
 
-        return await computeMapAwareContext(mapData, npcs, attackContext, playerName, campaignName, targetName, resistanceNotice);
+        return await computeMapAwareContext({ mapData, npcs, attackContext, playerName, campaignName, targetName, resistanceNotice });
      } catch {
         return buildSyncCtx(targetName, resistanceNotice, attackContext, playerName);
      }
 }
 
-async function computeMapAwareContext(mapData, npcs, attackContext, playerName, campaignName, targetName, resistanceNotice) {
+async function computeMapAwareContext({ mapData, npcs, attackContext, playerName, campaignName, targetName, resistanceNotice }) {
     const base = buildSyncCtx(targetName, resistanceNotice, attackContext, playerName);
     const attackerPlayer = mapData?.players?.find(p => p.name === playerName);
     if (!attackerPlayer) return base;

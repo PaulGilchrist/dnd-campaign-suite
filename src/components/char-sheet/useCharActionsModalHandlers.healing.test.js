@@ -145,15 +145,15 @@ describe('useCharActionsModalHandlers - healing', () => {
       const handlers = getHandlers(modalState);
       await handlers.handleMassHealConfirm({ Ally1: 20, Ally2: 30 });
 
-      expect(confirmMassHeal).toHaveBeenCalledWith(
-        modalState.massHealModal.action,
-        modalState.massHealModal.playerStats,
-        modalState.massHealModal.campaignName,
-        { Ally1: 20, Ally2: 30 },
-        50,
-        10,
-        'bonus'
-      );
+      expect(confirmMassHeal).toHaveBeenCalledWith({
+        action: modalState.massHealModal.action,
+        playerStats: modalState.massHealModal.playerStats,
+        campaignName: modalState.massHealModal.campaignName,
+        distribution: { Ally1: 20, Ally2: 30 },
+        totalPool: 50,
+        bonusHeal: 10,
+        bonusDetails: 'bonus',
+      });
       expect(mockSetModalState).toHaveBeenCalledWith({ massHealModal: null });
     });
 

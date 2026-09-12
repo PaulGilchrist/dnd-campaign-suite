@@ -383,11 +383,11 @@ describe('confirmMantleOfInspiration', () => {
     const action = makeMantleAction();
     const ps = makeBardStats('Bard1', 16);
 
-    const result = await confirmMantleOfInspiration(
-      action, ps, campaignName,
-      ['Ally1', 'Ally2'],
-      4, 6, 8
-    );
+    const result = await confirmMantleOfInspiration({
+      action, playerStats: ps, campaignName,
+      selectedTargets: ['Ally1', 'Ally2'],
+      dieRoll: 4, bardicDieSize: 6, tempHp: 8
+    })
 
     expect(result.type).toBe('popup');
     expect(result.payload.description).toContain('Ally1, Ally2');
@@ -409,11 +409,11 @@ describe('confirmMantleOfInspiration', () => {
     const action = makeMantleAction();
     const ps = makeBardStats('Bard1', 16);
 
-    await confirmMantleOfInspiration(
-      action, ps, campaignName,
-      ['Ally1', 'Ally2', 'Ally3'],
-      4, 6, 8
-    );
+    await confirmMantleOfInspiration({
+      action, playerStats: ps, campaignName,
+      selectedTargets: ['Ally1', 'Ally2', 'Ally3'],
+      dieRoll: 4, bardicDieSize: 6, tempHp: 8
+    })
 
     const movementCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
       c => c[1] === 'inspiringMovementNoOA'
@@ -432,11 +432,11 @@ describe('confirmMantleOfInspiration', () => {
     const action = makeMantleAction();
     const ps = makeBardStats('Bard1', 16);
 
-    await confirmMantleOfInspiration(
-      action, ps, campaignName,
-      ['Ally1', 'Ally2'],
-      4, 6, 8
-    );
+    await confirmMantleOfInspiration({
+      action, playerStats: ps, campaignName,
+      selectedTargets: ['Ally1', 'Ally2'],
+      dieRoll: 4, bardicDieSize: 6, tempHp: 8
+    })
 
     expect(expirations.addExpiration).toHaveBeenCalledWith(
       'Bard1',
@@ -462,11 +462,11 @@ describe('confirmMantleOfInspiration', () => {
     const action = makeAction({}, { name: 'Mantle of Inspiration' });
     const ps = makeBardStats('Bard1');
 
-    await confirmMantleOfInspiration(
-      action, ps, campaignName,
-      ['Ally1'],
-      4, 6, 8
-    );
+    await confirmMantleOfInspiration({
+      action, playerStats: ps, campaignName,
+      selectedTargets: ['Ally1'],
+      dieRoll: 4, bardicDieSize: 6, tempHp: 8
+    })
 
     expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
       type: 'ability_use',
@@ -482,11 +482,11 @@ describe('confirmMantleOfInspiration', () => {
     const action = makeMantleAction();
     const ps = makeBardStats('Bard1');
 
-    await confirmMantleOfInspiration(
-      action, ps, campaignName,
-      ['Ally1'],
-      5, 8, 10
-    );
+    await confirmMantleOfInspiration({
+      action, playerStats: ps, campaignName,
+      selectedTargets: ['Ally1'],
+      dieRoll: 5, bardicDieSize: 8, tempHp: 10
+    })
 
     const logCall = logService.addEntry.mock.calls[0][1];
     expect(logCall.description).toContain('rolled 5');
@@ -500,11 +500,11 @@ describe('confirmMantleOfInspiration', () => {
     const action = makeMantleAction();
     const ps = makeBardStats('Bard1', 12); // +1 modifier
 
-    await confirmMantleOfInspiration(
-      action, ps, campaignName,
-      ['Ally1', 'Ally2', 'Ally3'],
-      4, 6, 8
-    );
+    await confirmMantleOfInspiration({
+      action, playerStats: ps, campaignName,
+      selectedTargets: ['Ally1', 'Ally2', 'Ally3'],
+      dieRoll: 4, bardicDieSize: 6, tempHp: 8
+    })
 
     const tempCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
       c => c[1] === 'tempHp'
@@ -519,11 +519,11 @@ describe('confirmMantleOfInspiration', () => {
     const action = makeMantleAction();
     const ps = makeBardStats('Bard1');
 
-    const result = await confirmMantleOfInspiration(
-      action, ps, campaignName,
-      [],
-      4, 6, 8
-    );
+    const result = await confirmMantleOfInspiration({
+      action, playerStats: ps, campaignName,
+      selectedTargets: [],
+      dieRoll: 4, bardicDieSize: 6, tempHp: 8
+    })
 
     expect(result.type).toBe('popup');
     expect(result.payload.description).toContain('no targets selected');
@@ -537,11 +537,11 @@ describe('confirmMantleOfInspiration', () => {
     const action = makeMantleAction();
     const ps = makeBardStats('Bard1');
 
-    const result = await confirmMantleOfInspiration(
-      action, ps, campaignName,
-      null,
-      4, 6, 8
-    );
+    const result = await confirmMantleOfInspiration({
+      action, playerStats: ps, campaignName,
+      selectedTargets: null,
+      dieRoll: 4, bardicDieSize: 6, tempHp: 8
+    })
 
     expect(result.type).toBe('popup');
     expect(result.payload.description).toContain('no targets selected');
@@ -553,11 +553,11 @@ describe('confirmMantleOfInspiration', () => {
     const action = makeMantleAction();
     const ps = makeBardStats('Bard1');
 
-    const result = await confirmMantleOfInspiration(
-      action, ps, campaignName,
-      undefined,
-      4, 6, 8
-    );
+    const result = await confirmMantleOfInspiration({
+      action, playerStats: ps, campaignName,
+      selectedTargets: undefined,
+      dieRoll: 4, bardicDieSize: 6, tempHp: 8
+    })
 
     expect(result.type).toBe('popup');
     expect(result.payload.description).toContain('no targets selected');
@@ -569,11 +569,11 @@ describe('confirmMantleOfInspiration', () => {
     const action = makeMantleAction();
     const ps = makeBardStats('Bard1');
 
-    const result = await confirmMantleOfInspiration(
-      action, ps, campaignName,
-      ['Ally1'],
-      4, 6, 8
-    );
+    const result = await confirmMantleOfInspiration({
+      action, playerStats: ps, campaignName,
+      selectedTargets: ['Ally1'],
+      dieRoll: 4, bardicDieSize: 6, tempHp: 8
+    })
 
     expect(result.type).toBe('popup');
     expect(result.payload.type).toBe('automation_info');
@@ -587,11 +587,11 @@ describe('confirmMantleOfInspiration', () => {
     const action = makeMantleAction();
     const ps = makeBardStats('Bard1', 1); // CHA score 1 -> modifier -5 -> Math.max(1, -5) = 1
 
-    const result = await confirmMantleOfInspiration(
-      action, ps, campaignName,
-      ['Ally1', 'Ally2'],
-      4, 6, 8
-    );
+    const result = await confirmMantleOfInspiration({
+      action, playerStats: ps, campaignName,
+      selectedTargets: ['Ally1', 'Ally2'],
+      dieRoll: 4, bardicDieSize: 6, tempHp: 8
+    })
 
     // Even with CHA 1 (modifier -5), Math.max(1, -5) = 1 so at least 1 target is selected
     expect(result.payload.description).toContain('Ally1');

@@ -140,7 +140,7 @@ function handleSleep(fullSpell, spellSaveDc, playerStats, campaignName, metaCtx,
     return { handled: false };
 }
 
-function handleConfusionEarly(fullSpell, spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName, triggerConfusion) {
+function handleConfusionEarly({ fullSpell, spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName, triggerConfusion }) {
     if (fullSpell.name && fullSpell.name.toLowerCase() === 'confusion' && fullSpell.dc) {
         return {
             handled: true,
@@ -222,7 +222,7 @@ function handleConjureVolley(spell, fullSpell) {
     return { handled: false };
 }
 
-function handleSilence(spell, fullSpell, metaCtx, spellSaveDc, playerStats, campaignName, rangeToFeet, getCombatSummary) {
+function handleSilence({ spell, metaCtx, playerStats, campaignName, getCombatSummary }) {
     if (spell.name && spell.name.toLowerCase() === 'silence') {
         const rangeFeet = (() => {
             const match = String(spell.range || '120 feet').match(/(\d+)-?foot/);

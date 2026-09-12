@@ -12,7 +12,7 @@ import { hasAuraOfProtection } from '../combat/auras/auraOfProtection.js';
 import { isWithinRange } from '../rules/combat/rangeCheck.js';
 import { buildAttackContextSync } from './contextBuilder-sync.js';
 
-export function buildAttackContext(attack, playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects, opts) {
+export function buildAttackContext({ attack, playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects, opts }) {
     if (!mapName) {
         return buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, featRangeEffects, opts);
     }
@@ -40,15 +40,10 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
             const isRanged = numericRange > 8;
             const feats = featRangeEffects || { ignoresMeleeDisadvantage: false, ignoresLongRangeDisadvantage: false, rangeMultiplier: 1, spellRangeBonus: 0 };
 
-            // Improved Illusions: only apply range bonus to Illusion spells with range 10+ feet
-            const hasImprovedIllusions = playerStats.automation?.passives?.some(p => p.type === 'improved_illusions');
-            const isIllusionSpell = attack.school && attack.school.toLowerCase() === 'illusion';
-            const effectiveRangeBonus = (hasImprovedIllusions && isIllusionSpell && numericRange >= 10)
-                ? (feats.spellRangeBonus || 0) + 60
-                : feats.spellRangeBonus || 0;
+            const effectiveRangeBonus = computeIllusionRangeBonus(playerStats, attack, numericRange, feats);
 
             if (targetPos) {
-                applyRangeEffect(base, attack, attackerPlayer, targetPos, isRanged, effectiveRangeBonus, feats);
+                applyRangeEffect({ base, attack, attackerPlayer, targetPos, isRanged, effectiveRangeBonus, feats });
             }
 
             if (!base.isAutoMiss && targetPos) {
@@ -66,6 +61,16 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
         });
     })
         .catch(() => basePromise);
+}
+
+function computeIllusionRangeBonus(playerStats, attack, numericRange, feats) {
+    // Improved Illusions: only apply range bonus to Illusion spells with range 10+ feet
+    const hasImprovedIllusions = playerStats.automation?.passives?.some(p => p.type === 'improved_illusions');
+    const isIllusionSpell = attack.school && attack.school.toLowerCase() === 'illusion';
+    if (hasImprovedIllusions && isIllusionSpell && numericRange >= 10) {
+        return (feats.spellRangeBonus || 0) + 60;
+    }
+    return feats.spellRangeBonus || 0;
 }
 
 function resolveMapMode(base) {
@@ -180,7 +185,7 @@ async function accumulateAuraCounts(base, playerStats, campaignName, mapData, ta
     return { mapAdv, mapDis };
 }
 
-function applyRangeEffect(base, attack, attackerPlayer, targetPos, isRanged, effectiveRangeBonus, feats) {
+function applyRangeEffect({ base, attack, attackerPlayer, targetPos, isRanged, effectiveRangeBonus, feats }) {
     const numericRange = rangeToFeet(attack.range) || 0;
     const effectiveRange = isRanged ? numericRange + effectiveRangeBonus : attack.range;
     const distanceFt = getDistanceFeet(

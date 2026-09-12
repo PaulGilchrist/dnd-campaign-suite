@@ -86,34 +86,38 @@ async function applySecondaryDamage({ combatSummary, pendingTargetName, secondar
     };
 }
 
+function isTargetImmuneToConditionKey(targetStats, condKey, attackerCreature, campaignName) {
+    if (!targetStats) return false;
+    return playerIsImmuneToCondition({
+        conditionKey: condKey,
+        playerStats: targetStats,
+        getRuntimeValue: getRuntimeValue,
+        campaignName,
+        sourceCreatureType: resolveCreatureType(attackerCreature),
+    });
+}
+
 function applyFailedSaveStatusEffects({ detail, pending, combatSummary, charactersRef, characterName }) {
     const targetName = pending.targetName;
     const targetCreature = combatSummary?.creatures?.find(c => c.name === targetName);
     const targetCharacter = (charactersRef.current || []).find(c => utils.getName(c.name) === targetName);
     const targetStats = targetCharacter?.computedStats || targetCharacter;
+    const attackerName = pending.attackerName || pending.sourceAttackerName || null;
+    const attackerCreature = combatSummary?.creatures?.find(c => c.name === attackerName);
     const effectsToExpire = [];
     for (const effect of pending.statusEffects) {
         const condKey = String(effect).toLowerCase();
-        const attackerName = pending.attackerName || pending.sourceAttackerName || null;
         if (!attackerName) {
             console.error('[save-result-handler] Status effect missing attacker for', condKey, ':', { promptId: detail.promptId, pendingKeys: Object.keys(pending), characterName });
         }
-        const attackerCreature = combatSummary?.creatures?.find(c => c.name === attackerName);
-        if (targetStats && playerIsImmuneToCondition({
-            conditionKey: condKey,
-            playerStats: targetStats,
-            getRuntimeValue: getRuntimeValue,
-            campaignName: pending.campaignName,
-            sourceCreatureType: resolveCreatureType(attackerCreature),
-        })) {
+        if (isTargetImmuneToConditionKey(targetStats, condKey, attackerCreature, pending.campaignName)) {
             continue;
         }
-        if (targetCreature) {
-            const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
-            const filtered = conditions.filter(c => String(c).toLowerCase() !== condKey);
-            setRuntimeValue(targetName, 'activeConditions', [...filtered, condKey], pending.campaignName);
-            effectsToExpire.push({ type: 'condition', condition: condKey });
-        }
+        if (!targetCreature) continue;
+        const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+        const filtered = conditions.filter(c => String(c).toLowerCase() !== condKey);
+        setRuntimeValue(targetName, 'activeConditions', [...filtered, condKey], pending.campaignName);
+        effectsToExpire.push({ type: 'condition', condition: condKey });
     }
     if (effectsToExpire.length > 0) {
         addExpiration(characterName, targetName, effectsToExpire, pending.campaignName, 2);

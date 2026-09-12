@@ -6,7 +6,7 @@ import HiddenInput from '../../common/HiddenInput.jsx'
 function TrackedResourceInput({ label, resourceKey, playerName, getMax, deps, campaignName, playerStats }) {
     const [showInput, setShowInput] = React.useState(false);
     const handleToggle = () => setShowInput((s) => !s);
-    const { current, max, update: handleChange } = useTrackedResource(resourceKey, playerName, getMax, deps, campaignName, playerStats);
+    const { current, max, update: handleChange } = useTrackedResource({ storageKey: resourceKey, playerName, maxGetter: getMax, deps, campaignName, playerStats });
 
     return (
           <div className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>

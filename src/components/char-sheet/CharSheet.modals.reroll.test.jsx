@@ -41,7 +41,7 @@ describe('renderPopup — Indomitable reroll wiring (CLA-195)', () => {
 
     render(
       <div>
-        {renderPopup(popupHtml, vi.fn(), true, { name: 'EvasiveFighter', level: 18 }, 'test-campaign', [], popupHandlers)}
+        {renderPopup({ popupHtml, setPopupHtml: vi.fn(), isLocalhost: true, playerStats: { name: 'EvasiveFighter', level: 18 }, campaignName: 'test-campaign', characters: [], popupHandlers })}
       </div>
     );
 
@@ -87,7 +87,7 @@ describe('renderPopup — Indomitable reroll wiring (CLA-195)', () => {
 
     render(
       <div>
-        {renderPopup(popupHtml, vi.fn(), true, { name: 'EvasiveFighter', level: 18 }, 'test-campaign', [], popupHandlers)}
+        {renderPopup({ popupHtml, setPopupHtml: vi.fn(), isLocalhost: true, playerStats: { name: 'EvasiveFighter', level: 18 }, campaignName: 'test-campaign', characters: [], popupHandlers })}
       </div>
     );
 

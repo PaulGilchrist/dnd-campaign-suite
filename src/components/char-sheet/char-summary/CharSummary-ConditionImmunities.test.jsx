@@ -54,8 +54,8 @@ vi.mock('./CharConditions.jsx', () => ({
 }));
 
 vi.mock('../../../hooks/runtime/useTrackedResource.js', () => ({
-    default: vi.fn((key, name, init, _deps, _campaign) => ({
-        current: init(),
+    default: vi.fn(({ maxGetter }) => ({
+        current: maxGetter(),
         update: vi.fn(),
     })),
 }));

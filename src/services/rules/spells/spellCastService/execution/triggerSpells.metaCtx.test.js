@@ -32,7 +32,7 @@ describe('handleGenericAutomation metaCtx forwarding (SP-092)', () => {
     const playerStats = makePlayerStats();
     const metaCtx = { selectedTargets: ['Zombie 1', 'Zombie 2', 'Archmage 1', 'Archmage 2'] };
 
-    const result = await handleGenericAutomation(spell, executeHandler, null, playerStats, 'test-campaign', 'map', [], metaCtx);
+    const result = await handleGenericAutomation({ spell, executeHandler, playerStats: playerStats, campaignName: 'test-campaign', mapName: 'map', characters: [], metaCtx });
 
     expect(result.handled).toBe(true);
     expect(executeHandler).toHaveBeenCalledTimes(1);
@@ -46,7 +46,7 @@ describe('handleGenericAutomation metaCtx forwarding (SP-092)', () => {
     const spell = makePrismaticSpray();
     const metaCtx = { selectedTargets: ['Goblin'], slotLevel: 7, heightenTarget: 'Goblin' };
 
-    await handleGenericAutomation(spell, executeHandler, null, makePlayerStats(), 'test-campaign', 'map', [], metaCtx);
+    await handleGenericAutomation({ spell, executeHandler, playerStats: makePlayerStats(), campaignName: 'test-campaign', mapName: 'map', characters: [], metaCtx });
 
     const action = executeHandler.mock.calls[0][0];
     expect(action.metaCtx).toEqual({ selectedTargets: ['Goblin'], slotLevel: 7, heightenTarget: 'Goblin' });
@@ -56,7 +56,7 @@ describe('handleGenericAutomation metaCtx forwarding (SP-092)', () => {
     const executeHandler = vi.fn(async () => null);
     const spell = makePrismaticSpray();
 
-    await handleGenericAutomation(spell, executeHandler, null, makePlayerStats(), 'test-campaign', 'map', []);
+    await handleGenericAutomation({ spell, executeHandler, playerStats: makePlayerStats(), campaignName: 'test-campaign', mapName: 'map', characters: [] });
 
     const action = executeHandler.mock.calls[0][0];
     expect(action.metaCtx).toEqual({});
@@ -68,7 +68,7 @@ describe('handleGenericAutomation metaCtx forwarding (SP-092)', () => {
     const spell = makePrismaticSpray();
     const metaCtx = { selectedTargets: ['Goblin'] };
 
-    await handleGenericAutomation(spell, executeHandler, null, makePlayerStats(), 'test-campaign', 'map', [], metaCtx);
+    await handleGenericAutomation({ spell, executeHandler, playerStats: makePlayerStats(), campaignName: 'test-campaign', mapName: 'map', characters: [], metaCtx });
 
     const action = executeHandler.mock.calls[0][0];
     expect(action.metaCtx).not.toBe(metaCtx);

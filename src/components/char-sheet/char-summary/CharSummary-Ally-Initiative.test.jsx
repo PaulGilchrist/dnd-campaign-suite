@@ -65,7 +65,7 @@ vi.mock('../../common/AllySelectionModal.jsx', () => ({
 }));
 
 vi.mock('../../../hooks/runtime/useTrackedResource.js', () => ({
-    default: vi.fn((_key, _name, init) => ({ current: init(), update: vi.fn() })),
+    default: vi.fn(({ maxGetter }) => ({ current: maxGetter(), update: vi.fn() })),
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({

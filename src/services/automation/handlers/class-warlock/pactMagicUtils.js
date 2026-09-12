@@ -14,7 +14,7 @@ export function findPactSlotLevel(playerStats) {
 
 // True when the feature is out of uses, declares Pact Magic recharge, and a
 // Pact Magic slot is available to spend.
-export function hasPactSlotAvailable(playerStats, playerName, campaignName, auto, currentUses, maxUses, pactSlotLevel) {
+export function hasPactSlotAvailable({ playerStats, playerName, campaignName, auto, currentUses, maxUses, pactSlotLevel }) {
     if (!(currentUses >= maxUses && auto.pactMagicRecharge && pactSlotLevel > 0)) return false;
     const slotKey = `spell_slots_level_${pactSlotLevel}`;
     const currentSlots = Number(getRuntimeValue(playerName, slotKey, campaignName) ?? playerStats.spellAbilities?.[slotKey] ?? 0);

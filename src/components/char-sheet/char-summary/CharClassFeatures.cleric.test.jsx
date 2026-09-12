@@ -17,9 +17,9 @@ function expectResourceToDisplay(label, maxValue) {
 }
 
 vi.mock('../../../hooks/runtime/useTrackedResource.js', () => ({
-  default: vi.fn((_storageKey, _playerName, getMax, _deps, _campaignName, _playerStats) => ({
-    current: getMax ? getMax() : 0,
-    max: getMax ? getMax() : 0,
+  default: vi.fn(({ maxGetter }) => ({
+    current: maxGetter ? maxGetter() : 0,
+    max: maxGetter ? maxGetter() : 0,
     update: vi.fn(),
   })),
 }));

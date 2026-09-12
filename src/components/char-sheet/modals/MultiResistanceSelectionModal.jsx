@@ -1,6 +1,26 @@
 import { useState } from 'react';
 import '../CharSheet.css';
 
+function AppliedResultModal({ title, icon, result, onClose }) {
+    return (
+        <div className="sp-overlay" onClick={(e) => {
+        if (e.target.closest('.sp-modal')) return;
+        onClose?.();
+    }}>
+            <div className="sp-modal">
+                <div className="sp-header">
+                    <i className={`fa-solid ${icon || 'fa-shield-halved'}`}></i> {title || 'Resistance Selection'}
+                </div>
+                <div className="sp-body" dangerouslySetInnerHTML={{ __html: result?.payload?.description || '' }}>
+                </div>
+                <div className="sp-actions">
+                    <button className="sp-roll-btn" onClick={onClose}>Done</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function MultiResistanceSelectionModal({ title, icon, action: _action, playerStats: _playerStats, campaignName: _campaignName, damageTypes, existingTypes, maxSelections, onConfirm, onClose }) {
     const [selected, setSelected] = useState(existingTypes ? [...existingTypes] : []);
     const [applied, setApplied] = useState(false);
@@ -22,23 +42,7 @@ function MultiResistanceSelectionModal({ title, icon, action: _action, playerSta
     };
 
     if (applied && result) {
-        return (
-            <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
-                <div className="sp-modal">
-                    <div className="sp-header">
-                        <i className={`fa-solid ${icon || 'fa-shield-halved'}`}></i> {title || 'Resistance Selection'}
-                    </div>
-                    <div className="sp-body" dangerouslySetInnerHTML={{ __html: result?.payload?.description || '' }}>
-                    </div>
-                    <div className="sp-actions">
-                        <button className="sp-roll-btn" onClick={onClose}>Done</button>
-                    </div>
-                </div>
-            </div>
-        );
+        return <AppliedResultModal title={title} icon={icon} result={result} onClose={onClose} />;
     }
 
     return (

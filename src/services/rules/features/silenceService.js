@@ -67,16 +67,21 @@ export function getSilenceSource(playerName, campaignName) {
     return buff?.sourceCharacter || null;
 }
 
+function hasSilenceZoneTargetEffect(casterName, targetName, campaignName) {
+    const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+    if (!Array.isArray(targetEffects)) return false;
+    return targetEffects.some(
+        te => te.effect === SILENCE_TARGET_EFFECT && te.source === casterName && te.target === targetName
+    );
+}
+
 export function isCreatureInSilenceZone(targetName, casterName, campaignName) {
     if (!isSilenceActive(casterName, campaignName)) return false;
 
     // Manual-picker zone model: creatures chosen at cast time carry a 'silenced'
     // te from the caster — that IS zone membership until concentration breaks
     // (clear_silence_zone drains both te and the Silence activeBuffs).
-    const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
-    if (Array.isArray(targetEffects) && targetEffects.some(
-        te => te.effect === SILENCE_TARGET_EFFECT && te.source === casterName && te.target === targetName
-    )) {
+    if (hasSilenceZoneTargetEffect(casterName, targetName, campaignName)) {
         return true;
     }
 

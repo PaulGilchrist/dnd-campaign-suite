@@ -82,7 +82,7 @@ export async function handleFiresBurnDirect(action, playerStats, campaignName) {
         description: `${playerStats.name} used ${optName} to deal ${actualDamage} fire damage to ${targetName}.`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
-    return ancestryDamagePopup(optName, formula, damageResult, actualDamage, targetName, newHp, damageType);
+    return ancestryDamagePopup({ optName, formula, damageResult, actualDamage, targetName, newHp, damageType });
 }
 
 export async function handleFrostsChillDirect(action, playerStats, campaignName) {
@@ -125,7 +125,7 @@ export async function handleFrostsChillDirect(action, playerStats, campaignName)
 
     await logSpeedReductionCondition(campaignName, playerStats, optName, targetName, speedReduction);
 
-    return ancestryDamagePopup(optName, formula, damageResult, actualDamage, targetName, newHp, damageType);
+    return ancestryDamagePopup({ optName, formula, damageResult, actualDamage, targetName, newHp, damageType });
 }
 
 export async function handleHillsTumbleDirect(action, playerStats, campaignName) {
@@ -370,5 +370,5 @@ export async function handleStormsThunderDirect(action, playerStats, campaignNam
         description: `${playerStats.name} used ${optName} to deal ${actualDamage} thunder damage to ${attackerName}.`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
-    return ancestryDamagePopup(optName, formula, damageResult, actualDamage, attackerName, newHp, damageType);
+    return ancestryDamagePopup({ optName, formula, damageResult, actualDamage, targetName: attackerName, newHp, damageType });
 }

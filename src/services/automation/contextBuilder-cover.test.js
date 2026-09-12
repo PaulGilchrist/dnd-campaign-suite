@@ -177,7 +177,7 @@ describe('contextBuilder: baitAndSwitch cover bonus', () => {
       return undefined;
     });
 
-    const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+    const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
 
     expect(result.coverAcBonus).toBe(5);
     expect(result.coverLevel).toBe('half');

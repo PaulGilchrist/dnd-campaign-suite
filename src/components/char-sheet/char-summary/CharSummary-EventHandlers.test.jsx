@@ -35,7 +35,7 @@ vi.mock('../ShortRestModal.jsx', () => ({ default: () => <div data-testid="short
 vi.mock('./CharConditions.jsx', () => ({ default: () => <div data-testid="char-conditions">Conditions</div> }));
 
 vi.mock('../../../hooks/runtime/useTrackedResource.js', () => ({
-    default: vi.fn((_key, _name, _init, _deps, _campaign) => ({ current: false, update: vi.fn() })),
+    default: vi.fn(() => ({ current: false, update: vi.fn() })),
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({

@@ -42,7 +42,7 @@ export function generateDungeon(opts) {
   const placedItems = placeFurniture(rooms, gridSize, rng, grid, corridorCells, trimmedDoors);
 
   // ---- 6-7. Place NPCs, stairs, doors, deduplicate ----
-  const dedupedItems = placeItems(rooms, placedItems, gridSize, rng, grid, trimmedDoors, corridorCells);
+  const dedupedItems = placeItems({ rooms, placedItems, gridSize, rng, grid, trimmedDoors, corridorCells });
 
   // ---- 8. Build output ----
   const walls = [];
@@ -69,6 +69,16 @@ export function generateDungeon(opts) {
 // ---------------------------------------------------------------------------
 // ASCII visualiser
 // ---------------------------------------------------------------------------
+const ITEM_GLYPHS = {
+  secretDoor: 's',
+  door: '+',
+  stairs: '>',
+  npc: '@',
+  chest: '=',
+  altar: 'A',
+  trap: '^'
+};
+
 export function visualize(map) {
   const g = [];
   for (let y = 0; y < map.gridSize; y++) {
@@ -94,21 +104,8 @@ export function visualize(map) {
       item.gridY < map.gridSize &&
       item.gridX < map.gridSize
     ) {
-      if (item.type === 'secretDoor') {
-        g[item.gridY][item.gridX] = 's';
-      } else if (item.type === 'door') {
-        g[item.gridY][item.gridX] = '+';
-      } else if (item.type === 'stairs') {
-        g[item.gridY][item.gridX] = '>';
-      } else if (item.type === 'npc') {
-        g[item.gridY][item.gridX] = '@';
-      } else if (item.type === 'chest') {
-        g[item.gridY][item.gridX] = '=';
-      } else if (item.type === 'altar') {
-        g[item.gridY][item.gridX] = 'A';
-      } else if (item.type === 'trap') {
-        g[item.gridY][item.gridX] = '^';
-      }
+      const glyph = ITEM_GLYPHS[item.type];
+      if (glyph) g[item.gridY][item.gridX] = glyph;
     }
   }
 

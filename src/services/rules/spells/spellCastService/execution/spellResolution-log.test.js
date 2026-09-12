@@ -87,16 +87,16 @@ describe('logGenericSpellCast', () => {
     const fullSpell = { description: ['A bright flash', 'of lightning'] };
     const getTargetInfo = vi.fn(() => Promise.resolve({ name: 'Goblin' }));
 
-    const result = logGenericSpellCast(
+    const result = logGenericSpellCast({
       spell,
-      makePlayerStats(),
-      'test-campaign',
+      playerStats: makePlayerStats(),
+      campaignName: 'test-campaign',
       getTargetInfo,
-      fullSpell,
-      'Lightning',
-      '2d6',
-      15,
-    );
+      fullSpell: fullSpell,
+      damageType: 'Lightning',
+      formula: '2d6',
+      spellSaveDc: 15,
+    });
 
     expect(result).toBeInstanceOf(Promise);
     await result;
@@ -120,16 +120,16 @@ describe('logGenericSpellCast', () => {
     const spell = { name: 'Hex' };
     const getTargetInfo = vi.fn();
 
-    const result = logGenericSpellCast(
+    const result = logGenericSpellCast({
       spell,
-      makePlayerStats(),
-      'test-campaign',
+      playerStats: makePlayerStats(),
+      campaignName: 'test-campaign',
       getTargetInfo,
-      {},
-      null,
-      null,
-      0,
-    );
+      fullSpell: {},
+      damageType: null,
+      formula: null,
+      spellSaveDc: 0,
+    });
 
     expect(result).toBeInstanceOf(Promise);
     await result;
@@ -142,16 +142,16 @@ describe('logGenericSpellCast', () => {
     const spell = { name: 'Fireball', level: 3, casting_time: '1 action', concentration: false, dc: { dc_type: 'dex' } };
     const getTargetInfo = vi.fn(() => Promise.resolve({ name: 'Goblin' }));
 
-    const result = logGenericSpellCast(
+    const result = logGenericSpellCast({
       spell,
-      makePlayerStats(),
-      'test-campaign',
+      playerStats: makePlayerStats(),
+      campaignName: 'test-campaign',
       getTargetInfo,
-      {},
-      'Fire',
-      '8d6',
-      15,
-    );
+      fullSpell: {},
+      damageType: 'Fire',
+      formula: '8d6',
+      spellSaveDc: 15,
+    });
 
     await result;
 
@@ -164,16 +164,16 @@ describe('logGenericSpellCast', () => {
     const spell = { name: 'Fireball', level: 3, casting_time: '1 action', concentration: false };
     const getTargetInfo = vi.fn(() => Promise.resolve({ name: 'Goblin' }));
 
-    const result = logGenericSpellCast(
+    const result = logGenericSpellCast({
       spell,
-      makePlayerStats(),
-      'test-campaign',
+      playerStats: makePlayerStats(),
+      campaignName: 'test-campaign',
       getTargetInfo,
-      {},
-      'Fire',
-      '8d6',
-      15,
-    );
+      fullSpell: {},
+      damageType: 'Fire',
+      formula: '8d6',
+      spellSaveDc: 15,
+    });
 
     await result;
 
@@ -186,16 +186,16 @@ describe('logGenericSpellCast', () => {
     const spell = { name: 'Fireball' };
     const getTargetInfo = vi.fn(() => Promise.resolve({ name: 'Target' }));
 
-    const result = logGenericSpellCast(
+    const result = logGenericSpellCast({
       spell,
-      makePlayerStats(),
-      'test-campaign',
+      playerStats: makePlayerStats(),
+      campaignName: 'test-campaign',
       getTargetInfo,
-      {},
-      null,
-      null,
-      0,
-    );
+      fullSpell: {},
+      damageType: null,
+      formula: null,
+      spellSaveDc: 0,
+    });
 
     await result;
 
@@ -209,16 +209,16 @@ describe('logGenericSpellCast', () => {
     const fullSpell = { description: ['Line 1', 'Line 2', 'Line 3'] };
     const getTargetInfo = vi.fn(() => Promise.resolve({ name: 'Target' }));
 
-    const result = logGenericSpellCast(
+    const result = logGenericSpellCast({
       spell,
-      makePlayerStats(),
-      'test-campaign',
+      playerStats: makePlayerStats(),
+      campaignName: 'test-campaign',
       getTargetInfo,
-      fullSpell,
-      null,
-      null,
-      0,
-    );
+      fullSpell: fullSpell,
+      damageType: null,
+      formula: null,
+      spellSaveDc: 0,
+    });
 
     await result;
 
@@ -231,16 +231,16 @@ describe('logGenericSpellCast', () => {
     const spell = { name: 'Fireball' };
     const getTargetInfo = vi.fn(() => Promise.resolve({ name: 'Target' }));
 
-    const result = logGenericSpellCast(
+    const result = logGenericSpellCast({
       spell,
-      makePlayerStats(),
-      'test-campaign',
+      playerStats: makePlayerStats(),
+      campaignName: 'test-campaign',
       getTargetInfo,
-      { description: null },
-      null,
-      null,
-      0,
-    );
+      fullSpell: { description: null },
+      damageType: null,
+      formula: null,
+      spellSaveDc: 0,
+    });
 
     await result;
 
@@ -253,16 +253,16 @@ describe('logGenericSpellCast', () => {
     const spell = { name: 'Fireball' };
     const getTargetInfo = vi.fn(() => Promise.resolve({ name: 'Target' }));
 
-    const result = logGenericSpellCast(
+    const result = logGenericSpellCast({
       spell,
-      makePlayerStats(),
-      'test-campaign',
+      playerStats: makePlayerStats(),
+      campaignName: 'test-campaign',
       getTargetInfo,
-      {},
-      null,
-      null,
-      0,
-    );
+      fullSpell: {},
+      damageType: null,
+      formula: null,
+      spellSaveDc: 0,
+    });
 
     await result;
 
@@ -275,16 +275,16 @@ describe('logGenericSpellCast', () => {
     const spell = { name: 'Fireball', dc: { dc_type: 'dex', dc_success: 'half' } };
     const getTargetInfo = vi.fn(() => Promise.resolve({ name: 'Target' }));
 
-    const result = logGenericSpellCast(
+    const result = logGenericSpellCast({
       spell,
-      makePlayerStats(),
-      'test-campaign',
+      playerStats: makePlayerStats(),
+      campaignName: 'test-campaign',
       getTargetInfo,
-      {},
-      'Fire',
-      '8d6',
-      15,
-    );
+      fullSpell: {},
+      damageType: 'Fire',
+      formula: '8d6',
+      spellSaveDc: 15,
+    });
 
     await result;
 
@@ -297,16 +297,16 @@ describe('logGenericSpellCast', () => {
     const spell = { name: 'Fireball' };
     const getTargetInfo = vi.fn(() => Promise.resolve(null));
 
-    const result = logGenericSpellCast(
+    const result = logGenericSpellCast({
       spell,
-      makePlayerStats(),
-      'test-campaign',
+      playerStats: makePlayerStats(),
+      campaignName: 'test-campaign',
       getTargetInfo,
-      {},
-      null,
-      null,
-      0,
-    );
+      fullSpell: {},
+      damageType: null,
+      formula: null,
+      spellSaveDc: 0,
+    });
 
     await result;
 
@@ -319,16 +319,16 @@ describe('logGenericSpellCast', () => {
     const spell = { name: 'Fireball' };
     const getTargetInfo = vi.fn(() => Promise.resolve(undefined));
 
-    const result = logGenericSpellCast(
+    const result = logGenericSpellCast({
       spell,
-      makePlayerStats(),
-      'test-campaign',
+      playerStats: makePlayerStats(),
+      campaignName: 'test-campaign',
       getTargetInfo,
-      {},
-      null,
-      null,
-      0,
-    );
+      fullSpell: {},
+      damageType: null,
+      formula: null,
+      spellSaveDc: 0,
+    });
 
     await result;
 

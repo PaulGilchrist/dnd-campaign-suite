@@ -6,6 +6,10 @@ function resolveTempBuffUsesMax(auto, playerStats) {
     return playerStats.class?.levels || playerStats.level || 0;
 }
 
+function pickDefault(auto, key, fallback) {
+    return auto[key] || fallback;
+}
+
 export const tempHandlers = {
     'temp_buff': (feature, playerStats) => {
         const auto = feature.automation
@@ -13,30 +17,30 @@ export const tempHandlers = {
         return {
             type: 'temp_buff',
             name: feature.name,
-            effect: auto.effect || '',
-            duration: auto.duration || '1_minute',
-            action: auto.action || 'bonus_action',
-            recharge: auto.recharge || 'long_rest',
-            distance: auto.distance || '',
-            extendedDistance: auto.extendedDistance || '',
+            effect: pickDefault(auto, 'effect', ''),
+            duration: pickDefault(auto, 'duration', '1_minute'),
+            action: pickDefault(auto, 'action', 'bonus_action'),
+            recharge: pickDefault(auto, 'recharge', 'long_rest'),
+            distance: pickDefault(auto, 'distance', ''),
+            extendedDistance: pickDefault(auto, 'extendedDistance', ''),
             oncePerRage: !!auto.oncePerRage,
             bringAllies: !!auto.bringAllies,
-            allyCount: auto.allyCount || 0,
-            teleportRange: auto.teleportRange || '',
-            enemiesDisadvantageSaves: auto.enemies_disadvantage_saves || [],
+            allyCount: pickDefault(auto, 'allyCount', 0),
+            teleportRange: pickDefault(auto, 'teleportRange', ''),
+            enemiesDisadvantageSaves: pickDefault(auto, 'enemies_disadvantage_saves', []),
             triggerOnRage: !!auto.triggerOnRage,
-            distanceExpression: auto.distanceExpression || '',
-            casting_time: auto.casting_time || '',
-            trigger: auto.trigger || null,
-            uses: auto.uses || null,
+            distanceExpression: pickDefault(auto, 'distanceExpression', ''),
+            casting_time: pickDefault(auto, 'casting_time', ''),
+            trigger: pickDefault(auto, 'trigger', null),
+            uses: pickDefault(auto, 'uses', null),
             usesMax,
             multiTarget: !!auto.multiTarget,
-            targets: auto.targets || null,
-            resourceCost: auto.resourceCost || '',
+            targets: pickDefault(auto, 'targets', null),
+            resourceCost: pickDefault(auto, 'resourceCost', ''),
             freeFirstUseAfterLongRest: !!auto.freeFirstUseAfterLongRest,
             // CLA-301: preserve options so choice-pickers (e.g. Sacred Weapon
             // Normal/Radiant damage type) reach the row handler.
-            options: auto.options || [],
+            options: pickDefault(auto, 'options', []),
             hasAutomation: true
         }
     },

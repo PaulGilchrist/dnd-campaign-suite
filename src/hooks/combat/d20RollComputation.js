@@ -177,7 +177,7 @@ function resolveAttackRoll({ rollType, forcedMode, context, campaignName, r1, r2
     return { forcedMode: resolvedForcedMode, effectiveD20Roll, luckyRerolled, luckyRerollValue };
 }
 
-export function computeD20Roll(characterName, campaignName, name, rollType, context, bonus, isResilientSphereActive) {
+export function computeD20Roll({ characterName, campaignName, name, rollType, context, bonus, isResilientSphereActive }) {
     const r1 = rollD20();
     const r2 = rollD20();
 

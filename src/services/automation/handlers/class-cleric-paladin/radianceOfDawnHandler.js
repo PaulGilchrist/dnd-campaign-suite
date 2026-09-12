@@ -184,7 +184,7 @@ async function promptRadiancePlayerTarget(targetName, ctx) {
     }).catch((e) => { console.error('[radianceOfDawn] Log error:', e); });
 }
 
-function buildRadianceResultsHtml(results, playerCount, featureName, saveDc, damageExpression, totalDamage, damageType) {
+function buildRadianceResultsHtml({ results, playerCount, featureName, saveDc, damageExpression, totalDamage, damageType }) {
     let resultsHtml = `<b>${featureName} used!</b><br/><br/>`;
     resultsHtml += `<b>Save DC: ${saveDc}</b> (CON)<br/><br/>`;
     resultsHtml += `<b>Rolls:</b> ${damageExpression} = ${totalDamage} ${damageType} damage<br/><br/>`;
@@ -293,7 +293,7 @@ export async function confirmRadianceOfDawn(action, playerStats, campaignName, s
     const playerCount = playerPrompts.length;
 
     // Build detailed results HTML for popup
-    const resultsHtml = buildRadianceResultsHtml(results, playerCount, featureName, saveDc, damageExpression, totalDamage, damageType);
+    const resultsHtml = buildRadianceResultsHtml({ results, playerCount, featureName, saveDc, damageExpression, totalDamage, damageType });
 
     return {
         type: 'popup',

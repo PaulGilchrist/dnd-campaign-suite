@@ -169,7 +169,7 @@ describe('massHealHandler', () => {
         it('applies healing to each target from distribution', async () => {
             const distribution = { Fighter: 100, Rogue: 50 };
 
-            await confirmMassHeal(baseAction, casterStats, campaignName, distribution, 700, 0, []);
+            await confirmMassHeal({ action: baseAction, playerStats: casterStats, campaignName, distribution, totalPool: 700, bonusHeal: 0, bonusDetails: [] });
 
             expect(applyHealingToTarget).toHaveBeenCalledWith(
                 baseCombatSummary,
@@ -194,7 +194,7 @@ describe('massHealHandler', () => {
 
             const distribution = { Fighter: 100 };
 
-            await confirmMassHeal(baseAction, casterStats, campaignName, distribution, 700, 0, []);
+            await confirmMassHeal({ action: baseAction, playerStats: casterStats, campaignName, distribution, totalPool: 700, bonusHeal: 0, bonusDetails: [] });
 
             expect(applyHealingToTarget).toHaveBeenCalledWith(
                 baseCombatSummary,
@@ -207,7 +207,7 @@ describe('massHealHandler', () => {
         it('logs hp_change for each target', async () => {
             const distribution = { Fighter: 100, Rogue: 50 };
 
-            await confirmMassHeal(baseAction, casterStats, campaignName, distribution, 700, 0, []);
+            await confirmMassHeal({ action: baseAction, playerStats: casterStats, campaignName, distribution, totalPool: 700, bonusHeal: 0, bonusDetails: [] });
 
             const hpLogs = addEntry.mock.calls.filter(call => call[1].type === 'hp_change');
             expect(hpLogs.length).toBe(2);
@@ -225,7 +225,7 @@ describe('massHealHandler', () => {
 
             const distribution = { Fighter: 100 };
 
-            await confirmMassHeal(baseAction, casterStats, campaignName, distribution, 700, 0, []);
+            await confirmMassHeal({ action: baseAction, playerStats: casterStats, campaignName, distribution, totalPool: 700, bonusHeal: 0, bonusDetails: [] });
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'Fighter',
@@ -249,7 +249,7 @@ describe('massHealHandler', () => {
             const mockDispatch = vi.fn();
             window.dispatchEvent = mockDispatch;
 
-            await confirmMassHeal(baseAction, casterStats, campaignName, distribution, 700, 0, []);
+            await confirmMassHeal({ action: baseAction, playerStats: casterStats, campaignName, distribution, totalPool: 700, bonusHeal: 0, bonusDetails: [] });
 
             expect(mockDispatch).toHaveBeenCalled();
             expect(mockDispatch.mock.calls[0][0].type).toBe('combat-summary-updated');
@@ -260,7 +260,7 @@ describe('massHealHandler', () => {
         it('returns popup with healing summary', async () => {
             const distribution = { Fighter: 100, Rogue: 50 };
 
-            const result = await confirmMassHeal(baseAction, casterStats, campaignName, distribution, 700, 0, []);
+            const result = await confirmMassHeal({ action: baseAction, playerStats: casterStats, campaignName, distribution, totalPool: 700, bonusHeal: 0, bonusDetails: [] });
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
@@ -273,7 +273,7 @@ describe('massHealHandler', () => {
         it('handles empty distribution gracefully', async () => {
             const distribution = {};
 
-            const result = await confirmMassHeal(baseAction, casterStats, campaignName, distribution, 700, 0, []);
+            const result = await confirmMassHeal({ action: baseAction, playerStats: casterStats, campaignName, distribution, totalPool: 700, bonusHeal: 0, bonusDetails: [] });
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('0 HP');
@@ -294,7 +294,7 @@ describe('massHealHandler', () => {
 
             const distribution = { Fighter: 100 };
 
-            await confirmMassHeal(action, casterStats, campaignName, distribution, 700, 0, []);
+            await confirmMassHeal({ action, playerStats: casterStats, campaignName, distribution, totalPool: 700, bonusHeal: 0, bonusDetails: [] });
 
             const condLogs = addEntry.mock.calls.filter(call => call[1].type === 'condition');
             expect(condLogs.length).toBe(2);

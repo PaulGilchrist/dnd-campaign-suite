@@ -78,20 +78,23 @@ function computeSaveAdvantage(pending, saveType, targetEffects, targetChar, camp
     };
 }
 
-function resolveEvasionFlags(pending, targetChar, normalizedSaveType, selectedAllies, circleOfPowerAdvantage, allCharacters, campaignName) {
+function sharesEvasionWithTarget(character, targetName, normalizedSaveType) {
+    if (character.name === targetName) return false;
+    const ev = character?.computedStats?.evasionEffects;
+    return ev?.some(ef => ef.saveType === normalizedSaveType && ef.shareable && ef.shareRange >= 5) || false;
+}
+
+function resolveEvasionFlags({ pending, targetChar, normalizedSaveType, selectedAllies, allCharacters, campaignName }) {
     const targetConditions = getRuntimeValue(pending.targetName, 'activeConditions', campaignName) || [];
     const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
+    const halfDamage = pending.dcSuccess === 'half';
 
     const ownEvasion = targetChar?.computedStats?.evasionEffects;
-    const hasOwnEvasion = !isIncapacitated && pending.dcSuccess === 'half' && ownEvasion?.some(ef => ef.saveType === normalizedSaveType);
+    const hasOwnEvasion = !isIncapacitated && halfDamage && ownEvasion?.some(ef => ef.saveType === normalizedSaveType);
     const hasSelectedEvasion = selectedAllies?.has?.(pending.targetName) || false;
-    const hasSharedEvasion = !hasOwnEvasion && !hasSelectedEvasion && !isIncapacitated && pending.dcSuccess === 'half' &&
-        allCharacters.some(c => {
-            if (c.name === pending.targetName) return false;
-            const ev = c?.computedStats?.evasionEffects;
-            return ev?.some(ef => ef.saveType === normalizedSaveType && ef.shareable && ef.shareRange >= 5);
-        });
-    const hasEvasion = hasOwnEvasion || hasSelectedEvasion || hasSharedEvasion || isCircleOfPowerActive(pending.targetName, campaignName);
+    const hasSharedEvasion = !hasOwnEvasion && !hasSelectedEvasion && !isIncapacitated && halfDamage &&
+        allCharacters.some(c => sharesEvasionWithTarget(c, pending.targetName, normalizedSaveType));
+    const hasEvasion = [hasOwnEvasion, hasSelectedEvasion, hasSharedEvasion].some(Boolean) || isCircleOfPowerActive(pending.targetName, campaignName);
     return { hasEvasion, hasOwnEvasion, hasSelectedEvasion, isIncapacitated };
 }
 
@@ -151,7 +154,7 @@ function isShieldBlockingMagicMissile(targetActiveBuffs, pending) {
     return isShieldActive && !!isMagicMissile;
 }
 
-function logQuickRollEvasion(pending, target, saveResult, saveType, evasionFlags, circleOfPowerAdvantage, logEntry) {
+function logQuickRollEvasion({ pending, saveResult, saveType, evasionFlags, circleOfPowerAdvantage, logEntry }) {
     const { hasOwnEvasion, hasSelectedEvasion } = evasionFlags;
     logEntry({
         type: 'roll',
@@ -318,11 +321,11 @@ export function createSaves(deps) {
         saveResult.total += baneSave.penalty + blessSaveBonus + baneAttacker.bonus;
 
         const normalizedSaveType = normalizeSaveType(saveType);
-        const evasionFlags = resolveEvasionFlags(pending, targetChar, normalizedSaveType, selectedAllies, circleOfPowerAdvantage, charactersRef.current || [], campaignName);
+        const evasionFlags = resolveEvasionFlags({ pending, targetChar, normalizedSaveType, selectedAllies, allCharacters: charactersRef.current || [], campaignName });
         let finalDamage = computeDamageAfterEvasion(pending.rawDamage, saveResult.success, pending.dcSuccess, evasionFlags.hasEvasion);
 
         if (evasionFlags.hasEvasion) {
-            logQuickRollEvasion(pending, target, saveResult, saveType, evasionFlags, circleOfPowerAdvantage, logEntry);
+            logQuickRollEvasion({ pending, saveResult, saveType, evasionFlags, circleOfPowerAdvantage, logEntry });
         }
 
         if (isShieldBlockingMagicMissile(targetActiveBuffs, pending)) {

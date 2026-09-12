@@ -26,7 +26,7 @@ const ShieldOfFaithTargetSelectionModal = ({ popupHtml, setPopupHtml, handleShie
 export { ShieldOfFaithTargetSelectionModal };
 
 // eslint-disable-next-line react-refresh/only-export-components
-export const renderPopup = (popupHtml, setPopupHtml, isLocalhost, playerStats, campaignName, characters, popupHandlers) => {
+export const renderPopup = ({ popupHtml, setPopupHtml, isLocalhost, playerStats, campaignName, characters: _characters, popupHandlers }) => {
     if (!popupHtml) return null;
     
     if (typeof popupHtml === 'string') {

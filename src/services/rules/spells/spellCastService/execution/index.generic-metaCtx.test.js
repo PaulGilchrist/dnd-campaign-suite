@@ -274,7 +274,7 @@ describe('executeSpellCast routes metaCtx into handleGenericAutomation (SP-092)'
 
     expect(mockGenericAutomation).toHaveBeenCalledTimes(1);
     const callArgs = mockGenericAutomation.mock.calls[0];
-    expect(callArgs[7]).toEqual(metaCtx);
-    expect(callArgs[7].selectedTargets).toEqual(['Zombie 1', 'Zombie 2', 'Archmage 1', 'Archmage 2']);
+    expect(callArgs[0].metaCtx).toEqual(metaCtx);
+    expect(callArgs[0].metaCtx.selectedTargets).toEqual(['Zombie 1', 'Zombie 2', 'Archmage 1', 'Archmage 2']);
   });
 });

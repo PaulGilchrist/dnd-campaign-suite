@@ -83,7 +83,7 @@ export async function logAncestryDamageRoll({ campaignName, playerStats, optName
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 }
 
-export function ancestryDamagePopup(optName, formula, damageResult, actualDamage, targetName, newHp, damageType) {
+export function ancestryDamagePopup({ optName, formula, damageResult, actualDamage, targetName, newHp, damageType }) {
     return {
         type: 'popup',
         payload: {

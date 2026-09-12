@@ -31,12 +31,41 @@ export async function triggerBaneSpell(spell, metaCtx, playerStats, campaignName
     }
 }
 
+async function applyBanePenaltyEffect(campaignName, targetName, casterName, slotLevel) {
+    const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const effects = Array.isArray(storedEffects) ? [...storedEffects] : [];
+    const baneEffect = {
+        target: targetName,
+        effect: 'bane_penalty',
+        source: casterName,
+        slotLevel,
+        duration: 'concentration',
+    };
+    const existingIndex = effects.findIndex(
+        te => te.target === targetName && te.effect === 'bane_penalty' && te.source === casterName
+    );
+    if (existingIndex >= 0) {
+        effects[existingIndex] = baneEffect;
+    } else {
+        effects.push(baneEffect);
+    }
+    setRuntimeValue('campaign', 'targetEffects', effects, campaignName, true);
+
+    addEntry(campaignName, {
+        type: 'automation',
+        characterName: casterName,
+        abilityName: 'Bane',
+        description: `${targetName} fails CHA save against Bane. Attack rolls and saving throws suffer -1d4 penalty.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[baneSpell] Error logging effect:', e); });
+}
 export async function applyBaneEffect(spell, playerStats, campaignName, mapName, targetNames) {
     if (!targetNames || !Array.isArray(targetNames) || targetNames.length === 0) {
         return null;
     }
 
     const slotLevel = spell.level || 1;
+    const castingTime = spell.casting_time || '1 action';
     const saveDc = buildSaveDc(spell.automation || {}, playerStats) || playerStats.computedStats?.saveBonuses?.CHA + 8;
     const casterName = playerStats.name;
 
@@ -58,7 +87,7 @@ export async function applyBaneEffect(spell, playerStats, campaignName, mapName,
             targetName,
             spellName: 'Bane',
             spellLevel: slotLevel,
-            castingTime: spell.casting_time || '1 action',
+            castingTime: castingTime,
             description: `${casterName} casts Bane on ${targetName} (DC ${saveDc} CHA save).`,
             promptId,
             timestamp: Date.now(),
@@ -80,34 +109,8 @@ export async function applyBaneEffect(spell, playerStats, campaignName, mapName,
         }).catch((e) => { console.error('[baneSpell] Error logging save:', e); });
 
         if (!saveResult.success) {
-            const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-            const effects = Array.isArray(storedEffects) ? [...storedEffects] : [];
-            const baneEffect = {
-                target: targetName,
-                effect: 'bane_penalty',
-                source: casterName,
-                slotLevel,
-                duration: 'concentration',
-            };
-            const existingIndex = effects.findIndex(
-                te => te.target === targetName && te.effect === 'bane_penalty' && te.source === casterName
-            );
-            if (existingIndex >= 0) {
-                effects[existingIndex] = baneEffect;
-            } else {
-                effects.push(baneEffect);
-            }
-            setRuntimeValue('campaign', 'targetEffects', effects, campaignName, true);
-
+            await applyBanePenaltyEffect(campaignName, targetName, casterName, slotLevel);
             logTargets.push({ name: targetName, saved: false });
-
-            addEntry(campaignName, {
-                type: 'automation',
-                characterName: casterName,
-                abilityName: 'Bane',
-                description: `${targetName} fails CHA save against Bane. Attack rolls and saving throws suffer -1d4 penalty.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[baneSpell] Error logging effect:', e); });
         } else {
             logTargets.push({ name: targetName, saved: true });
         }

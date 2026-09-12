@@ -270,7 +270,7 @@ async function computeSaveRollOutcome({ current, characters, campaignName, activ
   };
 }
 
-function buildResultDispatchDetail(campaignName, current, result, saveBonus, rawRolls, rollMode, evasionActive) {
+function buildResultDispatchDetail({ current, result, saveBonus, rawRolls, rollMode, evasionActive }) {
   return {
     promptId: current.promptId,
     targetName: current.targetName,
@@ -335,7 +335,7 @@ function submitResultAndClear(campaignName, current, result, { includeBaneRoll, 
 
   window.dispatchEvent(new CustomEvent('save-result', {
     detail: {
-      ...buildResultDispatchDetail(campaignName, current, result, saveBonus, rawRolls, rollMode, evasionActive),
+      ...buildResultDispatchDetail({ current, result, saveBonus, rawRolls, rollMode, evasionActive }),
       ...(includeBaneRoll ? { baneRoll: result.baneRoll } : {}),
     },
   }));
@@ -445,13 +445,19 @@ function resolveIndomitableReroll(targetCharacter) {
   return { modifier, maxUses, rerollBonus };
 }
 
+function readRerollResourceState(current, campaignName) {
+  return {
+    fanaticalFocusUsed: current ? getRuntimeValue(current.targetName, 'fanaticalFocusUsed', campaignName) : false,
+    isRagingForSave: isRaging(getRuntimeValue(current?.targetName, 'activeBuffs', campaignName) || []),
+    livingLegendActive: current ? getRuntimeValue(current.targetName, 'livingLegendActive', campaignName) === true : false,
+    indomitableUses: current ? Number(getRuntimeValue(current?.targetName, 'indomitableUses', campaignName) ?? 0) : 0,
+    guardedMindUsed: current ? getRuntimeValue(current.targetName, '_guardedMind_usedRest', campaignName) : false,
+  };
+}
+
 function computeRerollAvailability(current, targetCharacter, campaignName) {
-  const fanaticalFocusUsed = current ? getRuntimeValue(current.targetName, 'fanaticalFocusUsed', campaignName) : false;
-  const isRagingForSave = isRaging(getRuntimeValue(current?.targetName, 'activeBuffs', campaignName) || []);
-  const livingLegendActive = current ? getRuntimeValue(current.targetName, 'livingLegendActive', campaignName) === true : false;
-  const indomitableUses = current ? Number(getRuntimeValue(current?.targetName, 'indomitableUses', campaignName) ?? 0) : 0;
+  const { fanaticalFocusUsed, isRagingForSave, livingLegendActive, indomitableUses, guardedMindUsed } = readRerollResourceState(current, campaignName);
   const currentFocusPoints = resolveCurrentFocusPoints(current, targetCharacter, campaignName);
-  const guardedMindUsed = current ? getRuntimeValue(current.targetName, '_guardedMind_usedRest', campaignName) : false;
 
   const guardedMindSpecialAction = findGuardedMindAction(targetCharacter);
   const isValidSaveType = !!current && GUARDED_MIND_SAVE_TYPES.includes(current.saveType);

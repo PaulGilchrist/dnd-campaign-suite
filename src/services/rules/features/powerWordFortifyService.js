@@ -70,6 +70,14 @@ function resolveTargets(combatSummary, casterName, rangeFt, maxTargets) {
     return selectDefaultTargets(combatSummary, casterName, maxTargets);
 }
 
+function resolveFortifyMaxTargets(spell) {
+    return spell.automation?.maxTargets || 6;
+}
+
+function resolveFortifyRangeFt(spell) {
+    return rangeToFeet(spell.automation?.range || spell.range || '60 feet');
+}
+
 export async function triggerPowerWordFortify(spell, metaCtx, playerStats, campaignName, _mapName) {
     if (!isPowerWordFortify(spell)) {
         return null;
@@ -90,8 +98,8 @@ export async function triggerPowerWordFortify(spell, metaCtx, playerStats, campa
     }
 
     const casterName = playerStats.name;
-    const maxTargets = spell.automation?.maxTargets || 6;
-    const rangeFt = rangeToFeet(spell.automation?.range || spell.range || '60 feet');
+    const maxTargets = resolveFortifyMaxTargets(spell);
+    const rangeFt = resolveFortifyRangeFt(spell);
 
     const targets = resolveTargets(combatSummary, casterName, rangeFt, maxTargets);
 

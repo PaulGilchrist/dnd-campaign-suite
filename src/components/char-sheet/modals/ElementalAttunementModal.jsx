@@ -311,6 +311,28 @@ function applyAttunementSaveEffect({ detail, targetName, success, saveBonus, set
     }]);
 }
 
+function computeAttunementSaveDc(playerStats) {
+    return 8 + (playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0) + playerStats.proficiency;
+}
+
+function ElementalCreatureSelection({ chosenElement, saveType, saveDc, elementData, targets, onConfirm, onSkip }) {
+    return (
+        <CreatureSelectionModal
+            title="Elemental Attunement"
+            icon="fa-wand-magic-sparkles"
+            targets={targets}
+            description={`Select creatures within the ${chosenElement} manifestation. Each must make a <strong>${saveType}</strong> saving throw (DC ${saveDc}).`}
+            note={elementData?.damage
+                ? `On a failed save, target takes ${elementData.damage} ${elementData.damageType} damage. On a successful save, target takes half damage.`
+                : `On a failed save, target suffers the ${chosenElement} effect.`}
+            confirmLabel="Activate"
+            confirmIcon="fa-wand-magic-sparkles"
+            onConfirm={onConfirm}
+            onSkip={onSkip}
+        />
+    );
+}
+
 function ElementalAttunementModal({ action, playerStats, campaignName, mapName, activeOverlay, onClose }) {
     const [phase, setPhase] = useState('element');
     const [chosenElement, setChosenElement] = useState(null);
@@ -321,7 +343,7 @@ function ElementalAttunementModal({ action, playerStats, campaignName, mapName, 
 
     const elementData = chosenElement ? ELEMENT_DATA[chosenElement] : null;
     const saveType = elementData?.saveType || 'DEX';
-    const saveDc = 8 + (playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0) + playerStats.proficiency;
+    const saveDc = computeAttunementSaveDc(playerStats);
 
     useEffect(() => {
         return () => {
@@ -588,16 +610,12 @@ function ElementalAttunementModal({ action, playerStats, campaignName, mapName, 
 
     if (phase === 'creatureSelection') {
         return (
-            <CreatureSelectionModal
-                title="Elemental Attunement"
-                icon="fa-wand-magic-sparkles"
+            <ElementalCreatureSelection
+                chosenElement={chosenElement}
+                saveType={saveType}
+                saveDc={saveDc}
+                elementData={elementData}
                 targets={targets}
-                description={`Select creatures within the ${chosenElement} manifestation. Each must make a <strong>${saveType}</strong> saving throw (DC ${saveDc}).`}
-                note={elementData?.damage
-                    ? `On a failed save, target takes ${elementData.damage} ${elementData.damageType} damage. On a successful save, target takes half damage.`
-                    : `On a failed save, target suffers the ${chosenElement} effect.`}
-                confirmLabel="Activate"
-                confirmIcon="fa-wand-magic-sparkles"
                 onConfirm={handleCreatureSelectionConfirm}
                 onSkip={handleCreatureSelectionSkip}
             />

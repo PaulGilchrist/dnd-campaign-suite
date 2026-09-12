@@ -72,13 +72,20 @@ const SPELL_SLOT_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 // FS-010: single source of truth for a Fighter's superiority die COUNT.
 // Battle Master → level-table dice; non-Battle-Master with the Superior
 // Technique fighting style → exactly 1.
+function battleMasterDiceMax(playerStats, classLevel, is2024) {
+  if (is2024) return classLevel?.superiority_dice || 0
+  if (playerStats.level >= 15) return 6
+  if (playerStats.level >= 7) return 5
+  return 4
+}
+
 export function computeSuperiorityDiceMax(playerStats) {
   if (playerStats?.class?.name !== 'Fighter') return 0
   const is2024 = playerStats.rules === '2024'
   const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level)
   const majorName = playerStats.class.major?.name || playerStats.class.subclass?.name
   if (majorName === 'Battle Master') {
-    return is2024 ? (classLevel?.superiority_dice || 0) : (playerStats.level >= 15 ? 6 : (playerStats.level >= 7 ? 5 : 4))
+    return battleMasterDiceMax(playerStats, classLevel, is2024)
   }
   if (playerStats.class.fightingStyles?.includes('Superior Technique')) return 1
   return 0
@@ -99,6 +106,13 @@ function addCoreResources(resources, { playerStats }) {
   resources.shortRestHitDice = { current: shortRestHitDice, max: shortRestHitDice }
 }
 
+function resolveArcaneWardMax(playerStats) {
+  const hasArcaneWard = playerStats.automation?.passives?.some(p => p.type === 'arcane_ward' || (p.type === 'passive_rule' && p.effect === 'arcane_ward'))
+  if (!hasArcaneWard) return 0
+  const intMod = playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus || 0
+  return (2 * playerStats.level) + intMod
+}
+
 function addCasterResources(resources, { playerStats, features, classLevel }) {
   const maxSP = features?.maxSorceryPoints || 0
   resources.sorceryPoints = { current: maxSP, max: maxSP }
@@ -113,12 +127,7 @@ function addCasterResources(resources, { playerStats, features, classLevel }) {
   const maxAR = features?.arcaneRecoveryLevels || 0
   resources.arcaneRecoveryLevels = { current: maxAR, max: maxAR }
 
-  const hasArcaneWard = playerStats.automation?.passives?.some(p => p.type === 'arcane_ward' || (p.type === 'passive_rule' && p.effect === 'arcane_ward'))
-  let maxWard = 0
-  if (hasArcaneWard) {
-    const intMod = playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus || 0
-    maxWard = (2 * playerStats.level) + intMod
-  }
+  const maxWard = resolveArcaneWardMax(playerStats)
   resources.arcaneWardMax = { current: maxWard, max: maxWard }
   resources.arcaneWardHp = { current: maxWard, max: maxWard }
 }

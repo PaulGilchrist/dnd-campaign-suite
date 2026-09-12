@@ -137,7 +137,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         spellName: action.name,
         saveType: 'WIS',
         saveDc: dc,
-        attackScope: targetNames.length > 1 ? 'single' : 'single',
+        attackScope: 'single',
     });
 
     let paralyzedCount = 0;
@@ -186,14 +186,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
         if (saveResult.success) {
             savedCount++;
-            await addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'success',
-                roll: saveResult.roll ?? 0,
-                total: saveResult.total ?? 0,
-                conditions: [],
-                appliedDamage: 0,
-            });
+            await recordHoldTargetResult(campaignName, targetName, saveResult, 'success');
             addEntry(campaignName, {
                 type: 'save_result',
                 characterName: casterName,
@@ -224,4 +217,15 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             description: summary,
         },
     };
+}
+
+async function recordHoldTargetResult(campaignName, targetName, saveResult, saveOutcome) {
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: saveOutcome,
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: [],
+        appliedDamage: 0,
+    });
 }

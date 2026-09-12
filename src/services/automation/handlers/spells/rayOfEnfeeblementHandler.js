@@ -41,67 +41,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const saveResult = await promise;
 
     if (saveResult.success) {
-        await addTargetResult(campaignName, {
-            targetName,
-            saveResult: 'success',
-            roll: saveResult.roll ?? 0,
-            total: saveResult.total ?? 0,
-            conditions: [],
-            appliedDamage: 0,
-        });
-        addEntry(campaignName, {
-            type: 'save_result',
-            characterName: playerStats.name,
-            rollType: 'save-ray-of-enfeeblement',
-            targetName,
-            saveDc: dc,
-            saveType: 'CON',
-            success: true,
-            description: `${targetName} succeeded on CON save against Ray of Enfeeblement.`,
-        }).catch((e) => { console.error("[rayOfEnfeeblement] Error:", e); });
-
-        // Successful save: target has Disadvantage on next attack roll until start of caster's next turn
-        const allTargetEffects = [...getRuntimeValue('campaign', 'targetEffects') || []];
-        const existingIndex = allTargetEffects.findIndex(
-            te => te.target === targetName && te.effect === 'disadvantage_next_attack' && te.source === playerStats.name
-        );
-
-        const nextAttackEffect = {
-            target: targetName,
-            source: playerStats.name,
-            effect: 'disadvantage_next_attack',
-        };
-
-        if (existingIndex >= 0) {
-            allTargetEffects[existingIndex] = nextAttackEffect;
-        } else {
-            allTargetEffects.push(nextAttackEffect);
-        }
-
-        setRuntimeValue('campaign', 'targetEffects', allTargetEffects, campaignName);
-
-        addExpiration(playerStats.name, targetName, [
-            { type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: playerStats.name },
-        ], campaignName, undefined, playerStats.name);
-
-        addEntry(campaignName, {
-            type: 'automation_info',
-            action: 'applied',
-            characterName: targetName,
-            effect: 'Disadvantage on next attack roll',
-            reason: 'Ray of Enfeeblement (successful save)',
-            note: `${targetName} has Disadvantage on the next attack roll until the start of ${playerStats.name}'s next turn.`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[rayOfEnfeeblement] Error:", e); });
-
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: 'Ray of Enfeeblement',
-                description: `${targetName} succeeded on the CON save. ${targetName} has Disadvantage on the next attack roll until the start of ${playerStats.name}'s next turn.`,
-            },
-        };
+        return await handleRaySaveSuccess(action, playerStats, campaignName, targetName, dc, saveResult);
     }
 
     // ── Failed save: apply debuffs via targetEffects ──
@@ -181,6 +121,70 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             targetName,
             description: `${targetName} failed the CON save. ${targetName} has Disadvantage on Strength-based d20 tests and subtracts 1d8 from all damage rolls (Concentration, up to 1 minute). ${targetName} repeats the save at the end of each turn.`,
             automation: auto,
+        },
+    };
+}
+
+async function handleRaySaveSuccess(action, playerStats, campaignName, targetName, dc, saveResult) {
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'success',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: [],
+        appliedDamage: 0,
+    });
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: playerStats.name,
+        rollType: 'save-ray-of-enfeeblement',
+        targetName,
+        saveDc: dc,
+        saveType: 'CON',
+        success: true,
+        description: `${targetName} succeeded on CON save against Ray of Enfeeblement.`,
+    }).catch((e) => { console.error("[rayOfEnfeeblement] Error:", e); });
+
+    // Successful save: target has Disadvantage on next attack roll until start of caster's next turn
+    const allTargetEffects = [...getRuntimeValue('campaign', 'targetEffects') || []];
+    const existingIndex = allTargetEffects.findIndex(
+        te => te.target === targetName && te.effect === 'disadvantage_next_attack' && te.source === playerStats.name
+    );
+
+    const nextAttackEffect = {
+        target: targetName,
+        source: playerStats.name,
+        effect: 'disadvantage_next_attack',
+    };
+
+    if (existingIndex >= 0) {
+        allTargetEffects[existingIndex] = nextAttackEffect;
+    } else {
+        allTargetEffects.push(nextAttackEffect);
+    }
+
+    setRuntimeValue('campaign', 'targetEffects', allTargetEffects, campaignName);
+
+    addExpiration(playerStats.name, targetName, [
+        { type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: playerStats.name },
+    ], campaignName, undefined, playerStats.name);
+
+    addEntry(campaignName, {
+        type: 'automation_info',
+        action: 'applied',
+        characterName: targetName,
+        effect: 'Disadvantage on next attack roll',
+        reason: 'Ray of Enfeeblement (successful save)',
+        note: `${targetName} has Disadvantage on the next attack roll until the start of ${playerStats.name}'s next turn.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[rayOfEnfeeblement] Error:", e); });
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: 'Ray of Enfeeblement',
+            description: `${targetName} succeeded on the CON save. ${targetName} has Disadvantage on the next attack roll until the start of ${playerStats.name}'s next turn.`,
         },
     };
 }

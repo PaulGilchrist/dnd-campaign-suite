@@ -138,25 +138,27 @@ function clearCasterAnimalShapesExpiration(animalShapesCaster, targetName, campa
     setRuntimeValue(animalShapesCaster, 'pendingExpirations', filteredExp, campaignName);
 }
 
+function revertAnimalShapesCreature(cs, targetName) {
+    if (!cs?.creatures) return { changed: false, caster: null };
+    const creature = cs.creatures.find(c => c.name === targetName);
+    if (!creature?.animalShapesSource) return { changed: false, caster: null };
+
+    const caster = creature.animalShapesSource;
+    const original = creature.polymorphOriginal || {};
+    creature.maxHp = original.maxHp;
+    creature.ac = original.ac;
+    if (original.speed !== undefined) creature.speed = original.speed;
+    delete creature.animalShapesSource;
+    delete creature.animalShapesBeast;
+    delete creature.beastName;
+    return { changed: true, caster };
+}
+
 export function revertAnimalShapes(targetName, campaignName) {
     const cs = getCombatSummary(campaignName);
-    let animalShapesCaster = null;
-    let changed = false;
+    const { changed, caster } = revertAnimalShapesCreature(cs, targetName);
+    let animalShapesCaster = caster;
 
-    if (cs?.creatures) {
-        const creature = cs.creatures.find(c => c.name === targetName);
-        if (creature?.animalShapesSource) {
-            animalShapesCaster = creature.animalShapesSource;
-            const original = creature.polymorphOriginal || {};
-            creature.maxHp = original.maxHp;
-            creature.ac = original.ac;
-            if (original.speed !== undefined) creature.speed = original.speed;
-            delete creature.animalShapesSource;
-            delete creature.animalShapesBeast;
-            delete creature.beastName;
-            changed = true;
-        }
-    }
     if (changed && cs) {
         storage.set('combatSummary', cs, campaignName);
         setCombatSummaryCache(cs, campaignName);

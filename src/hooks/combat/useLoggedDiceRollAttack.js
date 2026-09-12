@@ -67,7 +67,7 @@ function logLuckyReroll(characterName, campaignName, name, rollType, ctx) {
     }).catch((e) => { console.error('[Lucky] Log error:', e); });
 }
 
-function logIndomitableMight(characterName, campaignName, name, rollType, bonus, context, ctx) {
+function logIndomitableMight({ characterName, campaignName, name, rollType, bonus, context, ctx }) {
     const strReplaceApplied = (context?.strSaveReplace && rollType === 'save') || (context?.strCheckReplace && (rollType === 'check' || rollType === 'skill'));
     const originalTotal = ctx.effectiveD20Roll + bonus + ctx.cosmicOmenAppliedBonus + ctx.sunderingBlowBonus;
     if (!(strReplaceApplied && originalTotal < (context?.strScore || 10))) return;
@@ -375,7 +375,7 @@ export function createLogAndShow(deps) {
         await maybeCancelForcedMode({ ctx, rollType, characterName, campaignName, combatSummary, name });
 
         // Compute d20 roll with all modifiers
-        const d20Result = computeD20Roll(characterName, campaignName, name, rollType, ctx, bonus, isResilientSphereActive);
+        const d20Result = computeD20Roll({ characterName, campaignName, name, rollType, context: ctx, bonus, isResilientSphereActive });
         Object.assign(ctx, d20Result);
         ctx.effectiveD20 = d20Result.effectiveD20;
 
@@ -418,7 +418,7 @@ export function createLogAndShow(deps) {
         logLuckyReroll(characterName, campaignName, name, rollType, ctx);
 
         // Log Indomitable Might to campaign log
-        logIndomitableMight(characterName, campaignName, name, rollType, bonus, context, ctx);
+        logIndomitableMight({ characterName, campaignName, name, rollType, bonus, context, ctx });
 
         logEntry(buildRollLogEntry({ characterName, rollType, name, ctx, context, target, targetAc }));
 

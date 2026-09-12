@@ -132,7 +132,7 @@ function applySpreadDamage({ combatSummary, secondTarget, secondTargetName, spel
     }
 }
 
-function applyPowerWordHealSpread(combatSummary, secondTarget, secondTargetName, spell, spellName, playerStats, campaignName) {
+function applyPowerWordHealSpread({ combatSummary, secondTarget, secondTargetName, spell, spellName, playerStats, campaignName }) {
     if (spellName.toLowerCase() !== 'power word heal') return;
 
     const maxHp = secondTarget.maxHp || (playerStats.hitPoints || 0);
@@ -213,7 +213,7 @@ export async function applyMultiTarget(
 
     applySpreadDamage({ combatSummary, secondTarget, secondTargetName, spell, spellName, damageType, metaCtx, playerStats, campaignName });
 
-    applyPowerWordHealSpread(combatSummary, secondTarget, secondTargetName, spell, spellName, playerStats, campaignName);
+    applyPowerWordHealSpread({ combatSummary, secondTarget, secondTargetName, spell, spellName, playerStats, campaignName });
 
     addEntry(campaignName, {
         type: 'ability_use',

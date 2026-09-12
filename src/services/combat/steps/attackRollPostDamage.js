@@ -317,7 +317,7 @@ export function buildProceedToDamageStep() {
     handler: async (ctx) => {
       const { saveResult, saveDc } = await requestPoisonedWeaponsSave(ctx);
 
-      ctx.proceedWithDamage(ctx.attack, ctx.formula, ctx.total, ctx.rolls, ctx.modifier, ctx.critLabels, ctx);
+      ctx.proceedWithDamage({ attack: ctx.attack, formula: ctx.formula, total: ctx.total, rolls: ctx.rolls, modifier: ctx.modifier, critLabels: ctx.critLabels, pipelineCtx: ctx });
 
       if (saveResult && !saveResult.success) {
         await applyFailedPoisonSaveOutcome(ctx, saveDc);
@@ -488,6 +488,26 @@ export function buildCleaveMasteryStep() {
   };
 }
 
+function collectTacticalMasteries(available) {
+  const choiceMasteries = available.choiceMasteries || [];
+  const replaceOptions = available.replaceMasteryOptions || [];
+  const modalOptions = replaceOptions.length > 0 ? replaceOptions : choiceMasteries;
+  const allMasteries = [available.baseMastery, ...(available.extraMasteries || [])].filter(Boolean);
+  const autoApplyMasteries = allMasteries.filter(m => !['Graze', 'Topple', 'Nick', ...choiceMasteries, ...replaceOptions].includes(m));
+  return { choiceMasteries, modalOptions, autoApplyMasteries, allMasteries };
+}
+
+async function applyAutoMasteries(ctx, autoApplyMasteries, targetName) {
+  for (const masteryName of autoApplyMasteries) {
+    const alreadyApplied = getRuntimeValue('campaign', `_${masteryName}_appliedTarget`, ctx.campaignName);
+    if (alreadyApplied === targetName) continue;
+    if (masteryName !== 'Slow') {
+      setRuntimeValue('campaign', `_${masteryName}_appliedTarget`, targetName, ctx.campaignName);
+    }
+    await applyMasteryEffect(masteryName, ctx.playerStats, ctx.campaignName, targetName).catch((e) => { console.error('[Mastery] Error:', e); });
+  }
+}
+
 export function buildTacticalMasterStep() {
   return {
     name: 'tacticalMaster',
@@ -501,11 +521,7 @@ export function buildTacticalMasterStep() {
       const available = collectWeaponMastery(lastAttack.attackName, ctx.playerStats);
       if (!available) return { data: {} };
 
-      const choiceMasteries = available.choiceMasteries || [];
-      const replaceOptions = available.replaceMasteryOptions || [];
-      const modalOptions = replaceOptions.length > 0 ? replaceOptions : choiceMasteries;
-      const allMasteries = [available.baseMastery, ...(available.extraMasteries || [])].filter(Boolean);
-      const autoApplyMasteries = allMasteries.filter(m => !['Graze', 'Topple', 'Nick', ...choiceMasteries, ...replaceOptions].includes(m));
+      const { choiceMasteries, modalOptions, autoApplyMasteries, allMasteries } = collectTacticalMasteries(available);
 
       console.log('[WM-004 debug] tacticalMaster step', { attackName: lastAttack.attackName, allMasteries, autoApplyMasteries, targetName: lastAttack.targetName });
       const wh = (ctx.playerStats.equipment || []).find(e => e.name === 'Warhammer');
@@ -513,32 +529,23 @@ export function buildTacticalMasterStep() {
 
       const targetName = lastAttack.targetName;
 
-      for (const masteryName of autoApplyMasteries) {
-        const alreadyApplied = getRuntimeValue('campaign', `_${masteryName}_appliedTarget`, ctx.campaignName);
-        if (alreadyApplied === targetName) continue;
-        if (masteryName !== 'Slow') {
-          setRuntimeValue('campaign', `_${masteryName}_appliedTarget`, targetName, ctx.campaignName);
-        }
-        await applyMasteryEffect(masteryName, ctx.playerStats, ctx.campaignName, targetName).catch((e) => { console.error('[Mastery] Error:', e); });
-      }
+      await applyAutoMasteries(ctx, autoApplyMasteries, targetName);
 
-      if (modalOptions.length > 0) {
-        const isChoiceMode = !!available.choiceMasteries && available.choiceMasteries.length > 0;
-        ctx.setModalState?.({
-          tacticalMasterPending: {
-            attackName: lastAttack.attackName,
-            baseMastery: available.baseMastery,
-            replaceOptions: modalOptions,
-            targetName,
-            isChoiceMode,
-          },
-        });
-        return {
-          data: { _tacticalMasterPending: true },
-          modal: { type: 'tacticalMaster', props: { attackName: lastAttack.attackName, baseMastery: available.baseMastery, replaceOptions: modalOptions, targetName, isChoiceMode } },
-        };
-      }
-      return { data: {} };
+      if (modalOptions.length === 0) return { data: {} };
+
+      ctx.setModalState?.({
+        tacticalMasterPending: {
+          attackName: lastAttack.attackName,
+          baseMastery: available.baseMastery,
+          replaceOptions: modalOptions,
+          targetName,
+          isChoiceMode: choiceMasteries.length > 0,
+        },
+      });
+      return {
+        data: { _tacticalMasterPending: true },
+        modal: { type: 'tacticalMaster', props: { attackName: lastAttack.attackName, baseMastery: available.baseMastery, replaceOptions: modalOptions, targetName, isChoiceMode: choiceMasteries.length > 0 } },
+      };
     },
   };
 }

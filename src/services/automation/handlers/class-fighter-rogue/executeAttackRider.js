@@ -42,7 +42,7 @@ export async function applyManeuveringAllyGrant(allyName, casterName, targetName
     return { halfSpeed, description };
 }
 
-async function applyBrutalStrikeRider(maneuver, targetName, playerStats, campaignName, dieValue, dieDescription, description) {
+async function applyBrutalStrikeRider({ maneuver, targetName, playerStats, campaignName, dieValue, dieDescription, description }) {
     const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
     const newEffect = {
         target: targetName,
@@ -221,7 +221,7 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
 
     // Handle attack_rider maneuvers with options (Brutal Strike)
     if (isBrutalStrikeRider(maneuver)) {
-        return applyBrutalStrikeRider(maneuver, targetName, playerStats, campaignName, dieValue, dieDescription, description);
+        return applyBrutalStrikeRider({ maneuver, targetName, playerStats, campaignName, dieValue, dieDescription, description });
     }
 
     description = await applyManeuverSaveOutcome(description, maneuver, auto, targetName, playerStats, campaignName);

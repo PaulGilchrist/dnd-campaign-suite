@@ -309,15 +309,15 @@ describe('oceanicGiftHandler', () => {
 
     describe('confirmOceanicGift', () => {
         it('grants wrathOfTheSeaActive to selected ally', async () => {
-            const result = await confirmOceanicGift(
-                makeAction(),
-                makePlayerStats(),
+            const result = await confirmOceanicGift({
+                action: makeAction(),
+                playerStats: makePlayerStats(),
                 campaignName,
-                'AllyOne',
-                13,
-                1,
-                false,
-            );
+                selectedAllyName: 'AllyOne',
+                spellSaveDc: 13,
+                wisMod: 1,
+                doubleEmanation: false,
+            })
 
             expect(setRuntimeValue).toHaveBeenCalledWith('AllyOne', 'wrathOfTheSeaActive', true, campaignName);
             expect(result.type).toBe('popup');
@@ -326,57 +326,57 @@ describe('oceanicGiftHandler', () => {
         });
 
         it('sets wrathOfTheSeaDc on the ally', async () => {
-            await confirmOceanicGift(
-                makeAction(),
-                makePlayerStats(),
+            await confirmOceanicGift({
+                action: makeAction(),
+                playerStats: makePlayerStats(),
                 campaignName,
-                'AllyTwo',
-                15,
-                3,
-                false,
-            );
+                selectedAllyName: 'AllyTwo',
+                spellSaveDc: 15,
+                wisMod: 3,
+                doubleEmanation: false,
+            })
 
             expect(setRuntimeValue).toHaveBeenCalledWith('AllyTwo', 'wrathOfTheSeaDc', 15, campaignName);
         });
 
         it('sets wrathOfTheSeaWisMod on the ally', async () => {
-            await confirmOceanicGift(
-                makeAction(),
-                makePlayerStats(),
+            await confirmOceanicGift({
+                action: makeAction(),
+                playerStats: makePlayerStats(),
                 campaignName,
-                'AllyTwo',
-                15,
-                3,
-                false,
-            );
+                selectedAllyName: 'AllyTwo',
+                spellSaveDc: 15,
+                wisMod: 3,
+                doubleEmanation: false,
+            })
 
             expect(setRuntimeValue).toHaveBeenCalledWith('AllyTwo', 'wrathOfTheSeaWisMod', 3, campaignName);
         });
 
         it('sets wrathOfTheSeaSource on the ally', async () => {
-            await confirmOceanicGift(
-                makeAction(),
-                makePlayerStats(),
+            await confirmOceanicGift({
+                action: makeAction(),
+                playerStats: makePlayerStats(),
                 campaignName,
-                'AllyTwo',
-                15,
-                3,
-                false,
-            );
+                selectedAllyName: 'AllyTwo',
+                spellSaveDc: 15,
+                wisMod: 3,
+                doubleEmanation: false,
+            })
 
             expect(setRuntimeValue).toHaveBeenCalledWith('AllyTwo', 'wrathOfTheSeaSource', playerName, campaignName);
         });
 
         it('logs an ability_use entry when ally is selected', async () => {
-            await confirmOceanicGift(
-                makeAction(),
-                makePlayerStats(),
+            await confirmOceanicGift({
+                action: makeAction(),
+                playerStats: makePlayerStats(),
                 campaignName,
-                'AllyOne',
-                13,
-                1,
-                false,
-            );
+                selectedAllyName: 'AllyOne',
+                spellSaveDc: 13,
+                wisMod: 1,
+                doubleEmanation: false,
+            })
 
             expect(addEntry).toHaveBeenCalledWith(
                 campaignName,
@@ -389,29 +389,29 @@ describe('oceanicGiftHandler', () => {
         });
 
         it('grants wrathOfTheSeaActive to the player when doubleEmanation is true', async () => {
-            await confirmOceanicGift(
-                makeAction({ doubleEmanation: true }),
-                makePlayerStats(),
+            await confirmOceanicGift({
+                action: makeAction({ doubleEmanation: true }),
+                playerStats: makePlayerStats(),
                 campaignName,
-                'AllyOne',
-                13,
-                1,
-                true,
-            );
+                selectedAllyName: 'AllyOne',
+                spellSaveDc: 13,
+                wisMod: 1,
+                doubleEmanation: true,
+            })
 
             expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'wrathOfTheSeaActive', true, campaignName);
         });
 
         it('logs with combined message when doubleEmanation is true', async () => {
-            await confirmOceanicGift(
-                makeAction({ doubleEmanation: true }),
-                makePlayerStats(),
+            await confirmOceanicGift({
+                action: makeAction({ doubleEmanation: true }),
+                playerStats: makePlayerStats(),
                 campaignName,
-                'AllyOne',
-                13,
-                1,
-                true,
-            );
+                selectedAllyName: 'AllyOne',
+                spellSaveDc: 13,
+                wisMod: 1,
+                doubleEmanation: true,
+            })
 
             expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 description: expect.stringContaining('both themselves and AllyOne'),
@@ -424,15 +424,15 @@ describe('oceanicGiftHandler', () => {
                 return undefined;
             });
 
-            await confirmOceanicGift(
-                makeAction(),
-                makePlayerStats(),
+            await confirmOceanicGift({
+                action: makeAction(),
+                playerStats: makePlayerStats(),
                 campaignName,
-                'AllyOne',
-                13,
-                1,
-                false,
-            );
+                selectedAllyName: 'AllyOne',
+                spellSaveDc: 13,
+                wisMod: 1,
+                doubleEmanation: false,
+            })
 
             expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'wildShapeUses', 2, campaignName);
         });
@@ -443,15 +443,15 @@ describe('oceanicGiftHandler', () => {
                 return undefined;
             });
 
-            await confirmOceanicGift(
-                makeAction({ doubleEmanation: true }),
-                makePlayerStats(),
+            await confirmOceanicGift({
+                action: makeAction({ doubleEmanation: true }),
+                playerStats: makePlayerStats(),
                 campaignName,
-                'AllyOne',
-                13,
-                1,
-                true,
-            );
+                selectedAllyName: 'AllyOne',
+                spellSaveDc: 13,
+                wisMod: 1,
+                doubleEmanation: true,
+            })
 
             expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'wildShapeUses', 1, campaignName);
         });
@@ -459,15 +459,15 @@ describe('oceanicGiftHandler', () => {
         it('handles null wildShapeUses runtime value (treats as 0)', async () => {
             getRuntimeValue.mockReturnValue(null);
 
-            await confirmOceanicGift(
-                makeAction(),
-                makePlayerStats(),
+            await confirmOceanicGift({
+                action: makeAction(),
+                playerStats: makePlayerStats(),
                 campaignName,
-                'AllyOne',
-                13,
-                1,
-                false,
-            );
+                selectedAllyName: 'AllyOne',
+                spellSaveDc: 13,
+                wisMod: 1,
+                doubleEmanation: false,
+            })
 
             expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'wildShapeUses', -1, campaignName);
         });
@@ -478,15 +478,15 @@ describe('oceanicGiftHandler', () => {
                 return undefined;
             });
 
-            const result = await confirmOceanicGift(
-                makeAction(),
-                makePlayerStats(),
+            const result = await confirmOceanicGift({
+                action: makeAction(),
+                playerStats: makePlayerStats(),
                 campaignName,
-                null,
-                13,
-                1,
-                false,
-            );
+                selectedAllyName: null,
+                spellSaveDc: 13,
+                wisMod: 1,
+                doubleEmanation: false,
+            })
 
             expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'wildShapeUses', 1, campaignName);
             expect(setRuntimeValue).not.toHaveBeenCalledWith('AllyOne', 'wrathOfTheSeaActive', true, campaignName);
@@ -499,15 +499,15 @@ describe('oceanicGiftHandler', () => {
                 return undefined;
             });
 
-            const result = await confirmOceanicGift(
-                makeAction(),
-                makePlayerStats(),
+            const result = await confirmOceanicGift({
+                action: makeAction(),
+                playerStats: makePlayerStats(),
                 campaignName,
-                '',
-                13,
-                1,
-                false,
-            );
+                selectedAllyName: '',
+                spellSaveDc: 13,
+                wisMod: 1,
+                doubleEmanation: false,
+            })
 
             expect(result.payload.description).toContain('skipped');
         });
@@ -518,15 +518,15 @@ describe('oceanicGiftHandler', () => {
                 return undefined;
             });
 
-            const result = await confirmOceanicGift(
-                makeAction({ doubleEmanation: true }),
-                makePlayerStats(),
+            const result = await confirmOceanicGift({
+                action: makeAction({ doubleEmanation: true }),
+                playerStats: makePlayerStats(),
                 campaignName,
-                'AllyOne',
-                13,
-                1,
-                true,
-            );
+                selectedAllyName: 'AllyOne',
+                spellSaveDc: 13,
+                wisMod: 1,
+                doubleEmanation: true,
+            })
 
             expect(result.payload.description).toContain('You also gain the Emanation');
         });
@@ -537,15 +537,15 @@ describe('oceanicGiftHandler', () => {
                 return undefined;
             });
 
-            const result = await confirmOceanicGift(
-                makeAction(),
-                makePlayerStats(),
+            const result = await confirmOceanicGift({
+                action: makeAction(),
+                playerStats: makePlayerStats(),
                 campaignName,
-                'AllyOne',
-                13,
-                1,
-                false,
-            );
+                selectedAllyName: 'AllyOne',
+                spellSaveDc: 13,
+                wisMod: 1,
+                doubleEmanation: false,
+            })
 
             expect(result.payload.description).not.toContain('You also gain the Emanation');
             expect(result.payload.description).toContain('Wrath of the Sea granted to AllyOne');
@@ -557,15 +557,15 @@ describe('oceanicGiftHandler', () => {
                 return undefined;
             });
 
-            const result = await confirmOceanicGift(
-                makeAction({ doubleEmanation: true }),
-                makePlayerStats(),
+            const result = await confirmOceanicGift({
+                action: makeAction({ doubleEmanation: true }),
+                playerStats: makePlayerStats(),
                 campaignName,
-                'AllyOne',
-                13,
-                1,
-                true,
-            );
+                selectedAllyName: 'AllyOne',
+                spellSaveDc: 13,
+                wisMod: 1,
+                doubleEmanation: true,
+            })
 
             expect(result.payload.automation).toEqual(makeAction({ doubleEmanation: true }).automation);
         });
@@ -577,15 +577,15 @@ describe('oceanicGiftHandler', () => {
                 return undefined;
             });
 
-            const result = await confirmOceanicGift(
-                makeAction(),
-                makePlayerStats(),
+            const result = await confirmOceanicGift({
+                action: makeAction(),
+                playerStats: makePlayerStats(),
                 campaignName,
-                'AllyOne',
-                13,
-                1,
-                false,
-            );
+                selectedAllyName: 'AllyOne',
+                spellSaveDc: 13,
+                wisMod: 1,
+                doubleEmanation: false,
+            })
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Wrath of the Sea granted to AllyOne');
@@ -597,15 +597,15 @@ describe('oceanicGiftHandler', () => {
                 return undefined;
             });
 
-            await confirmOceanicGift(
-                makeAction(),
-                makePlayerStats(),
+            await confirmOceanicGift({
+                action: makeAction(),
+                playerStats: makePlayerStats(),
                 campaignName,
-                'AllyOne',
-                14,
-                2,
-                false,
-            );
+                selectedAllyName: 'AllyOne',
+                spellSaveDc: 14,
+                wisMod: 2,
+                doubleEmanation: false,
+            })
 
             expect(setRuntimeValue).toHaveBeenCalledWith('AllyOne', 'wrathOfTheSeaActive', true, campaignName);
             expect(setRuntimeValue).toHaveBeenCalledWith('AllyOne', 'wrathOfTheSeaDc', 14, campaignName);
@@ -634,15 +634,15 @@ describe('oceanicGiftHandler', () => {
                 return undefined;
             });
 
-            const result = await confirmOceanicGift(
-                makeAction(),
-                makePlayerStats(),
+            const result = await confirmOceanicGift({
+                action: makeAction(),
+                playerStats: makePlayerStats(),
                 campaignName,
-                'AllyOne',
-                17,
-                3,
-                true,
-            );
+                selectedAllyName: 'AllyOne',
+                spellSaveDc: 17,
+                wisMod: 3,
+                doubleEmanation: true,
+            })
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Not enough Wild Shape uses remaining');
@@ -657,15 +657,15 @@ describe('oceanicGiftHandler', () => {
                 return undefined;
             });
 
-            const result = await confirmOceanicGift(
-                makeAction(),
-                makePlayerStats(),
+            const result = await confirmOceanicGift({
+                action: makeAction(),
+                playerStats: makePlayerStats(),
                 campaignName,
-                'AllyOne',
-                17,
-                3,
-                true,
-            );
+                selectedAllyName: 'AllyOne',
+                spellSaveDc: 17,
+                wisMod: 3,
+                doubleEmanation: true,
+            })
 
             expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'wildShapeUses', 0, campaignName);
             expect(setRuntimeValue).toHaveBeenCalledWith('AllyOne', 'wrathOfTheSeaActive', true, campaignName);
@@ -683,15 +683,15 @@ describe('oceanicGiftHandler', () => {
                 return undefined;
             });
 
-            await confirmOceanicGift(
-                makeAction(),
-                makePlayerStats(),
+            await confirmOceanicGift({
+                action: makeAction(),
+                playerStats: makePlayerStats(),
                 campaignName,
-                'AllyOne',
-                17,
-                3,
-                true,
-            );
+                selectedAllyName: 'AllyOne',
+                spellSaveDc: 17,
+                wisMod: 3,
+                doubleEmanation: true,
+            })
 
             expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'wrathOfTheSeaDc', 17, campaignName);
             expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'wrathOfTheSeaWisMod', 3, campaignName);
@@ -703,15 +703,15 @@ describe('oceanicGiftHandler', () => {
                 return undefined;
             });
 
-            await confirmOceanicGift(
-                makeAction(),
-                makePlayerStats(),
+            await confirmOceanicGift({
+                action: makeAction(),
+                playerStats: makePlayerStats(),
                 campaignName,
-                'AllyOne',
-                17,
-                3,
-                false,
-            );
+                selectedAllyName: 'AllyOne',
+                spellSaveDc: 17,
+                wisMod: 3,
+                doubleEmanation: false,
+            })
 
             expect(setRuntimeValue).not.toHaveBeenCalledWith(playerName, 'wrathOfTheSeaActive', true, campaignName);
             expect(setRuntimeValue).not.toHaveBeenCalledWith(playerName, 'wrathOfTheSeaDc', 17, campaignName);

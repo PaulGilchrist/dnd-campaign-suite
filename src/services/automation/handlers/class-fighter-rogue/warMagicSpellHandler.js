@@ -186,7 +186,7 @@ async function rollWeaponAttack(action, playerStats, campaignName, targetName, t
     return { d20Roll, totalAttack, hit, isCrit, finalDamage, damageType, ac: targetAc };
 }
 
-async function resolveSpellSaveDamage(action, spell, selectedSpellName, playerName, playerStats, campaignName, targetName) {
+async function resolveSpellSaveDamage({ action, spell, selectedSpellName, playerName, playerStats, campaignName, targetName }) {
     const formula = resolveSpellDamageAtLevel(spell, spell.level);
     const { promise } = createSaveListener(campaignName, {
         targetName,
@@ -264,7 +264,7 @@ async function resolveWarMagicDamageRoll({ action, spell, selectedSpellName, pla
         return resolveAutoHitSpellDamage(spell, selectedSpellName);
     }
     if (spell.dc?.dc_type) {
-        return resolveSpellSaveDamage(action, spell, selectedSpellName, playerName, playerStats, campaignName, targetName);
+        return resolveSpellSaveDamage({ action, spell, selectedSpellName, playerName, playerStats, campaignName, targetName });
     }
     // Spell attack roll against the target's AC.
     return resolveSpellAttackDamage(spell, playerName, playerStats, cs, targetName);
@@ -310,7 +310,7 @@ function resolveWarMagicTargetName(cs, playerName) {
     return getTargetFromAttacker(cs, playerName)?.name || null;
 }
 
-function buildWarMagicPopupDescription(action, selectedSpellName, spell, targetName, spellDamage, spellDamageType, weaponLine) {
+function buildWarMagicPopupDescription({ action, selectedSpellName, spell, targetName, spellDamage, spellDamageType, weaponLine }) {
     const spellPart = spellDamage > 0
         ? ` Spell dealt <b>${spellDamage}</b> ${spellDamageType} damage.`
         : (spell.damage ? ' Spell dealt no damage.' : '');
@@ -405,7 +405,7 @@ export async function confirmWarMagicSpell(action, playerStats, campaignName, se
 
     const weaponLine = buildWeaponLine(weapon);
 
-    const popupDescription = buildWarMagicPopupDescription(action, selectedSpellName, spell, targetName, spellDamage, spellDamageType, weaponLine);
+    const popupDescription = buildWarMagicPopupDescription({ action, selectedSpellName, spell, targetName, spellDamage, spellDamageType, weaponLine });
 
     return {
         type: 'popup',

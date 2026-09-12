@@ -60,7 +60,7 @@ function syncHeroismTargetEffects(targetName, campaignName) {
     setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
 }
 
-async function applyHeroismToTarget(targetName, playerStats, campaignName, casterName, duration, tempHpAmount, combatSummary, dc) {
+async function applyHeroismToTarget({ targetName, playerStats, campaignName, casterName, duration, tempHpAmount, combatSummary, dc }) {
     const storedBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
     const buffs = Array.isArray(storedBuffs) ? storedBuffs : [];
     const existingHeroismIndex = buffs.findIndex(b => b.name === HEROISM_BUFF_NAME);
@@ -131,7 +131,7 @@ export async function applyHeroism(heroismAction, playerStats, campaignName, _ma
     const dc = playerStats.spellAbilities?.saveDc || (8 + (playerStats.proficiency || 0));
 
     for (const targetName of targetNames) {
-        await applyHeroismToTarget(targetName, playerStats, campaignName, casterName, duration, tempHpAmount, combatSummary, dc);
+        await applyHeroismToTarget({ targetName, playerStats, campaignName, casterName, duration, tempHpAmount, combatSummary, dc });
     }
 
     return {

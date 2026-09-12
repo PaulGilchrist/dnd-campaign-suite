@@ -12,7 +12,7 @@ import { addCondition } from '../../../../services/combat/conditions/conditionSa
 import { loadManeuvers } from '../../../ui/dataLoader.js';
 import { computeSuperiorityDiceMax } from '../../../rules/trackedResources.js';
 
-export function applyConditionToTarget(targetName, conditionKey, campaignName, combatSummary, saveDc, saveType, playerStats) {
+export function applyConditionToTarget({ targetName, conditionKey, campaignName, combatSummary, saveDc, saveType, playerStats }) {
     if (!combatSummary) {
         console.error(`[combatSuperiority] Failed to get combatSummary for applying ${conditionKey} to ${targetName}`);
         return;
@@ -159,7 +159,7 @@ export async function processManeuverSaveResult(maneuver, targetName, saveDc, su
         if (maneuver.effect === 'frightened') {
             description += ` ${targetName} is Frightened until the end of your next turn.`;
             const cs = await getCombatContext(campaignName);
-            applyConditionToTarget(targetName, 'frightened', campaignName, cs, saveDc, maneuver.saveType, playerStats);
+            applyConditionToTarget({ targetName, conditionKey: 'frightened', campaignName, combatSummary: cs, saveDc, saveType: maneuver.saveType, playerStats });
             await addExpiration(playerStats.name, targetName, [
                 { type: 'condition', condition: 'frightened' },
             ], campaignName, 2);
@@ -189,7 +189,7 @@ export async function processManeuverSaveResult(maneuver, targetName, saveDc, su
         } else if (maneuver.effect === 'prone') {
             description += ` ${targetName} fell Prone.`;
             const cs = await getCombatContext(campaignName);
-            applyConditionToTarget(targetName, 'prone', campaignName, cs, saveDc, maneuver.saveType, playerStats);
+            applyConditionToTarget({ targetName, conditionKey: 'prone', campaignName, combatSummary: cs, saveDc, saveType: maneuver.saveType, playerStats });
         } else if (maneuver.conditionInflicted) {
             description += ` ${targetName} gained the ${maneuver.conditionInflicted} condition.`;
         } else {
@@ -299,7 +299,7 @@ export async function executeCommanderStrikeChoice(action, playerStats, campaign
     };
 }
 
-export async function executeRallyChoice(action, playerStats, campaignName, chosenName, totalHp, extraHp, description) {
+export async function executeRallyChoice({ action, playerStats, campaignName, chosenName, totalHp, extraHp: _extraHp, description }) {
     if (!chosenName || !playerStats || !campaignName) {
         return {
             type: 'popup',

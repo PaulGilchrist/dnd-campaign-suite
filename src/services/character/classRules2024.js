@@ -29,6 +29,30 @@ function resolveMajor(characterClass, majorName) {
     return major ? cloneDeep(major) : { name: majorName, features: [] };
 }
 
+// Divine Order: Protector grants Martial weapons and Heavy armor
+// Primal Order: Warden grants Martial weapons and Medium armor
+const ORDER_GRANTS = {
+    'Cleric': { key: 'divineOrder', order: 'Protector', grants: ['Martial Weapons', 'Heavy Armor'] },
+    'Druid': { key: 'primalOrder', order: 'Warden', grants: ['Martial Weapons', 'Medium Armor'] }
+};
+
+function appendOrderProficiencies(proficiencies, characterClass, playerSummary) {
+    const rule = ORDER_GRANTS[characterClass.name];
+    if (rule && playerSummary.class?.[rule.key] === rule.order) {
+        proficiencies.push(...rule.grants);
+    }
+}
+
+// If it starts with "Choose", the player has already selected their skills in character JSON
+// Otherwise, parse skills like "History, Insight, Medicine, Persuasion, or Religion"
+function appendSkillProficiencies(proficiencies, skillString) {
+    if (!skillString || skillString.startsWith('Choose')) {
+        return;
+    }
+    const skills = skillString.split(',').map(skill => skill.trim().replace(' or ', ''));
+    proficiencies.push(...skills.map(skill => `Skill: ${skill}`));
+}
+
 // Convert string proficiencies to array format for consistency with rules engine
 function buildProficiencies(characterClass, playerSummary) {
     const proficiencies = [];
@@ -46,23 +70,8 @@ function buildProficiencies(characterClass, playerSummary) {
         proficiencies.push(characterClass.tool_proficiencies);
     }
 
-    // If it starts with "Choose", the player has already selected their skills in character JSON
-    // Otherwise, parse skills like "History, Insight, Medicine, Persuasion, or Religion"
-    const skillString = characterClass.skill_proficiencies || characterClass.skill_proficiencies_choices;
-    if (skillString && !skillString.startsWith('Choose')) {
-        const skills = skillString.split(',').map(skill => skill.trim().replace(' or ', ''));
-        proficiencies.push(...skills.map(skill => `Skill: ${skill}`));
-    }
-
-    // Divine Order: Protector grants Martial weapons and Heavy armor
-    if (playerSummary.class?.divineOrder === 'Protector' && characterClass.name === 'Cleric') {
-        proficiencies.push('Martial Weapons', 'Heavy Armor');
-    }
-
-    // Primal Order: Warden grants Martial weapons and Medium armor
-    if (playerSummary.class?.primalOrder === 'Warden' && characterClass.name === 'Druid') {
-        proficiencies.push('Martial Weapons', 'Medium Armor');
-    }
+    appendSkillProficiencies(proficiencies, characterClass.skill_proficiencies || characterClass.skill_proficiencies_choices);
+    appendOrderProficiencies(proficiencies, characterClass, playerSummary);
 
     return proficiencies;
 }

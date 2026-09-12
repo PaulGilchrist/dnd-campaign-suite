@@ -3,6 +3,42 @@ import { getClassFeatures } from '../../../character/classFeatures.js';
 import { getCurrentSorceryPoints, spendSorceryPoints } from '../../../../hooks/combat/useMetamagic.js';
 import { setInnateSorceryActive, isInnateSorceryActive } from '../../../combat/buffs/buffService.js';
 
+async function activateInnateSorceryAura(action, auto, playerStats, campaignName) {
+    const currentUses = getRuntimeValue(playerStats.name, 'innateSorceryUses', campaignName);
+    const usesMax = getClassFeatures(playerStats)?.maxInnateSorcery || 0;
+    const remaining = currentUses != null ? Number(currentUses) : usesMax;
+
+    if (remaining <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description: `${action.name} has no remaining uses. Recharges on a long rest.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const newRemaining = Math.max(0, remaining - 1);
+    setRuntimeValue(playerStats.name, 'innateSorceryUses', newRemaining, campaignName);
+
+    setInnateSorceryActive(playerStats.name, true, campaignName);
+    window.dispatchEvent(new CustomEvent('innate-sorcery-updated'));
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            automationType: auto.type,
+            description: `${action.name} activated (${newRemaining}/${usesMax} uses remaining).`,
+            automation: auto,
+        },
+    };
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
 
@@ -20,39 +56,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     if (auto.type === 'sorcery_aura') {
-        const currentUses = getRuntimeValue(playerStats.name, 'innateSorceryUses', campaignName);
-        const usesMax = getClassFeatures(playerStats)?.maxInnateSorcery || 0;
-        const remaining = currentUses != null ? Number(currentUses) : usesMax;
-
-        if (remaining <= 0) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    automationType: auto.type,
-                    description: `${action.name} has no remaining uses. Recharges on a long rest.`,
-                    automation: auto,
-                },
-            };
-        }
-
-        const newRemaining = Math.max(0, remaining - 1);
-        setRuntimeValue(playerStats.name, 'innateSorceryUses', newRemaining, campaignName);
-
-        setInnateSorceryActive(playerStats.name, true, campaignName);
-        window.dispatchEvent(new CustomEvent('innate-sorcery-updated'));
-
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                automationType: auto.type,
-                description: `${action.name} activated (${newRemaining}/${usesMax} uses remaining).`,
-                automation: auto,
-            },
-        };
+        return await activateInnateSorceryAura(action, auto, playerStats, campaignName);
     }
 
     const cost = auto.cost || 2;

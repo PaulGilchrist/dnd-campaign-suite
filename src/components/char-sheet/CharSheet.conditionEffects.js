@@ -145,6 +145,22 @@ function applyAttackAdvantageBuffs(conditionEffects, activeBuffs) {
     return { hasTricksterBlessing, buffAllyActive, cloakOfShadowsActive };
 }
 
+// Shield / Shield of Faith AC buff modifiers applied to conditionEffects.
+function applyDefensiveShieldBuffs(conditionEffects, activeBuffs) {
+    // Shield: +5 AC until start of next turn, immune to Magic Missile
+    const shieldActive = hasBuffEffect(activeBuffs, 'shield');
+    if (shieldActive) {
+        conditionEffects.shieldAcBonus = 5;
+        conditionEffects.magicMissileImmune = true;
+    }
+    // Shield of Faith: +2 AC for duration (Concentration, up to 10 minutes)
+    const shieldOfFaithActive = hasBuffEffect(activeBuffs, 'shield_of_faith');
+    if (shieldOfFaithActive) {
+        conditionEffects.shieldOfFaithAcBonus = 2;
+    }
+    return { shieldActive, shieldOfFaithActive };
+}
+
 // Post-compute buff/feature modifiers applied to the base conditionEffects, in original order.
 function applyPostComputeModifiers({ conditionEffects, activeBuffs, playerSummary, playerStats, combatContext, campaignName, pfeagActive, activeConditions }) {
     if (playerStats) {
@@ -157,23 +173,13 @@ function applyPostComputeModifiers({ conditionEffects, activeBuffs, playerSummar
     }
     const advantageBuffFlags = applyAttackAdvantageBuffs(conditionEffects, activeBuffs);
     const { hasTricksterBlessing, buffAllyActive, cloakOfShadowsActive } = advantageBuffFlags;
-    // Shield: +5 AC until start of next turn, immune to Magic Missile
-    const shieldActive = hasBuffEffect(activeBuffs, 'shield');
-    if (shieldActive) {
-        conditionEffects.shieldAcBonus = 5;
-        conditionEffects.magicMissileImmune = true;
-    }
+    const { shieldActive, shieldOfFaithActive } = applyDefensiveShieldBuffs(conditionEffects, activeBuffs);
     const { wardingBondAcBonus, wardingBondSaveBonus } = computeWardingBondBonuses(activeBuffs, playerSummary, playerStats, combatContext);
     if (wardingBondAcBonus > 0) {
         conditionEffects.wardingBondAcBonus = wardingBondAcBonus;
     }
     if (wardingBondSaveBonus > 0) {
         conditionEffects.saveBonusExpression = (conditionEffects.saveBonusExpression || '0') + ' + ' + wardingBondSaveBonus;
-    }
-    // Shield of Faith: +2 AC for duration (Concentration, up to 10 minutes)
-    const shieldOfFaithActive = hasBuffEffect(activeBuffs, 'shield_of_faith');
-    if (shieldOfFaithActive) {
-        conditionEffects.shieldOfFaithAcBonus = 2;
     }
     // Alert: Other creatures don't gain advantage on attack rolls against you from being unseen
     if (playerStats?.unseenAttackerAdvantageNegate) {

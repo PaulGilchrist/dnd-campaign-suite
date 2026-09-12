@@ -34,13 +34,13 @@ export async function resolveAttackDamageStandalone(attack, ctxOverrides, { play
     const modalState = {};
     const setModalStateFn = (updates) => { Object.assign(modalState, updates); };
 
-    const proceedWithDamage = (a, formula, total, rolls, modifier) => {
+    const proceedWithDamage = ({ attack, formula, total, rolls, modifier }) => {
         const o = ctxOverrides;
         const minimalCtx = {
-            attackName: a.name,
-            damageType: a.damageType,
+            attackName: attack.name,
+            damageType: attack.damageType,
             targetName: o.targetName || null,
-            attackerName: o.attackerName || a.name,
+            attackerName: o.attackerName || attack.name,
             isAutoCrit: o.isCrit || false,
             doubledRolls: o.doubledRolls || null,
             playerStats: o.playerStats || null,
@@ -53,7 +53,7 @@ export async function resolveAttackDamageStandalone(attack, ctxOverrides, { play
             metamagicTwinTarget: o.metamagicTwinTarget || null,
             metamagicHeighten: o.metamagicHeighten || false,
         };
-        rollDamage(a.name, formula, total, rolls, modifier, minimalCtx);
+        rollDamage(attack.name, formula, total, rolls, modifier, minimalCtx);
     };
 
     const ctx = {
@@ -336,7 +336,7 @@ export default function useAttackDamageResolution({
 }) {
     let pendingCtxOverrides = {};
 
-    const proceedWithDamage = (attack, formula, total, rolls, modifier, critLabels, pipelineCtx) => {
+    const proceedWithDamage = ({ attack, formula, total, rolls, modifier, critLabels, pipelineCtx }) => {
         console.log('[sw-debug] proceedWithDamage attack.damageType=', attack?.damageType, 'formula=', formula);
         if (buildCtxSync) {
             // WM-008: damage-phase ctx rebuild must NOT consume one-shot attack te.

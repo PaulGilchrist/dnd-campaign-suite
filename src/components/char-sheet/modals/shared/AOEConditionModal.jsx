@@ -85,6 +85,117 @@ function buildSaveResultRecord(targetName, success, detail) {
     };
 }
 
+async function resolveNpcTarget({ campaignName, casterName, targetName, target, saveType, saveDc, heightenTarget, conditionList, conditionLabel, carefulSpellProtected, applyConditionsToTarget }) {
+    const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
+    const saveRoll = heightenTarget === targetName ? Math.min(Math.floor(Math.random() * 20) + 1, Math.floor(Math.random() * 20) + 1) : Math.floor(Math.random() * 20) + 1;
+    const saveTotal = saveRoll + saveBonus;
+    const success = saveTotal >= saveDc;
+
+    if (carefulSpellProtected) {
+        await addEntry(campaignName, {
+            type: 'save_result',
+            characterName: casterName,
+            targetName,
+            saveDc,
+            saveType,
+            success: true,
+            roll: saveRoll,
+            total: saveTotal,
+            saveBonus,
+            description: `${targetName} succeeded on ${saveType} save (DC ${saveDc}, rolled ${saveRoll} + ${saveBonus} = ${saveTotal}) — Careful Spell protected`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[AOEConditionModal] Error logging save result:', e); });
+        addTargetResult(campaignName, {
+            targetName,
+            saveResult: 'success',
+            roll: saveRoll,
+            total: saveTotal,
+            conditions: [],
+            appliedDamage: 0,
+        });
+        return {
+            targetName,
+            success: true,
+            roll: saveRoll,
+            total: saveTotal,
+            saveBonus,
+            conditionApplied: false,
+        };
+    }
+
+    if (!success) {
+        applyConditionsToTarget(targetName, conditionList, campaignName);
+
+        await addEntry(campaignName, {
+            type: 'condition',
+            action: 'applied',
+            characterName: targetName,
+            condition: conditionLabel || conditionList.map(e => e.condition || e.type).join(', '),
+            dc: saveDc,
+            ability: saveType,
+            sourceName: casterName,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[AOEConditionModal] Error logging condition:', e); });
+
+        await addEntry(campaignName, {
+            type: 'save_result',
+            characterName: casterName,
+            targetName,
+            saveDc,
+            saveType,
+            success: false,
+            roll: saveRoll,
+            total: saveTotal,
+            saveBonus,
+            description: `${targetName} failed ${saveType} save (DC ${saveDc}, rolled ${saveRoll} + ${saveBonus} = ${saveTotal})`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[AOEConditionModal] Error logging save result:', e); });
+
+        const appliedConditions = conditionList.map(e => e.condition || e.type).filter(Boolean);
+        addTargetResult(campaignName, {
+            targetName,
+            saveResult: 'failure',
+            roll: saveRoll,
+            total: saveTotal,
+            conditions: appliedConditions,
+            appliedDamage: 0,
+        });
+        return null;
+    }
+
+    await addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        targetName,
+        saveDc,
+        saveType,
+        success: true,
+        roll: saveRoll,
+        total: saveTotal,
+        saveBonus,
+        description: `${targetName} succeeded on ${saveType} save (DC ${saveDc}, rolled ${saveRoll} + ${saveBonus} = ${saveTotal})`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[AOEConditionModal] Error logging save result:', e); });
+
+    addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'success',
+        roll: saveRoll,
+        total: saveTotal,
+        conditions: [],
+        appliedDamage: 0,
+    });
+    return {
+        targetName,
+        success: true,
+        roll: saveRoll,
+        total: saveTotal,
+        saveBonus,
+        conditionApplied: false,
+    };
+}
+
+
 function AOEConditionModal({
     action,
     playerStats,
@@ -168,116 +279,14 @@ function AOEConditionModal({
             if (!target) continue;
 
             const isNpc = target.type === 'npc';
-            const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
 
             if (isNpc) {
                 const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
-                const isHeightenTarget = heightenTarget === targetName;
-
-                const saveRoll = isHeightenTarget ? Math.min(Math.floor(Math.random() * 20) + 1, Math.floor(Math.random() * 20) + 1) : Math.floor(Math.random() * 20) + 1;
-                const saveTotal = saveRoll + saveBonus;
-                const success = saveTotal >= saveDc;
-
-                if (carefulSpellProtected) {
-                    await addEntry(campaignName, {
-                        type: 'save_result',
-                        characterName: playerStats.name,
-                        targetName,
-                        saveDc,
-                        saveType,
-                        success: true,
-                        roll: saveRoll,
-                        total: saveTotal,
-                        saveBonus,
-                        description: `${targetName} succeeded on ${saveType} save (DC ${saveDc}, rolled ${saveRoll} + ${saveBonus} = ${saveTotal}) — Careful Spell protected`,
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error('[AOEConditionModal] Error logging save result:', e); });
-                    addTargetResult(campaignName, {
-                        targetName,
-                        saveResult: 'success',
-                        roll: saveRoll,
-                        total: saveTotal,
-                        conditions: [],
-                        appliedDamage: 0,
-                    });
-                    results.push({
-                        targetName,
-                        success: true,
-                        roll: saveRoll,
-                        total: saveTotal,
-                        saveBonus,
-                        conditionApplied: false,
-                    });
-                } else if (!success) {
-                    applyConditionsToTarget(targetName, conditionList, campaignName);
-
-                    await addEntry(campaignName, {
-                        type: 'condition',
-                        action: 'applied',
-                        characterName: targetName,
-                        condition: conditionLabel || conditionList.map(e => e.condition || e.type).join(', '),
-                        dc: saveDc,
-                        ability: saveType,
-                        sourceName: playerStats.name,
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error('[AOEConditionModal] Error logging condition:', e); });
-
-                    await addEntry(campaignName, {
-                        type: 'save_result',
-                        characterName: playerStats.name,
-                        targetName,
-                        saveDc,
-                        saveType,
-                        success: false,
-                        roll: saveRoll,
-                        total: saveTotal,
-                        saveBonus,
-                        description: `${targetName} failed ${saveType} save (DC ${saveDc}, rolled ${saveRoll} + ${saveBonus} = ${saveTotal})`,
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error('[AOEConditionModal] Error logging save result:', e); });
-
-                    const appliedConditions = conditionList.map(e => e.condition || e.type).filter(Boolean);
-                    addTargetResult(campaignName, {
-                        targetName,
-                        saveResult: 'failure',
-                        roll: saveRoll,
-                        total: saveTotal,
-                        conditions: appliedConditions,
-                        appliedDamage: 0,
-                    });
-                } else {
-                    results.push({
-                        targetName,
-                        success: true,
-                        roll: saveRoll,
-                        total: saveTotal,
-                        saveBonus,
-                        conditionApplied: false,
-                    });
-
-                    await addEntry(campaignName, {
-                        type: 'save_result',
-                        characterName: playerStats.name,
-                        targetName,
-                        saveDc,
-                        saveType,
-                        success: true,
-                        roll: saveRoll,
-                        total: saveTotal,
-                        saveBonus,
-                        description: `${targetName} succeeded on ${saveType} save (DC ${saveDc}, rolled ${saveRoll} + ${saveBonus} = ${saveTotal})`,
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error('[AOEConditionModal] Error logging save result:', e); });
-
-                    addTargetResult(campaignName, {
-                        targetName,
-                        saveResult: 'success',
-                        roll: saveRoll,
-                        total: saveTotal,
-                        conditions: [],
-                        appliedDamage: 0,
-                    });
-                }
+                const npcResult = await resolveNpcTarget({
+                    campaignName, casterName: playerStats.name, targetName, target, saveType, saveDc,
+                    heightenTarget, conditionList, conditionLabel, carefulSpellProtected, applyConditionsToTarget,
+                });
+                if (npcResult) results.push(npcResult);
             } else {
                 const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
 

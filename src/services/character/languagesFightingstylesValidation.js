@@ -267,6 +267,18 @@ async function getLanguageLimits2024(formData) {
     return { allowed, preSelected, details: `In 2024 rules, languages come from your race, class, and background.` };
 }
 
+// 5e: class languages from JSON, plus class_levels language features
+function add5eClassLanguageGrants(classData, level, preSelected) {
+    if (!classData) {
+        return 0;
+    }
+    let allowed = addLanguageSource(preSelected, classData.languages || []);
+    if (classData.class_levels) {
+        allowed += countLanguagesFromClassLevels(classData.class_levels, level, countLanguagesFrom5eClassLevelFeature);
+    }
+    return allowed;
+}
+
 // 5e: race languages plus racial language choice options
 function add5eRaceLanguageGrants(raceData, preSelected) {
     let allowed = addLanguageSource(preSelected, raceData.languages || []);
@@ -300,12 +312,7 @@ async function getLanguageLimits5e(formData) {
     }
 
     // Class languages from JSON, plus class_levels language features
-    if (classData) {
-        allowed += addLanguageSource(preSelected, classData.languages || []);
-        if (classData.class_levels) {
-            allowed += countLanguagesFromClassLevels(classData.class_levels, level, countLanguagesFrom5eClassLevelFeature);
-        }
-    }
+    allowed += add5eClassLanguageGrants(classData, level, preSelected);
 
     // Background languages (5e: typically 2 from backstory)
     allowed += 2;

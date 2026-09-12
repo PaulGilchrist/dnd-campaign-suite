@@ -200,17 +200,17 @@ describe('bonusAttacksHandler', () => {
 
     it('returns null when distribution is falsy or combat summary is unavailable', async () => {
       getCombatSummary.mockReturnValue(combatSummary);
-      let result = await applyFlurryOfBlows(action, makePlayerStats(), campaignName, mapName, null, 3);
+      let result = await applyFlurryOfBlows({ action: action, playerStats: makePlayerStats(), campaignName, _mapName: mapName, distribution: null, numAttacks: 3 });
       expect(result).toBeNull();
 
       getCombatSummary.mockReturnValue(null);
-      result = await applyFlurryOfBlows(action, makePlayerStats(), campaignName, mapName, { Goblin: 1 }, 1);
+      result = await applyFlurryOfBlows({ action: action, playerStats: makePlayerStats(), campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1 });
       expect(result).toBeNull();
     });
 
     it('skips targets with 0 attacks and logs ability use', async () => {
       getCombatSummary.mockReturnValue(combatSummary);
-      const result = await applyFlurryOfBlows(action, makePlayerStats(), campaignName, mapName, { Goblin: 0, Orc: 3 }, 3);
+      const result = await applyFlurryOfBlows({ action: action, playerStats: makePlayerStats(), campaignName, _mapName: mapName, distribution: { Goblin: 0, Orc: 3 }, numAttacks: 3 });
       expect(result.type).toBe('popup');
       expect(addEntry).toHaveBeenCalled();
       const abilityUseEntry = addEntry.mock.calls.find(
@@ -228,14 +228,7 @@ describe('bonusAttacksHandler', () => {
         .mockReturnValueOnce(12)
         .mockReturnValueOnce(20);
 
-      const result = await applyFlurryOfBlows(
-        action,
-        makePlayerStats(),
-        campaignName,
-        mapName,
-        { Goblin: 2, Orc: 1 },
-        3
-      );
+      const result = await applyFlurryOfBlows({ action: action, playerStats: makePlayerStats(), campaignName, _mapName: mapName, distribution: { Goblin: 2, Orc: 1 }, numAttacks: 3 });
 
       expect(rollD20).toHaveBeenCalledTimes(3);
       expect(result.type).toBe('popup');
@@ -251,14 +244,7 @@ describe('bonusAttacksHandler', () => {
         .mockReturnValueOnce(20)  // natural 20 → crit
         .mockReturnValueOnce(10); // normal hit (6+10=16 >= 15)
 
-      const result = await applyFlurryOfBlows(
-        action,
-        makePlayerStats(),
-        campaignName,
-        mapName,
-        { Goblin: 1, Orc: 2 },
-        3
-      );
+      const result = await applyFlurryOfBlows({ action: action, playerStats: makePlayerStats(), campaignName, _mapName: mapName, distribution: { Goblin: 1, Orc: 2 }, numAttacks: 3 });
 
       const desc = result.payload.description;
       expect(desc).toContain('Miss');
@@ -276,14 +262,7 @@ describe('bonusAttacksHandler', () => {
       getCombatSummary.mockReturnValue(combatSummary);
       vi.mocked(rollD20).mockReturnValue(1);
 
-      await applyFlurryOfBlows(
-        action,
-        makePlayerStats(),
-        campaignName,
-        mapName,
-        { Goblin: 1 },
-        1
-      );
+      await applyFlurryOfBlows({ action: action, playerStats: makePlayerStats(), campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1 });
 
       expect(applyDamageToTarget).not.toHaveBeenCalled();
     });
@@ -292,9 +271,7 @@ describe('bonusAttacksHandler', () => {
       getCombatSummary.mockReturnValue(combatSummary);
 
       vi.mocked(rollD20).mockReturnValue(20);
-      await applyFlurryOfBlows(
-        action, makePlayerStats(), campaignName, mapName, { Goblin: 1 }, 1
-      );
+      await applyFlurryOfBlows({ action: action, playerStats: makePlayerStats(), campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1 });
       expect(rollExpressionDoubled).toHaveBeenCalledWith('1d6+3');
       expect(rollExpression).not.toHaveBeenCalled();
 
@@ -302,9 +279,7 @@ describe('bonusAttacksHandler', () => {
       getCombatSummary.mockReturnValue(combatSummary);
       mockDefaultDamageResult();
       vi.mocked(rollD20).mockReturnValue(15);
-      await applyFlurryOfBlows(
-        action, makePlayerStats(), campaignName, mapName, { Goblin: 1 }, 1
-      );
+      await applyFlurryOfBlows({ action: action, playerStats: makePlayerStats(), campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1 });
       expect(rollExpression).toHaveBeenCalledWith('1d6+3');
       expect(rollExpressionDoubled).not.toHaveBeenCalled();
     });
@@ -331,14 +306,7 @@ describe('bonusAttacksHandler', () => {
       });
 
       // Has feature and hits → includes openHandTargets
-      let result = await applyFlurryOfBlows(
-        actionWithOpenHand,
-        playerStatsWithOpenHand,
-        campaignName,
-        mapName,
-        { Goblin: 1 },
-        1
-      );
+      let result = await applyFlurryOfBlows({ action: actionWithOpenHand, playerStats: playerStatsWithOpenHand, campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1 });
       expect(result.openHandTargets).toEqual([
         {
           targetName: 'Goblin',
@@ -354,28 +322,14 @@ describe('bonusAttacksHandler', () => {
       getCombatSummary.mockReturnValue(combatSummary);
       mockDefaultDamageResult();
       vi.mocked(rollD20).mockReturnValue(18);
-      result = await applyFlurryOfBlows(
-        action,
-        makePlayerStats(),
-        campaignName,
-        mapName,
-        { Goblin: 1 },
-        1
-      );
+      result = await applyFlurryOfBlows({ action: action, playerStats: makePlayerStats(), campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1 });
       expect(result.openHandTargets).toBeUndefined();
 
       // Miss → no openHandTargets
       vi.clearAllMocks();
       getCombatSummary.mockReturnValue(combatSummary);
       vi.mocked(rollD20).mockReturnValue(1);
-      result = await applyFlurryOfBlows(
-        actionWithOpenHand,
-        playerStatsWithOpenHand,
-        campaignName,
-        mapName,
-        { Goblin: 1 },
-        1
-      );
+      result = await applyFlurryOfBlows({ action: actionWithOpenHand, playerStats: playerStatsWithOpenHand, campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1 });
       expect(result.openHandTargets).toBeUndefined();
 
       // Hits but 0 damage → still includes openHandTargets
@@ -383,14 +337,7 @@ describe('bonusAttacksHandler', () => {
       getCombatSummary.mockReturnValue(combatSummary);
       vi.mocked(rollD20).mockReturnValue(18);
       applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 7 });
-      result = await applyFlurryOfBlows(
-        actionWithOpenHand,
-        playerStatsWithOpenHand,
-        campaignName,
-        mapName,
-        { Goblin: 1 },
-        1
-      );
+      result = await applyFlurryOfBlows({ action: actionWithOpenHand, playerStats: playerStatsWithOpenHand, campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1 });
       expect(result.openHandTargets).toEqual([
         {
           targetName: 'Goblin',
@@ -423,14 +370,7 @@ describe('bonusAttacksHandler', () => {
         },
       });
 
-      const result = await applyFlurryOfBlows(
-        actionWithOpenHand,
-        playerStatsWithOpenHand,
-        campaignName,
-        mapName,
-        { Goblin: 3 },
-        3
-      );
+      const result = await applyFlurryOfBlows({ action: actionWithOpenHand, playerStats: playerStatsWithOpenHand, campaignName, _mapName: mapName, distribution: { Goblin: 3 }, numAttacks: 3 });
 
       expect(result.openHandTargets).toHaveLength(1);
       expect(result.openHandTargets[0].targetName).toBe('Goblin');
@@ -440,28 +380,14 @@ describe('bonusAttacksHandler', () => {
       getCombatSummary.mockReturnValue(combatSummary);
       vi.mocked(rollD20).mockReturnValue(18);
 
-      let result = await applyFlurryOfBlows(
-        action,
-        makePlayerStats(),
-        campaignName,
-        mapName,
-        { UnknownEnemy: 2, Goblin: 1 },
-        3
-      );
+      let result = await applyFlurryOfBlows({ action: action, playerStats: makePlayerStats(), campaignName, _mapName: mapName, distribution: { UnknownEnemy: 2, Goblin: 1 }, numAttacks: 3 });
       expect(rollD20).toHaveBeenCalledTimes(1);
       expect(result.type).toBe('popup');
 
       vi.clearAllMocks();
       getCombatSummary.mockReturnValue(combatSummary);
       vi.mocked(rollD20).mockReturnValue(18);
-      result = await applyFlurryOfBlows(
-        action,
-        makePlayerStats(),
-        campaignName,
-        mapName,
-        { TestMonk: 2, Goblin: 1 },
-        3
-      );
+      result = await applyFlurryOfBlows({ action: action, playerStats: makePlayerStats(), campaignName, _mapName: mapName, distribution: { TestMonk: 2, Goblin: 1 }, numAttacks: 3 });
       expect(rollD20).toHaveBeenCalledTimes(1);
       expect(result.type).toBe('popup');
     });
@@ -470,14 +396,7 @@ describe('bonusAttacksHandler', () => {
       getCombatSummary.mockReturnValue(combatSummary);
       vi.mocked(rollD20).mockReturnValue(18);
 
-      await applyFlurryOfBlows(
-        action,
-        makePlayerStats(),
-        campaignName,
-        mapName,
-        { Goblin: 1 },
-        1
-      );
+      await applyFlurryOfBlows({ action: action, playerStats: makePlayerStats(), campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1 });
 
       let attackEntries = addEntry.mock.calls.filter(
         call => call[1].rollType === 'attack'
@@ -505,14 +424,7 @@ describe('bonusAttacksHandler', () => {
       getCombatSummary.mockReturnValue(combatSummary);
       vi.mocked(rollD20).mockReturnValue(1);
 
-      await applyFlurryOfBlows(
-        action,
-        makePlayerStats(),
-        campaignName,
-        mapName,
-        { Goblin: 1 },
-        1
-      );
+      await applyFlurryOfBlows({ action: action, playerStats: makePlayerStats(), campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1 });
 
       attackEntries = addEntry.mock.calls.filter(
         call => call[1].rollType === 'attack'
@@ -538,14 +450,7 @@ describe('bonusAttacksHandler', () => {
       ]));
       vi.mocked(rollD20).mockReturnValue(12);
 
-      const result = await applyFlurryOfBlows(
-        action,
-        makePlayerStats(),
-        campaignName,
-        mapName,
-        { Mystery: 1 },
-        1
-      );
+      const result = await applyFlurryOfBlows({ action: action, playerStats: makePlayerStats(), campaignName, _mapName: mapName, distribution: { Mystery: 1 }, numAttacks: 1 });
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('AC 10');
@@ -556,14 +461,7 @@ describe('bonusAttacksHandler', () => {
       vi.mocked(rollD20).mockReturnValue(18);
       applyDamageToTarget.mockReturnValue(null);
 
-      let result = await applyFlurryOfBlows(
-        action,
-        makePlayerStats(),
-        campaignName,
-        mapName,
-        { Goblin: 1 },
-        1
-      );
+      let result = await applyFlurryOfBlows({ action: action, playerStats: makePlayerStats(), campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1 });
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('0 damage');
 
@@ -573,14 +471,7 @@ describe('bonusAttacksHandler', () => {
       rollExpression.mockReturnValue(null);
       applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 7 });
 
-      result = await applyFlurryOfBlows(
-        action,
-        makePlayerStats(),
-        campaignName,
-        mapName,
-        { Goblin: 1 },
-        1
-      );
+      result = await applyFlurryOfBlows({ action: action, playerStats: makePlayerStats(), campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1 });
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('0 damage');
     });
@@ -590,14 +481,7 @@ describe('bonusAttacksHandler', () => {
       vi.mocked(rollD20).mockReturnValue(18);
       applyDamageToTarget.mockReturnValue({ finalDamage: 4, newHp: 6 });
 
-      await applyFlurryOfBlows(
-        action,
-        makePlayerStats(),
-        campaignName,
-        mapName,
-        { Goblin: 1 },
-        1
-      );
+      await applyFlurryOfBlows({ action: action, playerStats: makePlayerStats(), campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1 });
       expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith(
         'TestMonk',
         campaignName
@@ -608,14 +492,7 @@ describe('bonusAttacksHandler', () => {
       vi.mocked(rollD20).mockReturnValue(18);
       applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 7 });
 
-      await applyFlurryOfBlows(
-        action,
-        makePlayerStats(),
-        campaignName,
-        mapName,
-        { Goblin: 1 },
-        1
-      );
+      await applyFlurryOfBlows({ action: action, playerStats: makePlayerStats(), campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1 });
       expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled();
     });
 
@@ -625,14 +502,7 @@ describe('bonusAttacksHandler', () => {
       applyDamageToTarget.mockReturnValue({ finalDamage: 4, newHp: 6 });
 
       let playerStats = makePlayerStats({ automation: undefined });
-      let result = await applyFlurryOfBlows(
-        action,
-        playerStats,
-        campaignName,
-        mapName,
-        { Goblin: 1 },
-        1
-      );
+      let result = await applyFlurryOfBlows({ action: action, playerStats: playerStats, campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1 });
       expect(result.openHandTargets).toBeUndefined();
 
       vi.clearAllMocks();
@@ -641,14 +511,7 @@ describe('bonusAttacksHandler', () => {
       applyDamageToTarget.mockReturnValue({ finalDamage: 4, newHp: 6 });
 
       playerStats = makePlayerStats({ automation: {} });
-      result = await applyFlurryOfBlows(
-        action,
-        playerStats,
-        campaignName,
-        mapName,
-        { Goblin: 1 },
-        1
-      );
+      result = await applyFlurryOfBlows({ action: action, playerStats: playerStats, campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1 });
       expect(result.openHandTargets).toBeUndefined();
     });
 
@@ -656,42 +519,21 @@ describe('bonusAttacksHandler', () => {
       getCombatSummary.mockReturnValue(combatSummary);
       vi.mocked(rollD20).mockReturnValue(20);
 
-      let result = await applyFlurryOfBlows(
-        action,
-        makePlayerStats(),
-        campaignName,
-        mapName,
-        { Goblin: 1 },
-        1
-      );
+      let result = await applyFlurryOfBlows({ action: action, playerStats: makePlayerStats(), campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1 });
       expect(result.payload.description).toContain('1 critical');
 
       vi.clearAllMocks();
       getCombatSummary.mockReturnValue(combatSummary);
       vi.mocked(rollD20).mockReturnValue(20);
 
-      result = await applyFlurryOfBlows(
-        action,
-        makePlayerStats(),
-        campaignName,
-        mapName,
-        { Goblin: 2 },
-        2
-      );
+      result = await applyFlurryOfBlows({ action: action, playerStats: makePlayerStats(), campaignName, _mapName: mapName, distribution: { Goblin: 2 }, numAttacks: 2 });
       expect(result.payload.description).toContain('2 criticals');
 
       vi.clearAllMocks();
       getCombatSummary.mockReturnValue(combatSummary);
       vi.mocked(rollD20).mockReturnValue(10);
 
-      result = await applyFlurryOfBlows(
-        action,
-        makePlayerStats(),
-        campaignName,
-        mapName,
-        { Goblin: 1 },
-        1
-      );
+      result = await applyFlurryOfBlows({ action: action, playerStats: makePlayerStats(), campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1 });
       expect(result.payload.description).toContain('0 criticals');
     });
 
@@ -700,14 +542,7 @@ describe('bonusAttacksHandler', () => {
       vi.mocked(rollD20).mockReturnValue(18);
       applyDamageToTarget.mockReturnValue({ finalDamage: 4, newHp: 6 });
 
-      await applyFlurryOfBlows(
-        action,
-        makePlayerStats(),
-        campaignName,
-        mapName,
-        { Goblin: 2 },
-        2
-      );
+      await applyFlurryOfBlows({ action: action, playerStats: makePlayerStats(), campaignName, _mapName: mapName, distribution: { Goblin: 2 }, numAttacks: 2 });
 
       const abilityEntries = addEntry.mock.calls.filter(
         call => call[1].type === 'ability_use'
@@ -768,15 +603,7 @@ describe('bonusAttacksHandler', () => {
 
         const playerStats = makeWarriorOfMercyMonk();
 
-        await applyFlurryOfBlows(
-          actionWithFlurry,
-          playerStats,
-          campaignName,
-          mapName,
-          { Goblin: 1 },
-          1,
-          'Goblin'
-        );
+        await applyFlurryOfBlows({ action: actionWithFlurry, playerStats: playerStats, campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1, healingTarget: 'Goblin' });
 
         expect(applyHealingDirectly).toHaveBeenCalledWith(
           expect.any(Object),
@@ -798,15 +625,7 @@ describe('bonusAttacksHandler', () => {
 
         const playerStats = makeWarriorOfMercyMonk();
 
-        await applyFlurryOfBlows(
-          actionWithFlurry,
-          playerStats,
-          campaignName,
-          mapName,
-          { Goblin: 2 },
-          2,
-          'Goblin'
-        );
+        await applyFlurryOfBlows({ action: actionWithFlurry, playerStats: playerStats, campaignName, _mapName: mapName, distribution: { Goblin: 2 }, numAttacks: 2, healingTarget: 'Goblin' });
 
         expect(setRuntimeValue).toHaveBeenCalledTimes(2);
         expect(setRuntimeValue).toHaveBeenNthCalledWith(1, 'TestMonk', 'flurryHealingHarmUses', 1, campaignName);
@@ -825,15 +644,7 @@ describe('bonusAttacksHandler', () => {
 
         const playerStats = makeWarriorOfMercyMonk();
 
-        await applyFlurryOfBlows(
-          actionWithFlurry,
-          playerStats,
-          campaignName,
-          mapName,
-          { Goblin: 2 },
-          2,
-          'Goblin'
-        );
+        await applyFlurryOfBlows({ action: actionWithFlurry, playerStats: playerStats, campaignName, _mapName: mapName, distribution: { Goblin: 2 }, numAttacks: 2, healingTarget: 'Goblin' });
 
         expect(applyHealingDirectly).toHaveBeenCalledTimes(1);
         expect(createSaveListener).toHaveBeenCalledTimes(1);
@@ -851,15 +662,7 @@ describe('bonusAttacksHandler', () => {
 
         const playerStats = makeWarriorOfMercyMonk();
 
-        await applyFlurryOfBlows(
-          actionWithFlurry,
-          playerStats,
-          campaignName,
-          mapName,
-          { Goblin: 1 },
-          1,
-          'Ally'
-        );
+        await applyFlurryOfBlows({ action: actionWithFlurry, playerStats: playerStats, campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1, healingTarget: 'Ally' });
 
         expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
           targetName: 'Goblin',
@@ -876,15 +679,7 @@ describe('bonusAttacksHandler', () => {
 
         const playerStats = makePlayerStats();
 
-        const result = await applyFlurryOfBlows(
-          actionWithFlurry,
-          playerStats,
-          campaignName,
-          mapName,
-          { Goblin: 1 },
-          1,
-          'Goblin'
-        );
+        const result = await applyFlurryOfBlows({ action: actionWithFlurry, playerStats: playerStats, campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1, healingTarget: 'Goblin' });
 
         expect(applyHealingDirectly).not.toHaveBeenCalled();
         expect(createSaveListener).not.toHaveBeenCalled();
@@ -903,15 +698,7 @@ describe('bonusAttacksHandler', () => {
 
         const playerStats = makeWarriorOfMercyMonk();
 
-        await applyFlurryOfBlows(
-          actionWithFlurry,
-          playerStats,
-          campaignName,
-          mapName,
-          { Goblin: 1 },
-          1,
-          'Ally'
-        );
+        await applyFlurryOfBlows({ action: actionWithFlurry, playerStats: playerStats, campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1, healingTarget: 'Ally' });
 
         expect(createSaveListener).not.toHaveBeenCalled();
       });
@@ -927,15 +714,7 @@ describe('bonusAttacksHandler', () => {
 
         const playerStats = makeWarriorOfMercyMonk();
 
-        await applyFlurryOfBlows(
-          actionWithFlurry,
-          playerStats,
-          campaignName,
-          mapName,
-          { Goblin: 1 },
-          1,
-          'Goblin'
-        );
+        await applyFlurryOfBlows({ action: actionWithFlurry, playerStats: playerStats, campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1, healingTarget: 'Goblin' });
 
         const hpEntries = addEntry.mock.calls.filter(
           call => call[1].type === 'hp_change'

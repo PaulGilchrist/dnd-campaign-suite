@@ -101,12 +101,12 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
 
   describe('no map name — delegates to sync path', () => {
     it('returns base attack context when mapName is null or undefined', async () => {
-      let result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', null, 'normal', {});
+      let result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: null, conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.targetName).toBe('Orc');
       expect(result.attackerName).toBe('Fighter1');
       expect(result.damageType).toBe('Piercing');
       expect(result.isMelee).toBe(false);
-      result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', undefined, 'normal', {});
+      result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: undefined, conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.targetName).toBe('Orc');
     });
   });
@@ -114,38 +114,38 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
   describe('map data loading', () => {
     it('loads map data and NPC data when mapName is provided', async () => {
       loadMapData.mockResolvedValue(makeMapData([{ name: 'Fighter1', gridX: 1, gridY: 1 }]));
-      await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(loadMapData).toHaveBeenCalledWith('camp', 'test-map');
       expect(loadNPCs).toHaveBeenCalledWith('camp');
     });
 
     it('returns base context when attacker is not found on map', async () => {
       loadMapData.mockResolvedValue(makeMapData([{ name: 'Other', gridX: 1, gridY: 1 }]));
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.targetName).toBe('Orc');
     });
 
     it('returns base context when map data is null or has no players array', async () => {
-      let result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      let result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.targetName).toBe('Orc');
       loadMapData.mockResolvedValue(null);
-      result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.targetName).toBe('Orc');
       loadMapData.mockResolvedValue({});
-      result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.targetName).toBe('Orc');
     });
 
     it('handles map loading rejection gracefully', async () => {
       loadMapData.mockRejectedValue(new Error('map load failed'));
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.targetName).toBe('Orc');
     });
 
     it('handles getCombatContext rejection gracefully', async () => {
       loadMapData.mockResolvedValue(makeMapData([{ name: 'Fighter1', gridX: 1, gridY: 1 }]));
       getCombatContext.mockRejectedValue(new Error('combat context failed'));
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.targetName).toBe('Orc');
     });
   });
@@ -155,7 +155,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       setupMapPathWithTarget('Orc', 10, 10);
       loadMapData.mockResolvedValue(makeMapDataWithNPCs(null, [{ name: 'Orc', gridX: 10, gridY: 10 }]));
       computeRangeEffect.mockReturnValue({ mode: 'miss', reason: 'Out of range' });
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.isAutoMiss).toBe(true);
       expect(result.rangeReason).toBe('Out of range');
       expect(result.forcedMode).toBeUndefined();
@@ -165,7 +165,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       setupMapPathWithTarget('Orc', 10, 10);
       loadMapData.mockResolvedValue(makeMapDataWithNPCs(null, [{ name: 'Orc', gridX: 10, gridY: 10 }]));
       computeRangeEffect.mockReturnValue({ mode: 'disadvantage', reason: 'Long range' });
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.forcedMode).toBe('disadvantage');
       expect(result.rangeReason).toBe('Long range');
     });
@@ -181,7 +181,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       setupCoverTest();
       computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
       const stats = { ...mockStats, automation: { passives: [{ type: 'passive_rule', effect: 'ignore_cover_ranged' }] } };
-      const result = await buildAttackContext(mockRangedAttack, stats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: stats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.coverAcBonus).toBeUndefined();
       expect(result.isAutoMiss).toBeUndefined();
       expect(result.coverReason).toBe('Sharpshooter');
@@ -191,7 +191,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       setupCoverTest();
       computeCover.mockReturnValue({ level: 'threeQuarter', acBonus: 5 });
       const stats = { ...mockStats, automation: { passives: [{ type: 'passive_rule', effect: 'ignore_cover_ranged' }] } };
-      const result = await buildAttackContext(mockRangedAttack, stats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: stats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.coverAcBonus).toBeUndefined();
       expect(result.isAutoMiss).toBeUndefined();
       expect(result.coverReason).toBe('Sharpshooter');
@@ -201,7 +201,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       setupCoverTest();
       computeCover.mockReturnValue({ level: 'full', acBonus: null });
       const stats = { ...mockStats, automation: { passives: [{ type: 'passive_rule', effect: 'ignore_cover_ranged' }] } };
-      const result = await buildAttackContext(mockRangedAttack, stats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: stats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.isAutoMiss).toBe(true);
       expect(result.coverReason).toBe('Target has full cover');
     });
@@ -210,7 +210,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       setupCoverTest();
       computeCover.mockReturnValue({ level: 'threeQuarter', acBonus: 5 });
       const stats = { ...mockStats, automation: { passives: [{ type: 'passive_rule', effect: 'ignore_cover_ranged', coverTypes: ['Half'] }] } };
-      const result = await buildAttackContext(mockRangedAttack, stats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: stats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.coverAcBonus).toBe(5);
       expect(result.coverLevel).toBe('threeQuarter');
     });
@@ -218,14 +218,14 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
     it('sets auto miss when cover is full', async () => {
       setupCoverTest();
       computeCover.mockReturnValue({ level: 'full', acBonus: 4 });
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.isAutoMiss).toBe(true);
     });
 
     it('applies cover AC bonus when cover is not none and not full', async () => {
       setupCoverTest();
       computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.coverAcBonus).toBe(2);
       expect(result.coverLevel).toBe('half');
     });
@@ -234,7 +234,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       setupCoverTest();
       computeRangeEffect.mockReturnValue({ mode: 'miss', reason: 'Out of range' });
       computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.isAutoMiss).toBe(true);
       expect(result.coverAcBonus).toBeUndefined();
     });
@@ -243,7 +243,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       setupCoverTest();
       computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
       const meleeAttack = { ...mockRangedAttack, range: 5, weaponType: 'melee' };
-      const result = await buildAttackContext(meleeAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: meleeAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.coverAcBonus).toBe(2);
       expect(result.coverLevel).toBe('half');
     });
@@ -253,7 +253,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       computeCover.mockReturnValue({ level: 'threeQuarter', acBonus: 5 });
       const meleeSpellAttack = { name: 'Inflict Wounds', damage: '3d10', damageType: 'Necrotic', hitBonus: 7, weaponType: 'melee', range: 5, school: 'Necromancy' };
       const stats = { ...mockStats, automation: { passives: [{ type: 'passive_rule', effect: 'ignore_cover_ranged' }] } };
-      const result = await buildAttackContext(meleeSpellAttack, stats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: meleeSpellAttack, playerStats: stats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.coverAcBonus).toBe(5);
       expect(result.coverLevel).toBe('threeQuarter');
     });
@@ -263,7 +263,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
       const rangedSpellAttack = { name: 'Fire Bolt', damage: '4d10', damageType: 'Fire', hitBonus: 9, range: 120, school: 'Evocation' };
       const stats = { ...mockStats, automation: { passives: [{ type: 'passive_rule', effect: 'ignore_cover_ranged' }] } };
-      const result = await buildAttackContext(rangedSpellAttack, stats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: rangedSpellAttack, playerStats: stats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.coverAcBonus).toBe(2);
       expect(result.coverLevel).toBe('half');
     });
@@ -273,7 +273,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
       const meleeAttack = { ...mockRangedAttack, weaponType: 'melee', range: 5 };
       const stats = { ...mockStats, automation: { passives: [{ type: 'passive_rule', effect: 'ignore_cover_ranged' }] } };
-      const result = await buildAttackContext(meleeAttack, stats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: meleeAttack, playerStats: stats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.coverAcBonus).toBe(2);
       expect(result.coverLevel).toBe('half');
     });
@@ -281,7 +281,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
     it('does not apply cover when target position cannot be resolved', async () => {
       loadMapData.mockResolvedValue(makeMapData([{ name: 'Fighter1', gridX: 1, gridY: 1 }]));
       getCombatContext.mockResolvedValue(null);
-      await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(computeCover).not.toHaveBeenCalled();
     });
   });
@@ -296,7 +296,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       setupMeleeProxTest();
       isHostileNPC.mockReturnValue(true);
       computeMeleeProximityEffect.mockReturnValue({ mode: 'disadvantage', reason: 'Firing in melee' });
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.forcedMode).toBe('disadvantage');
       expect(result.rangeReason).toBe('Firing in melee');
     });
@@ -306,7 +306,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       isHostileNPC.mockReturnValue(true);
       computeRangeEffect.mockReturnValue({ mode: 'miss', reason: 'Out of range' });
       computeMeleeProximityEffect.mockReturnValue({ mode: 'disadvantage', reason: 'Firing in melee' });
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.isAutoMiss).toBe(true);
       expect(result.forcedMode).toBeUndefined();
     });
@@ -324,7 +324,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
         { name: 'Hostile', attitude: 'negative' },
       ]);
       isHostileNPC.mockImplementation((npc) => npc.attitude === 'negative');
-      await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(isHostileNPC).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'Hostile', attitude: 'negative' }),
       );
@@ -338,7 +338,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       ));
       getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
       getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.targetName).toBe('Orc');
     });
 
@@ -350,7 +350,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
       getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
       getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.targetName).toBe('Orc');
     });
 
@@ -362,7 +362,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
       getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
       getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 11, gridY: 11 });
-      await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(getNearestPlacedItem).toHaveBeenCalledWith(
         expect.any(Array), 'Orc', expect.objectContaining({ gridX: 1, gridY: 1 }),
       );
@@ -372,7 +372,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       loadMapData.mockResolvedValue(makeMapData([{ name: 'Fighter1', gridX: 1, gridY: 1 }]));
       getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
       getTargetFromAttacker.mockReturnValue(null);
-      await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(computeCover).not.toHaveBeenCalled();
     });
   });
@@ -387,7 +387,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       setupIllusionTest();
       const stats = { ...mockStats, automation: { passives: [{ type: 'improved_illusions' }] } };
       const illusionAttack = { ...mockRangedAttack, damage: '1d4', damageType: 'Force', range: 120, school: 'Illusion' };
-      await buildAttackContext(illusionAttack, stats, 'camp', 'test-map', 'normal', {});
+      await buildAttackContext({ attack: illusionAttack, playerStats: stats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(computeRangeEffect).toHaveBeenCalledWith(180, expect.any(Number), expect.any(Object));
     });
 
@@ -395,7 +395,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       setupIllusionTest();
       const stats = { ...mockStats, automation: { passives: [{ type: 'improved_illusions' }] } };
       const fireAttack = { ...mockRangedAttack, school: 'Evocation' };
-      await buildAttackContext(fireAttack, stats, 'camp', 'test-map', 'normal', {});
+      await buildAttackContext({ attack: fireAttack, playerStats: stats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(computeRangeEffect).toHaveBeenCalledWith(150, expect.any(Number), expect.any(Object));
     });
 
@@ -403,7 +403,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       setupIllusionTest();
       const stats = { ...mockStats, automation: { passives: [{ type: 'improved_illusions' }] } };
       const illusionAttack = { ...mockRangedAttack, range: 5, school: 'Illusion' };
-      await buildAttackContext(illusionAttack, stats, 'camp', 'test-map', 'normal', {});
+      await buildAttackContext({ attack: illusionAttack, playerStats: stats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(computeRangeEffect).toHaveBeenCalledWith(5, expect.any(Number), expect.any(Object));
     });
 
@@ -412,7 +412,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       const stats = { ...mockStats, automation: { passives: [{ type: 'improved_illusions' }] } };
       const illusionAttack = { ...mockRangedAttack, range: 120, school: 'Illusion' };
       const feats = { spellRangeBonus: 30 };
-      await buildAttackContext(illusionAttack, stats, 'camp', 'test-map', 'normal', feats);
+      await buildAttackContext({ attack: illusionAttack, playerStats: stats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: feats });
       expect(computeRangeEffect).toHaveBeenCalledWith(210, expect.any(Number), expect.any(Object));
     });
   });
@@ -422,12 +422,12 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       loadMapData.mockResolvedValue(makeMapData([{ name: 'Fighter1', gridX: 1, gridY: 1 }]));
       getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
       getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      let result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', undefined);
+      let result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: undefined });
       expect(result).toBeDefined();
-      result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', null);
+      result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: null });
       expect(result).toBeDefined();
       const feats = { ignoresMeleeDisadvantage: true, ignoresLongRangeDisadvantage: true, rangeMultiplier: 1, spellRangeBonus: 10 };
-      result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', feats);
+      result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: feats });
       expect(result).toBeDefined();
     });
   });
@@ -445,7 +445,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
       getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
       getWolfAdvantageAgainst.mockImplementation((opts) => opts.targetPos ? { advantage: true } : { advantage: false });
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.forcedMode).toBe('advantage');
       expect(getWolfAdvantageAgainst).toHaveBeenCalledWith(
         expect.objectContaining({ targetPos: { gridX: 10, gridY: 10 }, mapData: expect.any(Object) }),
@@ -456,7 +456,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       setupAuraTest();
       getWolfAdvantageAgainst.mockReturnValue({ advantage: false });
       getDuplicityAdvantageAgainst.mockReturnValue({ advantage: true });
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.forcedMode).toBe('advantage');
     });
 
@@ -465,7 +465,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       getWolfAdvantageAgainst.mockReturnValue({ advantage: false });
       getDuplicityAdvantageAgainst.mockReturnValue({ advantage: false });
       getLionDisadvantageAgainst.mockReturnValue({ disadvantage: true });
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.forcedMode).toBe('disadvantage');
     });
 
@@ -478,7 +478,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
         if (prop === 'targetEffects') return [{ effect: 'protection', target: 'Orc', source: 'Paladin' }];
         return undefined;
       });
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.forcedMode).toBe('disadvantage');
     });
 
@@ -488,7 +488,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       getDuplicityAdvantageAgainst.mockReturnValue({ advantage: false });
       getLionDisadvantageAgainst.mockReturnValue({ disadvantage: true });
       getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.forcedMode).toBe('advantage');
     });
   });
@@ -498,7 +498,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       loadMapData.mockResolvedValue(makeMapData([{ name: 'Fighter1', gridX: 1, gridY: 1 }]));
       getCombatContext.mockResolvedValue(null);
       getWolfAdvantageAgainst.mockReturnValue({ advantage: true });
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      const result = await buildAttackContext({ attack: mockRangedAttack, playerStats: mockStats, campaignName: 'camp', mapName: 'test-map', conditionAttackMode: 'normal', featRangeEffects: {} });
       expect(result.forcedMode).toBe('advantage');
       expect(getWolfAdvantageAgainst).toHaveBeenCalledWith(
         expect.objectContaining({ skipRangeCheck: true }),

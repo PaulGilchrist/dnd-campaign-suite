@@ -30,7 +30,7 @@ vi.mock('../../services/combat/steps/index.js', async () => {
         emit: 'damage:applied',
         condition: () => true,
         handler: async (ctx) => {
-          ctx.proceedWithDamage(ctx.attack, ctx.formula, ctx.total, ctx.rolls, ctx.modifier, {}, ctx);
+          ctx.proceedWithDamage({ attack: ctx.attack, formula: ctx.formula, total: ctx.total, rolls: ctx.rolls, modifier: ctx.modifier, critLabels: {}, pipelineCtx: ctx });
           return { data: { _done: true } };
         },
       });

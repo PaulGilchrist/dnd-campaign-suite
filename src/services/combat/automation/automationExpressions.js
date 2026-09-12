@@ -56,8 +56,10 @@ function resolveHealingPoolExpression(baseExpression, scaling, playerStats) {
 function getSuperiorityDieSize(playerStats) {
     // FS-010: a non-Battle Master with the Superior Technique fighting style
     // always uses a d6 (trackedResources.js mirrors this max-dice gate).
-    const majorName = playerStats?.class?.major?.name || playerStats?.class?.subclass?.name
-    if (majorName !== 'Battle Master' && (playerStats?.class?.fightingStyles || []).includes('Superior Technique')) return 6
+    const playerClass = playerStats?.class || {}
+    const majorName = playerClass.major?.name || playerClass.subclass?.name
+    const fightingStyles = playerClass.fightingStyles || []
+    if (majorName !== 'Battle Master' && fightingStyles.includes('Superior Technique')) return 6
     const level = playerStats?.level || 1
     if (level >= 18) return 12
     if (level >= 10) return 10

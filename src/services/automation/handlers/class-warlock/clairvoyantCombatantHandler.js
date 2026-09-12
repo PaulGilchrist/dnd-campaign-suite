@@ -20,7 +20,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const pactSlotLevel = findPactSlotLevel(playerStats);
 
     // Check Pact Magic slot availability if needed
-    const pactSlotsAvailable = hasPactSlotAvailable(playerStats, playerName, campaignName, auto, currentUses, maxUses, pactSlotLevel);
+    const pactSlotsAvailable = hasPactSlotAvailable({ playerStats, playerName, campaignName, auto, currentUses, maxUses, pactSlotLevel });
 
     // Check if we can use at all
     const canUse = currentUses < maxUses || (auto.pactMagicRecharge && pactSlotsAvailable);

@@ -119,6 +119,62 @@ export async function applyPostDamageMasteryEffects(attackName, playerStats, cam
     }
 }
 
+function buildMasteryEffectPayload(masteryName, mastery, playerStats, targetName, campaignName) {
+    let newEffect = {
+        target: targetName,
+        source: masteryName,
+        option: masteryName,
+        effect: mastery.effect,
+        value: mastery.value || null,
+        duration: 'until_start_of_next_turn',
+    };
+    if (masteryName === 'Graze') {
+        newEffect = buildGrazeEffect(newEffect, playerStats);
+    }
+    if (masteryName === 'Vex') {
+        newEffect = {
+            ...newEffect,
+            target: playerStats.name,
+            vexTarget: targetName,
+            appliedRound: getCurrentCombatRound(),
+        };
+        addExpiration(playerStats.name, targetName, [
+            { type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: 'Vex', target: targetName }
+        ], campaignName, 2);
+    }
+    if (masteryName === 'Sap') {
+        newEffect = {
+            ...newEffect,
+            appliedRound: getCurrentCombatRound(),
+        };
+        addExpiration(playerStats.name, targetName, [
+            { type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: 'Sap', target: targetName }
+        ], campaignName, undefined, playerStats.name);
+    }
+    return newEffect;
+}
+
+function slowMasteryRefusal(storedEffects, masteryName, targetName, playerStats, campaignName) {
+    if (masteryName !== 'Slow') return null;
+    const existingSlowForTarget = storedEffects.filter(
+        te => te.target === targetName && te.effect === 'speed_reduction' && te.source === 'Slow'
+    );
+    if (existingSlowForTarget.length > 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: masteryName,
+                description: `${masteryName}: Target already has Speed reduction from Slow — additional reductions don't stack.`,
+            },
+        };
+    }
+    addExpiration(playerStats.name, targetName, [
+        { type: 'remove_target_effect', effectKey: 'speed_reduction', source: 'Slow', target: targetName }
+    ], campaignName, 1);
+    return null;
+}
+
 export async function applyMasteryEffect(masteryName, playerStats, campaignName, targetName) {
     const mastery = MASTERY_EFFECTS[masteryName];
     if (!mastery) return null;
@@ -145,57 +201,11 @@ export async function applyMasteryEffect(masteryName, playerStats, campaignName,
     }
 
     const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-    let newEffect = {
-        target: targetName,
-        source: masteryName,
-        option: masteryName,
-        effect: mastery.effect,
-        value: mastery.value || null,
-        duration: 'until_start_of_next_turn',
-    };
-    if (masteryName === 'Graze') {
-        newEffect = buildGrazeEffect(newEffect, playerStats);
-    }
-    if (masteryName === 'Vex') {
-        const currentRound = getCurrentCombatRound();
-        newEffect = {
-            ...newEffect,
-            target: playerStats.name,
-            vexTarget: targetName,
-            appliedRound: currentRound,
-        };
-        addExpiration(playerStats.name, targetName, [
-            { type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: 'Vex', target: targetName }
-        ], campaignName, 2);
-    }
-    if (masteryName === 'Sap') {
-        const currentRound = getCurrentCombatRound();
-        newEffect = {
-            ...newEffect,
-            appliedRound: currentRound,
-        };
-        addExpiration(playerStats.name, targetName, [
-            { type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: 'Sap', target: targetName }
-        ], campaignName, undefined, playerStats.name);
-    }
-    if (masteryName === 'Slow') {
-        const existingSlowForTarget = storedEffects.filter(
-            te => te.target === targetName && te.effect === 'speed_reduction' && te.source === 'Slow'
-        );
-        if (existingSlowForTarget.length > 0) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: masteryName,
-                    description: `${masteryName}: Target already has Speed reduction from Slow — additional reductions don't stack.`,
-                },
-            };
-        }
-        addExpiration(playerStats.name, targetName, [
-            { type: 'remove_target_effect', effectKey: 'speed_reduction', source: 'Slow', target: targetName }
-        ], campaignName, 1);
-    }
+    const newEffect = buildMasteryEffectPayload(masteryName, mastery, playerStats, targetName, campaignName);
+
+    const slowRefusal = slowMasteryRefusal(storedEffects, masteryName, targetName, playerStats, campaignName);
+    if (slowRefusal) return slowRefusal;
+
     const updatedEffects = [...storedEffects, newEffect];
     setRuntimeValue('campaign', 'targetEffects', updatedEffects, campaignName);
 

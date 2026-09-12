@@ -242,7 +242,7 @@ async function buildHealModal(action, auto, playerStats, campaignName, _mapName,
     };
 }
 
-async function buildConditionModal(action, auto, playerStats, campaignName, _mapName, resolvedShape, saveDcValue) {
+async function buildConditionModal({ action, auto, playerStats, campaignName, _mapName, resolvedShape, saveDcValue }) {
     const cs = await getCombatContext(campaignName);
     const { attackerPos, mapData, attackerPlayer } = await resolveAttackerPosition(_mapName, campaignName, playerStats);
 
@@ -322,7 +322,7 @@ function routeSaveAttack(action, auto, playerStats, campaignName, _mapName, reso
 
     if (auto.conditionInflicted && !auto.damage) {
         if (isAreaShape(resolvedShape)) {
-            return buildConditionModal(action, auto, playerStats, campaignName, _mapName, resolvedShape, saveDcValue);
+            return buildConditionModal({ action, auto, playerStats, campaignName, _mapName, resolvedShape, saveDcValue });
         }
         return conditionInflictedPopup(action, auto, saveDcValue);
     }
@@ -337,7 +337,7 @@ function routeSaveAttack(action, auto, playerStats, campaignName, _mapName, reso
         return buildAoeModal({ action, auto, playerStats, campaignName, resolvedShape, resolvedDamageType, saveDcValue, dcSuccess });
     }
 
-    return buildSaveAttackRollResult(action, auto, playerStats, resolvedShape, resolvedDamageType, saveDcValue, dcSuccess);
+    return buildSaveAttackRollResult({ action, auto, playerStats, resolvedShape, resolvedDamageType, saveDcValue, dcSuccess });
 }
 
 export async function handle(action, playerStats, campaignName, _mapName) {
@@ -404,7 +404,7 @@ function resolveSaveAttackDamageType(auto, playerStats) {
     return resolvedDamageType;
 }
 
-function buildSaveAttackRollResult(action, auto, playerStats, resolvedShape, resolvedDamageType, saveDcValue, dcSuccess) {
+function buildSaveAttackRollResult({ action, auto, playerStats, resolvedShape, resolvedDamageType, saveDcValue, dcSuccess }) {
     const resolvedDamageExpression = auto.damage;
     const scalingEntry = resolveScaling(playerStats, auto.scaling);
     const damageExpression = scalingEntry?.damage || resolvedDamageExpression;

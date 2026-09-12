@@ -7,6 +7,17 @@ import { endFriendsOnHostileAction } from '../../services/rules/features/friends
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js'
 import { selectBrutalStrikeRiders } from '../../services/combat/brutalStrikeSelection.js'
 
+function readBrutalStrikeOffer(passives) {
+    const brutalStrikePassives = selectBrutalStrikeRiders(passives);
+    const brutalStrikePassive = brutalStrikePassives[0] || {};
+    return {
+        hasBrutalStrike: brutalStrikePassives.length > 0,
+        brutalStrikeOptions: brutalStrikePassive.options || [],
+        maxEffects: brutalStrikePassive.maxEffects || 1,
+        riderName: brutalStrikePassive?.name || 'Brutal Strike',
+    };
+}
+
 export default function useCharActionsAttackHandlers({
     cannotAct,
     buildCtx,
@@ -96,24 +107,21 @@ export default function useCharActionsAttackHandlers({
         const currentCreature = getActiveCreatureName(campaignName);
         const isOfferedThisTurn = offeredValue && offeredValue.activeCreature === currentCreature;
 
-        const brutalStrikePassives = selectBrutalStrikeRiders(passives);
-        const brutalStrikePassive = brutalStrikePassives[0] || {};
-        const hasBrutalStrike = brutalStrikePassives.length > 0;
-        const brutalStrikeOptions = brutalStrikePassive.options || [];
-        const maxEffects = brutalStrikePassive.maxEffects || 1;
+        const { hasBrutalStrike, brutalStrikeOptions, maxEffects, riderName } = readBrutalStrikeOffer(passives);
 
         const brutalStrikeUsedKey = '_BrutalStrike_usedRound';
         const brutalStrikeUsedValue = getRuntimeValue(playerName, brutalStrikeUsedKey, campaignName);
         const brutalStrikeUsedThisTurn = brutalStrikeUsedValue && brutalStrikeUsedValue.activeCreature === currentCreature;
 
-        const riderName = brutalStrikePassive?.name || 'Brutal Strike';
+        const recklessOwed = hasRecklessFeature && !isRecklessActive && !isOfferedThisTurn;
+        const brutalOwed = hasRecklessFeature && isRecklessActive && hasBrutalStrike && !brutalStrikeUsedThisTurn;
 
-        if (hasRecklessFeature && !isRecklessActive && !isOfferedThisTurn) {
+        if (recklessOwed) {
             setModalState({ recklessAttackModal: { attack, mode: 'full', hasBrutalStrike, brutalStrikeOptions, maxEffects, riderName } });
             return true;
         }
 
-        if (hasRecklessFeature && isRecklessActive && hasBrutalStrike && !brutalStrikeUsedThisTurn) {
+        if (brutalOwed) {
             setModalState({ recklessAttackModal: { attack, mode: 'brutalOnly', hasBrutalStrike: true, brutalStrikeOptions, maxEffects, riderName } });
             return true;
         }

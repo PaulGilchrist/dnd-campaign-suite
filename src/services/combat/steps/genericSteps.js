@@ -48,7 +48,7 @@ export function buildGenericSteps() {
       emit: 'pipeline:complete',
       condition: (ctx) => ctx.formula != null,
       handler: async (ctx) => {
-        ctx.proceedWithDamage(ctx.attack, ctx.formula, ctx.total, ctx.rolls, ctx.modifier);
+        ctx.proceedWithDamage({ attack: ctx.attack, formula: ctx.formula, total: ctx.total, rolls: ctx.rolls, modifier: ctx.modifier });
         return { data: { _done: true } };
       },
     },

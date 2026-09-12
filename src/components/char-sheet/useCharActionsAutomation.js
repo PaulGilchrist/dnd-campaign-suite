@@ -188,6 +188,30 @@ function buildCastHealPopup(healResult, spell) {
     };
 }
 
+function dispatchAutomationResult(result, { modalMap, setPopupHtml, rollDamage, rollAttack, onBuffsChange }) {
+    switch (result.type) {
+        case 'popup':
+            setPopupHtml(result.payload);
+            break;
+        case 'modal': {
+            const handler = modalMap[result.modalName];
+            if (handler) {
+                handler(result.payload);
+            }
+            break;
+        }
+        case 'roll':
+            dispatchRollResult(result.payload, rollDamage);
+            break;
+        case 'attack_roll':
+            dispatchAttackRollResult(result.payload, rollAttack);
+            break;
+        case 'notify_buffs_changed':
+            if (onBuffsChange) onBuffsChange();
+            break;
+    }
+}
+
 export default function useCharActionsAutomation({
     cannotAct,
     playerStats,
@@ -356,27 +380,7 @@ export default function useCharActionsAutomation({
         const result = await executeHandler(action, playerStats, campaignName, mapName, characters);
         if (!result) return;
 
-        switch (result.type) {
-            case 'popup':
-                setPopupHtml(result.payload);
-                break;
-            case 'modal': {
-                const handler = modalMap[result.modalName];
-                if (handler) {
-                    handler(result.payload);
-                }
-                break;
-            }
-            case 'roll':
-                dispatchRollResult(result.payload, rollDamage);
-                break;
-            case 'attack_roll':
-                dispatchAttackRollResult(result.payload, rollAttack);
-                break;
-            case 'notify_buffs_changed':
-                if (onBuffsChange) onBuffsChange();
-                break;
-        }
+        dispatchAutomationResult(result, { modalMap, setPopupHtml, rollDamage, rollAttack, onBuffsChange });
 
         finalizeAutomationOutcome(result, auto, addEntry, campaignName, onBuffsChange);
     }

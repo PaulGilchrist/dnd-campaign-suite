@@ -67,7 +67,7 @@ export async function markFortifiedHealthIfApplied(playerStats, campaignName, an
     }
 }
 
-function logHealingWordEntry(campaignName, targetName, actualHeal, newHp, maxHp, playerStats, formula, bonusDetails) {
+function logHealingWordEntry({ campaignName, targetName, actualHeal, newHp, maxHp, playerStats, formula, bonusDetails }) {
     addEntry(campaignName, {
         type: 'hp_change',
         targetName,
@@ -130,7 +130,7 @@ export async function triggerHealingWord(spell, metaCtx, playerStats, campaignNa
 
     await markFortifiedHealthIfApplied(playerStats, campaignName, actualHeal > 0, bonusDetails);
 
-    logHealingWordEntry(campaignName, targetName, actualHeal, newHp, maxHp, playerStats, buildHealingWordFormula(healExpression, bonusDetails), bonusDetails);
+    logHealingWordEntry({ campaignName, targetName, actualHeal, newHp, maxHp, playerStats, formula: buildHealingWordFormula(healExpression, bonusDetails), bonusDetails });
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 

@@ -297,6 +297,10 @@ async function collectFeatSpells(selectedFeats, version) {
   return { cantrips, spells };
 }
 
+function resolveSubclassName(formData) {
+  return formData.class?.subclass?.name || formData.class?.major?.name;
+}
+
 export async function getPreSelectedSpells(formData) {
   if (!formData) return [];
 
@@ -304,7 +308,7 @@ export async function getPreSelectedSpells(formData) {
   const charLevel = parseInt(formData.level) || 1;
 
   const className = formData.class?.name;
-  const subclassName = formData.class?.subclass?.name || formData.class?.major?.name;
+  const subclassName = resolveSubclassName(formData);
   const raceName = formData.race?.name;
   const subraceName = formData.race?.subrace?.name;
 

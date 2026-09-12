@@ -62,11 +62,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const originalDamage = attackResult.totalDamage || 0;
 
-    const damageRoll = rollExpression(auto.damageExpression || '1d10');
-    const damageBonus = resolveInterceptionDamageBonus(auto, playerStats);
-    const reductionAmount = (damageRoll?.total || 0) + damageBonus;
-    const reducedDamage = Math.max(0, originalDamage - reductionAmount);
-    const actualHeal = Math.min(reductionAmount, originalDamage);
+    const { damageRoll, damageBonus, reductionAmount, reducedDamage, actualHeal } = computeInterceptionReduction(auto, playerStats, originalDamage);
 
     if (actualHeal > 0 && defenderName) {
         applyHealingToTarget(combatSummary, defenderName, actualHeal, campaignName);
@@ -74,7 +70,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     await stampInterceptionRound(playerName, currentRound, combatSummary, attackerName, attackEvent, campaignName);
 
-    const description = baseDescription(action, attackerName, defenderName) + attackDetails(attackEvent, originalDamage, damageRoll, damageBonus, reductionAmount, reducedDamage, actualHeal);
+    const description = baseDescription(action, attackerName, defenderName) + attackDetails({ attackEvent, originalDamage, damageRoll, damageBonus, reductionAmount, reducedDamage, actualHeal });
 
     const result = {
         type: 'popup',
@@ -105,6 +101,15 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }).catch((e) => { console.error("[interception] Error:", e); });
 
     return result;
+}
+
+function computeInterceptionReduction(auto, playerStats, originalDamage) {
+    const damageRoll = rollExpression(auto.damageExpression || '1d10');
+    const damageBonus = resolveInterceptionDamageBonus(auto, playerStats);
+    const reductionAmount = (damageRoll?.total || 0) + damageBonus;
+    const reducedDamage = Math.max(0, originalDamage - reductionAmount);
+    const actualHeal = Math.min(reductionAmount, originalDamage);
+    return { damageRoll, damageBonus, reductionAmount, reducedDamage, actualHeal };
 }
 
 async function stampInterceptionRound(playerName, currentRound, combatSummary, attackerName, attackEvent, campaignName) {
@@ -220,7 +225,7 @@ function baseDescription(action, attackerName, defenderName) {
     return `<b>${action.name}</b><br/>You interpose yourself between ${attackerName} and ${defenderName}. ${attackerName} and all other creatures have Disadvantage on attack rolls against ${defenderName} until the start of your next turn.`;
 }
 
-function attackDetails(attackEvent, originalDamage, damageRoll, damageBonus, reductionAmount, reducedDamage, actualHeal) {
+function attackDetails({ attackEvent, originalDamage, damageRoll, damageBonus, reductionAmount, reducedDamage, actualHeal }) {
     if (!attackEvent || originalDamage == null) return '';
 
     let description = `<br/><br/>Attack roll: d20(${attackEvent.d20}) + ${attackEvent.bonus || 0} = ${attackEvent.d20 + (attackEvent.bonus || 0)} vs AC ${attackEvent.targetAc != null ? attackEvent.targetAc : '—'} → <b>${attackEvent.hit ? 'HIT' : 'MISS'}</b><br/>`;

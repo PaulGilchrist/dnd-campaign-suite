@@ -20,7 +20,7 @@ async function resolveSphereTarget(action, campaignName, casterName) {
     return targetName;
 }
 
-async function encloseInResilientSphere(action, auto, casterName, targetName, dc, saveResult, campaignName) {
+async function encloseInResilientSphere({ action, auto, casterName, targetName, dc, saveResult, campaignName }) {
     // Failed save: apply the sphere enclosure
     const { wasActive } = toggleResilientSphere(
         targetName,
@@ -165,7 +165,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     // Failed save: apply the sphere enclosure
-    return encloseInResilientSphere(action, auto, casterName, targetName, dc, saveResult, campaignName);
+    return encloseInResilientSphere({ action, auto, casterName, targetName, dc, saveResult, campaignName });
 }
 
 async function promptResilientSphereSave(action, auto, campaignName, casterName, targetName, dc) {

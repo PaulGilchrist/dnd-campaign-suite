@@ -217,7 +217,7 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
     }, [playerStats, campaignName, conditionAttackMode, featRangeEffects]);
 
     const buildCtx = React.useCallback(async (attack, opts) => {
-        return await buildAttackContext(attack, playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects || null, opts);
+        return await buildAttackContext({ attack, playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects: featRangeEffects || null, opts });
     }, [playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects]);
 
     // Synced before useCharActionModals so its pause write can update this mirror

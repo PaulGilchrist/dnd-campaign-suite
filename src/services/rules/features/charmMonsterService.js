@@ -69,10 +69,16 @@ async function resolveCharmMonsterTarget(playerStats, campaignName) {
     return null;
 }
 
+function resolveCharmMonsterSaveDc(metaCtx, playerStats) {
+    if (metaCtx?.spellSaveDc) return metaCtx.spellSaveDc;
+    if (playerStats.spellAbilities?.saveDc) return playerStats.spellAbilities.saveDc;
+    return 8 + (playerStats.proficiency || 2);
+}
+
 export async function triggerCharmMonster(spell, metaCtx, playerStats, campaignName, mapName) {
     if ((spell.name || '').toLowerCase() !== 'charm monster') return null;
 
-    const spellSaveDc = metaCtx?.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
+    const spellSaveDc = resolveCharmMonsterSaveDc(metaCtx, playerStats);
     const slotLevel = metaCtx?.slotLevel || spell.level || 4;
 
     const targetNames = metaCtx?.charmMonsterTargets;

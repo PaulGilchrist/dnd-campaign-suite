@@ -278,15 +278,15 @@ describe('rollConditionSave', () => {
     rollD20.mockReturnValue(12);
     isAuraOfPurityActive.mockReturnValue(false);
 
-    const result = await rollConditionSave(
-      { type: 'player', name: 'Hero' },
+    const result = await rollConditionSave({
+      creature: { type: 'player', name: 'Hero' },
       condition,
-      [{ name: 'Hero' }],
-      [],
-      'Campaign',
-      '',
-      defaultGetName,
-    );
+      characters: [{ name: 'Hero' }],
+      campaignNpcs: [],
+      campaignName: 'Campaign',
+      mapName: '',
+      getName: defaultGetName,
+    });
 
     expect(result.roll).toBe(12);
     expect(result.bonus).toBe(3);
@@ -302,15 +302,15 @@ describe('rollConditionSave', () => {
     rollD20.mockReturnValue(14);
     isAuraOfPurityActive.mockReturnValue(false);
 
-    let result = await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'con', dc: 18 },
-      [{ name: 'Hero' }],
-      [],
-      'Campaign',
-      '',
-      defaultGetName,
-    );
+    let result = await rollConditionSave({
+      creature: { type: 'player', name: 'Hero' },
+      condition: { ability: 'con', dc: 18 },
+      characters: [{ name: 'Hero' }],
+      campaignNpcs: [],
+      campaignName: 'Campaign',
+      mapName: '',
+      getName: defaultGetName,
+    });
 
     expect(result.total).toBe(19);
     expect(result.success).toBe(true);
@@ -320,15 +320,15 @@ describe('rollConditionSave', () => {
     computeAuraBonus.mockResolvedValue({ bonus: 1 });
     rollD20.mockReturnValue(10);
 
-    result = await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'wis', dc: 11 },
-      [{ name: 'Hero' }],
-      [],
-      'Campaign',
-      '',
-      defaultGetName,
-    );
+    result = await rollConditionSave({
+      creature: { type: 'player', name: 'Hero' },
+      condition: { ability: 'wis', dc: 11 },
+      characters: [{ name: 'Hero' }],
+      campaignNpcs: [],
+      campaignName: 'Campaign',
+      mapName: '',
+      getName: defaultGetName,
+    });
 
     expect(result.bonusDetail).toBe('(+1 aura)');
 
@@ -336,15 +336,15 @@ describe('rollConditionSave', () => {
     computeAuraBonus.mockResolvedValue({ bonus: 3, sourceName: 'Paladin' });
     rollD20.mockReturnValue(8);
 
-    result = await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'wis', dc: 13 },
-      [{ name: 'Hero' }],
-      [],
-      'Campaign',
-      '',
-      defaultGetName,
-    );
+    result = await rollConditionSave({
+      creature: { type: 'player', name: 'Hero' },
+      condition: { ability: 'wis', dc: 13 },
+      characters: [{ name: 'Hero' }],
+      campaignNpcs: [],
+      campaignName: 'Campaign',
+      mapName: '',
+      getName: defaultGetName,
+    });
 
     expect(result.bonusDetail).toBe('(+3 aura from Paladin)');
   });
@@ -355,15 +355,15 @@ describe('rollConditionSave', () => {
     rollD20.mockReturnValue(1);
     isAuraOfPurityActive.mockReturnValue(false);
 
-    const result = await rollConditionSave(
-      { type: 'monster', name: 'Goblin' },
-      { ability: 'con', dc: 6 },
-      [],
-      [],
-      'Campaign',
-      '',
-      defaultGetName,
-    );
+    const result = await rollConditionSave({
+      creature: { type: 'monster', name: 'Goblin' },
+      condition: { ability: 'con', dc: 6 },
+      characters: [],
+      campaignNpcs: [],
+      campaignName: 'Campaign',
+      mapName: '',
+      getName: defaultGetName,
+    });
 
     expect(result.bonusDetail).toBeUndefined();
   });
@@ -374,15 +374,15 @@ describe('rollConditionSave', () => {
     rollD20.mockReturnValue(10);
     isAuraOfPurityActive.mockReturnValue(false);
 
-    await rollConditionSave(
-      { type: 'player', name: 'Ally' },
-      { ability: 'con', dc: 10 },
-      [{ name: 'Group' }],
-      [],
-      'TheCampaign',
-      'DungeonMap',
-      defaultGetName,
-    );
+    await rollConditionSave({
+      creature: { type: 'player', name: 'Ally' },
+      condition: { ability: 'con', dc: 10 },
+      characters: [{ name: 'Group' }],
+      campaignNpcs: [],
+      campaignName: 'TheCampaign',
+      mapName: 'DungeonMap',
+      getName: defaultGetName,
+    });
 
     expect(computeAuraBonus).toHaveBeenCalledWith({
       targetName: 'Ally',
@@ -398,42 +398,42 @@ describe('rollConditionSave', () => {
     rollD20.mockReturnValue(10);
     isAuraOfPurityActive.mockReturnValue(false);
 
-    let result = await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'str', dc: 15 },
-      [{ name: 'Hero' }],
-      [],
-      '',
-      '',
-      defaultGetName,
-    );
+    let result = await rollConditionSave({
+      creature: { type: 'player', name: 'Hero' },
+      condition: { ability: 'str', dc: 15 },
+      characters: [{ name: 'Hero' }],
+      campaignNpcs: [],
+      campaignName: '',
+      mapName: '',
+      getName: defaultGetName,
+    });
     expect(result.success).toBe(true);
 
     getAbilitySaveBonus.mockReturnValue(4);
-    result = await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'str', dc: 15 },
-      [{ name: 'Hero' }],
-      [],
-      '',
-      '',
-      defaultGetName,
-    );
+    result = await rollConditionSave({
+      creature: { type: 'player', name: 'Hero' },
+      condition: { ability: 'str', dc: 15 },
+      characters: [{ name: 'Hero' }],
+      campaignNpcs: [],
+      campaignName: '',
+      mapName: '',
+      getName: defaultGetName,
+    });
     expect(result.success).toBe(false);
 
     getAbilitySaveBonus.mockReturnValue(-1);
     computeAuraBonus.mockResolvedValue({ bonus: 1 });
     rollD20.mockReturnValue(10);
 
-    result = await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'con', dc: 10 },
-      [{ name: 'Hero' }],
-      [],
-      '',
-      '',
-      defaultGetName,
-    );
+    result = await rollConditionSave({
+      creature: { type: 'player', name: 'Hero' },
+      condition: { ability: 'con', dc: 10 },
+      characters: [{ name: 'Hero' }],
+      campaignNpcs: [],
+      campaignName: '',
+      mapName: '',
+      getName: defaultGetName,
+    });
     expect(result.total).toBe(10);
     expect(result.success).toBe(true);
     expect(result.bonus).toBe(0);
@@ -446,15 +446,15 @@ describe('rollConditionSave', () => {
     isAuraOfPurityActive.mockReturnValue(true);
     getAuraOfPuritySaveAdvantageConditions.mockReturnValue(['charmed']);
 
-    const result = await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'wis', key: 'charmed', dc: 15 },
-      [{ name: 'Hero' }],
-      [],
-      'Campaign',
-      '',
-      defaultGetName,
-    );
+    const result = await rollConditionSave({
+      creature: { type: 'player', name: 'Hero' },
+      condition: { ability: 'wis', key: 'charmed', dc: 15 },
+      characters: [{ name: 'Hero' }],
+      campaignNpcs: [],
+      campaignName: 'Campaign',
+      mapName: '',
+      getName: defaultGetName,
+    });
 
     expect(result.roll).toBe(17);
     expect(result.total).toBe(19);
@@ -470,15 +470,15 @@ describe('rollConditionSave', () => {
     isAuraOfPurityActive.mockReturnValue(true);
     getAuraOfPuritySaveAdvantageConditions.mockReturnValue(['blinded']);
 
-    const result = await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'con', key: 'blinded', dc: 10 },
-      [{ name: 'Hero' }],
-      [],
-      'Campaign',
-      '',
-      defaultGetName,
-    );
+    const result = await rollConditionSave({
+      creature: { type: 'player', name: 'Hero' },
+      condition: { ability: 'con', key: 'blinded', dc: 10 },
+      characters: [{ name: 'Hero' }],
+      campaignNpcs: [],
+      campaignName: 'Campaign',
+      mapName: '',
+      getName: defaultGetName,
+    });
     expect(result.roll).toBe(18);
     expect(result.total).toBe(18);
 
@@ -488,15 +488,15 @@ describe('rollConditionSave', () => {
     rollD20.mockReturnValue(10);
     isAuraOfPurityActive.mockReturnValue(false);
 
-    await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'wis', key: 'charmed', dc: 12 },
-      [{ name: 'Hero' }],
-      [],
-      'Campaign',
-      '',
-      defaultGetName,
-    );
+    await rollConditionSave({
+      creature: { type: 'player', name: 'Hero' },
+      condition: { ability: 'con', key: 'charmed', dc: 12 },
+      characters: [{ name: 'Hero' }],
+      campaignNpcs: [],
+      campaignName: 'Campaign',
+      mapName: '',
+      getName: defaultGetName,
+    });
     expect(rollD20).toHaveBeenCalledTimes(1);
 
     isAuraOfPurityActive.mockReturnValue(true);
@@ -504,15 +504,15 @@ describe('rollConditionSave', () => {
     rollD20.mockReset();
     rollD20.mockReturnValue(10);
 
-    await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'con', key: 'poisoned', dc: 12 },
-      [{ name: 'Hero' }],
-      [],
-      'Campaign',
-      '',
-      defaultGetName,
-    );
+    await rollConditionSave({
+      creature: { type: 'player', name: 'Hero' },
+      condition: { ability: 'con', key: 'poisoned', dc: 12 },
+      characters: [{ name: 'Hero' }],
+      campaignNpcs: [],
+      campaignName: 'Campaign',
+      mapName: '',
+      getName: defaultGetName,
+    });
     expect(rollD20).toHaveBeenCalledTimes(1);
   });
 
@@ -523,15 +523,15 @@ describe('rollConditionSave', () => {
     isAuraOfPurityActive.mockReturnValue(false);
     hasStarryDragonConstellation.mockReturnValue(true);
 
-    const result = await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'con', key: 'deafened', dc: 15 },
-      [{ name: 'Hero' }],
-      [],
-      'Campaign',
-      '',
-      defaultGetName,
-    );
+    const result = await rollConditionSave({
+      creature: { type: 'player', name: 'Hero' },
+      condition: { ability: 'con', key: 'deafened', dc: 15 },
+      characters: [{ name: 'Hero' }],
+      campaignNpcs: [],
+      campaignName: 'Campaign',
+      mapName: '',
+      getName: defaultGetName,
+    });
 
     expect(result.roll).toBe(10);
     expect(result.total).toBe(13);
@@ -547,15 +547,15 @@ describe('rollConditionSave', () => {
     hasStarryDragonConstellation.mockReturnValue(true);
     rollD20.mockReturnValue(12);
 
-    let result = await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'con', key: 'deafened', dc: 15 },
-      [{ name: 'Hero' }],
-      [],
-      'Campaign',
-      '',
-      defaultGetName,
-    );
+    let result = await rollConditionSave({
+      creature: { type: 'player', name: 'Hero' },
+      condition: { ability: 'con', key: 'deafened', dc: 15 },
+      characters: [{ name: 'Hero' }],
+      campaignNpcs: [],
+      campaignName: 'Campaign',
+      mapName: '',
+      getName: defaultGetName,
+    });
 
     expect(result.roll).toBe(12);
     expect(result.total).toBe(15);
@@ -564,15 +564,15 @@ describe('rollConditionSave', () => {
     hasStarryDragonConstellation.mockReturnValue(false);
     rollD20.mockReturnValue(5);
 
-    result = await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'con', key: 'deafened', dc: 10 },
-      [{ name: 'Hero' }],
-      [],
-      'Campaign',
-      '',
-      defaultGetName,
-    );
+    result = await rollConditionSave({
+      creature: { type: 'player', name: 'Hero' },
+      condition: { ability: 'con', key: 'deafened', dc: 10 },
+      characters: [{ name: 'Hero' }],
+      campaignNpcs: [],
+      campaignName: 'Campaign',
+      mapName: '',
+      getName: defaultGetName,
+    });
 
     expect(result.roll).toBe(5);
     expect(result.total).toBe(8);
@@ -586,15 +586,15 @@ describe('rollConditionSave', () => {
     hasStarryDragonConstellation.mockReturnValue(true);
     rollD20.mockReturnValue(5);
 
-    const result = await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'wis', key: 'charmed', dc: 10 },
-      [{ name: 'Hero' }],
-      [],
-      'Campaign',
-      '',
-      defaultGetName,
-    );
+    const result = await rollConditionSave({
+      creature: { type: 'player', name: 'Hero' },
+      condition: { ability: 'wis', key: 'charmed', dc: 10 },
+      characters: [{ name: 'Hero' }],
+      campaignNpcs: [],
+      campaignName: 'Campaign',
+      mapName: '',
+      getName: defaultGetName,
+    });
 
     expect(result.roll).toBe(5);
     expect(result.total).toBe(8);
@@ -609,15 +609,15 @@ describe('rollConditionSave', () => {
     hasStarryDragonConstellation.mockReturnValue(true);
     rollD20.mockReturnValueOnce(8).mockReturnValueOnce(2);
 
-    const result = await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'con', key: 'deafened', dc: 15 },
-      [{ name: 'Hero' }],
-      [],
-      'Campaign',
-      '',
-      defaultGetName,
-    );
+    const result = await rollConditionSave({
+      creature: { type: 'player', name: 'Hero' },
+      condition: { ability: 'con', key: 'deafened', dc: 15 },
+      characters: [{ name: 'Hero' }],
+      campaignNpcs: [],
+      campaignName: 'Campaign',
+      mapName: '',
+      getName: defaultGetName,
+    });
 
     expect(result.roll).toBe(10);
     expect(result.total).toBe(13);
@@ -646,15 +646,15 @@ describe('rollConditionSave', () => {
       },
     }];
 
-    const result = await rollConditionSave(
-      { type: 'player', name: 'Ironhold' },
-      { ability: 'con', key: 'poisoned', dc: 12 },
+    const result = await rollConditionSave({
+      creature: { type: 'player', name: 'Ironhold' },
+      condition: { ability: 'con', key: 'poisoned', dc: 12 },
       characters,
-      [],
-      'Campaign',
-      '',
-      defaultGetName,
-    );
+      campaignNpcs: [],
+      campaignName: 'Campaign',
+      mapName: '',
+      getName: defaultGetName,
+    });
 
     expect(rollD20).toHaveBeenCalledTimes(2);
     expect(result.advantage).toBe(true);
@@ -683,15 +683,15 @@ describe('rollConditionSave', () => {
       },
     }];
 
-    const result = await rollConditionSave(
-      { type: 'player', name: 'Ironhold' },
-      { ability: 'wis', key: 'frightened', dc: 12 },
+    const result = await rollConditionSave({
+      creature: { type: 'player', name: 'Ironhold' },
+      condition: { ability: 'wis', key: 'frightened', dc: 12 },
       characters,
-      [],
-      'Campaign',
-      '',
-      defaultGetName,
-    );
+      campaignNpcs: [],
+      campaignName: 'Campaign',
+      mapName: '',
+      getName: defaultGetName,
+    });
 
     expect(rollD20).toHaveBeenCalledTimes(1);
     expect(result.advantage).toBeUndefined();

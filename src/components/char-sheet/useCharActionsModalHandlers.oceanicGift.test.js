@@ -191,15 +191,15 @@ describe('useCharActionsModalHandlers - oceanicGift', () => {
       };
       const handlers = getHandlers(modalState);
       await handlers.handleOceanicGiftConfirm('Ally1');
-      expect(confirmOceanicGift).toHaveBeenCalledWith(
-        modalState.oceanicGiftTargetModal.action,
-        modalState.oceanicGiftTargetModal.playerStats,
-        modalState.oceanicGiftTargetModal.campaignName,
-        'Ally1',
-        13,
-        3,
-        false
-      );
+      expect(confirmOceanicGift).toHaveBeenCalledWith({
+        action: modalState.oceanicGiftTargetModal.action,
+        playerStats: modalState.oceanicGiftTargetModal.playerStats,
+        campaignName: modalState.oceanicGiftTargetModal.campaignName,
+        selectedAllyName: 'Ally1',
+        spellSaveDc: 13,
+        wisMod: 3,
+        doubleEmanation: false,
+      });
       expect(mockSetModalState).toHaveBeenCalledWith({ oceanicGiftTargetModal: null });
     });
 
@@ -230,28 +230,24 @@ describe('useCharActionsModalHandlers - oceanicGift', () => {
       };
       const handlers = getHandlers(modalState);
       await handlers.handleOceanicGiftConfirm('Ally1', true);
-      expect(confirmOceanicGift).toHaveBeenCalledWith(
-        modalState.oceanicGiftTargetModal.action,
-        modalState.oceanicGiftTargetModal.playerStats,
-        modalState.oceanicGiftTargetModal.campaignName,
-        'Ally1',
-        13,
-        3,
-        true
-      );
+      expect(confirmOceanicGift).toHaveBeenCalledWith({
+        action: modalState.oceanicGiftTargetModal.action,
+        playerStats: modalState.oceanicGiftTargetModal.playerStats,
+        campaignName: modalState.oceanicGiftTargetModal.campaignName,
+        selectedAllyName: 'Ally1',
+        spellSaveDc: 13,
+        wisMod: 3,
+        doubleEmanation: true,
+      });
     });
 
     it('keeps doubleEmanation:false when the toggle override is false or omitted', async () => {
       confirmOceanicGift.mockResolvedValue({ type: 'popup', payload: '<p>Gift!</p>' });
       const handlers = getHandlers({ oceanicGiftTargetModal: makeBaseModalData() });
       await handlers.handleOceanicGiftConfirm('Ally1', false);
-      expect(confirmOceanicGift).toHaveBeenLastCalledWith(
-        expect.anything(), expect.anything(), expect.anything(), 'Ally1', 13, 3, false
-      );
+      expect(confirmOceanicGift).toHaveBeenLastCalledWith(expect.objectContaining({ selectedAllyName: 'Ally1', spellSaveDc: 13, wisMod: 3, doubleEmanation: false }));
       await handlers.handleOceanicGiftConfirm('Ally1');
-      expect(confirmOceanicGift).toHaveBeenLastCalledWith(
-        expect.anything(), expect.anything(), expect.anything(), 'Ally1', 13, 3, false
-      );
+      expect(confirmOceanicGift).toHaveBeenLastCalledWith(expect.objectContaining({ selectedAllyName: 'Ally1', spellSaveDc: 13, wisMod: 3, doubleEmanation: false }));
     });
 
     it('skips popup when confirmOceanicGift returns non-popup type but still clears modal', async () => {

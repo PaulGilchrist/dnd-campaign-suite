@@ -65,7 +65,7 @@ async function recordCrownSaveSuccess(campaignName, casterName, action, targetNa
     };
 }
 
-async function applyCrownCharm(campaignName, casterName, action, playerStats, targetName, dc, saveResult) {
+async function applyCrownCharm({ campaignName, casterName, action, playerStats, targetName, dc, saveResult }) {
     const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
     const conditions = Array.isArray(storedConditions) ? storedConditions : [];
     const filtered = conditions.filter(c => String(c).toLowerCase() !== 'charmed');
@@ -182,5 +182,5 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return recordCrownSaveSuccess(campaignName, casterName, action, targetName, dc, saveResult);
     }
 
-    return applyCrownCharm(campaignName, casterName, action, playerStats, targetName, dc, saveResult);
+    return applyCrownCharm({ campaignName, casterName, action, playerStats, targetName, dc, saveResult });
 }

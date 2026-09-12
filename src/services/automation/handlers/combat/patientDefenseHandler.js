@@ -56,7 +56,7 @@ async function applyPatientDefense({ action, auto, playerStats, playerName, camp
     };
 }
 
-async function refusePatientDefenseDodge(action, auto, playerName, campaignName, isHeightened, cost, currentFocus) {
+async function refusePatientDefenseDodge({ action, auto, playerName, campaignName, isHeightened, cost, currentFocus }) {
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
@@ -88,7 +88,7 @@ export async function handle(action, playerStats, campaignName) {
     if (currentFocus >= cost) {
         return await applyPatientDefense({ action, auto, playerStats, playerName, campaignName, isHeightened, cost, currentFocus });
     }
-    return await refusePatientDefenseDodge(action, auto, playerName, campaignName, isHeightened, cost, currentFocus);
+    return await refusePatientDefenseDodge({ action, auto, playerName, campaignName, isHeightened, cost, currentFocus });
 }
 
 function rollDie(sides) {

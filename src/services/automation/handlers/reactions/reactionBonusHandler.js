@@ -157,7 +157,7 @@ function attackOutcomeTail(oldHit, newHit) {
     return ' → No change in outcome.';
 }
 
-async function shiftAttackOutcome(action, cs, lastAttack, playerName, attackerName, shift, campaignName) {
+async function shiftAttackOutcome({ action, cs, lastAttack, playerName, attackerName, shift, campaignName }) {
     const { originalTotal, newTotal, modifier, diceValue, mode } = shift;
     const targetAc = lastAttack.targetAc || lastAttack.effectiveAc;
     const oldHit = lastAttack.hit ?? (targetAc != null ? originalTotal >= targetAc : null);
@@ -229,38 +229,59 @@ async function shiftSaveOutcome(lastAttack, shift, campaignName) {
     return { outcomeNote, conditionsAdded, conditionsRemoved };
 }
 
-function buildD20ModifierDescription(lastAttack, rollInfo, outcomeNote, conditionsAdded, conditionsRemoved, isAttack, isSave) {
+function describeAttackShift(lastAttack, rollInfo, outcomeNote) {
+    const { newTotal, d20, bonus, modifierLabel } = rollInfo;
+    const acValue = lastAttack.targetAc || lastAttack.effectiveAc;
+    const ac = acValue || '—';
+    const hitStatus = (newTotal >= acValue) ? 'HIT' : 'MISS';
+    let description = `Attack: d20(${d20}) + ${bonus}${modifierLabel} = <strong>${newTotal}</strong> vs AC ${ac} → ${hitStatus}${outcomeNote}`;
+    if (lastAttack.targetAc == null && lastAttack.effectiveAc == null && lastAttack.hit) {
+        description += ` (Original was a hit)`;
+    }
+    return description;
+}
+
+function describeSaveShift(lastAttack, rollInfo, outcomeNote, conditionsAdded, conditionsRemoved) {
+    const { newTotal, d20, bonus, modifierLabel } = rollInfo;
+    const saveLabel = lastAttack.saveType ? lastAttack.saveType.toUpperCase() : 'Save';
+    const dc = lastAttack.saveDc || '—';
+    const saveStatus = (newTotal >= (lastAttack.saveDc || 0)) ? 'Success' : 'Failure';
+    let description = `${saveLabel}: d20(${d20}) + ${bonus}${modifierLabel} = <strong>${newTotal}</strong> vs DC ${dc} → ${saveStatus}${outcomeNote}`;
+    if (conditionsAdded.length > 0) {
+        description += `<br/><i>Conditions applied: ${conditionsAdded.join(', ')}</i>`;
+    }
+    if (conditionsRemoved.length > 0) {
+        description += `<br/><i>Conditions removed: ${conditionsRemoved.join(', ')}</i>`;
+    }
+    return description;
+}
+
+function buildD20ModifierDescription({ lastAttack, rollInfo, outcomeNote, conditionsAdded, conditionsRemoved, isAttack, isSave }) {
     const { diceValue, mode, modifierLabel, newTotal, d20, bonus } = rollInfo;
     let description = `Target: ${lastAttack.attackerName}<br/>`;
     description += `Rolled <b>${diceValue}</b><br/>`;
     description += `Applied as <b>${mode}</b>: <b>${modifierLabel}</b><br/><br/>`;
 
     if (isAttack) {
-        const ac = lastAttack.targetAc || lastAttack.effectiveAc || '—';
-        const hitStatus = (newTotal >= (lastAttack.targetAc || lastAttack.effectiveAc)) ? 'HIT' : 'MISS';
-        description += `Attack: d20(${d20}) + ${bonus}${modifierLabel} = <strong>${newTotal}</strong> vs AC ${ac} → ${hitStatus}${outcomeNote}`;
-        if (lastAttack.targetAc == null && lastAttack.effectiveAc == null && lastAttack.hit) {
-            description += ` (Original was a hit)`;
-        }
-    } else if (isSave) {
-        const saveLabel = lastAttack.saveType ? lastAttack.saveType.toUpperCase() : 'Save';
-        const dc = lastAttack.saveDc || '—';
-        const saveStatus = (newTotal >= (lastAttack.saveDc || 0)) ? 'Success' : 'Failure';
-        description += `${saveLabel}: d20(${d20}) + ${bonus}${modifierLabel} = <strong>${newTotal}</strong> vs DC ${dc} → ${saveStatus}${outcomeNote}`;
-        if (conditionsAdded.length > 0) {
-            description += `<br/><i>Conditions applied: ${conditionsAdded.join(', ')}</i>`;
-        }
-        if (conditionsRemoved.length > 0) {
-            description += `<br/><i>Conditions removed: ${conditionsRemoved.join(', ')}</i>`;
-        }
-    } else {
-        description += `${lastAttack.checkName || 'Check'}: d20(${d20}) + ${bonus}${modifierLabel} = <strong>${newTotal}</strong>${outcomeNote}`;
+        return description + describeAttackShift(lastAttack, rollInfo, outcomeNote);
     }
-
-    return description;
+    if (isSave) {
+        return description + describeSaveShift(lastAttack, rollInfo, outcomeNote, conditionsAdded, conditionsRemoved);
+    }
+    return description + `${lastAttack.checkName || 'Check'}: d20(${d20}) + ${bonus}${modifierLabel} = <strong>${newTotal}</strong>${outcomeNote}`;
 }
 
-export async function applyD20Modifier(action, playerName, campaignName, diceValue, lastAttack, mode, options) {
+function classifyD20RollType(lastAttack) {
+    const rollType = lastAttack.rollType || 'attack';
+    return {
+        rollType,
+        isAttack: rollType === 'attack',
+        isSave: rollType === 'save' || (rollType === 'attack' && lastAttack.saveDc != null && lastAttack.saveResult != null),
+        isCheck: rollType === 'check' || rollType === 'skill',
+    };
+}
+
+export async function applyD20Modifier({ action, playerName, campaignName, diceValue, lastAttack, mode, options }) {
     const featureName = options.featureName || 'Modify D20';
     const auto = action.automation;
 
@@ -272,10 +293,7 @@ export async function applyD20Modifier(action, playerName, campaignName, diceVal
 
     const cs = await getCombatContext(campaignName);
     const attackerName = lastAttack.attackerName;
-    const rollType = lastAttack.rollType || 'attack';
-    const isAttack = rollType === 'attack';
-    const isSave = rollType === 'save' || (rollType === 'attack' && lastAttack.saveDc != null && lastAttack.saveResult != null);
-    const isCheck = rollType === 'check' || rollType === 'skill';
+    const { isAttack, isSave, isCheck } = classifyD20RollType(lastAttack);
 
     const modifierLabel = modifier >= 0 ? `+${modifier}` : `${modifier}`;
     let outcomeNote = '';
@@ -285,7 +303,7 @@ export async function applyD20Modifier(action, playerName, campaignName, diceVal
     const shift = { originalTotal, newTotal, modifier, diceValue, mode };
 
     if (isAttack && cs) {
-        outcomeNote = await shiftAttackOutcome(action, cs, lastAttack, playerName, attackerName, shift, campaignName);
+        outcomeNote = await shiftAttackOutcome({ action, cs, lastAttack, playerName, attackerName, shift, campaignName });
     } else if (isSave && cs) {
         const saveShift = await shiftSaveOutcome(lastAttack, shift, campaignName);
         outcomeNote = saveShift.outcomeNote;
@@ -323,7 +341,7 @@ export async function applyD20Modifier(action, playerName, campaignName, diceVal
     }).catch((e) => { console.error(`[${featureName}] Error:`, e); });
 
     const rollInfo = { diceValue, mode, modifierLabel, newTotal, d20, bonus };
-    const description = buildD20ModifierDescription(lastAttack, rollInfo, outcomeNote, conditionsAdded, conditionsRemoved, isAttack, isSave);
+    const description = buildD20ModifierDescription({ lastAttack, rollInfo, outcomeNote, conditionsAdded, conditionsRemoved, isAttack, isSave });
 
     return infoPopup(featureName, description, auto);
 }
@@ -332,10 +350,13 @@ export async function applyBendFateChoice(action, playerStats, campaignName, d4R
     const playerName = playerStats.name;
     const d4Value = typeof d4Roll === 'object' ? d4Roll.total : d4Roll;
     action._playerStats = playerStats;
-    return applyD20Modifier(action, playerName, campaignName, d4Value, lastAttack, mode, {
-        featureName: action.name || 'Bend Luck',
-        logDescription: `${playerName} used ${action.name || 'Bend Luck'}`,
-        onSpent: () => spendSorceryPoints(playerName, 1, campaignName, getClassFeatures(playerStats)?.maxSorceryPoints || 0),
+    return applyD20Modifier({
+        action, playerName, campaignName, diceValue: d4Value, lastAttack, mode,
+        options: {
+            featureName: action.name || 'Bend Luck',
+            logDescription: `${playerName} used ${action.name || 'Bend Luck'}`,
+            onSpent: () => spendSorceryPoints(playerName, 1, campaignName, getClassFeatures(playerStats)?.maxSorceryPoints || 0),
+        },
     });
 }
 

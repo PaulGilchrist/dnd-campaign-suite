@@ -46,7 +46,7 @@ vi.mock('../../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Pro
 // Runtime / state mocks
 // ---------------------------------------------------------------------------
 vi.mock('../../../hooks/runtime/useTrackedResource.js', () => ({
-    default: vi.fn((key, name, init, _deps, _campaign) => ({ current: init(), update: vi.fn() })),
+    default: vi.fn(({ maxGetter }) => ({ current: maxGetter(), update: vi.fn() })),
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({

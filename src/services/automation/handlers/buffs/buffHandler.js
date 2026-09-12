@@ -125,7 +125,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     await applyGenericBuffSideEffects(action, auto, playerStats, targetName, campaignName, wasActive);
 
-    return buildBuffTogglePopup(action, auto, playerStats, targetName, wasActive, usesKey, usesAfterActivation);
+    return buildBuffTogglePopup({ action, auto, playerStats, targetName, wasActive, usesKey, usesAfterActivation });
 }
 
 async function gateTrackedBuffUses(action, auto, playerStats, campaignName) {
@@ -195,7 +195,7 @@ async function applyGenericBuffSideEffects(action, auto, playerStats, targetName
     }
 }
 
-function buildBuffTogglePopup(action, auto, playerStats, targetName, wasActive, usesKey, usesAfterActivation) {
+function buildBuffTogglePopup({ action, auto, playerStats, targetName, wasActive, usesKey, usesAfterActivation }) {
     const displayTarget = targetName === playerStats.name ? 'yourself' : targetName;
     let durationDisplay = auto.duration || '10 min';
     if (auto.effect === 'shape_shift' && durationDisplay === 'half_druid_level_hours') {

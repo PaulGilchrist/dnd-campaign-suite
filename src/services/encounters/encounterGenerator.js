@@ -49,6 +49,30 @@ export function getDifficultyLabel(totalXP, monsterCount, threshold, partySize) 
   return 'Deadly';
 }
 
+function increaseQuantities(workingMonsters, totalXP, totalCount, partySize, playerLevels) {
+  for (let pass = 0; pass < 3; pass++) {
+    for (let i = 0; i < workingMonsters.length && totalCount < partySize; i++) {
+      const wm = workingMonsters[i];
+      const newTotalXP = totalXP + wm.monster.xp;
+      const newCount = totalCount + 1;
+      const newMultiplier = calculateDifficultyMultiplier(newCount, partySize);
+      const newEffective = newTotalXP * newMultiplier;
+
+       // Don't go over deadly threshold * safety cap
+      const deadlyThreshold = calculateXPThreshold(playerLevels, 3);
+      if (newEffective > deadlyThreshold * ENCOUNTER_CONFIG.deadlyMultiplier) break;
+
+       // Don't exceed party size
+      if (newCount > partySize) break;
+
+      workingMonsters[i] = { ...wm, qty: wm.qty + 1 };
+      totalXP = newTotalXP;
+      totalCount = newCount;
+     }
+   }
+  return { workingMonsters, totalXP, totalCount };
+}
+
 export function generateEncounterSuggestions({
   monsters,
   playerLevels,
@@ -120,26 +144,7 @@ export function generateEncounterSuggestions({
      }
 
      // Iterate to increase quantities while staying within budget
-    for (let pass = 0; pass < 3; pass++) {
-      for (let i = 0; i < workingMonsters.length && totalCount < partySize; i++) {
-        const wm = workingMonsters[i];
-        const newTotalXP = totalXP + wm.monster.xp;
-        const newCount = totalCount + 1;
-        const newMultiplier = calculateDifficultyMultiplier(newCount, partySize);
-        const newEffective = newTotalXP * newMultiplier;
-
-         // Don't go over deadly threshold * safety cap
-        const deadlyThreshold = calculateXPThreshold(playerLevels, 3);
-        if (newEffective > deadlyThreshold * ENCOUNTER_CONFIG.deadlyMultiplier) break;
-
-         // Don't exceed party size
-        if (newCount > partySize) break;
-
-        workingMonsters[i] = { ...wm, qty: wm.qty + 1 };
-        totalXP = newTotalXP;
-        totalCount = newCount;
-       }
-     }
+    ({ workingMonsters, totalXP, totalCount } = increaseQuantities(workingMonsters, totalXP, totalCount, partySize, playerLevels));
 
     workingMonsters = workingMonsters.filter(w => w.qty > 0);
 

@@ -755,24 +755,19 @@ function combineAttackModes(attackerEffects, targetEffects, attackRange, targetN
   return getNetAttackMode(adv, dis, attackerEffects.restoreBalance || targetEffects.restoreBalance)
 }
 
+function hasSaveAbilityAdvantage(abilities, saveType) {
+  if (!saveType || !abilities?.length) return false;
+  return abilities.includes(saveType.substring(0, 3).toUpperCase());
+}
+
 function hasSaveAdvantage(effects, saveType, restoreBalance) {
   if (!effects) return false;
-  if (effects.saveAdvantage?.includes('against_spell')) {
-    if (restoreBalance) return false;
-    return true;
-  }
-  if (restoreBalance) {
-    const effectiveAdvCount = Math.max(0, (effects.saveAdvantageCount || 0) - 1);
-    if (effectiveAdvCount > 0) return true;
-    return false;
-  }
-  if ((effects.saveAdvantageCount || 0) > 0) return true;
+  if (effects.saveAdvantage?.includes('against_spell')) return !restoreBalance;
+  const advCount = effects.saveAdvantageCount || 0;
+  if (restoreBalance) return advCount - 1 > 0;
+  if (advCount > 0) return true;
   if (saveType && effects.saveAdvantage?.includes(saveType)) return true;
-  if (saveType && effects.saveAdvantageAbilities?.length) {
-    const abbr = saveType.substring(0, 3).toUpperCase();
-    if (effects.saveAdvantageAbilities.includes(abbr)) return true;
-  }
-  return false;
+  return hasSaveAbilityAdvantage(effects.saveAdvantageAbilities, saveType);
 }
 
 export function hasSaveModifier(modifiers, target, abilityName) {

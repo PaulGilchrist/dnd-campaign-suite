@@ -30,7 +30,7 @@ describe('useTrackedResource', () => {
 
       const maxGetter = vi.fn(() => 10);
       const { result } = renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
+        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1' })
       );
 
       expect(result.current.current).toBe(5);
@@ -44,7 +44,7 @@ describe('useTrackedResource', () => {
 
       const maxGetter = vi.fn(() => 10);
       const { result } = renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
+        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1' })
       );
 
       expect(result.current.current).toBe(0);
@@ -57,7 +57,7 @@ describe('useTrackedResource', () => {
 
       const maxGetter = vi.fn(() => 20);
       const { result } = renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
+        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1' })
       );
 
       expect(result.current.current).toBe(-3);
@@ -70,7 +70,7 @@ describe('useTrackedResource', () => {
 
       const maxGetter = vi.fn(() => 20);
       const { result } = renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
+        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1' })
       );
 
       expect(result.current.current).toBe(20);
@@ -83,7 +83,7 @@ describe('useTrackedResource', () => {
 
       const maxGetter = vi.fn(() => 25);
       const { result } = renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
+        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1' })
       );
 
       expect(result.current.current).toBe(25);
@@ -102,7 +102,7 @@ describe('useTrackedResource', () => {
       const maxGetter = vi.fn(() => 20);
 
       const { result } = renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1', undefined, playerStats)
+        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1', playerStats })
       );
 
       expect(result.current.current).toBe(12);
@@ -122,7 +122,7 @@ describe('useTrackedResource', () => {
       const maxGetter = vi.fn(() => 20);
 
       const { result } = renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1', undefined, playerStats)
+        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1', playerStats })
       );
 
       expect(result.current.current).toBe(0);
@@ -141,7 +141,7 @@ describe('useTrackedResource', () => {
       const maxGetter = vi.fn(() => 25);
 
       const { result } = renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1', undefined, playerStats)
+        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1', playerStats })
       );
 
       expect(result.current.current).toBe(25);
@@ -157,15 +157,7 @@ describe('useTrackedResource', () => {
       const maxGetter = vi.fn(() => 25);
 
       const { result } = renderHook(() =>
-        useTrackedResource(
-          'hp',
-          'Gandalf',
-          maxGetter,
-          'dep1',
-          undefined,
-          playerStats,
-          15
-        )
+        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1', playerStats, defaultValue: 15 })
       );
 
       expect(result.current.current).toBe(15);
@@ -179,7 +171,7 @@ describe('useTrackedResource', () => {
 
       const maxGetter = vi.fn(() => 30);
       const { result } = renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1', undefined, null, null)
+        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1', playerStats: null, defaultValue: null })
       );
 
       expect(result.current.current).toBe(30);
@@ -197,7 +189,7 @@ describe('useTrackedResource', () => {
       const maxGetter = vi.fn(() => 20);
 
       const { result } = renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1', undefined, playerStats)
+        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1', playerStats })
       );
 
       expect(result.current.current).toBe(8);
@@ -216,15 +208,7 @@ describe('useTrackedResource', () => {
       };
 
       const { result } = renderHook(() =>
-        useTrackedResource(
-          'hp',
-          'Gandalf',
-          () => 20,
-          'dep1',
-          undefined,
-          playerStats,
-          5
-        )
+        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter: () => 20, deps: 'dep1', playerStats, defaultValue: 5 })
       );
 
       expect(result.current.current).toBe(12);
@@ -239,7 +223,7 @@ describe('useTrackedResource', () => {
       const maxGetter = vi.fn(() => maxVal);
 
       const { result, rerender } = renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
+        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1' })
       );
 
       expect(result.current.max).toBe(10);
@@ -259,7 +243,7 @@ describe('useTrackedResource', () => {
 
       const maxGetter = vi.fn(() => 20);
       const { result } = renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
+        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1' })
       );
 
       expect(result.current.current).toBe(10);
@@ -284,7 +268,7 @@ describe('useTrackedResource', () => {
 
       const maxGetter = vi.fn(() => 20);
       const { result } = renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1', 'MyCampaign')
+        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1', campaignName: 'MyCampaign' })
       );
 
       await act(async () => {
@@ -307,7 +291,7 @@ describe('useTrackedResource', () => {
 
       const maxGetter = vi.fn(() => 20);
       const { result } = renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
+        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1' })
       );
 
       await act(async () => {
@@ -333,7 +317,7 @@ describe('useTrackedResource', () => {
 
       const maxGetter = vi.fn(() => 20);
       const { result } = renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
+        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1' })
       );
 
       await act(async () => {
@@ -348,7 +332,7 @@ describe('useTrackedResource', () => {
 
       const maxGetter = vi.fn(() => 20);
       const { result } = renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
+        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1' })
       );
 
       expect(result.current.current).toBe(10);
@@ -372,7 +356,7 @@ describe('useTrackedResource', () => {
 
       const maxGetter = vi.fn(() => 20);
       const { result, rerender } = renderHook(
-        ({ deps }) => useTrackedResource('hp', 'Gandalf', maxGetter, deps),
+        ({ deps }) => useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps }),
         { initialProps: { deps: 'dep1' } }
       );
 
@@ -392,7 +376,7 @@ describe('useTrackedResource', () => {
 
       const maxGetter = vi.fn(() => 20);
       const { result, rerender } = renderHook(
-        ({ name }) => useTrackedResource('hp', name, maxGetter, 'dep1'),
+        ({ name }) => useTrackedResource({ storageKey: 'hp', playerName: name, maxGetter, deps: 'dep1' }),
         { initialProps: { name: 'Gandalf' } }
       );
 
@@ -418,7 +402,7 @@ describe('useTrackedResource', () => {
 
       const { result, rerender } = renderHook(
         ({ stats }) =>
-          useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1', undefined, stats),
+          useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1', playerStats: stats }),
         { initialProps: { stats: playerStats1 } }
       );
 
@@ -439,7 +423,7 @@ describe('useTrackedResource', () => {
       const maxGetter = vi.fn(() => 20);
       const { result, rerender } = renderHook(
         ({ campaign }) =>
-          useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1', campaign),
+          useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1', campaignName: campaign }),
         { initialProps: { campaign: 'CampaignA' } }
       );
 
@@ -461,7 +445,7 @@ describe('useTrackedResource', () => {
 
       const maxGetter = vi.fn(() => 20);
       const { result, rerender } = renderHook(
-        ({ key }) => useTrackedResource(key, 'Gandalf', maxGetter, 'dep1'),
+        ({ key }) => useTrackedResource({ storageKey: key, playerName: 'Gandalf', maxGetter, deps: 'dep1' }),
         { initialProps: { key: 'hp' } }
       );
 
@@ -479,7 +463,7 @@ describe('useTrackedResource', () => {
       addStorageChangeListener.mockReturnValue(removeListener);
 
       const { unmount } = renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', () => 10, 'dep1')
+        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter: () => 10, deps: 'dep1' })
       );
 
       expect(addStorageChangeListener).toHaveBeenCalledWith(
@@ -499,7 +483,7 @@ describe('useTrackedResource', () => {
       const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
 
       const { unmount } = renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', () => 10, 'dep1')
+        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter: () => 10, deps: 'dep1' })
       );
 
       unmount();
@@ -531,7 +515,7 @@ describe('useTrackedResource', () => {
 
       const maxGetter = vi.fn(() => 20);
       const { result } = renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
+        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1' })
       );
 
       expect(result.current.current).toBe(10);
@@ -552,7 +536,7 @@ describe('useTrackedResource', () => {
 
       const maxGetter = vi.fn(() => 10);
       const { result } = renderHook(() =>
-        useTrackedResource('sp', 'Gandalf', maxGetter, 'dep1')
+        useTrackedResource({ storageKey: 'sp', playerName: 'Gandalf', maxGetter, deps: 'dep1' })
       );
 
       expect(result.current.current).toBe(5);
@@ -573,12 +557,7 @@ describe('useTrackedResource', () => {
 
       const maxGetter = vi.fn(() => 10);
       const { result } = renderHook(() =>
-        useTrackedResource(
-          'innateSorcery',
-          'Gandalf',
-          maxGetter,
-          'dep1'
-        )
+        useTrackedResource({ storageKey: 'innateSorcery', playerName: 'Gandalf', maxGetter, deps: 'dep1' })
       );
 
       expect(result.current.current).toBe(3);
@@ -607,7 +586,7 @@ describe('useTrackedResource', () => {
       const maxGetter = vi.fn(() => 10);
       const { result, rerender } = renderHook(
         ({ stats }) =>
-          useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1', undefined, stats),
+          useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1', playerStats: stats }),
         { initialProps: { stats: playerStats1 } }
       );
 

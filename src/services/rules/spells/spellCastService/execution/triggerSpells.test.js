@@ -38,7 +38,7 @@ describe('handleGenericAutomation', () => {
       const mapName = 'test-map';
       const characters = makeCharacters();
 
-      await handleGenericAutomation(spell, executeHandler, null, playerStats, campaignName, mapName, characters);
+      await handleGenericAutomation({ spell, executeHandler, playerStats, campaignName, mapName, characters });
 
       expect(executeHandler).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -59,7 +59,7 @@ describe('handleGenericAutomation', () => {
       const spell = makeSpell({ type: 'buff' });
       const playerStats = makePlayerStats();
 
-      const result = await handleGenericAutomation(spell, executeHandler, null, playerStats, 'camp', 'map', []);
+      const result = await handleGenericAutomation({ spell, executeHandler, playerStats: playerStats, campaignName: 'camp', mapName: 'map', characters: [] });
 
       expect(result).toEqual({ handled: true, result: { automationPopup: { popup: 'activation' } } });
     });
@@ -69,7 +69,7 @@ describe('handleGenericAutomation', () => {
       const spell = makeSpell({ type: 'buff' });
       const playerStats = makePlayerStats();
 
-      const result = await handleGenericAutomation(spell, executeHandler, null, playerStats, 'camp', 'map', []);
+      const result = await handleGenericAutomation({ spell, executeHandler, playerStats: playerStats, campaignName: 'camp', mapName: 'map', characters: [] });
 
       expect(result).toEqual({ handled: true });
     });
@@ -79,7 +79,7 @@ describe('handleGenericAutomation', () => {
       const spell = makeSpell({ type: 'buff', effects: { fail: 'save' } });
       const playerStats = makePlayerStats();
 
-      const result = await handleGenericAutomation(spell, executeHandler, null, playerStats, 'camp', 'map', []);
+      const result = await handleGenericAutomation({ spell, executeHandler, playerStats: playerStats, campaignName: 'camp', mapName: 'map', characters: [] });
 
       expect(result).toEqual({ handled: false });
       expect(executeHandler).not.toHaveBeenCalled();
@@ -92,7 +92,7 @@ describe('handleGenericAutomation', () => {
       // 'hex' is in SERVICE_HANDLED_SPELLS
       spell.name = 'Hex';
 
-      const result = await handleGenericAutomation(spell, executeHandler, null, makePlayerStats(), 'camp', 'map', []);
+      const result = await handleGenericAutomation({ spell, executeHandler, playerStats: makePlayerStats(), campaignName: 'camp', mapName: 'map', characters: [] });
 
       expect(result).toEqual({ handled: false });
       expect(executeHandler).not.toHaveBeenCalled();
@@ -109,7 +109,7 @@ describe('handleGenericAutomation', () => {
       const mapName = 'test-map';
       const characters = makeCharacters();
 
-      const result = await handleGenericAutomation(spell, executeHandler, null, playerStats, campaignName, mapName, characters);
+      const result = await handleGenericAutomation({ spell, executeHandler, playerStats, campaignName, mapName, characters });
 
       expect(result.handled).toBe(true);
       expect(executeHandler).toHaveBeenCalledWith(
@@ -126,7 +126,7 @@ describe('handleGenericAutomation', () => {
       // Actual compulsion spell data has NO automation.type, only status_effects and dc
       const spell = { name: 'Compulsion', status_effects: ['Charmed'], dc: { dc_type: 'WIS', dc_success: 'none' } };
 
-      const result = await handleGenericAutomation(spell, executeHandler, null, makePlayerStats(), 'camp', 'map', []);
+      const result = await handleGenericAutomation({ spell, executeHandler, playerStats: makePlayerStats(), campaignName: 'camp', mapName: 'map', characters: [] });
 
       expect(result).toEqual({ handled: false });
       expect(executeHandler).not.toHaveBeenCalled();

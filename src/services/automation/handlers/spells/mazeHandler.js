@@ -228,6 +228,13 @@ export function removeMazeEffect(targetName, sourceName, campaignName) {
     return existing;
 }
 
+function clearMazeIncapacitated(targetName, campaignName) {
+    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'incapacitated');
+    setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
+}
+
 /**
  * mazeEscapeHandler — triggered when a maze'd creature takes a Study action
  * to escape the demiplane.
@@ -305,10 +312,7 @@ export async function handleEscape(action, playerStats, campaignName, _mapName) 
         setRuntimeValue(targetName, 'mazeData', null, campaignName);
 
         // Remove incapacitated condition from the target
-        const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-        const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-        const filtered = conditions.filter(c => String(c).toLowerCase() !== 'incapacitated');
-        setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
+        clearMazeIncapacitated(targetName, campaignName);
 
         addEntry(campaignName, {
             type: 'condition',

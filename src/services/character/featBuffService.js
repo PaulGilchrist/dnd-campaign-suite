@@ -430,6 +430,20 @@ function parse2024Spell(benefit, feat, buffs) {
   });
 }
 
+function push2024BonusAction(benefit, buffs) {
+  const profMatch = (benefit.description || '').match(PROFICIENCY_PATTERN);
+  if (profMatch) {
+    buffs.proficiencies.push({ name: profMatch[1].trim() });
+  }
+  buffs.features.push({
+    name: benefit.name,
+    description: benefit.description,
+    type: 'bonus_action',
+    automation: benefit.automation,
+    isBonusAction: true,
+  });
+}
+
 function parse2024OtherBenefit(benefit, feat, buffs) {
   const benefitName = benefit.name || '';
   if (benefitName.includes('Great Weapon Fighting') || benefitName.includes('Damage Die Reroll')) {
@@ -478,17 +492,7 @@ function parse2024OtherBenefit(benefit, feat, buffs) {
     return;
   }
   if (benefit.type === 'bonus_action') {
-    const profMatch = (benefit.description || '').match(PROFICIENCY_PATTERN);
-    if (profMatch) {
-      buffs.proficiencies.push({ name: profMatch[1].trim() });
-    }
-    buffs.features.push({
-      name: benefit.name,
-      description: benefit.description,
-      type: 'bonus_action',
-      automation: benefit.automation,
-      isBonusAction: true,
-    });
+    push2024BonusAction(benefit, buffs);
     return;
   }
   buffs.features.push({

@@ -67,13 +67,18 @@ async function deactivateDragonWingsBuff({ playerName, featureName, campaignName
     };
 }
 
+function resolveSorceryPoints(playerStats) {
+    const maxSP = getClassFeatures(playerStats)?.maxSorceryPoints || 0;
+    const currentSP = playerStats.resources?.sorcery_points?.current ?? maxSP;
+    return { maxSP, currentSP };
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
     const featureName = action.name || 'Dragon Wings';
 
-    const maxSP = getClassFeatures(playerStats)?.maxSorceryPoints || 0;
-    const currentSP = playerStats.resources?.sorcery_points?.current ?? maxSP;
+    const { maxSP, currentSP } = resolveSorceryPoints(playerStats);
 
     const usesKey = getRuntimeKey(playerName, DRAGON_WINGS_USES_KEY);
     const usesMax = auto.uses ?? 1;

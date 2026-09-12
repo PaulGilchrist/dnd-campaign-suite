@@ -136,7 +136,7 @@ export async function applyTelekineticThrust(action, playerStats, campaignName, 
     }).catch((e) => { console.error("[telekineticThrust] Error:", e); });
 
     if (!success) {
-        await applyThrustEffect(action, playerStats, campaignName, targetName, chosenOption, saveDc, saveType);
+        await applyThrustEffect({ action, playerStats, campaignName, targetName, option: chosenOption, saveDc, saveType });
     }
 
     return {
@@ -151,7 +151,7 @@ export async function applyTelekineticThrust(action, playerStats, campaignName, 
     };
 }
 
-async function applyThrustEffect(action, playerStats, campaignName, targetName, option, saveDc, saveType) {
+async function applyThrustEffect({ action, playerStats, campaignName, targetName, option, saveDc, saveType }) {
     if (!targetName) return;
 
     const combatContext = await getCombatContext(campaignName);

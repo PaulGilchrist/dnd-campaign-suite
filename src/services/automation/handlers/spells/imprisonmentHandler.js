@@ -78,7 +78,7 @@ function rollNpcImprisonmentSave(targetCreature, dc) {
     return { roll, total, bonus: 0, success, rawRolls: [r1, r2] };
 }
 
-async function applyImprisonmentEffect(action, auto, casterName, targetName, dc, saveResult, campaignName) {
+async function applyImprisonmentEffect({ action, auto, casterName, targetName, dc, saveResult, campaignName }) {
     // Failed save: apply imprisonment target effect (badge)
     const prisonType = auto.options?.[0] || 'Slumber';
 
@@ -247,5 +247,5 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     // Failed save: apply imprisonment target effect (badge)
-    return applyImprisonmentEffect(action, auto, casterName, targetName, dc, saveResult, campaignName);
+    return applyImprisonmentEffect({ action, auto, casterName, targetName, dc, saveResult, campaignName });
 }

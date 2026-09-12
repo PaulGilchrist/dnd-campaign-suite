@@ -784,6 +784,28 @@ function stampModifiedSpell(modifiedSpell, spell, playerStats, usePsychicDamage,
   applyPhantasmalStamp(modifiedSpell, spell, playerStats, freeCastAuthorized, playerName, campaignName);
 }
 
+function isWarGodsBlessingSpell(playerName, spellName) {
+  const isWgbActive = getRuntimeValue(playerName, '_War_Gods_Blessing_active');
+  return !!(isWgbActive && ['Shield of Faith', 'Spiritual Weapon'].includes(spellName));
+}
+
+// Concentration tracking applied after slot consumption: new concentration, Hunter's
+// Mark / Hex buff tracking, and Eyebite's concentration buff stamp.
+function applyConcentrationTracking(spell, shouldSetConcentration, oldConcentrationSpell, playerName, playerStats, campaignName) {
+  if (oldConcentrationSpell) {
+    cleanupConcentrationEffects(playerName, oldConcentrationSpell, campaignName);
+  }
+  if (!shouldSetConcentration) return;
+
+  applyNewConcentration(spell, playerName, playerStats, campaignName);
+  trackConcentrationBuff(spell.name, playerName, campaignName);
+
+  if (spell.name === 'Eyebite') {
+    const existingBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName) || [];
+    setRuntimeValue(playerName, 'activeBuffs', [...existingBuffs, { name: 'Eyebite', effect: 'eyebite_concentration', duration: 'concentration' }], campaignName);
+  }
+}
+
 export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats, campaignName, isUpcast, upcastLevel, usePsionicPayment, usePsychicDamage, freeCastAuthorized }) {
   const result = {
     modifiedSpell: { ...spell },
@@ -806,8 +828,7 @@ export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats
   const effectiveSpellLevel = isUpcast && upcastLevel ? upcastLevel : spell.level;
 
   // Concentration management
-  const isWgbActive = getRuntimeValue(playerName, '_War_Gods_Blessing_active');
-  const isWgbSpell = isWgbActive && ['Shield of Faith', 'Spiritual Weapon'].includes(spell.name);
+  const isWgbSpell = isWarGodsBlessingSpell(playerName, spell.name);
 
   const concentration = resolveConcentrationChange(spell, playerName, playerStats, campaignName, isWgbSpell);
   const shouldSetConcentration = concentration.shouldSetConcentration;
@@ -827,25 +848,7 @@ export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats
 
   consumeSpellResource(spell, result, { isWgbSpell, isEyebiteRecast, isUpcast, isFreeCast, isQuickRitualCast, isWarlock, effectiveSpellLevel, playerName, playerStats, campaignName });
 
-  // Cleanup old concentration effects
-  if (oldConcentrationSpell) {
-    cleanupConcentrationEffects(playerName, oldConcentrationSpell, campaignName);
-  }
-
-  // Set new concentration
-  if (shouldSetConcentration) {
-    applyNewConcentration(spell, playerName, playerStats, campaignName);
-  }
-
-  // Hunter's Mark / Hex buff tracking
-  if (shouldSetConcentration) {
-    trackConcentrationBuff(spell.name, playerName, campaignName);
-  }
-
-  if (shouldSetConcentration && spell.name === 'Eyebite') {
-    const existingBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName) || [];
-    setRuntimeValue(playerName, 'activeBuffs', [...existingBuffs, { name: 'Eyebite', effect: 'eyebite_concentration', duration: 'concentration' }], campaignName);
-  }
+  applyConcentrationTracking(spell, shouldSetConcentration, oldConcentrationSpell, playerName, playerStats, campaignName);
 
   // Build modified spell
   const modifiedSpell = effectiveSpellLevel !== spell.level

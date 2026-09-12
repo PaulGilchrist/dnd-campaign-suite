@@ -18,19 +18,25 @@ export const crusher = {
   },
 };
 
+function crusherMoveEffect(targetName, feat) {
+  const option = feat.options[0];
+  return { target: targetName, source: feat.name, option: option.name, effect: option.effect, value: option.value || null, sizeLimit: option.sizeLimit || null, noOpportunityAttacks: option.noOpportunityAttacks || false, duration: 'until_start_of_next_turn' };
+}
+
 // Once-per-turn bludgeoning hit rider: push/pull/prone via first option.
 async function applyCrusherRiderMove(ctx, ps) {
   const isBludgeoning = (ctx.attack?.damageType || '').toLowerCase() === 'bludgeoning';
+  if (!isBludgeoning) return;
   const crusherFeat = (ps.automation?.passives || []).find(a => a.type === 'attack_rider' && a.trigger === 'bludgeoning_damage_hit' && a.oncePerTurn);
-  if (!(crusherFeat && isBludgeoning)) return;
+  if (!crusherFeat) return;
   const key = `_${crusherFeat.name.replace(/\s+/g, '_')}_usedRound`;
   const round = getCurrentCombatRound();
   if (getRuntimeValue(ps.name, key, ctx.campaignName) === round) return;
   const cs = await getCombatContext(ctx.campaignName);
   const t = cs ? getTargetFromAttacker(cs, ps.name) : null;
-  if (!(t?.name && crusherFeat.options?.length > 0)) return;
+  if (!t?.name || !crusherFeat.options?.length) return;
   const effs = getRuntimeValue('campaign', 'targetEffects') || [];
-  setRuntimeValue('campaign', 'targetEffects', [...effs, { target: t.name, source: crusherFeat.name, option: crusherFeat.options[0].name, effect: crusherFeat.options[0].effect, value: crusherFeat.options[0].value || null, sizeLimit: crusherFeat.options[0].sizeLimit || null, noOpportunityAttacks: crusherFeat.options[0].noOpportunityAttacks || false, duration: 'until_start_of_next_turn' }], ctx.campaignName);
+  setRuntimeValue('campaign', 'targetEffects', [...effs, crusherMoveEffect(t.name, crusherFeat)], ctx.campaignName);
   setRuntimeValue(ps.name, key, round, ctx.campaignName);
 }
 

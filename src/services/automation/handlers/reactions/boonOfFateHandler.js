@@ -87,8 +87,11 @@ export async function applyBoonFateChoice(action, playerStats, campaignName, rol
 
     await setRuntimeValue(playerName, 'boonOfFateUsed', true, campaignName);
 
-    return applyD20Modifier(action, playerName, campaignName, diceValue, lastAttack, mode, {
-        featureName: action.name || 'Improve Fate',
-        onSpent: () => {},
+    return applyD20Modifier({
+        action, playerName, campaignName, diceValue, lastAttack, mode,
+        options: {
+            featureName: action.name || 'Improve Fate',
+            onSpent: () => {},
+        },
     });
 }

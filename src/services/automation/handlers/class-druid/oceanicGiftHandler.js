@@ -49,7 +49,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
-export async function confirmOceanicGift(action, playerStats, campaignName, selectedAllyName, spellSaveDc, wisMod, doubleEmanation) {
+export async function confirmOceanicGift({ action, playerStats, campaignName, selectedAllyName, spellSaveDc, wisMod, doubleEmanation }) {
     const playerName = playerStats.name;
     const cost = doubleEmanation ? 2 : 1;
     const currentWS = Number(getRuntimeValue(playerName, 'wildShapeUses', campaignName) ?? 0);

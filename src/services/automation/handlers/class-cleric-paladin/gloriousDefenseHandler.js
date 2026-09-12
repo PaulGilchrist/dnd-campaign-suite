@@ -63,17 +63,17 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return await blockAndCounterattack({ auto, playerStats, playerName, campaignName, featureName, targetName, attackerName, chaMod, currentUses, description });
     }
 
+    return infoPopup(featureName, appendOutcomeNote(description, originalHit, wouldHit), auto);
+}
+
+function appendOutcomeNote(description, originalHit, wouldHit) {
     if (originalHit && wouldHit === true) {
-        description += `<br/><i>The attack still hits despite your Glorious Defense.</i>`;
-        return infoPopup(featureName, description, auto);
+        return `${description}<br/><i>The attack still hits despite your Glorious Defense.</i>`;
     }
     if (!originalHit) {
-        description += `<br/><i>The attack already missed — Glorious Defense has no additional effect.</i>`;
-        return infoPopup(featureName, description, auto);
+        return `${description}<br/><i>The attack already missed — Glorious Defense has no additional effect.</i>`;
     }
-
-    // Fallback
-    return infoPopup(featureName, description, auto);
+    return description;
 }
 
 async function blockAndCounterattack({ auto, playerStats, playerName, campaignName, featureName, targetName, attackerName, chaMod, currentUses, description }) {

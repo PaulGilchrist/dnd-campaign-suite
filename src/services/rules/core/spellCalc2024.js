@@ -271,6 +271,8 @@ function applyPsionicSpellsList(spellAbilities, feature, playerStats, allSpells)
     });
 }
 
+const LINEAGE_FEATURE_TYPES = new Set(['elfish_lineage', 'gnomish_lineage', 'fiendish_legacy']);
+
 function applyAutomationFeature(spellAbilities, feature, playerStats, playerSummary, allSpells) {
     if (feature.type === 'cantrip_spellcasting_ability') {
         applyCantripAbilityOverride(spellAbilities, feature);
@@ -283,7 +285,7 @@ function applyAutomationFeature(spellAbilities, feature, playerStats, playerSumm
             });
         }
     }
-    if (feature.type === 'elfish_lineage' || feature.type === 'gnomish_lineage' || feature.type === 'fiendish_legacy') {
+    if (LINEAGE_FEATURE_TYPES.has(feature.type)) {
         applyLineageFeatureSpells(spellAbilities, feature, playerSummary);
     }
     if (feature.type === 'passive_rule' && feature.effect === 'always_prepared_spells' && feature.spells) {

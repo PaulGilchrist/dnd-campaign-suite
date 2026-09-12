@@ -173,11 +173,10 @@ describe('resolveAttackDamageStandalone', () => {
             const playerStats = { ...defaultPlayerStats };
             const mockRun = vi.fn().mockImplementation(async (event, ctx) => {
                 if (event === 'housekeeping:do') {
-                    ctx.proceedWithDamage(
-                        { name: 'Longsword', damageType: 'slashing' },
-                        '1d8+3', 8, [5, 3], 3,
-                        { targetName: 'Goblin', isCrit: false, attackerName: 'Player' }
-                    );
+                    ctx.proceedWithDamage({
+                        attack: { name: 'Longsword', damageType: 'slashing' },
+                        formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3,
+                    });
                 }
             });
             buildPipelineForAction.mockReturnValue({ run: mockRun });
@@ -206,10 +205,10 @@ describe('resolveAttackDamageStandalone', () => {
             const playerStats = { ...defaultPlayerStats };
             const mockRun = vi.fn().mockImplementation(async (event, ctx) => {
                 if (event === 'housekeeping:do') {
-                    ctx.proceedWithDamage(
-                        { name: 'Fire Bolt', damageType: 'fire' },
-                        '1d10+4', 14, [10, 4], 4, {}
-                    );
+                    ctx.proceedWithDamage({
+                        attack: { name: 'Fire Bolt', damageType: 'fire' },
+                        formula: '1d10+4', total: 14, rolls: [10, 4], modifier: 4,
+                    });
                 }
             });
             buildPipelineForAction.mockReturnValue({ run: mockRun });
@@ -240,10 +239,10 @@ describe('resolveAttackDamageStandalone', () => {
             const playerStats = { ...defaultPlayerStats };
             const mockRun = vi.fn().mockImplementation(async (event, ctx) => {
                 if (event === 'housekeeping:do') {
-                    ctx.proceedWithDamage(
-                        { name: 'Rapier', damageType: 'piercing' },
-                        '1d8+4', 9, [5, 4], 4, {}
-                    );
+                    ctx.proceedWithDamage({
+                        attack: { name: 'Rapier', damageType: 'piercing' },
+                        formula: '1d8+4', total: 9, rolls: [5, 4], modifier: 4,
+                    });
                 }
             });
             buildPipelineForAction.mockReturnValue({ run: mockRun });
@@ -266,10 +265,10 @@ describe('resolveAttackDamageStandalone', () => {
             const playerStats = { ...defaultPlayerStats };
             const mockRun = vi.fn().mockImplementation(async (event, ctx) => {
                 if (event === 'housekeeping:do') {
-                    ctx.proceedWithDamage(
-                        { name: 'Longsword', damageType: 'slashing' },
-                        '1d8+3', 8, [5, 3], 3, {}
-                    );
+                    ctx.proceedWithDamage({
+                        attack: { name: 'Longsword', damageType: 'slashing' },
+                        formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3,
+                    });
                 }
             });
             buildPipelineForAction.mockReturnValue({ run: mockRun });

@@ -698,7 +698,7 @@ async function emitWardDamageEvents({ creature, combatSummary, characters, isPla
 // SP-114: summoned creatures disappear at 0 Hit Points (canonical "disappears
 // when it drops to 0 Hit Points"). Mutates combatSummary in place — the
 // combatSummaryChanged persist below writes the filtered roster.
-function handleSummonVanishAndConcentrationDc(creature, combatSummary, isPlayer, wasAlive, isNowUnconscious, options, actualDamageTaken, campaignName) {
+function handleSummonVanishAndConcentrationDc({ creature, combatSummary, isPlayer, wasAlive, isNowUnconscious, options, actualDamageTaken, campaignName }) {
   if (!isPlayer && wasAlive && isNowUnconscious && creature.summonedBy && creature.summonSource === 'spell') {
     vanishSummonAtZeroHp(creature, combatSummary, campaignName);
   }
@@ -753,17 +753,25 @@ function applyTargetHpDamage(creature, isPlayer, damageAfterTempHp, options, cam
   return applyCreatureHpDamage(creature, damageAfterTempHp, options, campaignName);
 }
 
+function findPlayerStatsForTarget(characters, targetName) {
+  return characters.find(c => c.name === targetName || c.name.startsWith(targetName + ' '));
+}
+
+function isUsableRawDamage(rawDamage) {
+  return !isNaN(rawDamage) && rawDamage != null;
+}
+
 export async function applyDamageToTarget(combatSummary, targetName, rawDamage, damageTypes, campaignName, characters, { ignoreResistance = false, attackerName = null, suppressHpLog = false, ...options } = {}) {
   if (!combatSummary) return null;
+  if (!isUsableRawDamage(rawDamage)) return null;
   const creature = combatSummary.creatures.find(c => c.name === targetName);
   if (!creature) return null;
-  if (isNaN(rawDamage) || rawDamage == null) return null;
 
   const existingAttack = stampLastAttack(attackerName, targetName, rawDamage, damageTypes, campaignName);
   const isSecondary = existingAttack?.primaryDamage != null;
 
   const isPlayer = creature.type === 'player';
-  const playerStats = isPlayer ? characters.find(c => c.name === targetName || c.name.startsWith(targetName + ' ')) : null;
+  const playerStats = isPlayer ? findPlayerStatsForTarget(characters, targetName) : null;
   const playerComputed = playerStats?.computedStats || playerStats;
 
   const defenses = await resolveCreatureDefenses(creature, targetName, isPlayer, characters, campaignName);
@@ -793,9 +801,9 @@ export async function applyDamageToTarget(combatSummary, targetName, rawDamage, 
   const wasAlive = oldHp > 0;
   const isNowUnconscious = newHp <= 0;
 
-  handleSummonVanishAndConcentrationDc(creature, combatSummary, isPlayer, wasAlive, isNowUnconscious, options, actualDamageTaken, campaignName);
+  handleSummonVanishAndConcentrationDc({ creature, combatSummary, isPlayer, wasAlive, isNowUnconscious, options, actualDamageTaken, campaignName });
 
-  checkDarkOnesBlessing(characters, creature, finalDamage, isPlayer, wasAlive, isNowUnconscious, campaignName, attackerName);
+  checkDarkOnesBlessing({ characters, creature, finalDamage, isPlayer, wasAlive, isNowUnconscious, campaignName, attackerName });
 
   const outcome = resolveTargetDamageOutcome({ creature, combatSummary, characters, isPlayer, playerComputed, options, wasAlive, isNowUnconscious, oldHp, finalDamage, actualDamageTaken, attackerName, campaignName });
   if (outcome.interception) {
@@ -937,22 +945,27 @@ function handleDominateRepeatSave(creature, isPlayer, domination, combatSummary,
   return false;
 }
 
+function resolveHpThreshold(oldHp, newHp, maxHp) {
+  const isDead = newHp <= 0;
+  const wasDead = oldHp <= 0;
+  const wasBloodied = oldHp > 0 && oldHp <= Math.floor(maxHp / 2);
+  const isBloodied = newHp > 0 && newHp <= Math.floor(maxHp / 2);
+  if (!wasDead && isDead) return 'dead';
+  if (!wasBloodied && isBloodied) return 'bloodied';
+  if (wasBloodied && !isBloodied && newHp > 0) return 'recovering';
+  return null;
+}
+
 function logDamageApplication(creature, damage, oldHp, newHp, campaignName) {
   const maxHp = creature.type === 'player'
     ? (getRuntimeValue(creature.name, 'hitPoints') ?? newHp)
     : creature.maxHp;
   const delta = newHp - oldHp;
   const isDead = newHp <= 0;
-  const wasDead = oldHp <= 0;
-  const wasBloodied = oldHp > 0 && oldHp <= Math.floor(maxHp / 2);
-  const isBloodied = newHp > 0 && newHp <= Math.floor(maxHp / 2);
-
-  let threshold;
-  if (!wasDead && isDead) threshold = 'dead';
-  else if (!wasBloodied && isBloodied) threshold = 'bloodied';
-  else if (wasBloodied && !isBloodied && newHp > 0) threshold = 'recovering';
 
   if (delta === 0) return;
+
+  const threshold = resolveHpThreshold(oldHp, newHp, maxHp);
 
   const entry = {
     type: 'hp_change',
@@ -970,8 +983,8 @@ function logDamageApplication(creature, damage, oldHp, newHp, campaignName) {
     if (oldHp > 0 && isDead) {
       setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName);
       setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);
-       }
-      }
+    }
+  }
 
   addEntry(campaignName, entry);
 }

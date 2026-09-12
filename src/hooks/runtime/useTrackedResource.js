@@ -12,7 +12,7 @@ function resolveCurrent(storageKey, playerName, playerStats, maxGetter, defaultV
   return defaultValue !== null ? defaultValue : maxGetter();
 }
 
-function useTrackedResource(storageKey, playerName, maxGetter, deps, campaignName, playerStats, defaultValue = null) {
+function useTrackedResource({ storageKey, playerName, maxGetter, deps, campaignName, playerStats, defaultValue = null }) {
   const [current, setCurrent] = React.useState(() =>
     resolveCurrent(storageKey, playerName, playerStats, maxGetter, defaultValue)
   );

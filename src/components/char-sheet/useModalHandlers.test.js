@@ -50,13 +50,13 @@ describe('useModalHandlers', () => {
             const { handleMasteryClose } = useModalHandlers(deps);
             await handleMasteryClose();
             expect(deps.setModalState).toHaveBeenCalledWith({ weaponMasteryModal: null });
-            expect(deps.proceedWithDamage).toHaveBeenCalledWith(
-                { name: 'Longsword' },
-                '1d8+3',
-                10,
-                [5, 5],
-                3
-            );
+            expect(deps.proceedWithDamage).toHaveBeenCalledWith({
+                attack: { name: 'Longsword' },
+                formula: '1d8+3',
+                total: 10,
+                rolls: [5, 5],
+                modifier: 3,
+            });
             expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
         });
 
@@ -82,13 +82,13 @@ describe('useModalHandlers', () => {
             });
             const { handleMasteryClose } = useModalHandlers(deps);
             await handleMasteryClose();
-            expect(deps.proceedWithDamage).toHaveBeenCalledWith(
-                attack,
-                '2d6+3',
-                12,
-                [6, 6],
-                3
-            );
+            expect(deps.proceedWithDamage).toHaveBeenCalledWith({
+                attack: attack,
+                formula: '2d6+3',
+                total: 12,
+                rolls: [6, 6],
+                modifier: 3,
+            });
         });
     });
 });

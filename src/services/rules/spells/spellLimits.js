@@ -203,6 +203,13 @@ function convertSpellcastingToLimits(spellcasting, className = null, abilityScor
   };
 }
 
+const PREPARED_SPELLCASTING_ABILITIES = {
+  Cleric: 'Wisdom',
+  Druid: 'Wisdom',
+  Wizard: 'Intelligence',
+  Paladin: 'Charisma',
+};
+
 /**
  * Computes the prepared spells limit for classes where it's not in the JSON data
  */
@@ -215,20 +222,9 @@ function computePreparedSpellsLimit(className, spellcasting, abilityScores, char
   const abilityOrder = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'];
 
   // Get the spellcasting ability name from class data
-  let spellcastingAbility = null;
-  switch (className) {
-    case 'Cleric':
-    case 'Druid':
-      spellcastingAbility = 'Wisdom';
-      break;
-    case 'Wizard':
-      spellcastingAbility = 'Intelligence';
-      break;
-    case 'Paladin':
-      spellcastingAbility = 'Charisma';
-      break;
-    default:
-      return null;
+  const spellcastingAbility = PREPARED_SPELLCASTING_ABILITIES[className] ?? null;
+  if (!spellcastingAbility) {
+    return null;
   }
 
   // Find the ability index and compute total score + modifier
@@ -281,6 +277,28 @@ function getDefaultSpellLimits() {
      };
 }
 
+const KNOWN_SPELL_LEVEL_LABELS = [
+  ['level1', '1st level'],
+  ['level2', '2nd level'],
+  ['level3', '3rd level'],
+  ['level4', '4th level'],
+  ['level5', '5th level'],
+  ['level6', '6th level'],
+  ['level7', '7th level'],
+  ['level8', '8th level'],
+  ['level9', '9th level'],
+];
+
+function collectKnownSpellLevelViolations(counts, limits) {
+  const violations = [];
+  for (const [key, label] of KNOWN_SPELL_LEVEL_LABELS) {
+    if (counts[key] > limits[key]) {
+      violations.push(`${label}: ${counts[key]}/${limits[key]}`);
+    }
+  }
+  return violations;
+}
+
 /**
  * Validates if spell selection is within limits for a given class and level
  */
@@ -292,7 +310,7 @@ export async function validateSpellSelection(selectedSpells, allSpells, classNam
   if (limits.isNonSpellcaster) {
       return { valid: true, violations: [], limits, counts };
       }
-  
+   
    const violations = [];
 
    if (counts.cantrip > limits.cantrip) {
@@ -305,34 +323,8 @@ export async function validateSpellSelection(selectedSpells, allSpells, classNam
        violations.push(`Prepared spells: ${totalPrepared}/${limits.preparedSpells}`);
       }
    } else {
-     if (counts.level1 > limits.level1) {
-       violations.push(`1st level: ${counts.level1}/${limits.level1}`);
-      }
-     if (counts.level2 > limits.level2) {
-       violations.push(`2nd level: ${counts.level2}/${limits.level2}`);
-      }
-     if (counts.level3 > limits.level3) {
-       violations.push(`3rd level: ${counts.level3}/${limits.level3}`);
-      }
-     if (counts.level4 > limits.level4) {
-       violations.push(`4th level: ${counts.level4}/${limits.level4}`);
-      }
-     if (counts.level5 > limits.level5) {
-       violations.push(`5th level: ${counts.level5}/${limits.level5}`);
-      }
-     if (counts.level6 > limits.level6) {
-       violations.push(`6th level: ${counts.level6}/${limits.level6}`);
-      }
-     if (counts.level7 > limits.level7) {
-       violations.push(`7th level: ${counts.level7}/${limits.level7}`);
-      }
-     if (counts.level8 > limits.level8) {
-       violations.push(`8th level: ${counts.level8}/${limits.level8}`);
-      }
-     if (counts.level9 > limits.level9) {
-       violations.push(`9th level: ${counts.level9}/${limits.level9}`);
-      }
-    }
+     violations.push(...collectKnownSpellLevelViolations(counts, limits));
+   }
 
   return {
     valid: violations.length === 0,

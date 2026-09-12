@@ -246,9 +246,9 @@ export function createRollConditionSaveHandler({
         const creature = combatSummary.creatures.find(c => c.name === creatureName)
         if (!creature) return
 
-        const { roll: r1, success, bonus, bonusDetail, rolls, starryDragonFloor } = await rollConditionSave(
-            creature, condition, characters, campaignNpcs, campaignName, mapName, (name) => name
-        )
+        const { roll: r1, success, bonus, bonusDetail, rolls, starryDragonFloor } = await rollConditionSave({
+            creature, condition, characters, campaignNpcs, campaignName, mapName, getName: (name) => name
+        })
 
         const conditionKey = String(condition.key).toLowerCase()
         const ctx = { combatSummary, creatureName, condition, campaignName, r1, bonus }

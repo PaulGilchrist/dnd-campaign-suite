@@ -218,7 +218,7 @@ function expandPushOrProneOptions(auto, options) {
     ];
 }
 
-async function markAndApplySingleRiderOption(action, auto, options, playerStats, campaignName, targetName, _mapName) {
+async function markAndApplySingleRiderOption({ action, auto, options, playerStats, campaignName, targetName, _mapName }) {
     if (auto.oncePerTurn) {
         const usedKey = oncePerTurnUsedKey(action);
         await markOncePerTurn(action.name, usedKey, playerStats, campaignName);
@@ -239,6 +239,10 @@ function logRiderUse(campaignName, playerStats, action, targetName) {
 async function gateHandleOncePerTurn(action, auto, playerStats, campaignName) {
     if (!auto.oncePerTurn) return null;
     return checkOncePerTurn(action.name, oncePerTurnUsedKey(action), playerStats.name, campaignName);
+}
+
+function wantsChoice(auto) {
+    return auto.chooseOne || (auto.maxEffects || 1) > 1;
 }
 
 export async function handle(action, playerStats, campaignName, _mapName) {
@@ -265,7 +269,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const skip = await gateHandleOncePerTurn(action, auto, playerStats, campaignName);
     if (skip) return skip;
 
-    if (options.length > 0 && (auto.chooseOne || (auto.maxEffects || 1) > 1)) {
+    if (options.length > 0 && wantsChoice(auto)) {
         return {
             type: 'modal',
             modalName: 'attackRider',
@@ -280,7 +284,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     // Single option — apply immediately
     if (options.length === 1) {
-        return markAndApplySingleRiderOption(action, auto, options, playerStats, campaignName, targetName, _mapName);
+        return markAndApplySingleRiderOption({ action, auto, options, playerStats, campaignName, targetName, _mapName });
     }
 
     return {

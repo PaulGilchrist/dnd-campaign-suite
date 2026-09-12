@@ -19,7 +19,7 @@ function endWardingBond(targetName, casterName, campaignName, reason) {
     }).catch((e) => { console.error('[wardingBond] Break log error:', e); });
 }
 
-function shareWardingBondDamage(casterName, casterCreature, casterIsPlayer, casterHp, wardDamage, creature, combatSummary, campaignName) {
+function shareWardingBondDamage({ casterName, casterCreature, casterIsPlayer, casterHp, wardDamage, creature, campaignName }) {
     const sharedDamage = wardDamage;
     const oldHp = casterHp;
     const newHp = Math.max(0, casterHp - sharedDamage);
@@ -79,6 +79,6 @@ export function applyWardingBond(creature, combatSummary, campaignName, wardDama
         ? getRuntimeValue(casterName, 'currentHitPoints', campaignName)
         : casterCreature.currentHp;
     if (casterHp > 0) {
-        shareWardingBondDamage(casterName, casterCreature, casterIsPlayer, casterHp, wardDamage, creature, combatSummary, campaignName);
+        shareWardingBondDamage({ casterName, casterCreature, casterIsPlayer, casterHp, wardDamage, creature, combatSummary, campaignName });
     }
 }

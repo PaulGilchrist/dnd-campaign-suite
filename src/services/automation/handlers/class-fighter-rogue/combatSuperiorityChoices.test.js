@@ -438,53 +438,53 @@ describe('executeRallyChoice', () => {
     });
 
     it('returns popup with error when required args are null', async () => {
-        let result = await executeRallyChoice(
-            { dieValue: 4, maneuverName: 'Rally' },
-            makePlayerStats(),
-            'test-campaign',
-            null,
-            8,
-            4,
-            'Rally description'
-        );
+        let result = await executeRallyChoice({
+            action: { dieValue: 4, maneuverName: 'Rally' },
+            playerStats: makePlayerStats(),
+            campaignName: 'test-campaign',
+            chosenName: null,
+            totalHp: 8,
+            extraHp: 4,
+            description: 'Rally description',
+        })
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
         expect(result.payload.name).toBe('Rally');
         expect(result.payload.description).toContain('No target selected');
 
-        result = await executeRallyChoice(
-            { dieValue: 4, maneuverName: 'Rally' },
-            null,
-            'test-campaign',
-            'Ally1',
-            8,
-            4,
-            'Rally description'
-        );
+        result = await executeRallyChoice({
+            action: { dieValue: 4, maneuverName: 'Rally' },
+            playerStats: null,
+            campaignName: 'test-campaign',
+            chosenName: 'Ally1',
+            totalHp: 8,
+            extraHp: 4,
+            description: 'Rally description',
+        })
         expect(result.payload.description).toContain('No target selected');
 
-        result = await executeRallyChoice(
-            { dieValue: 4, maneuverName: 'Rally' },
-            makePlayerStats(),
-            null,
-            'Ally1',
-            8,
-            4,
-            'Rally description'
-        );
+        result = await executeRallyChoice({
+            action: { dieValue: 4, maneuverName: 'Rally' },
+            playerStats: makePlayerStats(),
+            campaignName: null,
+            chosenName: 'Ally1',
+            totalHp: 8,
+            extraHp: 4,
+            description: 'Rally description',
+        })
         expect(result.payload.description).toContain('No target selected');
     });
 
     it('sets temp HP and expiration on chosen ally', async () => {
-        const result = await executeRallyChoice(
-            { dieValue: 4, maneuverName: 'Rally' },
-            makePlayerStats(),
-            'test-campaign',
-            'Ally1',
-            8,
-            4,
-            'Rally description'
-        );
+        const result = await executeRallyChoice({
+            action: { dieValue: 4, maneuverName: 'Rally' },
+            playerStats: makePlayerStats(),
+            campaignName: 'test-campaign',
+            chosenName: 'Ally1',
+            totalHp: 8,
+            extraHp: 4,
+            description: 'Rally description',
+        })
 
         expect(result.type).toBe('popup');
         expect(result.payload.name).toBe('Rally');
@@ -507,15 +507,15 @@ describe('executeRallyChoice', () => {
     });
 
     it('uses default maneuver name when not provided', async () => {
-        const result = await executeRallyChoice(
-            { dieValue: 6 },
-            makePlayerStats(),
-            'test-campaign',
-            'Ally1',
-            10,
-            4,
-            'Rally description'
-        );
+        const result = await executeRallyChoice({
+            action: { dieValue: 6 },
+            playerStats: makePlayerStats(),
+            campaignName: 'test-campaign',
+            chosenName: 'Ally1',
+            totalHp: 10,
+            extraHp: 4,
+            description: 'Rally description',
+        })
 
         expect(result.payload.name).toBe('Rally');
         expect(result.logEntries[0].description).toContain('Rally');

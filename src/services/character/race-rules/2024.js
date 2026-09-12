@@ -8,6 +8,29 @@ import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 const featureCategories = getCategories('2024');
 
+// Fiendish Legacy: resistance is determined by subrace name
+const FIENDISH_LEGACY_RESISTANCE_MAP = {
+    'Abyssal': 'Poison',
+    'Chthonic': 'Necrotic',
+    'Infernal': 'Fire',
+};
+
+function resolveFiendishLegacyName(playerSummary) {
+    const raceName = playerSummary.race?.name;
+    const subraceName = playerSummary.race?.subrace?.name;
+    if (subraceName && raceName === 'Tiefling') {
+        return subraceName.replace(' Tiefling', '');
+    }
+    return null;
+}
+
+function pushFiendishLegacyResistance(resistances, legacyName) {
+    const legResist = legacyName ? FIENDISH_LEGACY_RESISTANCE_MAP[legacyName] : null;
+    if (legResist && !resistances.includes(legResist)) {
+        resistances.push(legResist);
+    }
+}
+
 const raceRules = {
     getImmunities: (playerSummary) => {
             // 2024 Rules: Simplified immunities based on racial traits
@@ -96,24 +119,8 @@ const raceRules = {
             resistances.push(playerSummary.race.subrace.damage_resistance);
         }
 
-        // Fiendish Legacy: resistance is determined by subrace name
-        const raceName = playerSummary?.race?.name;
-        const subraceName = playerSummary?.race?.subrace?.name;
-        let fiendishLegacyName = null;
-        if (subraceName && raceName === 'Tiefling') {
-            fiendishLegacyName = subraceName.replace(' Tiefling', '');
-        }
-        const fiendishLegacyResistanceMap = {
-            'Abyssal': 'Poison',
-            'Chthonic': 'Necrotic',
-            'Infernal': 'Fire',
-        };
-        if (fiendishLegacyName) {
-            const legResist = fiendishLegacyResistanceMap[fiendishLegacyName];
-            if (legResist && !resistances.includes(legResist)) {
-                resistances.push(legResist);
-            }
-        }
+        const fiendishLegacyName = resolveFiendishLegacyName(playerSummary);
+        pushFiendishLegacyResistance(resistances, fiendishLegacyName);
 
         if (playerSummary.race && playerSummary.race.traits) {
             playerSummary.race.traits.forEach(trait => {

@@ -153,7 +153,7 @@ async function handleMultiManeuverSelection(action, playerStats, campaignName, s
 }
 
 export async function onCombatSuperioritySelected(action, playerStats, campaignName, selectedManeuverNames, singleUseManeuverName) {
-    const auto = action.automation;
+    const auto = action.automation || {};
 
     if (Array.isArray(selectedManeuverNames) && !singleUseManeuverName) {
         return handleMultiManeuverSelection(action, playerStats, campaignName, selectedManeuverNames);
@@ -168,16 +168,16 @@ export async function onCombatSuperioritySelected(action, playerStats, campaignN
     const stored = getRuntimeValue(playerStats.name, 'BattleMasterManeuvers_selection', campaignName);
     const knownManeuvers = Array.isArray(stored) ? stored : [];
 
-    if (auto?.singleUseManeuver === selectedName && !auto?.isReload) {
+    if (auto.singleUseManeuver === selectedName && !auto.isReload) {
         const newKnown = knownManeuvers.filter(n => n !== selectedName);
         await setRuntimeValue(playerStats.name, 'BattleMasterManeuvers_selection', newKnown, campaignName);
     }
 
-    if (auto?.actionType === 'attack_rider') {
-        return executeAttackRiderManeuver(action, playerStats, campaignName, selectedName, auto?.attackContext || null);
+    if (auto.actionType === 'attack_rider') {
+        return executeAttackRiderManeuver(action, playerStats, campaignName, selectedName, auto.attackContext || null);
     }
 
-    const executor = SELECTION_ACTION_DISPATCH[auto?.actionType] || executeManeuver;
+    const executor = SELECTION_ACTION_DISPATCH[auto.actionType] || executeManeuver;
     return executor(action, playerStats, campaignName, selectedName);
 }
 

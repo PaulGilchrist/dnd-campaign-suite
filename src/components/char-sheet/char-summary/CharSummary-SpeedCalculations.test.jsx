@@ -40,7 +40,7 @@ vi.mock('./CharConditions.jsx', () => ({ default: () => <div data-testid="char-c
 vi.mock('../../common/AllySelectionModal.jsx', () => ({ default: () => <div data-testid="ally-selection-modal">Ally Selection</div> }));
 
 vi.mock('../../../hooks/runtime/useTrackedResource.js', () => ({
-    default: vi.fn((key, name, init, _deps, _campaign) => ({ current: init(), update: vi.fn() })),
+    default: vi.fn(({ maxGetter }) => ({ current: maxGetter(), update: vi.fn() })),
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({

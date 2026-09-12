@@ -212,7 +212,7 @@ async function applySharedMoonlight(playerStats, playerName, campaignName) {
     return ` Shared Moonlight: ${targetName} also gains Advantage on their next attack roll.`;
 }
 
-function applyStepTeleportAdvantage(action, playerStats, playerName, campaignName, distance, consumedSlotLevel, auto) {
+function applyStepTeleportAdvantage({ action, playerStats, playerName, campaignName, distance, consumedSlotLevel, auto }) {
     let logDescription = `${playerName} used ${action.name} to teleport ${distance}. Gains Advantage on next attack roll.`;
     if (consumedSlotLevel) {
         logDescription += ` Expend a level ${consumedSlotLevel} spell slot.`;
@@ -264,16 +264,12 @@ export async function confirmTeleport(action, playerStats, campaignName, useExte
         }
     }
 
-    if (auto.effect === 'shadow_step_teleport' || auto.effect === 'moonlight_step_teleport') {
-        applyStepTeleportAdvantage(action, playerStats, playerName, campaignName, distance, consumedSlotLevel, auto);
-
-        if (auto.effect === 'shadow_step_teleport') {
-            description += await applyImprovedShadowStep(action, playerStats, playerName, campaignName);
-        }
-
-        if (auto.effect === 'moonlight_step_teleport') {
-            description += await applySharedMoonlight(playerStats, playerName, campaignName);
-        }
+    if (auto.effect === 'shadow_step_teleport') {
+        applyStepTeleportAdvantage({ action, playerStats, playerName, campaignName, distance, consumedSlotLevel, auto });
+        description += await applyImprovedShadowStep(action, playerStats, playerName, campaignName);
+    } else if (auto.effect === 'moonlight_step_teleport') {
+        applyStepTeleportAdvantage({ action, playerStats, playerName, campaignName, distance, consumedSlotLevel, auto });
+        description += await applySharedMoonlight(playerStats, playerName, campaignName);
     }
 
     if (auto.effect === 'bonus_teleport') {

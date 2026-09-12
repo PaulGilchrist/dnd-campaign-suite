@@ -81,6 +81,54 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
+function shakeOutConditionEntry(campaignName, targetName, condition) {
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'removed',
+        characterName: targetName,
+        condition,
+        reason: 'Shake Out Stupor (Hypnotic Pattern)',
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[hypnoticPatternShake] Error:", e); });
+}
+
+async function shakeOutPlayer(targetName, campaignName) {
+    const conditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const condArray = Array.isArray(conditions) ? conditions : [];
+    const filtered = condArray.filter(c => {
+        const cl = String(c).toLowerCase();
+        return cl !== 'charmed' && cl !== 'incapacitated' && cl !== 'speed_zero';
+    });
+    if (filtered.length !== condArray.length) {
+        setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
+        for (const cond of ['charmed', 'incapacitated', 'speed_zero']) {
+            if (!filtered.some(f => String(f).toLowerCase() === cond)) {
+                shakeOutConditionEntry(campaignName, targetName, cond.charAt(0).toUpperCase() + cond.slice(1));
+            }
+        }
+    }
+}
+
+function shakeOutCreature(targetName, campaignName) {
+    const conditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const condArray = Array.isArray(conditions) ? conditions : [];
+    const hadCharmed = condArray.some(c => String(c).toLowerCase() === 'charmed');
+    const hadIncapacitated = condArray.some(c => String(c).toLowerCase() === 'incapacitated');
+    const filtered = condArray.filter(c => {
+        const cl = String(c).toLowerCase();
+        return cl !== 'charmed' && cl !== 'incapacitated' && cl !== 'speed_zero';
+    });
+    if (filtered.length !== condArray.length) {
+        setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
+    }
+    if (hadCharmed) {
+        shakeOutConditionEntry(campaignName, targetName, 'Charmed');
+    }
+    if (hadIncapacitated) {
+        shakeOutConditionEntry(campaignName, targetName, 'Incapacitated');
+    }
+}
+
 export async function handleConfirm(action, playerStats, campaignName, _mapName, targetName) {
     if (!targetName) return null;
 
@@ -90,59 +138,9 @@ export async function handleConfirm(action, playerStats, campaignName, _mapName,
     const creature = combatSummary?.creatures?.find(c => c.name === targetName);
 
     if (creature?.type === 'player') {
-        const conditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-        const condArray = Array.isArray(conditions) ? conditions : [];
-        const filtered = condArray.filter(c => {
-            const cl = String(c).toLowerCase();
-            return cl !== 'charmed' && cl !== 'incapacitated' && cl !== 'speed_zero';
-        });
-        if (filtered.length !== condArray.length) {
-            setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
-            for (const cond of ['charmed', 'incapacitated', 'speed_zero']) {
-                if (!filtered.some(f => String(f).toLowerCase() === cond)) {
-                    addEntry(campaignName, {
-                        type: 'condition',
-                        action: 'removed',
-                        characterName: targetName,
-                        condition: cond.charAt(0).toUpperCase() + cond.slice(1),
-                        reason: 'Shake Out Stupor (Hypnotic Pattern)',
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error("[hypnoticPatternShake] Error:", e); });
-                }
-            }
-        }
+        await shakeOutPlayer(targetName, campaignName);
     } else if (creature) {
-        const conditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-        const condArray = Array.isArray(conditions) ? conditions : [];
-        const hadCharmed = condArray.some(c => String(c).toLowerCase() === 'charmed');
-        const hadIncapacitated = condArray.some(c => String(c).toLowerCase() === 'incapacitated');
-        const filtered = condArray.filter(c => {
-            const cl = String(c).toLowerCase();
-            return cl !== 'charmed' && cl !== 'incapacitated' && cl !== 'speed_zero';
-        });
-        if (filtered.length !== condArray.length) {
-            setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
-        }
-        if (hadCharmed) {
-            addEntry(campaignName, {
-                type: 'condition',
-                action: 'removed',
-                characterName: targetName,
-                condition: 'Charmed',
-                reason: 'Shake Out Stupor (Hypnotic Pattern)',
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[hypnoticPatternShake] Error:", e); });
-        }
-        if (hadIncapacitated) {
-            addEntry(campaignName, {
-                type: 'condition',
-                action: 'removed',
-                characterName: targetName,
-                condition: 'Incapacitated',
-                reason: 'Shake Out Stupor (Hypnotic Pattern)',
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[hypnoticPatternShake] Error:", e); });
-        }
+        shakeOutCreature(targetName, campaignName);
     }
 
     addEntry(campaignName, {

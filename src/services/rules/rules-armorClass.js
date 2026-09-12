@@ -46,7 +46,7 @@ function computeAddedBonus(allEquipment, playerStats, playerSummary, armorName, 
     return addedBonus;
 }
 
-function computeBaseArmorClass(allEquipment, playerStats, playerSummary, armorName, addedBonus, dexterity, charisma, contributions) {
+function computeBaseArmorClass({ allEquipment, playerStats, playerSummary, armorName, addedBonus, dexterity, charisma, contributions }) {
     if (armorName) {
         let parsedArmor = parseMagicItemName(armorName);
         contributions.push(`Armor Magic Bonus (${parsedArmor.magicBonus})`);
@@ -138,7 +138,7 @@ function applyUnarmoredDefense5e(armorClass, playerStats, dexterity, constitutio
 // 2024: College of Dance (AC = 10 + DEX + CHA, no armor or shield),
 // Draconic Sorcery (AC = 10 + DEX + CHA, no armor),
 // and Barbarian (AC = 10 + DEX + CON, no armor) unarmored defenses
-function applyUnarmoredDefense2024(armorClass, playerStats, armorName, shield, dexterity, charisma, constitution, contributions) {
+function applyUnarmoredDefense2024({ armorClass, playerStats, armorName, shield, dexterity, charisma, constitution, contributions }) {
     if (playerStats.class.subclass && playerStats.class.subclass.name === 'College of Dance' && !armorName && !shield) {
         const danceAc = 10 + dexterity.bonus + charisma.bonus;
         if (danceAc > armorClass) {
@@ -211,7 +211,7 @@ export function getArmorClass(allEquipment, playerStats, playerSummary) {
 
     const addedBonus = computeAddedBonus(allEquipment, playerStats, playerSummary, armorName, contributions);
 
-    let armorClass = computeBaseArmorClass(allEquipment, playerStats, playerSummary, armorName, addedBonus, dexterity, charisma, contributions);
+    let armorClass = computeBaseArmorClass({ allEquipment, playerStats, playerSummary, armorName, addedBonus, dexterity, charisma, contributions });
 
     // 5e: Medium Armor Master – increase medium armor dex bonus cap from 2 to 3 when Dex >= 16
     if (!is2024(playerStats, playerSummary)) {
@@ -231,7 +231,7 @@ export function getArmorClass(allEquipment, playerStats, playerSummary) {
     }
 
     if (is2024(playerStats, playerSummary)) {
-        armorClass = applyUnarmoredDefense2024(armorClass, playerStats, armorName, shield, dexterity, charisma, constitution, contributions);
+        armorClass = applyUnarmoredDefense2024({ armorClass, playerStats, armorName, shield, dexterity, charisma, constitution, contributions });
 
         const passives = playerStats.automation?.passives;
         if (!Array.isArray(passives)) {
