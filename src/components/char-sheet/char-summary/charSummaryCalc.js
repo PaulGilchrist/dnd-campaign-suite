@@ -247,6 +247,15 @@ function applyMovementPassives(playerStats, acc, hasArmorOrShield, wrathOfTheSea
     return acrobaticMovementActive
 }
 
+function deriveAspectSpeeds(aspectOption, totalSpeed, acc, playerStats) {
+    let climbSpeed = null
+    if (aspectOption === 'Panther') climbSpeed = totalSpeed + acc.buffSpeedBonus
+    if (!climbSpeed && playerStats.climbSpeed) climbSpeed = playerStats.climbSpeed
+    if (aspectOption === 'Salmon' && acc.swimSpeed === null) acc.swimSpeed = totalSpeed + acc.buffSpeedBonus
+    if (!acc.swimSpeed && playerStats.swimSpeed) acc.swimSpeed = playerStats.swimSpeed
+    return climbSpeed
+}
+
 function computeMovementSection(playerStats, activeBuffs, hasArmorOrShield, speed, totalSpeed, buffSpeedBonus, auraSpeedBonus, wrathOfTheSeaActive) {
     const largeFormActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'large_form')
     const huntersMarkActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === "Hunter's Mark")
@@ -262,11 +271,7 @@ function computeMovementSection(playerStats, activeBuffs, hasArmorOrShield, spee
     }
     activeBuffs.forEach(buff => applyBuffEffect(buff, acc))
 
-    let climbSpeed = null
-    if (aspectOption === 'Panther') climbSpeed = totalSpeed + acc.buffSpeedBonus
-    if (!climbSpeed && playerStats.climbSpeed) climbSpeed = playerStats.climbSpeed
-    if (aspectOption === 'Salmon' && acc.swimSpeed === null) acc.swimSpeed = totalSpeed + acc.buffSpeedBonus
-    if (!acc.swimSpeed && playerStats.swimSpeed) acc.swimSpeed = playerStats.swimSpeed
+    const climbSpeed = deriveAspectSpeeds(aspectOption, totalSpeed, acc, playerStats)
 
     if (activeBuffs.some(b => b.effect === 'haste')) {
         acc.speed = acc.speed * 2

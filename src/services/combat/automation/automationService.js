@@ -136,6 +136,33 @@ export function getAutomationInfo(feature, playerStats) {
     return null
 }
 
+function normalizeSaveName(name) {
+    return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()
+}
+
+function hasSaveProficiency(saveName, result, classSaves) {
+    return result.has(saveName) || classSaves.includes(saveName)
+}
+
+function addSaveProficiencyAuto(auto, result, playerStats) {
+    const saveName = auto.saveType || ''
+    if (!saveName) return
+    const normalizedSave = normalizeSaveName(saveName)
+    const classSaves = playerStats?.class?.saving_throw_proficiencies || []
+    if (!hasSaveProficiency(normalizedSave, result, classSaves)) {
+        result.add(normalizedSave)
+        return
+    }
+    // Already proficient — use fallback types in order
+    for (const fallback of auto.fallbackTypes || []) {
+        const normalizedFallback = normalizeSaveName(fallback)
+        if (!hasSaveProficiency(normalizedFallback, result, classSaves)) {
+            result.add(normalizedFallback)
+            break
+        }
+    }
+}
+
 export function getAllSaveProficiencies(features, playerStats) {
     const allSaves = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']
     if (!features) return allSaves
@@ -150,28 +177,7 @@ export function getAllSaveProficiencies(features, playerStats) {
                 }
             }
             if (auto.type === 'save_proficiency') {
-                const saveName = auto.saveType || ''
-                const fallbackTypes = auto.fallbackTypes || []
-                if (saveName) {
-                    // Normalize: capitalize first letter, lowercase rest
-                    const normalizedSave = saveName.charAt(0).toUpperCase() + saveName.slice(1).toLowerCase()
-                    // Check if character already has proficiency in this save
-                    const classSaves = playerStats?.class?.saving_throw_proficiencies || []
-                    const hasSave = result.has(normalizedSave) || classSaves.includes(normalizedSave)
-                    if (hasSave) {
-                        // Use fallback types in order
-                        for (const fallback of fallbackTypes) {
-                            const normalizedFallback = fallback.charAt(0).toUpperCase() + fallback.slice(1).toLowerCase()
-                            const hasFallback = result.has(normalizedFallback) || classSaves.includes(normalizedFallback)
-                            if (!hasFallback) {
-                                result.add(normalizedFallback)
-                                break
-                            }
-                        }
-                    } else {
-                        result.add(normalizedSave)
-                    }
-                }
+                addSaveProficiencyAuto(auto, result, playerStats)
             }
         }
     })

@@ -8,6 +8,43 @@ import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 
 const ZEALOUS_PRESENCE_KEY = 'zealousPresenceActive';
 
+function infoPopup(action, auto, description) {
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            description,
+            automation: auto,
+        },
+    };
+}
+
+// Handle uses and rage expenditure (same pattern as saveAttackHandler.js).
+// Returns an info-popup when exhausted, or null when a use was consumed.
+async function expendUseOrRage(action, auto, playerStats, campaignName) {
+    const playerName = playerStats.name;
+    const maxUses = auto.usesMax ?? auto.uses ?? 0;
+    if (maxUses <= 0) return null;
+
+    const usedUpPopup = infoPopup(action, auto, `${action.name} has been used and cannot be used again until a long rest.`);
+    const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
+    const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? maxUses);
+    if (currentUses > 0) {
+        await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
+        return null;
+    }
+
+    if (auto.recharge !== 'long_rest_or_expend_rage') return usedUpPopup;
+
+    const storedRage = getRuntimeValue(playerName, 'ragePoints', campaignName);
+    const currentRage = storedRage != null ? Number(storedRage) : (playerStats._trackedResources?.ragePoints?.current ?? 0);
+    if (currentRage <= 0) return usedUpPopup;
+
+    await setRuntimeValue(playerName, 'ragePoints', currentRage - 1, campaignName);
+    return null;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -15,53 +52,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // Check if Zealous Presence is already active
     const isActive = getRuntimeValue(playerName, ZEALOUS_PRESENCE_KEY, campaignName);
     if (isActive) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${action.name} is already active.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(action, auto, `${action.name} is already active.`);
     }
 
-    // Handle uses and rage expenditure (same pattern as saveAttackHandler.js)
-    const maxUses = auto.usesMax ?? auto.uses ?? 0;
-    if (maxUses > 0) {
-        const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
-        const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? maxUses);
-        if (currentUses <= 0) {
-            if (auto.recharge === 'long_rest_or_expend_rage') {
-                const storedRage = getRuntimeValue(playerName, 'ragePoints', campaignName);
-                const currentRage = storedRage != null ? Number(storedRage) : (playerStats._trackedResources?.ragePoints?.current ?? 0);
-                if (currentRage <= 0) {
-                    return {
-                        type: 'popup',
-                        payload: {
-                            type: 'automation_info',
-                            name: action.name,
-                            description: `${action.name} has been used and cannot be used again until a long rest.`,
-                            automation: auto,
-                        },
-                    };
-                }
-                await setRuntimeValue(playerName, 'ragePoints', currentRage - 1, campaignName);
-            } else {
-                return {
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: action.name,
-                        description: `${action.name} has been used and cannot be used again until a long rest.`,
-                        automation: auto,
-                    },
-                };
-            }
-        } else {
-            await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
-        }
-    }
+    const exhausted = await expendUseOrRage(action, auto, playerStats, campaignName);
+    if (exhausted) return exhausted;
 
     // CLA-394: Gather creature targets from combat context (exclude self),
     // range-gated to "within 60 feet" (CLA-378 recipe — gridless resolves

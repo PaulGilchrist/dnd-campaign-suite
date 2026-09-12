@@ -68,7 +68,7 @@ describe('executeSweepingAttack — MN-018 original-roll vs AC + real damage', (
         expect(call[1]).toBe('Thug 2');
         expect(call[2]).toBe(9);
         expect(call[3]).toEqual(['slashing']);
-        expect(call[7]).toBe('EvasiveFighter');
+        expect(call[6].attackerName).toBe('EvasiveFighter');
         expect(result.payload.description).toMatch(/hits Thug 2/);
         expect(result.payload.description).toMatch(/9 slashing/);
         expect(result.payload.name).toBe('Sweeping Attack');

@@ -1,7 +1,16 @@
 import { getHitDieSize } from '../../../rules/effects/restRules.js';
 
+function resolveSlotLevel(action) {
+    return action.metaCtx?.slotLevel || action.metaCtx?.modifiedSpell?.level || action.metaCtx?.upcastLevel || 2;
+}
+
+function resolveDiceCount(action, slotLevel) {
+    const diceText = action.spell?.heal_at_slot_level?.[String(slotLevel)] || action.action?.heal_at_slot_level?.[String(slotLevel)] || '2 short rest dice';
+    return parseInt(diceText, 10) || 2;
+}
+
 export function handle(action, playerStats, campaignName, _mapName) {
-    const slotLevel = action.metaCtx?.slotLevel || action.metaCtx?.modifiedSpell?.level || action.metaCtx?.upcastLevel || 2;
+    const slotLevel = resolveSlotLevel(action);
     const hitDieSize = getHitDieSize(playerStats);
 
     if (!hitDieSize) {
@@ -21,8 +30,7 @@ export function handle(action, playerStats, campaignName, _mapName) {
     const abilityObj = playerStats.abilities?.find(a => a.name === spellcastingAbility);
     const spellcastingAbilityModifier = abilityObj?.bonus || 0;
 
-    const diceText = action.spell?.heal_at_slot_level?.[String(slotLevel)] || action.action?.heal_at_slot_level?.[String(slotLevel)] || '2 short rest dice';
-    const diceCount = parseInt(diceText, 10) || 2;
+    const diceCount = resolveDiceCount(action, slotLevel);
 
     return {
         type: 'modal',

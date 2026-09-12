@@ -114,6 +114,114 @@ function handleChangeKeyEvent(event, campaignName, pendingPromptIdRef) {
   applyStoreUpdate(storeKey, event.data, campaignName);
 }
 
+async function fetchCampaignChangeData(campaignName) {
+  try {
+    const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/change-data`);
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch { /* no server — use computed defaults */ }
+  return {};
+}
+
+function seedCharServerKeys(storeName, charServerData) {
+  if (!charServerData || typeof charServerData !== 'object') return;
+  const store = getStore(storeName);
+  let seededAny = false;
+  for (const [key, value] of Object.entries(charServerData)) {
+    if (!store.has(key) && value != null && key !== 'biPrompt') {
+      store.set(key, value);
+      seededAny = true;
+    }
+  }
+  // Wake store listeners (e.g. maneuver recompute) for values seeded from disk
+  if (seededAny) notify(storeName);
+}
+
+function seedCharFeatureKeys(storeName, char) {
+  // Seed Magic Initiate instances / Fey Touched / Shadow Touched from character data
+  if (char.magicInitiateInstances && Array.isArray(char.magicInitiateInstances)) {
+    getStore(storeName).set('_magicInitiateInstances', char.magicInitiateInstances);
+  }
+  if (char.feyTouchedSpell) {
+    getStore(storeName).set('feyTouchedSpell', char.feyTouchedSpell);
+  }
+  if (char.shadowTouchedSpell) {
+    getStore(storeName).set('shadowTouchedSpell', char.shadowTouchedSpell);
+  }
+}
+
+function seedCharacterRuntimeData(char, serverData) {
+  const stats = char.computedStats;
+  if (!stats || !stats._trackedResources) return;
+  const charServerData = serverData ? serverData[stats.name] : null;
+  const merged = applyServerOverride(stats._trackedResources, charServerData);
+  seedTrackedResources(stats.name, trackedResourcesToStoreEntries(merged));
+  seedCharServerKeys(stats.name, charServerData);
+  seedCharFeatureKeys(stats.name, char);
+}
+
+function seedCampaignRuntimeData(serverData) {
+  // Campaign keys are at the top level of serverData, seeded into the 'campaign' store
+  if (!serverData || typeof serverData !== 'object') return;
+  const campaignStore = getStore('campaign');
+  for (const [key, value] of Object.entries(serverData)) {
+    if (!campaignStore.has(key) && value != null) {
+      campaignStore.set(key, value);
+    }
+  }
+}
+
+function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, onBackFromMap, onEncounterCreated, setMapsView, setActiveMapName }) {
+  if (mapsView.type === 'manager') {
+    return (
+      <MapsManager
+        campaignName={campaignName}
+        onOpenMap={(mapName) => { setMapsView({ type: 'map', mapName }); setActiveMapName(mapName); }}
+        onBack={() => setMapsView({ type: 'none' })}
+      />
+    );
+  }
+  if (mapsView.type === 'map') {
+    return (
+      <Map
+        campaignName={campaignName}
+        characters={characters}
+        npcs={npcs}
+        isLocalhost={isLocalhost}
+        mapName={mapsView.mapName}
+        onBack={onBackFromMap}
+        onEncounterCreated={onEncounterCreated}
+        onPoiEntered={onEncounterCreated}
+      />
+    );
+  }
+  return null;
+}
+
+function OverlayViews({ activeView, campaignName, characters, isLocalhost, theme, toggleTheme, onRenameCampaign, onDeleteCampaign, setActiveView }) {
+  const views = {
+    encounter: <EncounterBuilder characters={characters} campaignName={campaignName} onJoinEncounter={() => setActiveView('initiative')} />,
+    notes: <Notes campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} onBack={() => setActiveView(null)} />,
+    quests: <Quests campaignName={campaignName} isLocalhost={isLocalhost} onBack={() => setActiveView(null)} />,
+    npcs: <NPCs campaignName={campaignName} characters={characters} onBack={() => setActiveView(null)} onViewInitiative={() => setActiveView('initiative')} />,
+    settlements: <Settlements campaignName={campaignName} onBack={() => setActiveView(null)} />,
+    factions: <Factions campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} onBack={() => setActiveView(null)} />,
+    campaignLog: <Log campaignName={campaignName} characters={characters} />,
+    campaignRepair: (
+      <CampaignAdmin
+        campaignName={campaignName}
+        onBack={() => setActiveView(null)}
+        theme={theme}
+        toggleTheme={toggleTheme}
+        onRenameCampaign={onRenameCampaign}
+        onDeleteCampaign={onDeleteCampaign}
+      />
+    ),
+  };
+  return views[activeView] || null;
+}
+
 function App() {
   const appData = useAppData();
   const { abilityScores, classes, classes2024, equipment, magicItems, magicItems2024, races, races2024, spells, spells2024 } = appData;
@@ -217,62 +325,14 @@ function App() {
       if (seededCampaignRef.current === campaign && computedCharacters.length > 0) return;
       seededCampaignRef.current = campaign;
       (async () => {
-        let serverData = {};
-        try {
-          const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/change-data`);
-          if (response.ok) {
-            serverData = await response.json();
-          }
-        } catch { /* no server — use computed defaults */ }
-
+        const serverData = await fetchCampaignChangeData(campaignName);
+        // Also seed arbitrary runtime keys (weapon mastery choices, etc.) from server data,
+        // excluding transient prompt keys that should not persist across refreshes
         for (const char of computedCharacters) {
-          const stats = char.computedStats;
-          if (!stats || !stats._trackedResources) continue;
-          const charServerData = serverData ? serverData[stats.name] : null;
-          const merged = applyServerOverride(stats._trackedResources, charServerData);
-          const entries = trackedResourcesToStoreEntries(merged);
-          seedTrackedResources(stats.name, entries);
-          // Also seed arbitrary runtime keys (weapon mastery choices, etc.) from server data
-          // Exclude transient prompt keys that should not persist across refreshes
-          if (charServerData && typeof charServerData === 'object') {
-            const store = getStore(stats.name);
-            let seededAny = false;
-            for (const [key, value] of Object.entries(charServerData)) {
-              if (!store.has(key) && value != null && key !== 'biPrompt') {
-                store.set(key, value);
-                seededAny = true;
-              }
-            }
-            // Wake store listeners (e.g. maneuver recompute) for values seeded from disk
-            if (seededAny) notify(stats.name);
-          }
-          // Seed Magic Initiate instances from character data into runtime store
-          if (char.magicInitiateInstances && Array.isArray(char.magicInitiateInstances)) {
-            const miStore = getStore(stats.name);
-            miStore.set('_magicInitiateInstances', char.magicInitiateInstances);
-          }
-          // Seed Fey Touched spell from character data into runtime store
-          if (char.feyTouchedSpell) {
-            const ftStore = getStore(stats.name);
-            ftStore.set('feyTouchedSpell', char.feyTouchedSpell);
-          }
-          // Seed Shadow Touched spell from character data into runtime store
-          if (char.shadowTouchedSpell) {
-            const stStore = getStore(stats.name);
-            stStore.set('shadowTouchedSpell', char.shadowTouchedSpell);
-          }
+          seedCharacterRuntimeData(char, serverData);
         }
-
         // Seed campaign-level runtime data (targetEffects, etc.)
-        // Campaign keys are now at the top level of serverData, seeded into the 'campaign' store
-        const campaignStore = getStore('campaign');
-        if (serverData && typeof serverData === 'object') {
-            for (const [key, value] of Object.entries(serverData)) {
-                if (!campaignStore.has(key) && value != null) {
-                    campaignStore.set(key, value);
-                }
-            }
-        }
+        seedCampaignRuntimeData(serverData);
       })();
     }, [computedCharacters, campaignName]);
 
@@ -437,14 +497,6 @@ function App() {
     }
   };
 
-  const handleBackFromSettlements = () => {
-    setActiveView(null);
-  };
-
-  const handleBackFromNPCs = () => {
-    setActiveView(null);
-  };
-
   const handleFactionsClick = () => {
     if (activeView !== 'factions') {
       setActiveView('factions');
@@ -557,85 +609,31 @@ function App() {
            />
         )}
         {activeView === 'initiative' && <Initiative characters={computedCharacters} campaignName={campaignName} onNpcsChange={setNpcs} isLocalhost={isLocalhost} mapName={activeMapName} onViewCharacter={handleCharacterClick} />}
-        {activeView === 'mapsManager' && mapsView.type === 'manager' && (
-          <MapsManager
-            campaignName={campaignName}
-            onOpenMap={(mapName) => { setMapsView({ type: 'map', mapName }); setActiveMapName(mapName); }}
-            onBack={() => setMapsView({ type: 'none' })}
-          />
-        )}
-        {activeView === 'mapsManager' && mapsView.type === 'map' && (
-          <Map
+        {activeView === 'mapsManager' && (
+          <MapsAreaView
             campaignName={campaignName}
             characters={characters}
             npcs={npcs}
             isLocalhost={isLocalhost}
-            mapName={mapsView.mapName}
-            onBack={handleBackFromMap}
+            mapsView={mapsView}
+            onBackFromMap={handleBackFromMap}
             onEncounterCreated={handleEnterMap}
-            onPoiEntered={handleEnterMap}
+            setMapsView={setMapsView}
+            setActiveMapName={setActiveMapName}
           />
         )}
-          {activeView === 'encounter' && (
-            <EncounterBuilder characters={characters} campaignName={campaignName} onJoinEncounter={() => setActiveView('initiative')} />
-          )}
-        {activeView === 'notes' && (
-          <Notes
-            campaignName={campaignName}
-            characters={characters}
-            isLocalhost={isLocalhost}
-            onBack={() => setActiveView(null)}
-          />
-        )}
-        {activeView === 'quests' && (
-          <Quests
-            campaignName={campaignName}
-            isLocalhost={isLocalhost}
-            onBack={() => setActiveView(null)}
-          />
-        )}
-        {activeView === 'npcs' && (
-          <NPCs
-            campaignName={campaignName}
-            characters={characters}
-            onBack={handleBackFromNPCs}
-            onViewInitiative={() => setActiveView('initiative')}
-          />
-        )}
-        {activeView === 'settlements' && (
-          <Settlements
-            campaignName={campaignName}
-            onBack={handleBackFromSettlements}
-          />
-        )}
-          {activeView === 'factions' && (
-            <Factions
-             campaignName={campaignName}
-             characters={characters}
-             isLocalhost={isLocalhost}
-              onBack={() => setActiveView(null)}
-               />
-                 ) }
-
-                  { activeView === 'campaignLog' && (
-                       <Log
-                         campaignName={campaignName}
-                          characters={characters}
-                           />
-                           ) }
-
-                  { activeView === 'campaignRepair' && (
-                        <CampaignAdmin
-                         campaignName={campaignName}
-                         onBack={() => setActiveView(null)}
-                         theme={theme}
-                         toggleTheme={toggleTheme}
-                         onRenameCampaign={handleRenameCampaign}
-                         onDeleteCampaign={handleDeleteCampaign}
-                          />
-                         ) }
-
-                              <br />
+        <OverlayViews
+          activeView={activeView}
+          campaignName={campaignName}
+          characters={characters}
+          isLocalhost={isLocalhost}
+          theme={theme}
+          toggleTheme={toggleTheme}
+          onRenameCampaign={handleRenameCampaign}
+          onDeleteCampaign={handleDeleteCampaign}
+          setActiveView={setActiveView}
+        />
+        <br />
         {showCharacterWizard && <CharacterCreationWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} allClasses={classes} campaignName={campaignName} />}
         {showEditCharacterWizard && <CharacterCreationWizard onComplete={handleEditWizardComplete} onCancel={handleEditWizardCancel} allClasses={classes} characterData={activeCharacter} isEditing={true} campaignName={campaignName} />}
         <SavePromptModal campaignName={campaignName} characters={computedCharacters} activeMapName={activeMapName} />

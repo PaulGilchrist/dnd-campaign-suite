@@ -51,7 +51,7 @@ export async function handle(action, playerStats, campaignName, _mapName, _chara
 
     if (hit) {
         const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-        applyDamageToTarget(cs, targetName, damageTotal, ['Bludgeoning'], campaignName, characters, false, playerStats.name);
+        applyDamageToTarget(cs, targetName, damageTotal, ['Bludgeoning'], campaignName, characters, { ignoreResistance: false, attackerName: playerStats.name });
     }
 
     const hitText = hit ? 'HIT' : 'MISS';

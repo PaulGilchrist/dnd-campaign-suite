@@ -8,13 +8,26 @@ import WeaponKindMasteryModal from '../modals/WeaponKindMasteryModal.jsx';
 import { loadFightingStyles } from '../../../services/ui/dataLoader.js';
 import { isUnbreakableMajestyActive, getUnbreakableMajestySaveDc, clearUnbreakableMajesty } from '../../../services/combat/auras/unbreakableMajesty.js';
 import { getAuraRangeFromStats } from '../../../services/combat/auras/auraOfProtection.js';
-function barbarianRageScaling(classLevel, is2024, level) {
+function barbarianRageScaling2024(classLevel) {
     return {
-        extraAttacks: is2024 ? (classLevel?.extra_attacks || 0) : (level > 4 ? 1 : 0),
-        rageCount: is2024 ? (classLevel?.rages || 0) : (classLevel?.class_specific?.rage_count || 0),
-        rageDamage: is2024 ? (classLevel?.rage_damage || 0) : (classLevel?.class_specific?.rage_damage_bonus || 0),
-        weaponMastery: is2024 ? (classLevel?.weapon_mastery ?? 'N/A') : 'N/A',
+        extraAttacks: classLevel?.extra_attacks || 0,
+        rageCount: classLevel?.rages || 0,
+        rageDamage: classLevel?.rage_damage || 0,
+        weaponMastery: classLevel?.weapon_mastery ?? 'N/A',
     };
+}
+
+function barbarianRageScalingLegacy(classLevel, level) {
+    return {
+        extraAttacks: level > 4 ? 1 : 0,
+        rageCount: classLevel?.class_specific?.rage_count || 0,
+        rageDamage: classLevel?.class_specific?.rage_damage_bonus || 0,
+        weaponMastery: 'N/A',
+    };
+}
+
+function barbarianRageScaling(classLevel, is2024, level) {
+    return is2024 ? barbarianRageScaling2024(classLevel) : barbarianRageScalingLegacy(classLevel, level);
 }
 
 function barbarianWarriorMaxDice(level) {
@@ -289,6 +302,15 @@ function computeSuperiorityStats(playerStats, isBattleMaster) {
     return { hasSuperiorityDice: true, superiorityDiceMax, superiorityDieType: 8 };
 }
 
+function EnergyDiceSection({ playerStats, campaignName, classLevel }) {
+    return (
+        <div>
+            <TrackedResourceInput label="Energy Dice" resourceKey="psionicEnergy" playerName={playerStats.name} getMax={() => classLevel?.energy?.energy_die_num || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+            <div><b>Energy Die Type: </b>d{classLevel.energy.energy_die_type}</div>
+        </div>
+    );
+}
+
 const FighterFeatures = function FighterFeatures({ playerStats, campaignName, onWeaponMasteryClick }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     const majorName = playerStats.class.major?.name || playerStats.class.subclass?.name;
@@ -323,12 +345,7 @@ const FighterFeatures = function FighterFeatures({ playerStats, campaignName, on
     return (
           <div data-testid="char-class-fighter">
               <TrackedResourceInput label="Action Surge Uses" resourceKey="actionSurgeUses" playerName={playerStats.name} getMax={() => actionsurgeMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-              {hasEnergy && (
-                  <div>
-                      <TrackedResourceInput label="Energy Dice" resourceKey="psionicEnergy" playerName={playerStats.name} getMax={() => hasEnergy ? classLevel?.energy?.energy_die_num || 0 : 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-                      <div><b>Energy Die Type: </b>d{classLevel.energy.energy_die_type}</div>
-                  </div>
-              )}
+              {hasEnergy && <EnergyDiceSection playerStats={playerStats} campaignName={campaignName} classLevel={classLevel} />}
                <div><b>Extra Attacks: </b>{classLevel.extra_attacks || 0}</div>
                <div><b>Fighting Styles: </b>{playerStats.class.fightingStyles ? (
                    <span>{playerStats.class.fightingStyles.map((style, idx) => (
@@ -354,6 +371,27 @@ const FighterFeatures = function FighterFeatures({ playerStats, campaignName, on
 };
 
 /* ─── Monk ─── */
+const MONK_STRIDE_LABELS = {
+    'ice_walk': 'Ice Walk',
+    'speed_boost': '+10 Speed',
+    'fly_speed_equals_walk_speed': 'Fly Speed',
+    'teleport_ready': 'Teleport 30 ft',
+};
+
+function MonkElementalBadges({ elementalAttunementActive, elementalAttunementElement, strideBuff, elementalEpitomeActive, epitomeResistanceType, destructiveStrideActive }) {
+    return (
+        <>
+            {elementalAttunementActive && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-wand-magic-sparkles"></i> Elemental Attunement: {elementalAttunementElement}</span>}
+            <div className="automation-spacer"></div>
+            {strideBuff && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-person-walking"></i> Stride: {MONK_STRIDE_LABELS[strideBuff.effect] || 'Stride'}</span>}
+            <div className="automation-spacer"></div>
+            {elementalEpitomeActive && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-shield-halved"></i> Elemental Epitome: Resistance to {epitomeResistanceType || 'not chosen'}</span>}
+            <div className="automation-spacer"></div>
+            {destructiveStrideActive && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-person-running"></i> Destructive Stride: +20 Speed</span>}
+        </>
+    );
+}
+
 const MonkFeatures = function MonkFeatures({ playerStats, campaignName }) {
     const wisdom = playerStats.abilities?.find((a) => a.name === 'Wisdom');
     const monkFeatures = getClassFeatures(playerStats);
@@ -365,12 +403,6 @@ const MonkFeatures = function MonkFeatures({ playerStats, campaignName }) {
     const epitomeResistanceType = useRuntimeValue(playerStats.name, 'epitomeResistanceType', campaignName);
     const strideBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.name === 'Stride of the Elements') : null;
     const destructiveStrideActive = useRuntimeValue(playerStats.name, 'destructiveStrideActive', campaignName);
-    const STRIDE_LABELS = {
-        'ice_walk': 'Ice Walk',
-        'speed_boost': '+10 Speed',
-        'fly_speed_equals_walk_speed': 'Fly Speed',
-        'teleport_ready': 'Teleport 30 ft',
-    };
     if (playerStats.level < 2) return null;
     const focusSaveDc = 8 + (wisdom?.bonus || 0) + playerStats.proficiency;
     return (
@@ -382,13 +414,14 @@ const MonkFeatures = function MonkFeatures({ playerStats, campaignName }) {
                <div><b>Unarmored Movement:</b> +{monkFeatures?.unarmoredMovementIncrease || 0} ft.</div>
                 {cloakOfShadowsActive && <span className="automation-badge">Cloak of Shadows</span>}
                 <div className="automation-spacer"></div>
-                {elementalAttunementActive && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-wand-magic-sparkles"></i> Elemental Attunement: {elementalAttunementElement}</span>}
-                <div className="automation-spacer"></div>
-                {strideBuff && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-person-walking"></i> Stride: {STRIDE_LABELS[strideBuff.effect] || 'Stride'}</span>}
-                <div className="automation-spacer"></div>
-                {elementalEpitomeActive && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-shield-halved"></i> Elemental Epitome: Resistance to {epitomeResistanceType || 'not chosen'}</span>}
-                <div className="automation-spacer"></div>
-                {destructiveStrideActive && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-person-running"></i> Destructive Stride: +20 Speed</span>}
+                <MonkElementalBadges
+                    elementalAttunementActive={elementalAttunementActive}
+                    elementalAttunementElement={elementalAttunementElement}
+                    strideBuff={strideBuff}
+                    elementalEpitomeActive={elementalEpitomeActive}
+                    epitomeResistanceType={epitomeResistanceType}
+                    destructiveStrideActive={destructiveStrideActive}
+                />
            </div>
       );
 };
@@ -511,6 +544,19 @@ const RangerFeatures = function RangerFeatures({ playerStats, campaignName }) {
 };
 
 /* ─── Rogue ─── */
+function SupremeSneakBadge({ level, stealthAttackActive }) {
+    if (level < 9) return null;
+    const cls = 'automation-badge' + (stealthAttackActive ? ' automation-badge--active' : '');
+    const title = stealthAttackActive
+        ? "Supreme Sneak: Stealth Attack active — next attack costs 1d6 Sneak Attack, Invisible preserved with cover"
+        : "Supreme Sneak: Available at Rogue level 9 — activate from Actions section";
+    return (
+        <span className={cls} title={title}>
+            <i className="fas fa-eye-slash"></i> Supreme Sneak
+        </span>
+    );
+}
+
 const RogueFeatures = function RogueFeatures({ playerStats, campaignName }) {
     const rogueFeatures = getClassFeatures(playerStats);
     const stealthAttackCost = useRuntimeValue(playerStats.name, 'stealthAttackCost', campaignName);
@@ -521,17 +567,8 @@ const RogueFeatures = function RogueFeatures({ playerStats, campaignName }) {
     return (
           <div data-testid="char-class-rogue">
               {rogueFeatures?.expertise?.length > 0 && <div><b>Expertise: </b>{rogueFeatures.expertise.join(', ')}</div>}
-              {hasEnergy && (
-                  <div>
-                      <TrackedResourceInput label="Energy Dice" resourceKey="psionicEnergy" playerName={playerStats.name} getMax={() => classLevel?.energy?.energy_die_num || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-                      <div><b>Energy Die Type: </b>d{classLevel.energy.energy_die_type}</div>
-                  </div>
-              )}
-               {playerStats.level >= 9 && (
-                   <span className={'automation-badge' + (stealthAttackActive ? ' automation-badge--active' : '')} title={stealthAttackActive ? "Supreme Sneak: Stealth Attack active — next attack costs 1d6 Sneak Attack, Invisible preserved with cover" : "Supreme Sneak: Available at Rogue level 9 — activate from Actions section"}>
-                       <i className="fas fa-eye-slash"></i> Supreme Sneak
-                   </span>
-               )}
+              {hasEnergy && <EnergyDiceSection playerStats={playerStats} campaignName={campaignName} classLevel={classLevel} />}
+              <SupremeSneakBadge level={playerStats.level} stealthAttackActive={stealthAttackActive} />
               <div><b>Sneak Attack Damage: </b>+{rogueFeatures?.sneakAttack?.dice_count || 0}d{rogueFeatures?.sneakAttack?.dice_value || 0}</div>
           </div>
     );
@@ -574,6 +611,25 @@ function matchPatron(playerStats, patronNames) {
     return patronNames.some(name => assignedNames.includes(name));
 }
 
+function WarlockPatronFeatures({ playerStats, campaignName, isCelestialPatron, hasStepsOfTheFey, isFiendPatron, isGreatOldOnePatron, awakenedMindTarget, chaMod }) {
+    return (
+        <>
+            {isCelestialPatron && (
+                <TrackedResourceInput label="Healing Light" resourceKey="healinglightPool" playerName={playerStats.name} getMax={() => 1 + playerStats.level} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+            )}
+            {hasStepsOfTheFey && (
+                <TrackedResourceInput label="Steps of the Fey" resourceKey="_Steps_of_the_Fey_freeCastCount" playerName={playerStats.name} getMax={() => Math.max(chaMod, 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+            )}
+            {isFiendPatron && (
+                <TrackedResourceInput label="Dark One's Own Luck" resourceKey="darkOnesLuckUses" playerName={playerStats.name} getMax={() => Math.max(1, chaMod)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+            )}
+            {isGreatOldOnePatron && awakenedMindTarget && (
+                <span className="automation-badge"><i className="fa-solid fa-brain"></i> Awakened Mind: {awakenedMindTarget}</span>
+            )}
+        </>
+    );
+}
+
 const WarlockFeatures = function WarlockFeatures({ playerStats, campaignName }) {
     const warlockFeatures = getClassFeatures(playerStats);
     const arcanumLevels = warlockFeatures.arcanumLevels || {};
@@ -606,18 +662,16 @@ const WarlockFeatures = function WarlockFeatures({ playerStats, campaignName }) 
                       })}
                   </React.Fragment>
               )}
-              {isCelestialPatron && (
-                  <TrackedResourceInput label="Healing Light" resourceKey="healinglightPool" playerName={playerStats.name} getMax={() => 1 + playerStats.level} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-              )}
-               {hasStepsOfTheFey && (
-                   <TrackedResourceInput label="Steps of the Fey" resourceKey="_Steps_of_the_Fey_freeCastCount" playerName={playerStats.name} getMax={() => Math.max(chaMod, 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-               )}
-                {isFiendPatron && (
-                    <TrackedResourceInput label="Dark One's Own Luck" resourceKey="darkOnesLuckUses" playerName={playerStats.name} getMax={() => Math.max(1, chaMod)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-                )}
-                {isGreatOldOnePatron && awakenedMindTarget && (
-                    <span className="automation-badge"><i className="fa-solid fa-brain"></i> Awakened Mind: {awakenedMindTarget}</span>
-                )}
+              <WarlockPatronFeatures
+                  playerStats={playerStats}
+                  campaignName={campaignName}
+                  isCelestialPatron={isCelestialPatron}
+                  hasStepsOfTheFey={hasStepsOfTheFey}
+                  isFiendPatron={isFiendPatron}
+                  isGreatOldOnePatron={isGreatOldOnePatron}
+                  awakenedMindTarget={awakenedMindTarget}
+                  chaMod={chaMod}
+              />
              <div><b>{(warlockFeatures?.invocationsKnown ?? 0) > 0 ? 'Eldritch Invocations' : 'Invocations Known'}: </b>{warlockFeatures.invocationsKnown}</div>
              {warlockFeatures?.invocations && Array.isArray(warlockFeatures.invocations) && (
                  <div><b>Invocations: </b>{[...warlockFeatures.invocations].sort().join(', ')}</div>

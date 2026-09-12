@@ -247,18 +247,25 @@ export default function useCharActionsBaseActions({
         });
     }
 
+    function grappleForcedMode(current, mode) {
+        if (mode !== 'advantage') return mode;
+        return current === 'disadvantage' ? undefined : 'advantage';
+    }
+
     function resolveGrappleCheckContext(isMonk, useAbility) {
-        let checkContext = {};
-        if (isMonk && conditionEffects?.peerlessAthleteAdvantageSkills && conditionEffects.peerlessAthleteAdvantageSkills.includes(useAbility)) {
-            checkContext.forcedMode = checkContext.forcedMode === 'disadvantage' ? undefined : 'advantage';
+        const ce = conditionEffects || {};
+        const ctx = {};
+        if (isMonk && ce.peerlessAthleteAdvantageSkills?.includes(useAbility)) {
+            ctx.forcedMode = grappleForcedMode(ctx.forcedMode, 'advantage');
+        } else if (ce.strCheckDisadvantage) {
+            ctx.forcedMode = 'disadvantage';
         }
-        else if (conditionEffects?.strCheckDisadvantage) checkContext.forcedMode = 'disadvantage';
-        if (conditionEffects?.abilityCheckDisadvantage) checkContext.forcedMode = 'disadvantage';
-        if (!checkContext.forcedMode && conditionEffects?.hexAbilityCheckDisadvantage && conditionEffects?.hexAbilityCheckDisadvantageAbility === useAbility) checkContext.forcedMode = 'disadvantage';
-        if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === useAbility)) {
-            checkContext.forcedMode = checkContext.forcedMode === 'disadvantage' ? undefined : 'advantage';
+        if (ce.abilityCheckDisadvantage) ctx.forcedMode = 'disadvantage';
+        if (!ctx.forcedMode && ce.hexAbilityCheckDisadvantage && ce.hexAbilityCheckDisadvantageAbility === useAbility) ctx.forcedMode = 'disadvantage';
+        if (ce.abilityCheckAdvantage && (!ce.abilityCheckAdvantageSkill || ce.abilityCheckAdvantageSkill === useAbility)) {
+            ctx.forcedMode = grappleForcedMode(ctx.forcedMode, 'advantage');
         }
-        return checkContext;
+        return ctx;
     }
 
     // Pure: player target — look up STR bonus from its combatSummary creature entry.

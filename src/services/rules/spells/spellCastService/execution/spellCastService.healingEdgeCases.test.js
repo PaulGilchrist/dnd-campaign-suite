@@ -507,9 +507,7 @@ describe('executeSpellCast - healing & misc edge cases', () => {
       delete spell.dc
 
       await executeSpellCast(spell, makeMetaCtx({ slotLevel: 1, magicMissileDistribution: { Goblin: 0, Orc: 3 } }), services)
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-        expect.anything(), 'Orc', 15, ['Force'], 'testCampaign', undefined, false, 'TestWizard'
-      )
+      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Orc', 15, ['Force'], 'testCampaign', undefined, { ignoreResistance: false, attackerName: 'TestWizard' })
     })
   })
 

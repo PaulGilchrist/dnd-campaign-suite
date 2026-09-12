@@ -251,6 +251,11 @@ function buildCurableEntries(alsoCures, restoringTouchConditions, targetConditio
         .filter(entry => entry.key && targetConditions.some(c => conditionMatches(c, entry.key)));
 }
 
+function computeCharismaMod(playerStats) {
+    const chaScore = playerStats.abilities?.CHA || 10;
+    return Math.floor((chaScore - 1) / 2);
+}
+
 function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay On Hands', poolMax: poolMaxProp = 0, _poolExpression, isDicePool = false, dieType = null, resourceKey: resourceKeyProp, alsoCures, cureCost, restoringTouchConditions, bloodiedOnly = false, maxDicePerUse: maxDicePerUseProp = '', creatureTargets, resourceCost = '', onClose }) {
     const layOnHandsPoolMax = 5 * (playerStats.level || 1);
     const effectivePoolMax = isDicePool ? poolMaxProp : layOnHandsPoolMax;
@@ -264,7 +269,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
         campaignName,
         playerStats
     );
-    const [healAmount, setHealAmount] = React.useState(isDicePool ? 1 : 1);
+    const [healAmount, setHealAmount] = React.useState(1);
     const [log, setLog] = React.useState([]);
     const [selectedConditions, setSelectedConditions] = React.useState([]);
     const [combatSummary, setCombatSummary] = React.useState(null);
@@ -274,11 +279,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
     const [selectedTargetName, setSelectedTargetName] = React.useState(null);
     const [showTargetSelection, setShowTargetSelection] = React.useState(!!(creatureTargets && creatureTargets.length > 1));
 
-    const chaMod = (() => {
-        const chaScore = playerStats.abilities?.CHA || 10;
-        return Math.floor((chaScore - 1) / 2);
-    })();
-    const effectiveMaxDicePerUse = maxDicePerUseProp ? chaMod : Infinity;
+    const effectiveMaxDicePerUse = maxDicePerUseProp ? computeCharismaMod(playerStats) : Infinity;
 
     const safePool = Number(poolRemaining) || 0;
     const safeMax = Number(poolMaxFromHook) || 0;
@@ -575,9 +576,9 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
 
     const batchTotalCost = selectedConditions.length * cureCost;
 
-    return (
-        <div className="short-rest-overlay no-print" onClick={handleClose}>
-            {showTargetSelection ? (
+    if (showTargetSelection) {
+        return (
+            <div className="short-rest-overlay no-print" onClick={handleClose}>
                 <div className="short-rest-modal" onClick={(e) => e.stopPropagation()}>
                     <SecondaryTargetModal
                         title={`Choose target for ${featureName}`}
@@ -590,7 +591,12 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                         showHp={true}
                     />
                 </div>
-            ) : (
+            </div>
+        );
+    }
+
+    return (
+        <div className="short-rest-overlay no-print" onClick={handleClose}>
             <HealingPoolMain
                 loading={loading}
                 safePool={safePool}
@@ -622,7 +628,6 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                 handleClose={handleClose}
                 featureName={featureName}
             />
-            )}
         </div>
     );
 }

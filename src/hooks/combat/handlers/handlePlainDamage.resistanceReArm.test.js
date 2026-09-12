@@ -118,11 +118,7 @@ describe('SP-099 — Resistance consumer re-reduces once after per-turn re-arm',
 
     function attack(attackerName) {
         const fn = createLogDamageAndShow(deps);
-        return fn('Mace', '1d6+2', 8, [6], 2, {
-            targetName: 'Goblin',
-            damageType: 'bludgeoning',
-            attackerName,
-        });
+        return fn('Mace', '1d6+2', 8, [6], 2, { targetName: 'Goblin', damageType: 'bludgeoning', attackerName, });
     }
 
     function appliedTotals() {
@@ -158,11 +154,7 @@ describe('SP-099 — Resistance consumer re-reduces once after per-turn re-arm',
     it('non-chosen damage type is never reduced even when re-armed', async () => {
         state.used = false;
         const fn = createLogDamageAndShow(deps);
-        await fn('Dagger', '1d4+2', 6, [4], 2, {
-            targetName: 'Goblin',
-            damageType: 'piercing',
-            attackerName: 'Thug 2',
-        });
+        await fn('Dagger', '1d4+2', 6, [4], 2, { targetName: 'Goblin', damageType: 'piercing', attackerName: 'Thug 2', });
 
         expect(appliedTotals()).toEqual([6]);
         expect(resistanceLogs()).toHaveLength(0);

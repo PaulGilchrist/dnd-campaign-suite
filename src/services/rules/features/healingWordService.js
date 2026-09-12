@@ -41,13 +41,46 @@ function rollHealingWordExpression(healExpression, maximize, rerollOnes) {
     return { result, displayRolls, healingRerollOriginalRolls };
 }
 
+// Current HP from the runtime store, falling back to maxHp when unset.
+export function resolveCurrentHp(targetName, maxHp, campaignName) {
+    const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
+    return storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
+}
+
 // Target's current/max HP: max from combat summary (falling back to the
 // caster's hit points), current from the runtime store.
 function resolveTargetHp(combatSummary, targetName, playerStats, campaignName) {
     const maxHp = combatSummary.creatures.find(c => c.name === targetName)?.maxHp || playerStats.hitPoints || 0;
-    const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
-    const currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
-    return { maxHp, currentHp };
+    return { maxHp, currentHp: resolveCurrentHp(targetName, maxHp, campaignName) };
+}
+
+function buildHealingWordFormula(healExpression, bonusDetails) {
+    if (bonusDetails.length === 0) return healExpression;
+    const bonusParts = bonusDetails.map(d => `${d.amount} ${d.name}`).join(' + ');
+    return `${healExpression} + (${bonusParts})`;
+}
+
+// Mark Fortified Health used once healing actually landed via it.
+export async function markFortifiedHealthIfApplied(playerStats, campaignName, anyHealed, bonusDetails) {
+    if (anyHealed && bonusDetails?.some(d => d.name === 'Fortified Health')) {
+        await markFortifiedHealthUsed(playerStats, campaignName);
+    }
+}
+
+function logHealingWordEntry(campaignName, targetName, actualHeal, newHp, maxHp, playerStats, formula, bonusDetails) {
+    addEntry(campaignName, {
+        type: 'hp_change',
+        targetName,
+        delta: actualHeal,
+        currentHp: newHp,
+        maxHp,
+        isHealing: true,
+        sourceName: playerStats.name,
+        note: 'Healing Word',
+        formula,
+        bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[healingWord] Error:", e); });
 }
 
 export async function triggerHealingWord(spell, metaCtx, playerStats, campaignName, _mapName) {
@@ -90,29 +123,9 @@ export async function triggerHealingWord(spell, metaCtx, playerStats, campaignNa
 
     const newHp = Math.min(maxHp, currentHp + actualHeal);
 
-    if (actualHeal > 0 && bonusDetails?.some(d => d.name === 'Fortified Health')) {
-        await markFortifiedHealthUsed(playerStats, campaignName);
-    }
+    await markFortifiedHealthIfApplied(playerStats, campaignName, actualHeal > 0, bonusDetails);
 
-    const formulaParts = [healExpression];
-    if (bonusDetails.length > 0) {
-        const bonusParts = bonusDetails.map(d => `${d.amount} ${d.name}`).join(' + ');
-        formulaParts.push(`(${bonusParts})`);
-    }
-
-    addEntry(campaignName, {
-        type: 'hp_change',
-        targetName,
-        delta: actualHeal,
-        currentHp: newHp,
-        maxHp,
-        isHealing: true,
-        sourceName: playerStats.name,
-        note: 'Healing Word',
-        formula: formulaParts.join(' + '),
-        bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
-        timestamp: Date.now(),
-    }).catch((e) => { console.error("[healingWord] Error:", e); });
+    logHealingWordEntry(campaignName, targetName, actualHeal, newHp, maxHp, playerStats, buildHealingWordFormula(healExpression, bonusDetails), bonusDetails);
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 

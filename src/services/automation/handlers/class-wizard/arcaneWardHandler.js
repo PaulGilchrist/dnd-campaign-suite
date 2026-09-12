@@ -10,6 +10,16 @@ const ARCAN_WARD_KEY = 'arcaneWardHp';
 const ARCAN_WARD_ACTIVE_KEY = 'arcaneWardActive';
 const ARCAN_WARD_MAX_KEY = 'arcaneWardMax';
 
+async function restoreProjectedTargetHp(targetName, campaignName, absorbed) {
+    const targetHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
+    if (targetHp == null) {
+        console.error(`[arcaneWardHandler] currentHitPoints not found for ${targetName}; rollback heal skipped`);
+        return;
+    }
+    const newTargetHp = Math.min(targetHp + absorbed, getRuntimeValue(targetName, 'maxHitPoints', campaignName) ?? targetHp + absorbed);
+    await setRuntimeValue(targetName, 'currentHitPoints', newTargetHp, campaignName);
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -105,13 +115,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const newWardHp = wardHp - absorbed;
 
     // Restore target's HP by the absorbed amount
-    const targetHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
-    if (targetHp != null) {
-        const newTargetHp = Math.min(targetHp + absorbed, getRuntimeValue(targetName, 'maxHitPoints', campaignName) ?? targetHp + absorbed);
-        await setRuntimeValue(targetName, 'currentHitPoints', newTargetHp, campaignName);
-    } else {
-        console.error(`[arcaneWardHandler] currentHitPoints not found for ${targetName}; rollback heal skipped`);
-    }
+    await restoreProjectedTargetHp(targetName, campaignName, absorbed);
 
     // Reduce ward HP
     if (absorbed > 0) {

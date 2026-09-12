@@ -29,6 +29,42 @@ function resolveGateLevel(spell, spellLevel) {
   return (spell?.isUpcast && spell?.upcastLevel) || (spell?.level ?? spellLevel ?? 0)
 }
 
+function addMetamagicSpellEntry(campaignName, playerStats, pending, metamagicOptions, totalCost) {
+  addEntry(campaignName, {
+    type: 'spell',
+    characterName: playerStats.name,
+    targetName: pending._metaCtx?.multiTarget || null,
+    spellName: pending.spellName,
+    spellLevel: pending.spellLevel || 0,
+    castingTime: pending.castingTime,
+    metamagic: metamagicOptions,
+    spCost: totalCost,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error("[useMetamagicHandler:log-error]", e); })
+}
+
+async function prepareMetamagicCast(playerStats, campaignName, pending, metaCtx, usePsionicPayment) {
+  const isUpcast = pending.spell?.isUpcast
+  const upcastLevel = pending.spell?.upcastLevel
+  const gateLevel = resolveGateLevel(pending.spell, pending.spellLevel)
+  const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, pending.spellName, gateLevel, playerStats, campaignName)
+  const result = await prepareSpellCast(pending.spell, metaCtx, {
+    playerName: playerStats.name,
+    playerStats,
+    campaignName,
+    isUpcast,
+    upcastLevel,
+    freeCastAuthorized,
+    usePsionicPayment,
+  })
+  if (!metaCtx.slotLevel && upcastLevel) {
+    metaCtx.slotLevel = upcastLevel
+  }
+  const sorcMaterial = getConsumedMaterial(pending.spell)
+  if (sorcMaterial) await consumeMaterial(playerStats, sorcMaterial.itemName, campaignName)
+  return result
+}
+
 export function useMetamagicHandler(playerStats, campaignName, cfClearPending, getPending, onExecute) {
   const handleConfirm = async (result) => {
     const pending = getPending('metamagic')
@@ -57,38 +93,10 @@ export function useMetamagicHandler(playerStats, campaignName, cfClearPending, g
       logMetamagicUse(campaignName, playerStats.name, pending.spellName, metamagicOptions, totalCost)
     }
 
-    addEntry(campaignName, {
-      type: 'spell',
-      characterName: playerStats.name,
-      targetName: pending._metaCtx?.multiTarget || null,
-      spellName: pending.spellName,
-      spellLevel: pending.spellLevel || 0,
-      castingTime: pending.castingTime,
-      metamagic: metamagicOptions,
-      spCost: totalCost,
-      timestamp: Date.now(),
-    }).catch((e) => { console.error("[useMetamagicHandler:log-error]", e); })
+    addMetamagicSpellEntry(campaignName, playerStats, pending, metamagicOptions, totalCost)
 
     const metaCtx = buildMetamagicContext(pending, result, usePsionicPayment)
-
-    const isUpcast = pending.spell?.isUpcast
-    const upcastLevel = pending.spell?.upcastLevel
-    const gateLevel = resolveGateLevel(pending.spell, pending.spellLevel)
-    const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, pending.spellName, gateLevel, playerStats, campaignName)
-    const result2 = await prepareSpellCast(pending.spell, metaCtx, {
-      playerName: playerStats.name,
-      playerStats,
-      campaignName,
-      isUpcast,
-      upcastLevel,
-      freeCastAuthorized,
-      usePsionicPayment,
-    })
-    if (!metaCtx.slotLevel && upcastLevel) {
-      metaCtx.slotLevel = upcastLevel
-    }
-    const sorcMaterial = getConsumedMaterial(pending.spell)
-    if (sorcMaterial) await consumeMaterial(playerStats, sorcMaterial.itemName, campaignName)
+    const result2 = await prepareMetamagicCast(playerStats, campaignName, pending, metaCtx, usePsionicPayment)
     onExecute(result2.modifiedSpell, result2.metaCtx)
   }
 

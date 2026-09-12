@@ -267,16 +267,7 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
                 totalDamage += damageRoll;
 
                 if (combatContext?.creatures) {
-                    applyDamageToTarget(
-                        combatContext,
-                        targetName,
-                        damageRoll,
-                        ['Psychic'],
-                        campaignName,
-                        characters,
-                        false,
-                        playerName
-                    );
+                    applyDamageToTarget(combatContext, targetName, damageRoll, ['Psychic'], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
                 }
 
                 addEntry(campaignName, {

@@ -25,13 +25,24 @@ function registerObservers(pipeline, campaignName) {
   }
 }
 
-function selectStepBuilders(action) {
-  const hasDamage = action?.damage || action?.hasDamage || action?.damageExpression;
-  const isAttackRoll = action?.type === 'weapon_attack' || action?.weaponType || (hasDamage && !action?.autoDamageSchool && !action?.spellType);
-  const isDirectSpell = action?.type === 'spell' || action?.spellType || action?.autoDamageSchool;
+function actionHasDamage(action) {
+  return action?.damage || action?.hasDamage || action?.damageExpression;
+}
 
-  if (isAttackRoll) return buildAttackRollDamageSteps;
-  if (isDirectSpell) return buildDirectSpellDamageSteps;
+function isDirectSpellAction(action) {
+  return action?.type === 'spell' || action?.spellType || action?.autoDamageSchool;
+}
+
+function isAttackRollAction(action, hasDamage) {
+  if (action?.type === 'weapon_attack' || action?.weaponType) return true;
+  // Attack roll: damage that is not spell damage
+  return !!hasDamage && !action?.autoDamageSchool && !action?.spellType;
+}
+
+function selectStepBuilders(action) {
+  const hasDamage = actionHasDamage(action);
+  if (isAttackRollAction(action, hasDamage)) return buildAttackRollDamageSteps;
+  if (isDirectSpellAction(action)) return buildDirectSpellDamageSteps;
   // Generic: anything with damage that isn't weapon or spell
   if (hasDamage) return buildGenericSteps;
   return null;

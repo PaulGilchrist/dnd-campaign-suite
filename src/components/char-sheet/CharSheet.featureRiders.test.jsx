@@ -321,16 +321,7 @@ describe('handlePuncture', () => {
 
     const result = await handlePuncture(stats, campaignName, [], popupHtml, setPopupHtml, punctureData);
 
-    expect(applyDamageToTarget).toHaveBeenCalledWith(
-      expect.anything(),
-      'Goblin',
-      3,
-      ['Piercing'],
-      campaignName,
-      [],
-      false,
-      'Test Character'
-    );
+    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', 3, ['Piercing'], campaignName, [], { ignoreResistance: false, attackerName: 'Test Character' });
     expect(mockStore.get('Test Character:piercerPunctureUsedThisTurn')).toBe(true);
     expect(addEntry).toHaveBeenCalled();
     expect(addEntry.mock.calls[0][1].abilityName).toBe('Piercer - Puncture');

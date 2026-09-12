@@ -8,6 +8,7 @@ import { storeSpellLastAttack, addTargetResult } from '../../../../services/auto
 import { addExpiration } from '../../../../services/rules/effects/expirations.js';
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
+import { logConditionApplied, logSaveResultEntry } from './saveResultLogging.js';
 
 function FearModal({
     action,
@@ -277,29 +278,15 @@ function FearModal({
             ], campaignName);
             trackFearEffect(casterName, targetName, saveDc, campaignName);
 
-            await addEntry(campaignName, {
-                type: 'condition',
-                action: 'applied',
-                characterName: targetName,
+            await logConditionApplied(campaignName, {
+                targetName,
                 condition: 'Frightened',
                 reason: 'Fear spell',
                 note: `${targetName} drops what it was holding, becomes Frightened, and must take the Dash action to move away from ${casterName} on each of its turns.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[FearModal] Error logging condition:', e); });
+                logPrefix: '[FearModal]',
+            });
 
-            await addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                targetName,
-                saveDc,
-                saveType,
-                success: false,
-                roll: detail.roll ?? 0,
-                total: detail.total ?? 0,
-                saveBonus: detail.saveBonus ?? 0,
-                description: `${targetName} failed ${saveType} save (DC ${saveDc}, rolled ${detail.roll ?? 0}${detail.saveBonus !== 0 ? ' + ' + detail.saveBonus : ''} = ${detail.total ?? 0})`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[FearModal] Error logging save result:', e); });
+            await logSaveResultEntry(campaignName, { casterName, targetName, saveDc, saveType, success: false, detail, logPrefix: '[FearModal]' });
 
             addTargetResult(campaignName, {
                 targetName,
@@ -310,19 +297,7 @@ function FearModal({
                 appliedDamage: 0,
             });
         } else {
-            await addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                targetName,
-                saveDc,
-                saveType,
-                success: true,
-                roll: detail.roll ?? 0,
-                total: detail.total ?? 0,
-                saveBonus: detail.saveBonus ?? 0,
-                description: `${targetName} succeeded on ${saveType} save (DC ${saveDc}, rolled ${detail.roll ?? 0}${detail.saveBonus !== 0 ? ' + ' + detail.saveBonus : ''} = ${detail.total ?? 0})`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[FearModal] Error logging save result:', e); });
+            await logSaveResultEntry(campaignName, { casterName, targetName, saveDc, saveType, success: true, detail, logPrefix: '[FearModal]' });
 
             addTargetResult(campaignName, {
                 targetName,

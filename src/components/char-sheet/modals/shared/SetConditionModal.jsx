@@ -105,7 +105,7 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
 
                 npcResults.push({ targetName, success, roll: roll1, total, saveBonus });
 
-                logSaveEntry(campaignName, featureName, attackerName, targetName, saveDc, saveType, success, total, [roll1], saveBonus, `1d20${saveBonus !== 0 ? '+' + saveBonus : ''}`);
+                logSaveEntry({ campaignName, featureName, attackerName, targetName, saveDc, saveType, success, total, rolls: [roll1], bonus: saveBonus, formula: `1d20${saveBonus !== 0 ? '+' + saveBonus : ''}` });
             } else {
                 const promptId = utils.guid();
                 sendSavePrompt(campaignName, {
@@ -146,7 +146,7 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
             logCondition(targetName, saveDc);
         }
 
-        logSaveEntry(campaignName, featureName, attackerName, targetName, saveDc, saveType, success, detail.total ?? 0, [detail.roll ?? 0], detail.saveBonus ?? 0, `1d20${detail.saveBonus !== 0 ? '+' + detail.saveBonus : ''}`);
+        logSaveEntry({ campaignName, featureName, attackerName, targetName, saveDc, saveType, success, total: detail.total ?? 0, rolls: [detail.roll ?? 0], bonus: detail.saveBonus ?? 0, formula: `1d20${detail.saveBonus !== 0 ? '+' + detail.saveBonus : ''}` });
 
         persistAndNotify(ctx.combatSummary, campaignName);
 

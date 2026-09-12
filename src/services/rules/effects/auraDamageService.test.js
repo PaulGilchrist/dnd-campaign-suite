@@ -96,16 +96,7 @@ describe('auraDamageService — BUG CLA-170 persistence', () => {
     it('computes CHA + PB radiant damage and applies it to the active enemy', async () => {
       await applyHolyNimbusDamage('Wight 1', [paladin], CAMPAIGN);
 
-      expect(applyDamageToTarget).toHaveBeenCalledWith(
-        expect.any(Object),
-        'Wight 1',
-        11,
-        ['Radiant'],
-        CAMPAIGN,
-        [paladin],
-        false,
-        'ElderPaladin',
-      );
+      expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Wight 1', 11, ['Radiant'], CAMPAIGN, [paladin], { ignoreResistance: false, attackerName: 'ElderPaladin' },);
     });
 
     it('replaces the combat summary cache with the damaged copy (detached from live state)', async () => {

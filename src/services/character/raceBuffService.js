@@ -70,91 +70,98 @@ export function computeRaceBuffs(race, playerData, ruleset = '5e') {
 
   const traits = race.traits || [];
   traits.forEach(trait => {
-    result.traits.push({ name: trait.name, description: trait.description });
-
-    if (ruleset === '5e') {
-      add5eTraitProficiencies(trait, result);
-    }
-
-    addTraitSpeed(trait, result);
-
-    if (ruleset === '2024') {
-      addSkillProficiencies2024(trait, result);
-      addChoiceOptions2024(trait, result);
-    }
-
-    if (ruleset === '5e') {
-      add5eTraitResistances(trait, result);
-    }
-
-    if (trait.name === 'Trance') {
-      if (!result.traits.some(t => t.name === 'Trance')) {
-        result.traits.push({ name: 'Trance', description: trait.description });
-      }
-    }
+    applyTraitBuffs(trait, result, ruleset);
   });
 
+  const subraceName = playerData?.race?.subrace?.name;
   const subrace = race.subraces
-    ? race.subraces.find(sr => sr.name === playerData?.race?.subrace?.name)
+    ? race.subraces.find(sr => sr.name === subraceName)
     : null;
 
-    if (subrace) {
-    if (ruleset === '2024' && subrace.damage_resistance) {
-      if (!result.resistances.includes(subrace.damage_resistance)) {
-        result.resistances.push(subrace.damage_resistance);
-      }
-    }
-
-    if (ruleset === '5e' && subrace.ability_bonuses) {
-      subrace.ability_bonuses.forEach(ab => {
-        const abilityName = ab.name || ab.ability_score;
-        if (!abilityName) return;
-        const expandedName = expandAbilityName(abilityName);
-        const existing = result.abilityScoreIncreases.find(
-          inc => inc.name === expandedName
-        );
-        if (existing) {
-          existing.amount += ab.bonus || 1;
-        } else {
-          result.abilityScoreIncreases.push({
-            name: expandedName,
-            amount: ab.bonus || 1,
-          });
-        }
-      });
-    }
-
-    if (subrace.starting_proficiencies) {
-      subrace.starting_proficiencies.forEach(prof => {
-        result.proficiencies.push({ name: prof });
-      });
-    }
-
-    if (subrace.languages) {
-      subrace.languages.forEach(lang => {
-        if (!result.languages.includes(lang)) {
-          result.languages.push(lang);
-        }
-      });
-    }
-
-    if (subrace.hit_point_bonus_per_level) {
-      result.hitPointBonusPerLevel += subrace.hit_point_bonus_per_level;
-    }
-
-    if (subrace.racial_traits) {
-      subrace.racial_traits.forEach(trait => {
-        result.traits.push({ name: trait.name, description: trait.description });
-        if (trait.proficiencies) {
-          trait.proficiencies.forEach(prof => {
-            result.proficiencies.push({ name: prof });
-          });
-        }
-      });
-    }
+  if (subrace) {
+    applySubraceBuffs(subrace, result, ruleset);
   }
 
   return result;
+}
+
+function applyTraitBuffs(trait, result, ruleset) {
+  result.traits.push({ name: trait.name, description: trait.description });
+
+  if (ruleset === '5e') {
+    add5eTraitProficiencies(trait, result);
+  }
+
+  addTraitSpeed(trait, result);
+
+  if (ruleset === '2024') {
+    addSkillProficiencies2024(trait, result);
+    addChoiceOptions2024(trait, result);
+  }
+
+  if (ruleset === '5e') {
+    add5eTraitResistances(trait, result);
+  }
+
+  if (trait.name === 'Trance' && !result.traits.some(t => t.name === 'Trance')) {
+    result.traits.push({ name: 'Trance', description: trait.description });
+  }
+}
+
+function applySubraceBuffs(subrace, result, ruleset) {
+  if (ruleset === '2024' && subrace.damage_resistance) {
+    if (!result.resistances.includes(subrace.damage_resistance)) {
+      result.resistances.push(subrace.damage_resistance);
+    }
+  }
+
+  if (ruleset === '5e' && subrace.ability_bonuses) {
+    subrace.ability_bonuses.forEach(ab => {
+      const abilityName = ab.name || ab.ability_score;
+      if (!abilityName) return;
+      const expandedName = expandAbilityName(abilityName);
+      const existing = result.abilityScoreIncreases.find(
+        inc => inc.name === expandedName
+      );
+      if (existing) {
+        existing.amount += ab.bonus || 1;
+      } else {
+        result.abilityScoreIncreases.push({
+          name: expandedName,
+          amount: ab.bonus || 1,
+        });
+      }
+    });
+  }
+
+  if (subrace.starting_proficiencies) {
+    subrace.starting_proficiencies.forEach(prof => {
+      result.proficiencies.push({ name: prof });
+    });
+  }
+
+  if (subrace.languages) {
+    subrace.languages.forEach(lang => {
+      if (!result.languages.includes(lang)) {
+        result.languages.push(lang);
+      }
+    });
+  }
+
+  if (subrace.hit_point_bonus_per_level) {
+    result.hitPointBonusPerLevel += subrace.hit_point_bonus_per_level;
+  }
+
+  if (subrace.racial_traits) {
+    subrace.racial_traits.forEach(trait => {
+      result.traits.push({ name: trait.name, description: trait.description });
+      if (trait.proficiencies) {
+        trait.proficiencies.forEach(prof => {
+          result.proficiencies.push({ name: prof });
+        });
+      }
+    });
+  }
 }
 
 /**

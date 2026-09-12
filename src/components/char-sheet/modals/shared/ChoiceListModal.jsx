@@ -1,5 +1,48 @@
 import { useState } from 'react';
 
+function ChoiceResultView({ icon, title, result, onClose }) {
+  return (
+    <div className="sp-overlay" onClick={(e) => {
+      if (e.target.closest('.sp-modal')) return;
+      onClose?.();
+    }}>
+      <div className="sp-modal">
+        <div className="sp-header">
+          <i className={`fa-solid ${icon}`}></i> {title}
+        </div>
+        <div className="sp-body" dangerouslySetInnerHTML={{ __html: result.payload?.description || '' }}>
+        </div>
+        <div className="sp-actions">
+          <button className="sp-roll-btn" onClick={onClose}>Done</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DefaultChoiceOptionRow({ option, isSelected, isExisting, disabled, multiSelect, inputName, getOptionLabel, getOptionDescription, onToggle }) {
+  return (
+    <label
+      className={`choice-option${isSelected ? ' choice-selected' : ''}${isExisting && !isSelected ? ' choice-existing' : ''}${disabled ? ' choice-disabled' : ''}`}
+    >
+      <input
+        type={multiSelect ? 'checkbox' : 'radio'}
+        name={inputName}
+        checked={isSelected}
+        onChange={onToggle}
+        disabled={disabled}
+      />
+      <span className="choice-label">
+        <strong>{getOptionLabel(option)}</strong>
+        {getOptionDescription(option) && (
+          <span className="choice-description"> — {getOptionDescription(option)}</span>
+        )}
+      </span>
+      {isExisting && !isSelected && <span className="choice-existing-badge">(current)</span>}
+    </label>
+  );
+}
+
 export function ChoiceListModal({
   icon,
   title,
@@ -54,23 +97,7 @@ export function ChoiceListModal({
   };
 
   if (applied && result) {
-    return (
-      <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-      }}>
-        <div className="sp-modal">
-          <div className="sp-header">
-            <i className={`fa-solid ${icon}`}></i> {title}
-          </div>
-          <div className="sp-body" dangerouslySetInnerHTML={{ __html: result.payload?.description || '' }}>
-          </div>
-          <div className="sp-actions">
-            <button className="sp-roll-btn" onClick={onClose}>Done</button>
-          </div>
-        </div>
-      </div>
-    );
+    return <ChoiceResultView icon={icon} title={title} result={result} onClose={onClose} />;
   }
 
   return (
@@ -109,25 +136,18 @@ export function ChoiceListModal({
               }
 
               return (
-                <label
+                <DefaultChoiceOptionRow
                   key={i}
-                  className={`choice-option${isSel ? ' choice-selected' : ''}${isEx && !isSel ? ' choice-existing' : ''}${atMax ? ' choice-disabled' : ''}`}
-                >
-                  <input
-                    type={multiSelect ? 'checkbox' : 'radio'}
-                    name={inputName}
-                    checked={isSel}
-                    onChange={() => handleToggle(opt)}
-                    disabled={atMax}
-                  />
-                  <span className="choice-label">
-                    <strong>{getOptionLabel(opt)}</strong>
-                    {getOptionDescription(opt) && (
-                      <span className="choice-description"> — {getOptionDescription(opt)}</span>
-                    )}
-                  </span>
-                  {isEx && !isSel && <span className="choice-existing-badge">(current)</span>}
-                </label>
+                  option={opt}
+                  isSelected={isSel}
+                  isExisting={isEx}
+                  disabled={atMax}
+                  multiSelect={multiSelect}
+                  inputName={inputName}
+                  getOptionLabel={getOptionLabel}
+                  getOptionDescription={getOptionDescription}
+                  onToggle={() => handleToggle(opt)}
+                />
               );
             })}
           </div>

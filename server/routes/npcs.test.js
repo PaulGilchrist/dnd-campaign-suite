@@ -1,6 +1,6 @@
 import path from 'path';
 import express from 'express';
-import request from 'supertest';
+import { request } from '../test-utils/localhostSupertest.js';
 
 // ---------------------------------------------------------------------------
 // In-memory file system backed by a Map keyed by the path returned from

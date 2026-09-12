@@ -178,52 +178,37 @@ async function triggerDispelMagic(metaCtx, spell, playerStats, campaignName, _ma
     }
 }
 
-async function applyPowerWordHealToTarget(targetName, playerStats, campaignName, sharedCombatSummary) {
-    // CLA-392: optional shared combatSummary — when the Words of Creation spread
-    // heals two targets, both legs mutate ONE fetched snapshot so the second
-    // leg's full-store write can never resurrect the first target (§6-#18 race).
-    const combatSummary = sharedCombatSummary || await getCombatContext(campaignName);
-    if (!combatSummary) return;
-
-    const creature = combatSummary.creatures.find(c => c.name === targetName);
-    if (!creature) return;
-
-    const isPlayer = creature.type === 'player';
-    const maxHp = isPlayer
-        ? (getRuntimeValue(targetName, 'hitPoints') ?? creature.maxHp ?? 0)
-        : (creature.maxHp ?? 0);
-    const currentHp = isPlayer
-        ? (getRuntimeValue(targetName, 'currentHitPoints') ?? creature.currentHp ?? maxHp)
-        : (creature.currentHp ?? maxHp);
+function powerWordHealDamage(combatSummary, targetName, playerStats, campaignName, maxHp, currentHp) {
     const healAmount = Math.max(0, maxHp - currentHp);
+    if (healAmount <= 0) return;
 
-    if (healAmount > 0) {
-        const result = applyHealingToTarget(combatSummary, targetName, healAmount, campaignName);
-        const actualHeal = result?.actualHeal ?? healAmount;
-        const newHp = Math.min(maxHp, currentHp + actualHeal);
-        addEntry(campaignName, {
-            type: 'hp_change',
+    const result = applyHealingToTarget(combatSummary, targetName, healAmount, campaignName);
+    const actualHeal = result?.actualHeal ?? healAmount;
+    const newHp = Math.min(maxHp, currentHp + actualHeal);
+    addEntry(campaignName, {
+        type: 'hp_change',
+        targetName,
+        delta: actualHeal,
+        currentHp: newHp,
+        maxHp,
+        isHealing: true,
+        sourceName: playerStats.name,
+        note: 'Power Word Heal',
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[spellCast] Error:", e); });
+    window.dispatchEvent(new CustomEvent('healing-popup', {
+        detail: {
             targetName,
-            delta: actualHeal,
-            currentHp: newHp,
-            maxHp,
-            isHealing: true,
             sourceName: playerStats.name,
-            note: 'Power Word Heal',
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[spellCast] Error:", e); });
-        window.dispatchEvent(new CustomEvent('healing-popup', {
-            detail: {
-                targetName,
-                sourceName: playerStats.name,
-                healingName: 'Power Word Heal',
-                rollInfo: '',
-                maximizeHealingDice: false,
-                popupText: `Power Word Heal on ${targetName}: Regained ${actualHeal} HP`,
-            },
-        }));
-    }
+            healingName: 'Power Word Heal',
+            rollInfo: '',
+            maximizeHealingDice: false,
+            popupText: `Power Word Heal on ${targetName}: Regained ${actualHeal} HP`,
+        },
+    }));
+}
 
+function powerWordHealConditions(targetName, campaignName) {
     const conditionsToRemove = ['charmed', 'frightened', 'paralyzed', 'poisoned', 'stunned'];
     const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName);
     if (storedConditions == null || !Array.isArray(storedConditions)) {
@@ -257,6 +242,28 @@ async function applyPowerWordHealToTarget(targetName, playerStats, campaignName,
     }
 }
 
+async function applyPowerWordHealToTarget(targetName, playerStats, campaignName, sharedCombatSummary) {
+    // CLA-392: optional shared combatSummary — when the Words of Creation spread
+    // heals two targets, both legs mutate ONE fetched snapshot so the second
+    // leg's full-store write can never resurrect the first target (§6-#18 race).
+    const combatSummary = sharedCombatSummary || await getCombatContext(campaignName);
+    if (!combatSummary) return;
+
+    const creature = combatSummary.creatures.find(c => c.name === targetName);
+    if (!creature) return;
+
+    const isPlayer = creature.type === 'player';
+    const maxHp = isPlayer
+        ? (getRuntimeValue(targetName, 'hitPoints') ?? creature.maxHp ?? 0)
+        : (creature.maxHp ?? 0);
+    const currentHp = isPlayer
+        ? (getRuntimeValue(targetName, 'currentHitPoints') ?? creature.currentHp ?? maxHp)
+        : (creature.currentHp ?? maxHp);
+
+    powerWordHealDamage(combatSummary, targetName, playerStats, campaignName, maxHp, currentHp);
+    powerWordHealConditions(targetName, campaignName);
+}
+
 async function applyPowerWordKillToTarget(targetName, playerStats, campaignName, sharedCombatSummary) {
     // CLA-392: optional shared combatSummary — both spread legs mutate ONE
     // fetched snapshot so the second leg's full-store write can never
@@ -285,7 +292,7 @@ async function applyPowerWordKillToTarget(targetName, playerStats, campaignName,
             note: 'Power Word Kill',
         }).catch((e) => { console.error("[spellCast] Error:", e); });
 
-        await applyDamageToTarget(combatSummary, targetName, currentHp, ['Psychic'], campaignName, [], false, playerStats.name);
+        await applyDamageToTarget(combatSummary, targetName, currentHp, ['Psychic'], campaignName, [], { ignoreResistance: false, attackerName: playerStats.name });
 
         window.dispatchEvent(new CustomEvent('damage-popup', {
             detail: {
@@ -300,7 +307,7 @@ async function applyPowerWordKillToTarget(targetName, playerStats, campaignName,
         const damageFormula = '12d12';
         const damageResult = rollExpression(damageFormula);
         const totalDamage = damageResult?.total ?? 0;
-        await applyDamageToTarget(combatSummary, targetName, totalDamage, ['Psychic'], campaignName, [], false, playerStats.name);
+        await applyDamageToTarget(combatSummary, targetName, totalDamage, ['Psychic'], campaignName, [], { ignoreResistance: false, attackerName: playerStats.name });
 
         window.dispatchEvent(new CustomEvent('damage-popup', {
             detail: {
@@ -498,7 +505,7 @@ function applyMissileDamage(combatSummary, targetName, totalTargetDamage, damage
         return { finalDamage: 0, damageReduced: true, isShieldActive };
     }
     const ignoreResistance = resolveIgnoreResistance(playerStats);
-    const applyResult = applyDamageToTarget(combatSummary, targetName, totalTargetDamage, [damageType], campaignName, characters, ignoreResistance, casterName);
+    const applyResult = applyDamageToTarget(combatSummary, targetName, totalTargetDamage, [damageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: casterName });
     if (applyResult && applyResult.finalDamage > 0) {
         endInvisibilityOnHostileAction(casterName, campaignName);
     }

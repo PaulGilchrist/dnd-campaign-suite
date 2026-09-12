@@ -119,6 +119,44 @@ export async function consumeUse(action, playerStats, campaignName) {
     };
 }
 
+async function healCubeTarget({ combatSummary, playerStats, campaignName, featureName, playerName, targetName, userAmount, remainingPool }) {
+    const amount = Number(userAmount) || 0;
+    if (amount <= 0) return null;
+
+    const creatures = combatSummary && combatSummary.creatures ? combatSummary.creatures : [];
+    const creature = creatures.find(c => c.name === targetName);
+    const maxHp = (creature && creature.maxHp) || playerStats.hitPoints || 0;
+    let currentHp;
+    if (creature && creature.type === 'player') {
+        const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
+        currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
+    } else {
+        currentHp = creature ? (creature.currentHp ?? maxHp) : maxHp;
+    }
+    const missingHp = Math.max(0, maxHp - currentHp);
+    const actualHeal = Math.min(amount, missingHp, remainingPool);
+
+    if (actualHeal > 0) {
+        applyHealingToTarget(combatSummary, targetName, actualHeal, campaignName);
+        remainingPool -= actualHeal;
+    }
+
+    const newHp = Math.min(maxHp, currentHp + actualHeal);
+    await addEntry(campaignName, {
+        type: 'hp_change',
+        targetName,
+        delta: actualHeal,
+        currentHp: newHp,
+        maxHp,
+        isHealing: true,
+        sourceName: playerName,
+        note: featureName,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[clockworkCavalcade] Error:", e); });
+
+    return { entry: { targetName, healAmount: actualHeal }, remainingPool };
+}
+
 export async function confirmClockworkCavalcadeHeal(action, playerStats, campaignName, distribution, maxHeal) {
     const playerName = playerStats.name;
     const { featureName } = getFeatureInfo(action);
@@ -132,40 +170,10 @@ export async function confirmClockworkCavalcadeHeal(action, playerStats, campaig
     let remainingPool = totalPool;
 
     for (const [targetName, userAmount] of Object.entries(distribution || {})) {
-        const amount = Number(userAmount) || 0;
-        if (amount <= 0) continue;
-        const creature = combatSummary?.creatures?.find(c => c.name === targetName);
-        const maxHp = creature?.maxHp || playerStats.hitPoints || 0;
-        const isPlayer = creature?.type === 'player';
-        let currentHp;
-        if (isPlayer) {
-            const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
-            currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
-        } else {
-            currentHp = creature?.currentHp ?? maxHp;
-        }
-        const missingHp = Math.max(0, maxHp - currentHp);
-        const actualHeal = Math.min(amount, missingHp, remainingPool);
-
-        if (actualHeal > 0) {
-            applyHealingToTarget(combatSummary, targetName, actualHeal, campaignName);
-            remainingPool -= actualHeal;
-        }
-
-        const newHp = Math.min(maxHp, currentHp + actualHeal);
-        await addEntry(campaignName, {
-            type: 'hp_change',
-            targetName,
-            delta: actualHeal,
-            currentHp: newHp,
-            maxHp,
-            isHealing: true,
-            sourceName: playerName,
-            note: featureName,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[clockworkCavalcade] Error:", e); });
-
-        results.push({ targetName, healAmount: actualHeal });
+        const healed = await healCubeTarget({ combatSummary, playerStats, campaignName, featureName, playerName, targetName, userAmount, remainingPool });
+        if (!healed) continue;
+        remainingPool = healed.remainingPool;
+        results.push(healed.entry);
     }
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));

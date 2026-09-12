@@ -114,7 +114,7 @@ function applySpreadDamage(combatSummary, secondTarget, secondTargetName, spell,
     if (!spell?.damage) return;
     const rawDamage = metaCtx?.totalDamage || metaCtx?.rawDamage || 0;
     if (rawDamage <= 0) return;
-    const applyResult = applyDamageToTarget(combatSummary, secondTargetName, rawDamage, [damageType], campaignName, null, false, playerStats.name);
+    const applyResult = applyDamageToTarget(combatSummary, secondTargetName, rawDamage, [damageType], campaignName, null, { ignoreResistance: false, attackerName: playerStats.name });
     if (applyResult && applyResult.finalDamage > 0) {
         endInvisibilityOnHostileAction(playerStats.name, campaignName);
     }

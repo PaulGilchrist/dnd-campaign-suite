@@ -464,6 +464,16 @@ async function handleWardingFlare(action, auto, playerName, featureName, campaig
     return applied(infoPopup(action.name, flareDescription, auto, { defenderName: flareDefenderName, attackerName: attackAttackerName }), attackAttackerName);
 }
 
+async function bardicRangeRefusal(auto, campaignName, playerName, attackerName, _mapName, featureName) {
+    const rangeFt = auto.range ? parseInt(auto.range.replace(/[^0-9]/g, '')) || 60 : 60;
+    if (!_mapName || rangeFt == null) return null;
+    const positions = await resolveMapPositions(campaignName, playerName);
+    if (!positions?.attackerPos || !positions?.targetPos) return null;
+    const inRange = await isWithinRange(playerName, attackerName, rangeFt);
+    if (inRange) return null;
+    return refused(infoPopup(featureName, `${attackerName} is out of range.`, auto));
+}
+
 async function handleBardicRoll(action, auto, playerStats, playerName, featureName, campaignName, _mapName, combatSummary) {
     const targetInfo = await resolveTarget(campaignName, playerName);
     if (!targetInfo?.target) {
@@ -471,17 +481,9 @@ async function handleBardicRoll(action, auto, playerStats, playerName, featureNa
     }
 
     const attackerName = targetInfo.target.name;
-    const rangeFt = auto.range ? parseInt(auto.range.replace(/[^0-9]/g, '')) || 60 : 60;
 
-    if (_mapName && rangeFt != null) {
-        const positions = await resolveMapPositions(campaignName, playerName);
-        if (positions?.attackerPos && positions?.targetPos) {
-            const inRange = await isWithinRange(playerName, attackerName, rangeFt);
-            if (!inRange) {
-                return refused(infoPopup(featureName, `${attackerName} is out of range.`, auto));
-            }
-        }
-    }
+    const rangeRefusal = await bardicRangeRefusal(auto, campaignName, playerName, attackerName, _mapName, featureName);
+    if (rangeRefusal) return rangeRefusal;
 
     const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
     const bardicDieSize = classLevel?.bardic_die || 6;

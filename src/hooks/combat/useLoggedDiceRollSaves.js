@@ -205,108 +205,79 @@ function buildQuickRollSavePopup({ pending, target, saveResult, finalDamage, app
     };
 }
 
+function buildGloriousDefenseBlockPopup(characterName, popupMessage) {
+    return {
+        type: 'd20',
+        rollType: 'attack',
+        name: 'Glorious Defense',
+        rolls: [],
+        bonus: 0,
+        targetName: null,
+        targetAc: null,
+        hit: undefined,
+        isAutoMiss: false,
+        forcedMode: undefined,
+        isCrit: false,
+        isAutoCrit: false,
+        defensiveDuelistBonus: 0,
+        popupMessage,
+    };
+}
+
+function getCharismaBonus(charactersRef, playerName) {
+    return charactersRef?.current?.find(c => c.name === playerName)?.abilities?.find(a => a.name === 'Charisma')?.bonus || 0;
+}
+
+function evaluateGloriousDefenseOutcome(lastAttack, chaMod) {
+    const newAc = lastAttack.targetAc != null ? lastAttack.targetAc + chaMod : null;
+    return newAc != null ? (lastAttack.d20 + lastAttack.bonus >= newAc) : null;
+}
+
+function pickGloriousDefenseAttack(playerCreature) {
+    const attacks = playerCreature?.attacks || [];
+    const meleeAttacks = attacks.filter(a => a.range === MELEE_REACH_FEET);
+    return meleeAttacks.length > 0 ? meleeAttacks[0] : attacks[0];
+}
+
 export function createSaves(deps) {
     const { characterName, campaignName, setPopupHtml, logEntry, logAndShow, pendingSaves, charactersRef } = deps;
 
     async function triggerGloriousDefenseCounterAttack() {
         const playerName = characterName;
-        const chaBonus = charactersRef?.current?.find(c => c.name === playerName)?.abilities?.find(a => a.name === 'Charisma')?.bonus || 0;
+        const chaBonus = getCharismaBonus(charactersRef, playerName);
 
         const usesKey = 'gloriousDefenseUses';
         const usesMax = Math.max(1, chaBonus);
         const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? usesMax);
 
         if (currentUses <= 0) {
-            setPopupHtml({
-                type: 'd20',
-                rollType: 'attack',
-                name: 'Glorious Defense',
-                rolls: [],
-                bonus: 0,
-                targetName: null,
-                targetAc: null,
-                hit: undefined,
-                isAutoMiss: false,
-                forcedMode: undefined,
-                isCrit: false,
-                isAutoCrit: false,
-                defensiveDuelistBonus: 0,
-                popupMessage: `${characterName} has no uses remaining for Glorious Defense. Recharges on a Long Rest.`,
-            });
+            setPopupHtml(buildGloriousDefenseBlockPopup(characterName, `${characterName} has no uses remaining for Glorious Defense. Recharges on a Long Rest.`));
             return;
         }
 
         const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
 
         if (!lastAttack || lastAttack.targetName !== playerName) {
-            setPopupHtml({
-                type: 'd20',
-                rollType: 'attack',
-                name: 'Glorious Defense',
-                rolls: [],
-                bonus: 0,
-                targetName: null,
-                targetAc: null,
-                hit: undefined,
-                isAutoMiss: false,
-                forcedMode: undefined,
-                isCrit: false,
-                isAutoCrit: false,
-                defensiveDuelistBonus: 0,
-                popupMessage: `${characterName}: The last attack did not target you.`,
-            });
+            setPopupHtml(buildGloriousDefenseBlockPopup(characterName, `${characterName}: The last attack did not target you.`));
             return;
         }
 
         const chaMod = Math.max(1, chaBonus);
-        const newAc = lastAttack.targetAc != null ? lastAttack.targetAc + chaMod : null;
-        const wouldHit = newAc != null ? (lastAttack.d20 + lastAttack.bonus >= newAc) : null;
+        const wouldHit = evaluateGloriousDefenseOutcome(lastAttack, chaMod);
         const attackerName = lastAttack.attackerName || 'Unknown creature';
 
         if (wouldHit === true) {
-            setPopupHtml({
-                type: 'd20',
-                rollType: 'attack',
-                name: 'Glorious Defense',
-                rolls: [],
-                bonus: 0,
-                targetName: null,
-                targetAc: null,
-                hit: undefined,
-                isAutoMiss: false,
-                forcedMode: undefined,
-                isCrit: false,
-                isAutoCrit: false,
-                defensiveDuelistBonus: 0,
-                popupMessage: `The CHA bonus (+${chaMod}) was not enough to change the outcome.`,
-            });
+            setPopupHtml(buildGloriousDefenseBlockPopup(characterName, `The CHA bonus (+${chaMod}) was not enough to change the outcome.`));
             return;
         }
 
         // Attack becomes a miss — use the counterattack
         const combatSummary = await loadCombatSummary(campaignName);
         const playerCreature = combatSummary?.creatures?.find(c => c.type === 'player' && c.name === playerName);
-        const attacks = playerCreature?.attacks || [];
-        const meleeAttacks = attacks.filter(a => a.range === MELEE_REACH_FEET);
-        const attack = meleeAttacks.length > 0 ? meleeAttacks[0] : attacks[0];
+        const attack = pickGloriousDefenseAttack(playerCreature);
 
         if (!attack) {
-            setPopupHtml({
-                type: 'd20',
-                rollType: 'attack',
-                name: 'Glorious Defense',
-                rolls: [],
-                bonus: 0,
-                targetName: null,
-                targetAc: null,
-                hit: undefined,
-                isAutoMiss: false,
-                forcedMode: undefined,
-                isCrit: false,
-                isAutoCrit: false,
-                defensiveDuelistBonus: 0,
-                popupMessage: `${characterName} has no melee attack available.`,
-            });
+            setPopupHtml(buildGloriousDefenseBlockPopup(characterName, `${characterName} has no melee attack available.`));
             return;
         }
 
@@ -357,7 +328,7 @@ export function createSaves(deps) {
         finalDamage = await adjustQuickRollCantripDamage(finalDamage, pending, saveResult, campaignName, characterName);
         const ignoreResistance = (pending.playerStats && hasIgnoreResistance(pending.playerStats, pending.damageType)) || false;
         const allCharacters = charactersRef.current || [];
-        const applyResult = await applyDamageToTarget(combatSummary, pending.targetName, finalDamage, [pending.damageType], campaignName, allCharacters, ignoreResistance, pending.attackerName || characterName);
+        const applyResult = await applyDamageToTarget(combatSummary, pending.targetName, finalDamage, [pending.damageType], campaignName, allCharacters, { ignoreResistance: ignoreResistance, attackerName: pending.attackerName || characterName });
 
         storage.set('combatSummary', combatSummary, campaignName);
 

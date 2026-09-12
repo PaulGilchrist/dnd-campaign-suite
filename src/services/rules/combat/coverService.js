@@ -31,30 +31,27 @@ function getOccupiedCells(item) {
   return cells
 }
 
-export function computeCover(attackerPos, targetPos, walls, placedItems) {
-  const line = bresenham(attackerPos.gridX, attackerPos.gridY, targetPos.gridX, targetPos.gridY)
-
-  const wallKeys = walls?.has ? walls : new Set(walls || [])
-
+function buildCoverMap(placedItems) {
   const coverMap = new Map()
   for (const item of placedItems) {
-    const cells = getOccupiedCells(item)
     let level = null
     if (THREE_QUARTER_COVER_TYPES.has(item.type)) {
       level = COVER.THREE_QUARTER
     } else if (HALF_COVER_TYPES.has(item.type)) {
       level = COVER.HALF
     }
-    if (level) {
-      for (const cell of cells) {
-        const key = `${cell.x},${cell.y}`
-        if (!coverMap.has(key)) {
-          coverMap.set(key, level)
-        }
+    if (!level) continue
+    for (const cell of getOccupiedCells(item)) {
+      const key = `${cell.x},${cell.y}`
+      if (!coverMap.has(key)) {
+        coverMap.set(key, level)
       }
     }
   }
+  return coverMap
+}
 
+function buildClosedDoors(placedItems) {
   const closedDoors = new Set()
   for (const item of placedItems) {
     if (item.type === 'door' && !item.open) {
@@ -63,28 +60,30 @@ export function computeCover(attackerPos, targetPos, walls, placedItems) {
       }
     }
   }
+  return closedDoors
+}
+
+function lineHits(cells, test) {
+  return cells.some((cell) => test(`${cell.x},${cell.y}`))
+}
+
+export function computeCover(attackerPos, targetPos, walls, placedItems) {
+  const line = bresenham(attackerPos.gridX, attackerPos.gridY, targetPos.gridX, targetPos.gridY)
+
+  const wallKeys = walls?.has ? walls : new Set(walls || [])
+  const coverMap = buildCoverMap(placedItems)
+  const closedDoors = buildClosedDoors(placedItems)
 
   const cells = line.slice(1, -1)
 
-  for (const cell of cells) {
-    const key = `${cell.x},${cell.y}`
-    if (wallKeys.has(key) || closedDoors.has(key)) {
-      return { level: COVER.FULL, acBonus: COVER_AC_BONUS[COVER.FULL] }
-    }
+  if (lineHits(cells, (key) => wallKeys.has(key) || closedDoors.has(key))) {
+    return { level: COVER.FULL, acBonus: COVER_AC_BONUS[COVER.FULL] }
   }
-
-  for (const cell of cells) {
-    const key = `${cell.x},${cell.y}`
-    if (coverMap.get(key) === COVER.THREE_QUARTER) {
-      return { level: COVER.THREE_QUARTER, acBonus: COVER_AC_BONUS[COVER.THREE_QUARTER] }
-    }
+  if (lineHits(cells, (key) => coverMap.get(key) === COVER.THREE_QUARTER)) {
+    return { level: COVER.THREE_QUARTER, acBonus: COVER_AC_BONUS[COVER.THREE_QUARTER] }
   }
-
-  for (const cell of cells) {
-    const key = `${cell.x},${cell.y}`
-    if (coverMap.get(key) === COVER.HALF) {
-      return { level: COVER.HALF, acBonus: COVER_AC_BONUS[COVER.HALF] }
-    }
+  if (lineHits(cells, (key) => coverMap.get(key) === COVER.HALF)) {
+    return { level: COVER.HALF, acBonus: COVER_AC_BONUS[COVER.HALF] }
   }
 
   return { level: COVER.NONE, acBonus: 0 }

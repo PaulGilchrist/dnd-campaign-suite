@@ -140,7 +140,7 @@ describe('handleNpcSaveDamage - advanced scenarios', () => {
     }
 
     function callHandler(fn, contextOverride = {}, combatSummaryOverride = null) {
-        return fn('Fire Bolt', '1d10', 10, [6, 4], 0, { ...defaultContext, ...contextOverride }, 10, combatSummaryOverride || defaultCombatSummary);
+        return fn({ name: 'Fire Bolt', formula: '1d10', total: 10, rolls: [6, 4], modifier: 0, context: { ...defaultContext, ...contextOverride }, adjustedTotal: 10, combatSummary: combatSummaryOverride || defaultCombatSummary });
     }
 
     describe('popup data', () => {
@@ -644,17 +644,8 @@ describe('handleNpcSaveDamage - advanced scenarios', () => {
 
             await callHandler(createFn());
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.anything(),
-                'Goblin',
-                0, // zero damage
-                expect.any(Array),
-                'test-campaign',
-                expect.any(Array),
-                false,
-                'TestWizard',
-                true
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', 0, // zero damage
+                expect.any(Array), 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
         });
 
         it('marks saveResult as soulstitch_auto_success in log', async () => {

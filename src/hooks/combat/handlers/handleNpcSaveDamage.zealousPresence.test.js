@@ -112,7 +112,7 @@ describe('handleNpcSaveDamage — CLA-394 Zealous Presence save advantage', () =
 
     async function call() {
         const fn = createNpcSaveDamageHandler(deps);
-        await fn('Fire Bolt', '1d10', 10, [6, 4], 0, context, 10, combatSummary);
+        await fn({ name: 'Fire Bolt', formula: '1d10', total: 10, rolls: [6, 4], modifier: 0, context: context, adjustedTotal: 10, combatSummary: combatSummary });
     }
 
     it('rolls with advantage=true when the target carries the Zealous Presence buff', async () => {

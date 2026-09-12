@@ -6,11 +6,9 @@ import { addEntry } from '../../../ui/logService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollback.js';
-import { addConcentration } from '../../../combat/concentration/concentrationService.js';
-import { getCombatSummary } from '../../../encounters/combatData.js';
-import storage from '../../../ui/storage.js';
 import { playerIsImmuneToCondition } from '../../../combat/automation/automationImmunities.js';
 import { getEffectDefinition } from '../../../combat/conditions/targetEffectDefinitions.js';
+import { spellNoticePopup, resolveSelectedSpellTargets, registerSpellConcentration } from './areaSpellUtils.js';
 
 /**
  * Web spell handler for 2024 ruleset.
@@ -30,6 +28,28 @@ import { getEffectDefinition } from '../../../combat/conditions/targetEffectDefi
  * Obscured prose, STR (Athletics) break-free modal, anchoring/collapse,
  * flammability / 2d4 fire / burn-away.
  */
+
+// Cast-time DEX save succeeded: record the outcome + log row.
+async function saveSuccess(campaignName, casterName, targetName, dc, saveResult, saveType, rollType, successDescription) {
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'success',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: [],
+        appliedDamage: 0,
+    });
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType,
+        targetName,
+        saveDc: dc,
+        saveType,
+        success: true,
+        description: successDescription,
+    }).catch((e) => { console.error("[web] Error:", e); });
+}
 
 function stampWebZoneEffects(campaignName, casterName, targets, dc) {
     const storedZoneEffects = getRuntimeValue('campaign', 'targetEffects') || [];
@@ -128,29 +148,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const cs = await getCombatContext(campaignName);
     if (!cs?.creatures || cs.creatures.length === 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: 'No creatures in combat. Web has no effect.',
-            },
-        };
+        return spellNoticePopup(action.name, 'No creatures in combat. Web has no effect.');
     }
 
     // Get selected targets from metaCtx — includes ALL creatures (including caster)
-    const selectedTargetNames = action.metaCtx?.targets || cs.creatures.map(c => c.name);
-    const targets = cs.creatures.filter(c => selectedTargetNames.includes(c.name));
+    const targets = resolveSelectedSpellTargets(cs, action);
 
     if (targets.length === 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: 'No creatures selected for Web.',
-            },
-        };
+        return spellNoticePopup(action.name, 'No creatures selected for Web.');
     }
 
     storeSpellLastAttack(campaignName, {
@@ -196,14 +201,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         ], campaignName, durationRounds);
     }
 
-    // Register concentration for this spell
-    const combatSummary = getCombatSummary(campaignName);
-    if (combatSummary) {
-        const concentrationDc = playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
-        addConcentration(combatSummary, casterName, 'Web', concentrationDc);
-        storage.set('combatSummary', combatSummary, campaignName);
-        window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-    }
+    registerSpellConcentration(campaignName, casterName, 'Web', playerStats);
 
     let affectedCount = 0;
     let savedCount = 0;
@@ -232,24 +230,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
         if (saveResult.success) {
             savedCount++;
-            await addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'success',
-                roll: saveResult.roll ?? 0,
-                total: saveResult.total ?? 0,
-                conditions: [],
-                appliedDamage: 0,
-            });
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                rollType: 'save-web',
-                targetName,
-                saveDc: dc,
-                saveType: 'DEX',
-                success: true,
-                description: `${targetName} succeeded on DEX save against Web.`,
-            }).catch((e) => { console.error("[web] Error:", e); });
+            await saveSuccess(campaignName, casterName, targetName, dc, saveResult, 'DEX', 'save-web', `${targetName} succeeded on DEX save against Web.`);
         } else {
             affectedCount++;
             await restrainWebTarget(campaignName, casterName, targetName, dc, saveResult, durationRounds);
@@ -261,14 +242,69 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         ? `Web affects ${affectedCount} creature(s). ${results.join(' ')} ${savedCount} creature(s) saved. Affected creatures are Restrained (Speed 0, attack rolls against them have Advantage, their attacks have Disadvantage, Disadvantage on DEX saves). Restrained creatures can use their action to make a STR (Athletics) check vs DC ${dc} to break free.`
         : `No creatures affected by Web. ${savedCount} creature(s) saved.`;
 
-    return {
-        type: 'popup',
-        payload: {
-            type: 'automation_info',
-            name: action.name,
-            description: summary,
-        },
+    return spellNoticePopup(action.name, summary);
+}
+
+function webTargetIsImmune(targetName, campaignName) {
+    const targetCharacter = getCombatContext(campaignName)?.creatures?.find(c => c.name === targetName);
+    if (targetCharacter?.type !== 'player') return false;
+    const targetStats = {
+        computedStats: getRuntimeValue(targetName, 'computedStats', campaignName),
     };
+    return playerIsImmuneToCondition({
+        conditionKey: 'restrained',
+        playerStats: targetStats,
+        getRuntimeValue,
+        campaignName,
+    });
+}
+
+async function restrainRecurringWebTarget(campaignName, casterName, targetName, dc, saveResult) {
+    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'restrained');
+    setRuntimeValue(targetName, 'activeConditions', [...filtered, 'restrained'], campaignName);
+
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'failure',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: ['restrained'],
+        appliedDamage: 0,
+    });
+
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-web',
+        targetName,
+        saveDc: dc,
+        saveType: 'STR',
+        success: false,
+        description: `${targetName} failed STR save against Web. Becomes Restrained.`,
+    }).catch((e) => { console.error("[webAreaSave] Error:", e); });
+}
+
+async function recordWebAreaSaveSuccess(campaignName, casterName, targetName, dc, saveResult) {
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'success',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: [],
+        appliedDamage: 0,
+    });
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-web',
+        targetName,
+        saveDc: dc,
+        saveType: 'STR',
+        success: true,
+        description: `${targetName} succeeded on STR save against Web.`,
+    }).catch((e) => { console.error("[webAreaSave] Error:", e); });
 }
 
 export async function processWebAreaSave(casterName, targetName, campaignName, mapName) {
@@ -293,20 +329,7 @@ export async function processWebAreaSave(casterName, targetName, campaignName, m
     const isAlreadyRestrained = existingConditions.some(c => String(c).toLowerCase() === 'restrained');
     if (isAlreadyRestrained) return null;
 
-    const targetCharacter = getCombatContext(campaignName)?.creatures?.find(c => c.name === targetName);
-    if (targetCharacter?.type === 'player') {
-        const targetStats = {
-            computedStats: getRuntimeValue(targetName, 'computedStats', campaignName),
-        };
-        if (playerIsImmuneToCondition({
-            conditionKey: 'restrained',
-            playerStats: targetStats,
-            getRuntimeValue,
-            campaignName,
-        })) {
-            return null;
-        }
-    }
+    if (webTargetIsImmune(targetName, campaignName)) return null;
 
     const { promptId, promise } = createSaveListener(campaignName, {
         targetName,
@@ -325,49 +348,9 @@ export async function processWebAreaSave(casterName, targetName, campaignName, m
     const saveResult = await promise;
 
     if (!saveResult.success) {
-        const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-        const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-        const filtered = conditions.filter(c => String(c).toLowerCase() !== 'restrained');
-        setRuntimeValue(targetName, 'activeConditions', [...filtered, 'restrained'], campaignName);
-
-        await addTargetResult(campaignName, {
-            targetName,
-            saveResult: 'failure',
-            roll: saveResult.roll ?? 0,
-            total: saveResult.total ?? 0,
-            conditions: ['restrained'],
-            appliedDamage: 0,
-        });
-
-        addEntry(campaignName, {
-            type: 'save_result',
-            characterName: casterName,
-            rollType: 'save-web',
-            targetName,
-            saveDc: tracking.saveDc,
-            saveType: 'STR',
-            success: false,
-            description: `${targetName} failed STR save against Web. Becomes Restrained.`,
-        }).catch((e) => { console.error("[webAreaSave] Error:", e); });
+        await restrainRecurringWebTarget(campaignName, casterName, targetName, tracking.saveDc, saveResult);
     } else {
-        await addTargetResult(campaignName, {
-            targetName,
-            saveResult: 'success',
-            roll: saveResult.roll ?? 0,
-            total: saveResult.total ?? 0,
-            conditions: [],
-            appliedDamage: 0,
-        });
-        addEntry(campaignName, {
-            type: 'save_result',
-            characterName: casterName,
-            rollType: 'save-web',
-            targetName,
-            saveDc: tracking.saveDc,
-            saveType: 'STR',
-            success: true,
-            description: `${targetName} succeeded on STR save against Web.`,
-        }).catch((e) => { console.error("[webAreaSave] Error:", e); });
+        await recordWebAreaSaveSuccess(campaignName, casterName, targetName, tracking.saveDc, saveResult);
     }
 
     return {

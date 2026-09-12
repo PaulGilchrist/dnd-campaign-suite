@@ -108,7 +108,7 @@ function renderSpells() {
 
 function getCastExecutorTargetInfo() {
   const call = vi.mocked(useSpellCastExecutor).mock.calls.at(-1);
-  return call[3];
+  return call[0].getTargetInfo;
 }
 
 describe('CharSpells getTargetInfo seam (SP-097)', () => {

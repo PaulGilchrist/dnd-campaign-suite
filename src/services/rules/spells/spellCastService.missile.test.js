@@ -348,16 +348,7 @@ describe('executeSpellCast - Magic Missile', () => {
         services
       )
 
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-        expect.anything(),
-        'Goblin',
-        15,
-        ['Force'],
-        'testCampaign',
-        undefined,
-        true,
-        'TestWizard'
-      )
+      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', 15, ['Force'], 'testCampaign', undefined, { ignoreResistance: true, attackerName: 'TestWizard' })
     })
   })
 

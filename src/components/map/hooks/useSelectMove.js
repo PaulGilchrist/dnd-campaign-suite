@@ -2,6 +2,67 @@ import { useState, useCallback, useRef } from 'react';
 import { TOOL_SELECT } from '../../../config/mapConfig';
 import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
+function collectWallsInRect(walls, rect) {
+    const { minX, maxX, minY, maxY } = rect;
+    const selected = new Set();
+    for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+            const key = `${x},${y}`;
+            if (walls.has(key)) selected.add(key);
+        }
+    }
+    return selected;
+}
+
+function collectItemsInRect(items, rect) {
+    const { minX, maxX, minY, maxY } = rect;
+    const selected = new Set();
+    for (const item of items) {
+        if (item.gridX >= minX && item.gridX <= maxX &&
+            item.gridY >= minY && item.gridY <= maxY) {
+            selected.add(item.id);
+        }
+    }
+    return selected;
+}
+
+function offsetBounds(bounds, dx, dy) {
+    if (!bounds) return null;
+    return {
+        minX: bounds.minX + dx,
+        maxX: bounds.maxX + dx,
+        minY: bounds.minY + dy,
+        maxY: bounds.maxY + dy,
+    };
+}
+
+function shiftKeys(keys, dx, dy) {
+    const shifted = new Set();
+    for (const key of keys) {
+        const [x, y] = key.split(',').map(Number);
+        shifted.add(`${x + dx},${y + dy}`);
+    }
+    return shifted;
+}
+
+function buildMovedWalls(prev, selWalls, dstBounds, offset) {
+    const newWalls = new Set(prev.walls);
+    if (dstBounds) {
+        for (let y = dstBounds.minY; y <= dstBounds.maxY; y++) {
+            for (let x = dstBounds.minX; x <= dstBounds.maxX; x++) {
+                newWalls.delete(`${x},${y}`);
+            }
+        }
+    }
+    for (const key of selWalls) {
+        newWalls.delete(key);
+    }
+    for (const shifted of shiftKeys(selWalls, offset.dx, offset.dy)) {
+        newWalls.add(shifted);
+    }
+    return { ...prev, walls: newWalls };
+}
+
 function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignName }) {
     const [selectionRect, setSelectionRect] = useState(null);
     const [selectedWalls, setSelectedWalls] = useState(new Set());
@@ -85,6 +146,31 @@ function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignNa
         }
     }, [isLocalhost, tool, getGridFromEvent]);
 
+    const applySelectionMove = useCallback((offset, setMapData, setPlacedItems) => {
+        const curSelWalls = selectedWallsRef.current;
+        const curSelItems = selectedItemsRef.current;
+        const bounds = selectionBoundsRef.current;
+        const dstBounds = offsetBounds(bounds, offset.dx, offset.dy);
+
+        setMapData(prev => buildMovedWalls(prev, curSelWalls, dstBounds, offset));
+        setSelectedWalls(prev => shiftKeys(prev, offset.dx, offset.dy));
+
+        if (bounds) {
+            selectionBoundsRef.current = offsetBounds(bounds, offset.dx, offset.dy);
+        }
+
+        setPlacedItems(prev =>
+            prev.map(item => {
+                if (!curSelItems.has(item.id)) return item;
+                // Track movement for Steady Aim
+                if (campaignName && item.type === 'player') {
+                    setRuntimeValue(item.name || item.id, 'steadyAimMovedThisTurn', true, campaignName);
+                }
+                return { ...item, gridX: item.gridX + offset.dx, gridY: item.gridY + offset.dy };
+            })
+        );
+    }, [campaignName]);
+
     const handleSelectPointerUp = useCallback((e, placedItems, mapData, setMapData, setPlacedItems) => {
         if (!isLocalhost) return;
         const svg = svgRef.current;
@@ -93,100 +179,27 @@ function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignNa
         if (selectStart.current) {
             const rect = selectionRectRef.current;
             if (rect) {
-                const { minX, maxX, minY, maxY } = rect;
                 const walls = mapDataRef.current?.walls || new Set();
                 const items = placedItemsRef.current || [];
-
-                const newSelWalls = new Set();
-                for (let y = minY; y <= maxY; y++) {
-                    for (let x = minX; x <= maxX; x++) {
-                        if (walls.has(`${x},${y}`)) newSelWalls.add(`${x},${y}`);
-                    }
-                }
-                const newSelItems = new Set();
-                for (const item of items) {
-                    if (item.gridX >= minX && item.gridX <= maxX &&
-                        item.gridY >= minY && item.gridY <= maxY) {
-                        newSelItems.add(item.id);
-                    }
-                }
-                setSelectedWalls(newSelWalls);
-                setSelectedItems(newSelItems);
-                selectionBoundsRef.current = { minX, maxX, minY, maxY };
+                setSelectedWalls(collectWallsInRect(walls, rect));
+                setSelectedItems(collectItemsInRect(items, rect));
+                selectionBoundsRef.current = { minX: rect.minX, maxX: rect.maxX, minY: rect.minY, maxY: rect.maxY };
             }
             selectStart.current = null;
             selectionRectRef.current = null;
             setSelectionRect(null);
-        } else if (moveStartGrid.current) {
-            const offset = moveOffsetRef.current;
-            if (offset && (offset.dx !== 0 || offset.dy !== 0)) {
-                const curSelWalls = selectedWallsRef.current;
-                const curSelItems = selectedItemsRef.current;
-                const bounds = selectionBoundsRef.current;
-                const dstBounds = bounds && {
-                    minX: bounds.minX + offset.dx,
-                    maxX: bounds.maxX + offset.dx,
-                    minY: bounds.minY + offset.dy,
-                    maxY: bounds.maxY + offset.dy,
-                };
-
-                setMapData(prev => {
-                    const newWalls = new Set(prev.walls);
-                    if (dstBounds) {
-                        for (let y = dstBounds.minY; y <= dstBounds.maxY; y++) {
-                            for (let x = dstBounds.minX; x <= dstBounds.maxX; x++) {
-                                newWalls.delete(`${x},${y}`);
-                            }
-                        }
-                    }
-                    for (const key of curSelWalls) {
-                        newWalls.delete(key);
-                    }
-                    for (const key of curSelWalls) {
-                        const [x, y] = key.split(',').map(Number);
-                        newWalls.add(`${x + offset.dx},${y + offset.dy}`);
-                    }
-                    return { ...prev, walls: newWalls };
-                });
-
-                setSelectedWalls(prev => {
-                    const next = new Set();
-                    for (const key of prev) {
-                        const [x, y] = key.split(',').map(Number);
-                        next.add(`${x + offset.dx},${y + offset.dy}`);
-                    }
-                    return next;
-                });
-
-                if (bounds) {
-                    selectionBoundsRef.current = {
-                        minX: bounds.minX + offset.dx,
-                        maxX: bounds.maxX + offset.dx,
-                        minY: bounds.minY + offset.dy,
-                        maxY: bounds.maxY + offset.dy,
-                    };
-                }
-
-                setPlacedItems(prev =>
-                    prev.map(item => {
-                        if (curSelItems.has(item.id)) {
-                            const newGridX = item.gridX + offset.dx;
-                            const newGridY = item.gridY + offset.dy;
-                            // Track movement for Steady Aim
-                            if (campaignName && item.type === 'player' && (offset.dx !== 0 || offset.dy !== 0)) {
-                                setRuntimeValue(item.name || item.id, 'steadyAimMovedThisTurn', true, campaignName);
-                            }
-                            return { ...item, gridX: newGridX, gridY: newGridY };
-                        }
-                        return item;
-                    })
-                );
-            }
-            moveStartGrid.current = null;
-            moveOffsetRef.current = null;
-            setMoveOffset(null);
+            return;
         }
-    }, [isLocalhost, svgRef, campaignName]);
+
+        if (!moveStartGrid.current) return;
+        const offset = moveOffsetRef.current;
+        if (offset && (offset.dx !== 0 || offset.dy !== 0)) {
+            applySelectionMove(offset, setMapData, setPlacedItems);
+        }
+        moveStartGrid.current = null;
+        moveOffsetRef.current = null;
+        setMoveOffset(null);
+    }, [isLocalhost, svgRef, applySelectionMove]);
 
     return {
         selectionRect, selectedWalls, selectedItems, moveOffset,

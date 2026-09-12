@@ -4,90 +4,47 @@ import { buildSaveDc } from '../../common/savePrompt.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { getCurrentCombatRound } from '../../../encounters/combatData.js';
 
+import { findPactSlotLevel, hasPactSlotAvailable } from './pactMagicUtils.js';
+
 const USES_KEY = 'hurlThroughHellUses';
 const TURN_USED_KEY = 'hurlThroughHellTurnUsed';
 
-function findPactSlotLevel(playerStats) {
-    for (let lv = 9; lv >= 1; lv--) {
-        if (playerStats.spellAbilities?.[`spell_slots_level_${lv}`] > 0) {
-            return lv;
-        }
-    }
-    return 0;
+function hurlPopup(featureName, auto, description) {
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            description,
+            automation: auto,
+        },
+    };
 }
 
-function hasPactSlotAvailable(playerStats, playerName, campaignName, auto, currentUses, maxUses, pactSlotLevel) {
-    if (!(currentUses >= maxUses && auto.pactMagicRecharge && pactSlotLevel > 0)) return false;
-    const slotKey = `spell_slots_level_${pactSlotLevel}`;
-    const currentSlots = Number(getRuntimeValue(playerName, slotKey, campaignName) ?? playerStats.spellAbilities?.[slotKey] ?? 0);
-    return currentSlots > 0;
-}
-
-export async function handle(action, playerStats, campaignName, _mapName) {
-    const auto = action.automation;
-    const playerName = playerStats.name;
-    const featureName = action.name || 'Hurl Through Hell';
-
+// Attack-trigger gates: once-per-turn latch, lastAttack ownership/roll/hit,
+// and target selection. Returns a refusal popup, or { targetName } to proceed.
+async function gateHurlTrigger(playerName, campaignName, featureName, auto) {
     // CLA-175: round-keyed once-per-turn latch (CLA-109/CLA-273 pattern) —
     // compares the stored round number against the current round so the latch
     // self-re-arms each round instead of treating any sentinel as "used".
     const turnUsed = getRuntimeValue(playerName, TURN_USED_KEY, campaignName);
     if (turnUsed != null && Number(turnUsed) === getCurrentCombatRound(campaignName)) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                description: `${featureName}: Already used this turn. Once per turn.`,
-                automation: auto,
-            },
-        };
+        return hurlPopup(featureName, auto, `${featureName}: Already used this turn. Once per turn.`);
     }
 
     const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
 
     // Check lastAttack — triggers "when you hit with an attack roll"
     if (!lastAttack) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                description: `${featureName}: Requires that you hit with an attack roll. No attack recorded.`,
-                automation: auto,
-            },
-        };
+        return hurlPopup(featureName, auto, `${featureName}: Requires that you hit with an attack roll. No attack recorded.`);
     }
-
     if (lastAttack.attackerName !== playerName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                description: `${featureName}: Requires that you hit with an attack roll. Last attack was not yours.`,
-                automation: auto,
-            },
-        };
+        return hurlPopup(featureName, auto, `${featureName}: Requires that you hit with an attack roll. Last attack was not yours.`);
     }
-
     if (lastAttack.rollType !== 'attack') {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                description: `${featureName}: Requires that you hit with an attack roll. Last action was not an attack.`,
-                automation: auto,
-            },
-        };
+        return hurlPopup(featureName, auto, `${featureName}: Requires that you hit with an attack roll. Last action was not an attack.`);
     }
-
     if (lastAttack.hit !== true) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                description: `${featureName}: Requires that you hit with an attack roll. Last attack missed.`,
-                automation: auto,
-            },
-        };
+        return hurlPopup(featureName, auto, `${featureName}: Requires that you hit with an attack roll. Last attack missed.`);
     }
 
     const cs = await getCombatContext(campaignName);
@@ -95,15 +52,20 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const targetName = target?.name || null;
 
     if (!targetName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                description: `${featureName}: No target selected — effect noted for manual application.`,
-                automation: auto,
-            },
-        };
+        return hurlPopup(featureName, auto, `${featureName}: No target selected — effect noted for manual application.`);
     }
+
+    return { targetName };
+}
+
+export async function handle(action, playerStats, campaignName, _mapName) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+    const featureName = action.name || 'Hurl Through Hell';
+
+    const gate = await gateHurlTrigger(playerName, campaignName, featureName, auto);
+    if (gate.type === 'popup') return gate;
+    const targetName = gate.targetName;
 
     // Build save DC
     const saveDc = buildSaveDc(auto, playerStats);

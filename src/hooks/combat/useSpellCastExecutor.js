@@ -1,7 +1,7 @@
 import { useRef, useCallback } from 'react'
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
 
-export function useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, extraMeta = {}, cachedPosRef, setModalState) {
+export function useSpellCastExecutor({ rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, extraMeta = {}, cachedPosRef, setModalState }) {
     const internalPosRef = useRef(null);
     const ref = cachedPosRef || internalPosRef;
 
@@ -62,83 +62,38 @@ export function useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTar
     return { castAction, cachedPosRef: ref };
 }
 
+const MODAL_STATE_KEYS = {
+    massHealTarget: 'massHealModal',
+    massCureWoundsTarget: 'massCureWoundsModal',
+    prayerOfHealingTarget: 'prayerOfHealingModal',
+    powerWordFortifyTarget: 'powerWordFortifyModal',
+    massHealingWordTarget: 'massHealingWordModal',
+    saveAttackAoe: 'saveAttackAoeModal',
+    aoeCondition: 'aoeConditionModal',
+    fear: 'fearModal',
+    sleep: 'sleepModal',
+    hypnoticPattern: 'hypnoticPatternModal',
+    calmEmotions: 'calmEmotionsModal',
+    massSuggestion: 'massSuggestionModal',
+    commandChoice: 'commandModal',
+    ArcaneVigor: 'arcaneVigorModal',
+    blindnessDeafness: 'blindnessDeafnessModal',
+    silenceTargetSelection: 'silenceModal',
+    eyebiteEffect: 'eyebiteEffectModal',
+    wildMagicSurge: 'wildMagicSurgeModal',
+    feignDeathTargetSelection: 'feignDeathModal',
+    tashasLaughter: 'tashasLaughterModal',
+    animateDead: 'animateDeadModal',
+    createUndead: 'createUndeadModal',
+    summonSpirit: 'summonSpiritModal',
+    starryChaliceHeal: 'starryChaliceHealModal',
+};
+
 function handleModalResult(popup, setModalState) {
     const modalName = popup.modalName;
-    const payload = popup.payload;
-    switch (modalName) {
-        case 'massHealTarget':
-            setModalState({ massHealModal: payload });
-            break;
-        case 'massCureWoundsTarget':
-            setModalState({ massCureWoundsModal: payload });
-            break;
-        case 'prayerOfHealingTarget':
-            setModalState({ prayerOfHealingModal: payload });
-            break;
-        case 'powerWordFortifyTarget':
-            setModalState({ powerWordFortifyModal: payload });
-            break;
-        case 'massHealingWordTarget':
-            setModalState({ massHealingWordModal: payload });
-            break;
-        case 'saveAttackAoe':
-            setModalState({ saveAttackAoeModal: payload });
-            break;
-        case 'aoeCondition':
-            setModalState({ aoeConditionModal: payload });
-            break;
-        case 'fear':
-            setModalState({ fearModal: payload });
-            break;
-        case 'sleep':
-            setModalState({ sleepModal: payload });
-            break;
-        case 'hypnoticPattern':
-            setModalState({ hypnoticPatternModal: payload });
-            break;
-        case 'calmEmotions':
-            setModalState({ calmEmotionsModal: payload });
-            break;
-        case 'massSuggestion':
-            setModalState({ massSuggestionModal: payload });
-            break;
-        case 'commandChoice':
-            setModalState({ commandModal: payload });
-            break;
-        case 'ArcaneVigor':
-            setModalState({ arcaneVigorModal: payload });
-            break;
-        case 'blindnessDeafness':
-            setModalState({ blindnessDeafnessModal: payload });
-            break;
-        case 'silenceTargetSelection':
-            setModalState({ silenceModal: payload });
-            break;
-        case 'eyebiteEffect':
-            setModalState({ eyebiteEffectModal: payload });
-            break;
-        case 'wildMagicSurge':
-            setModalState({ wildMagicSurgeModal: payload });
-            break;
-        case 'feignDeathTargetSelection':
-            setModalState({ feignDeathModal: payload });
-            break;
-        case 'tashasLaughter':
-            setModalState({ tashasLaughterModal: payload });
-            break;
-        case 'animateDead':
-            setModalState({ animateDeadModal: payload });
-            break;
-        case 'createUndead':
-            setModalState({ createUndeadModal: payload });
-            break;
-        case 'summonSpirit':
-            setModalState({ summonSpiritModal: payload });
-            break;
-        case 'starryChaliceHeal':
-            setModalState({ starryChaliceHealModal: payload });
-            break;
-        default:
-            console.error(`[useSpellCastExecutor] Unknown modalName from spell cast: ${modalName}`);
+    if (!Object.hasOwn(MODAL_STATE_KEYS, modalName)) {
+        console.error(`[useSpellCastExecutor] Unknown modalName from spell cast: ${modalName}`);
+        return;
     }
+    setModalState({ [MODAL_STATE_KEYS[modalName]]: popup.payload });
 }

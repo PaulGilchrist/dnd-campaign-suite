@@ -118,6 +118,56 @@ export function getTotalTravelTime(path, terrain, horseback = false) {
   };
 }
 
+function findLowestFScoreIndex(openSet) {
+  let lowestIdx = 0;
+  for (let i = 1; i < openSet.length; i++) {
+    if (openSet[i].f < openSet[lowestIdx].f) lowestIdx = i;
+  }
+  return lowestIdx;
+}
+
+function reconstructPath(current) {
+  const path = [];
+  let node = current;
+  while (node) {
+    path.unshift({ q: node.q, r: node.r });
+    node = node.parent;
+  }
+  return path;
+}
+
+function isHexInBounds(q, r, hexCols, hexRows) {
+  return q >= 0 && q < hexCols && r >= 0 && r < hexRows;
+}
+
+function relaxNeighbor(current, nb, to, openSet, openKeys, tentativeG) {
+  const nk = hexKey(nb.q, nb.r);
+  const f = tentativeG + hexDistance(nb, to);
+  if (openKeys.has(nk)) {
+    const existing = openSet.find(n => n.q === nb.q && n.r === nb.r);
+    if (tentativeG < existing.g) {
+      existing.g = tentativeG;
+      existing.f = f;
+      existing.parent = current;
+    }
+    return;
+  }
+
+  openSet.push({
+    q: nb.q, r: nb.r,
+    g: tentativeG,
+    f,
+    parent: current,
+  });
+  openKeys.add(nk);
+}
+
+function neighborMoveCost(nk, nb, terrain, roads) {
+  const terrainType = terrain[nk] || DEFAULT_TERRAIN;
+  if (roads) return getHexMoveCostWithRoad(terrainType, nb.q, nb.r, roads);
+  return TERRAIN_MOVE_COST[terrainType];
+}
+
 export function calculatePath(from, to, hexCols, hexRows, terrain, roads) {
   if (!from || !to) return [];
   if (from.q === to.q && from.r === to.r) return [];
@@ -128,53 +178,21 @@ export function calculatePath(from, to, hexCols, hexRows, terrain, roads) {
   openKeys.add(hexKey(from.q, from.r));
 
   while (openSet.length > 0) {
-    let lowestIdx = 0;
-    for (let i = 1; i < openSet.length; i++) {
-      if (openSet[i].f < openSet[lowestIdx].f) lowestIdx = i;
-    }
-    const current = openSet.splice(lowestIdx, 1)[0];
+    const current = openSet.splice(findLowestFScoreIndex(openSet), 1)[0];
     const ck = hexKey(current.q, current.r);
     openKeys.delete(ck);
 
     if (current.q === to.q && current.r === to.r) {
-      const path = [];
-      let node = current;
-      while (node) {
-        path.unshift({ q: node.q, r: node.r });
-        node = node.parent;
-      }
-      return path;
+      return reconstructPath(current);
     }
 
     closedKeys.add(ck);
 
     for (const nb of hexNeighbors(current.q, current.r)) {
       const nk = hexKey(nb.q, nb.r);
-      if (closedKeys.has(nk)) continue;
-      if (nb.q < 0 || nb.q >= hexCols || nb.r < 0 || nb.r >= hexRows) continue;
-
-      const terrainType = terrain[nk] || DEFAULT_TERRAIN;
-      const baseCost = TERRAIN_MOVE_COST[terrainType];
-      if (baseCost === null) continue;
-      const cost = roads ? getHexMoveCostWithRoad(terrainType, nb.q, nb.r, roads) : baseCost;
-
-      const tentativeG = current.g + cost;
-      if (openKeys.has(nk)) {
-        const existing = openSet.find(n => n.q === nb.q && n.r === nb.r);
-        if (tentativeG < existing.g) {
-          existing.g = tentativeG;
-          existing.f = tentativeG + hexDistance(nb, to);
-          existing.parent = current;
-        }
-      } else {
-        openSet.push({
-          q: nb.q, r: nb.r,
-          g: tentativeG,
-          f: tentativeG + hexDistance(nb, to),
-          parent: current,
-        });
-        openKeys.add(nk);
-      }
+      if (closedKeys.has(nk) || !isHexInBounds(nb.q, nb.r, hexCols, hexRows)) continue;
+      if (TERRAIN_MOVE_COST[terrain[nk] || DEFAULT_TERRAIN] === null) continue;
+      relaxNeighbor(current, nb, to, openSet, openKeys, current.g + neighborMoveCost(nk, nb, terrain, roads));
     }
   }
 

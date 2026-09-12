@@ -55,8 +55,7 @@ async function activateSpiritualWeaponIfNeeded(spell, metaCtx, playerStats, camp
     });
 }
 
-async function handleNoSavePath(spell, metaCtx, playerStats, campaignName, mapName, characters,
-    getTargetInfo, rollAttack, spellToHit, damageType) {
+async function handleNoSavePath({ spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, rollAttack, spellToHit, damageType }) {
 
     if (isMagicMissile(spell)) {
         await executeMagicMissile(spell, metaCtx, { rollDamage: () => {}, playerStats, getTargetInfo, campaignName, mapName, characters });

@@ -182,16 +182,7 @@ describe('createSaves (useLoggedDiceRollSaves) - Core', () => {
             const { quickRollPlayerSave } = createFn();
             await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
             expect(hasIgnoreResistance).toHaveBeenCalledWith({}, 'fire');
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.any(Object),
-                'Goblin',
-                expect.any(Number),
-                ['fire'],
-                'test-campaign',
-                expect.any(Array),
-                true,
-                'TestWizard'
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', expect.any(Number), ['fire'], 'test-campaign', expect.any(Array), { ignoreResistance: true, attackerName: 'TestWizard' });
         });
 
         it('uses target saveModifiers from charactersRef when available', async () => {

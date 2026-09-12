@@ -38,7 +38,7 @@ function hasFeature(playerStats, featureName) {
     return allFeatureNames.includes(featureName);
 }
 
-function buildPrimalCompanionCreature(monster, companionTypeConfig, displayName, initiativeValue, rangerLevel, wisModifier, spellAttackMod, proficiencyBonus, spellSaveDc, hasBestialFury) {
+function buildPrimalCompanionCreature({ monster, companionTypeConfig, displayName, initiativeValue, rangerLevel, wisModifier, spellAttackMod, proficiencyBonus, spellSaveDc, hasBestialFury }) {
     const hp = companionTypeConfig.hpBase + (companionTypeConfig.hpPerLevel * rangerLevel);
 
     const baseSaves = getMonsterSaveBonuses(monster);
@@ -153,6 +153,15 @@ export async function handle(action, playerStats, campaignName) {
     };
 }
 
+function resolveCompanionInitiative(casterCreature) {
+    let initiativeValue = 0;
+    if (casterCreature?.initiative !== '' && casterCreature?.initiative !== undefined) {
+        initiativeValue = parseInt(casterCreature.initiative, 10) || 0;
+    }
+    const casterInitBonus = casterCreature?.initiativeBonus || 0;
+    return initiativeValue || (Math.floor(Math.random() * 20) + 1 + casterInitBonus);
+}
+
 export async function confirmPrimalCompanionSummon(action, playerStats, campaignName, selectedType) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -230,18 +239,13 @@ export async function confirmPrimalCompanionSummon(action, playerStats, campaign
     const spellSaveDc = playerStats.spellAbilities?.saveDc || (8 + proficiencyBonus + wisModifier);
 
     const casterCreature = combatSummary.creatures.find(c => c.name === casterName);
-    let initiativeValue = 0;
-    if (casterCreature?.initiative !== '' && casterCreature?.initiative !== undefined) {
-        initiativeValue = parseInt(casterCreature.initiative, 10) || 0;
-    }
-    const casterInitBonus = casterCreature?.initiativeBonus || 0;
-    initiativeValue = initiativeValue || (Math.floor(Math.random() * 20) + 1 + casterInitBonus);
+    const initiativeValue = resolveCompanionInitiative(casterCreature);
 
     const displayName = `Primal Companion (${selectedType})`;
 
     const hasBestialFury = hasFeature(playerStats, 'Bestial Fury');
 
-    const creature = buildPrimalCompanionCreature(monster, companionTypeConfig, displayName, initiativeValue, rangerLevel, wisModifier, spellAttackMod, proficiencyBonus, spellSaveDc, hasBestialFury);
+    const creature = buildPrimalCompanionCreature({ monster, companionTypeConfig, displayName, initiativeValue, rangerLevel, wisModifier, spellAttackMod, proficiencyBonus, spellSaveDc, hasBestialFury });
     combatSummary.creatures.push(creature);
 
     let targetEffects = getTargetEffects();

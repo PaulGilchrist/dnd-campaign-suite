@@ -115,17 +115,7 @@ const BASE_COMBAT_SUMMARY = {
 };
 
 function invokeHandler(handler, context = BASE_CONTEXT, combatSummary = BASE_COMBAT_SUMMARY) {
-    return handler(
-        'Frost Ray',
-        '3d6',
-        11,
-        [4, 4, 3],
-        0,
-        context,
-        11,
-        combatSummary,
-        [4, 4, 3],
-    );
+    return handler({ name: 'Frost Ray', formula: '3d6', total: 11, rolls: [4, 4, 3], modifier: 0, context: context, adjustedTotal: 11, combatSummary: combatSummary, displayRolls: [4, 4, 3] });
 }
 
 describe('handlePlayerSaveDamage — CLA-394 Zealous Presence save advantage', () => {

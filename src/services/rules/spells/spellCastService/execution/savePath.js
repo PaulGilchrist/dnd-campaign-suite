@@ -180,12 +180,8 @@ async function handleAoE({ spell, fullSpell, metaCtx, playerStats, campaignName,
         hasInvisible, overchannelActive, overchannelUseCount, slotLevel });
 }
 
-async function handleSingleTargetSave({ spell, fullSpell, metaCtx, playerStats, mapName,
-    getTargetInfo, innateSorceryActive, effectiveDamageType, spellSaveDc,
-    overchannelFormula, overchannelActive, overchannelUseCount, rollDamage, formula, hasInvisible,
-    soulstitchSelection = [] }) {
-
-    const target = await getTargetInfo();
+function buildSingleTargetSaveContext(target, mapName, { playerStats, metaCtx, fullSpell, spell, effectiveDamageType,
+    spellSaveDc, innateSorceryActive, hasInvisible, overchannelActive, overchannelUseCount, soulstitchSelection }) {
     const context = {
         targetName: target?.name,
         attackerName: playerStats.name,
@@ -213,14 +209,24 @@ async function handleSingleTargetSave({ spell, fullSpell, metaCtx, playerStats, 
         context.viciousMockerySpell = spell;
         context.viciousMockeryMapName = mapName;
     }
+    return context;
+}
 
-    let overchannelResult;
+async function handleSingleTargetSave({ spell, fullSpell, metaCtx, playerStats, mapName,
+    getTargetInfo, innateSorceryActive, effectiveDamageType, spellSaveDc,
+    overchannelFormula, overchannelActive, overchannelUseCount, rollDamage, formula, hasInvisible,
+    soulstitchSelection = [] }) {
+
+    const target = await getTargetInfo();
+    const context = buildSingleTargetSaveContext(target, mapName, { playerStats, metaCtx, fullSpell, spell,
+        effectiveDamageType, spellSaveDc, innateSorceryActive, hasInvisible, overchannelActive,
+        overchannelUseCount, soulstitchSelection });
+
     const damageFormula = overchannelFormula || formula;
-    if (overchannelActive) {
-        overchannelResult = rollExpressionMaximized(damageFormula);
-    } else {
-        overchannelResult = rollExpression(damageFormula);
-    }
+    const overchannelResult = overchannelActive
+        ? rollExpressionMaximized(damageFormula)
+        : rollExpression(damageFormula);
+
     if (overchannelResult) {
         rollDamage(spell.name, overchannelFormula || formula, overchannelResult.total, overchannelResult.rolls, overchannelResult.modifier, context);
     }

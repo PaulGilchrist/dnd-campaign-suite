@@ -214,7 +214,7 @@ function applyShockwaveDamage(campaignName, playerName, targetName, finalDamage,
     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
     const cs = getCombatSummary(campaignName);
     if (!cs) return;
-    const applyResult = applyDamageToTarget(cs, targetName, finalDamage, [damageType], campaignName, characters, false, playerName);
+    const applyResult = applyDamageToTarget(cs, targetName, finalDamage, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
     const actualDamage = applyResult?.finalDamage ?? finalDamage;
     if (actualDamage !== finalDamage) {
         console.error(`[quiveringPalm] Damage adjusted by resistances: ${finalDamage} → ${actualDamage}`);

@@ -61,7 +61,7 @@ async function handlePotentCantripHalfDamage({ deps, name, formula, context }) {
     const halfDamage = Math.floor(adjustedPotentTotal / 2);
     const combatSummary2 = await loadCombatSummary(campaignName);
     const ignoreResistance = (playerStats && hasIgnoreResistance(playerStats, damageType)) || false;
-    const applyResult = await applyDamageToTarget(combatSummary2, targetName, halfDamage, [damageType], campaignName, characters, ignoreResistance, characterName);
+    const applyResult = await applyDamageToTarget(combatSummary2, targetName, halfDamage, [damageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: characterName });
     const target = combatSummary2?.creatures?.find(c => c.name === targetName) || null;
     const isCrit = isAutoCrit || false;
     const displayFormula = isCrit ? formatDamageFormula(formula, damageResult.rolls, true) : formula;

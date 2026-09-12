@@ -5,6 +5,16 @@ import { getHolyAuraTargets } from '../../automation/handlers/buffs/holyAuraHand
 import { addCondition } from '../../combat/conditions/conditionSaveService.js';
 import { loadCombatSummary } from '../../encounters/combatData.js';
 
+function resolveAttackerFiendOrUndead(combatSummary, attackerName) {
+    const attackerCreature = combatSummary.creatures.find(c => c.name === attackerName);
+    if (!attackerCreature) return null;
+    const attackerType = (attackerCreature.monsterType || '').toLowerCase();
+    const attackerTemplate = (attackerCreature.template || []).map(t => t.toLowerCase());
+    const isFiendOrUndead = attackerType === 'fiend' || attackerType === 'undead' ||
+        attackerTemplate.includes('fiend') || attackerTemplate.includes('undead');
+    return isFiendOrUndead ? attackerCreature : null;
+}
+
 export async function checkHolyAuraDamage(creature, attackerName, combatSummary, campaignName, wardDamage) {
     if (attackerName && attackerName !== creature.name && wardDamage > 0) {
         const targetEffects = (getRuntimeValue('campaign', 'targetEffects') || []).filter(
@@ -15,13 +25,8 @@ export async function checkHolyAuraDamage(creature, attackerName, combatSummary,
         const holyAuraTargets = getHolyAuraTargets(casterName, campaignName);
         const isTargetProtected = holyAuraTargets.includes(creature.name);
         if (!isTargetProtected) return null;
-        const attackerCreature = combatSummary.creatures.find(c => c.name === attackerName);
+        const attackerCreature = resolveAttackerFiendOrUndead(combatSummary, attackerName);
         if (!attackerCreature) return null;
-        const attackerType = (attackerCreature.monsterType || '').toLowerCase();
-        const attackerTemplate = (attackerCreature.template || []).map(t => t.toLowerCase());
-        const isFiendOrUndead = attackerType === 'fiend' || attackerType === 'undead' ||
-            attackerTemplate.includes('fiend') || attackerTemplate.includes('undead');
-        if (!isFiendOrUndead) return null;
         const conSaveDc = getRuntimeValue(casterName, 'holyAuraSaveDc', campaignName);
         if (!conSaveDc) return null;
         const saveRoll = rollD20();

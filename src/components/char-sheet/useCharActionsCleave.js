@@ -92,10 +92,62 @@ export default function useCharActionsCleave({
         }
     }
 
+    async function applyToppleMastery(attackName, actualTargetName) {
+        const weaponAttack = playerStats.attacks?.find(a => a.name === attackName);
+        const abilityName = weaponAttack?.abilityName || 'Strength';
+        const ability = playerStats.abilities?.find(a => a.name === abilityName);
+        const abilityMod = ability?.bonus || 0;
+        const prof = playerStats.proficiency || 0;
+        const saveDc = 8 + abilityMod + prof;
+        const { promise } = createSaveListener(campaignName, {
+            targetName: actualTargetName,
+            saveType: 'CON',
+            saveDc,
+        });
+        await addEntry(campaignName, {
+            type: 'save_result',
+            characterName: playerStats.name,
+            targetName: actualTargetName,
+            saveType: 'CON',
+            saveDc,
+            description: `Topple: ${actualTargetName} must make a DC ${saveDc} CON save (weapon ${abilityName}) or fall Prone.`,
+            success: null,
+        }).catch((e) => { console.error("[useCharActionsCleave:log-error]", e); });
+        const result = await promise;
+        if (!result || result.success) return;
+        await applyToppleProne(actualTargetName, saveDc, abilityName);
+    }
+
+    async function applyToppleProne(actualTargetName, saveDc, abilityName) {
+        const storedConditions = getRuntimeValue(actualTargetName, 'activeConditions') || [];
+        const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+        if (!conditions.includes('prone')) {
+            await setRuntimeValue(actualTargetName, 'activeConditions', [...conditions, 'prone'], campaignName);
+        }
+        await addEntry(campaignName, {
+            type: 'save_result',
+            characterName: playerStats.name,
+            rollType: 'save-topple',
+            targetName: actualTargetName,
+            saveDc,
+            saveType: 'CON',
+            success: false,
+            description: `${actualTargetName} failed CON save vs Topple. Gains Prone condition.`,
+        }).catch((e) => { console.error("[useCharActionsCleave:log-error]", e); });
+        await addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: 'Topple',
+            description: `${playerStats.name} used Topple on ${actualTargetName} — target failed CON save (DC ${saveDc}, weapon ${abilityName}), fell Prone.`,
+            targetName: actualTargetName,
+        }).catch((e) => { console.error("[useCharActionsCleave:log-error]", e); });
+    }
+
     async function handleTacticalMasterConfirm(chosenMastery) {
-        const oldMastery = getRuntimeValue('campaign', 'tacticalMasterPending', campaignName)?.baseMastery;
-        const attackName = getRuntimeValue('campaign', 'tacticalMasterPending', campaignName)?.attackName;
-        const targetName = getRuntimeValue('campaign', 'tacticalMasterPending', campaignName)?.targetName;
+        const pending = getRuntimeValue('campaign', 'tacticalMasterPending', campaignName) || {};
+        const oldMastery = pending.baseMastery;
+        const attackName = pending.attackName;
+        const targetName = pending.targetName;
         setTacticalMasterModal(null);
         if (!chosenMastery) return;
         if (targetName) {
@@ -111,51 +163,7 @@ export default function useCharActionsCleave({
         const actualTargetName = lastAttack?.targetName;
         if (!actualTargetName) return;
         if (chosenMastery === 'Topple') {
-            const weaponAttack = playerStats.attacks?.find(a => a.name === attackName);
-            const abilityName = weaponAttack?.abilityName || 'Strength';
-            const ability = playerStats.abilities?.find(a => a.name === abilityName);
-            const abilityMod = ability?.bonus || 0;
-            const prof = playerStats.proficiency || 0;
-            const saveDc = 8 + abilityMod + prof;
-            const { promise } = createSaveListener(campaignName, {
-                targetName: actualTargetName,
-                saveType: 'CON',
-                saveDc,
-            });
-            await addEntry(campaignName, {
-                type: 'save_result',
-                characterName: playerStats.name,
-                targetName: actualTargetName,
-                saveType: 'CON',
-                saveDc,
-                description: `Topple: ${actualTargetName} must make a DC ${saveDc} CON save (weapon ${abilityName}) or fall Prone.`,
-                success: null,
-            }).catch((e) => { console.error("[useCharActionsCleave:log-error]", e); });
-            const result = await promise;
-            if (result && !result.success) {
-                const storedConditions = getRuntimeValue(actualTargetName, 'activeConditions') || [];
-                const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-                if (!conditions.includes('prone')) {
-                    await setRuntimeValue(actualTargetName, 'activeConditions', [...conditions, 'prone'], campaignName);
-                }
-                await addEntry(campaignName, {
-                    type: 'save_result',
-                    characterName: playerStats.name,
-                    rollType: 'save-topple',
-                    targetName: actualTargetName,
-                    saveDc,
-                    saveType: 'CON',
-                    success: false,
-                    description: `${actualTargetName} failed CON save vs Topple. Gains Prone condition.`,
-                }).catch((e) => { console.error("[useCharActionsCleave:log-error]", e); });
-                await addEntry(campaignName, {
-                    type: 'ability_use',
-                    characterName: playerStats.name,
-                    abilityName: 'Topple',
-                    description: `${playerStats.name} used Topple on ${actualTargetName} — target failed CON save (DC ${saveDc}, weapon ${abilityName}), fell Prone.`,
-                    targetName: actualTargetName,
-                }).catch((e) => { console.error("[useCharActionsCleave:log-error]", e); });
-            }
+            await applyToppleMastery(attackName, actualTargetName);
         } else {
             await applyMasteryEffect(chosenMastery, playerStats, campaignName, actualTargetName);
         }

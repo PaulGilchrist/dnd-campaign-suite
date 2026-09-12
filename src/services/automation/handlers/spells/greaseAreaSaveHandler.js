@@ -96,6 +96,72 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
+async function greaseTargetIsImmune(targetName, tracking, campaignName) {
+    const targetCharacter = (await getCombatContext(campaignName))?.creatures?.find(c => c.name === targetName);
+    if (targetCharacter?.type !== 'player') return false;
+    const targetStats = {
+        computedStats: getRuntimeValue(targetName, 'computedStats', campaignName),
+    };
+    return playerIsImmuneToCondition({
+        conditionKey: tracking.condition.toLowerCase(),
+        playerStats: targetStats,
+        getRuntimeValue,
+        campaignName,
+    });
+}
+
+function targetHasCondition(targetName, condition, campaignName) {
+    const existingConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    return existingConditions.some(c => String(c).toLowerCase() === condition);
+}
+
+async function recordGreaseFailure(campaignName, casterName, targetName, tracking, saveResult) {
+    const cs = await getCombatContext(campaignName);
+    const conditionDef = { key: tracking.condition.toLowerCase(), label: tracking.condition.charAt(0).toUpperCase() + tracking.condition.slice(1) };
+    addCondition(cs, targetName, conditionDef, tracking.saveDc, tracking.saveType, getRuntimeValue, setRuntimeValue, campaignName, null);
+
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'failure',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: [tracking.condition.toLowerCase()],
+        appliedDamage: 0,
+    });
+
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-grease',
+        targetName,
+        saveDc: tracking.saveDc,
+        saveType: tracking.saveType,
+        success: false,
+        description: `${targetName} failed ${tracking.saveType} save against Grease. Becomes Prone.`,
+    }).catch((e) => { console.error("[greaseAreaSave] Error:", e); });
+}
+
+async function recordGreaseSuccess(campaignName, casterName, targetName, tracking, saveResult) {
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'success',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: [],
+        appliedDamage: 0,
+    });
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-grease',
+        targetName,
+        saveDc: tracking.saveDc,
+        saveType: tracking.saveType,
+        success: true,
+        description: `${targetName} succeeded on ${tracking.saveType} save against Grease.`,
+    }).catch((e) => { console.error("[greaseAreaSave] Error:", e); });
+}
+
 export async function processGreaseAreaSave(casterName, targetName, campaignName, _mapName) {
     const trackingKey = getGreaseTrackingKey(casterName);
     const tracking = getRuntimeValue(casterName, trackingKey, campaignName);
@@ -112,26 +178,12 @@ export async function processGreaseAreaSave(casterName, targetName, campaignName
 
         if (!inArea) return null;
 
-        // Check condition immunity
-        const targetCharacter = (await getCombatContext(campaignName))?.creatures?.find(c => c.name === targetName);
-        if (targetCharacter?.type === 'player') {
-            const targetStats = {
-                computedStats: getRuntimeValue(targetName, 'computedStats', campaignName),
-            };
-            if (playerIsImmuneToCondition({
-                conditionKey: tracking.condition.toLowerCase(),
-                playerStats: targetStats,
-                getRuntimeValue,
-                campaignName,
-            })) {
-                return null;
-            }
+        if (await greaseTargetIsImmune(targetName, tracking, campaignName)) {
+            return null;
         }
 
         // Check if target is already Prone (no need to re-save)
-        const existingConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-        const isAlreadyProne = existingConditions.some(c => String(c).toLowerCase() === 'prone');
-        if (isAlreadyProne) return null;
+        if (targetHasCondition(targetName, 'prone', campaignName)) return null;
 
         // Trigger save for this creature
         const { promptId, promise } = createSaveListener(campaignName, {
@@ -151,48 +203,9 @@ export async function processGreaseAreaSave(casterName, targetName, campaignName
         const saveResult = await promise;
 
         if (!saveResult.success) {
-            const cs = await getCombatContext(campaignName);
-            const conditionDef = { key: tracking.condition.toLowerCase(), label: tracking.condition.charAt(0).toUpperCase() + tracking.condition.slice(1) };
-            addCondition(cs, targetName, conditionDef, tracking.saveDc, tracking.saveType, getRuntimeValue, setRuntimeValue, campaignName, null);
-
-            await addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'failure',
-                roll: saveResult.roll ?? 0,
-                total: saveResult.total ?? 0,
-                conditions: [tracking.condition.toLowerCase()],
-                appliedDamage: 0,
-            });
-
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                rollType: 'save-grease',
-                targetName,
-                saveDc: tracking.saveDc,
-                saveType: tracking.saveType,
-                success: false,
-                description: `${targetName} failed ${tracking.saveType} save against Grease. Becomes Prone.`,
-            }).catch((e) => { console.error("[greaseAreaSave] Error:", e); });
+            await recordGreaseFailure(campaignName, casterName, targetName, tracking, saveResult);
         } else {
-            await addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'success',
-                roll: saveResult.roll ?? 0,
-                total: saveResult.total ?? 0,
-                conditions: [],
-                appliedDamage: 0,
-            });
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                rollType: 'save-grease',
-                targetName,
-                saveDc: tracking.saveDc,
-                saveType: tracking.saveType,
-                success: true,
-                description: `${targetName} succeeded on ${tracking.saveType} save against Grease.`,
-            }).catch((e) => { console.error("[greaseAreaSave] Error:", e); });
+            await recordGreaseSuccess(campaignName, casterName, targetName, tracking, saveResult);
         }
 
         return {

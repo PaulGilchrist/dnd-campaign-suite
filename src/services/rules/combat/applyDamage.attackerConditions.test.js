@@ -139,10 +139,7 @@ describe('Psychic Veil — attacker condition removal on hit', () => {
       return undefined;
     });
 
-    await applyDamageToTarget(cs, 'Goblin', 5, ['Psychic'], 'TestCampaign', [
-      createMinimalCharacter('Warlock'),
-      createMinimalCharacter('Goblin'),
-    ], false, 'Warlock');
+    await applyDamageToTarget(cs, 'Goblin', 5, ['Psychic'], 'TestCampaign', [ createMinimalCharacter('Warlock'), createMinimalCharacter('Goblin'), ], { ignoreResistance: false, attackerName: 'Warlock' });
 
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'Warlock', 'activeConditions', [], 'TestCampaign',
@@ -170,7 +167,7 @@ describe('Psychic Veil — attacker condition removal on hit', () => {
       if (key === 'tempHp') return 0;
       return undefined;
     });
-    await applyDamageToTarget(cs, 'Skeleton', 5, ['Psychic'], 'TestCampaign', [createMinimalCharacter('Warlock'), createMinimalCharacter('Skeleton')], false, 'Warlock');
+    await applyDamageToTarget(cs, 'Skeleton', 5, ['Psychic'], 'TestCampaign', [createMinimalCharacter('Warlock'), createMinimalCharacter('Skeleton')], { ignoreResistance: false, attackerName: 'Warlock' });
     expect(setRuntimeValue).not.toHaveBeenCalledWith('Warlock', 'activeConditions', expect.any(Array), 'TestCampaign');
   });
 
@@ -192,7 +189,7 @@ describe('Psychic Veil — attacker condition removal on hit', () => {
       if (key === 'tempHp') return 0;
       return undefined;
     });
-    await applyDamageToTarget(cs, 'Goblin', 5, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Fighter'), createMinimalCharacter('Goblin')], false, 'Fighter');
+    await applyDamageToTarget(cs, 'Goblin', 5, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Fighter'), createMinimalCharacter('Goblin')], { ignoreResistance: false, attackerName: 'Fighter' });
     expect(setRuntimeValue).not.toHaveBeenCalledWith('Fighter', 'activeConditions', expect.any(Array), 'TestCampaign');
   });
 });
@@ -223,7 +220,7 @@ describe('Supreme Sneak — preserve Invisible condition', () => {
       return undefined;
     });
 
-    await applyDamageToTarget(cs, 'Goblin', 5, ['Psychic'], 'TestCampaign', [createMinimalCharacter('Rogue'), createMinimalCharacter('Goblin')], false, 'Rogue');
+    await applyDamageToTarget(cs, 'Goblin', 5, ['Psychic'], 'TestCampaign', [createMinimalCharacter('Rogue'), createMinimalCharacter('Goblin')], { ignoreResistance: false, attackerName: 'Rogue' });
     expect(setRuntimeValue).not.toHaveBeenCalledWith('Rogue', 'activeConditions', expect.any(Array), 'TestCampaign');
   });
 });

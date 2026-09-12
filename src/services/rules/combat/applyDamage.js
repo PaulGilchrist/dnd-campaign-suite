@@ -623,7 +623,7 @@ function concentrationDamagePending(options, creature, damageTaken) {
 // Player drop-to-0 interception + death-save prompt + concentration prompt.
 // Returns { interception, combatSummaryChanged } — the interception (when non-null)
 // must be returned verbatim from applyDamageToTarget.
-function handlePlayerZeroHpAndConcentration(creature, characters, playerComputed, options, wasAlive, isNowUnconscious, oldHp, finalDamage, actualDamageTaken, attackerName, campaignName) {
+function handlePlayerZeroHpAndConcentration({ creature, characters, playerComputed, options, wasAlive, isNowUnconscious, oldHp, finalDamage, actualDamageTaken, attackerName, campaignName }) {
   if (wasAlive && isNowUnconscious) {
     const interception = interceptZeroHitPoints(creature, playerComputed, options, finalDamage, oldHp, campaignName);
     if (interception) {
@@ -664,7 +664,7 @@ function absorbThroughFeaturesAndWards(creature, isPlayer, playerComputed, playe
 
 // Post-HP events for damage that landed on the ward: projected-ward record,
 // reaction/tracking events, avenging-angel aura cleanup. Dispatch order is rule-significant.
-async function emitWardDamageEvents(creature, combatSummary, characters, isPlayer, attackerName, isSecondary, actualDamageTaken, damageTypes, wardDamage, campaignName) {
+async function emitWardDamageEvents({ creature, combatSummary, characters, isPlayer, attackerName, isSecondary, actualDamageTaken, damageTypes, wardDamage, campaignName }) {
   let combatSummaryChanged = false;
   let holyAuraSaveResult = null;
   // Projected Ward (Abjurer reaction roll-back record)
@@ -698,9 +698,9 @@ function handleSummonVanishAndConcentrationDc(creature, combatSummary, isPlayer,
 // Zero-HP/concentration outcomes, player vs NPC. A player interception is
 // returned verbatim by applyDamageToTarget; NPC concentration breaks fold
 // into combatSummaryChanged (both only ever feed the summary persist).
-function resolveTargetDamageOutcome(creature, combatSummary, characters, isPlayer, playerComputed, options, wasAlive, isNowUnconscious, oldHp, finalDamage, actualDamageTaken, attackerName, campaignName) {
+function resolveTargetDamageOutcome({ creature, combatSummary, characters, isPlayer, playerComputed, options, wasAlive, isNowUnconscious, oldHp, finalDamage, actualDamageTaken, attackerName, campaignName }) {
   if (isPlayer) {
-    return handlePlayerZeroHpAndConcentration(creature, characters, playerComputed, options, wasAlive, isNowUnconscious, oldHp, finalDamage, actualDamageTaken, attackerName, campaignName);
+    return handlePlayerZeroHpAndConcentration({ creature, characters, playerComputed, options, wasAlive, isNowUnconscious, oldHp, finalDamage, actualDamageTaken, attackerName, campaignName });
   }
   if (concentrationDamagePending(options, creature, finalDamage)) {
     handleNpcConcentrationBreak(creature, characters, attackerName, combatSummary, campaignName);
@@ -725,7 +725,7 @@ function isSpellOriginDamage(options, existingAttack) {
   return options?.isSpellDamage === true || existingAttack?.rollType === 'spell-save' || existingAttack?.isSpellDamage === true;
 }
 
-export async function applyDamageToTarget(combatSummary, targetName, rawDamage, damageTypes, campaignName, characters, ignoreResistance = false, attackerName = null, suppressHpLog = false, options = {}) {
+export async function applyDamageToTarget(combatSummary, targetName, rawDamage, damageTypes, campaignName, characters, { ignoreResistance = false, attackerName = null, suppressHpLog = false, ...options } = {}) {
   if (!combatSummary) return null;
   const creature = combatSummary.creatures.find(c => c.name === targetName);
   if (!creature) return null;
@@ -765,7 +765,7 @@ export async function applyDamageToTarget(combatSummary, targetName, rawDamage, 
 
   recordActualDamageInLastAttack(isSecondary, wardDamage, campaignName);
 
-  const wardEvents = await emitWardDamageEvents(creature, combatSummary, characters, isPlayer, attackerName, isSecondary, actualDamageTaken, damageTypes, wardDamage, campaignName);
+  const wardEvents = await emitWardDamageEvents({ creature, combatSummary, characters, isPlayer, attackerName, isSecondary, actualDamageTaken, damageTypes, wardDamage, campaignName });
   let combatSummaryChanged = wardEvents.combatSummaryChanged;
 
   const wasAlive = oldHp > 0;
@@ -775,7 +775,7 @@ export async function applyDamageToTarget(combatSummary, targetName, rawDamage, 
 
   checkDarkOnesBlessing(characters, creature, finalDamage, isPlayer, wasAlive, isNowUnconscious, campaignName, attackerName);
 
-  const outcome = resolveTargetDamageOutcome(creature, combatSummary, characters, isPlayer, playerComputed, options, wasAlive, isNowUnconscious, oldHp, finalDamage, actualDamageTaken, attackerName, campaignName);
+  const outcome = resolveTargetDamageOutcome({ creature, combatSummary, characters, isPlayer, playerComputed, options, wasAlive, isNowUnconscious, oldHp, finalDamage, actualDamageTaken, attackerName, campaignName });
   if (outcome.interception) {
     return outcome.interception;
   }

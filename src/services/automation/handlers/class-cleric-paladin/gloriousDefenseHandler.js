@@ -6,6 +6,15 @@ import { infoPopup } from '../../common/infoPopup.js';
 
 const USES_KEY = 'gloriousDefenseUses';
 
+function buildOutcomeDescription({ featureName, targetName, attackerName, d20, bonus, ac, chaMod, newAc, hit, wouldHit }) {
+    let description = `<b>${featureName}</b><br/>`;
+    description += `Target: ${targetName}<br/>`;
+    description += `Attacker: ${attackerName}<br/>`;
+    description += `Original roll: d20(${d20}) + ${bonus} = ${d20 + bonus} vs AC ${ac != null ? ac : '—'} → <b>${hit ? 'HIT' : 'MISS'}</b><br/>`;
+    description += `With CHA modifier (${chaMod}): d20(${d20}) + ${bonus} = ${d20 + bonus} vs AC ${newAc != null ? newAc : '—'} → <b>${wouldHit == null ? 'N/A' : wouldHit ? 'HIT' : 'MISS'}</b><br/>`;
+    return description;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -21,8 +30,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     // Read the last attack to determine if it targeted this Paladin
-    const lastAttack = await findLastAttack(campaignName);
-    const attackEvent = lastAttack?.attackEvent;
+    const lastAttack = await findLastAttack(campaignName) || {};
+    const attackEvent = lastAttack.attackEvent;
 
     if (!attackEvent) {
         return infoPopup(featureName, `${featureName}: No recent attack roll found. This reaction must be used in response to an attack.`, auto);
@@ -43,11 +52,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const originalHit = hit === true;
     const wouldHit = newAc != null ? (d20 + bonus >= newAc) : null;
 
-    let description = `<b>${featureName}</b><br/>`;
-    description += `Target: ${targetName}<br/>`;
-    description += `Attacker: ${attackerName}<br/>`;
-    description += `Original roll: d20(${d20}) + ${bonus} = ${d20 + bonus} vs AC ${ac != null ? ac : '—'} → <b>${hit ? 'HIT' : 'MISS'}</b><br/>`;
-    description += `With CHA modifier (${chaMod}): d20(${d20}) + ${bonus} = ${d20 + bonus} vs AC ${newAc != null ? newAc : '—'} → <b>${wouldHit == null ? 'N/A' : wouldHit ? 'HIT' : 'MISS'}</b><br/>`;
+    let description = buildOutcomeDescription({ featureName, targetName, attackerName, d20, bonus, ac, chaMod, newAc, hit, wouldHit });
 
     if (originalHit && wouldHit === false) {
         return await blockAndCounterattack({ auto, playerStats, playerName, campaignName, featureName, targetName, attackerName, chaMod, currentUses, description });

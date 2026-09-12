@@ -1,6 +1,20 @@
 // Shared helpers for the damage handlers in this directory.
 import { applyMinDamageAdjustment } from '../loggedDiceRollUtils.js';
 import { hasGreatWeaponFighting, applyGreatWeaponFightingToDamage } from '../../../services/combat/automation/automationService.js';
+import { getRuntimeValue } from '../../runtime/useRuntimeState.js';
+
+export function findTargetByContext(combatSummary, context) {
+    return combatSummary?.creatures?.find(c => c.name === context?.targetName) || null;
+}
+
+export function resolveTargetMaxHp(target) {
+    return target?.type === 'player' ? (getRuntimeValue(target.name, 'hitPoints') ?? 0) : target?.maxHp ?? 0;
+}
+
+export function resolveAppliedDamage(applyResult, isIntercepted) {
+    if (isIntercepted) return applyResult.damageDealt ?? 0;
+    return applyResult?.finalDamage ?? 0;
+}
 
 export function getHpThreshold({ oldHp, newHp, maxHp, deadHp = newHp }) {
     const wasAlive = oldHp > 0;

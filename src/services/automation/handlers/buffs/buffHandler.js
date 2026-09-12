@@ -46,14 +46,7 @@ function getPsionicEnergy(playerStats, campaignName) {
     return Number(stored ?? defaultMax);
 }
 
-export async function handle(action, playerStats, campaignName, _mapName) {
-    const auto = action.automation;
-
-    const delegate = auto?.effect ? EFFECT_DELEGATES[auto.effect] : null;
-    if (delegate) {
-        return delegate(action, playerStats, campaignName, _mapName);
-    }
-
+function checkBuffGates(action, auto, playerStats, campaignName, _mapName) {
     // dash_action trigger: temporary speed bonus
     if (auto?.trigger === 'dash_action' && auto?.effect === 'speed_bonus') {
         const dashPopup = handleDashSpeedBonus(action, auto, playerStats, campaignName);
@@ -80,6 +73,20 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     if (TELEPORT_EFFECTS.has(auto?.effect)) {
         return handleTeleport(action, playerStats, campaignName, _mapName);
     }
+
+    return null;
+}
+
+export async function handle(action, playerStats, campaignName, _mapName) {
+    const auto = action.automation;
+
+    const delegate = auto?.effect ? EFFECT_DELEGATES[auto.effect] : null;
+    if (delegate) {
+        return delegate(action, playerStats, campaignName, _mapName);
+    }
+
+    const gatePopup = checkBuffGates(action, auto, playerStats, campaignName, _mapName);
+    if (gatePopup) return gatePopup;
 
     // Telepathic Speech: defer to modal for target selection
     if (auto?.effect === 'telepathic_speech') {
@@ -441,6 +448,26 @@ async function handleCoronaOfLight(action, playerStats, campaignName, _mapName) 
     };
 }
 
+function resolveAdrenalineUsesMax(auto, playerStats) {
+    if (auto.uses === 'proficiency_bonus') return playerStats.proficiency || 0;
+    if (typeof auto.uses === 'number') return auto.uses;
+    return auto.usesMax != null ? auto.usesMax : 1;
+}
+
+// First eval applies temp HP; description re-evaluates below (matches original double-roll).
+function applyDashTempHp(auto, playerStats, playerName, campaignName) {
+    if (auto?.bonusEffect !== 'temp_hp' || !auto?.bonusExpression) return;
+    const tempHpAmount = evaluateAutoExpression(auto.bonusExpression, playerStats);
+    if (typeof tempHpAmount === 'number' && tempHpAmount > 0) {
+        setTempHp(playerName, tempHpAmount, campaignName);
+    }
+}
+
+function dashBonusTempHp(auto, playerStats) {
+    if (auto?.bonusEffect !== 'temp_hp' || !auto?.bonusExpression) return 0;
+    return evaluateAutoExpression(auto.bonusExpression, playerStats);
+}
+
 async function handleBonusActionDash(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -448,14 +475,7 @@ async function handleBonusActionDash(action, playerStats, campaignName, _mapName
 
     const usesKey = ADRENALINE_RUSH_USES_KEY;
 
-    let usesMax;
-    if (auto.uses === 'proficiency_bonus') {
-        usesMax = playerStats.proficiency || 0;
-    } else if (typeof auto.uses === 'number') {
-        usesMax = auto.uses;
-    } else {
-        usesMax = auto.usesMax != null ? auto.usesMax : 1;
-    }
+    const usesMax = resolveAdrenalineUsesMax(auto, playerStats);
 
     const stored = getRuntimeValue(playerName, usesKey, campaignName);
     const usesRemaining = stored != null ? Number(stored) : usesMax;
@@ -474,19 +494,12 @@ async function handleBonusActionDash(action, playerStats, campaignName, _mapName
         };
     }
 
-    if (auto?.bonusEffect === 'temp_hp' && auto?.bonusExpression) {
-        const tempHpAmount = evaluateAutoExpression(auto.bonusExpression, playerStats);
-        if (typeof tempHpAmount === 'number' && tempHpAmount > 0) {
-            setTempHp(playerName, tempHpAmount, campaignName);
-        }
-    }
+    applyDashTempHp(auto, playerStats, playerName, campaignName);
 
     const newUses = usesRemaining - 1;
     await setRuntimeValue(playerName, usesKey, newUses, campaignName);
 
-    const tempHpAmount = auto?.bonusEffect === 'temp_hp' && auto?.bonusExpression
-        ? evaluateAutoExpression(auto.bonusExpression, playerStats)
-        : 0;
+    const tempHpAmount = dashBonusTempHp(auto, playerStats);
 
     const tempHpDesc = tempHpAmount > 0
         ? ` Gained ${tempHpAmount} temporary hit points.`

@@ -512,7 +512,7 @@ describe('applyDamageToTarget', () => {
       stubPlayerRuntime(73);
       const player = createPlayerCreature('HexWarlock', { currentHp: 73 });
       const cs = makeCombatSummary([player]);
-      await applyDamageToTarget(cs, 'HexWarlock', 13, ['Slashing'], 'TestCampaign', [createMinimalCharacter('HexWarlock')], false, 'Wight 1');
+      await applyDamageToTarget(cs, 'HexWarlock', 13, ['Slashing'], 'TestCampaign', [createMinimalCharacter('HexWarlock')], { ignoreResistance: false, attackerName: 'Wight 1' });
       expect(setRuntimeValue).toHaveBeenCalledWith('HexWarlock', 'projectedWardDamage',
         expect.objectContaining({ rawDamage: 13, damageType: 'Slashing', attackerName: 'Wight 1' }), 'TestCampaign');
     });
@@ -529,7 +529,7 @@ describe('applyDamageToTarget', () => {
       });
       const warden = createPlayerCreature('DivinationWizard', { currentHp: 73 });
       const cs = makeCombatSummary([warden]);
-      await applyDamageToTarget(cs, 'DivinationWizard', 10, ['Necrotic'], 'TestCampaign', [createMinimalCharacter('DivinationWizard')], false, 'Wight 1');
+      await applyDamageToTarget(cs, 'DivinationWizard', 10, ['Necrotic'], 'TestCampaign', [createMinimalCharacter('DivinationWizard')], { ignoreResistance: false, attackerName: 'Wight 1' });
       expect(setRuntimeValue).not.toHaveBeenCalledWith('DivinationWizard', 'projectedWardDamage', expect.anything(), 'TestCampaign');
     });
 
@@ -537,7 +537,7 @@ describe('applyDamageToTarget', () => {
       stubPlayerRuntime(73);
       const player = createPlayerCreature('HexWarlock', { currentHp: 73 });
       const cs = makeCombatSummary([player]);
-      await applyDamageToTarget(cs, 'HexWarlock', 0, ['Slashing'], 'TestCampaign', [createMinimalCharacter('HexWarlock')], false, 'Wight 1');
+      await applyDamageToTarget(cs, 'HexWarlock', 0, ['Slashing'], 'TestCampaign', [createMinimalCharacter('HexWarlock')], { ignoreResistance: false, attackerName: 'Wight 1' });
       expect(setRuntimeValue).not.toHaveBeenCalledWith('HexWarlock', 'projectedWardDamage', expect.anything(), 'TestCampaign');
     });
 
@@ -547,8 +547,8 @@ describe('applyDamageToTarget', () => {
       setRuntimeValue.mockImplementation((storeName, subKey, value) => { store.set(`${storeName}.${subKey}`, value); });
       const player = createPlayerCreature('HexWarlock', { currentHp: 73 });
       const cs = makeCombatSummary([player]);
-      await applyDamageToTarget(cs, 'HexWarlock', 7, ['Slashing'], 'TestCampaign', [createMinimalCharacter('HexWarlock')], false, 'Wight 1');
-      await applyDamageToTarget(cs, 'HexWarlock', 6, ['Necrotic'], 'TestCampaign', [createMinimalCharacter('HexWarlock')], false, 'Wight 1');
+      await applyDamageToTarget(cs, 'HexWarlock', 7, ['Slashing'], 'TestCampaign', [createMinimalCharacter('HexWarlock')], { ignoreResistance: false, attackerName: 'Wight 1' });
+      await applyDamageToTarget(cs, 'HexWarlock', 6, ['Necrotic'], 'TestCampaign', [createMinimalCharacter('HexWarlock')], { ignoreResistance: false, attackerName: 'Wight 1' });
       expect(store.get('HexWarlock.projectedWardDamage').rawDamage).toBe(13);
       expect(store.get('HexWarlock.currentHitPoints')).toBe(60);
     });
@@ -557,7 +557,7 @@ describe('applyDamageToTarget', () => {
       stubNpcRuntime(55);
       const npc = { ...createNpcCreature('Wight 1', 55, 55), type: 'npc' };
       const cs = makeCombatSummary([npc]);
-      await applyDamageToTarget(cs, 'Wight 1', 12, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Wight 1')], false, 'HexWarlock');
+      await applyDamageToTarget(cs, 'Wight 1', 12, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Wight 1')], { ignoreResistance: false, attackerName: 'HexWarlock' });
       expect(setRuntimeValue).not.toHaveBeenCalledWith('Wight 1', 'projectedWardDamage', expect.anything(), 'TestCampaign');
     });
   });

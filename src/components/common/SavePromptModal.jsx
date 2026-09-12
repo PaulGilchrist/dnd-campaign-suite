@@ -147,6 +147,22 @@ function rollEffectDie(allTargetEffects, targetName, effect) {
   return rollExpression('1d4');
 }
 
+// Bane/bless effect dice for the target and its attacker. Rolls in the same
+// order as the original inline block: target bane, attacker bane, target bless.
+function rollEffectDieContributions(allTargetEffects, current) {
+  const baneSaveDie = rollEffectDie(allTargetEffects, current.targetName, 'bane_penalty');
+  const baneAttackerDie = current.attackerName ? rollEffectDie(allTargetEffects, current.attackerName, 'bane_penalty') : null;
+  const blessSaveDie = rollEffectDie(allTargetEffects, current.targetName, 'bless_bonus');
+  return {
+    baneSaveRoll: baneSaveDie ? baneSaveDie.total : null,
+    baneSavePenalty: baneSaveDie ? -baneSaveDie.total : 0,
+    baneAttackerBonus: baneAttackerDie ? baneAttackerDie.total : 0,
+    baneAttackerRoll: baneAttackerDie ? baneAttackerDie.total : null,
+    blessSaveBonus: blessSaveDie ? blessSaveDie.total : 0,
+    blessSaveRoll: blessSaveDie ? blessSaveDie.total : null,
+  };
+}
+
 function findWardingBondSaveBonus(current, campaignName) {
   const targetBuffs = getRuntimeValue(current.targetName, 'activeBuffs', campaignName);
   const targetActiveBuffs = Array.isArray(targetBuffs) ? targetBuffs : [];
@@ -221,22 +237,9 @@ async function computeSaveRollOutcome({ current, characters, campaignName, activ
   const finalRoll = hasDisadvantage ? Math.min(roll1, roll2) : hasAdvantage ? Math.max(roll1, roll2) : roll1;
   const { bonus: cosmicOmenAppliedBonus, detail: cosmicOmenDetail } = consumeCosmicOmen(campaignName);
 
-  const allTargetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-
-  // Bane: apply -1d4 penalty to saving throws for cursed targets
-  const baneSaveDie = rollEffectDie(allTargetEffects, current.targetName, 'bane_penalty');
-  const baneSaveRoll = baneSaveDie ? baneSaveDie.total : null;
-  const baneSavePenalty = baneSaveDie ? -baneSaveDie.total : 0;
-
-  // Bane on attacker: grant +1d4 to the target's save when the attacker is cursed by Bane
-  const baneAttackerDie = current.attackerName ? rollEffectDie(allTargetEffects, current.attackerName, 'bane_penalty') : null;
-  const baneAttackerBonus = baneAttackerDie ? baneAttackerDie.total : 0;
-  const baneAttackerRoll = baneAttackerDie ? baneAttackerDie.total : null;
-
-  // Bless: add 1d4 to saving throws
-  const blessSaveDie = rollEffectDie(allTargetEffects, current.targetName, 'bless_bonus');
-  const blessSaveBonus = blessSaveDie ? blessSaveDie.total : 0;
-  const blessSaveRoll = blessSaveDie ? blessSaveDie.total : null;
+  // Bane (target + attacker) and bless effect dice, then Warding Bond flat bonus.
+  const { baneSaveRoll, baneSavePenalty, baneAttackerBonus, baneAttackerRoll, blessSaveBonus, blessSaveRoll } =
+    rollEffectDieContributions(getRuntimeValue('campaign', 'targetEffects') || [], current);
 
   // Warding Bond: +1 flat bonus to saving throws
   const wardingBondSaveBonus = findWardingBondSaveBonus(current, campaignName);
@@ -463,6 +466,22 @@ function EvasionNote({ current, characters, campaignName }) {
     : <p className="sp-note">Half damage on successful save</p>;
 }
 
+function rollBreakdownText(result) {
+  const hasDoubleRoll = result.mode !== 'normal' && Array.isArray(result.rawRolls) && result.rawRolls.length === 2;
+  const rolls = hasDoubleRoll ? `${result.rawRolls[0]}, ${result.rawRolls[1]}` : result.roll;
+  const bonusDetail = result.bonusDetail ? ` ${result.bonusDetail}` : '';
+  const modeLabel = result.mode === 'advantage' ? ' (Advantage)' : result.mode === 'disadvantage' ? ' (Disadvantage)' : '';
+  return `d20 (${rolls}) + ${result.saveBonus}${bonusDetail}${modeLabel}`;
+}
+
+const REROLL_BUTTONS = [
+  { key: 'fanaticalFocusAvailable', handler: 'fanaticalFocus', icon: 'fa-rotate', label: (a) => `Reroll Save (+${a.rageDamageBonus})` },
+  { key: 'indomitableAvailable', handler: 'indomitable', icon: 'fa-rotate', label: (a) => `Indomitable (+${a.indomitableRerollBonus})` },
+  { key: 'disciplinedSurvivorAvailable', handler: 'disciplinedSurvivor', icon: 'fa-rotate', label: () => 'Reroll Save (1 Focus Point)' },
+  { key: 'livingLegendAvailable', handler: 'livingLegend', icon: 'fa-rotate', label: () => 'Reroll Save' },
+  { key: 'guardedMindAvailable', handler: 'guardedMind', icon: 'fa-shield-halved', label: () => 'Guarded Mind' },
+];
+
 function SaveResultPanel({ current, rerollUsedForSave, availability, handlers }) {
   const result = current.result;
   const showReroll = !result.success && !rerollUsedForSave;
@@ -470,32 +489,12 @@ function SaveResultPanel({ current, rerollUsedForSave, availability, handlers })
     <div className={`sp-result ${result.success ? 'sp-result-success' : 'sp-result-fail'}`}>
       <p className="sp-result-label">{result.success ? 'SAVE SUCCESS' : 'SAVE FAILURE'}</p>
       <p className="sp-result-total">Total: <strong>{result.total}</strong> vs DC {current.saveDc}</p>
-      <p className="sp-result-breakdown">d20 ({result.mode !== 'normal' && Array.isArray(result.rawRolls) && result.rawRolls.length === 2 ? `${result.rawRolls[0]}, ${result.rawRolls[1]}` : result.roll}) + {result.saveBonus}{result.bonusDetail ? ' ' + result.bonusDetail : ''}{result.mode === 'advantage' ? ' (Advantage)' : result.mode === 'disadvantage' ? ' (Disadvantage)' : ''}</p>
-      {showReroll && availability.fanaticalFocusAvailable && (
-        <button className="sp-stroke-btn" onClick={handlers.fanaticalFocus} type="button">
-          <i className="fa-solid fa-rotate"></i> Reroll Save (+{availability.rageDamageBonus})
+      <p className="sp-result-breakdown">{rollBreakdownText(result)}</p>
+      {showReroll && REROLL_BUTTONS.filter(b => availability[b.key]).map(b => (
+        <button key={b.key} className="sp-stroke-btn" onClick={handlers[b.handler]} type="button">
+          <i className={`fa-solid ${b.icon}`}></i> {b.label(availability)}
         </button>
-      )}
-      {showReroll && availability.indomitableAvailable && (
-        <button className="sp-stroke-btn" onClick={handlers.indomitable} type="button">
-          <i className="fa-solid fa-rotate"></i> Indomitable (+{availability.indomitableRerollBonus})
-        </button>
-      )}
-      {showReroll && availability.disciplinedSurvivorAvailable && (
-        <button className="sp-stroke-btn" onClick={handlers.disciplinedSurvivor} type="button">
-          <i className="fa-solid fa-rotate"></i> Reroll Save (1 Focus Point)
-        </button>
-      )}
-      {showReroll && availability.livingLegendAvailable && (
-        <button className="sp-stroke-btn" onClick={handlers.livingLegend} type="button">
-          <i className="fa-solid fa-rotate"></i> Reroll Save
-        </button>
-      )}
-      {showReroll && availability.guardedMindAvailable && (
-        <button className="sp-stroke-btn" onClick={handlers.guardedMind} type="button">
-          <i className="fa-solid fa-shield-halved"></i> Guarded Mind
-        </button>
-      )}
+      ))}
     </div>
   );
 }

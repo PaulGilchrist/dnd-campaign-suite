@@ -164,24 +164,25 @@ function buildRerollAndReplacementFlags(context) {
     };
 }
 
+const LUCK_INSPIRATION_PASSTHROUGH_KEYS = [
+    'tacticalMind', 'tacticalMindBonus', 'darkOnesLuck', 'strokeOfLuck',
+    'psiBolsteredKnack', 'psiBolsteredKnackDieSize', 'bardicInspiration', 'bardicInspirationDie',
+];
+
 function buildLuckInspirationEmpoweredFlags(context, ctx, characterName, campaignName) {
-    return {
-        tacticalMind: context?.tacticalMind,
-        tacticalMindBonus: context?.tacticalMindBonus,
-        darkOnesLuck: context?.darkOnesLuck,
-        strokeOfLuck: context?.strokeOfLuck,
-        psiBolsteredKnack: context?.psiBolsteredKnack,
-        psiBolsteredKnackDieSize: context?.psiBolsteredKnackDieSize,
-        bardicInspiration: context?.bardicInspiration,
-        bardicInspirationDie: context?.bardicInspirationDie,
-        bardicInspirationDefense: ctx.bardicInspirationDefense,
-        bardicInspirationDefenseDieSize: ctx.bardicInspirationDefenseDieSize,
-        bardicInspirationDefenseTargetName: ctx.bardicInspirationDefenseTargetName,
-        bardicInspirationOffense: context?.bardicInspirationOffense || (context?.playerStats ? hasBardicInspirationOffense(context.playerStats, campaignName) : false),
-        bardicInspirationOffenseDieSize: context?.bardicInspirationOffenseDieSize || getBardicInspirationDieSize(characterName, campaignName) || (context?.playerStats ? getBardicInspirationDieSizeFromClass(context.playerStats) : null),
-        empoweredSpell: context?.empoweredSpell || (context?.playerStats ? hasEmpoweredSpell(context.playerStats) : false),
-        empoweredSpellChaMod: context?.empoweredSpellChaMod || getChaModifier(context?.playerStats),
-    };
+    const stats = context?.playerStats;
+    const flags = {};
+    for (const key of LUCK_INSPIRATION_PASSTHROUGH_KEYS) {
+        flags[key] = context?.[key];
+    }
+    flags.bardicInspirationDefense = ctx.bardicInspirationDefense;
+    flags.bardicInspirationDefenseDieSize = ctx.bardicInspirationDefenseDieSize;
+    flags.bardicInspirationDefenseTargetName = ctx.bardicInspirationDefenseTargetName;
+    flags.bardicInspirationOffense = context?.bardicInspirationOffense || (stats ? hasBardicInspirationOffense(stats, campaignName) : false);
+    flags.bardicInspirationOffenseDieSize = context?.bardicInspirationOffenseDieSize || getBardicInspirationDieSize(characterName, campaignName) || (stats ? getBardicInspirationDieSizeFromClass(stats) : null);
+    flags.empoweredSpell = context?.empoweredSpell || (stats ? hasEmpoweredSpell(stats) : false);
+    flags.empoweredSpellChaMod = context?.empoweredSpellChaMod || getChaModifier(stats);
+    return flags;
 }
 
 function buildAttackFeatureFlags({ ctx, context, characterName, campaignName }) {
@@ -327,11 +328,11 @@ async function processRollTypeTail({ rollType, target, targetName, combatSummary
     }
 
     if (rollType === 'save') {
-        await processSaveRoll(rollType, target, characterName, campaignName, ctx, bonus, ctx.r1, ctx.r2, logEntry, setPopupHtml);
+        await processSaveRoll({ rollType, target, characterName, campaignName, context: ctx, bonus, r1: ctx.r1, r2: ctx.r2, logEntry, setPopupHtml });
     }
 
     if (rollType === 'initiative') {
-        await processInitiativeRoll(characterName, campaignName, ctx, bonus, ctx.effectiveD20Roll, ctx.r1, ctx.r2, setPopupHtml, availableSuperiorityManeuvers, ctx.cosmicOmenAppliedBonus, ctx._characters);
+        await processInitiativeRoll({ characterName, campaignName, context: ctx, bonus, effectiveD20Roll: ctx.effectiveD20Roll, r1: ctx.r1, r2: ctx.r2, setPopupHtml, availableSuperiorityManeuvers, cosmicOmenAppliedBonus: ctx.cosmicOmenAppliedBonus, characters: ctx._characters });
     }
 }
 
@@ -394,7 +395,7 @@ export function createLogAndShow(deps) {
         let resolveResult = { hit: undefined, isAutoMiss: false, isCrit: false, unerringStrikeApplied: false, homingStrikesUsed: false, homingStrikesBonus: 0, targetAc, effectiveAc: undefined, effectiveD20Roll: ctx.effectiveD20Roll };
         if (rollType === 'attack') {
             ctx.bonus = bonus;
-            resolveResult = await resolveHit(characterName, campaignName, ctx, bonus, ctx.effectiveD20Roll, target, combatSummary, characters, logEntry, setPopupHtml);
+            resolveResult = await resolveHit({ characterName, campaignName, context: ctx, bonus, effectiveD20Roll: ctx.effectiveD20Roll, target, combatSummary, characters, logEntry });
             Object.assign(ctx, resolveResult);
         }
 
@@ -426,10 +427,10 @@ export function createLogAndShow(deps) {
         }
 
         // Process attack post-results (lastAttack storage, graze, potent cantrip, vex clearing)
-        await processAttackAfterResult(ctx.hit, ctx.isAutoMiss, targetName, characterName, campaignName, ctx, combatSummary, characters, logEntry, setPopupHtml, ctx);
+        await processAttackAfterResult({ hit: ctx.hit, isAutoMiss: ctx.isAutoMiss, targetName, characterName, campaignName, context: ctx, combatSummary, characters, logEntry, setPopupHtml, state: ctx });
 
         // Potent cantrip half-damage on miss
-        await processPotentCantrip(ctx.hit, ctx.isAutoMiss, targetName, characterName, campaignName, ctx, combatSummary, characters, logEntry, setPopupHtml);
+        await processPotentCantrip({ hit: ctx.hit, isAutoMiss: ctx.isAutoMiss, targetName, characterName, campaignName, context: ctx, characters, logEntry, setPopupHtml });
 
         await processRollTypeTail({ rollType, target, targetName, combatSummary, characterName, campaignName, ctx, bonus, logEntry, setPopupHtml, availableSuperiorityManeuvers });
 

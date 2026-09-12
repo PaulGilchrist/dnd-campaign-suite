@@ -1,4 +1,4 @@
-import request from 'supertest';
+import { request } from '../test-utils/localhostSupertest.js';
 import express from 'express';
 import { spellOverlayData } from '../utils/changeData.js';
 

@@ -7,6 +7,77 @@ import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollback.js';
 
+async function applyPowerWordStun(targetName, action, campaignName, dc, targetCurrentHp) {
+    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'stunned');
+    setRuntimeValue(targetName, 'activeConditions', [...filtered, 'stunned'], campaignName);
+
+    // Store condition metadata with DC and ability for recurring CON save
+    const existingMeta = getRuntimeValue(targetName, 'activeConditionMeta', campaignName) || {};
+    setRuntimeValue(targetName, 'activeConditionMeta', {
+        ...existingMeta,
+        stunned: {
+            ...(existingMeta.stunned || {}),
+            dc,
+            ability: 'con',
+        },
+    }, campaignName);
+
+    // Update lastAttack for counterspell rollback
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'failure',
+        roll: 0,
+        total: 0,
+        conditions: ['stunned'],
+        appliedDamage: 0,
+    });
+
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: 'Stunned',
+        reason: action.name,
+        note: `${targetName} is Stunned by ${action.name} (${targetCurrentHp} HP).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[powerWordStun] Error:", e); });
+
+    return `${targetName} has ${targetCurrentHp} HP (150 or fewer). ${targetName} is Stunned.`;
+}
+
+async function applyPowerWordSpeedZero(targetName, casterName, action, campaignName, dc, targetCurrentHp) {
+    setRuntimeValue(targetName, 'activeConditions', [...(getRuntimeValue(targetName, 'activeConditions', campaignName) || []), 'speed_zero'], campaignName);
+
+    // Update lastAttack for counterspell rollback
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'failure',
+        roll: 0,
+        total: 0,
+        conditions: ['speed_zero'],
+        appliedDamage: 0,
+    });
+
+    // Set expiration: speed_zero ends at start of caster's next turn
+    addExpiration(casterName, targetName, [
+        { type: 'speed_zero', condition: 'speed_zero' },
+    ], campaignName, undefined, casterName);
+
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: 'Speed 0',
+        reason: action.name,
+        note: `${targetName} has Speed 0 from ${action.name} (${targetCurrentHp !== null ? targetCurrentHp + ' HP' : 'HP unknown'}). Ends at start of caster's next turn.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[powerWordStun] Error:", e); });
+
+    return `${targetName} has ${targetCurrentHp !== null ? targetCurrentHp + ' HP' : 'unknown HP'} (more than 150). ${targetName}'s Speed is 0 until the start of your next turn.`;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
@@ -56,74 +127,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     if (targetCurrentHp !== null && targetCurrentHp <= 150) {
         // Target has 150 HP or fewer → Stunned condition
-        const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-        const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-        const filtered = conditions.filter(c => String(c).toLowerCase() !== 'stunned');
-        setRuntimeValue(targetName, 'activeConditions', [...filtered, 'stunned'], campaignName);
-
-        // Store condition metadata with DC and ability for recurring CON save
-        const existingMeta = getRuntimeValue(targetName, 'activeConditionMeta', campaignName) || {};
-        setRuntimeValue(targetName, 'activeConditionMeta', {
-            ...existingMeta,
-            stunned: {
-                ...(existingMeta.stunned || {}),
-                dc,
-                ability: 'con',
-            },
-        }, campaignName);
-
-        // Update lastAttack for counterspell rollback
-        await addTargetResult(campaignName, {
-            targetName,
-            saveResult: 'failure',
-            roll: 0,
-            total: 0,
-            conditions: ['stunned'],
-            appliedDamage: 0,
-        });
-
-        addEntry(campaignName, {
-            type: 'condition',
-            action: 'applied',
-            characterName: targetName,
-            condition: 'Stunned',
-            reason: action.name,
-            note: `${targetName} is Stunned by ${action.name} (${targetCurrentHp} HP).`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[powerWordStun] Error:", e); });
-
-        description = `${targetName} has ${targetCurrentHp} HP (150 or fewer). ${targetName} is Stunned.`;
+        description = await applyPowerWordStun(targetName, action, campaignName, dc, targetCurrentHp);
         actionsTaken.push('stunned');
     } else {
         // Target has more than 150 HP → Speed 0 until start of next turn
-        setRuntimeValue(targetName, 'activeConditions', [...(getRuntimeValue(targetName, 'activeConditions', campaignName) || []), 'speed_zero'], campaignName);
-
-        // Update lastAttack for counterspell rollback
-        await addTargetResult(campaignName, {
-            targetName,
-            saveResult: 'failure',
-            roll: 0,
-            total: 0,
-            conditions: ['speed_zero'],
-            appliedDamage: 0,
-        });
-
-        // Set expiration: speed_zero ends at start of caster's next turn
-        addExpiration(casterName, targetName, [
-            { type: 'speed_zero', condition: 'speed_zero' },
-        ], campaignName, undefined, casterName);
-
-        addEntry(campaignName, {
-            type: 'condition',
-            action: 'applied',
-            characterName: targetName,
-            condition: 'Speed 0',
-            reason: action.name,
-            note: `${targetName} has Speed 0 from ${action.name} (${targetCurrentHp !== null ? targetCurrentHp + ' HP' : 'HP unknown'}). Ends at start of caster's next turn.`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[powerWordStun] Error:", e); });
-
-        description = `${targetName} has ${targetCurrentHp !== null ? targetCurrentHp + ' HP' : 'unknown HP'} (more than 150). ${targetName}'s Speed is 0 until the start of your next turn.`;
+        description = await applyPowerWordSpeedZero(targetName, casterName, action, campaignName, dc, targetCurrentHp);
         actionsTaken.push('speed_zero');
     }
 

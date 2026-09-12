@@ -53,33 +53,40 @@ export function getPassiveBuffs(features, playerStats) {
  */
 const CHOICE_MASTERY_NAMES = ['Push', 'Topple'];
 
-function accumulateMasteryPassive(passive, playerStats, baseName, weapon, acc) {
-    if (passive.extraMastery && Array.isArray(passive.extraMastery)) {
-        for (const m of passive.extraMastery) {
-            const bucket = CHOICE_MASTERY_NAMES.includes(m) ? acc.choiceMasteries : acc.extraMasteries;
-            if (!bucket.includes(m)) {
-                bucket.push(m);
-            }
+function accumulateExtraMasteries(passive, acc) {
+    if (!Array.isArray(passive.extraMastery)) return;
+    for (const m of passive.extraMastery) {
+        const bucket = CHOICE_MASTERY_NAMES.includes(m) ? acc.choiceMasteries : acc.extraMasteries;
+        if (!bucket.includes(m)) {
+            bucket.push(m);
         }
     }
-    if (passive.replaceMastery && Array.isArray(passive.replaceMastery) && passive.replaceMastery.length > 0) {
+}
+
+function accumulateMasteryChoice(passive, playerStats, acc) {
+    if (passive.type !== 'weapon_mastery_choice' || !passive.masteryProperties) return;
+    const chosenMastery = getChosenRuntimeValue(playerStats, passive.name, 'chosenMastery');
+    if (chosenMastery && passive.masteryProperties.includes(chosenMastery)) {
+        acc.extraMasteries.push(chosenMastery);
+    }
+}
+
+function accumulateKindMastery(passive, playerStats, baseName, weapon, acc) {
+    if (passive.type !== 'weapon_kind_mastery') return;
+    const chosenWeapons = getRuntimeValue(playerStats.name, '_Weapon_Kind_Mastery_chosenWeapons');
+    if (!Array.isArray(chosenWeapons) || !chosenWeapons.includes(baseName)) return;
+    if (!passive.meleeOnly || weapon?.weapon_range === 'Melee') {
+        acc.hasKindMasteryMatch = true;
+    }
+}
+
+function accumulateMasteryPassive(passive, playerStats, baseName, weapon, acc) {
+    accumulateExtraMasteries(passive, acc);
+    if (Array.isArray(passive.replaceMastery) && passive.replaceMastery.length > 0) {
         acc.replaceMastery = passive.replaceMastery;
     }
-    if (passive.type === 'weapon_mastery_choice' && passive.masteryProperties) {
-        const chosenMastery = getChosenRuntimeValue(playerStats, passive.name, 'chosenMastery');
-        if (chosenMastery && passive.masteryProperties.includes(chosenMastery)) {
-            acc.extraMasteries.push(chosenMastery);
-        }
-    }
-    if (passive.type === 'weapon_kind_mastery') {
-        const chosenWeapons = getRuntimeValue(playerStats.name, '_Weapon_Kind_Mastery_chosenWeapons');
-        if (chosenWeapons && Array.isArray(chosenWeapons) && chosenWeapons.includes(baseName)) {
-            const isMeleeOnly = passive.meleeOnly;
-            if (!isMeleeOnly || weapon?.weapon_range === 'Melee') {
-                acc.hasKindMasteryMatch = true;
-            }
-        }
-    }
+    accumulateMasteryChoice(passive, playerStats, acc);
+    accumulateKindMastery(passive, playerStats, baseName, weapon, acc);
 }
 
 export function collectWeaponMastery(weaponName, playerStats) {

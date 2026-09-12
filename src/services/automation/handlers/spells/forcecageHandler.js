@@ -78,6 +78,44 @@ export function removeForcecageEffect(targetName, sourceName, campaignName) {
     return existing;
 }
 
+function imprisonTarget(targetName, casterName, dc, campaignName) {
+    // Track the Forcecage effect with DC and source for cleanup and escape checks
+    const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const effects = Array.isArray(storedEffects) ? [...storedEffects] : [];
+    const forcecageEffect = {
+        target: targetName,
+        effect: 'forcecage',
+        source: casterName,
+        dc: dc,
+        saveAbility: 'CHA',
+        duration: 'concentration',
+        concentration: true,
+    };
+    const existingIdx = effects.findIndex(
+        te => te.target === targetName && te.effect === 'forcecage'
+    );
+    if (existingIdx >= 0) {
+        effects[existingIdx] = forcecageEffect;
+    } else {
+        effects.push(forcecageEffect);
+    }
+    setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
+
+    addExpiration(casterName, targetName, [
+        { type: 'remove_target_effect', effectKey: 'forcecage', target: targetName, source: casterName },
+    ], campaignName);
+
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: 'Forcecaged',
+        reason: 'Forcecage spell',
+        note: `${targetName} is trapped in a Forcecage cast by ${casterName}. Cannot leave by nonmagical means. No attack, spell, or effect can pass between inside and outside the prison. Must make a CHA save (DC ${dc}) to use teleportation or interplanar travel to exit. Cage extends into the Ethereal Plane. Can't be dispelled by Dispel Magic. Concentration, up to 1 hour.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[forcecage] Error:", e); });
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     let dc = buildSaveDc(auto, playerStats);
@@ -137,45 +175,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const trapped = [];
 
     for (const target of targets) {
-        const targetName = target.name;
-
-        // Track the Forcecage effect with DC and source for cleanup and escape checks
-        const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-        const effects = Array.isArray(storedEffects) ? [...storedEffects] : [];
-        const forcecageEffect = {
-            target: targetName,
-            effect: 'forcecage',
-            source: casterName,
-            dc: dc,
-            saveAbility: 'CHA',
-            duration: 'concentration',
-            concentration: true,
-        };
-        const existingIdx = effects.findIndex(
-            te => te.target === targetName && te.effect === 'forcecage'
-        );
-        if (existingIdx >= 0) {
-            effects[existingIdx] = forcecageEffect;
-        } else {
-            effects.push(forcecageEffect);
-        }
-        setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
-
-        addExpiration(casterName, targetName, [
-            { type: 'remove_target_effect', effectKey: 'forcecage', target: targetName, source: casterName },
-        ], campaignName);
-
-        addEntry(campaignName, {
-            type: 'condition',
-            action: 'applied',
-            characterName: targetName,
-            condition: 'Forcecaged',
-            reason: 'Forcecage spell',
-            note: `${targetName} is trapped in a Forcecage cast by ${casterName}. Cannot leave by nonmagical means. No attack, spell, or effect can pass between inside and outside the prison. Must make a CHA save (DC ${dc}) to use teleportation or interplanar travel to exit. Cage extends into the Ethereal Plane. Can't be dispelled by Dispel Magic. Concentration, up to 1 hour.`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[forcecage] Error:", e); });
-
-        trapped.push(targetName);
+        imprisonTarget(target.name, casterName, dc, campaignName);
+        trapped.push(target.name);
     }
 
     const summary = trapped.length > 0

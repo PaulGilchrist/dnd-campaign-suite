@@ -51,23 +51,24 @@ function buildPromptPayload(config) {
 }
 
 function resolveSaveOutcome(promptData, detail) {
+    const pd = promptData || {};
     return {
-        attackerName: promptData?.attackerName || detail.attackerName || 'Unknown',
-        targetName: promptData?.targetName || detail.targetName || 'Unknown',
-        saveType: promptData?.saveType || detail.saveType || 'CON',
-        saveDc: promptData?.saveDc || detail.saveDc || 0,
+        attackerName: pd.attackerName || detail.attackerName || 'Unknown',
+        targetName: pd.targetName || detail.targetName || 'Unknown',
+        saveType: pd.saveType || detail.saveType || 'CON',
+        saveDc: pd.saveDc || detail.saveDc || 0,
         success: detail.success,
         roll: detail.roll ?? 0,
         saveBonus: detail.saveBonus ?? 0,
         total: detail.total ?? 0,
-        advantage: promptData?.advantage,
-        disadvantage: promptData?.disadvantage,
-        dcSuccess: promptData?.dcSuccess,
-        sourceName: promptData?.sourceName,
-        condition: promptData?.condition,
-        damageFormula: promptData?.damageFormula,
-        damageType: promptData?.damageType,
-        rawDamage: promptData?.rawDamage,
+        advantage: pd.advantage,
+        disadvantage: pd.disadvantage,
+        dcSuccess: pd.dcSuccess,
+        sourceName: pd.sourceName,
+        condition: pd.condition,
+        damageFormula: pd.damageFormula,
+        damageType: pd.damageType,
+        rawDamage: pd.rawDamage,
     };
 }
 

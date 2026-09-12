@@ -129,6 +129,15 @@ export async function confirmAnimalShapesTransform({ targetName, beast, casterNa
     return { ok: true };
 }
 
+function clearCasterAnimalShapesExpiration(animalShapesCaster, targetName, campaignName) {
+    if (!animalShapesCaster) return;
+    const expirations = getRuntimeValue(animalShapesCaster, 'pendingExpirations', campaignName);
+    if (!Array.isArray(expirations)) return;
+    const filteredExp = expirations.filter(e => !(e.target === targetName && (e.effects || []).some(ef => ef.type === ANIMAL_SHAPES_EFFECT)));
+    if (filteredExp.length === expirations.length) return;
+    setRuntimeValue(animalShapesCaster, 'pendingExpirations', filteredExp, campaignName);
+}
+
 export function revertAnimalShapes(targetName, campaignName) {
     const cs = getCombatSummary(campaignName);
     let animalShapesCaster = null;
@@ -177,15 +186,7 @@ export function revertAnimalShapes(targetName, campaignName) {
         setRuntimeValue(targetName, 'animalShapesTempHp', 0, campaignName);
     }
 
-    if (animalShapesCaster) {
-        const expirations = getRuntimeValue(animalShapesCaster, 'pendingExpirations', campaignName);
-        if (Array.isArray(expirations)) {
-            const filteredExp = expirations.filter(e => !(e.target === targetName && (e.effects || []).some(ef => ef.type === ANIMAL_SHAPES_EFFECT)));
-            if (filteredExp.length !== expirations.length) {
-                setRuntimeValue(animalShapesCaster, 'pendingExpirations', filteredExp, campaignName);
-            }
-        }
-    }
+    clearCasterAnimalShapesExpiration(animalShapesCaster, targetName, campaignName);
 
     addEntry(campaignName, {
         type: 'ability_use',

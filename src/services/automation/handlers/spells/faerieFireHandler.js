@@ -4,10 +4,8 @@ import { addEntry } from '../../../ui/logService.js';
 
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollback.js';
-import { addConcentration } from '../../../combat/concentration/concentrationService.js';
-import { getCombatSummary } from '../../../encounters/combatData.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
-import storage from '../../../ui/storage.js';
+import { spellNoticePopup, registerSpellConcentration } from './areaSpellUtils.js';
 /**
  * Faerie Fire spell handler.
  * Mechanics:
@@ -112,6 +110,43 @@ async function outlineTarget(campaignName, casterName, targetName, dc, saveResul
     }).catch((e) => { console.error("[faerieFire] Error:", e); });
 }
 
+// Selected targets from metaCtx, otherwise all creatures except the caster.
+function selectFaerieTargets(cs, action, casterName) {
+    const selectedTargetNames = action.metaCtx?.targets;
+    return selectedTargetNames
+        ? cs.creatures.filter(c => selectedTargetNames.includes(c.name) && c.name !== casterName)
+        : cs.creatures.filter(c => c.name !== casterName);
+}
+
+async function recordFaerieFireSaveSuccess(campaignName, casterName, targetName, dc, saveResult) {
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'success',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: [],
+        appliedDamage: 0,
+    });
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-faerie-fire',
+        targetName,
+        saveDc: dc,
+        saveType: 'DEX',
+        success: true,
+        description: `${targetName} succeeded on DEX save against Faerie Fire.`,
+    }).catch((e) => { console.error("[faerieFire] Error:", e); });
+}
+
+function faerieFireSummary(affectedCount, savedCount, immuneCount, results) {
+    const immuneNote = immuneCount > 0 ? `${immuneCount} creature(s) immune.` : '';
+    if (affectedCount > 0) {
+        return `Faerie Fire affects ${affectedCount} creature(s). ${results.join(' ')} ${savedCount} creature(s) saved. ${immuneNote} Affected creatures shed Dim Light in a 10-foot radius, are immune to the Invisible condition, and attack rolls against them have Advantage.`;
+    }
+    return `No creatures affected by Faerie Fire. ${savedCount} creature(s) saved. ${immuneNote}`;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
@@ -119,31 +154,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const cs = await getCombatContext(campaignName);
     if (!cs?.creatures || cs.creatures.length === 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: 'No creatures in combat. Faerie Fire has no effect.',
-            },
-        };
+        return spellNoticePopup(action.name, 'No creatures in combat. Faerie Fire has no effect.');
     }
 
     // Use selected targets from metaCtx (CreatureSelectionModal), otherwise default to all creatures except the caster
-    const selectedTargetNames = action.metaCtx?.targets;
-    const targets = selectedTargetNames
-        ? cs.creatures.filter(c => selectedTargetNames.includes(c.name) && c.name !== casterName)
-        : cs.creatures.filter(c => c.name !== casterName);
+    const targets = selectFaerieTargets(cs, action, casterName);
 
     if (targets.length === 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: 'No creatures selected for Faerie Fire.',
-            },
-        };
+        return spellNoticePopup(action.name, 'No creatures selected for Faerie Fire.');
     }
 
     storeSpellLastAttack(campaignName, {
@@ -155,13 +173,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     });
 
     // Register concentration for this spell
-    const combatSummary = getCombatSummary(campaignName);
-    if (combatSummary) {
-        const concentrationDc = playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
-        addConcentration(combatSummary, casterName, 'Faerie Fire', concentrationDc);
-        storage.set('combatSummary', combatSummary, campaignName);
-        window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-    }
+    registerSpellConcentration(campaignName, casterName, 'Faerie Fire', playerStats);
 
     let affectedCount = 0;
     let savedCount = 0;
@@ -204,24 +216,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
         if (saveResult.success) {
             savedCount++;
-            await addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'success',
-                roll: saveResult.roll ?? 0,
-                total: saveResult.total ?? 0,
-                conditions: [],
-                appliedDamage: 0,
-            });
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                rollType: 'save-faerie-fire',
-                targetName,
-                saveDc: dc,
-                saveType: 'DEX',
-                success: true,
-                description: `${targetName} succeeded on DEX save against Faerie Fire.`,
-            }).catch((e) => { console.error("[faerieFire] Error:", e); });
+            await recordFaerieFireSaveSuccess(campaignName, casterName, targetName, dc, saveResult);
         } else {
             affectedCount++;
             await outlineTarget(campaignName, casterName, targetName, dc, saveResult);
@@ -229,16 +224,5 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         }
     }
 
-    const summary = affectedCount > 0
-        ? `Faerie Fire affects ${affectedCount} creature(s). ${results.join(' ')} ${savedCount} creature(s) saved. ${immuneCount > 0 ? `${immuneCount} creature(s) immune.` : ''} Affected creatures shed Dim Light in a 10-foot radius, are immune to the Invisible condition, and attack rolls against them have Advantage.`
-        : `No creatures affected by Faerie Fire. ${savedCount} creature(s) saved. ${immuneCount > 0 ? `${immuneCount} creature(s) immune.` : ''}`;
-
-    return {
-        type: 'popup',
-        payload: {
-            type: 'automation_info',
-            name: action.name,
-            description: summary,
-        },
-    };
+    return spellNoticePopup(action.name, faerieFireSummary(affectedCount, savedCount, immuneCount, results));
 }

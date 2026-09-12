@@ -91,7 +91,7 @@ describe('processAttackAfterResult — CLA-230 next_attack_advantage consumption
             return null;
         });
 
-        await processAttackAfterResult(true, false, TARGET, ATTACKER, CAMPAIGN, makeContext(), null, [], vi.fn(), vi.fn(), makeState({ hit: true }));
+        await processAttackAfterResult({ hit: true, isAutoMiss: false, targetName: TARGET, characterName: ATTACKER, campaignName: CAMPAIGN, context: makeContext(), combatSummary: null, characters: [], logEntry: vi.fn(), setPopupHtml: vi.fn(), state: makeState({ hit: true }) });
 
         const writes = campaignTeWrites();
         const cleared = writes.find(c => c[2].every(te => te !== moonlightTe));
@@ -108,7 +108,7 @@ describe('processAttackAfterResult — CLA-230 next_attack_advantage consumption
             return null;
         });
 
-        await processAttackAfterResult(false, false, TARGET, ATTACKER, CAMPAIGN, makeContext(), null, [], vi.fn(), vi.fn(), makeState({ hit: false, effectiveD20: 2 }));
+        await processAttackAfterResult({ hit: false, isAutoMiss: false, targetName: TARGET, characterName: ATTACKER, campaignName: CAMPAIGN, context: makeContext(), combatSummary: null, characters: [], logEntry: vi.fn(), setPopupHtml: vi.fn(), state: makeState({ hit: false, effectiveD20: 2 }) });
 
         const writes = campaignTeWrites();
         expect(writes.length).toBeGreaterThan(0);
@@ -122,7 +122,7 @@ describe('processAttackAfterResult — CLA-230 next_attack_advantage consumption
             return null;
         });
 
-        await processAttackAfterResult(false, true, TARGET, ATTACKER, CAMPAIGN, makeContext(), null, [], vi.fn(), vi.fn(), makeState({ hit: false, isAutoMiss: true }));
+        await processAttackAfterResult({ hit: false, isAutoMiss: true, targetName: TARGET, characterName: ATTACKER, campaignName: CAMPAIGN, context: makeContext(), combatSummary: null, characters: [], logEntry: vi.fn(), setPopupHtml: vi.fn(), state: makeState({ hit: false, isAutoMiss: true }) });
 
         const clearedWrites = campaignTeWrites().filter(c => Array.isArray(c[2]) && c[2].every(te => te !== moonlightTe));
         expect(clearedWrites).toHaveLength(0);
@@ -135,7 +135,7 @@ describe('processAttackAfterResult — CLA-230 next_attack_advantage consumption
             return null;
         });
 
-        await processAttackAfterResult(true, false, TARGET, ATTACKER, CAMPAIGN, makeContext(), null, [], vi.fn(), vi.fn(), makeState());
+        await processAttackAfterResult({ hit: true, isAutoMiss: false, targetName: TARGET, characterName: ATTACKER, campaignName: CAMPAIGN, context: makeContext(), combatSummary: null, characters: [], logEntry: vi.fn(), setPopupHtml: vi.fn(), state: makeState() });
 
         const writes = campaignTeWrites();
         const clearedWrite = writes.find(c => Array.isArray(c[2]) && c[2].length === 0);
@@ -148,7 +148,7 @@ describe('processAttackAfterResult — CLA-230 next_attack_advantage consumption
             return null;
         });
 
-        await processAttackAfterResult(true, false, TARGET, ATTACKER, CAMPAIGN, makeContext(), null, [], vi.fn(), vi.fn(), makeState());
+        await processAttackAfterResult({ hit: true, isAutoMiss: false, targetName: TARGET, characterName: ATTACKER, campaignName: CAMPAIGN, context: makeContext(), combatSummary: null, characters: [], logEntry: vi.fn(), setPopupHtml: vi.fn(), state: makeState() });
 
         const clearedWrites = campaignTeWrites().filter(c => Array.isArray(c[2]) && !c[2].some(te => te.target === 'OtherPC'));
         expect(clearedWrites).toHaveLength(0);

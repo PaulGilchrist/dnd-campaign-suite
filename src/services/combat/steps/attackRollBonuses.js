@@ -46,31 +46,42 @@ function applyHeavyWeaponHitBonuses(ctx, acc) {
   return acc;
 }
 
+function abilityBonus(playerStats, abilityName) {
+  return playerStats.abilities?.find(a => a.name === abilityName)?.bonus ?? 0;
+}
+
+function isStrengthAttack(ctx) {
+  const attackAbilityName = ctx.attack?.abilityName;
+  if (attackAbilityName) return attackAbilityName.toLowerCase() === 'strength';
+  return abilityBonus(ctx.playerStats, 'Strength') >= abilityBonus(ctx.playerStats, 'Dexterity');
+}
+
+function frenzyTriggerActive(ctx) {
+  const buffs = getRuntimeValue(ctx.playerStats.name, 'activeBuffs', ctx.campaignName) || [];
+  if (!buffs.some(b => b.effect === 'advantage_attacks_advantage_against')) return false;
+  if (!buffs.some(b => b.damageBonusExpression)) return false;
+  return isStrengthAttack(ctx);
+}
+
+function frenzyDamageLabel(ctx, a) {
+  if (a.damageType === 'same_as_weapon') return (ctx.attack?.damageType || 'Slashing').toLowerCase();
+  return a.damageType.toLowerCase();
+}
+
 function applyFrenzyBonuses(ctx, acc) {
   const frenzy = (ctx.playerStats.automation.actions || []).filter(x => x.type === 'damage_bonus' && x.trigger === 'reckless_attack_hit_while_raging');
   if (frenzy.length === 0) return acc;
   const used = getRuntimeValue(ctx.playerStats.name, '_frenzyUsedRound', ctx.campaignName);
   const round = getCurrentCombatRound(ctx.campaignName);
   if (used === round || !ctx.hit) return acc;
-  const buffs = getRuntimeValue(ctx.playerStats.name, 'activeBuffs', ctx.campaignName) || [];
-  const isReckless = buffs.some(b => b.effect === 'advantage_attacks_advantage_against');
-  const isRaging = buffs.some(b => b.damageBonusExpression);
-  const attackAbilityName = ctx.attack?.abilityName;
-  const isStr = attackAbilityName ? attackAbilityName.toLowerCase() === 'strength' : null;
-  const strMod = ctx.playerStats.abilities?.find(a => a.name === 'Strength')?.bonus ?? 0;
-  const dexMod = ctx.playerStats.abilities?.find(a => a.name === 'Dexterity')?.bonus ?? 0;
-  const inferredIsStr = strMod >= dexMod;
-  const isStrFinal = isStr !== null ? isStr : inferredIsStr;
-  if (!(isReckless && isRaging && isStrFinal)) return acc;
+  if (!frenzyTriggerActive(ctx)) return acc;
   for (const a of frenzy) {
     const resolvedExpr = resolveDiceExpression(a.damageExpression, ctx.playerStats);
     const r = rollExpression(resolvedExpr);
-    if (r) {
-      const dt = a.damageType === 'same_as_weapon' ? (ctx.attack?.damageType || 'Slashing').toLowerCase() : a.damageType.toLowerCase();
-      acc.formula += ` + ${resolvedExpr} [${dt}]`;
-      acc.total += r.total;
-      acc.rolls = [...acc.rolls, ...r.rolls];
-    }
+    if (!r) continue;
+    acc.formula += ` + ${resolvedExpr} [${frenzyDamageLabel(ctx, a)}]`;
+    acc.total += r.total;
+    acc.rolls = [...acc.rolls, ...r.rolls];
   }
   setRuntimeValue(ctx.playerStats.name, '_frenzyUsedRound', round, ctx.campaignName);
   return acc;
@@ -271,6 +282,19 @@ export function buildWeaponHitBonusesStep() {
   };
 }
 
+function resolveNatural20Expression(a, playerStats) {
+  const expr = a.extraDamageExpression || '';
+  if (expr !== 'increased_ability_score') return expr;
+  const abilityName = a.abilityIncreased || null;
+  if (abilityName) {
+    const abil = playerStats.abilities?.find(x => x.name === abilityName);
+    return abil?.bonus || 0;
+  }
+  const strBonus = playerStats.abilities?.find(x => x.name === 'Strength')?.bonus || 0;
+  const dexBonus = playerStats.abilities?.find(x => x.name === 'Dexterity')?.bonus || 0;
+  return Math.max(strBonus, dexBonus);
+}
+
 export function buildNatural20BonusesStep() {
   const OVERWHELMING_STRIKE_TEST_ROLL = 20;
 
@@ -291,20 +315,7 @@ export function buildNatural20BonusesStep() {
 
       const matchingActions = ctx.playerStats.automation.actions.filter(x => x.type === 'damage_bonus' && x.trigger === 'natural_20_attack_roll');
       for (const a of matchingActions) {
-        let expr = a.extraDamageExpression || '';
-        if (expr === 'increased_ability_score') {
-          const abilityName = a.abilityIncreased || null;
-          if (abilityName) {
-            const abil = ctx.playerStats.abilities?.find(x => x.name === abilityName);
-            expr = abil?.bonus || 0;
-          } else {
-            const strAbil = ctx.playerStats.abilities?.find(x => x.name === 'Strength');
-            const dexAbil = ctx.playerStats.abilities?.find(x => x.name === 'Dexterity');
-            const strBonus = strAbil?.bonus || 0;
-            const dexBonus = dexAbil?.bonus || 0;
-            expr = Math.max(strBonus, dexBonus);
-          }
-        }
+        const expr = resolveNatural20Expression(a, ctx.playerStats);
         if (expr || expr === 0) {
           const r = rollExpression(String(expr));
           if (r) {

@@ -646,7 +646,7 @@ describe('createLogAndShow - Miss Effects & Combat Inspiration', () => {
                 unerringStrikeApplied: false, homingStrikesUsed: false, homingStrikesBonus: 0,
                 targetAc: 20, effectiveAc: 20, effectiveD20Roll: 5,
             });
-            processAttackAfterResult.mockImplementation(async (hit, isAutoMiss) => {
+            processAttackAfterResult.mockImplementation(async ({ hit, isAutoMiss }) => {
                 expect(hit).toBe(false);
                 expect(isAutoMiss).toBe(false);
             });
@@ -673,7 +673,7 @@ describe('createLogAndShow - Miss Effects & Combat Inspiration', () => {
                 unerringStrikeApplied: false, homingStrikesUsed: false, homingStrikesBonus: 0,
                 targetAc: 10, effectiveAc: 10, effectiveD20Roll: 15,
             });
-            processAttackAfterResult.mockImplementation(async (hit) => {
+            processAttackAfterResult.mockImplementation(async ({ hit }) => {
                 expect(hit).toBe(true);
             });
 

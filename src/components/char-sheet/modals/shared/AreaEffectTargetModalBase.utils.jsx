@@ -66,7 +66,7 @@ export function renderResultsSection({ results, pendingPrompts, allResolved, sav
   );
 }
 
-export function logSaveEntry(campaignName, featureName, attackerName, targetName, saveDc, saveType, success, total, rolls, bonus, formula) {
+export function logSaveEntry({ campaignName, featureName, attackerName, targetName, saveDc, saveType, success, total, rolls, bonus, formula }) {
   addEntry(campaignName, {
     type: 'roll',
     name: featureName,

@@ -77,25 +77,25 @@ beforeEach(() => {
 describe('resolveHit — SP-109 Slow -2 AC', () => {
     it('folds _slowAcPenalty into effectiveAc (base 9 → slowed 7)', async () => {
         const ctx = makeContext({ _slowAcPenalty: 2 });
-        const result = await resolveHit(attackerName, campaignName, ctx, 5, 16, sorcerer, { creatures: [] }, characters, logEntry, vi.fn());
+        const result = await resolveHit({ characterName: attackerName, campaignName: campaignName, context: ctx, bonus: 5, effectiveD20Roll: 16, target: sorcerer, combatSummary: { creatures: [] }, characters: characters, logEntry: logEntry });
         expect(result.targetAc).toBe(9);
         expect(result.effectiveAc).toBe(7);
         expect(result.hit).toBe(true);
     });
 
     it('turns a base-AC miss into a hit at the slowed AC (total 8 vs slowed 7)', async () => {
-        const slowed = await resolveHit(attackerName, campaignName, makeContext({ _slowAcPenalty: 2 }), 5, 3, sorcerer, { creatures: [] }, characters, logEntry, vi.fn());
+        const slowed = await resolveHit({ characterName: attackerName, campaignName: campaignName, context: makeContext({ _slowAcPenalty: 2 }), bonus: 5, effectiveD20Roll: 3, target: sorcerer, combatSummary: { creatures: [] }, characters: characters, logEntry: logEntry });
         expect(slowed.effectiveAc).toBe(7);
         expect(slowed.hit).toBe(true);
 
-        const unslowed = await resolveHit(attackerName, campaignName, makeContext(), 5, 3, sorcerer, { creatures: [] }, characters, logEntry, vi.fn());
+        const unslowed = await resolveHit({ characterName: attackerName, campaignName: campaignName, context: makeContext(), bonus: 5, effectiveD20Roll: 3, target: sorcerer, combatSummary: { creatures: [] }, characters: characters, logEntry: logEntry });
         expect(unslowed.effectiveAc).toBe(9);
         expect(unslowed.hit).toBe(false);
     });
 
     it('keeps a roll below the slowed AC a miss', async () => {
         const ctx = makeContext({ _slowAcPenalty: 2 });
-        const result = await resolveHit(attackerName, campaignName, ctx, 5, 1, sorcerer, { creatures: [] }, characters, logEntry, vi.fn());
+        const result = await resolveHit({ characterName: attackerName, campaignName: campaignName, context: ctx, bonus: 5, effectiveD20Roll: 1, target: sorcerer, combatSummary: { creatures: [] }, characters: characters, logEntry: logEntry });
         expect(result.effectiveAc).toBe(7);
         expect(result.hit).toBe(false);
     });

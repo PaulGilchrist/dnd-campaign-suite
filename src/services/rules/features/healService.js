@@ -71,7 +71,7 @@ function resolveTargetHpBounds(targetName, creature, campaignName) {
     return { maxHp, currentHp };
 }
 
-function logHealEntry(campaignName, spell, targetName, casterName, actualHeal, maxHp, currentHp, healAmount, bonusHeal, bonusDetails) {
+function logHealEntry({ campaignName, spell, targetName, casterName, actualHeal, maxHp, currentHp, healAmount, bonusHeal, bonusDetails }) {
     const formulaParts = [spell.heal_at_slot_level ? `${spell.heal_at_slot_level[spell.level || 6] || '70'}` : `${healAmount - bonusHeal}`];
     if (bonusDetails.length > 0) {
         const bonusParts = bonusDetails.map(d => `${d.amount} ${d.name}`).join(' + ');
@@ -124,7 +124,7 @@ export async function triggerHeal(spell, { targetName }, playerStats, campaignNa
 
     if (actualHeal > 0) {
         applyHealingToTarget(combatSummary, targetName, actualHeal, campaignName);
-        logHealEntry(campaignName, spell, targetName, casterName, actualHeal, maxHp, currentHp, healAmount, bonusHeal, bonusDetails);
+        logHealEntry({ campaignName, spell, targetName, casterName, actualHeal, maxHp, currentHp, healAmount, bonusHeal, bonusDetails });
     }
 
     const conditionsRemoved = removeConditionsOnTarget(targetName, campaignName, spell, 'Heal');

@@ -157,22 +157,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     logThiefSave(campaignName, featureName, playerName, casterName, saveDc, auto, saveResult, success);
 
-    const negationNote = success
-        ? ''
-        : await stealSpell({ attackEvent, cs, campaignName, featureName, playerName, casterName, spellName, saveDc, isMonsterCaster });
-
-    if (success) {
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerName,
-            abilityName: featureName,
-            description: `${casterName} succeeded on INT save (DC ${saveDc}). ${featureName} has no effect.`,
-        }).catch((e) => { console.error("[spellThief] Error:", e); });
-    }
-
-    const resultDescription = success
-        ? `${casterName} succeeded on INT save (DC ${saveDc}). ${featureName} has no effect.`
-        : `${casterName} failed INT save (DC ${saveDc}). Spell negated.${negationNote} ${playerName} steals ${spellName} for 8 hours.`;
+    const resultDescription = await resolveThiefSaveOutcome({
+        success, attackEvent, cs, campaignName, featureName, playerName, casterName, spellName, saveDc, isMonsterCaster,
+    });
 
     return {
         type: 'popup',
@@ -183,6 +170,21 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             automation: auto,
         },
     };
+}
+
+async function resolveThiefSaveOutcome({ success, attackEvent, cs, campaignName, featureName, playerName, casterName, spellName, saveDc, isMonsterCaster }) {
+    if (success) {
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: featureName,
+            description: `${casterName} succeeded on INT save (DC ${saveDc}). ${featureName} has no effect.`,
+        }).catch((e) => { console.error("[spellThief] Error:", e); });
+        return `${casterName} succeeded on INT save (DC ${saveDc}). ${featureName} has no effect.`;
+    }
+
+    const negationNote = await stealSpell({ attackEvent, cs, campaignName, featureName, playerName, casterName, spellName, saveDc, isMonsterCaster });
+    return `${casterName} failed INT save (DC ${saveDc}). Spell negated.${negationNote} ${playerName} steals ${spellName} for 8 hours.`;
 }
 
 // Spell-origin: PC spell pipeline stamps rollType 'spell-save'; monster-card

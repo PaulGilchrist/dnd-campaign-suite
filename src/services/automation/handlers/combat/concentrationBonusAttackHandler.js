@@ -18,6 +18,14 @@ function hitLabel(isCrit, hit) {
     return isCrit ? 'CRIT' : hit ? 'HIT' : 'MISS';
 }
 
+function hitText(isCrit, hit) {
+    return isCrit ? 'CRITICAL HIT' : hit ? 'HIT' : 'MISS';
+}
+
+function damageClause(hit, finalDamage, damageType) {
+    return hit ? `, ${finalDamage} ${damageType} damage` : '';
+}
+
 function resolveMeleeWeapon(playerStats) {
     const weapon = (playerStats.attacks || []).find(a => (a.weaponType || a.attackType) === 'melee')
         || playerStats.attacks?.[0];
@@ -38,9 +46,7 @@ async function resolveConcentrationDamage(cs, campaignName, playerName, targetNa
     damageRolls = rollResult?.rolls || [];
     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
     // applyDamageToTarget writes lastAttack + logs hp_change canonically.
-    const applyResult = await applyDamageToTarget(
-        cs, targetName, rawDamage, [damageType], campaignName, characters, false, playerName
-    );
+    const applyResult = await applyDamageToTarget(cs, targetName, rawDamage, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
     finalDamage = applyResult?.finalDamage || 0;
     if (finalDamage > 0) endInvisibilityOnHostileAction(playerName, campaignName);
 
@@ -190,20 +196,19 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         type: 'ability_use',
         characterName: playerName,
         abilityName: action.name,
-        description: `${playerName} used ${action.name} — bonus-action ${weaponName} attack on ${targetName}: ${hitLabel(isCrit, hit)} (${d20Roll}+${attackBonus}=${total} vs AC ${ac})${hit ? `, ${finalDamage} ${damageType} damage` : ''}.`,
+        description: `${playerName} used ${action.name} — bonus-action ${weaponName} attack on ${targetName}: ${hitLabel(isCrit, hit)} (${d20Roll}+${attackBonus}=${total} vs AC ${ac})${damageClause(hit, finalDamage, damageType)}.`,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[concentrationBonusAttackHandler:log-error]", e); });
 
     await setRuntimeValue(playerName, LATCH_KEY, { round, activeCreature: playerName }, campaignName);
 
-    const hitText = isCrit ? 'CRITICAL HIT' : hit ? 'HIT' : 'MISS';
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
             name: action.name,
             automationType: auto.type,
-            description: `${action.name}: bonus-action ${weaponName} attack on ${targetName} — <b>${hitText}</b> (${d20Roll}+${attackBonus}=${total} vs AC ${ac})${hit ? `, ${finalDamage} ${damageType} damage` : ''}.`,
+            description: `${action.name}: bonus-action ${weaponName} attack on ${targetName} — <b>${hitText(isCrit, hit)}</b> (${d20Roll}+${attackBonus}=${total} vs AC ${ac})${damageClause(hit, finalDamage, damageType)}.`,
             automation: auto,
         },
     };

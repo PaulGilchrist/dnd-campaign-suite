@@ -3,20 +3,24 @@ import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { buildSaveDc, createSaveListener } from '../../../automation/common/savePrompt.js';
 
+function buildTricksterPopup(action, auto, description) {
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name || 'Versatile Trickster',
+            automationType: auto.type || 'versatile_trickster',
+            description,
+            automation: auto,
+        },
+    };
+}
+
 export async function applyVersatileTrickster(action, playerStats, campaignName, secondaryTargetName) {
     const auto = action.automation || {};
 
     if (!secondaryTargetName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name || 'Versatile Trickster',
-                automationType: auto.type || 'versatile_trickster',
-                description: `Versatile Trickster: No secondary target selected.`,
-                automation: auto,
-            },
-        };
+        return buildTricksterPopup(action, auto, 'Versatile Trickster: No secondary target selected.');
     }
 
     // Validate size limit for Trip on secondary target
@@ -27,16 +31,7 @@ export async function applyVersatileTrickster(action, playerStats, campaignName,
         const sizeOrder = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan'];
         const targetSizeIndex = sizeOrder.indexOf(secondaryTarget.size);
         if (targetSizeIndex !== -1 && targetSizeIndex > sizeOrder.indexOf('Large')) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name || 'Versatile Trickster',
-                    automationType: auto.type || 'versatile_trickster',
-                    description: `<b>Trip</b> cannot be used on ${secondaryTargetName}: Target is ${secondaryTarget.size} (too large for Trip — only Large or smaller affected).`,
-                    automation: auto,
-                },
-            };
+            return buildTricksterPopup(action, auto, `<b>Trip</b> cannot be used on ${secondaryTargetName}: Target is ${secondaryTarget.size} (too large for Trip — only Large or smaller affected).`);
         }
     }
 
@@ -97,16 +92,7 @@ export async function applyVersatileTrickster(action, playerStats, campaignName,
         description: `Trip applied to ${secondaryTargetName} (secondary target via Versatile Trickster) — ${secondaryTargetName} rolled ${saveResult.roll} on DEX save (DC ${saveDc}), ${saveResult.success ? 'succeeded — no effect' : 'failed — prone condition applied'}`,
     }).catch((e) => { console.error("[versatileTricksterHandler:log-error]", e); });
 
-    return {
-        type: 'popup',
-        payload: {
-            type: 'automation_info',
-            name: action.name || 'Versatile Trickster',
-            automationType: auto.type || 'versatile_trickster',
-            description: saveFailed
-                ? `Versatile Trickster: Trip also applied to ${secondaryTargetName} — failed its Dexterity save (DC ${saveDc}) and gained the Prone condition.`
-                : `Versatile Trickster: Trip also applied to ${secondaryTargetName} — succeeded its Dexterity save (DC ${saveDc}) — no effect.`,
-            automation: auto,
-        },
-    };
+    return buildTricksterPopup(action, auto, saveFailed
+        ? `Versatile Trickster: Trip also applied to ${secondaryTargetName} — failed its Dexterity save (DC ${saveDc}) and gained the Prone condition.`
+        : `Versatile Trickster: Trip also applied to ${secondaryTargetName} — succeeded its Dexterity save (DC ${saveDc}) — no effect.`);
 }

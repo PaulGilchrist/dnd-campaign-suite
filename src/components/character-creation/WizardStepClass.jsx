@@ -1,26 +1,31 @@
 import ClassDetailCard from './ClassDetailCard.jsx';
+import ClassOrderSelect from './ClassOrderSelect.jsx';
 import './WizardStepClass.css';
 
+const CLASS_ORDER_CONFIGS = {
+  2024: {
+    Cleric: { field: 'divineOrder', label: 'Divine Order *', placeholder: 'Select a Divine Order', options: ['Protector', 'Thaumaturge'] },
+    Druid: { field: 'primalOrder', label: 'Primal Order *', placeholder: 'Select a Primal Order', options: ['Magician', 'Warden'] },
+  },
+};
+
 function WizardStepClass({ formData, errors, allClassesData, ruleset, onInputChange }) {
-  const selectedClassName = formData.class?.name || '';
+  const selectedClass = formData.class || {};
+  const selectedClassName = selectedClass.name || '';
   const fullClassData = allClassesData.find(c => c.name === selectedClassName);
-
-  const isCleric2024 = ruleset === '2024' && selectedClassName === 'Cleric';
-  const isDruid2024 = ruleset === '2024' && selectedClassName === 'Druid';
-
-  const divineOrderOptions = isCleric2024 ? ['Protector', 'Thaumaturge'] : [];
-  const primalOrderOptions = isDruid2024 ? ['Magician', 'Warden'] : [];
+  const orderConfig = CLASS_ORDER_CONFIGS[ruleset]?.[selectedClassName];
 
   const handleClassChange = (e) => {
-    const name = e.target.value;
-    const cls = allClassesData.find(c => c.name === name);
-    const hasSubs = (cls?.subclasses || cls?.majors || []).length > 0;
     onInputChange('class', {
-      name: name,
-      subclass: hasSubs ? { name: '' } : { name: '' },
+      name: e.target.value,
+      subclass: { name: '' },
       divineOrder: '',
       primalOrder: ''
     });
+  };
+
+  const handleOrderChange = (value) => {
+    onInputChange('class', { ...selectedClass, [orderConfig.field]: value });
   };
 
   return (
@@ -42,38 +47,13 @@ function WizardStepClass({ formData, errors, allClassesData, ruleset, onInputCha
         {errors.class && <span className="error-message">{errors.class}</span>}
       </div>
 
-      {isCleric2024 && (
-        <div className="form-group">
-          <label>Divine Order *</label>
-          <select
-            value={formData.class?.divineOrder || ''}
-            onChange={(e) => onInputChange('class', { ...formData.class, divineOrder: e.target.value })}
-            className={errors.divineOrder ? 'error' : ''}
-          >
-            <option value="">Select a Divine Order</option>
-            {divineOrderOptions.map(option => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
-          {errors.divineOrder && <span className="error-message">{errors.divineOrder}</span>}
-        </div>
-      )}
-
-      {isDruid2024 && (
-        <div className="form-group">
-          <label>Primal Order *</label>
-          <select
-            value={formData.class?.primalOrder || ''}
-            onChange={(e) => onInputChange('class', { ...formData.class, primalOrder: e.target.value })}
-            className={errors.primalOrder ? 'error' : ''}
-          >
-            <option value="">Select a Primal Order</option>
-            {primalOrderOptions.map(option => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
-          {errors.primalOrder && <span className="error-message">{errors.primalOrder}</span>}
-        </div>
+      {orderConfig && (
+        <ClassOrderSelect
+          config={orderConfig}
+          value={selectedClass[orderConfig.field] || ''}
+          error={errors[orderConfig.field]}
+          onChange={handleOrderChange}
+        />
       )}
 
       {fullClassData && <ClassDetailCard fullClassData={fullClassData} />}

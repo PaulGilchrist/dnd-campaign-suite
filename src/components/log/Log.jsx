@@ -20,6 +20,36 @@ import { SummonsEntry } from './LogSummonsEntry.jsx';
 import { SpellEffectEntry } from './LogSpellEffectEntry.jsx';
 import { BuffEntry } from './LogBuffEntry.jsx';
 
+const ENTRY_COMPONENTS = {
+  roll: RollEntry,
+  note: NoteEntry,
+  travel: TravelEntry,
+  loot: LootEntry,
+  condition: ConditionEntry,
+  encounter: EncounterEntry,
+  hp_change: HpChangeEntry,
+  healing: HealingEntry,
+  death_save: DeathSaveEntry,
+  spell: SpellEntry,
+  metamagic: MetamagicEntry,
+  metamagic_use: MetamagicEntry,
+  healing_pool: HealingPoolEntry,
+  ability_use: AbilityUseEntry,
+  short_rest: RestEntry,
+  long_rest: RestEntry,
+  automation: AutomationEntry,
+  save_result: SaveResultEntry,
+  psionic_sorcery: PsionicSorceryEntry,
+  summons: SummonsEntry,
+  spell_effect: SpellEffectEntry,
+  buff: BuffEntry
+};
+
+function LogEntryRenderer({ entry }) {
+  const EntryComponent = ENTRY_COMPONENTS[entry.type];
+  return <div>{EntryComponent && <EntryComponent entry={entry}/>}</div>;
+}
+
 export default function Log({ campaignName, characters }) {
   const { logEntries, initialized, addEntry } = useLog(campaignName);
   const [noteText, setNoteText] = useState('');
@@ -78,30 +108,7 @@ export default function Log({ campaignName, characters }) {
 
       <div className="log-entries">
         {!initialized ? null : [...logEntries].reverse().map(entry => (
-          <div key={entry.id}>
-            {entry.type === 'roll' && <RollEntry entry={entry}/>}
-            {entry.type === 'note' && <NoteEntry entry={entry}/>}
-            {entry.type === 'travel' && <TravelEntry entry={entry}/>}
-            {entry.type === 'loot' && <LootEntry entry={entry}/>}
-            {entry.type === 'condition' && <ConditionEntry entry={entry}/>}
-            {entry.type === 'encounter' && <EncounterEntry entry={entry}/>}
-            {entry.type === 'hp_change' && <HpChangeEntry entry={entry}/>}
-            {entry.type === 'healing' && <HealingEntry entry={entry}/>}
-            {entry.type === 'death_save' && <DeathSaveEntry entry={entry}/>}
-            {entry.type === 'spell' && <SpellEntry entry={entry}/>}
-            {entry.type === 'metamagic' && <MetamagicEntry entry={entry}/>}
-            {entry.type === 'metamagic_use' && <MetamagicEntry entry={entry}/>}
-            {entry.type === 'healing_pool' && <HealingPoolEntry entry={entry}/>}
-            {entry.type === 'ability_use' && <AbilityUseEntry entry={entry}/>}
-            {entry.type === 'short_rest' && <RestEntry entry={entry}/>}
-            {entry.type === 'long_rest' && <RestEntry entry={entry}/>}
-            {entry.type === 'automation' && <AutomationEntry entry={entry}/>}
-            {entry.type === 'save_result' && <SaveResultEntry entry={entry}/>}
-            {entry.type === 'psionic_sorcery' && <PsionicSorceryEntry entry={entry}/>}
-            {entry.type === 'summons' && <SummonsEntry entry={entry}/>}
-            {entry.type === 'spell_effect' && <SpellEffectEntry entry={entry}/>}
-            {entry.type === 'buff' && <BuffEntry entry={entry}/>}
-          </div>
+          <LogEntryRenderer key={entry.id} entry={entry}/>
         ))}
       </div>
     </div>

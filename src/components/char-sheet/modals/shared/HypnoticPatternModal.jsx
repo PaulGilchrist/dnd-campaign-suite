@@ -8,6 +8,7 @@ import { storeSpellLastAttack, addTargetResult } from '../../../../services/auto
 import { addExpiration } from '../../../../services/rules/effects/expirations.js';
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
+import { logConditionApplied, logSaveResultEntry } from './saveResultLogging.js';
 
 function HypnoticPatternModal({
     action,
@@ -283,29 +284,15 @@ function HypnoticPatternModal({
                 { type: 'speed_zero', condition: 'speed_zero' },
             ], campaignName);
 
-            await addEntry(campaignName, {
-                type: 'condition',
-                action: 'applied',
-                characterName: targetName,
+            await logConditionApplied(campaignName, {
+                targetName,
                 condition: 'Charmed, Incapacitated, Speed 0',
                 reason: 'Hypnotic Pattern spell',
                 note: `${targetName} is Charmed, Incapacitated, and has Speed 0. The spell ends if the creature takes damage or someone uses an action to shake it free.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[HypnoticPatternModal] Error logging condition:', e); });
+                logPrefix: '[HypnoticPatternModal]',
+            });
 
-            await addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                targetName,
-                saveDc,
-                saveType,
-                success: false,
-                roll: detail.roll ?? 0,
-                total: detail.total ?? 0,
-                saveBonus: detail.saveBonus ?? 0,
-                description: `${targetName} failed ${saveType} save (DC ${saveDc}, rolled ${detail.roll ?? 0}${detail.saveBonus !== 0 ? ' + ' + detail.saveBonus : ''} = ${detail.total ?? 0})`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[HypnoticPatternModal] Error logging save result:', e); });
+            await logSaveResultEntry(campaignName, { casterName, targetName, saveDc, saveType, success: false, detail, logPrefix: '[HypnoticPatternModal]' });
 
             addTargetResult(campaignName, {
                 targetName,
@@ -316,19 +303,7 @@ function HypnoticPatternModal({
                 appliedDamage: 0,
             });
         } else {
-            await addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                targetName,
-                saveDc,
-                saveType,
-                success: true,
-                roll: detail.roll ?? 0,
-                total: detail.total ?? 0,
-                saveBonus: detail.saveBonus ?? 0,
-                description: `${targetName} succeeded on ${saveType} save (DC ${saveDc}, rolled ${detail.roll ?? 0}${detail.saveBonus !== 0 ? ' + ' + detail.saveBonus : ''} = ${detail.total ?? 0})`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[HypnoticPatternModal] Error logging save result:', e); });
+            await logSaveResultEntry(campaignName, { casterName, targetName, saveDc, saveType, success: true, detail, logPrefix: '[HypnoticPatternModal]' });
 
             addTargetResult(campaignName, {
                 targetName,

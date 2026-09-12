@@ -728,7 +728,7 @@ describe('reactionDamageHandler', () => {
                 targetName: 'Enemy',
                 damageType: 'Necrotic',
             }));
-            expect(applyDamageToTarget).toHaveBeenCalledWith(cs, 'Enemy', 5, ['Necrotic'], 'test-campaign', [], false, 'TestHero');
+            expect(applyDamageToTarget).toHaveBeenCalledWith(cs, 'Enemy', 5, ['Necrotic'], 'test-campaign', [], { ignoreResistance: false, attackerName: 'TestHero' });
         });
 
         it('logs hp_change via applyDamageToTarget after the damage roll (Hand of Harm CLA-158)', async () => {
@@ -754,7 +754,7 @@ describe('reactionDamageHandler', () => {
             await Promise.resolve();
             await Promise.resolve();
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(cs, 'Animated Rug of Smothering 1', 5, ['Necrotic'], 'test-campaign', [], false, 'TestHero');
+            expect(applyDamageToTarget).toHaveBeenCalledWith(cs, 'Animated Rug of Smothering 1', 5, ['Necrotic'], 'test-campaign', [], { ignoreResistance: false, attackerName: 'TestHero' });
         });
 
         it('does not apply damage when save succeeds', async () => {
@@ -927,16 +927,7 @@ describe('reactionDamageHandler', () => {
             const result = await handle(tsAction, tsStats(), 'test-campaign', null, []);
 
             expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.objectContaining({ round: 3 }),
-                'Githzerai Psion 1',
-                14,
-                ['Psychic'],
-                'test-campaign',
-                expect.any(Array),
-                true,
-                'TestHero'
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.objectContaining({ round: 3 }), 'Githzerai Psion 1', 14, ['Psychic'], 'test-campaign', expect.any(Array), { ignoreResistance: true, attackerName: 'TestHero' });
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('reflects 14 psychic damage back to Githzerai Psion 1');
         });

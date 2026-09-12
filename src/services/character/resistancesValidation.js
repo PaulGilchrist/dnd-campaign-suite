@@ -450,41 +450,42 @@ export async function validateResistances(formData) {
  */
 export async function getResistanceInfo(type, category, formData) {
   const ruleset = formData.rules || '5e';
-  const sources = [];
-  let isPreSelected = false;
 
   const limits = await getResistanceLimits(formData);
   const grantedTypes = category === 'resistance' ? limits.resistances : limits.immunities;
+  const isGranted = grantedTypes.includes(type);
 
-  if (grantedTypes.includes(type)) {
-    isPreSelected = true;
+  const sources = isGranted ? await resolveGrantedSources(type, category, formData, ruleset) : [];
 
-    // Determine source
-    const raceName = formData.race?.name || '';
-    const className = formData.class?.name || '';
+  return {
+    isGranted,
+    source: sources.join(', ') || 'Unknown',
+    isPreSelected: isGranted
+  };
+}
 
-    if (raceName) {
-      const raceData = await fetchRaceData(raceName, ruleset);
-      const raceResistances = ruleset === '2024'
-         ? extract2024RaceResistances(raceData, formData.race?.subrace?.name || '')
-         : extract5eRaceResistances(raceData, formData.race?.subrace?.name || '');
-      if (raceResistances.includes(type)) {
-        sources.push('Race');
-        }
-      }
+async function resolveGrantedSources(type, category, formData, ruleset) {
+  const sources = [];
+  const raceName = formData.race?.name || '';
+  const className = formData.class?.name || '';
 
-    if (className && category === 'immunity') {
-      const classData = await fetchClassData(className, ruleset);
-      const classImmunities = extractClassImmunities(classData, ruleset, formData.level || 1);
-      if (classImmunities.includes(type)) {
-        sources.push('Class');
-        }
+  if (raceName) {
+    const raceData = await fetchRaceData(raceName, ruleset);
+    const raceResistances = ruleset === '2024'
+       ? extract2024RaceResistances(raceData, formData.race?.subrace?.name || '')
+       : extract5eRaceResistances(raceData, formData.race?.subrace?.name || '');
+    if (raceResistances.includes(type)) {
+      sources.push('Race');
       }
     }
 
-  return {
-    isGranted: grantedTypes.includes(type),
-    source: sources.join(', ') || 'Unknown',
-    isPreSelected
-  };
+  if (className && category === 'immunity') {
+    const classData = await fetchClassData(className, ruleset);
+    const classImmunities = extractClassImmunities(classData, ruleset, formData.level || 1);
+    if (classImmunities.includes(type)) {
+      sources.push('Class');
+      }
+    }
+
+  return sources;
 }

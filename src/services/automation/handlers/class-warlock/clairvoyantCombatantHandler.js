@@ -1,4 +1,11 @@
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { infoPopup } from '../../common/infoPopup.js';
+import { findPactSlotLevel, hasPactSlotAvailable } from './pactMagicUtils.js';
+
+// Build save DC
+function resolveClairvoyantSaveDc(auto, playerStats) {
+    return auto.saveDc || 8 + playerStats.proficiency + (playerStats.abilities?.find(a => a.name === auto.saveType)?.bonus || 3);
+}
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -10,21 +17,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const maxUses = auto.uses || 1;
 
     // Find Pact Magic slot level (highest spell slot level the warlock has)
-    let pactSlotLevel = 0;
-    for (let lv = 9; lv >= 1; lv--) {
-        if (playerStats.spellAbilities?.[`spell_slots_level_${lv}`] > 0) {
-            pactSlotLevel = lv;
-            break;
-        }
-    }
+    const pactSlotLevel = findPactSlotLevel(playerStats);
 
     // Check Pact Magic slot availability if needed
-    let pactSlotsAvailable = false;
-    if (currentUses >= maxUses && auto.pactMagicRecharge && pactSlotLevel > 0) {
-        const slotKey = `spell_slots_level_${pactSlotLevel}`;
-        const currentSlots = Number(getRuntimeValue(playerName, slotKey, campaignName) ?? playerStats.spellAbilities?.[slotKey] ?? 0);
-        pactSlotsAvailable = currentSlots > 0;
-    }
+    const pactSlotsAvailable = hasPactSlotAvailable(playerStats, playerName, campaignName, auto, currentUses, maxUses, pactSlotLevel);
 
     // Check if we can use at all
     const canUse = currentUses < maxUses || (auto.pactMagicRecharge && pactSlotsAvailable);
@@ -34,34 +30,17 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         if (auto.pactMagicRecharge) {
             reason = `${featureName}: No uses remaining. Recharges on a Short or Long Rest, or expend a Pact Magic spell slot to restore a use. No Pact Magic slots available.`;
         }
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: reason,
-                automation: auto,
-            },
-        };
+        return infoPopup(featureName, reason, auto);
     }
 
     // Get the target from Awakened Mind bond
     const awakenedMindTarget = getRuntimeValue(playerName, 'awakenedMindTarget', campaignName);
 
     if (!awakenedMindTarget) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName} requires an active Awakened Mind bond. Activate Awakened Mind first to form a telepathic bond with a creature.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(featureName, `${featureName} requires an active Awakened Mind bond. Activate Awakened Mind first to form a telepathic bond with a creature.`, auto);
     }
 
-    // Build save DC
-    const saveDc = auto.saveDc || 8 + playerStats.proficiency + (playerStats.abilities?.find(a => a.name === auto.saveType)?.bonus || 3);
+    const saveDc = resolveClairvoyantSaveDc(auto, playerStats);
     const saveType = auto.saveType || 'WIS';
 
     // Return modal for confirmation

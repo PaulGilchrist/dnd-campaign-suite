@@ -104,6 +104,16 @@ function setFriendsConcentrationBadge(csForConc, playerStats, campaignName) {
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 }
 
+// Execute the Friends save pipeline, returning an info popup on failure.
+async function runFriendsHandler(action, playerStats, campaignName, mapName) {
+    try {
+        return await executeHandler(action, playerStats, campaignName, mapName);
+    } catch (e) {
+        console.error('[friendsService] Failed to execute Friends handler:', e);
+        return { type: 'popup', payload: { type: 'automation_info', name: 'Friends', description: `Failed to execute Friends.` } };
+    }
+}
+
 export async function triggerFriends(spell, metaCtx, playerStats, campaignName, mapName) {
     const isFriends = (spell.name || '').toLowerCase() === 'friends';
     if (!isFriends) return null;
@@ -164,13 +174,7 @@ export async function triggerFriends(spell, metaCtx, playerStats, campaignName, 
         spellSlotLevel: slotLevel,
     };
 
-    try {
-        const result = await executeHandler(action, playerStats, campaignName, mapName);
-        return result;
-    } catch (e) {
-        console.error('[friendsService] Failed to execute Friends handler:', e);
-        return { type: 'popup', payload: { type: 'automation_info', name: 'Friends', description: `Failed to execute Friends.` } };
-    }
+    return await runFriendsHandler(action, playerStats, campaignName, mapName);
 }
 
 /**

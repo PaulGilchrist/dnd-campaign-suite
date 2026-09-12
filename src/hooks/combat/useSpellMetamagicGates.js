@@ -177,6 +177,36 @@ async function handleMultiTargetGate(spell, metaCtx, {
   return true;
 }
 
+function isBlockedByConsumedMaterial(consumedMaterial, materialsWaived, playerStats, hasMaterial) {
+  return !!(consumedMaterial && !materialsWaived && !hasMaterial(playerStats, consumedMaterial.itemName));
+}
+
+function queueSorceryMetamagic(spell, metaCtx, { playerStats, cfSetPending }) {
+  let sorcerySpell = spell;
+  if (spell.level === 0 && spell.damage) {
+    const autoLevel = resolveCantripAutoLevel(spell, playerStats);
+    if (autoLevel) {
+      sorcerySpell = { ...spell, level: autoLevel, baseLevel: 0 };
+    }
+  }
+
+  const spellLevel = (metaCtx?.slotLevel ?? (sorcerySpell.baseLevel ?? sorcerySpell.level)) || 0;
+  const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
+  const isPsionic = isPsionicSpell(playerStats, spell.name);
+  const hasPsionic = hasPsionicSorcery(playerStats);
+
+  cfSetPending('metamagic', {
+    spell: sorcerySpell,
+    spellName: spell.name,
+    spellLevel: spellLevel,
+    castingTime: spell.casting_time,
+    _currentSP: currentSP,
+    isPsionic: isPsionic && hasPsionic,
+    psionicCost: isPsionic && hasPsionic ? spellLevel : 0,
+    _metaCtx: metaCtx,
+  });
+}
+
 export async function gateMetamagic(spell, metaCtx, {
   hasMaterial, setPopupHtml, isSorcerer, playerStats, campaignName, cfSetPending, setSecondaryTargetModal, characters, onExecute
 }) {
@@ -185,7 +215,7 @@ export async function gateMetamagic(spell, metaCtx, {
   const gateLevel = (spell.isUpcast && spell.upcastLevel) || spell.level;
   const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, spell.name, gateLevel, playerStats, campaignName);
   const materialsWaived = hasWildCompanionWaiver(playerStats, spell, freeCastAuthorized);
-  if (consumedMaterial && !materialsWaived && !hasMaterial(playerStats, consumedMaterial.itemName)) {
+  if (isBlockedByConsumedMaterial(consumedMaterial, materialsWaived, playerStats, hasMaterial)) {
     showMaterialRequiredPopup(spell, setPopupHtml);
     return;
   }
@@ -211,29 +241,7 @@ export async function gateMetamagic(spell, metaCtx, {
     return;
   }
 
-  let sorcerySpell = spell;
-  if (spell.level === 0 && spell.damage) {
-    const autoLevel = resolveCantripAutoLevel(spell, playerStats);
-    if (autoLevel) {
-      sorcerySpell = { ...spell, level: autoLevel, baseLevel: 0 };
-    }
-  }
-
-  const spellLevel = (metaCtx?.slotLevel ?? (sorcerySpell.baseLevel ?? sorcerySpell.level)) || 0;
-  const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
-  const isPsionic = isPsionicSpell(playerStats, spell.name);
-  const hasPsionic = hasPsionicSorcery(playerStats);
-
-  cfSetPending('metamagic', {
-    spell: sorcerySpell,
-    spellName: spell.name,
-    spellLevel: spellLevel,
-    castingTime: spell.casting_time,
-    _currentSP: currentSP,
-    isPsionic: isPsionic && hasPsionic,
-    psionicCost: isPsionic && hasPsionic ? spellLevel : 0,
-    _metaCtx: metaCtx,
-  });
+  queueSorceryMetamagic(spell, metaCtx, { playerStats, cfSetPending });
 }
 
 

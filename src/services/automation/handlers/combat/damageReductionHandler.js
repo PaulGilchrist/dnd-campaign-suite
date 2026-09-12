@@ -143,36 +143,76 @@ async function gateFallingReaction(auto, combatContext, playerName, usedRoundKey
     return infoPopup(featureName, refusalText, auto);
 }
 
+function equipmentPopup(action, auto, description) {
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            automationType: auto.type,
+            description,
+            automation: auto,
+        },
+    };
+}
+
+// Equipment prerequisites. Returns a refusal popup, or null when equipped.
+function equipmentRefusal(action, auto, playerStats) {
+    if (auto.requiresShield && !hasShield(playerStats)) {
+        return equipmentPopup(action, auto, `${action.name}: You must be holding a Shield to use this Reaction.`);
+    }
+    if (auto.requiresShieldOrWeapon && !hasShieldOrWeapon(playerStats)) {
+        return equipmentPopup(action, auto, `${action.name}: You must be holding a Shield or a Simple or Martial weapon to use this Reaction.`);
+    }
+    return null;
+}
+
+function triggerNoticePopup(featureName, auto, description) {
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: featureName,
+            description,
+            automation: auto,
+        },
+    };
+}
+
+// Last-attack trigger gates. Returns a refusal popup, or null when the trigger is valid.
+function attackTriggerRefusal(auto, lastAttack, playerName, featureName, campaignName) {
+    if (!lastAttack.attackEvent) {
+        return triggerNoticePopup(featureName, auto, `No recent attack found. ${featureName} can only be used after taking damage in combat.`);
+    }
+    if (lastAttack.targetName !== playerName) {
+        return triggerNoticePopup(featureName, auto, `The last attack did not target you. ${featureName} can only be used when you are the target.`);
+    }
+    if (!matchesTrigger(lastAttack, auto.trigger)) {
+        return triggerRefusal(auto, featureName, playerName, campaignName);
+    }
+    return null;
+}
+
+// Heal the holder by the reduced amount and log the hp_change entry.
+async function applyDeflectHeal(cs, actualHeal, playerName, campaignName, playerStats, featureName, reductionRoll, totalDamage) {
+    let healedAmount = 0;
+    if (cs && actualHeal > 0) {
+        const healResult = await applyHealingToTarget(cs, playerName, actualHeal, campaignName);
+        healedAmount = healResult?.actualHeal ?? 0;
+    }
+    if (healedAmount > 0) {
+        await logDeflectHeal(playerName, campaignName, playerStats, featureName, healedAmount, reductionRoll, totalDamage);
+    }
+    return healedAmount;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
     const featureName = action.name || 'Deflect Attacks';
 
-    if (auto.requiresShield && !hasShield(playerStats)) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                automationType: auto.type,
-                description: `${action.name}: You must be holding a Shield to use this Reaction.`,
-                automation: auto,
-            },
-        };
-    }
-
-    if (auto.requiresShieldOrWeapon && !hasShieldOrWeapon(playerStats)) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                automationType: auto.type,
-                description: `${action.name}: You must be holding a Shield or a Simple or Martial weapon to use this Reaction.`,
-                automation: auto,
-            },
-        };
-    }
+    const refuse = equipmentRefusal(action, auto, playerStats);
+    if (refuse) return refuse;
 
     if (auto.effect === 'zero_on_success') {
         return await handleZeroOnSuccess(action, playerStats, campaignName);
@@ -180,33 +220,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const lastAttack = await findLastAttack(campaignName);
 
-    if (!lastAttack.attackEvent) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `No recent attack found. ${featureName} can only be used after taking damage in combat.`,
-                automation: auto,
-            },
-        };
-    }
-
-    if (lastAttack.targetName !== playerName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `The last attack did not target you. ${featureName} can only be used when you are the target.`,
-                automation: auto,
-            },
-        };
-    }
-
-    if (!matchesTrigger(lastAttack, auto.trigger)) {
-        return triggerRefusal(auto, featureName, playerName, campaignName);
-    }
+    const triggerRefuse = attackTriggerRefusal(auto, lastAttack, playerName, featureName, campaignName);
+    if (triggerRefuse) return triggerRefuse;
 
     // CLA-315: Reaction economy latch for the 'falling' trigger consumers
     // (Slow Fall) — mirrors the CLA-297 Retaliation / CLA-310 Shadowy Dodge
@@ -228,15 +243,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const damageAfterReduction = Math.max(0, totalDamage - reductionAmount);
 
     const cs = combatContext;
-    let healedAmount = 0;
-    if (cs && actualHeal > 0) {
-        const healResult = await applyHealingToTarget(cs, playerName, actualHeal, campaignName);
-        healedAmount = healResult?.actualHeal ?? 0;
-    }
-
-    if (healedAmount > 0) {
-        await logDeflectHeal(playerName, campaignName, playerStats, featureName, healedAmount, reductionRoll, totalDamage);
-    }
+    const healedAmount = await applyDeflectHeal(cs, actualHeal, playerName, campaignName, playerStats, featureName, reductionRoll, totalDamage);
 
     const attackDetailsHTML = buildAttackDetailsHTML(lastAttack, playerName, totalDamage, primaryDamage, secondaryDamage, reductionRoll, healedAmount, damageAfterReduction);
 
@@ -306,6 +313,11 @@ function buildAttackDetailsHTML(lastAttack, playerName, totalDamage, primaryDama
     `;
 }
 
+function redirectSaveDc(auto, playerStats) {
+    const dexBonus = playerStats.abilities?.find(a => a.name === 'Dexterity')?.bonus || 0;
+    return auto.saveDc || (8 + dexBonus + getMonkLevel(playerStats) + (playerStats.proficiency || 0));
+}
+
 async function handleRedirect(action, auto, playerStats, campaignName, featureName) {
     const playerName = playerStats.name;
 
@@ -351,8 +363,7 @@ async function handleRedirect(action, auto, playerStats, campaignName, featureNa
     const martialArtsDie = getMartialArtsDie(playerStats);
     const redirectDamageExpression = auto.redirectDamage || `2 * ${martialArtsDie} + DEX modifier`;
 
-    const calculatedSaveDc = 8 + (playerStats.abilities?.find(a => a.name === 'Dexterity')?.bonus || 0) + getMonkLevel(playerStats) + (playerStats.proficiency || 0);
-    const finalSaveDc = auto.saveDc || calculatedSaveDc;
+    const finalSaveDc = redirectSaveDc(auto, playerStats);
 
     return {
         type: 'modal',
@@ -415,7 +426,7 @@ async function executeRedirect(playerName, targetName, campaignName, auto, redir
     const damageOnSave = computeDamageAfterSave(redirectDamage, saveResult.success, null);
 
     if (damageOnSave > 0 && cs) {
-        await applyDamageToTarget(cs, targetName, damageOnSave, ['Force'], campaignName, characters, false, playerName);
+        await applyDamageToTarget(cs, targetName, damageOnSave, ['Force'], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
     }
 
     await addEntry(campaignName, {
@@ -426,6 +437,29 @@ async function executeRedirect(playerName, targetName, campaignName, auto, redir
         targetName,
         timestamp: Date.now(),
     }).catch((e) => { console.error(`[${featureName}] Error:`, e); });
+}
+
+// Intervene Shield trigger gates — returns a refusal popup, or null when valid.
+function interveneShieldTriggerRefusal(featureName, auto, playerName, lastAttack) {
+    const refuse = (reason) => ({
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: featureName,
+            description: `${featureName}: ${reason}`,
+            automation: auto,
+        },
+    });
+
+    if (!lastAttack) return refuse('No recent attack or saving throw found.');
+    if (lastAttack.rollType !== 'save') return refuse('The last roll was not a saving throw.');
+    if (lastAttack.targetName !== playerName) return refuse('You were not the target of the last saving throw.');
+    if (lastAttack.saveType !== 'DEX') return refuse('The last saving throw was not a Dexterity save.');
+    if (lastAttack.saveResult !== 'success') return refuse('The last saving throw did not succeed.');
+
+    const rawDamage = lastAttack.rawDamage || lastAttack.primaryDamage || 0;
+    if (rawDamage <= 0) return refuse('No damage was dealt by the last attack.');
+    return null;
 }
 
 async function handleZeroOnSuccess(action, playerStats, campaignName) {
@@ -448,79 +482,10 @@ async function handleZeroOnSuccess(action, playerStats, campaignName) {
     const lastAttackResult = await findLastAttack(campaignName);
     const lastAttack = lastAttackResult.attackEvent;
 
-    if (!lastAttack) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName}: No recent attack or saving throw found.`,
-                automation: auto,
-            },
-        };
-    }
-
-    if (lastAttack.rollType !== 'save') {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName}: The last roll was not a saving throw.`,
-                automation: auto,
-            },
-        };
-    }
-
-    if (lastAttack.targetName !== playerName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName}: You were not the target of the last saving throw.`,
-                automation: auto,
-            },
-        };
-    }
-
-    if (lastAttack.saveType !== 'DEX') {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName}: The last saving throw was not a Dexterity save.`,
-                automation: auto,
-            },
-        };
-    }
-
-    if (lastAttack.saveResult !== 'success') {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName}: The last saving throw did not succeed.`,
-                automation: auto,
-            },
-        };
-    }
+    const refusal = interveneShieldTriggerRefusal(featureName, auto, playerName, lastAttack);
+    if (refusal) return refusal;
 
     const rawDamage = lastAttack.rawDamage || lastAttack.primaryDamage || 0;
-    if (rawDamage <= 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName}: No damage was dealt by the last attack.`,
-                automation: auto,
-            },
-        };
-    }
-
     const healAmount = Math.floor(rawDamage / 2);
 
     const cs = await getCombatContext(campaignName);

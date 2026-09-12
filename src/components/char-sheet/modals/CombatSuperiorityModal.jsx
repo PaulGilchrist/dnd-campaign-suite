@@ -12,6 +12,13 @@ const ACTION_TYPE_LABELS = {
 
 const ACTION_TYPE_ORDER = ['attack_rider', 'bonus_action', 'reaction', 'skill_check', 'movement', 'grant_attack'];
 
+const ACTION_TYPE_HINTS = {
+    attack_rider: 'on hit',
+    bonus_action: 'bonus action',
+    reaction: 'reaction',
+    skill_check: 'skill check',
+};
+
 // MN-018: HIT-triggered riders require the attack to have actually hit.
 const TRIGGER_PREDICATES = {
     weapon_attack_hit: (attack, playerName) => attack.attackerName === playerName && attack.hit === true && (attack.weaponType === 'melee' || attack.weaponType === 'ranged' || attack.isUnarmedStrike),
@@ -62,6 +69,236 @@ function computeHasSuperiorityDice(playerStats) {
     const dice = getRuntimeValue(playerStats.name, 'superiorityDice');
     const value = dice != null ? Number(dice) : (playerStats._trackedResources?.superiorityDice?.current || 0);
     return value > 0;
+}
+
+function shouldShowUseGroup(type, isPrompt, groupedManeuvers, knownManeuvers) {
+    if (type === 'skill_check') return false;
+    if (isPrompt) return !!groupedManeuvers[type];
+    if (type === 'attack_rider') return false;
+    return !!groupedManeuvers[type] && groupedManeuvers[type].some(m => knownManeuvers.includes(m.name));
+}
+
+function groupManeuversByType(maneuverList) {
+    const grouped = {};
+    for (const m of maneuverList) {
+        const type = m.actionType || 'other';
+        if (!grouped[type]) grouped[type] = [];
+        grouped[type].push(m);
+    }
+    return grouped;
+}
+
+function SpOverlay({ onClose, wide, children }) {
+    return (
+        <div className="sp-overlay" onClick={(e) => {
+            if (e.target.closest('.sp-modal')) return;
+            onClose?.();
+        }}>
+            <div className={wide ? 'sp-modal sp-modal--wide' : 'sp-modal'}>
+                {children}
+            </div>
+        </div>
+    );
+}
+
+function AppliedResultView({ result, onClose }) {
+    return (
+        <SpOverlay onClose={onClose}>
+            <div className="sp-header">
+                <i className="fa-solid fa-bolt"></i> {result.payload.name || 'Maneuver'}
+            </div>
+            <div className="sp-body" dangerouslySetInnerHTML={{ __html: result.payload.description }}>
+            </div>
+            <div className="sp-actions">
+                <button className="sp-roll-btn" onClick={onClose}>Done</button>
+            </div>
+        </SpOverlay>
+    );
+}
+
+function SimpleNoticeView({ title, message, onClose }) {
+    return (
+        <SpOverlay onClose={onClose}>
+            <div className="sp-header">
+                <i className="fa-solid fa-bolt"></i> {title}
+            </div>
+            <div className="sp-body">
+                <p>{message}</p>
+            </div>
+            <div className="sp-actions">
+                <button className="sp-dismiss-btn" onClick={onClose}>Close</button>
+            </div>
+        </SpOverlay>
+    );
+}
+
+function SelectionGroupCheckbox({ maneuver, isSelected, atMax, onToggle }) {
+    return (
+        <div style={{ marginBottom: '2px' }}>
+            <label
+                style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '8px',
+                    padding: '6px 10px',
+                    borderRadius: '4px',
+                    cursor: atMax ? 'not-allowed' : 'pointer',
+                    background: isSelected ? 'rgba(255,255,255,0.12)' : 'transparent',
+                    border: isSelected ? '1px solid var(--color-link)' : '1px solid transparent',
+                    opacity: atMax ? 0.5 : 1,
+                }}
+            >
+                <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => {
+                        if (!atMax) onToggle(maneuver.name);
+                    }}
+                    disabled={atMax}
+                    style={{ marginTop: '2px', flexShrink: 0 }}
+                />
+                <div style={{ flex: 1 }}>
+                    <div>
+                        <strong>{maneuver.name}</strong>
+                    </div>
+                    {maneuver.description && (
+                        <div style={{ fontSize: '0.85em', opacity: 0.7, marginTop: '2px', lineHeight: 1.3 }}>
+                            {maneuver.description}
+                        </div>
+                    )}
+                </div>
+            </label>
+        </div>
+    );
+}
+
+function ManeuverRadioItem({ maneuver, isSelected, onSelect }) {
+    return (
+        <label
+            style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '8px',
+                padding: '6px 10px',
+                marginBottom: '2px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                background: isSelected ? 'rgba(255,255,255,0.12)' : 'transparent',
+                border: isSelected ? '1px solid var(--color-link)' : '1px solid transparent',
+            }}
+        >
+            <input
+                type="radio"
+                name="combatManeuver"
+                checked={isSelected}
+                onChange={() => onSelect(maneuver.name)}
+                style={{ marginTop: '2px', flexShrink: 0 }}
+            />
+            <div style={{ flex: 1 }}>
+                <div>
+                    <strong>{maneuver.name}</strong>
+                    <span style={{ opacity: 0.7, marginLeft: '6px', fontSize: '0.85em' }}>
+                        — {ACTION_TYPE_HINTS[maneuver.actionType] || ''}
+                    </span>
+                </div>
+                {maneuver.description && (
+                    <div style={{ fontSize: '0.85em', opacity: 0.7, marginTop: '2px', lineHeight: 1.3 }}>
+                        {maneuver.description}
+                    </div>
+                )}
+            </div>
+        </label>
+    );
+}
+
+function SelectionView({ isPrompt, knownManeuvers, maxOptions, selectedForSelection, groupedManeuvers, toggleSelection, handleConfirmSelection, handleClearSelection, onClose }) {
+    const isKnown = knownManeuvers.length > 0;
+    return (
+        <SpOverlay onClose={onClose} wide>
+            <div className="sp-header">
+                <i className="fa-solid fa-bolt"></i> {isPrompt ? 'Combat Superiority — Choose Maneuver' : 'Combat Superiority — Select Maneuvers'}
+            </div>
+            <div className="sp-body">
+                <p>
+                    {isKnown
+                        ? `Your known maneuvers: ${knownManeuvers.length}. You can know up to ${maxOptions}. Select your maneuvers below. You can change your selection at any time.`
+                        : `Choose up to ${maxOptions} maneuvers. You learn 3 at level 3, and gain more at levels 7, 10, and 15.`
+                    }
+                </p>
+                <p style={{ opacity: 0.7, marginTop: '4px' }}>
+                    {selectedForSelection.length}/{maxOptions} selected
+                </p>
+                {ACTION_TYPE_ORDER.filter(t => groupedManeuvers[t]).map(type => (
+                    <div key={type} style={{ marginTop: '12px' }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95em', opacity: 0.9 }}>
+                            {ACTION_TYPE_LABELS[type] || type}
+                        </h4>
+                        {groupedManeuvers[type].map(m => (
+                            <SelectionGroupCheckbox
+                                key={m.name}
+                                maneuver={m}
+                                isSelected={selectedForSelection.includes(m.name)}
+                                atMax={selectedForSelection.length >= maxOptions && !selectedForSelection.includes(m.name)}
+                                onToggle={toggleSelection}
+                            />
+                        ))}
+                    </div>
+                ))}
+            </div>
+            <div className="sp-actions">
+                <button
+                    className="sp-roll-btn"
+                    onClick={handleConfirmSelection}
+                    disabled={selectedForSelection.length === 0}
+                >
+                    <i className="fa-solid fa-check"></i> Confirm Selection
+                </button>
+                {isKnown && (
+                    <button className="sp-dismiss-btn" onClick={handleClearSelection}>
+                        Clear Selection
+                    </button>
+                )}
+                <button className="sp-dismiss-btn" onClick={onClose}>Cancel</button>
+            </div>
+        </SpOverlay>
+    );
+}
+
+function UseView({ isPrompt, groupedManeuvers, knownManeuvers, selectedForUse, setSelectedForUse, handleUseManeuver, handleReopenSelection, onClose }) {
+    return (
+        <SpOverlay onClose={onClose}>
+            <div className="sp-header">
+                <i className="fa-solid fa-bolt"></i> {isPrompt ? 'Combat Superiority — Use Maneuver' : 'Combat Superiority — Choose Maneuver'}
+            </div>
+            <div className="sp-body">
+                <p>{isPrompt ? 'Choose a maneuver to use:' : 'Choose a maneuver to use:'}</p>
+                {ACTION_TYPE_ORDER.filter(t => shouldShowUseGroup(t, isPrompt, groupedManeuvers, knownManeuvers)).map(type => (
+                    <div key={type} style={{ marginTop: '12px' }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95em', opacity: 0.9 }}>
+                            {ACTION_TYPE_LABELS[type] || type}
+                        </h4>
+                        {groupedManeuvers[type].filter(m => knownManeuvers.includes(m.name)).map(m => (
+                            <ManeuverRadioItem
+                                key={m.name}
+                                maneuver={m}
+                                isSelected={selectedForUse === m.name}
+                                onSelect={setSelectedForUse}
+                            />
+                        ))}
+                    </div>
+                ))}
+            </div>
+            <div className="sp-actions">
+                <button className="sp-roll-btn" onClick={handleUseManeuver} disabled={!selectedForUse}>
+                    <i className="fa-solid fa-bolt"></i> Use Maneuver
+                </button>
+                <button className="sp-dismiss-btn" onClick={handleReopenSelection}>
+                    <i className="fa-solid fa-gear"></i> Manage Maneuvers
+                </button>
+                <button className="sp-dismiss-btn" onClick={onClose}>Cancel</button>
+            </div>
+        </SpOverlay>
+    );
 }
 
 function CombatSuperiorityModal({ payload, onConfirm, onReopenSelection, onClose }) {
@@ -129,237 +366,49 @@ function CombatSuperiorityModal({ payload, onConfirm, onReopenSelection, onClose
 
     const maneuverList = computeManeuverList({ availableManeuvers, allManeuvers, selectionMode, isPromptMode, attackContext, lastAttack, knownManeuvers, playerStats });
 
-    const groupedManeuvers = {};
-    for (const m of maneuverList) {
-        const type = m.actionType || 'other';
-        if (!groupedManeuvers[type]) groupedManeuvers[type] = [];
-        groupedManeuvers[type].push(m);
-    }
+    const groupedManeuvers = groupManeuversByType(maneuverList);
 
     const knownManeuverObjects = selectionMode ? [] : maneuverList.filter(m => knownManeuvers.includes(m.name));
 
     if (!selectionMode && applied && result) {
-        return (
-            <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
-                <div className="sp-modal">
-                    <div className="sp-header">
-                        <i className="fa-solid fa-bolt"></i> {result.payload.name || 'Maneuver'}
-                    </div>
-                    <div className="sp-body" dangerouslySetInnerHTML={{ __html: result.payload.description }}>
-                    </div>
-                    <div className="sp-actions">
-                        <button className="sp-roll-btn" onClick={onClose}>Done</button>
-                    </div>
-                </div>
-            </div>
-        );
+        return <AppliedResultView result={result} onClose={onClose} />;
     }
 
     if (!selectionMode && !hasSuperiorityDice) {
-        return (
-            <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
-                <div className="sp-modal">
-                    <div className="sp-header">
-                        <i className="fa-solid fa-bolt"></i> Combat Superiority
-                    </div>
-                    <div className="sp-body">
-                        <p>No Superiority Dice remaining. Recharges on a Short or Long Rest.</p>
-                    </div>
-                    <div className="sp-actions">
-                        <button className="sp-dismiss-btn" onClick={onClose}>Close</button>
-                    </div>
-                </div>
-            </div>
-        );
+        return <SimpleNoticeView title="Combat Superiority" message="No Superiority Dice remaining. Recharges on a Short or Long Rest." onClose={onClose} />;
     }
 
     if (selectionMode) {
-        const isKnown = knownManeuvers.length > 0;
         return (
-            <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
-                <div className="sp-modal sp-modal--wide">
-                    <div className="sp-header">
-                        <i className="fa-solid fa-bolt"></i> {isPrompt ? 'Combat Superiority — Choose Maneuver' : 'Combat Superiority — Select Maneuvers'}
-                    </div>
-                    <div className="sp-body">
-                        <p>
-                            {isKnown
-                                ? `Your known maneuvers: ${knownManeuvers.length}. You can know up to ${maxOptions}. Select your maneuvers below. You can change your selection at any time.`
-                                : `Choose up to ${maxOptions} maneuvers. You learn 3 at level 3, and gain more at levels 7, 10, and 15.`
-                            }
-                        </p>
-                        <p style={{ opacity: 0.7, marginTop: '4px' }}>
-                            {selectedForSelection.length}/{maxOptions} selected
-                        </p>
-                        {ACTION_TYPE_ORDER.filter(t => groupedManeuvers[t]).map(type => (
-                            <div key={type} style={{ marginTop: '12px' }}>
-                                <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95em', opacity: 0.9 }}>
-                                    {ACTION_TYPE_LABELS[type] || type}
-                                </h4>
-                                {groupedManeuvers[type].map(m => {
-                                    const isSelected = selectedForSelection.includes(m.name);
-                                    const atMax = selectedForSelection.length >= maxOptions && !isSelected;
-                                    return (
-                                        <div key={m.name} style={{ marginBottom: '2px' }}>
-                                            <label
-                                                style={{
-                                                    display: 'flex',
-                                                    alignItems: 'flex-start',
-                                                    gap: '8px',
-                                                    padding: '6px 10px',
-                                                    borderRadius: '4px',
-                                                    cursor: atMax ? 'not-allowed' : 'pointer',
-                                                    background: isSelected ? 'rgba(255,255,255,0.12)' : 'transparent',
-                                                    border: isSelected ? '1px solid var(--color-link)' : '1px solid transparent',
-                                                    opacity: atMax ? 0.5 : 1,
-                                                }}
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isSelected}
-                                                    onChange={() => {
-                                                        if (!atMax) toggleSelection(m.name);
-                                                    }}
-                                                    disabled={atMax}
-                                                    style={{ marginTop: '2px', flexShrink: 0 }}
-                                                />
-                                                <div style={{ flex: 1 }}>
-                                                    <div>
-                                                        <strong>{m.name}</strong>
-                                                    </div>
-                                                    {m.description && (
-                                                        <div style={{ fontSize: '0.85em', opacity: 0.7, marginTop: '2px', lineHeight: 1.3 }}>
-                                                            {m.description}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </label>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        ))}
-                    </div>
-                    <div className="sp-actions">
-                        <button
-                            className="sp-roll-btn"
-                            onClick={handleConfirmSelection}
-                            disabled={selectedForSelection.length === 0}
-                        >
-                            <i className="fa-solid fa-check"></i> Confirm Selection
-                        </button>
-                        {isKnown && (
-                            <button className="sp-dismiss-btn" onClick={handleClearSelection}>
-                                Clear Selection
-                            </button>
-                        )}
-                        <button className="sp-dismiss-btn" onClick={onClose}>Cancel</button>
-                    </div>
-                </div>
-            </div>
+            <SelectionView
+                isPrompt={isPrompt}
+                knownManeuvers={knownManeuvers}
+                maxOptions={maxOptions}
+                selectedForSelection={selectedForSelection}
+                groupedManeuvers={groupedManeuvers}
+                toggleSelection={toggleSelection}
+                handleConfirmSelection={handleConfirmSelection}
+                handleClearSelection={handleClearSelection}
+                onClose={onClose}
+            />
         );
     }
 
     if (knownManeuverObjects.length === 0) {
-        return (
-            <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
-                <div className="sp-modal">
-                    <div className="sp-header">
-                        <i className="fa-solid fa-bolt"></i> Combat Superiority
-                    </div>
-                    <div className="sp-body">
-                        <p>No maneuvers selected. Use Combat Superiority again to select your maneuvers.</p>
-                    </div>
-                    <div className="sp-actions">
-                        <button className="sp-dismiss-btn" onClick={onClose}>Close</button>
-                    </div>
-                </div>
-            </div>
-        );
+        return <SimpleNoticeView title="Combat Superiority" message="No maneuvers selected. Use Combat Superiority again to select your maneuvers." onClose={onClose} />;
     }
 
     return (
-        <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
-            <div className="sp-modal">
-                <div className="sp-header">
-                    <i className="fa-solid fa-bolt"></i> {isPrompt ? 'Combat Superiority — Use Maneuver' : 'Combat Superiority — Choose Maneuver'}
-                </div>
-                <div className="sp-body">
-                    <p>{isPrompt ? 'Choose a maneuver to use:' : 'Choose a maneuver to use:'}</p>
-                    {ACTION_TYPE_ORDER.filter(t => t !== 'skill_check' && ((isPrompt && groupedManeuvers[t]) || (!isPrompt && t !== 'attack_rider' && groupedManeuvers[t] && groupedManeuvers[t].some(m => knownManeuvers.includes(m.name))))).map(type => (
-                        <div key={type} style={{ marginTop: '12px' }}>
-                            <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95em', opacity: 0.9 }}>
-                                {ACTION_TYPE_LABELS[type] || type}
-                            </h4>
-                            {groupedManeuvers[type].filter(m => knownManeuvers.includes(m.name)).map(m => {
-                                const isSelected = selectedForUse === m.name;
-                                return (
-                                    <label
-                                        key={m.name}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'flex-start',
-                                            gap: '8px',
-                                            padding: '6px 10px',
-                                            marginBottom: '2px',
-                                            borderRadius: '4px',
-                                            cursor: 'pointer',
-                                            background: isSelected ? 'rgba(255,255,255,0.12)' : 'transparent',
-                                            border: isSelected ? '1px solid var(--color-link)' : '1px solid transparent',
-                                        }}
-                                    >
-                                        <input
-                                            type="radio"
-                                            name="combatManeuver"
-                                            checked={isSelected}
-                                            onChange={() => setSelectedForUse(m.name)}
-                                            style={{ marginTop: '2px', flexShrink: 0 }}
-                                        />
-                                        <div style={{ flex: 1 }}>
-                                            <div>
-                                                <strong>{m.name}</strong>
-                                                <span style={{ opacity: 0.7, marginLeft: '6px', fontSize: '0.85em' }}>
-                                                    — {m.actionType === 'attack_rider' ? 'on hit' : m.actionType === 'bonus_action' ? 'bonus action' : m.actionType === 'reaction' ? 'reaction' : m.actionType === 'skill_check' ? 'skill check' : ''}
-                                                </span>
-                                            </div>
-                                            {m.description && (
-                                                <div style={{ fontSize: '0.85em', opacity: 0.7, marginTop: '2px', lineHeight: 1.3 }}>
-                                                    {m.description}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </label>
-                                );
-                            })}
-                        </div>
-                    ))}
-                </div>
-                <div className="sp-actions">
-                    <button className="sp-roll-btn" onClick={handleUseManeuver} disabled={!selectedForUse}>
-                        <i className="fa-solid fa-bolt"></i> Use Maneuver
-                    </button>
-                    <button className="sp-dismiss-btn" onClick={handleReopenSelection}>
-                        <i className="fa-solid fa-gear"></i> Manage Maneuvers
-                    </button>
-                    <button className="sp-dismiss-btn" onClick={onClose}>Cancel</button>
-                </div>
-            </div>
-        </div>
+        <UseView
+            isPrompt={isPrompt}
+            groupedManeuvers={groupedManeuvers}
+            knownManeuvers={knownManeuvers}
+            selectedForUse={selectedForUse}
+            setSelectedForUse={setSelectedForUse}
+            handleUseManeuver={handleUseManeuver}
+            handleReopenSelection={handleReopenSelection}
+            onClose={onClose}
+        />
     );
 }
 

@@ -17,48 +17,54 @@ async function isTargetHumanoid(targetName, campaignName) {
     return true;
 }
 
+function madnessPopup(description) {
+    return { type: 'popup', payload: { type: 'automation_info', name: 'Crown of Madness', description } };
+}
+
+// Explicit meta target, else the attacker's current target in initiative view.
+async function resolveCrownTarget(playerStats, campaignName, metaCtx) {
+    if (metaCtx?.targetName) return metaCtx.targetName;
+    const cs = await getCombatContext(campaignName);
+    if (cs?.creatures && cs.creatures.length > 0) {
+        const attackerTarget = getTargetFromAttacker(cs, playerStats.name);
+        if (attackerTarget) return attackerTarget.name;
+    }
+    console.error(`[crownOfMadnessService] No target selected for Crown of Madness by ${playerStats.name}. Caster has no target in initiative view.`);
+    return null;
+}
+
+function resolveCrownSaveDc(metaCtx, playerStats) {
+    return metaCtx?.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
+}
+
 export async function triggerCrownOfMadness(spell, metaCtx, playerStats, campaignName, mapName) {
     const isCrownOfMadness = (spell.name || '').toLowerCase() === 'crown of madness';
     if (!isCrownOfMadness) return null;
 
-    let targetName = metaCtx?.targetName;
+    const targetName = await resolveCrownTarget(playerStats, campaignName, metaCtx);
     if (!targetName) {
-        const cs = await getCombatContext(campaignName);
-        if (cs?.creatures && cs.creatures.length > 0) {
-            const attackerTarget = getTargetFromAttacker(cs, playerStats.name);
-            if (attackerTarget) targetName = attackerTarget.name;
-        }
-        if (!targetName) {
-            console.error(`[crownOfMadnessService] No target selected for Crown of Madness by ${playerStats.name}. Caster has no target in initiative view.`);
-        }
-    }
-    if (!targetName) {
-        return { type: 'popup', payload: { type: 'automation_info', name: 'Crown of Madness', description: 'No target selected for Crown of Madness.' } };
+        return madnessPopup('No target selected for Crown of Madness.');
     }
 
     const humanoid = await isTargetHumanoid(targetName, campaignName);
     if (!humanoid) {
-        return { type: 'popup', payload: { type: 'automation_info', name: 'Crown of Madness', description: `No effect. ${targetName} is not a Humanoid.` } };
+        return madnessPopup(`No effect. ${targetName} is not a Humanoid.`);
     }
 
     const cs = await getCombatContext(campaignName);
     const targetInCombat = cs?.creatures?.some(c => c.name === targetName && c.name !== playerStats.name) ?? false;
 
-    const spellSaveDc = metaCtx?.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
-    const slotLevel = metaCtx?.slotLevel || spell.level || 2;
-
     const action = {
         name: 'Crown of Madness',
-        automation: { type: 'crown_of_madness', saveDc: spellSaveDc, targetName, advantage: targetInCombat },
+        automation: { type: 'crown_of_madness', saveDc: resolveCrownSaveDc(metaCtx, playerStats), targetName, advantage: targetInCombat },
         spell,
-        spellSlotLevel: slotLevel,
+        spellSlotLevel: metaCtx?.slotLevel || spell.level || 2,
     };
 
     try {
-        const result = await executeHandler(action, playerStats, campaignName, mapName);
-        return result;
+        return await executeHandler(action, playerStats, campaignName, mapName);
     } catch (e) {
         console.error('[crownOfMadnessService] Failed to execute Crown of Madness handler:', e);
-        return { type: 'popup', payload: { type: 'automation_info', name: 'Crown of Madness', description: `Failed to execute Crown of Madness.` } };
+        return madnessPopup('Failed to execute Crown of Madness.');
     }
 }

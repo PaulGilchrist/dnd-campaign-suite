@@ -288,6 +288,12 @@ export async function rollbackSpellEffects(lastAttack, campaignName, featureName
         setRuntimeValue('campaign', 'targetEffects', filtered, campaignName);
     }
 
+    rolledBack.logDescription = buildRollbackLogDescription(attackerName, spellName, targets, rolledBack);
+
+    return rolledBack;
+}
+
+function buildRollbackLogDescription(attackerName, spellName, targets, rolledBack) {
     const damageStr = rolledBack.damageHealed > 0 ? `${rolledBack.damageHealed} HP healed` : 'no damage dealt';
     const conditionStr = rolledBack.conditionsRemoved.length > 0
         ? `${rolledBack.conditionsRemoved.length} condition(s) removed`
@@ -295,9 +301,7 @@ export async function rollbackSpellEffects(lastAttack, campaignName, featureName
     const effectStr = rolledBack.effectsRemoved > 0 ? `${rolledBack.effectsRemoved} target effect(s) cleared` : 'no target effects to clear';
     const affectedList = targets.join(', ');
 
-    rolledBack.logDescription = `${attackerName}'s spell '${spellName}' was countered — ${damageStr}, ${conditionStr}, ${effectStr} on ${affectedList}.`;
-
-    return rolledBack;
+    return `${attackerName}'s spell '${spellName}' was countered — ${damageStr}, ${conditionStr}, ${effectStr} on ${affectedList}.`;
 }
 
 function rollbackTarget(cs, targetName, damage, conditions, rolledBack, featureName, campaignName) {

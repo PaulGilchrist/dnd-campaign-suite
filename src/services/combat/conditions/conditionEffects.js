@@ -595,11 +595,8 @@ function applyProtectionFromPoisonAdvantage(effects, conditionSet, isProtectionF
   effects.saveAdvantageReasons = [...(effects.saveAdvantageReasons || []), 'Protection from Poison'];
 }
 
-function normalizeConditionEffectOptions(options = {}) {
+function normalizeConditionEffectFlags(options = {}) {
   const {
-    conditions = [],
-    saveModifiers = [],
-    targetEffects = [],
     isRaging = false,
     shapeShiftActive = false,
     isPeerlessAthlete = false,
@@ -610,7 +607,6 @@ function normalizeConditionEffectOptions(options = {}) {
     isLivingLegendActive = false,
     isElderChampionActive = false,
     isElderChampionAttackerActive = false,
-    holyAuraTargets = [],
     isProtectionFromPoisonActive = false,
     isTranceOfOrderActive = false,
     hasPowerfulBuild = false,
@@ -618,24 +614,37 @@ function normalizeConditionEffectOptions(options = {}) {
   } = options
 
   return {
-    conditions,
-    saveModifiers,
-    targetEffects,
+    combatContext,
+    seeInvisibilityActive,
+    attackerName,
+    attackerSenses,
     isRaging,
     shapeShiftActive,
     isPeerlessAthlete,
     isLargeFormActive,
-    combatContext,
-    seeInvisibilityActive,
-    attackerName,
     isLivingLegendActive,
     isElderChampionActive,
     isElderChampionAttackerActive,
-    holyAuraTargets,
     isProtectionFromPoisonActive,
     isTranceOfOrderActive,
     hasPowerfulBuild,
-    attackerSenses,
+  }
+}
+
+function normalizeConditionEffectOptions(options = {}) {
+  const {
+    conditions = [],
+    saveModifiers = [],
+    targetEffects = [],
+    holyAuraTargets = [],
+  } = options
+
+  return {
+    conditions,
+    saveModifiers,
+    targetEffects,
+    holyAuraTargets,
+    ...normalizeConditionEffectFlags(options),
   }
 }
 

@@ -205,9 +205,9 @@ describe('createRollConditionSaveHandler', () => {
 
             await handler('Alice', { key: 'blinded', label: 'Blinded', dc: 12, ability: 'con' });
 
-            expect(buildConditionPopup).toHaveBeenCalledWith(
-                15, 3, '(+3 proficiency)', 'Constitution', 'Blinded', 12, true, [15], false, false
-            );
+            expect(buildConditionPopup).toHaveBeenCalledWith({
+                roll: 15, bonus: 3, bonusDetail: '(+3 proficiency)', abilityLabel: 'Constitution', conditionLabel: 'Blinded', dc: 12, success: true, rolls: [15], advantage: false, starryDragonFloor: false,
+            });
         });
 
         it('passes advantage=true when rolls has multiple entries', async () => {
@@ -216,9 +216,9 @@ describe('createRollConditionSaveHandler', () => {
 
             await handler('Alice', { key: 'blinded', label: 'Blinded', dc: 12, ability: 'con' });
 
-            expect(buildConditionPopup).toHaveBeenCalledWith(
-                15, 2, '', 'Constitution', 'Blinded', 12, true, [15, 12], true, false
-            );
+            expect(buildConditionPopup).toHaveBeenCalledWith({
+                roll: 15, bonus: 2, bonusDetail: '', abilityLabel: 'Constitution', conditionLabel: 'Blinded', dc: 12, success: true, rolls: [15, 12], advantage: true, starryDragonFloor: false,
+            });
         });
 
         it('passes starryDragonFloor when true', async () => {
@@ -227,9 +227,9 @@ describe('createRollConditionSaveHandler', () => {
 
             await handler('Alice', { key: 'blinded', label: 'Blinded', dc: 12, ability: 'con' });
 
-            expect(buildConditionPopup).toHaveBeenCalledWith(
-                10, 3, '', 'Constitution', 'Blinded', 12, true, [5], false, true
-            );
+            expect(buildConditionPopup).toHaveBeenCalledWith({
+                roll: 10, bonus: 3, bonusDetail: '', abilityLabel: 'Constitution', conditionLabel: 'Blinded', dc: 12, success: true, rolls: [5], advantage: false, starryDragonFloor: true,
+            });
         });
     });
 

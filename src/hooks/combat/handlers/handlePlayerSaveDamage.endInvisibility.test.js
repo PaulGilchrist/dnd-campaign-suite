@@ -143,32 +143,11 @@ describe('handlePlayerSaveDamage - endInvisibilityOnHostileAction', () => {
             metamagicCareful: true,
         };
 
-        const result = await handler(
-            'Fire Bolt',
-            '1d10',
-            5,
-            [6],
-            0,
-            context,
-            5,
-            { creatures: [{ name: 'Ally1', type: 'player' }] },
-            [6]
-        );
+        const result = await handler({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [6], modifier: 0, context: context, adjustedTotal: 5, combatSummary: { creatures: [{ name: 'Ally1', type: 'player' }] }, displayRolls: [6] });
 
         expect(result).toBe(true);
         expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-        expect(applyDamageToTarget).toHaveBeenCalledWith(
-            expect.any(Object),
-            'Ally1',
-            0,
-            ['Fire'],
-            'test-campaign',
-            expect.any(Array),
-            false,
-            'TestWizard',
-            false,
-            { isSpellDamage: true }
-        );
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', 0, ['Fire'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: false, ...{ isSpellDamage: true } });
         expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('TestWizard', 'test-campaign');
         expect(deps.logEntry).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -200,17 +179,7 @@ describe('handlePlayerSaveDamage - endInvisibilityOnHostileAction', () => {
             metamagicCareful: true,
         };
 
-        const result = await handler(
-            'Fire Bolt',
-            '1d10',
-            5,
-            [6],
-            0,
-            context,
-            5,
-            { creatures: [{ name: 'Ally1', type: 'player' }] },
-            [6]
-        );
+        const result = await handler({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [6], modifier: 0, context: context, adjustedTotal: 5, combatSummary: { creatures: [{ name: 'Ally1', type: 'player' }] }, displayRolls: [6] });
 
         expect(result).toBe(true);
         expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled();
@@ -236,17 +205,7 @@ describe('handlePlayerSaveDamage - endInvisibilityOnHostileAction', () => {
             metamagicCareful: true,
         };
 
-        await handler(
-            'Fire Bolt',
-            '1d10',
-            5,
-            [6],
-            0,
-            context,
-            5,
-            { creatures: [{ name: 'Ally1', type: 'player' }] },
-            [6]
-        );
+        await handler({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [6], modifier: 0, context: context, adjustedTotal: 5, combatSummary: { creatures: [{ name: 'Ally1', type: 'player' }] }, displayRolls: [6] });
 
         expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled();
     });
@@ -268,32 +227,11 @@ describe('handlePlayerSaveDamage - endInvisibilityOnHostileAction', () => {
             },
         };
 
-        const result = await handler(
-            'Contact Other Plane',
-            '4d6',
-            14,
-            [3, 5, 2, 4],
-            0,
-            context,
-            14,
-            { creatures: [{ name: 'TestWizard', type: 'player' }] },
-            [3, 5, 2, 4]
-        );
+        const result = await handler({ name: 'Contact Other Plane', formula: '4d6', total: 14, rolls: [3, 5, 2, 4], modifier: 0, context: context, adjustedTotal: 14, combatSummary: { creatures: [{ name: 'TestWizard', type: 'player' }] }, displayRolls: [3, 5, 2, 4] });
 
         expect(result).toBe(true);
         expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-        expect(applyDamageToTarget).toHaveBeenCalledWith(
-            expect.any(Object),
-            'TestWizard',
-            0,
-            ['Psychic'],
-            'test-campaign',
-            null,
-            false,
-            'TestWizard',
-            false,
-            { isSpellDamage: true }
-        );
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'TestWizard', 0, ['Psychic'], 'test-campaign', null, { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: false, ...{ isSpellDamage: true } });
         expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('TestWizard', 'test-campaign');
         expect(deps.logEntry).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -329,17 +267,7 @@ describe('handlePlayerSaveDamage - endInvisibilityOnHostileAction', () => {
             },
         };
 
-        const result = await handler(
-            'Contact Other Plane',
-            '4d6',
-            14,
-            [3, 5, 2, 4],
-            0,
-            context,
-            14,
-            { creatures: [{ name: 'TestWizard', type: 'player' }] },
-            [3, 5, 2, 4]
-        );
+        const result = await handler({ name: 'Contact Other Plane', formula: '4d6', total: 14, rolls: [3, 5, 2, 4], modifier: 0, context: context, adjustedTotal: 14, combatSummary: { creatures: [{ name: 'TestWizard', type: 'player' }] }, displayRolls: [3, 5, 2, 4] });
 
         expect(result).toBe(true);
         expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled();
@@ -369,17 +297,7 @@ describe('handlePlayerSaveDamage - endInvisibilityOnHostileAction', () => {
             },
         };
 
-        await handler(
-            'Contact Other Plane',
-            '4d6',
-            14,
-            [3, 5, 2, 4],
-            0,
-            context,
-            14,
-            { creatures: [{ name: 'TestWizard', type: 'player' }] },
-            [3, 5, 2, 4]
-        );
+        await handler({ name: 'Contact Other Plane', formula: '4d6', total: 14, rolls: [3, 5, 2, 4], modifier: 0, context: context, adjustedTotal: 14, combatSummary: { creatures: [{ name: 'TestWizard', type: 'player' }] }, displayRolls: [3, 5, 2, 4] });
 
         expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled();
     });

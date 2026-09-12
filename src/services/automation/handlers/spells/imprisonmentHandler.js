@@ -68,6 +68,16 @@ function dispatchSaveResult(campaignName, promptId, targetName, saveType, saveDc
     }));
 }
 
+function rollNpcImprisonmentSave(targetCreature, dc) {
+    if (targetCreature) return rollSaveForCreature(targetCreature, 'WIS', dc, false, false);
+    const r1 = rollD20();
+    const r2 = rollD20();
+    const roll = Math.max(r1, r2);
+    const total = roll;
+    const success = total >= dc;
+    return { roll, total, bonus: 0, success, rawRolls: [r1, r2] };
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
@@ -140,18 +150,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }).catch((e) => { console.error("[imprisonment] Error:", e); });
 
     if (isTargetNpc) {
-        const saveResult = targetCreature
-            ? rollSaveForCreature(targetCreature, 'WIS', dc, false, false)
-            : (() => {
-                const r1 = rollD20();
-                const r2 = rollD20();
-                const roll = Math.max(r1, r2);
-                const total = roll;
-                const success = total >= dc;
-                return { roll, total, bonus: 0, success, rawRolls: [r1, r2] };
-            })();
-
-        dispatchSaveResult(campaignName, promptId, targetName, 'WIS', dc, saveResult);
+        dispatchSaveResult(campaignName, promptId, targetName, 'WIS', dc, rollNpcImprisonmentSave(targetCreature, dc));
     }
 
     const saveResult = await promise;

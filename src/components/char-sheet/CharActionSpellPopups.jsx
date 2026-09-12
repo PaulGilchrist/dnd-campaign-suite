@@ -10,66 +10,164 @@ import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.j
 import { getCombatSummary } from '../../services/encounters/combatData.js'
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 
-export default function CharActionSpellPopups({
-    playerStats,
-    campaignName,
-    selectedActionSpell,
-    setSelectedActionSpell,
-    buildUpcastLevels,
-    handleActionSpellCast,
-    actionPendingMetamagic,
-    actionHandleConfirm,
-    actionHandleSkip,
-    actionPendingAid,
-    actionHandleAidConfirm,
-    actionHandleAidSkip,
-    actionPendingBane,
-    actionHandleBaneConfirm,
-    actionHandleBaneSkip,
-    actionPendingBless,
-    actionHandleBlessConfirm,
-    actionHandleBlessSkip,
-    actionPendingFaerieFire,
-    actionHandleFaerieFireConfirm,
-    actionHandleFaerieFireSkip,
-    actionPendingBeaconOfHope,
-    actionHandleBeaconOfHopeConfirm,
-    actionHandleBeaconOfHopeSkip,
-    actionPendingPassWithoutTrace,
-    actionHandlePassWithoutTraceConfirm,
-    actionHandlePassWithoutTraceSkip,
-    actionPendingHaste,
-    actionHandleHasteConfirm,
-    actionHandleHasteSkip,
-    actionPendingBarkskin,
-    actionHandleBarkskinConfirm,
-    actionHandleBarkskinSkip,
-    actionPendingHeal,
-    actionHandleHealConfirm,
-    actionHandleHealSkip,
-    actionPendingGreaterRestoration,
-    actionHandleGreaterRestorationConfirm,
-    actionHandleGreaterRestorationSkip,
-    actionHandleGreaterRestorationNoEffects,
-    actionPendingRemoveCurse,
-    actionHandleRemoveCurseConfirm,
-    actionHandleRemoveCurseSkip,
-    actionPendingMagicMissile,
-    actionHandleMagicMissileConfirm,
-    actionHandleMagicMissileSkip,
-    actionPendingMageArmor,
-    actionHandleMageArmorConfirm,
-    actionHandleMageArmorSkip,
-    actionPendingCureWounds,
-    actionHandleCureWoundsConfirm,
-    actionHandleCureWoundsSkip,
-    actionPendingRevivify,
-    actionHandleRevivifyConfirm,
-    actionHandleRevivifySkip,
-    pendingActionMetamagic,
-    handleActionMetamagicConfirm,
-    handleActionMetamagicSkip,
-}) {
+const ALLY_SELECTION_MODAL_SPECS = [
+    {
+        pending: 'actionPendingAid', onConfirm: 'actionHandleAidConfirm', onSkip: 'actionHandleAidSkip',
+        title: 'Aid', icon: 'fa-hand-holding-heart', confirmLabel: 'Cast Aid',
+        description: 'Your spell bolsters your allies with toughness and resolve. Choose up to 3 creatures within range.',
+    },
+    {
+        pending: 'actionPendingBane', onConfirm: 'actionHandleBaneConfirm', onSkip: 'actionHandleBaneSkip',
+        title: 'Bane', icon: 'fa-shield-halved', confirmLabel: 'Cast Bane',
+        description: 'Curse up to three creatures of your choice that you can see within range. Affected creatures subtract 1d4 from attack rolls and saving throws.',
+    },
+    {
+        pending: 'actionPendingBless', onConfirm: 'actionHandleBlessConfirm', onSkip: 'actionHandleBlessSkip',
+        title: 'Bless', icon: 'fa-hands', confirmLabel: 'Cast Bless',
+        description: 'You bless up to three creatures of your choice within range. Affected creatures add 1d4 to attack rolls and saving throws.',
+    },
+    {
+        pending: 'actionPendingFaerieFire', onConfirm: 'actionHandleFaerieFireConfirm', onSkip: 'actionHandleFaerieFireSkip',
+        title: 'Faerie Fire', icon: 'fa-fire', confirmLabel: 'Cast Faerie Fire', confirmIcon: 'fa-fire',
+        description: 'Each creature in a 20-foot Cube within range must succeed on a Dexterity saving throw or be outlined in light for the duration. Affected creatures shed Dim Light in a 10-foot radius, can\'t benefit from the Invisible condition, and attack rolls against them have Advantage if the attacker can see them. Concentration, up to 1 minute.',
+    },
+    {
+        pending: 'actionPendingBeaconOfHope', onConfirm: 'actionHandleBeaconOfHopeConfirm', onSkip: 'actionHandleBeaconOfHopeSkip',
+        title: 'Beacon of Hope', icon: 'fa-heart-pulse', confirmLabel: 'Cast Beacon of Hope',
+        description: 'This spell bestows hope and vitality. Choose any number of creatures within range. For the duration, each target has advantage on wisdom saving throws and death saving throws, and regains the maximum number of hit points possible from any healing.',
+    },
+    {
+        pending: 'actionPendingPassWithoutTrace', onConfirm: 'actionHandlePassWithoutTraceConfirm', onSkip: 'actionHandlePassWithoutTraceSkip',
+        title: 'Pass Without Trace', icon: 'fa-ghost', confirmLabel: 'Cast Pass Without Trace',
+        description: 'A veil of shadows and silence radiates from you, masking you and your companions from detection. Choose creatures within 30 feet of you. Each chosen creature has a +10 bonus to Dexterity (Stealth) checks and can\'t be tracked except by magical means.',
+    },
+];
+
+const TOUCH_TARGET_MODAL_SPECS = [
+    {
+        pending: 'actionPendingHaste', onConfirm: 'actionHandleHasteConfirm', onSkip: 'actionHandleHasteSkip',
+        title: 'Haste', confirmLabel: 'Cast Haste', confirmIcon: 'fa-bolt', pick: 'array',
+        description: 'Choose a willing creature within range. Target\'s speed doubles, gains +2 AC, and gets advantage on DEX saves.',
+    },
+    {
+        pending: 'actionPendingBarkskin', onConfirm: 'actionHandleBarkskinConfirm', onSkip: 'actionHandleBarkskinSkip',
+        title: 'Barkskin', confirmLabel: 'Cast Barkskin', confirmIcon: 'fa-tree', pick: 'array',
+        description: 'Choose a willing creature within range. Target\'s AC becomes 17.',
+    },
+    {
+        pending: 'actionPendingHeal', onConfirm: 'actionHandleHealConfirm', onSkip: 'actionHandleHealSkip',
+        title: 'Heal', confirmLabel: 'Cast Heal', confirmIcon: 'fa-heart', pick: 'object',
+        description: 'A surge of positive energy washes through the creature, causing it to regain 70 hit points. This spell also ends blindness, deafness, and any diseases affecting the target.',
+    },
+    {
+        pending: 'actionPendingCureWounds', onConfirm: 'actionHandleCureWoundsConfirm', onSkip: 'actionHandleCureWoundsSkip',
+        title: 'Cure Wounds', confirmLabel: 'Cast Cure Wounds', confirmIcon: 'fa-heart', pick: 'object',
+        description: 'Choose a creature within touch range. The target regains hit points equal to the roll of your dice plus your spellcasting ability modifier.',
+    },
+    {
+        pending: 'actionPendingRevivify', onConfirm: 'actionHandleRevivifyConfirm', onSkip: 'actionHandleRevivifySkip',
+        title: 'Revivify', confirmLabel: 'Cast Revivify', confirmIcon: 'fa-heart', pick: 'object',
+        description: 'Choose a creature to revive. The target must have 0 Hit Points. A diamond worth 300+ GP is consumed.',
+    },
+    {
+        pending: 'actionPendingRemoveCurse', onConfirm: 'actionHandleRemoveCurseConfirm', onSkip: 'actionHandleRemoveCurseSkip',
+        title: 'Remove Curse', confirmLabel: 'Cast Remove Curse', confirmIcon: 'fa-hand-holding-medical', pick: 'object',
+        description: state => `Choose a creature within <strong>${state.range}</strong>. This spell ends all curses affecting the target and breaks the target's attunement to any cursed magic items.`,
+    },
+    {
+        pending: 'actionPendingMageArmor', onConfirm: 'actionHandleMageArmorConfirm', onSkip: 'actionHandleMageArmorSkip',
+        title: 'Mage Armor', confirmLabel: 'Cast Mage Armor', confirmIcon: 'fa-shield-halved', pick: 'array',
+        description: 'Choose a creature within range. The target\'s base AC becomes 13 + Dexterity modifier. Mage Armor lasts 8 hours and ends on a long rest.',
+    },
+];
+
+function ActionMetamagicHost({ pending, playerStats, campaignName, onConfirm, onSkip }) {
+    if (!pending) return null;
+    return (
+        <MetamagicPopup
+            spell={{ name: pending.spellName, level: pending.spellLevel || 0 }}
+            playerStats={{ ...playerStats, _metamagicCurrentSP: pending._currentSP, _isPsionicSpell: pending.isPsionic, _psionicCost: pending.psionicCost }}
+            campaignName={campaignName}
+            onConfirm={onConfirm}
+            onSkip={onSkip}
+        />
+    );
+}
+
+function MagicMissileTargetHost({ pending, playerStats, campaignName, filterTargets, onConfirm, onSkip }) {
+    if (!pending) return null;
+    const { spell, totalMissiles, missileDamage, creatureTargets } = pending;
+    const currentTargetName = getTargetFromAttacker(getCombatSummary(campaignName), playerStats.name)?.name;
+    return (
+        <MagicMissileTargetPopup
+            spell={{ name: spell.name, level: spell.level || 0 }}
+            playerStats={playerStats}
+            campaignName={campaignName}
+            totalMissiles={totalMissiles}
+            missileDamage={missileDamage}
+            creatureTargets={filterTargets(creatureTargets)}
+            currentTargetName={currentTargetName}
+            onConfirm={onConfirm}
+            onSkip={onSkip}
+        />
+    );
+}
+
+function GreaterRestorationHost({ pending, selectedTarget, filterTargets, onTargetSelected, onEffectSelected, onEffectSkip, onNoEffectsDismiss, onCancel }) {
+    if (pending && !selectedTarget) {
+        return (
+            <SecondaryTargetModal
+                title="Greater Restoration"
+                targets={filterTargets(pending.creatureTargets).map(name => ({ name, type: 'creature' }))}
+                onTargetSelected={onTargetSelected}
+                onSkip={onCancel}
+                description={`Choose a creature within <strong>${pending.range}</strong>. You'll select which debilitating effect to remove.`}
+                confirmLabel="Cast Greater Restoration"
+                confirmIcon="fa-hand-holding-medical"
+            />
+        );
+    }
+    if (selectedTarget) {
+        const hasEffects = selectedTarget.effects.length > 0;
+        return (
+            <SecondaryTargetModal
+                title="Greater Restoration"
+                targets={selectedTarget.effects.map(e => ({ value: e.value, label: e.label }))}
+                onTargetSelected={onEffectSelected}
+                onSkip={hasEffects ? onEffectSkip : onNoEffectsDismiss}
+                description={hasEffects
+                    ? `Choose one effect to remove from ${selectedTarget.targetName}.`
+                    : `No removable effects found on ${selectedTarget.targetName}.`}
+                confirmLabel="Remove Effect"
+                confirmIcon="fa-hand-holding-medical"
+                hideConfirm={!hasEffects}
+            />
+        );
+    }
+    return null;
+}
+
+export default function CharActionSpellPopups(props) {
+    const {
+        playerStats,
+        campaignName,
+        selectedActionSpell,
+        setSelectedActionSpell,
+        buildUpcastLevels,
+        handleActionSpellCast,
+        actionPendingMetamagic,
+        actionHandleConfirm,
+        actionHandleSkip,
+        actionHandleGreaterRestorationConfirm,
+        actionHandleGreaterRestorationSkip,
+        actionHandleGreaterRestorationNoEffects,
+        actionPendingMagicMissile,
+        actionHandleMagicMissileConfirm,
+        actionHandleMagicMissileSkip,
+        pendingActionMetamagic,
+        handleActionMetamagicConfirm,
+        handleActionMetamagicSkip,
+    } = props;
     const playerStatsName = playerStats?.name;
 
     const isForcecageBlocked = (attackerName, targetName) => {
@@ -166,6 +264,40 @@ export default function CharActionSpellPopups({
         actionHandleGreaterRestorationNoEffects();
         setGreaterRestorationSelectedTarget(null);
     }, [actionHandleGreaterRestorationNoEffects]);
+    const renderAllySelectionModals = () => ALLY_SELECTION_MODAL_SPECS.map(({ pending, onConfirm, onSkip, ...modalProps }) => {
+        const state = props[pending];
+        if (!state) return null;
+        return (
+            <CreatureSelectionModal
+                key={modalProps.title}
+                {...modalProps}
+                targets={filterForcecageBlockedTargets(state.creatureTargets)}
+                maxTargets={state.maxTargets}
+                onConfirm={props[onConfirm]}
+                onSkip={props[onSkip]}
+            />
+        );
+    });
+
+    const renderTouchTargetModals = () => TOUCH_TARGET_MODAL_SPECS.map(({ pending, onConfirm, onSkip, pick, ...modalProps }) => {
+        const state = props[pending];
+        if (!state) return null;
+        const confirm = props[onConfirm];
+        const selectTarget = pick === 'array'
+            ? (targetName) => confirm([targetName])
+            : (targetName) => confirm({ targetName });
+        return (
+            <SecondaryTargetModal
+                key={modalProps.title}
+                {...modalProps}
+                description={typeof modalProps.description === 'function' ? modalProps.description(state) : modalProps.description}
+                targets={filterForcecageBlockedTargets(state.creatureTargets).map(name => ({ name, type: 'creature' }))}
+                onTargetSelected={selectTarget}
+                onSkip={props[onSkip]}
+            />
+        );
+    });
+
     return (
         <>
             {selectedActionSpell && (
@@ -181,222 +313,40 @@ export default function CharActionSpellPopups({
                     />
                 </Popup>
             )}
-            {actionPendingMetamagic && (
-                <MetamagicPopup
-                    spell={{ name: actionPendingMetamagic.spellName, level: actionPendingMetamagic.spellLevel || 0 }}
-                    playerStats={{ ...playerStats, _metamagicCurrentSP: actionPendingMetamagic._currentSP, _isPsionicSpell: actionPendingMetamagic.isPsionic, _psionicCost: actionPendingMetamagic.psionicCost }}
-                    campaignName={campaignName}
-                    onConfirm={actionHandleConfirm}
-                    onSkip={actionHandleSkip}
-                />
-            )}
-            {actionPendingAid && (
-                <CreatureSelectionModal
-                    title="Aid"
-                    icon="fa-hand-holding-heart"
-                    targets={filterForcecageBlockedTargets(actionPendingAid.creatureTargets)}
-                    maxTargets={actionPendingAid.maxTargets}
-                    description="Your spell bolsters your allies with toughness and resolve. Choose up to 3 creatures within range."
-                    confirmLabel="Cast Aid"
-                    onConfirm={actionHandleAidConfirm}
-                    onSkip={actionHandleAidSkip}
-                />
-            )}
-            {actionPendingBane && (
-                <CreatureSelectionModal
-                    title="Bane"
-                    icon="fa-shield-halved"
-                    targets={filterForcecageBlockedTargets(actionPendingBane.creatureTargets)}
-                    maxTargets={actionPendingBane.maxTargets}
-                    description="Curse up to three creatures of your choice that you can see within range. Affected creatures subtract 1d4 from attack rolls and saving throws."
-                    confirmLabel="Cast Bane"
-                    onConfirm={actionHandleBaneConfirm}
-                    onSkip={actionHandleBaneSkip}
-                />
-            )}
-            {actionPendingBless && (
-                <CreatureSelectionModal
-                    title="Bless"
-                    icon="fa-hands"
-                    targets={filterForcecageBlockedTargets(actionPendingBless.creatureTargets)}
-                    maxTargets={actionPendingBless.maxTargets}
-                    description="You bless up to three creatures of your choice within range. Affected creatures add 1d4 to attack rolls and saving throws."
-                    confirmLabel="Cast Bless"
-                    onConfirm={actionHandleBlessConfirm}
-                    onSkip={actionHandleBlessSkip}
-                />
-            )}
-            {actionPendingFaerieFire && (
-                <CreatureSelectionModal
-                    title="Faerie Fire"
-                    icon="fa-fire"
-                    targets={filterForcecageBlockedTargets(actionPendingFaerieFire.creatureTargets)}
-                    description="Each creature in a 20-foot Cube within range must succeed on a Dexterity saving throw or be outlined in light for the duration. Affected creatures shed Dim Light in a 10-foot radius, can't benefit from the Invisible condition, and attack rolls against them have Advantage if the attacker can see them. Concentration, up to 1 minute."
-                    confirmLabel="Cast Faerie Fire"
-                    confirmIcon="fa-fire"
-                    onConfirm={actionHandleFaerieFireConfirm}
-                    onSkip={actionHandleFaerieFireSkip}
-                />
-            )}
-            {actionPendingBeaconOfHope && (
-                <CreatureSelectionModal
-                    title="Beacon of Hope"
-                    icon="fa-heart-pulse"
-                    targets={filterForcecageBlockedTargets(actionPendingBeaconOfHope.creatureTargets)}
-                    description="This spell bestows hope and vitality. Choose any number of creatures within range. For the duration, each target has advantage on wisdom saving throws and death saving throws, and regains the maximum number of hit points possible from any healing."
-                    confirmLabel="Cast Beacon of Hope"
-                    onConfirm={actionHandleBeaconOfHopeConfirm}
-                    onSkip={actionHandleBeaconOfHopeSkip}
-                />
-            )}
-            {actionPendingPassWithoutTrace && (
-                <CreatureSelectionModal
-                    title="Pass Without Trace"
-                    icon="fa-ghost"
-                    targets={filterForcecageBlockedTargets(actionPendingPassWithoutTrace.creatureTargets)}
-                    description="A veil of shadows and silence radiates from you, masking you and your companions from detection. Choose creatures within 30 feet of you. Each chosen creature has a +10 bonus to Dexterity (Stealth) checks and can't be tracked except by magical means."
-                    confirmLabel="Cast Pass Without Trace"
-                    onConfirm={actionHandlePassWithoutTraceConfirm}
-                    onSkip={actionHandlePassWithoutTraceSkip}
-                />
-            )}
-            {actionPendingHaste && (
-                <SecondaryTargetModal
-                    title="Haste"
-                    targets={filterForcecageBlockedTargets(actionPendingHaste.creatureTargets).map(name => ({ name, type: 'creature' }))}
-                    onTargetSelected={(targetName) => actionHandleHasteConfirm([targetName])}
-                    onSkip={actionHandleHasteSkip}
-                    description="Choose a willing creature within range. Target's speed doubles, gains +2 AC, and gets advantage on DEX saves."
-                    confirmLabel="Cast Haste"
-                    confirmIcon="fa-bolt"
-                />
-            )}
-            {actionPendingBarkskin && (
-                <SecondaryTargetModal
-                    title="Barkskin"
-                    targets={filterForcecageBlockedTargets(actionPendingBarkskin.creatureTargets).map(name => ({ name, type: 'creature' }))}
-                    onTargetSelected={(targetName) => actionHandleBarkskinConfirm([targetName])}
-                    onSkip={actionHandleBarkskinSkip}
-                    description="Choose a willing creature within range. Target's AC becomes 17."
-                    confirmLabel="Cast Barkskin"
-                    confirmIcon="fa-tree"
-                />
-            )}
-            {actionPendingHeal && (
-                <SecondaryTargetModal
-                    title="Heal"
-                    targets={filterForcecageBlockedTargets(actionPendingHeal.creatureTargets).map(name => ({ name, type: 'creature' }))}
-                    onTargetSelected={(targetName) => actionHandleHealConfirm({ targetName })}
-                    onSkip={actionHandleHealSkip}
-                    description="A surge of positive energy washes through the creature, causing it to regain 70 hit points. This spell also ends blindness, deafness, and any diseases affecting the target."
-                    confirmLabel="Cast Heal"
-                    confirmIcon="fa-heart"
-                />
-            )}
-            {actionPendingCureWounds && (
-                <SecondaryTargetModal
-                    title="Cure Wounds"
-                    targets={filterForcecageBlockedTargets(actionPendingCureWounds.creatureTargets).map(name => ({ name, type: 'creature' }))}
-                    onTargetSelected={(targetName) => actionHandleCureWoundsConfirm({ targetName })}
-                    onSkip={actionHandleCureWoundsSkip}
-                    description="Choose a creature within touch range. The target regains hit points equal to the roll of your dice plus your spellcasting ability modifier."
-                    confirmLabel="Cast Cure Wounds"
-                    confirmIcon="fa-heart"
-                />
-            )}
-            {actionPendingRevivify && (
-                <SecondaryTargetModal
-                    title="Revivify"
-                    targets={filterForcecageBlockedTargets(actionPendingRevivify.creatureTargets).map(name => ({ name, type: 'creature' }))}
-                    onTargetSelected={(targetName) => actionHandleRevivifyConfirm({ targetName })}
-                    onSkip={actionHandleRevivifySkip}
-                    description="Choose a creature to revive. The target must have 0 Hit Points. A diamond worth 300+ GP is consumed."
-                    confirmLabel="Cast Revivify"
-                    confirmIcon="fa-heart"
-                />
-            )}
-            {(() => {
-                if (actionPendingGreaterRestoration && !greaterRestorationSelectedTarget) {
-                    return (
-                        <SecondaryTargetModal
-                            title="Greater Restoration"
-                            targets={filterForcecageBlockedTargets(actionPendingGreaterRestoration.creatureTargets).map(name => ({ name, type: 'creature' }))}
-                            onTargetSelected={handleGreaterRestorationTargetSelected}
-                            onSkip={actionHandleGreaterRestorationSkip}
-                            description={`Choose a creature within <strong>${actionPendingGreaterRestoration.range}</strong>. You'll select which debilitating effect to remove.`}
-                            confirmLabel="Cast Greater Restoration"
-                            confirmIcon="fa-hand-holding-medical"
-                        />
-                    );
-                }
-                if (greaterRestorationSelectedTarget) {
-                    const hasEffects = greaterRestorationSelectedTarget.effects.length > 0;
-                    return (
-                        <SecondaryTargetModal
-                            title="Greater Restoration"
-                            targets={greaterRestorationSelectedTarget.effects.map(e => ({ value: e.value, label: e.label }))}
-                            onTargetSelected={handleGreaterRestorationEffectSelected}
-                            onSkip={hasEffects ? handleGreaterRestorationEffectSkip : handleNoEffectsDismiss}
-                            description={hasEffects
-                                ? `Choose one effect to remove from ${greaterRestorationSelectedTarget.targetName}.`
-                                : `No removable effects found on ${greaterRestorationSelectedTarget.targetName}.`}
-                            confirmLabel="Remove Effect"
-                            confirmIcon="fa-hand-holding-medical"
-                            hideConfirm={!hasEffects}
-                        />
-                    );
-                }
-                return null;
-            })()}
-            {actionPendingRemoveCurse && (
-                <SecondaryTargetModal
-                    title="Remove Curse"
-                    targets={filterForcecageBlockedTargets(actionPendingRemoveCurse.creatureTargets).map(name => ({ name, type: 'creature' }))}
-                    onTargetSelected={(targetName) => actionHandleRemoveCurseConfirm({ targetName })}
-                    onSkip={actionHandleRemoveCurseSkip}
-                    description={`Choose a creature within <strong>${actionPendingRemoveCurse.range}</strong>. This spell ends all curses affecting the target and breaks the target's attunement to any cursed magic items.`}
-                    confirmLabel="Cast Remove Curse"
-                    confirmIcon="fa-hand-holding-medical"
-                />
-            )}
-            {actionPendingMagicMissile && (() => {
-              const { spell, totalMissiles, missileDamage, creatureTargets } = actionPendingMagicMissile;
-              const currentTargetName = getTargetFromAttacker(getCombatSummary(campaignName), playerStats.name)?.name;
-              const filteredTargets = filterForcecageBlockedTargets(creatureTargets);
-              return (
-                <MagicMissileTargetPopup
-                  spell={{ name: spell.name, level: spell.level || 0 }}
-                  playerStats={playerStats}
-                  campaignName={campaignName}
-                  totalMissiles={totalMissiles}
-                  missileDamage={missileDamage}
-                  creatureTargets={filteredTargets}
-                  currentTargetName={currentTargetName}
-                  onConfirm={actionHandleMagicMissileConfirm}
-                  onSkip={actionHandleMagicMissileSkip}
-                />
-              );
-            })()}
-            {actionPendingMageArmor && (
-                <SecondaryTargetModal
-                    title="Mage Armor"
-                    targets={filterForcecageBlockedTargets(actionPendingMageArmor.creatureTargets).map(name => ({ name, type: 'creature' }))}
-                    onTargetSelected={(targetName) => actionHandleMageArmorConfirm([targetName])}
-                    onSkip={actionHandleMageArmorSkip}
-                    description="Choose a creature within range. The target's base AC becomes 13 + Dexterity modifier. Mage Armor lasts 8 hours and ends on a long rest."
-                    confirmLabel="Cast Mage Armor"
-                    confirmIcon="fa-shield-halved"
-                />
-            )}
-            {pendingActionMetamagic && (
-                <MetamagicPopup
-                    spell={{ name: pendingActionMetamagic.spellName, level: pendingActionMetamagic.spellLevel || 0 }}
-                    playerStats={{ ...playerStats, _metamagicCurrentSP: pendingActionMetamagic._currentSP, _isPsionicSpell: pendingActionMetamagic.isPsionic, _psionicCost: pendingActionMetamagic.psionicCost }}
-                    campaignName={campaignName}
-                    onConfirm={handleActionMetamagicConfirm}
-                    onSkip={handleActionMetamagicSkip}
-                />
-            )}
+            <ActionMetamagicHost
+                pending={actionPendingMetamagic}
+                playerStats={playerStats}
+                campaignName={campaignName}
+                onConfirm={actionHandleConfirm}
+                onSkip={actionHandleSkip}
+            />
+            {renderAllySelectionModals()}
+            {renderTouchTargetModals()}
+            <GreaterRestorationHost
+                pending={props.actionPendingGreaterRestoration}
+                selectedTarget={greaterRestorationSelectedTarget}
+                filterTargets={filterForcecageBlockedTargets}
+                onTargetSelected={handleGreaterRestorationTargetSelected}
+                onEffectSelected={handleGreaterRestorationEffectSelected}
+                onEffectSkip={handleGreaterRestorationEffectSkip}
+                onNoEffectsDismiss={handleNoEffectsDismiss}
+                onCancel={actionHandleGreaterRestorationSkip}
+            />
+            <MagicMissileTargetHost
+                pending={actionPendingMagicMissile}
+                playerStats={playerStats}
+                campaignName={campaignName}
+                filterTargets={filterForcecageBlockedTargets}
+                onConfirm={actionHandleMagicMissileConfirm}
+                onSkip={actionHandleMagicMissileSkip}
+            />
+            <ActionMetamagicHost
+                pending={pendingActionMetamagic}
+                playerStats={playerStats}
+                campaignName={campaignName}
+                onConfirm={handleActionMetamagicConfirm}
+                onSkip={handleActionMetamagicSkip}
+            />
         </>
     )
 }

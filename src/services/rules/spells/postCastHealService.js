@@ -46,12 +46,52 @@ function getPostCastAllyHeals(playerStats, campaignName) {
     return allyHealPassives;
 }
 
- export async function triggerPostCastSelfHeals(spell, metaCtx, playerStats, campaignName, _mapName) {
-    if (!isHealingSpell(spell)) {
-        return null;
+// Shared guard: only leveled healing spells trigger post-cast heals.
+function canTriggerPostCastHeal(spell) {
+    return isHealingSpell(spell) && spell.level !== 0;
+}
+
+// Shared level/slot validation for both post-cast heal paths.
+function resolvePostCastLevelContext(playerStats, metaCtx, spell, fnName, resourceLabel) {
+    const prof = playerStats.proficiency || 0;
+    if (playerStats.level == null) {
+        console.error(`[postCastHealService] ${fnName}: playerStats.level is missing`);
+        throw new Error(`playerStats.level is required for ${resourceLabel}`);
+    }
+    const level = playerStats.level;
+    if (metaCtx?.slotLevel == null && spell.level == null) {
+        console.error(`[postCastHealService] ${fnName}: slot level is missing (metaCtx.slotLevel and spell.level)`);
+        throw new Error(`slot level is required for ${resourceLabel}`);
+    }
+    const slotLevel = metaCtx?.slotLevel || spell.level;
+    return { prof, level, slotLevel };
+}
+
+// Resolve a passive's heal expression and roll it. Returns 0 when the
+// passive targets self-only spells or the roll is invalid/zero.
+function rollPostCastHealAmount(heal, spell, playerStats, prof, level, slotLevel) {
+    if (heal.othersOnly && spell.range === 'Self') {
+        return 0;
     }
 
-    if (spell.level === 0) {
+    let expression = heal.healExpression || '0';
+    if (level >= 10) {
+        expression = expression.replace(/1d8/g, '2d8');
+    }
+    const resolvedExpression = resolveDiceExpression(expression, playerStats, slotLevel);
+    const evaluated = evaluateAutoExpression(resolvedExpression, playerStats, prof, level, slotLevel);
+    const rollResult = typeof evaluated === 'number'
+        ? { total: evaluated, rolls: [evaluated], formula: resolvedExpression }
+        : rollExpression(resolvedExpression);
+    const amount = rollResult?.total ?? 0;
+    if (typeof amount !== 'number' || isNaN(amount) || amount <= 0) {
+        return 0;
+    }
+    return amount;
+}
+
+export async function triggerPostCastSelfHeals(spell, metaCtx, playerStats, campaignName, _mapName) {
+    if (!canTriggerPostCastHeal(spell)) {
         return null;
     }
 
@@ -60,36 +100,12 @@ function getPostCastAllyHeals(playerStats, campaignName) {
         return null;
     }
 
+    const { prof, level, slotLevel } = resolvePostCastLevelContext(playerStats, metaCtx, spell, 'triggerPostCastSelfHeals', 'post-cast self heals');
+
     const results = [];
-    const prof = playerStats.proficiency || 0;
-    if (playerStats.level == null) {
-        console.error('[postCastHealService] triggerPostCastSelfHeals: playerStats.level is missing')
-        throw new Error('playerStats.level is required for post-cast self heals')
-      }
-      const level = playerStats.level
-      if (metaCtx?.slotLevel == null && spell.level == null) {
-        console.error('[postCastHealService] triggerPostCastSelfHeals: slot level is missing (metaCtx.slotLevel and spell.level)')
-        throw new Error('slot level is required for post-cast self heals')
-      }
-      const slotLevel = metaCtx?.slotLevel || spell.level;
-
     for (const heal of selfHeals) {
-        if (heal.othersOnly && spell.range === 'Self') {
-            continue;
-        }
-
-        let expression = heal.healExpression || '0';
-        const isTwinkled = level >= 10;
-        if (isTwinkled) {
-            expression = expression.replace(/1d8/g, '2d8');
-        }
-        const resolvedExpression = resolveDiceExpression(expression, playerStats, slotLevel);
-        const evaluated = evaluateAutoExpression(resolvedExpression, playerStats, prof, level, slotLevel);
-        const rollResult = typeof evaluated === 'number'
-            ? { total: evaluated, rolls: [evaluated], formula: resolvedExpression }
-            : rollExpression(resolvedExpression);
-        const amount = rollResult?.total ?? 0;
-        if (typeof amount !== 'number' || isNaN(amount) || amount <= 0) {
+        const amount = rollPostCastHealAmount(heal, spell, playerStats, prof, level, slotLevel);
+        if (amount <= 0) {
             continue;
         }
 
@@ -110,11 +126,7 @@ function getPostCastAllyHeals(playerStats, campaignName) {
 }
 
 export async function triggerPostCastAllyHeals(spell, metaCtx, playerStats, campaignName, _mapName) {
-    if (!isHealingSpell(spell)) {
-        return null;
-    }
-
-    if (spell.level === 0) {
+    if (!canTriggerPostCastHeal(spell)) {
         return null;
     }
 
@@ -123,35 +135,11 @@ export async function triggerPostCastAllyHeals(spell, metaCtx, playerStats, camp
         return null;
     }
 
-    const prof = playerStats.proficiency || 0;
-    if (playerStats.level == null) {
-        console.error('[postCastHealService] triggerPostCastAllyHeals: playerStats.level is missing')
-        throw new Error('playerStats.level is required for post-cast ally heals')
-      }
-      const level = playerStats.level
-      if (metaCtx?.slotLevel == null && spell.level == null) {
-        console.error('[postCastHealService] triggerPostCastAllyHeals: slot level is missing (metaCtx.slotLevel and spell.level)')
-        throw new Error('slot level is required for post-cast ally heals')
-      }
-      const slotLevel = metaCtx?.slotLevel || spell.level;
+    const { prof, level, slotLevel } = resolvePostCastLevelContext(playerStats, metaCtx, spell, 'triggerPostCastAllyHeals', 'post-cast ally heals');
 
     for (const heal of allyHeals) {
-        if (heal.othersOnly && spell.range === 'Self') {
-            continue;
-        }
-
-        let expression = heal.healExpression || '0';
-        const isTwinkled = level >= 10;
-        if (isTwinkled) {
-            expression = expression.replace(/1d8/g, '2d8');
-        }
-        const resolvedExpression = resolveDiceExpression(expression, playerStats, slotLevel);
-        const evaluated = evaluateAutoExpression(resolvedExpression, playerStats, prof, level, slotLevel);
-        const rollResult = typeof evaluated === 'number'
-            ? { total: evaluated, rolls: [evaluated], formula: resolvedExpression }
-            : rollExpression(resolvedExpression);
-        const amount = rollResult?.total ?? 0;
-        if (typeof amount !== 'number' || isNaN(amount) || amount <= 0) {
+        const amount = rollPostCastHealAmount(heal, spell, playerStats, prof, level, slotLevel);
+        if (amount <= 0) {
             continue;
         }
 

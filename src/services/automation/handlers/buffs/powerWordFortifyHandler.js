@@ -8,39 +8,18 @@ import { rollExpression } from '../../../dice/diceRoller.js';
 
 const POWER_WORD_FORTIFY_NAME = 'Power Word Fortify';
 
-export async function handle(action, playerStats, campaignName, _mapName) {
-    const auto = action.automation;
-    const playerName = playerStats.name;
-    const maxTargets = auto?.maxTargets || 6;
-    const rangeFt = auto?.range ? rangeToFeet(auto.range) : 60;
-    const tempHpExpression = resolveTempHpExpression(auto, playerStats);
-
-    const diceMatch = tempHpExpression.match(/^(\d+)d(\d+)([+-]\d+)?$/i);
-    let totalTempHp;
+// Returns { total } on success, or { error: true } when the expression can't produce HP.
+function rollFortifyTempHp(expression) {
+    const diceMatch = expression.match(/^(\d+)d(\d+)([+-]\d+)?$/i);
     if (diceMatch) {
-        const result = rollExpression(tempHpExpression);
-        if (!result) {
-            return {
-                type: 'popup',
-                payload: { type: 'automation_info', name: POWER_WORD_FORTIFY_NAME, description: `${POWER_WORD_FORTIFY_NAME} failed to roll temporary HP.` },
-            };
-        }
-        totalTempHp = result.total;
-    } else {
-        const numeric = parseInt(tempHpExpression, 10);
-        if (isNaN(numeric)) {
-            return {
-                type: 'popup',
-                payload: { type: 'automation_info', name: POWER_WORD_FORTIFY_NAME, description: `${POWER_WORD_FORTIFY_NAME} failed to roll temporary HP.` },
-            };
-        }
-        totalTempHp = numeric;
+        const result = rollExpression(expression);
+        return result ? { total: result.total } : { error: true };
     }
-    const combatSummary = await getCombatContext(campaignName);
-    if (!combatSummary) {
-        return null;
-    }
+    const numeric = parseInt(expression, 10);
+    return isNaN(numeric) ? { error: true } : { total: numeric };
+}
 
+async function collectFortifyEligible(combatSummary, playerName, rangeFt) {
     const allyNames = getAllyList(playerName);
     const allyList = Array.isArray(allyNames) && allyNames.length > 0 ? allyNames : [];
     const effectiveAllies = allyList.length > 0 && allyList.some(a => a !== playerName)
@@ -56,6 +35,31 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             eligible.push(creature);
         }
     }
+    return eligible;
+}
+
+export async function handle(action, playerStats, campaignName, _mapName) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+    const maxTargets = auto?.maxTargets || 6;
+    const rangeFt = auto?.range ? rangeToFeet(auto.range) : 60;
+    const tempHpExpression = resolveTempHpExpression(auto, playerStats);
+
+    const roll = rollFortifyTempHp(tempHpExpression);
+    if (roll.error) {
+        return {
+            type: 'popup',
+            payload: { type: 'automation_info', name: POWER_WORD_FORTIFY_NAME, description: `${POWER_WORD_FORTIFY_NAME} failed to roll temporary HP.` },
+        };
+    }
+    const totalTempHp = roll.total;
+
+    const combatSummary = await getCombatContext(campaignName);
+    if (!combatSummary) {
+        return null;
+    }
+
+    const eligible = await collectFortifyEligible(combatSummary, playerName, rangeFt);
 
     if (eligible.length === 0) {
         return {

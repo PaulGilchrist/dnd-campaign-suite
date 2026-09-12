@@ -1,66 +1,75 @@
+const SIZE_ORDER = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan'];
+
+function hasRequiredToolOrItem(option, playerStats) {
+    const toolProficiencies = playerStats?.toolProficiencies || [];
+    const hasProficiency = toolProficiencies.some(p =>
+        p.toLowerCase().includes(option.requires.toLowerCase())
+    );
+    const inventory = playerStats?.inventory || {};
+    const allItems = [
+        ...(inventory.equipped || []),
+        ...(inventory.backpack || []),
+    ];
+    const hasItem = allItems.some(item => {
+        const itemName = typeof item === 'string' ? item : item.name;
+        return itemName && itemName.toLowerCase().includes(option.requires.toLowerCase());
+    });
+    return hasProficiency || hasItem;
+}
+
+function validateTripSizeLimit(option, targetName, getCombatContextSync) {
+    if (option.sizeLimit !== 'large_or_smaller' || !targetName) return null;
+    const combatContext = getCombatContextSync(targetName);
+    if (!combatContext) return null;
+    const targetSizeIndex = SIZE_ORDER.indexOf(combatContext.size);
+    if (targetSizeIndex !== -1 && targetSizeIndex > SIZE_ORDER.indexOf('Large')) {
+        return {
+            valid: false,
+            reason: `Target is ${combatContext.size} (too large for Trip — only Large or smaller affected).`,
+        };
+    }
+    // If we can't determine size from combat context, allow it (default assumption: target is valid size)
+    return null;
+}
+
+function validateChargerPushSizeLimit(option, targetName, playerStats, getCombatContextSync) {
+    if (option.sizeLimit !== 'one_size_larger' || !targetName) return null;
+    const playerSize = playerStats.size || 'Medium';
+    const combatContext = getCombatContextSync(targetName);
+    if (!combatContext) return null;
+    const playerSizeIndex = SIZE_ORDER.indexOf(playerSize);
+    const targetSizeIndex = SIZE_ORDER.indexOf(combatContext.size);
+    if (playerSizeIndex === -1 || targetSizeIndex === -1) return null;
+    const maxAllowedIndex = playerSizeIndex + 1;
+    if (targetSizeIndex > maxAllowedIndex) {
+        return {
+            valid: false,
+            reason: `Target is ${combatContext.size} (too large for Charger push — only up to ${SIZE_ORDER[maxAllowedIndex]} allowed when player is ${playerSize}).`,
+        };
+    }
+    return null;
+}
+
 /**
  * Validate a Cunning Strike option before applying it.
  * Checks prerequisites (e.g., Poisoner's Kit) and size limits.
  */
 export function validateCunningStrikeOption(option, targetName, playerStats, getCombatContextSync) {
     // Check tool/item requirements (e.g., Poisoner's Kit for Poison option)
-    if (option.requires) {
-        const toolProficiencies = playerStats?.toolProficiencies || [];
-        const hasProficiency = toolProficiencies.some(p =>
-            p.toLowerCase().includes(option.requires.toLowerCase())
-        );
-        const inventory = playerStats?.inventory || {};
-        const allItems = [
-            ...(inventory.equipped || []),
-            ...(inventory.backpack || []),
-        ];
-        const hasItem = allItems.some(item => {
-            const itemName = typeof item === 'string' ? item : item.name;
-            return itemName && itemName.toLowerCase().includes(option.requires.toLowerCase());
-        });
-        if (!hasProficiency && !hasItem) {
-            return {
-                valid: false,
-                reason: `Requires ${option.requires} which the character does not have.`,
-            };
-        }
+    if (option.requires && !hasRequiredToolOrItem(option, playerStats)) {
+        return {
+            valid: false,
+            reason: `Requires ${option.requires} which the character does not have.`,
+        };
     }
 
     // Check size limit for Trip (Large or smaller)
-    if (option.sizeLimit === 'large_or_smaller' && targetName) {
-        const combatContext = getCombatContextSync(targetName);
-        if (combatContext) {
-            const sizeOrder = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan'];
-            const targetSizeIndex = sizeOrder.indexOf(combatContext.size);
-            if (targetSizeIndex !== -1 && targetSizeIndex > sizeOrder.indexOf('Large')) {
-                return {
-                    valid: false,
-                    reason: `Target is ${combatContext.size} (too large for Trip — only Large or smaller affected).`,
-                };
-            }
-        }
-        // If we can't determine size from combat context, allow it (default assumption: target is valid size)
-    }
+    const tripInvalid = validateTripSizeLimit(option, targetName, getCombatContextSync);
+    if (tripInvalid) return tripInvalid;
 
     // Check size limit for Charger push (one size larger than player)
-    if (option.sizeLimit === 'one_size_larger' && targetName) {
-        const playerSize = playerStats.size || 'Medium';
-        const combatContext = getCombatContextSync(targetName);
-        if (combatContext) {
-            const sizeOrder = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan'];
-            const playerSizeIndex = sizeOrder.indexOf(playerSize);
-            const targetSizeIndex = sizeOrder.indexOf(combatContext.size);
-            if (playerSizeIndex !== -1 && targetSizeIndex !== -1) {
-                const maxAllowedIndex = playerSizeIndex + 1;
-                if (targetSizeIndex > maxAllowedIndex) {
-                    return {
-                        valid: false,
-                        reason: `Target is ${combatContext.size} (too large for Charger push — only up to ${sizeOrder[maxAllowedIndex]} allowed when player is ${playerSize}).`,
-                    };
-                }
-            }
-        }
-    }
+    const chargerInvalid = validateChargerPushSizeLimit(option, targetName, playerStats, getCombatContextSync);
+    if (chargerInvalid) return chargerInvalid;
 
     return { valid: true };
 }

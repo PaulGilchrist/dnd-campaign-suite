@@ -72,11 +72,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         applyHealingToTarget(combatSummary, defenderName, actualHeal, campaignName);
     }
 
-    await setRuntimeValue(playerName, USED_ROUND_KEY, {
-        round: currentRound,
-        activeCreature: combatSummary.activeCreatureName || attackerName,
-        lastAttackTimestamp: attackEvent?.timestamp || Date.now(),
-    }, campaignName);
+    await stampInterceptionRound(playerName, currentRound, combatSummary, attackerName, attackEvent, campaignName);
 
     const description = baseDescription(action, attackerName, defenderName) + attackDetails(attackEvent, originalDamage, damageRoll, damageBonus, reductionAmount, reducedDamage, actualHeal);
 
@@ -109,6 +105,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }).catch((e) => { console.error("[interception] Error:", e); });
 
     return result;
+}
+
+async function stampInterceptionRound(playerName, currentRound, combatSummary, attackerName, attackEvent, campaignName) {
+    await setRuntimeValue(playerName, USED_ROUND_KEY, {
+        round: currentRound,
+        activeCreature: combatSummary.activeCreatureName || attackerName,
+        lastAttackTimestamp: attackEvent?.timestamp || Date.now(),
+    }, campaignName);
 }
 
 async function checkInterceptionRange(auto, playerName, attackerName, featureName, _mapName, campaignName) {

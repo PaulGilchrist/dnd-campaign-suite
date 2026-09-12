@@ -81,7 +81,7 @@ function makeContext() {
 const target = { name: 'Knight 1', ac: 18, type: 'monster' };
 
 function callResolveHit(effectiveD20Roll) {
-    return resolveHit(characterName, campaignName, makeContext(), 8, effectiveD20Roll, target, null, [], vi.fn(), vi.fn());
+    return resolveHit({ characterName: characterName, campaignName: campaignName, context: makeContext(), bonus: 8, effectiveD20Roll: effectiveD20Roll, target: target, combatSummary: null, characters: [], logEntry: vi.fn() });
 }
 
 describe('resolveHit — Homing Strikes (CLA-320 Soul Blades)', () => {
@@ -115,7 +115,7 @@ describe('resolveHit — Homing Strikes (CLA-320 Soul Blades)', () => {
         stubRandom(0.41); // d12 → 5; total 21 vs effective AC 20
         const context = makeContext();
         context.coverAcBonus = 2;
-        const result = await resolveHit(characterName, campaignName, context, 8, 8, { name: 'Knight 1', ac: 18 }, null, [], vi.fn(), vi.fn());
+        const result = await resolveHit({ characterName: characterName, campaignName: campaignName, context: context, bonus: 8, effectiveD20Roll: 8, target: { name: 'Knight 1', ac: 18 }, combatSummary: null, characters: [], logEntry: vi.fn() });
 
         expect(result.hit).toBe(true);
         expect(result.homingStrikesUsed).toBe(true);

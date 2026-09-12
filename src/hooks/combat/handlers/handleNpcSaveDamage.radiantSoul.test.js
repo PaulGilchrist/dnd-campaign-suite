@@ -102,12 +102,7 @@ describe('handleNpcSaveDamage — CLA-279 Radiant Soul consumption', () => {
 
     it('writes the once-per-turn flag when the save-damage formula carries [Radiant Soul]', async () => {
         const fn = createNpcSaveDamageHandler(deps);
-        await fn(
-            'Hellish Rebuke', '2d6 + 3 [Radiant Soul]', 13, [6, 4, 3], 3,
-            { targetName: 'Goblin', saveDc: 16, saveType: 'DEX', dcSuccess: 'half', damageType: 'Fire', attackerName: 'HexWarlock' },
-            13,
-            combatSummary
-        );
+        await fn({ name: 'Hellish Rebuke', formula: '2d6 + 3 [Radiant Soul]', total: 13, rolls: [6, 4, 3], modifier: 3, context: { targetName: 'Goblin', saveDc: 16, saveType: 'DEX', dcSuccess: 'half', damageType: 'Fire', attackerName: 'HexWarlock' }, adjustedTotal: 13, combatSummary: combatSummary });
 
         expect(setRuntimeValue).toHaveBeenCalledWith('HexWarlock', '_radiantSoul_HexWarlock_oncePerTurn', true, 'test-campaign');
     });
@@ -115,12 +110,7 @@ describe('handleNpcSaveDamage — CLA-279 Radiant Soul consumption', () => {
     it('does NOT write the flag when formula has no [Radiant Soul] marker', async () => {
         const fn = createNpcSaveDamageHandler(deps);
         rollExpression.mockReturnValue({ total: 10, rolls: [6, 4], modifier: 0 });
-        await fn(
-            'Hellish Rebuke', '2d6', 10, [6, 4], 0,
-            { targetName: 'Goblin', saveDc: 16, saveType: 'DEX', dcSuccess: 'half', damageType: 'Fire', attackerName: 'HexWarlock' },
-            10,
-            combatSummary
-        );
+        await fn({ name: 'Hellish Rebuke', formula: '2d6', total: 10, rolls: [6, 4], modifier: 0, context: { targetName: 'Goblin', saveDc: 16, saveType: 'DEX', dcSuccess: 'half', damageType: 'Fire', attackerName: 'HexWarlock' }, adjustedTotal: 10, combatSummary: combatSummary });
 
         expect(setRuntimeValue).not.toHaveBeenCalledWith('HexWarlock', '_radiantSoul_HexWarlock_oncePerTurn', true, 'test-campaign');
     });
@@ -128,12 +118,7 @@ describe('handleNpcSaveDamage — CLA-279 Radiant Soul consumption', () => {
     it('does NOT consume when no damage is applied', async () => {
         applyDamageToTarget.mockResolvedValue({ finalDamage: 0, newHp: 13, damageReduced: false });
         const fn = createNpcSaveDamageHandler(deps);
-        await fn(
-            'Hellish Rebuke', '2d6 + 3 [Radiant Soul]', 13, [6, 4, 3], 3,
-            { targetName: 'Goblin', saveDc: 16, saveType: 'DEX', dcSuccess: 'none', damageType: 'Fire', attackerName: 'HexWarlock' },
-            13,
-            combatSummary
-        );
+        await fn({ name: 'Hellish Rebuke', formula: '2d6 + 3 [Radiant Soul]', total: 13, rolls: [6, 4, 3], modifier: 3, context: { targetName: 'Goblin', saveDc: 16, saveType: 'DEX', dcSuccess: 'none', damageType: 'Fire', attackerName: 'HexWarlock' }, adjustedTotal: 13, combatSummary: combatSummary });
 
         expect(setRuntimeValue).not.toHaveBeenCalledWith('HexWarlock', '_radiantSoul_HexWarlock_oncePerTurn', true, 'test-campaign');
     });

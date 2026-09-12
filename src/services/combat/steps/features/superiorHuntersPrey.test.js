@@ -523,16 +523,7 @@ describe('superiorHuntersPrey', () => {
       await modalArgs.onTargetSelected('Goblin1');
 
       expect(rollExpression).toHaveBeenCalledWith('1d6');
-      expect(applyDamageToTarget).toHaveBeenCalledWith(
-        expect.anything(),
-        'Goblin1',
-        4,
-        ['Force'],
-        'test-campaign',
-        [],
-        false,
-        'Ranger1',
-      );
+      expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin1', 4, ['Force'], 'test-campaign', [], { ignoreResistance: false, attackerName: 'Ranger1' },);
     });
 
     it('logs a damage entry when target is selected', async () => {

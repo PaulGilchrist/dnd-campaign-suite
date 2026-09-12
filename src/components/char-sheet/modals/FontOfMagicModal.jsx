@@ -15,15 +15,19 @@ function getSlotCosts(playerStats) {
   return byLevel;
 }
 
+const SLOT_LEVELS = [1, 2, 3, 4, 5];
+
+function computeMaxSlots(playerStats) {
+  const maxSlots = {};
+  SLOT_LEVELS.forEach(lvl => {
+    maxSlots[lvl] = playerStats.spellAbilities?.[`spell_slots_level_${lvl}`] || 0;
+  });
+  return maxSlots;
+}
+
 function FontOfMagicModal({ playerStats, campaignName, onClose }) {
   const name = playerStats.name;
-  const maxSlots = {
-    1: playerStats.spellAbilities?.spell_slots_level_1 || 0,
-    2: playerStats.spellAbilities?.spell_slots_level_2 || 0,
-    3: playerStats.spellAbilities?.spell_slots_level_3 || 0,
-    4: playerStats.spellAbilities?.spell_slots_level_4 || 0,
-    5: playerStats.spellAbilities?.spell_slots_level_5 || 0,
-  };
+  const maxSlots = computeMaxSlots(playerStats);
   const slotCosts = getSlotCosts(playerStats);
 
   const maxSP = getClassFeatures(playerStats)?.maxSorceryPoints || 0;

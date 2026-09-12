@@ -3,29 +3,30 @@ export function formatTimestamp(ts) {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
+const ROLL_ICON_TYPES = {
+  attack: 'fa-crosshairs',
+  spell_attack: 'fa-wand-magic-sparkles',
+  save: 'fa-shield-halved',
+  'condition-save': 'fa-shield-halved',
+  'save-ottos-dance': 'fa-shield-halved',
+  'save-damage': 'fa-shield-halved',
+  'save-banishment': 'fa-shield-halved',
+  'save-polymorph': 'fa-paw',
+  'save-animal-shapes': 'fa-paw',
+  'save-prismatic-spray': 'fa-wand-magic-sparkles',
+  'save-prismatic-spray-indigo': 'fa-eye',
+  'save-prismatic-spray-violet': 'fa-door-open',
+  'save-imprisonment': 'fa-shield-halved',
+  'save-confusion': 'fa-shield-halved',
+  'save-forcecage': 'fa-shield-halved',
+  'save-forcecage-escape': 'fa-shield-halved',
+  'save-maze': 'fa-shield-halved',
+  'save-maze-escape': 'fa-shield-halved',
+  'aoe-damage': 'fa-wand-magic-sparkles',
+  initiative: 'fa-bolt',
+  damage: 'fa-skull'
+};
+
 export function getRollIconType(rollType) {
-  switch (rollType) {
-    case 'attack': return 'fa-crosshairs';
-    case 'spell_attack': return 'fa-wand-magic-sparkles';
-    case 'save': return 'fa-shield-halved';
-    case 'condition-save': return 'fa-shield-halved';
-    case 'save-ottos-dance': return 'fa-shield-halved';
-    case 'save-damage': return 'fa-shield-halved';
-    case 'save-banishment': return 'fa-shield-halved';
-    case 'save-polymorph': return 'fa-paw';
-    case 'save-animal-shapes': return 'fa-paw';
-    case 'save-prismatic-spray': return 'fa-wand-magic-sparkles';
-    case 'save-prismatic-spray-indigo': return 'fa-eye';
-    case 'save-prismatic-spray-violet': return 'fa-door-open';
-    case 'save-imprisonment': return 'fa-shield-halved';
-    case 'save-confusion': return 'fa-shield-halved';
-    case 'save-forcecage': return 'fa-shield-halved';
-    case 'save-forcecage-escape': return 'fa-shield-halved';
-    case 'save-maze': return 'fa-shield-halved';
-    case 'save-maze-escape': return 'fa-shield-halved';
-    case 'aoe-damage': return 'fa-wand-magic-sparkles';
-    case 'initiative': return 'fa-bolt';
-    case 'damage': return 'fa-skull';
-    default: return 'fa-dice-d20';
-   }
+  return ROLL_ICON_TYPES[rollType] || 'fa-dice-d20';
 }

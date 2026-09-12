@@ -141,16 +141,7 @@ describe('createLogAndShow - Graze Damage', () => {
                 damageType: 'slashing',
             });
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.any(Object),
-                'Goblin',
-                3,
-                ['slashing'],
-                expect.any(String),
-                expect.any(Array),
-                false,
-                'TestFighter'
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 3, ['slashing'], expect.any(String), expect.any(Array), { ignoreResistance: false, attackerName: 'TestFighter' });
 
             const grazeLogs = deps.logEntry.mock.calls.filter(
                 (call) => call[0].rollType === 'graze-damage'

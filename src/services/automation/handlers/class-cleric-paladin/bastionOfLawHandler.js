@@ -3,6 +3,7 @@ import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { infoPopup } from '../../common/infoPopup.js';
 
 const WARD_DICE_KEY = 'bastionOfLawWardDice';
 const WARD_TARGET_KEY = 'bastionOfLawWardTarget';
@@ -126,6 +127,31 @@ export async function handleApply(action, playerStats, campaignName, spAmount, t
     };
 }
 
+async function applyWardHeal(playerName, campaignName, playerStats, actualHeal) {
+    const storedHp = getRuntimeValue(playerName, 'currentHitPoints', campaignName);
+    const currentHp = storedHp ?? 0;
+    const baseHp = getRuntimeValue(playerName, 'hitPoints', campaignName);
+    const maxHp = baseHp || playerStats.hitPoints || 0;
+    const newHp = maxHp > 0 ? Math.min(maxHp, Math.max(0, currentHp + actualHeal)) : currentHp + actualHeal;
+    const healedAmount = newHp - currentHp;
+    if (healedAmount !== 0) {
+        await setRuntimeValue(playerName, 'currentHitPoints', newHp, campaignName);
+    }
+    return healedAmount;
+}
+
+async function deactivateWard(playerName, campaignName) {
+    await setRuntimeValue(playerName, WARD_ACTIVE_KEY, false, campaignName);
+    await setRuntimeValue(playerName, WARD_SOURCE_KEY, null, campaignName);
+    await setRuntimeValue(playerName, WARD_USED_KEY, null, campaignName);
+    await setRuntimeValue(playerName, LAST_ATTACK_DAMAGE_KEY, null, campaignName);
+    // Also clear sorcerer tracking
+    const wardTarget = getRuntimeValue(playerName, WARD_TARGET_KEY);
+    if (wardTarget) {
+        await setRuntimeValue(wardTarget, WARD_TARGET_KEY, null, campaignName);
+    }
+}
+
 export async function handleSpendDice(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -135,34 +161,18 @@ export async function handleSpendDice(action, playerStats, campaignName, _mapNam
     // Check that this character is the target of the last attack
     const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
     if (!lastAttack || lastAttack.targetName !== playerName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName}: The last attack did not target you.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(featureName, `${featureName}: The last attack did not target you.`, auto);
     }
 
     const wardDice = getRuntimeValue(playerName, WARD_DICE_KEY) || [];
     const wardActive = getRuntimeValue(playerName, WARD_ACTIVE_KEY);
 
     if (!wardActive || wardDice.length === 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName}: No ward active.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(featureName, `${featureName}: No ward active.`, auto);
     }
 
     // If no dice count specified, return modal for user to choose
-    if (numDice == null || numDice === undefined) {
+    if (numDice == null) {
         const totalDamage = lastAttack.actualDamage ?? (lastAttack.primaryDamage + lastAttack.secondaryDamage);
         await setRuntimeValue(playerName, LAST_ATTACK_DAMAGE_KEY, totalDamage, campaignName);
         await setRuntimeValue(playerName, WARD_USED_KEY, 0, campaignName);
@@ -196,15 +206,7 @@ export async function handleSpendDice(action, playerStats, campaignName, _mapNam
     const actualHeal = Math.min(totalReduction, remainingDamage);
 
     // Heal the target (damage reduction = healing)
-    const storedHp = getRuntimeValue(playerName, 'currentHitPoints', campaignName);
-    const currentHp = storedHp ?? 0;
-    const baseHp = getRuntimeValue(playerName, 'hitPoints', campaignName);
-    const maxHp = baseHp || playerStats.hitPoints || 0;
-    const newHp = maxHp > 0 ? Math.min(maxHp, Math.max(0, currentHp + actualHeal)) : currentHp + actualHeal;
-    const healedAmount = newHp - currentHp;
-    if (healedAmount !== 0) {
-        await setRuntimeValue(playerName, 'currentHitPoints', newHp, campaignName);
-    }
+    const healedAmount = await applyWardHeal(playerName, campaignName, playerStats, actualHeal);
 
     // Track ward usage
     const newWardUsed = wardUsed + actualHeal;
@@ -212,15 +214,7 @@ export async function handleSpendDice(action, playerStats, campaignName, _mapNam
 
     // If no dice remain, deactivate ward (removes the reaction)
     if (remainingDice.length === 0) {
-        await setRuntimeValue(playerName, WARD_ACTIVE_KEY, false, campaignName);
-        await setRuntimeValue(playerName, WARD_SOURCE_KEY, null, campaignName);
-        await setRuntimeValue(playerName, WARD_USED_KEY, null, campaignName);
-        await setRuntimeValue(playerName, LAST_ATTACK_DAMAGE_KEY, null, campaignName);
-        // Also clear sorcerer tracking
-        const wardTarget = getRuntimeValue(playerName, WARD_TARGET_KEY);
-        if (wardTarget) {
-            await setRuntimeValue(wardTarget, WARD_TARGET_KEY, null, campaignName);
-        }
+        await deactivateWard(playerName, campaignName);
     }
 
     await addEntry(campaignName, {

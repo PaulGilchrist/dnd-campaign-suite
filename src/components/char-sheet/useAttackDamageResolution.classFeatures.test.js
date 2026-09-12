@@ -447,16 +447,7 @@ describe('useAttackDamageResolution - class features', () => {
             await onTargetSelected('Orc');
             expect(rollExpression).toHaveBeenCalledWith('1d6');
             expect(loadCombatSummary).toHaveBeenCalledWith('test-campaign');
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                { some: 'data' },
-                'Orc',
-                5,
-                ['Force'],
-                'test-campaign',
-                [],
-                false,
-                'TestRogue',
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith({ some: 'data' }, 'Orc', 5, ['Force'], 'test-campaign', [], { ignoreResistance: false, attackerName: 'TestRogue' },);
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 rollType: 'damage',
                 formula: '1d6 [Superior Hunters Prey]',

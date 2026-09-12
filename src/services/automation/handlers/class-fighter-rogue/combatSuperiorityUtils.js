@@ -383,7 +383,6 @@ export async function executeSweepingAttack(action, playerStats, campaignName, s
     const inRange = await isWithinRange(targetName, secondaryTargetName, 5);
 
     let description;
-    let actualDamage = 0;
 
     if (!inRange) {
         description = `${secondaryTargetName} is not within 5 feet of ${targetName || 'the original target'} — no creature is swept.`;
@@ -394,33 +393,7 @@ export async function executeSweepingAttack(action, playerStats, campaignName, s
             description: `Sweeping Attack: ${secondaryTargetName} is not within 5 feet of ${targetName || 'the original target'} — no damage.`,
         }).catch((e) => { console.error('[MN-018:log-error]', e); });
     } else if (attackTotal >= secondAc) {
-        const cs = await getCombatContext(campaignName);
-        const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-        const applyResult = await applyDamageToTarget(cs, secondaryTargetName, dieValue, [damageType], campaignName, characters, false, playerStats.name);
-        actualDamage = applyResult?.finalDamage ?? dieValue;
-
-        const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-        storedEffects.push({
-            target: secondaryTargetName,
-            source: 'Sweeping Attack',
-            option: 'Sweeping Attack',
-            effect: 'secondary_damage',
-            value: actualDamage,
-            damageType: damageType,
-            duration: 'instant',
-            saveType: null,
-            saveDc: null,
-            saveAbility: null,
-        });
-        setRuntimeValue('campaign', 'targetEffects', storedEffects, campaignName);
-
-        description = `Original attack roll ${attackTotal} vs AC ${secondAc} hits ${secondaryTargetName}, which takes ${actualDamage} ${damageType} damage (same type as the original attack).`;
-        await addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: 'Sweeping Attack',
-            description: `Sweeping Attack: original attack roll ${attackTotal} vs AC ${secondAc} hits ${secondaryTargetName} — ${actualDamage} ${damageType} damage (same type as the attack on ${targetName || 'the original target'}).`,
-        }).catch((e) => { console.error('[MN-018:log-error]', e); });
+        description = (await sweepSecondTarget({ playerStats, campaignName, secondaryTargetName, targetName, dieValue, damageType, attackTotal, secondAc })).description;
     } else {
         description = `Original attack roll ${attackTotal} vs AC ${secondAc} — misses ${secondaryTargetName}. No damage.`;
         await addEntry(campaignName, {
@@ -440,4 +413,38 @@ export async function executeSweepingAttack(action, playerStats, campaignName, s
         },
         logEntries: [],
     };
+}
+
+// MN-018: original attack roll hits the second creature — apply damage,
+// track the secondary_damage targetEffect, and log the hit.
+async function sweepSecondTarget({ playerStats, campaignName, secondaryTargetName, targetName, dieValue, damageType, attackTotal, secondAc }) {
+    const cs = await getCombatContext(campaignName);
+    const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
+    const applyResult = await applyDamageToTarget(cs, secondaryTargetName, dieValue, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerStats.name });
+    const actualDamage = applyResult?.finalDamage ?? dieValue;
+
+    const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    storedEffects.push({
+        target: secondaryTargetName,
+        source: 'Sweeping Attack',
+        option: 'Sweeping Attack',
+        effect: 'secondary_damage',
+        value: actualDamage,
+        damageType: damageType,
+        duration: 'instant',
+        saveType: null,
+        saveDc: null,
+        saveAbility: null,
+    });
+    setRuntimeValue('campaign', 'targetEffects', storedEffects, campaignName);
+
+    const description = `Original attack roll ${attackTotal} vs AC ${secondAc} hits ${secondaryTargetName}, which takes ${actualDamage} ${damageType} damage (same type as the original attack).`;
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: 'Sweeping Attack',
+        description: `Sweeping Attack: original attack roll ${attackTotal} vs AC ${secondAc} hits ${secondaryTargetName} — ${actualDamage} ${damageType} damage (same type as the attack on ${targetName || 'the original target'}).`,
+    }).catch((e) => { console.error('[MN-018:log-error]', e); });
+
+    return { description, actualDamage };
 }

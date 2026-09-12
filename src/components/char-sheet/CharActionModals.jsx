@@ -84,6 +84,134 @@ const handleHealingIllusionConfirm = async (targetName, payload, characters, cam
     onClose();
 };
 
+function ResourcePoolsHostModals({ mergedModalState, setModalState, playerStats, campaignName }) {
+    return (
+        <>
+            {mergedModalState.healingPoolModal && (
+                <HealingPoolModal
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    name={mergedModalState.healingPoolModal.name}
+                    poolMax={mergedModalState.healingPoolModal.pool}
+                    poolExpression={mergedModalState.healingPoolModal.poolExpression}
+                    isDicePool={mergedModalState.healingPoolModal.isDicePool}
+                    dieType={mergedModalState.healingPoolModal.dieType}
+                    resourceKey={mergedModalState.healingPoolModal.resourceKey}
+                    alsoCures={mergedModalState.healingPoolModal.alsoCures}
+                    cureCost={mergedModalState.healingPoolModal.cureCost}
+                    bloodiedOnly={mergedModalState.healingPoolModal.bloodiedOnly}
+                    restoringTouchConditions={mergedModalState.healingPoolModal.restoringTouchConditions}
+                    maxDicePerUse={mergedModalState.healingPoolModal.maxDicePerUse}
+                    creatureTargets={mergedModalState.healingPoolModal.creatureTargets}
+                    resourceCost={mergedModalState.healingPoolModal.resourceCost}
+                    onClose={() => setModalState({ healingPoolModal: null })}
+                />
+            )}
+            {mergedModalState.handOfHealingModal && (
+                <HandOfHealingModal
+                    {...mergedModalState.handOfHealingModal}
+                    campaignName={campaignName}
+                    onClose={() => setModalState({ handOfHealingModal: null })}
+                />
+            )}
+            {mergedModalState.fontOfMagicModal && (
+                <FontOfMagicModal
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    onClose={() => setModalState({ fontOfMagicModal: null })}
+                />
+            )}
+            {mergedModalState.resourcePoolModal && (
+                <ResourcePoolModal
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    automation={mergedModalState.resourcePoolModal.automation}
+                    onClose={() => setModalState({ resourcePoolModal: null })}
+                />
+            )}
+            {mergedModalState.moonlightStepResourceModal && (
+                <MoonlightStepResourceModal
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    automation={mergedModalState.moonlightStepResourceModal.automation}
+                    onClose={() => setModalState({ moonlightStepResourceModal: null })}
+                />
+            )}
+            {mergedModalState.wildCompanionModal && (
+                <WildCompanionModal
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    onClose={() => setModalState({ wildCompanionModal: null })}
+                />
+            )}
+        </>
+    );
+}
+
+function ConditionSetHostModals({ mergedModalState, setModalState, characters }) {
+    return (
+        <>
+            {mergedModalState.setConditionModal && (
+                <SetConditionModal
+                    {...mergedModalState.setConditionModal}
+                    characters={characters}
+                    onClose={() => setModalState({ setConditionModal: null })}
+                />
+            )}
+            {mergedModalState.blindnessDeafnessModal && (
+                <BlindnessDeafnessModal
+                    {...mergedModalState.blindnessDeafnessModal}
+                    characters={characters}
+                    onClose={() => setModalState({ blindnessDeafnessModal: null })}
+                />
+            )}
+            {mergedModalState.eyebiteEffectModal && (
+                <EyebiteEffectModal
+                    {...mergedModalState.eyebiteEffectModal}
+                    characters={characters}
+                    onClose={() => setModalState({ eyebiteEffectModal: null })}
+                />
+            )}
+        </>
+    );
+}
+
+function UnarmedTechniqueHostModals({ mergedModalState, setModalState, flurryTarget, handleOpenHandFromFlurryConfirm, handleOpenHandFromFlurrySkip, resumeAttackPipeline }) {
+    return (
+        <>
+            {mergedModalState.openHandTechniqueModal && (
+                <OpenHandTechniqueModal
+                    {...mergedModalState.openHandTechniqueModal}
+                    onClose={() => { setModalState({ openHandTechniqueModal: null }); window.dispatchEvent(new CustomEvent('target-effects-updated')); window.dispatchEvent(new CustomEvent('combat-summary-updated')); }}
+                />
+            )}
+            {mergedModalState.shieldBashModal && (
+                <ShieldBashChoiceModal
+                    {...mergedModalState.shieldBashModal}
+                    onClose={() => { setModalState({ shieldBashModal: null }); window.dispatchEvent(new CustomEvent('target-effects-updated')); window.dispatchEvent(new CustomEvent('combat-summary-updated')); return resumeAttackPipeline?.(); }}
+                />
+            )}
+            {mergedModalState.quiveringPalmModal && (
+                <QuiveringPalmModal
+                    {...mergedModalState.quiveringPalmModal}
+                    onClose={() => { setModalState({ quiveringPalmModal: null }); window.dispatchEvent(new CustomEvent('target-effects-updated')); window.dispatchEvent(new CustomEvent('combat-summary-updated')); }}
+                />
+            )}
+            {mergedModalState.openHandFromFlurry && (
+                <OpenHandTechniqueModal
+                    action={flurryTarget.action}
+                    playerStats={flurryTarget.playerStats}
+                    campaignName={flurryTarget.campaignName}
+                    targetName={flurryTarget.targetName}
+                    saveDc={mergedModalState.openHandFromFlurry.saveDc}
+                    onClose={() => { handleOpenHandFromFlurrySkip(); window.dispatchEvent(new CustomEvent('target-effects-updated')); window.dispatchEvent(new CustomEvent('combat-summary-updated')); }}
+                    onConfirm={(optionName) => { handleOpenHandFromFlurryConfirm({ optionName }); window.dispatchEvent(new CustomEvent('target-effects-updated')); window.dispatchEvent(new CustomEvent('combat-summary-updated')); }}
+                />
+            )}
+        </>
+    );
+}
+
 function CharActionModals({
     playerStats,
     campaignName,
@@ -297,119 +425,31 @@ function CharActionModals({
 
     return (
         <>
-            {mergedModalState.healingPoolModal && (
-                <HealingPoolModal
-                    playerStats={playerStats}
-                    campaignName={campaignName}
-                    name={mergedModalState.healingPoolModal.name}
-                    poolMax={mergedModalState.healingPoolModal.pool}
-                    poolExpression={mergedModalState.healingPoolModal.poolExpression}
-                    isDicePool={mergedModalState.healingPoolModal.isDicePool}
-                    dieType={mergedModalState.healingPoolModal.dieType}
-                    resourceKey={mergedModalState.healingPoolModal.resourceKey}
-                    alsoCures={mergedModalState.healingPoolModal.alsoCures}
-                    cureCost={mergedModalState.healingPoolModal.cureCost}
-                    bloodiedOnly={mergedModalState.healingPoolModal.bloodiedOnly}
-                    restoringTouchConditions={mergedModalState.healingPoolModal.restoringTouchConditions}
-                    maxDicePerUse={mergedModalState.healingPoolModal.maxDicePerUse}
-                    creatureTargets={mergedModalState.healingPoolModal.creatureTargets}
-                    resourceCost={mergedModalState.healingPoolModal.resourceCost}
-                    onClose={() => setModalState({ healingPoolModal: null })}
-                />
-            )}
-            {mergedModalState.handOfHealingModal && (
-                <HandOfHealingModal
-                    {...mergedModalState.handOfHealingModal}
-                    campaignName={campaignName}
-                    onClose={() => setModalState({ handOfHealingModal: null })}
-                />
-            )}
-            {mergedModalState.fontOfMagicModal && (
-                <FontOfMagicModal
-                    playerStats={playerStats}
-                    campaignName={campaignName}
-                    onClose={() => setModalState({ fontOfMagicModal: null })}
-                />
-            )}
-            {mergedModalState.resourcePoolModal && (
-                <ResourcePoolModal
-                    playerStats={playerStats}
-                    campaignName={campaignName}
-                    automation={mergedModalState.resourcePoolModal.automation}
-                    onClose={() => setModalState({ resourcePoolModal: null })}
-                />
-            )}
-            {mergedModalState.moonlightStepResourceModal && (
-                <MoonlightStepResourceModal
-                    playerStats={playerStats}
-                    campaignName={campaignName}
-                    automation={mergedModalState.moonlightStepResourceModal.automation}
-                    onClose={() => setModalState({ moonlightStepResourceModal: null })}
-                />
-            )}
-            {mergedModalState.wildCompanionModal && (
-                <WildCompanionModal
-                    playerStats={playerStats}
-                    campaignName={campaignName}
-                    onClose={() => setModalState({ wildCompanionModal: null })}
-                />
-            )}
-            {mergedModalState.setConditionModal && (
-                <SetConditionModal
-                    {...mergedModalState.setConditionModal}
-                    characters={characters}
-                    onClose={() => setModalState({ setConditionModal: null })}
-                />
-            )}
-            {mergedModalState.blindnessDeafnessModal && (
-                <BlindnessDeafnessModal
-                    {...mergedModalState.blindnessDeafnessModal}
-                    characters={characters}
-                    onClose={() => setModalState({ blindnessDeafnessModal: null })}
-                />
-            )}
-            {mergedModalState.eyebiteEffectModal && (
-                <EyebiteEffectModal
-                    {...mergedModalState.eyebiteEffectModal}
-                    characters={characters}
-                    onClose={() => setModalState({ eyebiteEffectModal: null })}
-                />
-            )}
+            <ResourcePoolsHostModals
+                mergedModalState={mergedModalState}
+                setModalState={setModalState}
+                playerStats={playerStats}
+                campaignName={campaignName}
+            />
+            <ConditionSetHostModals
+                mergedModalState={mergedModalState}
+                setModalState={setModalState}
+                characters={characters}
+            />
             {mergedModalState.attackRiderModal && (
                 <AttackRiderModal
                     {...mergedModalState.attackRiderModal}
                     onClose={handleAttackRiderClose}
                 />
             )}
-            {mergedModalState.openHandTechniqueModal && (
-                <OpenHandTechniqueModal
-                    {...mergedModalState.openHandTechniqueModal}
-                    onClose={() => { setModalState({ openHandTechniqueModal: null }); window.dispatchEvent(new CustomEvent('target-effects-updated')); window.dispatchEvent(new CustomEvent('combat-summary-updated')); }}
-                />
-            )}
-            {mergedModalState.shieldBashModal && (
-                <ShieldBashChoiceModal
-                    {...mergedModalState.shieldBashModal}
-                    onClose={() => { setModalState({ shieldBashModal: null }); window.dispatchEvent(new CustomEvent('target-effects-updated')); window.dispatchEvent(new CustomEvent('combat-summary-updated')); return resumeAttackPipeline?.(); }}
-                />
-            )}
-            {mergedModalState.quiveringPalmModal && (
-                <QuiveringPalmModal
-                    {...mergedModalState.quiveringPalmModal}
-                    onClose={() => { setModalState({ quiveringPalmModal: null }); window.dispatchEvent(new CustomEvent('target-effects-updated')); window.dispatchEvent(new CustomEvent('combat-summary-updated')); }}
-                />
-            )}
-            {mergedModalState.openHandFromFlurry && (
-                <OpenHandTechniqueModal
-                    action={flurryTarget.action}
-                    playerStats={flurryTarget.playerStats}
-                    campaignName={flurryTarget.campaignName}
-                    targetName={flurryTarget.targetName}
-                    saveDc={mergedModalState.openHandFromFlurry.saveDc}
-                    onClose={() => { handleOpenHandFromFlurrySkip(); window.dispatchEvent(new CustomEvent('target-effects-updated')); window.dispatchEvent(new CustomEvent('combat-summary-updated')); }}
-                    onConfirm={(optionName) => { handleOpenHandFromFlurryConfirm({ optionName }); window.dispatchEvent(new CustomEvent('target-effects-updated')); window.dispatchEvent(new CustomEvent('combat-summary-updated')); }}
-                />
-            )}
+            <UnarmedTechniqueHostModals
+                mergedModalState={mergedModalState}
+                setModalState={setModalState}
+                flurryTarget={flurryTarget}
+                handleOpenHandFromFlurryConfirm={handleOpenHandFromFlurryConfirm}
+                handleOpenHandFromFlurrySkip={handleOpenHandFromFlurrySkip}
+                resumeAttackPipeline={resumeAttackPipeline}
+            />
             {mergedModalState.weaponMasteryModal && (
                 <WeaponMasteryModal
                     {...mergedModalState.weaponMasteryModal}

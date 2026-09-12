@@ -160,13 +160,7 @@ describe('Plain damage secondary damage', () => {
                 .mockReturnValueOnce({ finalDamage: 5, newHp: 8, damageReduced: false });
 
             const fn = createFn();
-            await fn('Eldritch Blast (Agonizing)', '2d10+4', 14, [5, 9], 4, {
-                targetName: 'Goblin',
-                damageType: 'force',
-                autoDamageSecondaryFormula: '1d10',
-                autoDamageSecondaryName: 'Eldritch Blast',
-                autoDamageSecondaryDamageType: 'force',
-            });
+            await fn('Eldritch Blast (Agonizing)', '2d10+4', 14, [5, 9], 4, { targetName: 'Goblin', damageType: 'force', autoDamageSecondaryFormula: '1d10', autoDamageSecondaryName: 'Eldritch Blast', autoDamageSecondaryDamageType: 'force', });
 
             // Secondary is applied first (index 0), primary second (index 1)
             expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
@@ -184,13 +178,7 @@ describe('Plain damage secondary damage', () => {
                 .mockReturnValueOnce({ finalDamage: 5, newHp: 8, damageReduced: false });
 
             const fn = createFn();
-            await fn('Eldritch Blast (Agonizing)', '2d10+4', 14, [5, 9], 4, {
-                targetName: 'Goblin',
-                damageType: 'force',
-                autoDamageSecondaryFormula: '1d10',
-                autoDamageSecondaryName: 'Eldritch Blast',
-                autoDamageSecondaryDamageType: 'force',
-            });
+            await fn('Eldritch Blast (Agonizing)', '2d10+4', 14, [5, 9], 4, { targetName: 'Goblin', damageType: 'force', autoDamageSecondaryFormula: '1d10', autoDamageSecondaryName: 'Eldritch Blast', autoDamageSecondaryDamageType: 'force', });
 
             expect(clearReTriggeredSequence).toHaveBeenCalled();
         });
@@ -200,10 +188,7 @@ describe('Plain damage secondary damage', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
         });
@@ -218,13 +203,7 @@ describe('Plain damage secondary damage', () => {
                 .mockReturnValueOnce({ finalDamage: 5, newHp: 8, damageReduced: false });
 
             const fn = createFn();
-            await fn('Eldritch Blast (Agonizing)', '2d10+4', 14, [5, 9], 4, {
-                targetName: 'Goblin',
-                damageType: 'force',
-                autoDamageSecondaryFormula: '1d10',
-                autoDamageSecondaryName: 'Eldritch Blast',
-                autoDamageSecondaryDamageType: 'force',
-            });
+            await fn('Eldritch Blast (Agonizing)', '2d10+4', 14, [5, 9], 4, { targetName: 'Goblin', damageType: 'force', autoDamageSecondaryFormula: '1d10', autoDamageSecondaryName: 'Eldritch Blast', autoDamageSecondaryDamageType: 'force', });
 
             expect(deps.logEntry).toHaveBeenCalled();
             const logCall = deps.logEntry.mock.calls[0][0];
@@ -241,10 +220,7 @@ describe('Plain damage secondary damage', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const logCall = deps.logEntry.mock.calls[0][0];
             expect(logCall.secondaryName).toBeUndefined();
@@ -262,13 +238,7 @@ describe('Plain damage secondary damage', () => {
                 .mockReturnValueOnce({ finalDamage: 5, newHp: 8, damageReduced: false });
 
             const fn = createFn();
-            await fn('Eldritch Blast (Agonizing)', '2d10+4', 14, [5, 9], 4, {
-                targetName: 'Goblin',
-                damageType: 'force',
-                autoDamageSecondaryFormula: '1d10',
-                autoDamageSecondaryName: 'Eldritch Blast',
-                autoDamageSecondaryDamageType: 'force',
-            });
+            await fn('Eldritch Blast (Agonizing)', '2d10+4', 14, [5, 9], 4, { targetName: 'Goblin', damageType: 'force', autoDamageSecondaryFormula: '1d10', autoDamageSecondaryName: 'Eldritch Blast', autoDamageSecondaryDamageType: 'force', });
 
             const popupCall = deps.setPopupHtml.mock.calls[0][0];
             expect(popupCall.secondaryName).toBe('Eldritch Blast');
@@ -284,10 +254,7 @@ describe('Plain damage secondary damage', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const popupCall = deps.setPopupHtml.mock.calls[0][0];
             expect(popupCall.secondaryName).toBeUndefined();
@@ -304,14 +271,7 @@ describe('Plain damage secondary damage', () => {
                 .mockReturnValueOnce({ finalDamage: 5, newHp: 8, damageReduced: false });
 
             const fn = createFn();
-            await fn('Eldritch Blast (Agonizing)', '2d10+4', 14, [5, 9], 4, {
-                targetName: 'Goblin',
-                damageType: 'force',
-                isAutoCrit: true,
-                autoDamageSecondaryFormula: '1d10',
-                autoDamageSecondaryName: 'Eldritch Blast',
-                autoDamageSecondaryDamageType: 'force',
-            });
+            await fn('Eldritch Blast (Agonizing)', '2d10+4', 14, [5, 9], 4, { targetName: 'Goblin', damageType: 'force', isAutoCrit: true, autoDamageSecondaryFormula: '1d10', autoDamageSecondaryName: 'Eldritch Blast', autoDamageSecondaryDamageType: 'force', });
 
             expect(rollExpressionDoubled).toHaveBeenCalledWith('1d10');
             expect(rollExpression).not.toHaveBeenCalledWith('1d10');
@@ -325,13 +285,7 @@ describe('Plain damage secondary damage', () => {
                 .mockReturnValueOnce({ finalDamage: 5, newHp: 8, damageReduced: false });
 
             const fn = createFn();
-            await fn('Eldritch Blast (Agonizing)', '2d10+4', 14, [5, 9], 4, {
-                targetName: 'Goblin',
-                damageType: 'force',
-                autoDamageSecondaryFormula: '1d10',
-                autoDamageSecondaryName: 'Eldritch Blast',
-                autoDamageSecondaryDamageType: 'force',
-            });
+            await fn('Eldritch Blast (Agonizing)', '2d10+4', 14, [5, 9], 4, { targetName: 'Goblin', damageType: 'force', autoDamageSecondaryFormula: '1d10', autoDamageSecondaryName: 'Eldritch Blast', autoDamageSecondaryDamageType: 'force', });
 
             expect(rollExpression).toHaveBeenCalledWith('1d10');
             expect(rollExpressionDoubled).not.toHaveBeenCalled();
@@ -347,13 +301,7 @@ describe('Plain damage secondary damage', () => {
                 .mockReturnValueOnce({ finalDamage: 8, newHp: 8, damageReduced: false });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
-                targetName: 'Goblin',
-                damageType: 'fire',
-                autoDamageSecondaryFormula: '1d6',
-                autoDamageSecondaryName: 'Searing Smite',
-                autoDamageSecondaryDamageType: 'fire',
-            });
+            await fn('Fire Bolt', '1d10', 8, [8], 0, { targetName: 'Goblin', damageType: 'fire', autoDamageSecondaryFormula: '1d6', autoDamageSecondaryName: 'Searing Smite', autoDamageSecondaryDamageType: 'fire', });
 
             const secondaryCall = applyDamageToTarget.mock.calls[0];
             expect(secondaryCall[3]).toEqual(['fire']);
@@ -367,13 +315,7 @@ describe('Plain damage secondary damage', () => {
                 .mockReturnValueOnce({ finalDamage: 8, newHp: 8, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-                autoDamageSecondaryFormula: '1d6',
-                autoDamageSecondaryName: 'Searing Smite',
-                autoDamageSecondaryDamageType: 'fire',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', autoDamageSecondaryFormula: '1d6', autoDamageSecondaryName: 'Searing Smite', autoDamageSecondaryDamageType: 'fire', });
 
             const secondaryCall = applyDamageToTarget.mock.calls[0];
             expect(secondaryCall[3]).toEqual(['fire']);
@@ -391,13 +333,7 @@ describe('Plain damage secondary damage', () => {
                 .mockReturnValueOnce({ finalDamage: 8, newHp: 8, damageReduced: false });
 
             const fn = createFn();
-            await fn('Eldritch Blast', '2d10', 10, [5, 5], 0, {
-                targetName: 'Goblin',
-                damageType: 'force',
-                autoDamageSecondaryFormula: '1d10',
-                autoDamageSecondaryName: 'Agonizing Blast',
-                autoDamageSecondaryDamageType: 'force',
-            });
+            await fn('Eldritch Blast', '2d10', 10, [5, 5], 0, { targetName: 'Goblin', damageType: 'force', autoDamageSecondaryFormula: '1d10', autoDamageSecondaryName: 'Agonizing Blast', autoDamageSecondaryDamageType: 'force', });
 
             const logCall = deps.logEntry.mock.calls[0][0];
             expect(logCall.secondaryName).toBe('Agonizing Blast');
@@ -411,12 +347,7 @@ describe('Plain damage secondary damage', () => {
                 .mockReturnValueOnce({ finalDamage: 8, newHp: 8, damageReduced: false });
 
             const fn = createFn();
-            await fn('Eldritch Blast', '2d10', 10, [5, 5], 0, {
-                targetName: 'Goblin',
-                damageType: 'force',
-                autoDamageSecondaryFormula: '1d10',
-                autoDamageSecondaryDamageType: 'force',
-            });
+            await fn('Eldritch Blast', '2d10', 10, [5, 5], 0, { targetName: 'Goblin', damageType: 'force', autoDamageSecondaryFormula: '1d10', autoDamageSecondaryDamageType: 'force', });
 
             const logCall = deps.logEntry.mock.calls[0][0];
             expect(logCall.secondaryName).toBe('Eldritch Blast');
@@ -432,13 +363,7 @@ describe('Plain damage secondary damage', () => {
                 .mockReturnValueOnce({ finalDamage: 8, newHp: 8, damageReduced: false });
 
             const fn = createFn();
-            await fn('Eldritch Blast', '2d10', 10, [5, 5], 0, {
-                targetName: 'Goblin',
-                damageType: 'force',
-                autoDamageSecondaryFormula: '1d10',
-                autoDamageSecondaryName: 'Agonizing Blast',
-                autoDamageSecondaryDamageType: 'force',
-            });
+            await fn('Eldritch Blast', '2d10', 10, [5, 5], 0, { targetName: 'Goblin', damageType: 'force', autoDamageSecondaryFormula: '1d10', autoDamageSecondaryName: 'Agonizing Blast', autoDamageSecondaryDamageType: 'force', });
 
             expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('TestFighter', 'test-campaign');
         });
@@ -453,17 +378,11 @@ describe('Plain damage secondary damage', () => {
                 .mockReturnValueOnce({ finalDamage: 8, newHp: 8, damageReduced: false });
 
             const fn = createFn();
-            await fn('Eldritch Blast', '2d10', 10, [5, 5], 0, {
-                targetName: 'Goblin',
-                damageType: 'force',
-                autoDamageSecondaryFormula: '1d10',
-                autoDamageSecondaryName: 'Agonizing Blast',
-                autoDamageSecondaryDamageType: 'force',
-            });
+            await fn('Eldritch Blast', '2d10', 10, [5, 5], 0, { targetName: 'Goblin', damageType: 'force', autoDamageSecondaryFormula: '1d10', autoDamageSecondaryName: 'Agonizing Blast', autoDamageSecondaryDamageType: 'force', });
 
-            // Second call is the primary damage; check the options object (last arg, index 9)
+            // Second call is the primary damage; check the options object (last arg, index 6)
             const primaryCall = applyDamageToTarget.mock.calls[1];
-            const options = primaryCall[9];
+            const options = primaryCall[6];
             expect(options.concentrationTotalDamage).toBe(15);
         });
     });

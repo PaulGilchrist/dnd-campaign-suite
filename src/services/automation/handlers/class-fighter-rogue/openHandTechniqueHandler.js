@@ -180,16 +180,18 @@ async function applyOpenHandEffect(action, playerStats, campaignName, targetName
     setRuntimeValue('campaign', 'targetEffects', updatedEffects, campaignName);
 
     if (option.effect === 'prone') {
-        const targetCharacter = playerStats.name ? (getRuntimeValue('characters', 'characters', campaignName) || []).find(c => utils.getName(c.name) === targetName) : null;
-        const targetStats = targetCharacter?.computedStats || targetCharacter;
         const conditionDef = { key: 'prone', label: 'Prone' };
-        addCondition(combatSummary, targetName, conditionDef, saveDc, saveType || 'STR', getRuntimeValue, setRuntimeValue, campaignName, targetStats);
+        addCondition(combatSummary, targetName, conditionDef, saveDc, saveType || 'STR', getRuntimeValue, setRuntimeValue, campaignName, findOpenHandTargetStats(playerStats, campaignName, targetName));
     }
 
     if (option.noOpportunityAttacks) {
-        const targetCharacter = playerStats.name ? (getRuntimeValue('characters', 'characters', campaignName) || []).find(c => utils.getName(c.name) === targetName) : null;
-        const targetStats = targetCharacter?.computedStats || targetCharacter;
         const conditionDef = { key: 'addled', label: 'Addled' };
-        addCondition(combatSummary, targetName, conditionDef, saveDc, saveType || 'STR', getRuntimeValue, setRuntimeValue, campaignName, targetStats);
+        addCondition(combatSummary, targetName, conditionDef, saveDc, saveType || 'STR', getRuntimeValue, setRuntimeValue, campaignName, findOpenHandTargetStats(playerStats, campaignName, targetName));
     }
+}
+
+function findOpenHandTargetStats(playerStats, campaignName, targetName) {
+    if (!playerStats.name) return null;
+    const targetCharacter = (getRuntimeValue('characters', 'characters', campaignName) || []).find(c => utils.getName(c.name) === targetName);
+    return targetCharacter?.computedStats || targetCharacter;
 }

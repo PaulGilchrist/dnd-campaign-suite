@@ -18,7 +18,7 @@ async function applyMissTurnedHitDamage({ campaignName, attackEvent, playerStats
     const cs = await getCombatContext(campaignName);
     const characters = [playerStats];
     try {
-        const appliedDmg = applyDamageToTarget(cs, attackEvent.targetName, damageResult.total, [attackEvent.damageType || 'unknown'], characters, false, characterName);
+        const appliedDmg = applyDamageToTarget(cs, attackEvent.targetName, damageResult.total, [attackEvent.damageType || 'unknown'], characters, false, { ignoreResistance: characterName });
         if (appliedDmg) {
             addEntry(campaignName, {
                 type: 'roll',
@@ -111,29 +111,39 @@ function handleSaveRoll(action, bonus, lastAttack) {
     return infoPopup(action.name, description, auto);
 }
 
+async function consumeChannelDivinity(auto, playerStats, campaignName) {
+    const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
+    const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
+    const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
+    const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
+
+    if (currentCharges <= 0) {
+        return infoPopup(playerStats.name, 'No Channel Divinity charges remaining.', auto);
+    }
+
+    await setRuntimeValue(playerStats.name, 'channelDivinityCharges', currentCharges - 1, campaignName);
+    return null;
+}
+
+async function consumeFocusPoints(auto, playerStats, campaignName) {
+    const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
+    const maxFocus = classLevel?.focus_points || getClassFeatures(playerStats)?.maxFocusPoints || 0;
+    const currentFocus = Number(getRuntimeValue(playerStats.name, 'focusPoints') ?? maxFocus);
+
+    if (currentFocus <= 0) {
+        return infoPopup(playerStats.name, 'No Focus Points remaining.', auto);
+    }
+
+    await setRuntimeValue(playerStats.name, 'focusPoints', currentFocus - 1, campaignName);
+    return null;
+}
+
 async function consumeResourceCost(auto, playerStats, campaignName) {
     if (auto.resourceCost === 'channel_divinity') {
-        const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
-        const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
-        const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
-        const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
-
-        if (currentCharges <= 0) {
-            return infoPopup(playerStats.name, 'No Channel Divinity charges remaining.', auto);
-        }
-
-        await setRuntimeValue(playerStats.name, 'channelDivinityCharges', currentCharges - 1, campaignName);
+        return consumeChannelDivinity(auto, playerStats, campaignName);
     }
-    else if (auto.resourceCost === 'focus_points') {
-        const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
-        const maxFocus = classLevel?.focus_points || getClassFeatures(playerStats)?.maxFocusPoints || 0;
-        const currentFocus = Number(getRuntimeValue(playerStats.name, 'focusPoints') ?? maxFocus);
-
-        if (currentFocus <= 0) {
-            return infoPopup(playerStats.name, 'No Focus Points remaining.', auto);
-        }
-
-        await setRuntimeValue(playerStats.name, 'focusPoints', currentFocus - 1, campaignName);
+    if (auto.resourceCost === 'focus_points') {
+        return consumeFocusPoints(auto, playerStats, campaignName);
     }
     return null;
 }
@@ -233,6 +243,30 @@ async function handleSavingThrowReroll(action, auto, playerName, playerStats, la
     return result;
 }
 
+async function bardicAttackOutcome(action, playerName, playerStats, lastAttack, campaignName, biDieRoll, bardicDieSize) {
+    const { d20, bonus: atkBonus, targetAc, hit } = lastAttack;
+    const ac = targetAc;
+    const modifiedD20 = d20 + biDieRoll;
+    const modifiedTotal = modifiedD20 + atkBonus;
+    const modifiedHit = ac != null ? (modifiedTotal >= ac) : null;
+    const originalTotal = d20 + atkBonus;
+
+    const logDescription = `${playerName} used ${action.name} on attack: d20(${d20}) + ${atkBonus} = ${originalTotal} vs AC ${ac != null ? ac : '—'} → ${hit ? 'HIT' : 'MISS'}. Bonus: +${biDieRoll} → Modified: d20(${modifiedD20}) + ${atkBonus} = ${modifiedTotal} vs AC ${ac != null ? ac : '—'} → ${modifiedHit == null ? 'N/A' : modifiedHit ? 'HIT' : 'MISS'}. Bardic Inspiration die: 1d${bardicDieSize} (${biDieRoll}).`;
+    const result = await handleAttackRoll(action, biDieRoll, lastAttack, playerStats, campaignName);
+    return { logDescription, result };
+}
+
+function bardicAbilityCheckOutcome(action, playerName, lastAttack, biDieRoll, bardicDieSize) {
+    const { d20, bonus: checkBonus, checkName } = lastAttack;
+    const originalTotal = d20 + checkBonus;
+    const modifiedD20 = d20 + biDieRoll;
+    const modifiedTotal = modifiedD20 + checkBonus;
+
+    const logDescription = `${playerName} used ${action.name} on ${checkName || 'ability check'}: d20(${d20}) + ${checkBonus} = ${originalTotal}. Bonus: +${biDieRoll} → Modified: d20(${modifiedD20}) + ${checkBonus} = ${modifiedTotal}. Bardic Inspiration die: 1d${bardicDieSize} (${biDieRoll}).`;
+    const result = handleAbilityCheck(action, biDieRoll, lastAttack);
+    return { logDescription, result };
+}
+
 async function handleBardicInspiration(action, auto, playerName, playerStats, lastAttack, campaignName, bardicDieSize) {
     const usesMax = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.bardic_inspiration_uses
         ?? (playerStats.proficiency || 0);
@@ -253,27 +287,9 @@ async function handleBardicInspiration(action, auto, playerName, playerStats, la
         return infoPopup(action.name, `No recent failed ability check or attack roll found. ${action.name} can only be used shortly after a failure.`, auto);
     }
 
-    let logDescription;
-    let result;
-    if (attackFresh) {
-        const { d20, bonus: atkBonus, targetAc, hit } = lastAttack;
-        const ac = targetAc;
-        const modifiedD20 = d20 + biDieRoll;
-        const modifiedTotal = modifiedD20 + atkBonus;
-        const modifiedHit = ac != null ? (modifiedTotal >= ac) : null;
-        const originalTotal = d20 + atkBonus;
-
-        logDescription = `${playerName} used ${action.name} on attack: d20(${d20}) + ${atkBonus} = ${originalTotal} vs AC ${ac != null ? ac : '—'} → ${hit ? 'HIT' : 'MISS'}. Bonus: +${biDieRoll} → Modified: d20(${modifiedD20}) + ${atkBonus} = ${modifiedTotal} vs AC ${ac != null ? ac : '—'} → ${modifiedHit == null ? 'N/A' : modifiedHit ? 'HIT' : 'MISS'}. Bardic Inspiration die: 1d${bardicDieSize} (${biDieRoll}).`;
-        result = await handleAttackRoll(action, biDieRoll, lastAttack, playerStats, campaignName);
-    } else {
-        const { d20, bonus: checkBonus, checkName } = lastAttack;
-        const originalTotal = d20 + checkBonus;
-        const modifiedD20 = d20 + biDieRoll;
-        const modifiedTotal = modifiedD20 + checkBonus;
-
-        logDescription = `${playerName} used ${action.name} on ${checkName || 'ability check'}: d20(${d20}) + ${checkBonus} = ${originalTotal}. Bonus: +${biDieRoll} → Modified: d20(${modifiedD20}) + ${checkBonus} = ${modifiedTotal}. Bardic Inspiration die: 1d${bardicDieSize} (${biDieRoll}).`;
-        result = handleAbilityCheck(action, biDieRoll, lastAttack);
-    }
+    const { logDescription, result } = attackFresh
+        ? await bardicAttackOutcome(action, playerName, playerStats, lastAttack, campaignName, biDieRoll, bardicDieSize)
+        : bardicAbilityCheckOutcome(action, playerName, lastAttack, biDieRoll, bardicDieSize);
 
     if (usesMax > 0) {
         await setRuntimeValue(playerName, 'bardicInspirationUses', currentUses - 1, campaignName);

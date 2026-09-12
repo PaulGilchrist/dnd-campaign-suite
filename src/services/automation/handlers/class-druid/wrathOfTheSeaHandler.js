@@ -94,17 +94,14 @@ async function activateWrathEmanation(action, auto, playerStats, playerName, cam
     };
 }
 
-async function resolveNpcSaveAndDamage(action, combatSummary, target, playerName, playerStats, damageResult, damageFormula, saveDc, pushDistanceFt, campaignName) {
+async function resolveNpcSaveAndDamage({ action, combatSummary, target, playerName, playerStats, damageResult, damageFormula, saveDc, pushDistanceFt, campaignName }) {
     const saveBonus = target?.saveBonuses?.['con'] ?? 0;
     const saveRoll = rollD20();
     const saveTotal = saveRoll + saveBonus;
     const saveSuccess = saveTotal >= saveDc;
 
     const finalDamage = saveSuccess ? 0 : damageResult.total;
-    const applyResult = applyDamageToTarget(
-        combatSummary, target.name, finalDamage, ['cold'], campaignName,
-        [playerStats], false, playerName, false
-    );
+    const applyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, ['cold'], campaignName, [playerStats], { ignoreResistance: false, attackerName: playerName, suppressHpLog: false });
 
     const actualDamage = applyResult?.finalDamage ?? finalDamage;
     const newHp = applyResult?.newHp ?? target.currentHp;
@@ -193,6 +190,23 @@ function resolveWrathWisdomAndDc(isAllyAttack, playerName, playerStats, campaign
     return { wisMod: wisBonus || 1, saveDc: 8 + wisBonus + (playerStats.proficiency || 0) };
 }
 
+// CLA-393 gate 1 — once-per-turn latch: the attack choice happens only once
+// per turn as a Bonus Action (CLA-371 read from fresh combat context).
+// CLA-393 gate 2 — turn gate: this Bonus Action fires only on the holder's turn.
+function checkWrathTurnGates(action, csFresh, currentRound, playerName, campaignName) {
+    const usedRound = Number(getRuntimeValue(playerName, USED_ROUND_KEY, campaignName) ?? 0);
+    if (usedRound === currentRound) {
+        return refusal(action, playerName, campaignName, 'Once per turn — the Wrath of the Sea attack has already been used this round.');
+    }
+
+    const activeName = csFresh?.activeCreatureName;
+    if (activeName && activeName !== playerName) {
+        return refusal(action, playerName, campaignName, `It is ${activeName}'s turn — Wrath of the Sea is a Bonus Action on your own turn.`);
+    }
+
+    return null;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const isAllyAttack = auto?.allyAttack === true;
@@ -211,18 +225,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         }
     }
 
-    // CLA-393 gate 1 — once-per-turn latch: the attack choice happens only once
-    // per turn as a Bonus Action (CLA-371 read from fresh combat context).
-    const usedRound = Number(getRuntimeValue(playerName, USED_ROUND_KEY, campaignName) ?? 0);
-    if (usedRound === currentRound) {
-        return refusal(action, playerName, campaignName, 'Once per turn — the Wrath of the Sea attack has already been used this round.');
-    }
-
-    // CLA-393 gate 2 — turn gate: this Bonus Action fires only on the holder's turn.
-    const activeName = csFresh?.activeCreatureName;
-    if (activeName && activeName !== playerName) {
-        return refusal(action, playerName, campaignName, `It is ${activeName}'s turn — Wrath of the Sea is a Bonus Action on your own turn.`);
-    }
+    const gateRefusal = checkWrathTurnGates(action, csFresh, currentRound, playerName, campaignName);
+    if (gateRefusal) return gateRefusal;
 
     const { wisMod, saveDc } = resolveWrathWisdomAndDc(isAllyAttack, playerName, playerStats, campaignName);
 
@@ -258,7 +262,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const playerPrompts = [];
 
     if (isNpc) {
-        results.push(await resolveNpcSaveAndDamage(action, combatSummary, target, playerName, playerStats, damageResult, damageFormula, saveDc, pushDistanceFt, campaignName));
+        results.push(await resolveNpcSaveAndDamage({ action, combatSummary, target, playerName, playerStats, damageResult, damageFormula, saveDc, pushDistanceFt, campaignName }));
     } else {
         const promptId = `${action.name.replace(/\s+/g, '_')}_${target.name}_${Date.now()}`;
 

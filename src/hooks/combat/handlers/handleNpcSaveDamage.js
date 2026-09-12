@@ -19,7 +19,7 @@ import { isCircleOfPowerActive } from '../../../services/automation/handlers/buf
 import { hasBuffEffect } from '../../../services/automation/common/buffToggle.js';
 import { handleOverchannelSelfDamage } from './handleOverchannelSelfDamage.js';
 import { triggerViciousMockeryForGeneric } from '../../../services/rules/features/viciousMockeryService.js';
-import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry, computeGwfAdjustedSecondaryTotal } from './damageHandlerUtils.js';
+import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry, computeGwfAdjustedSecondaryTotal, findTargetByContext, resolveTargetMaxHp } from './damageHandlerUtils.js';
 
 const SECONDARY_LOG_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage', 'SaveResult', 'SaveRoll', 'SaveBonus', 'SaveRawRolls', 'DcSuccess'];
 const SECONDARY_POPUP_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage'];
@@ -66,19 +66,29 @@ async function triggerViciousMockeryOnFailedSave(saveResult, context, target, ca
     }
 }
 
+// Consume (when present) a 'disadvantage_on_next_save' targetEffect stamp for
+// the given target, returning whether one was found.
+function consumeDisadvantageStamp(targetName, campaignName) {
+    const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+    const idx = targetEffects.findIndex(te => te.target === targetName && te.effect === 'disadvantage_on_next_save');
+    if (idx === -1) return false;
+    targetEffects.splice(idx, 1);
+    setRuntimeValue('campaign', 'targetEffects', [...targetEffects], campaignName);
+    return true;
+}
+
+function resolveSaveModifiers(characters, targetName) {
+    const character = (characters || []).find(c => utils.getName(c.name) === targetName);
+    return character?.saveModifiers || character?.computedStats?.saveModifiers || [];
+}
+
 // Resolve save disadvantage: forced (heightened) → consumed targetEffect stamp →
 // corona aura → elder champion aura. Short-circuits on the first hit, exactly
 // mirroring the original sequential checks.
 async function resolveSaveDisadvantage({ targetName, campaignName, damageType, attackerName, attackerStats, forceDisadvantage, consumeTargetEffect }) {
     if (forceDisadvantage) return true;
-    if (consumeTargetEffect) {
-        const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
-        const idx = targetEffects.findIndex(te => te.target === targetName && te.effect === 'disadvantage_on_next_save');
-        if (idx !== -1) {
-            targetEffects.splice(idx, 1);
-            setRuntimeValue('campaign', 'targetEffects', [...targetEffects], campaignName);
-            return true;
-        }
+    if (consumeTargetEffect && consumeDisadvantageStamp(targetName, campaignName)) {
+        return true;
     }
     const coronaResult = getCoronaSaveDisadvantage({ targetName, campaignName, damageType, skipRangeCheck: true });
     if (coronaResult.disadvantage) return true;
@@ -195,7 +205,7 @@ async function rollAndApplySecondarySaveDamage({ context, combatSummary, target,
     const secondarySaveResult = await resolveSecondarySaveResult({ target, context, saveResult, advantage, campaignName, characterName, secondaryDamageType });
     const secondaryRawDamage = computeSecondaryRawDamage(secondaryTotal, secondarySaveResult, { isSoulstitchProtected, hasPotentFlag, isCantripFlag, dcSuccess: context.dcSuccess });
     const secondaryIgnoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, secondaryDamageType)) || false;
-    const secondaryApplyResult = await applyDamageToTarget(combatSummary, target.name, secondaryRawDamage, [secondaryDamageType], campaignName, characters, secondaryIgnoreResistance, characterName, true, { skipConcentration: true });
+    const secondaryApplyResult = await applyDamageToTarget(combatSummary, target.name, secondaryRawDamage, [secondaryDamageType], campaignName, characters, { ignoreResistance: secondaryIgnoreResistance, attackerName: characterName, suppressHpLog: true, ...{ skipConcentration: true } });
     const secondaryFinalDamage = secondaryApplyResult?.finalDamage ?? secondaryRawDamage;
     if (secondaryApplyResult && secondaryApplyResult.finalDamage > 0) {
         endInvisibilityOnHostileAction(characterName, campaignName);
@@ -265,9 +275,7 @@ async function handleTwinSaveTarget({ name, modifier, context, combatSummary, ta
         forceDisadvantage: context?.metamagicHeighten || false,
         consumeTargetEffect: true,
     });
-    const twinCharacter = (characters || []).find(c => utils.getName(c.name) === twinTarget.name);
-    const twinSaveModifiers = twinCharacter?.saveModifiers || twinCharacter?.computedStats?.saveModifiers || [];
-    const twinAdvantage = hasSpellOrigin(twinSaveModifiers, context, campaignName);
+    const twinAdvantage = hasSpellOrigin(resolveSaveModifiers(characters, twinTarget.name), context, campaignName);
     const twinSaveResult = rollSaveForCreature(twinTarget, saveType, saveDc, twinDisadvantage, twinAdvantage);
     const twinFinalDamage = applyPotentCantripHalfDamage(computeDamageAfterSave(adjustedTotal, twinSaveResult.success, dcSuccess), { isSoulstitchProtected: false, hasPotentFlag, isCantripFlag, saveSuccess: twinSaveResult.success, dcSuccess, adjustedTotal });
     const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
@@ -277,7 +285,7 @@ async function handleTwinSaveTarget({ name, modifier, context, combatSummary, ta
 
     logEntry(buildTwinSaveLogData({ characterName, name, modifier, displayFormula, displayRolls, adjustedTotal, damageType, twinTarget, saveType, saveDc, twinSaveResult, twinDisadvantage, isCrit, gwfBaseRolls, gwfDisplayRolls }));
 
-    const twinApplyResult = await applyDamageToTarget(combatSummary, twinTarget.name, twinFinalDamage, [damageType], campaignName, characters, ignoreResistance, characterName);
+    const twinApplyResult = await applyDamageToTarget(combatSummary, twinTarget.name, twinFinalDamage, [damageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: characterName });
 
     if (twinApplyResult && twinApplyResult.finalDamage > 0) {
         endInvisibilityOnHostileAction(characterName, campaignName);
@@ -318,7 +326,7 @@ async function applyMultiTargetPlainDamage({ name, modifier, context, combatSumm
         isCrit,
     });
 
-    const multiApplyResult = await applyDamageToTarget(combatSummary, multiTarget.name, total, [damageType], campaignName, null, ignoreResistance, characterName);
+    const multiApplyResult = await applyDamageToTarget(combatSummary, multiTarget.name, total, [damageType], campaignName, null, { ignoreResistance: ignoreResistance, attackerName: characterName });
 
     if (multiApplyResult && multiApplyResult.finalDamage > 0) {
         endInvisibilityOnHostileAction(characterName, campaignName);
@@ -327,39 +335,14 @@ async function applyMultiTargetPlainDamage({ name, modifier, context, combatSumm
     setPopupHtml(prev => ({ ...prev, ...buildSecondTargetPopupPatch(multiTarget, multiApplyResult) }));
 }
 
-async function handleMultiSaveTarget({ name, modifier, context, combatSummary, target, characters, campaignName, characterName, saveType, saveDc, dcSuccess, damageType, adjustedTotal, total, formula, rolls, displayRolls, gwfBaseRolls, gwfDisplayRolls, hasPotentFlag, isCantripFlag, setPopupHtml, logEntry }) {
-    const multiTarget = combatSummary?.creatures?.find(c => c.name === context.multiTarget);
-    if (!multiTarget || multiTarget.name === target.name) return;
-
-    if (!saveType || !saveDc) {
-        await applyMultiTargetPlainDamage({ name, modifier, context, combatSummary, multiTarget, campaignName, characterName, damageType, total, formula, rolls, setPopupHtml, logEntry });
-        return;
-    }
-
-    const multiCharacter = (characters || []).find(c => utils.getName(c.name) === multiTarget.name);
-    const multiSaveModifiers = multiCharacter?.saveModifiers || multiCharacter?.computedStats?.saveModifiers || [];
-    const multiAdvantage = hasSpellOrigin(multiSaveModifiers, context, campaignName);
-    let multiDisadvantage = false;
-    const multiTargetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
-    const multiIdx = multiTargetEffects.findIndex(te => te.target === multiTarget.name && te.effect === 'disadvantage_on_next_save');
-    if (multiIdx !== -1) {
-        multiDisadvantage = true;
-        multiTargetEffects.splice(multiIdx, 1);
-        setRuntimeValue('campaign', 'targetEffects', [...multiTargetEffects], campaignName);
-    }
-    const multiSaveResult = rollSaveForCreature(multiTarget, saveType, saveDc, multiDisadvantage, multiAdvantage);
-    let multiFinalDamage = computeDamageAfterSave(adjustedTotal, multiSaveResult.success, dcSuccess);
-    if (hasPotentFlag && isCantripFlag && multiSaveResult.success && dcSuccess === 'none') {
-        multiFinalDamage = Math.floor(adjustedTotal / 2);
-    }
+function buildMultiSaveLogData({ characterName, name, modifier, context, multiTarget, saveType, saveDc, multiSaveResult, damageType, adjustedTotal, displayRolls, formula, gwfBaseRolls, gwfDisplayRolls }) {
     const isCrit = context?.isAutoCrit || false;
-    const displayFormula = isCrit ? formatDamageFormula(formula, displayRolls, true) : formula;
-    logEntry({
+    return {
         type: 'roll',
         characterName,
         rollType: 'save-damage',
         name: `${name} (Words of Creation)`,
-        formula: displayFormula,
+        formula: isCrit ? formatDamageFormula(formula, displayRolls, true) : formula,
         rolls: displayRolls,
         total: adjustedTotal,
         modifier,
@@ -377,7 +360,23 @@ async function handleMultiSaveTarget({ name, modifier, context, combatSummary, t
         isCrit,
         gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
         gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
-    });
+    };
+}
+
+async function handleMultiSaveTarget({ name, modifier, context, combatSummary, target, characters, campaignName, characterName, saveType, saveDc, dcSuccess, damageType, adjustedTotal, total, formula, rolls, displayRolls, gwfBaseRolls, gwfDisplayRolls, hasPotentFlag, isCantripFlag, setPopupHtml, logEntry }) {
+    const multiTarget = combatSummary?.creatures?.find(c => c.name === context.multiTarget);
+    if (!multiTarget || multiTarget.name === target.name) return;
+
+    if (!saveType || !saveDc) {
+        await applyMultiTargetPlainDamage({ name, modifier, context, combatSummary, multiTarget, campaignName, characterName, damageType, total, formula, rolls, setPopupHtml, logEntry });
+        return;
+    }
+
+    const multiAdvantage = hasSpellOrigin(resolveSaveModifiers(characters, multiTarget.name), context, campaignName);
+    const multiDisadvantage = consumeDisadvantageStamp(multiTarget.name, campaignName);
+    const multiSaveResult = rollSaveForCreature(multiTarget, saveType, saveDc, multiDisadvantage, multiAdvantage);
+    const multiFinalDamage = applyPotentCantripHalfDamage(computeDamageAfterSave(adjustedTotal, multiSaveResult.success, dcSuccess), { isSoulstitchProtected: false, hasPotentFlag, isCantripFlag, saveSuccess: multiSaveResult.success, dcSuccess, adjustedTotal });
+    logEntry(buildMultiSaveLogData({ characterName, name, modifier, context, multiTarget, saveType, saveDc, multiSaveResult, damageType, adjustedTotal, displayRolls, formula, gwfBaseRolls, gwfDisplayRolls }));
 
     const multiApplyResult = await applyDamageToTarget(combatSummary, multiTarget.name, multiFinalDamage, [damageType], campaignName, null);
 
@@ -552,17 +551,12 @@ function writeNpcDamageOutcome({ target, primaryApplyResult, secondaryResult, se
     return { newHp };
 }
 
-function resolveSaveTargetMaxHp(target) {
-    return target?.type === 'player' ? (getRuntimeValue(target.name, 'hitPoints') ?? 0) : target?.maxHp ?? 0;
-}
-
 // Roll the target's save and derive evasion/potent-cantrip damage, in the
 // original read/log order (evasion log fires mid-block, before damage adjust).
 function rollTargetSaveDamage({ context, target, characters, combatSummary, campaignName, characterName, disadvantage, saveType, saveDc, dcSuccess, adjustedTotal, logEntry }) {
     const isSoulstitchProtected = hasSoulstitchProtection(target.name, characterName, campaignName);
     const targetCharacter = (characters || []).find(c => utils.getName(c.name) === target.name);
-    const targetSaveModifiers = targetCharacter?.saveModifiers || targetCharacter?.computedStats?.saveModifiers || [];
-    const advantage = resolveSaveAdvantage(target, targetSaveModifiers, context, campaignName);
+    const advantage = resolveSaveAdvantage(target, resolveSaveModifiers(characters, target.name), context, campaignName);
     const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage, advantage);
     const normalizedSaveType = normalizeSaveType(saveType);
     const targetConditions = getRuntimeValue(target.name, 'activeConditions', campaignName) || [];
@@ -600,11 +594,11 @@ async function runNpcSaveDamageTail({ context, name, modifier, rolls, total, com
 export function createNpcSaveDamageHandler(deps) {
     const { characterName, campaignName, characters, setPopupHtml, logEntry } = deps;
 
-    return async function handleNpcSaveDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls, gwfBaseRolls, gwfDisplayRolls) {
+    return async function handleNpcSaveDamage({ name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls, gwfBaseRolls, gwfDisplayRolls }) {
         const { saveDc, saveType, dcSuccess, damageType } = context || {};
-        const target = combatSummary?.creatures?.find(c => c.name === context?.targetName) || null;
+        const target = findTargetByContext(combatSummary, context);
         if (!target) return;
-        const targetMaxHp = resolveSaveTargetMaxHp(target);
+        const targetMaxHp = resolveTargetMaxHp(target);
 
         const disadvantage = await resolveSaveDisadvantage({
             targetName: target.name,
@@ -625,8 +619,8 @@ export function createNpcSaveDamageHandler(deps) {
         });
 
         const primaryApplyResult = secondaryFinalDamage > 0
-          ? await applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName, characters, ignoreResistance, characterName, true, { concentrationTotalDamage: finalDamage + secondaryFinalDamage })
-          : await applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName, characters, ignoreResistance, characterName, true);
+          ? await applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: characterName, suppressHpLog: true, ...{ concentrationTotalDamage: finalDamage + secondaryFinalDamage } })
+          : await applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: characterName, suppressHpLog: true });
 
         applyPostSaveDamageEffects(primaryApplyResult, characterName, campaignName, formula);
 

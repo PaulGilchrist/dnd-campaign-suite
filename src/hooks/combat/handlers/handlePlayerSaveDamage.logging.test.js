@@ -122,17 +122,7 @@ const BASE_COMBAT_SUMMARY = {
 };
 
 function invokeHandler(handler, context = BASE_CONTEXT, combatSummary = BASE_COMBAT_SUMMARY) {
-    return handler(
-        'Acid Arrow',
-        '4d4',
-        10,
-        [3, 4, 2, 1],
-        5,
-        context,
-        10,
-        combatSummary,
-        [3, 4, 2, 1]
-    );
+    return handler({ name: 'Acid Arrow', formula: '4d4', total: 10, rolls: [3, 4, 2, 1], modifier: 5, context: context, adjustedTotal: 10, combatSummary: combatSummary, displayRolls: [3, 4, 2, 1] });
 }
 
 describe('handlePlayerSaveDamage - logging and popups', () => {

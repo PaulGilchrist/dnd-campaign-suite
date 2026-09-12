@@ -22,7 +22,7 @@ function isUnseeableInvisible(targetConditions, casterCreature) {
     return targetInvisible && !hasTruesight && !hasBlindsight;
 }
 
-async function applyParalyzedOnFail(campaignName, auto, playerStats, action, casterName, cs, casterCreature, targetName, dc, saveResult) {
+async function applyParalyzedOnFail({ campaignName, auto, playerStats, action, casterName, cs, casterCreature, targetName, dc, saveResult }) {
     // Failed save: apply Paralyzed condition
     const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
     const conditions = Array.isArray(storedConditions) ? storedConditions : [];
@@ -207,7 +207,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             savedTargets.push(targetName);
         } else {
             paralyzedCount++;
-            await applyParalyzedOnFail(campaignName, auto, playerStats, action, casterName, cs, casterCreature, targetName, dc, saveResult);
+            await applyParalyzedOnFail({ campaignName, auto, playerStats, action, casterName, cs, casterCreature, targetName, dc, saveResult });
             paralyzedTargets.push(targetName);
         }
     }

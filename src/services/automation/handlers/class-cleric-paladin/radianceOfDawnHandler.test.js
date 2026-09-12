@@ -368,10 +368,7 @@ describe('radianceOfDawnHandler.confirmRadianceOfDawn', () => {
       const result = await confirmRadianceOfDawn(action, makePlayerStats(), campaignName, ['Goblin']);
       expect(result.payload.results[0].success).toBe(true);
       expect(result.payload.results[0].damage).toBe(0);
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-        expect.any(Object), 'Goblin', 0, ['Radiant'], campaignName,
-        expect.any(Array), false, 'TestCleric', true,
-      );
+      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 0, ['Radiant'], campaignName, expect.any(Array), { ignoreResistance: false, attackerName: 'TestCleric', suppressHpLog: true },);
       passSpy.mockRestore();
 
       vi.clearAllMocks();
@@ -488,17 +485,7 @@ describe('radianceOfDawnHandler.confirmRadianceOfDawn', () => {
         makePlayerStats(),
         'Radiant',
       );
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-        expect.any(Object),
-        'Goblin',
-        expect.any(Number),
-        ['Radiant'],
-        campaignName,
-        expect.any(Array),
-        true,
-        'TestCleric',
-        true,
-      );
+      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', expect.any(Number), ['Radiant'], campaignName, expect.any(Array), { ignoreResistance: true, attackerName: 'TestCleric', suppressHpLog: true },);
     });
   });
 

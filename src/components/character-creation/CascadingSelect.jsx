@@ -1,4 +1,30 @@
 
+function resolveChildLabel(label, childLabelProp, ruleset) {
+  const text = childLabelProp || label;
+  return ruleset === '2024' ? `${text} (Major)` : text;
+}
+
+function optionValue(option, key, fallbackKey = 'index') {
+  return option[key] || option[fallbackKey];
+}
+
+function ParentOptionList({ options, optionsKey, loadingText }) {
+  if (options.length === 0) {
+    return <option value="">{loadingText}</option>;
+  }
+  return options.map(option => {
+    const value = optionValue(option, optionsKey);
+    return <option key={value} value={value}>{value}</option>;
+  });
+}
+
+function ChildOptionList({ options, childOptionsKey, childOptionsIndexKey }) {
+  return options.map(option => {
+    const value = optionValue(option, childOptionsKey, childOptionsIndexKey);
+    return <option key={value} value={value}>{value}</option>;
+  });
+}
+
 function CascadingSelect({
   label,
   options,
@@ -21,9 +47,7 @@ function CascadingSelect({
 
   const availableSubOptions = subOptionsSelector(selectedParentValue) || [];
 
-  const childLabel = childLabelProp
-    ? (ruleset === '2024' ? `${childLabelProp} (Major)` : childLabelProp)
-    : (ruleset === '2024' ? `${label} (Major)` : label);
+  const childLabel = resolveChildLabel(label, childLabelProp, ruleset);
 
   const handleParentChange = (e) => {
     onInputChange(fieldName, { name: e.target.value });
@@ -47,37 +71,40 @@ function CascadingSelect({
           className={errors[fieldName] ? 'error' : ''}
         >
           <option value="">Select a {label.toLowerCase()}</option>
-          {options.length > 0 ? (
-            options.map(option => (
-              <option key={option[optionsKey] || option.index} value={option[optionsKey] || option.index}>
-                {option[optionsKey] || option.index}
-              </option>
-            ))
-          ) : (
-            <option value="">{loadingText}</option>
-          )}
+          <ParentOptionList options={options} optionsKey={optionsKey} loadingText={loadingText} />
         </select>
         {errors[fieldName] && <span className="error-message">{errors[fieldName]}</span>}
       </div>
 
       {availableSubOptions.length > 0 && (
-        <div className="form-group">
-          <label>{childLabel} *</label>
-          <select
-            value={formData[fieldName]?.[childFieldName]?.name || ''}
-            onChange={handleChildChange}
-            className={errors[errorKey] ? 'error' : ''}
-          >
-            <option value="">Select a {childLabel.toLowerCase()}</option>
-            {availableSubOptions.map(option => (
-              <option key={option[childOptionsKey] || option[childOptionsIndexKey]} value={option[childOptionsKey] || option[childOptionsIndexKey]}>
-                {option[childOptionsKey] || option[childOptionsIndexKey]}
-              </option>
-            ))}
-          </select>
-          {errors[errorKey] && <span className="error-message">{errors[errorKey]}</span>}
-        </div>
+        <ChildSelect
+          childLabel={childLabel}
+          value={formData[fieldName]?.[childFieldName]?.name || ''}
+          onChange={handleChildChange}
+          className={errors[errorKey] ? 'error' : ''}
+          error={errors[errorKey]}
+          options={availableSubOptions}
+          childOptionsKey={childOptionsKey}
+          childOptionsIndexKey={childOptionsIndexKey}
+        />
       )}
+    </div>
+  );
+}
+
+function ChildSelect({ childLabel, value, onChange, className, error, options, childOptionsKey, childOptionsIndexKey }) {
+  return (
+    <div className="form-group">
+      <label>{childLabel} *</label>
+      <select value={value} onChange={onChange} className={className}>
+        <option value="">Select a {childLabel.toLowerCase()}</option>
+        <ChildOptionList
+          options={options}
+          childOptionsKey={childOptionsKey}
+          childOptionsIndexKey={childOptionsIndexKey}
+        />
+      </select>
+      {error && <span className="error-message">{error}</span>}
     </div>
   );
 }

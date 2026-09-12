@@ -261,9 +261,7 @@ describe('psionicStrikeHandler', () => {
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
             expect(rollExpression).toHaveBeenCalledWith('1d8');
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.anything(), 'Target Goblin', 8, ['Force'], 'test-campaign', [], false, 'Test Fighter'
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Target Goblin', 8, ['Force'], 'test-campaign', [], { ignoreResistance: false, attackerName: 'Test Fighter' });
             expect(setRuntimeValue).toHaveBeenCalledWith('Test Fighter', 'psionicEnergy', 4, 'test-campaign');
             expect(result.payload.description).toContain('Dealt <strong>8</strong> Force damage to Target Goblin');
         });

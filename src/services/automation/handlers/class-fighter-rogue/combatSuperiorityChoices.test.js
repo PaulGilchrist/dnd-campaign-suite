@@ -168,10 +168,7 @@ describe('executeSweepingAttack', () => {
         expect(result.payload.name).toBe('Sweeping Attack');
         expect(result.payload.description).toContain('hits Skeleton');
         expect(result.payload.description).toContain('slashing');
-        expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-            expect.objectContaining({ creatures: [{ name: 'Skeleton', ac: 11 }] }),
-            'Skeleton', 4, ['slashing'], 'test-campaign', [], false, 'TestFighter'
-        );
+        expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.objectContaining({ creatures: [{ name: 'Skeleton', ac: 11 }] }), 'Skeleton', 4, ['slashing'], 'test-campaign', [], { ignoreResistance: false, attackerName: 'TestFighter' });
         expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'pendingSweepingAttack', null, 'test-campaign');
     });
 
@@ -232,16 +229,7 @@ describe('executeSweepingAttack', () => {
             'Ogre'
         );
 
-        expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-            expect.objectContaining({ creatures: [{ name: 'Ogre', ac: 11 }] }),
-            'Ogre',
-            6,
-            ['bludgeoning'],
-            'test-campaign',
-            [],
-            false,
-            'TestFighter'
-        );
+        expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.objectContaining({ creatures: [{ name: 'Ogre', ac: 11 }] }), 'Ogre', 6, ['bludgeoning'], 'test-campaign', [], { ignoreResistance: false, attackerName: 'TestFighter' });
         expect(result.payload.description).toContain('hits Ogre');
         expect(result.payload.description).toContain('2 bludgeoning damage');
     });

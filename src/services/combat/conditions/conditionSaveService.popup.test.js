@@ -13,7 +13,7 @@ import { buildConditionPopup } from './conditionSaveService.js';
 
 describe('buildConditionPopup', () => {
   it('returns a popup object with all expected fields', () => {
-    const popup = buildConditionPopup(15, 5, '+3 aura from Paladin', 'Wisdom', 'Charmed', 18, true);
+    const popup = buildConditionPopup({ roll: 15, bonus: 5, bonusDetail: '+3 aura from Paladin', abilityLabel: 'Wisdom', conditionLabel: 'Charmed', dc: 18, success: true });
 
     expect(popup).toEqual({
       type: 'd20',
@@ -32,24 +32,24 @@ describe('buildConditionPopup', () => {
   });
 
   it('handles failure, null/undefined bonusDetail, and negative bonus', () => {
-    let popup = buildConditionPopup(5, 2, undefined, 'Strength', 'Grappled', 14, false);
+    let popup = buildConditionPopup({ roll: 5, bonus: 2, bonusDetail: undefined, abilityLabel: 'Strength', conditionLabel: 'Grappled', dc: 14, success: false });
     expect(popup.success).toBe(false);
     expect(popup.rollType).toBe('condition-save');
     expect(popup.hit).toBeUndefined();
 
-    popup = buildConditionPopup(10, 0, null, 'Constitution', 'Paralyzed', 12, true);
+    popup = buildConditionPopup({ roll: 10, bonus: 0, bonusDetail: null, abilityLabel: 'Constitution', conditionLabel: 'Paralyzed', dc: 12, success: true });
     expect(popup.bonusDetail).toBeNull();
 
-    popup = buildConditionPopup(8, 3, undefined, 'Dexterity', 'Blinded', 11, false);
+    popup = buildConditionPopup({ roll: 8, bonus: 3, bonusDetail: undefined, abilityLabel: 'Dexterity', conditionLabel: 'Blinded', dc: 11, success: false });
     expect(popup.bonusDetail).toBeUndefined();
 
-    popup = buildConditionPopup(1, -3, 'detail', 'Charisma', 'Frightened', 5, false);
+    popup = buildConditionPopup({ roll: 1, bonus: -3, bonusDetail: 'detail', abilityLabel: 'Charisma', conditionLabel: 'Frightened', dc: 5, success: false });
     expect(popup.targetName).toBeNull();
     expect(popup.targetAc).toBeNull();
   });
 
   it('wraps the roll value in a rolls array', () => {
-    const popup = buildConditionPopup(7, 0, undefined, 'Wisdom', 'Cursed', 10, false);
+    const popup = buildConditionPopup({ roll: 7, bonus: 0, bonusDetail: undefined, abilityLabel: 'Wisdom', conditionLabel: 'Cursed', dc: 10, success: false });
     expect(Array.isArray(popup.rolls)).toBe(true);
     expect(popup.rolls).toEqual([7]);
   });

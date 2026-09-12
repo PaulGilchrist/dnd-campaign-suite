@@ -6,7 +6,7 @@ import { clearAllExpirationEffects } from '../../services/rules/effects/expirati
 import { clearHuntersMarkConcentration } from '../../services/rules/effects/restRules.js';
 import { maybeGrantThiefsReflexesSecondTurn } from '../../services/combat/thiefsReflexesService.js';
 
-export async function processInitiativeRoll(characterName, campaignName, context, bonus, effectiveD20Roll, r1, r2, setPopupHtml, availableSuperiorityManeuvers, cosmicOmenAppliedBonus, characters) {
+export async function processInitiativeRoll({ characterName, campaignName, context, bonus, effectiveD20Roll, r1, r2, setPopupHtml, availableSuperiorityManeuvers, cosmicOmenAppliedBonus, characters }) {
     const firstName = utils.getName(characterName);
     const tandemFtBonus = Number(getRuntimeValue(firstName, 'tandemFootworkBonus', campaignName) ?? 0);
     if (tandemFtBonus > 0) {

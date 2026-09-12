@@ -41,21 +41,27 @@ function applyNaturalRecoverySelections(playerStats, campaignName, naturalRecove
     }
 }
 
+function findClassLevel(playerStats) {
+    return (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+}
+
+function collectFighterResourceLabel(playerStats, campaignName, restoredResources) {
+    const maxSW = findClassLevel(playerStats)?.second_wind || 0;
+    const currentSW = Number(getRuntimeValue(playerStats.name, 'secondWindUses', campaignName) ?? 0);
+    if (currentSW < maxSW) restoredResources.push('Second Wind');
+}
+
+function collectBarbarianRageLabel(playerStats, campaignName, restoredResources) {
+    const maxRage = findClassLevel(playerStats)?.rages || 0;
+    const storedRage = getRuntimeValue(playerStats.name, 'ragePoints', campaignName);
+    const trackedRage = playerStats._trackedResources?.ragePoints;
+    const currentRage = storedRage != null ? Number(storedRage) : (trackedRage?.current ?? maxRage);
+    if (currentRage < maxRage) restoredResources.push('Rage (2024)');
+}
+
 function collectClassResourceLabels(playerStats, campaignName, restoredResources) {
-    if (playerStats.class?.name === 'Fighter') {
-        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-        const maxSW = classLevel?.second_wind || 0;
-        const currentSW = Number(getRuntimeValue(playerStats.name, 'secondWindUses', campaignName) ?? 0);
-        if (currentSW < maxSW) restoredResources.push('Second Wind');
-    }
-    if (playerStats.class?.name === 'Barbarian' && playerStats.rules === '2024') {
-        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-        const maxRage = classLevel?.rages || 0;
-        const storedRage = getRuntimeValue(playerStats.name, 'ragePoints', campaignName);
-        const trackedRage = playerStats._trackedResources?.ragePoints;
-        const currentRage = storedRage != null ? Number(storedRage) : (trackedRage?.current ?? maxRage);
-        if (currentRage < maxRage) restoredResources.push('Rage (2024)');
-    }
+    if (playerStats.class?.name === 'Fighter') collectFighterResourceLabel(playerStats, campaignName, restoredResources);
+    if (playerStats.class?.name === 'Barbarian' && playerStats.rules === '2024') collectBarbarianRageLabel(playerStats, campaignName, restoredResources);
 }
 
 function isCelestialPatron(playerStats) {

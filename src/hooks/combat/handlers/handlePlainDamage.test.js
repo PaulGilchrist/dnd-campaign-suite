@@ -154,23 +154,10 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.any(Object),
-                'Goblin',
-                8,
-                ['slashing'],
-                'test-campaign',
-                expect.any(Array),
-                false,
-                'TestFighter',
-                true,
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 8, ['slashing'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestFighter', suppressHpLog: true },);
             expect(deps.logEntry).toHaveBeenCalled();
             const logCall = deps.logEntry.mock.calls[0][0];
             expect(logCall.type).toBe('roll');
@@ -199,10 +186,7 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith(
                 'TestFighter',
@@ -218,10 +202,7 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const popupCall = deps.setPopupHtml.mock.calls.find(
                 (call) => typeof call[0] === 'object' && call[0]?.type === 'damage'
@@ -248,10 +229,7 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const hpChangeCalls = addEntry.mock.calls.filter(
                 (call) => call[1]?.type === 'hp_change'
@@ -297,10 +275,7 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 4, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 6, [3, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 6, [3, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const hpChangeCalls = addEntry.mock.calls.filter(
                 (call) => call[1]?.type === 'hp_change'
@@ -319,10 +294,7 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 0, damageReduced: true });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 6, [3, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 6, [3, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const hpChangeCalls = addEntry.mock.calls.filter(
                 (call) => call[1]?.type === 'hp_change'
@@ -338,10 +310,7 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 3, newHp: 10, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 3, [3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 3, [3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const hpChangeCalls = addEntry.mock.calls.filter(
                 (call) => call[1]?.type === 'hp_change'
@@ -359,11 +328,7 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-                isAutoCrit: true,
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', isAutoCrit: true, });
 
             expect(deps.logEntry).toHaveBeenCalled();
             const logCall = deps.logEntry.mock.calls[0][0];
@@ -379,10 +344,7 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const logCall = deps.logEntry.mock.calls[0][0];
             expect(logCall.isCrit).toBe(false);
@@ -400,12 +362,7 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-                attackerName: 'TestFighter',
-                attackName: 'Longsword',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', attackerName: 'TestFighter', attackName: 'Longsword', });
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'campaign',
@@ -436,12 +393,7 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-                attackerName: 'TestFighter',
-                attackName: 'Longsword',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', attackerName: 'TestFighter', attackName: 'Longsword', });
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'campaign',
@@ -465,10 +417,7 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, null, 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, null, 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const lastAttackCalls = setRuntimeValue.mock.calls.filter(
                 (call) => call[1] === 'lastAttack'
@@ -485,9 +434,7 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', });
 
             const lastAttackCalls = setRuntimeValue.mock.calls.filter(
                 (call) => call[1] === 'lastAttack'
@@ -505,11 +452,7 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Unarmed Strike', '1d4', 4, [4], 0, {
-                targetName: 'Goblin',
-                damageType: 'bludgeoning',
-                isUnarmedStrike: true,
-            });
+            await fn('Unarmed Strike', '1d4', 4, [4], 0, { targetName: 'Goblin', damageType: 'bludgeoning', isUnarmedStrike: true, });
 
             const popupCall = deps.setPopupHtml.mock.calls.find(
                 (call) => typeof call[0] === 'object' && call[0]?.type === 'damage'
@@ -525,10 +468,7 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const popupCall = deps.setPopupHtml.mock.calls.find(
                 (call) => typeof call[0] === 'object' && call[0]?.type === 'damage'
@@ -544,11 +484,7 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
-                targetName: 'Goblin',
-                damageType: 'fire',
-                isMelee: false,
-            });
+            await fn('Fire Bolt', '1d10', 8, [8], 0, { targetName: 'Goblin', damageType: 'fire', isMelee: false, });
 
             const popupCall = deps.setPopupHtml.mock.calls.find(
                 (call) => typeof call[0] === 'object' && call[0]?.type === 'damage'
@@ -574,10 +510,7 @@ describe('Plain damage core flow', () => {
             });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const popupCall = deps.setPopupHtml.mock.calls.find(
                 (call) => typeof call[0] === 'object' && call[0]?.type === 'damage'
@@ -600,10 +533,7 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 3, newHp: 10, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             expect(deps.logEntry).toHaveBeenCalled();
             const logCall = deps.logEntry.mock.calls[0][0];
@@ -619,10 +549,7 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const logCall = deps.logEntry.mock.calls[0][0];
             expect(logCall.rayOfEnfeebleReduction).toBe(0);
@@ -639,13 +566,7 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-                dc: 15,
-                dcType: 'strength',
-                dcSuccess: false,
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', dc: 15, dcType: 'strength', dcSuccess: false, });
 
             const popupCall = deps.setPopupHtml.mock.calls.find(
                 (call) => typeof call[0] === 'object' && call[0]?.type === 'damage'
@@ -666,11 +587,7 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
-                targetName: 'Goblin',
-                damageType: 'fire',
-                spellName: 'Fire Bolt',
-            });
+            await fn('Fire Bolt', '1d10', 8, [8], 0, { targetName: 'Goblin', damageType: 'fire', spellName: 'Fire Bolt', });
 
             const popupCall = deps.setPopupHtml.mock.calls.find(
                 (call) => typeof call[0] === 'object' && call[0]?.type === 'damage'
@@ -686,10 +603,7 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const popupCall = deps.setPopupHtml.mock.calls.find(
                 (call) => typeof call[0] === 'object' && call[0]?.type === 'damage'
@@ -707,11 +621,7 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-                tavernBrawlerRerolls: [1, 2],
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', tavernBrawlerRerolls: [1, 2], });
 
             const popupCall = deps.setPopupHtml.mock.calls.find(
                 (call) => typeof call[0] === 'object' && call[0]?.type === 'damage'
@@ -727,10 +637,7 @@ describe('Plain damage core flow', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const popupCall = deps.setPopupHtml.mock.calls.find(
                 (call) => typeof call[0] === 'object' && call[0]?.type === 'damage'

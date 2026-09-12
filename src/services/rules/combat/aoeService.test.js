@@ -185,19 +185,13 @@ describe('processAoeNpcs', () => {
   });
 
   it('returns empty array for no affected creatures', () => {
-    const result = processAoeNpcs(
-      makeCombatSummary([]), [], 6, 'Fire', 15, 'dexterity', 'half',
-      'TestCampaign', 'TestHero'
-    );
+    const result = processAoeNpcs({ combatSummary: makeCombatSummary([]), affected: [], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
     expect(result).toEqual([]);
   });
 
   it('skips player creatures in affected list', () => {
     const player = createPlayerCreature('Hero');
-    const result = processAoeNpcs(
-      makeCombatSummary([player]), [{ creature: player }],
-      6, 'Fire', 15, 'dexterity', 'half', 'TestCampaign', 'TestHero'
-    );
+    const result = processAoeNpcs({ combatSummary: makeCombatSummary([player]), affected: [{ creature: player }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
     expect(result).toEqual([]);
     expect(rollSaveForCreature).not.toHaveBeenCalled();
   });
@@ -208,10 +202,7 @@ describe('processAoeNpcs', () => {
     computeDamageAfterEvasion.mockReturnValue(3);
     applyDamageToTarget.mockReturnValue({ finalDamage: 3, newHp: 17, damageReduced: false });
 
-    const result = processAoeNpcs(
-      makeCombatSummary([npc]), [{ creature: npc }],
-      6, 'Fire', 15, 'dexterity', 'half', 'TestCampaign', 'TestHero'
-    );
+    const result = processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
 
     expect(result).toEqual([
       {
@@ -233,10 +224,7 @@ describe('processAoeNpcs', () => {
     computeDamageAfterEvasion.mockReturnValue(6);
     applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 14, damageReduced: true });
 
-    const result = processAoeNpcs(
-      makeCombatSummary([npc]), [{ creature: npc }],
-      6, 'Fire', 15, 'constitution', 'half', 'TestCampaign'
-    );
+    const result = processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'constitution', dcSuccess: 'half', campaignName: 'TestCampaign' });
 
     expect(result[0].saveSuccess).toBe(false);
     expect(result[0].finalDamage).toBe(6);
@@ -249,10 +237,7 @@ describe('processAoeNpcs', () => {
     computeDamageAfterEvasion.mockReturnValue(4);
     applyDamageToTarget.mockReturnValue({ finalDamage: 4, newHp: 16 });
 
-    processAoeNpcs(
-      makeCombatSummary([npc]), [{ creature: npc }],
-      8, 'Fire', 15, 'dexterity', 'half', 'TestCampaign'
-    );
+    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 8, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign' });
     expect(computeDamageAfterEvasion).toHaveBeenCalledWith(8, true, 'half', false);
 
     npc = createNpcCreature('Goblin2');
@@ -260,10 +245,7 @@ describe('processAoeNpcs', () => {
     computeDamageAfterEvasion.mockReturnValue(0);
     applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 20 });
 
-    processAoeNpcs(
-      makeCombatSummary([npc]), [{ creature: npc }],
-      10, 'Fire', 15, 'dexterity', 'none', 'TestCampaign'
-    );
+    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 10, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'none', campaignName: 'TestCampaign' });
     expect(computeDamageAfterEvasion).toHaveBeenCalledWith(10, true, 'none', false);
   });
 
@@ -281,10 +263,7 @@ describe('processAoeNpcs', () => {
       .mockReturnValueOnce({ finalDamage: 3, newHp: 17, damageReduced: true })
       .mockReturnValueOnce({ finalDamage: 8, newHp: 7 });
 
-    const result = processAoeNpcs(
-      makeCombatSummary([npc1, npc2]), [{ creature: npc1 }, { creature: npc2 }],
-      6, 'Cold', 14, 'wisdom', 'none', 'TestCampaign'
-    );
+    const result = processAoeNpcs({ combatSummary: makeCombatSummary([npc1, npc2]), affected: [{ creature: npc1 }, { creature: npc2 }], rawDamage: 6, damageType: 'Cold', saveDc: 14, saveType: 'wisdom', dcSuccess: 'none', campaignName: 'TestCampaign' });
 
     expect(result).toHaveLength(2);
     expect(result[0].creatureName).toBe('Goblin 1');
@@ -299,14 +278,9 @@ describe('processAoeNpcs', () => {
     computeDamageAfterEvasion.mockReturnValue(5);
     applyDamageToTarget.mockReturnValue({ finalDamage: 5, newHp: 15 });
 
-    processAoeNpcs(
-      makeCombatSummary([npc]), [{ creature: npc }],
-      5, 'Acid', 13, 'strength', 'half', 'MyCampaign', 'TestHero', ['char1', 'char2']
-    );
+    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 5, damageType: 'Acid', saveDc: 13, saveType: 'strength', dcSuccess: 'half', campaignName: 'MyCampaign', attackerName: 'TestHero', characters: ['char1', 'char2'] });
 
-    expect(applyDamageToTarget).toHaveBeenCalledWith(
-      expect.any(Object), 'Troll', 5, ['Acid'], 'MyCampaign', ['char1', 'char2'], false, 'TestHero'
-    );
+    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Troll', 5, ['Acid'], 'MyCampaign', ['char1', 'char2'], { ignoreResistance: false, attackerName: 'TestHero' });
   });
 
   it('uses finalDamage from applyDamageToTarget when it differs from computeDamageAfterEvasion', () => {
@@ -315,10 +289,7 @@ describe('processAoeNpcs', () => {
     computeDamageAfterEvasion.mockReturnValue(5);
     applyDamageToTarget.mockReturnValue({ finalDamage: 2, newHp: 18 });
 
-    const result = processAoeNpcs(
-      makeCombatSummary([npc]), [{ creature: npc }],
-      10, 'Fire', 15, 'dexterity', 'half', 'TestCampaign'
-    );
+    const result = processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 10, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign' });
 
     expect(result[0].finalDamage).toBe(2);
   });
@@ -329,10 +300,7 @@ describe('processAoeNpcs', () => {
     computeDamageAfterEvasion.mockReturnValue(0);
     applyDamageToTarget.mockReturnValue(null);
 
-    const result = processAoeNpcs(
-      makeCombatSummary([npc]), [{ creature: npc }],
-      10, 'Bludgeoning', 20, 'constitution', 'half', 'TestCampaign'
-    );
+    const result = processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 10, damageType: 'Bludgeoning', saveDc: 20, saveType: 'constitution', dcSuccess: 'half', campaignName: 'TestCampaign' });
 
     expect(result[0].finalDamage).toBe(0);
   });
@@ -344,10 +312,7 @@ describe('processAoeNpcs', () => {
     computeDamageAfterEvasion.mockReturnValue(6);
     applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 14 });
 
-    processAoeNpcs(
-      makeCombatSummary([npc]), [{ creature: npc }],
-      6, 'Fire', 15, 'dexterity', 'half', 'TestCampaign', 'TestHero'
-    );
+    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
 
     expect(rollSaveForCreature).toHaveBeenCalledWith(npc, 'dexterity', 15, false, false);
   });
@@ -359,10 +324,7 @@ describe('processAoeNpcs', () => {
     computeDamageAfterEvasion.mockReturnValue(4);
     applyDamageToTarget.mockReturnValue({ finalDamage: 4, newHp: 16 });
 
-    const result = processAoeNpcs(
-      makeCombatSummary([npc, player]), [{ creature: npc }, { creature: player }],
-      4, 'Fire', 12, 'dexterity', 'half', 'TestCampaign'
-    );
+    const result = processAoeNpcs({ combatSummary: makeCombatSummary([npc, player]), affected: [{ creature: npc }, { creature: player }], rawDamage: 4, damageType: 'Fire', saveDc: 12, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign' });
 
     expect(result).toHaveLength(1);
     expect(result[0].creatureName).toBe('Goblin');
@@ -376,10 +338,7 @@ describe('processAoeNpcs', () => {
     computeDamageAfterEvasion.mockReturnValue(0);
     applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 20 });
 
-    const result = processAoeNpcs(
-      makeCombatSummary([npc]), [{ creature: npc }],
-      6, 'Fire', 15, 'dexterity', 'half', 'TestCampaign', 'Nemesis'
-    );
+    const result = processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'Nemesis' });
 
     expect(result[0].soulstitchProtected).toBe(true);
     expect(result[0].saveSuccess).toBe(true);
@@ -394,10 +353,7 @@ describe('processAoeNpcs', () => {
     computeDamageAfterEvasion.mockReturnValue(6);
     applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 14 });
 
-    const result = processAoeNpcs(
-      makeCombatSummary([npc]), [{ creature: npc }],
-      6, 'Fire', 15, 'dexterity', 'half', 'TestCampaign', 'Nemesis'
-    );
+    const result = processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'Nemesis' });
 
     expect(result[0].soulstitchProtected).toBe(false);
   });
@@ -414,10 +370,7 @@ describe('processAoeNpcs', () => {
     computeDamageAfterEvasion.mockReturnValue(6);
     applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 14 });
 
-    processAoeNpcs(
-      makeCombatSummary([npc]), [{ creature: npc }],
-      6, 'Fire', 15, 'dexterity', 'half', 'TestCampaign', 'TestHero'
-    );
+    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
 
     expect(rollSaveForCreature).toHaveBeenCalledWith(npc, 'dexterity', 15, true, false);
   });
@@ -430,10 +383,7 @@ describe('processAoeNpcs', () => {
     computeDamageAfterEvasion.mockReturnValue(0);
     applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 20 });
 
-    processAoeNpcs(
-      makeCombatSummary([npc]), [{ creature: npc }],
-      6, 'Fire', 15, 'dexterity', 'half', 'TestCampaign', 'TestHero'
-    );
+    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
 
     expect(computeDamageAfterEvasion).toHaveBeenCalledWith(6, true, 'half', true);
     expect(hasEvasionForSave).toHaveBeenCalledWith([{ saveType: 'DEX' }], 'dexterity');
@@ -445,10 +395,7 @@ describe('processAoeNpcs', () => {
     computeDamageAfterEvasion.mockReturnValue(3);
     applyDamageToTarget.mockReturnValue({ finalDamage: 3, newHp: 17 });
 
-    processAoeNpcs(
-      makeCombatSummary([npc]), [{ creature: npc }],
-      6, 'Fire', 15, 'dexterity', 'half', 'TestCampaign', 'TestHero'
-    );
+    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
 
     expect(computeDamageAfterEvasion).toHaveBeenCalledWith(6, true, 'half', false);
   });
@@ -460,10 +407,7 @@ describe('processAoeNpcs', () => {
     computeDamageAfterEvasion.mockReturnValue(3);
     applyDamageToTarget.mockReturnValue({ finalDamage: 3, newHp: 17 });
 
-    processAoeNpcs(
-      makeCombatSummary([npc]), [{ creature: npc }],
-      6, 'Fire', 15, 'dexterity', 'half', 'TestCampaign', 'TestHero'
-    );
+    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
 
     expect(computeDamageAfterEvasion).toHaveBeenCalledWith(6, true, 'half', false);
   });
@@ -480,10 +424,7 @@ describe('processAoeNpcs', () => {
     computeDamageAfterEvasion.mockReturnValue(6);
     applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 14 });
 
-    processAoeNpcs(
-      makeCombatSummary([npc]), [{ creature: npc }],
-      6, 'Fire', 15, 'dexterity', 'half', 'TestCampaign', 'TestHero'
-    );
+    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
 
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'campaign', 'targetEffects', [], 'TestCampaign'
@@ -499,17 +440,19 @@ describe('sendAoePlayerSaves', () => {
   });
 
   it('returns empty array for no affected creatures', () => {
-    const result = sendAoePlayerSaves(
-      [], 5, 'Fire', 15, 'dexterity', 'half', 'TestCampaign', '', '', [], ''
-    );
+    const result = sendAoePlayerSaves({
+      affected: [], rawDamage: 5, damageType: 'Fire', saveDc: 15, saveType: 'dexterity',
+      dcSuccess: 'half', campaignName: 'TestCampaign', spellName: '', attackerName: '', formula: '',
+    });
     expect(result).toEqual([]);
   });
 
   it('skips NPC creatures and returns empty array', () => {
     const npc = createNpcCreature('Goblin');
-    const result = sendAoePlayerSaves(
-      [{ creature: npc }], 5, 'Fire', 15, 'dexterity', 'half', 'TestCampaign', '', '', [], ''
-    );
+    const result = sendAoePlayerSaves({
+      affected: [{ creature: npc }], rawDamage: 5, damageType: 'Fire', saveDc: 15, saveType: 'dexterity',
+      dcSuccess: 'half', campaignName: 'TestCampaign', spellName: '', attackerName: '', formula: '',
+    });
     expect(result).toEqual([]);
     expect(sendSavePrompt).not.toHaveBeenCalled();
   });
@@ -518,10 +461,10 @@ describe('sendAoePlayerSaves', () => {
     const player = createPlayerCreature('Hero');
     utils.guid.mockReturnValue('guid-abc');
 
-    const results = sendAoePlayerSaves(
-      [{ creature: player }], 8, 'Fire', 15, 'dexterity', 'half',
-      'TestCampaign', 'Fireball', 'Wizard', [], '3d6'
-    );
+    const results = sendAoePlayerSaves({
+      affected: [{ creature: player }], rawDamage: 8, damageType: 'Fire', saveDc: 15, saveType: 'dexterity',
+      dcSuccess: 'half', campaignName: 'TestCampaign', spellName: 'Fireball', attackerName: 'Wizard', formula: '3d6',
+    });
 
     expect(results).toHaveLength(1);
     expect(results[0].targetName).toBe('Hero');
@@ -550,10 +493,10 @@ describe('sendAoePlayerSaves', () => {
       .mockReturnValueOnce('guid-1')
       .mockReturnValueOnce('guid-2');
 
-    let results = sendAoePlayerSaves(
-      [{ creature: hero }, { creature: ranger }], 5, 'Fire', 15, 'dexterity', 'half',
-      'TestCampaign', 'Fireball', 'Wizard', [], '4d6'
-    );
+    let results = sendAoePlayerSaves({
+      affected: [{ creature: hero }, { creature: ranger }], rawDamage: 5, damageType: 'Fire', saveDc: 15, saveType: 'dexterity',
+      dcSuccess: 'half', campaignName: 'TestCampaign', spellName: 'Fireball', attackerName: 'Wizard', formula: '4d6',
+    });
     expect(results).toHaveLength(2);
     expect(results[0].targetName).toBe('Hero');
     expect(results[0].creature).toBe(hero);
@@ -561,14 +504,14 @@ describe('sendAoePlayerSaves', () => {
     expect(results[1].creature).toBe(ranger);
 
     sendSavePrompt.mockClear();
-    sendAoePlayerSaves(
-      [
+    sendAoePlayerSaves({
+      affected: [
         { creature: createPlayerCreature('Hero') },
         { creature: createPlayerCreature('Ranger') },
         { creature: createPlayerCreature('Cleric') },
-      ], 10, 'Thunder', 15, 'strength', 'none',
-      'MyCampaign', 'Thunderstorm', 'Druid', [], '8d6'
-    );
+      ], rawDamage: 10, damageType: 'Thunder', saveDc: 15, saveType: 'strength',
+      dcSuccess: 'none', campaignName: 'MyCampaign', spellName: 'Thunderstorm', attackerName: 'Druid', formula: '8d6',
+    });
     expect(sendSavePrompt).toHaveBeenCalledTimes(3);
 
     utils.guid.mockClear();
@@ -576,27 +519,27 @@ describe('sendAoePlayerSaves', () => {
       .mockReturnValueOnce('id-a')
       .mockReturnValueOnce('id-b');
 
-    results = sendAoePlayerSaves(
-      [
+    results = sendAoePlayerSaves({
+      affected: [
         { creature: createPlayerCreature('Player1') },
         { creature: createPlayerCreature('Player2') },
-      ], 5, 'Fire', 10, 'dexterity', 'half',
-      'TestCampaign', 'Burning Hands', 'Wizard', [], '4d6'
-    );
+      ], rawDamage: 5, damageType: 'Fire', saveDc: 10, saveType: 'dexterity',
+      dcSuccess: 'half', campaignName: 'TestCampaign', spellName: 'Burning Hands', attackerName: 'Wizard', formula: '4d6',
+    });
     expect(results[0].promptId).toBe('id-a');
     expect(results[1].promptId).toBe('id-b');
     expect(utils.guid).toHaveBeenCalledTimes(2);
   });
 
   it('handles mixed players and NPCs — only sends prompts for players', () => {
-    const results = sendAoePlayerSaves(
-      [
+    const results = sendAoePlayerSaves({
+      affected: [
         { creature: createNpcCreature('Goblin') },
         { creature: createPlayerCreature('Hero') },
         { creature: createNpcCreature('Orc') },
-      ], 5, 'Fire', 12, 'dexterity', 'half',
-      'TestCampaign', 'Burning Hands', null, [], ''
-    );
+      ], rawDamage: 5, damageType: 'Fire', saveDc: 12, saveType: 'dexterity',
+      dcSuccess: 'half', campaignName: 'TestCampaign', spellName: 'Burning Hands', attackerName: null, formula: '',
+    });
 
     expect(results).toHaveLength(1);
     expect(sendSavePrompt).toHaveBeenCalledTimes(1);
@@ -605,10 +548,10 @@ describe('sendAoePlayerSaves', () => {
   it('passes all params correctly to sendSavePrompt', () => {
     utils.guid.mockReturnValue('guid-target');
 
-    sendAoePlayerSaves(
-      [{ creature: createPlayerCreature('Target') }], 7, 'Radiant', 16, 'wisdom', 'half',
-      'CampaignX', 'Guiding Bolt', 'Cleric', [4, 3, 5], '4d8'
-    );
+    sendAoePlayerSaves({
+      affected: [{ creature: createPlayerCreature('Target') }], rawDamage: 7, damageType: 'Radiant', saveDc: 16, saveType: 'wisdom',
+      dcSuccess: 'half', campaignName: 'CampaignX', spellName: 'Guiding Bolt', attackerName: 'Cleric', formula: '4d8',
+    });
 
     expect(sendSavePrompt).toHaveBeenCalledWith('CampaignX', {
       promptId: 'guid-target',
@@ -634,10 +577,10 @@ describe('sendAoePlayerSaves', () => {
       return null;
     });
 
-    sendAoePlayerSaves(
-      [{ creature: createPlayerCreature('Hero') }], 8, 'Fire', 15, 'dexterity', 'half',
-      'TestCampaign', 'Fireball', 'Wizard', [], '8d6'
-    );
+    sendAoePlayerSaves({
+      affected: [{ creature: createPlayerCreature('Hero') }], rawDamage: 8, damageType: 'Fire', saveDc: 15, saveType: 'dexterity',
+      dcSuccess: 'half', campaignName: 'TestCampaign', spellName: 'Fireball', attackerName: 'Wizard', formula: '8d6',
+    });
 
     expect(sendSavePrompt).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
       targetName: 'Hero',

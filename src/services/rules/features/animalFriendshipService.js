@@ -30,6 +30,23 @@ async function isTargetBeast(targetName, campaignName) {
     return false;
 }
 
+async function collectBeastTargetNames(campaignName) {
+    const cs = await getCombatContext(campaignName);
+    if (!cs?.creatures || cs.creatures.length === 0) return [];
+    const beasts = [];
+    for (const creature of cs.creatures) {
+        const isBeast = await isTargetBeast(creature.name, campaignName);
+        if (isBeast) {
+            beasts.push(creature.name);
+        }
+    }
+    return beasts;
+}
+
+function resolveSpellSaveDc(metaCtx, playerStats) {
+    return metaCtx?.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
+}
+
 export async function triggerAnimalFriendship(spell, metaCtx, playerStats, campaignName, mapName) {
     const isAnimalFriendship = (spell.name || '').toLowerCase() === 'animal friendship';
     if (!isAnimalFriendship) return null;
@@ -37,24 +54,14 @@ export async function triggerAnimalFriendship(spell, metaCtx, playerStats, campa
     let targetNames = metaCtx?.targetNames;
 
     if (!targetNames || targetNames.length === 0) {
-        const cs = await getCombatContext(campaignName);
-        if (cs?.creatures && cs.creatures.length > 0) {
-            const beasts = [];
-            for (const creature of cs.creatures) {
-                const isBeast = await isTargetBeast(creature.name, campaignName);
-                if (isBeast) {
-                    beasts.push(creature.name);
-                }
-            }
-            targetNames = beasts;
-        }
+        targetNames = await collectBeastTargetNames(campaignName);
     }
 
     if (!targetNames || targetNames.length === 0) {
         return { type: 'popup', payload: { type: 'automation_info', name: 'Animal Friendship', description: 'No Beast targets available for Animal Friendship.' } };
     }
 
-    const spellSaveDc = metaCtx?.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
+    const spellSaveDc = resolveSpellSaveDc(metaCtx, playerStats);
     const slotLevel = metaCtx?.slotLevel || spell.level || 1;
 
     const action = {

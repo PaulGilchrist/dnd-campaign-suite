@@ -249,7 +249,7 @@ function rollSearingDamage(automation, playerStats) {
 }
 
 async function applySearingVengeanceToCreature(cs, { creatureName, damageAmount, damageResult, damageExpr, campaignName, characters, playerName, name, automation }) {
-    applyDamageToTarget(cs, creatureName, damageAmount, ['Radiant'], campaignName, characters || [], false, playerName);
+    applyDamageToTarget(cs, creatureName, damageAmount, ['Radiant'], campaignName, characters || [], { ignoreResistance: false, attackerName: playerName });
 
     const storedConditions = getRuntimeValue(creatureName, 'activeConditions', campaignName) || [];
     const conditions = Array.isArray(storedConditions) ? storedConditions : [];

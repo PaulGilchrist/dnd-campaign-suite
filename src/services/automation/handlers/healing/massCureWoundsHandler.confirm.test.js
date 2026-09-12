@@ -114,17 +114,17 @@ describe('confirmMassCureWounds', () => {
 
   describe('basic healing', () => {
     it('heals each target up to max HP', async () => {
-      const result = await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter', 'Rogue'],
-        '3d8 + 3',
-        false,
-        0,
-        [],
-        5,
-      );
+      const result = await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter', 'Rogue'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('heal_multi');
@@ -141,17 +141,17 @@ describe('confirmMassCureWounds', () => {
         return null;
       });
 
-      const result = await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '3d8 + 3',
-        false,
-        0,
-        [],
-        5,
-      );
+      const result = await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
 
       expect(result.payload.results[0].healAmount).toBeLessThanOrEqual(1);
     });
@@ -166,17 +166,17 @@ describe('confirmMassCureWounds', () => {
         ...makeAction(),
         automation: { type: 'mass_cure_wounds', maxTargets: 2 },
       };
-      const result = await confirmMassCureWounds(
-        action,
-        makePlayerStats(),
-        campaignName,
-        ['Fighter', 'Rogue', 'Barbarian'],
-        '3d8 + 3',
-        false,
-        0,
-        [],
-        5,
-      );
+      const result = await confirmMassCureWounds({
+          action,
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter', 'Rogue', 'Barbarian'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
 
       expect(result.payload.results).toHaveLength(2);
       expect(result.payload.results[0].targetName).toBe('Fighter');
@@ -184,17 +184,17 @@ describe('confirmMassCureWounds', () => {
     });
 
     it('uses player name as sourceName in log entries', async () => {
-      await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '3d8 + 3',
-        false,
-        0,
-        [],
-        5,
-      );
+      await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
 
       expect(addEntry).toHaveBeenCalledWith(
         campaignName,
@@ -212,17 +212,17 @@ describe('confirmMassCureWounds', () => {
       const bonusDetails = [{ name: 'Disciple of Life', amount: 5 }];
       resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 5, details: bonusDetails });
 
-      await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '3d8 + 3',
-        false,
-        5,
-        bonusDetails,
-        5,
-      );
+      await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 5,
+          bonusDetails,
+          slotLevel: 5,
+      });
 
       const logEntry = addEntry.mock.calls[0][1];
       expect(logEntry.formula).toContain('Disciple of Life');
@@ -230,17 +230,17 @@ describe('confirmMassCureWounds', () => {
     });
 
     it('logs hp_change for each target', async () => {
-      await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter', 'Rogue', 'Barbarian'],
-        '3d8 + 3',
-        false,
-        0,
-        [],
-        5,
-      );
+      await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter', 'Rogue', 'Barbarian'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
 
       const hpLogs = addEntry.mock.calls.filter((call) => call[1].type === 'hp_change');
       expect(hpLogs).toHaveLength(3);
@@ -249,17 +249,17 @@ describe('confirmMassCureWounds', () => {
     it('applies healing via applyHealingToTarget for each target', async () => {
       applyHealingToTarget.mockReturnValue({ actualHeal: 18, oldHp: 20, newHp: 38 });
 
-      await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter', 'Rogue'],
-        '3d8 + 3',
-        false,
-        0,
-        [],
-        5,
-      );
+      await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter', 'Rogue'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
 
       expect(applyHealingToTarget).toHaveBeenCalledWith(
         expect.any(Object),
@@ -284,17 +284,17 @@ describe('confirmMassCureWounds', () => {
         return null;
       });
 
-      await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter', 'Rogue'],
-        '3d8 + 3',
-        false,
-        0,
-        [],
-        5,
-      );
+      await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter', 'Rogue'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
 
       // Fighter should not receive healing (already at max HP)
       const fighterCalls = applyHealingToTarget.mock.calls.filter(
@@ -308,17 +308,17 @@ describe('confirmMassCureWounds', () => {
       const mockDispatch = vi.fn();
       window.dispatchEvent = mockDispatch;
 
-      await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '3d8 + 3',
-        false,
-        0,
-        [],
-        5,
-      );
+      await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
 
       expect(mockDispatch).toHaveBeenCalled();
       expect(mockDispatch.mock.calls[0][0].type).toBe('combat-summary-updated');
@@ -331,17 +331,17 @@ describe('confirmMassCureWounds', () => {
 
   describe('maximization behavior', () => {
     it('uses rollExpressionMaximized when maximize is true', async () => {
-      await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '3d8 + 3',
-        true, // maximize
-        0,
-        [],
-        5,
-      );
+      await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '3d8 + 3',
+          maximize: true,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
 
       expect(rollExpressionMaximized).toHaveBeenCalledWith('3d8 + 3');
       expect(rollExpression).not.toHaveBeenCalled();
@@ -350,34 +350,34 @@ describe('confirmMassCureWounds', () => {
     it('uses rollExpressionMaximized when hasHealingMaximizationForTarget is true', async () => {
       hasHealingMaximizationForTarget.mockReturnValue(true);
 
-      await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '3d8 + 3',
-        false,
-        0,
-        [],
-        5,
-      );
+      await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
 
       expect(rollExpressionMaximized).toHaveBeenCalledWith('3d8 + 3');
       expect(rollExpression).not.toHaveBeenCalled();
     });
 
     it('uses normal rollExpression when neither maximization flag is set', async () => {
-      await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '3d8 + 3',
-        false,
-        0,
-        [],
-        5,
-      );
+      await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
 
       expect(rollExpression).toHaveBeenCalledWith('3d8 + 3');
       expect(rollExpressionMaximized).not.toHaveBeenCalled();
@@ -393,17 +393,17 @@ describe('confirmMassCureWounds', () => {
       const rollResult = { total: 18, rolls: [6, 7, 5] };
       rollExpression.mockReturnValue(rollResult);
 
-      await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '3d8 + 3',
-        false,
-        bonusHeal,
-        bonusDetails,
-        5,
-      );
+      await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal,
+          bonusDetails,
+          slotLevel: 5,
+      });
 
       // totalHeal = rollResult.total (18) + bonusHeal (5) = 23
       expect(applyHealingToTarget).toHaveBeenCalledWith(
@@ -418,34 +418,34 @@ describe('confirmMassCureWounds', () => {
       const bonusHeal = 5;
       const bonusDetails = [{ name: 'Disciple of Life', amount: 5 }];
 
-      const result = await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '3d8 + 3',
-        false,
-        bonusHeal,
-        bonusDetails,
-        5,
-      );
+      const result = await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal,
+          bonusDetails,
+          slotLevel: 5,
+      });
 
       expect(result.payload.bonusHeal).toBe(5);
       expect(result.payload.bonusHealDetail).toContain('Disciple of Life');
     });
 
     it('returns empty bonusHealDetail when no bonus details', async () => {
-      const result = await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '3d8 + 3',
-        false,
-        0,
-        [],
-        5,
-      );
+      const result = await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
 
       expect(result.payload.bonusHealDetail).toBe('');
     });
@@ -457,17 +457,17 @@ describe('confirmMassCureWounds', () => {
     it('calls markFortifiedHealthUsed when healing occurred and Fortified Health bonus is present', async () => {
       const bonusDetails = [{ name: 'Fortified Health', amount: 5 }];
 
-      await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '3d8 + 3',
-        false,
-        5,
-        bonusDetails,
-        5,
-      );
+      await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 5,
+          bonusDetails,
+          slotLevel: 5,
+      });
 
       expect(markFortifiedHealthUsed).toHaveBeenCalledWith(
         makePlayerStats(),
@@ -484,17 +484,17 @@ describe('confirmMassCureWounds', () => {
         return null;
       });
 
-      await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '3d8 + 3',
-        false,
-        5,
-        bonusDetails,
-        5,
-      );
+      await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 5,
+          bonusDetails,
+          slotLevel: 5,
+      });
 
       expect(markFortifiedHealthUsed).not.toHaveBeenCalled();
     });
@@ -502,17 +502,17 @@ describe('confirmMassCureWounds', () => {
     it('does not call markFortifiedHealthUsed when bonus is not Fortified Health', async () => {
       const bonusDetails = [{ name: 'Disciple of Life', amount: 5 }];
 
-      await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '3d8 + 3',
-        false,
-        5,
-        bonusDetails,
-        5,
-      );
+      await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 5,
+          bonusDetails,
+          slotLevel: 5,
+      });
 
       expect(markFortifiedHealthUsed).not.toHaveBeenCalled();
     });
@@ -522,17 +522,17 @@ describe('confirmMassCureWounds', () => {
 
   describe('popup payload structure', () => {
     it('returns correct popup payload structure', async () => {
-      const result = await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter', 'Rogue'],
-        '3d8 + 3',
-        false,
-        0,
-        [],
-        5,
-      );
+      const result = await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter', 'Rogue'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('heal_multi');
@@ -544,34 +544,34 @@ describe('confirmMassCureWounds', () => {
     });
 
     it('includes roll details in each result', async () => {
-      const result = await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '3d8 + 3',
-        false,
-        0,
-        [],
-        5,
-      );
+      const result = await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
 
       expect(result.payload.results[0].targetName).toBe('Fighter');
       expect(Array.isArray(result.payload.results[0].rolls)).toBe(true);
     });
 
     it('aggregates all rolls into payload.rolls', async () => {
-      const result = await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter', 'Rogue'],
-        '3d8 + 3',
-        false,
-        0,
-        [],
-        5,
-      );
+      const result = await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter', 'Rogue'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
 
       expect(result.payload.rolls.length).toBeGreaterThan(0);
     });
@@ -583,34 +583,34 @@ describe('confirmMassCureWounds', () => {
     it('handles rollExpression returning null (skips target)', async () => {
       rollExpression.mockReturnValue(null);
 
-      const result = await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter', 'Rogue'],
-        '3d8 + 3',
-        false,
-        0,
-        [],
-        5,
-      );
+      const result = await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter', 'Rogue'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
 
       // Should still return results but skip the target with null roll
       expect(result.payload.results).toBeDefined();
     });
 
     it('handles empty target list gracefully', async () => {
-      const result = await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        [],
-        '3d8 + 3',
-        false,
-        0,
-        [],
-        5,
-      );
+      const result = await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: [],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('heal_multi');
@@ -624,17 +624,17 @@ describe('confirmMassCureWounds', () => {
         return null;
       });
 
-      const result = await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '3d8 + 3',
-        false,
-        0,
-        [],
-        5,
-      );
+      const result = await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
 
       expect(result.payload.results[0].targetName).toBe('Fighter');
     });
@@ -645,17 +645,17 @@ describe('confirmMassCureWounds', () => {
         return null;
       });
 
-      const result = await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '3d8 + 3',
-        false,
-        0,
-        [],
-        5,
-      );
+      const result = await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
 
       expect(result.payload.results[0].targetName).toBe('Fighter');
     });
@@ -670,17 +670,17 @@ describe('confirmMassCureWounds', () => {
         },
       );
 
-      const result = await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '3d8 + 3',
-        false,
-        0,
-        [],
-        5,
-      );
+      const result = await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
 
       expect(result.payload.results[0].targetName).toBe('Fighter');
     });
@@ -692,17 +692,17 @@ describe('confirmMassCureWounds', () => {
 
       addEntry.mockRejectedValue(new Error('Log error'));
 
-      const result = await confirmMassCureWounds(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter', 'Rogue'],
-        '3d8 + 3',
-        false,
-        0,
-        [],
-        5,
-      );
+      const result = await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter', 'Rogue'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
 
       expect(mockError).toHaveBeenCalled();
       expect(result.payload.results).toHaveLength(2);
@@ -715,17 +715,17 @@ describe('confirmMassCureWounds', () => {
         ...makeAction(),
         automation: { type: 'mass_cure_wounds', maxTargets: 2 },
       };
-      const result = await confirmMassCureWounds(
-        action,
-        makePlayerStats(),
-        campaignName,
-        ['Fighter', 'Rogue', 'Barbarian'],
-        '3d8 + 3',
-        false,
-        0,
-        [],
-        5,
-      );
+      const result = await confirmMassCureWounds({
+          action,
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter', 'Rogue', 'Barbarian'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
 
       expect(result.payload.results).toHaveLength(2);
     });

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import express from 'express';
-import request from 'supertest';
+import { request } from '../test-utils/localhostSupertest.js';
 
 // Shared mock store keyed by "campaign:factions"
 const MOCK_STORE = new Map();

@@ -133,19 +133,20 @@ function makeDeps(overrides = {}) {
     };
 }
 
-function invokeHandler(handler, context = BASE_CONTEXT, combatSummary = BASE_COMBAT_SUMMARY, ...extraArgs) {
-    return handler(
-        'Fire Bolt',
-        '1d10',
-        5,
-        [6],
-        0,
+function invokeHandler(handler, context = BASE_CONTEXT, combatSummary = BASE_COMBAT_SUMMARY, gwfBaseRolls, gwfDisplayRolls) {
+    return handler({
+        name: 'Fire Bolt',
+        formula: '1d10',
+        total: 5,
+        rolls: [6],
+        modifier: 0,
         context,
-        5,
+        adjustedTotal: 5,
         combatSummary,
-        [6],
-        ...extraArgs
-    );
+        displayRolls: [6],
+        gwfBaseRolls,
+        gwfDisplayRolls,
+    });
 }
 
 describe('handlePlayerSaveDamage - pending data structure', () => {

@@ -100,21 +100,27 @@ async function computeMapAwareContext(mapData, npcs, attackContext, playerName, 
      }
 
     if (isRanged && targetPos && !rangeToFeet(attackContext.range)) {
-        const coverResult = computeCover(
-            { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
-            { gridX: targetPos.gridX, gridY: targetPos.gridY },
-            mapData?.walls || new Set(),
-            mapData?.placedItems || [],
-         );
-        if (coverResult.level === 'full') {
-            return { ...base, isAutoMiss: true, coverReason: 'Target has full cover' };
-         }
-        if (coverResult.acBonus > 0) {
-            return { ...base, coverAcBonus: coverResult.acBonus, coverLevel: coverResult.level };
-         }
-     }
+        const coverAdjustment = computeCoverAdjustment(base, attackerPlayer, targetPos, mapData);
+        if (coverAdjustment) return coverAdjustment;
+    }
 
     return base;
+}
+
+function computeCoverAdjustment(base, attackerPlayer, targetPos, mapData) {
+    const coverResult = computeCover(
+        { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
+        { gridX: targetPos.gridX, gridY: targetPos.gridY },
+        mapData?.walls || new Set(),
+        mapData?.placedItems || [],
+    );
+    if (coverResult.level === 'full') {
+        return { ...base, isAutoMiss: true, coverReason: 'Target has full cover' };
+    }
+    if (coverResult.acBonus > 0) {
+        return { ...base, coverAcBonus: coverResult.acBonus, coverLevel: coverResult.level };
+    }
+    return null;
 }
 
 function collectHostileThreats(mapData, npcs) {

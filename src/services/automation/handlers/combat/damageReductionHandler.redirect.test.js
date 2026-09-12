@@ -293,16 +293,7 @@ describe('damageReductionHandler - redirect flow', () => {
         false,
         null,
       );
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-        expect.anything(),
-        'Goblin',
-        10,
-        ['Force'],
-        campaignName,
-        expect.anything(),
-        false,
-        'MonkHero',
-      );
+      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', 10, ['Force'], campaignName, expect.anything(), { ignoreResistance: false, attackerName: 'MonkHero' },);
 
       vi.resetAllMocks();
       setupBaseMocks();
@@ -325,16 +316,7 @@ describe('damageReductionHandler - redirect flow', () => {
         true,
         null,
       );
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-        expect.anything(),
-        'Goblin',
-        5,
-        ['Force'],
-        campaignName,
-        expect.anything(),
-        false,
-        'MonkHero',
-      );
+      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', 5, ['Force'], campaignName, expect.anything(), { ignoreResistance: false, attackerName: 'MonkHero' },);
     });
 
     it('does not apply damage when damageOnSave is 0', async () => {
@@ -479,16 +461,7 @@ describe('damageReductionHandler - redirect flow', () => {
         await result.payload.onTargetSelected('Goblin');
 
         if (dct.expectedDamage > 0) {
-          expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-            expect.anything(),
-            'Goblin',
-            dct.expectedDamage,
-            ['Force'],
-            campaignName,
-            expect.anything(),
-            false,
-            'MonkHero',
-          );
+          expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', dct.expectedDamage, ['Force'], campaignName, expect.anything(), { ignoreResistance: false, attackerName: 'MonkHero' },);
         } else {
           expect(applyDamage.applyDamageToTarget).not.toHaveBeenCalled();
         }

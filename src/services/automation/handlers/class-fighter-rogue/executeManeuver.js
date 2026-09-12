@@ -242,7 +242,7 @@ async function applyDamageBonusRider(maneuver, auto, targetName, dieValue, playe
     const cs = await getCombatContext(campaignName);
     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
     const dmgType = lastAttack.damageType || maneuver.damageType || 'force';
-    const applyResult = await applyDamageToTarget(cs, targetName, dieValue, [dmgType], campaignName, characters, false, playerStats.name);
+    const applyResult = await applyDamageToTarget(cs, targetName, dieValue, [dmgType], campaignName, characters, { ignoreResistance: false, attackerName: playerStats.name });
     if (applyResult && applyResult.finalDamage > 0) {
         return ` ${targetName} takes ${applyResult.finalDamage} ${dmgType} damage.`;
     }

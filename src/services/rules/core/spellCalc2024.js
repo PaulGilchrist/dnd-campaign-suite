@@ -688,6 +688,47 @@ function keepSpellRow(spell, spellAbilities, arcanumNames) {
     return false;
 }
 
+function finalizeSpellRows(spellAbilities, playerStats, allSpells) {
+    if (spellAbilities.spells.length === 0) return;
+
+    const mageHandLegerdemainActive = hasMageHandLegerdemain(playerStats);
+    spellAbilities.spells = spellAbilities.spells.map(spell => remapSpellRow(spell, allSpells, mageHandLegerdemainActive));
+
+    // CLA-234: Path of the Wild Heart ritual stamps (casting_time 'Ritual' +
+    // _ritualOnly + Wisdom casting ability) happen BEFORE the slot-level filter
+    // below, so the spells survive and cast slotless (see CLA-234).
+    if (playerStats.class?.major?.name === 'Path of the Wild Heart') {
+        stampWildHeartRituals(spellAbilities, playerStats);
+    }
+
+    // CLA-308: Shadow Arts free-cast stamps, BEFORE the slot-level filter.
+    stampShadowArtsFreeCasts(spellAbilities, playerStats);
+
+    // FT-068: Ritual Master feat stamps, AFTER the detail remap so the flag survives.
+    stampRitualMasterRituals(spellAbilities, playerStats);
+
+    // CLA-231: Mystic Arcanum spells are slotless free casts (tracked by
+    // mysticArcanumLevel{6-9} counters) — exempt them from the "no spell slots
+    // at this level" filter. Warlock Pact Magic slots cap at lv5, so without
+    // this exemption every selected arcanum is silently dropped from the sheet.
+    const arcanumNames = new Set(playerStats.class?.arcanums || []);
+
+    spellAbilities.spells = spellAbilities.spells.filter(spell => keepSpellRow(spell, spellAbilities, arcanumNames));
+
+    spellAbilities.spells.sort((a, b) => {
+        if (a.level !== b.level) {
+            return a.level - b.level;
+        } else {
+            return a.name.localeCompare(b.name);
+        }
+    });
+}
+
+function resolveCastingAbility(playerStats) {
+    return playerStats.class.spell_casting_ability
+        || playerStats.class.major?.spell_casting_ability;
+}
+
 export function getSpellAbilities(allSpells, playerStats, playerSummary) {
     let spellAbilities = resolveCharacterSpellcasting(playerStats);
     spellAbilities = applyOrderCantripGrants(spellAbilities, playerStats);
@@ -704,8 +745,7 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
         spellAbilities.spells = [];
     }
 
-    const castingAbility = playerStats.class.spell_casting_ability
-        || playerStats.class.major?.spell_casting_ability;
+    const castingAbility = resolveCastingAbility(playerStats);
     if (castingAbility) {
         spellAbilities.spellCastingAbility = castingAbility;
     }
@@ -733,47 +773,14 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
         computeCastingAbilityStats(spellAbilities, playerStats);
     }
 
-    const mageHandLegerdemainActive = hasMageHandLegerdemain(playerStats);
-
-    if (spellAbilities.spells.length > 0) {
-        spellAbilities.spells = spellAbilities.spells.map(spell => remapSpellRow(spell, allSpells, mageHandLegerdemainActive));
-
-        // CLA-234: Path of the Wild Heart ritual stamps (casting_time 'Ritual' +
-        // _ritualOnly + Wisdom casting ability) happen BEFORE the slot-level filter
-        // below, so the spells survive and cast slotless (see CLA-234).
-        if (playerStats.class?.major?.name === 'Path of the Wild Heart') {
-            stampWildHeartRituals(spellAbilities, playerStats);
-        }
-
-        // CLA-308: Shadow Arts free-cast stamps, BEFORE the slot-level filter.
-        stampShadowArtsFreeCasts(spellAbilities, playerStats);
-
-        // FT-068: Ritual Master feat stamps, AFTER the detail remap so the flag survives.
-        stampRitualMasterRituals(spellAbilities, playerStats);
-
-        // CLA-231: Mystic Arcanum spells are slotless free casts (tracked by
-        // mysticArcanumLevel{6-9} counters) — exempt them from the "no spell slots
-        // at this level" filter. Warlock Pact Magic slots cap at lv5, so without
-        // this exemption every selected arcanum is silently dropped from the sheet.
-        const arcanumNames = new Set(playerStats.class?.arcanums || []);
-
-        spellAbilities.spells = spellAbilities.spells.filter(spell => keepSpellRow(spell, spellAbilities, arcanumNames));
-
-        spellAbilities.spells.sort((a, b) => {
-            if (a.level !== b.level) {
-                return a.level - b.level;
-            } else {
-                return a.name.localeCompare(b.name);
-            }
-        });
-    }
+    finalizeSpellRows(spellAbilities, playerStats, allSpells);
 
     // Path of the Wild Heart ritual overrides (casting_time 'Ritual' + _ritualOnly +
     // Wisdom casting ability) are stamped earlier in this function, BEFORE the
     // slot-level filter, so the spells survive and cast slotless (see CLA-234 block).
 
     // 2024 Wizards prepare a subset of their spellbook; track the limit so the sheet can toggle prepared status
-    if (playerStats.class?.name === 'Wizard' && spellAbilities.prepared_spells != null) {
+    if (isWizard && spellAbilities.prepared_spells != null) {
         spellAbilities.maxPreparedSpells = spellAbilities.prepared_spells;
     }
 

@@ -12,6 +12,50 @@ const COMMAND_EFFECTS = {
     'Halt': 'halt',
 };
 
+function commandLogDescription(commandEffect, commandChoice, targetName, casterName) {
+    switch (commandEffect) {
+        case 'approach': return `${targetName} failed WIS save against Command. Command: ${commandChoice} — ${targetName} should move toward ${casterName} by the shortest route and end turn within 5 feet.`;
+        case 'drop': return `${targetName} failed WIS save against Command. Command: Drop — ${targetName} should drop held items and end turn.`;
+        case 'flee': return `${targetName} failed WIS save against Command. Command: Flee — ${targetName} should spend turn moving away from ${casterName} by the fastest means.`;
+        case 'halt': return `${targetName} failed WIS save against Command. Command: Halt — ${targetName} shouldn't move or take actions on its next turn.`;
+        default: return null;
+    }
+}
+
+async function applyCommandEffect(commandEffect, commandChoice, targetName, casterName, campaignName) {
+    if (commandEffect === 'grovel') {
+        const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+        const existingConditions = Array.isArray(storedConditions) ? storedConditions : [];
+        const filtered = existingConditions.filter(c => String(c).toLowerCase() !== 'prone');
+        setRuntimeValue(targetName, 'activeConditions', [...filtered, 'prone'], campaignName);
+
+        addEntry(campaignName, {
+            type: 'condition',
+            action: 'applied',
+            characterName: targetName,
+            condition: 'Prone',
+            reason: 'Command spell (Grovel)',
+            note: `${targetName} falls prone due to Command spell.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[command] Error:", e); });
+    }
+
+    if (commandEffect === 'halt') {
+        setRuntimeValue(targetName, 'commandHalt', true, campaignName);
+    }
+
+    const description = commandLogDescription(commandEffect, commandChoice, targetName, casterName);
+    if (description) {
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: casterName,
+            abilityName: `Command: ${commandChoice}`,
+            description,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[command] Error:", e); });
+    }
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
@@ -101,64 +145,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         appliedDamage: 0,
     });
 
-    if (commandEffect === 'grovel') {
-        const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-        const existingConditions = Array.isArray(storedConditions) ? storedConditions : [];
-        const filtered = existingConditions.filter(c => String(c).toLowerCase() !== 'prone');
-        setRuntimeValue(targetName, 'activeConditions', [...filtered, 'prone'], campaignName);
-
-        addEntry(campaignName, {
-            type: 'condition',
-            action: 'applied',
-            characterName: targetName,
-            condition: 'Prone',
-            reason: 'Command spell (Grovel)',
-            note: `${targetName} falls prone due to Command spell.`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[command] Error:", e); });
-    }
-
-    if (commandEffect === 'approach') {
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: casterName,
-            abilityName: `Command: ${commandChoice}`,
-            description: `${targetName} failed WIS save against Command. Command: ${commandChoice} — ${targetName} should move toward ${casterName} by the shortest route and end turn within 5 feet.`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[command] Error:", e); });
-    }
-
-    if (commandEffect === 'drop') {
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: casterName,
-            abilityName: `Command: ${commandChoice}`,
-            description: `${targetName} failed WIS save against Command. Command: Drop — ${targetName} should drop held items and end turn.`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[command] Error:", e); });
-    }
-
-    if (commandEffect === 'flee') {
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: casterName,
-            abilityName: `Command: ${commandChoice}`,
-            description: `${targetName} failed WIS save against Command. Command: Flee — ${targetName} should spend turn moving away from ${casterName} by the fastest means.`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[command] Error:", e); });
-    }
-
-    if (commandEffect === 'halt') {
-        setRuntimeValue(targetName, 'commandHalt', true, campaignName);
-
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: casterName,
-            abilityName: `Command: ${commandChoice}`,
-            description: `${targetName} failed WIS save against Command. Command: Halt — ${targetName} shouldn't move or take actions on its next turn.`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[command] Error:", e); });
-    }
+    await applyCommandEffect(commandEffect, commandChoice, targetName, casterName, campaignName);
 
     const effectDescriptions = {
         approach: 'should move toward the caster by the shortest route and end turn within 5 feet',

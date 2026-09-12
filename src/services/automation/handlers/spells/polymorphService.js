@@ -135,6 +135,29 @@ export async function confirmPolymorphTransform({ targetName, beast, casterName,
     return { ok: true };
 }
 
+function isPolymorphEffectOn(te, targetName) {
+    const teTarget = Array.isArray(te.target) ? te.target[0] : te.target;
+    return teTarget === targetName && te.effect === POLYMORPH_EFFECT;
+}
+
+function findPolymorphEffect(targetEffects, targetName) {
+    return targetEffects.find(te => isPolymorphEffectOn(te, targetName)) || null;
+}
+
+function revertPolymorphTempHp(targetName, campaignName) {
+    const polymorphTempHp = Number(getRuntimeValue(targetName, 'polymorphTempHp', campaignName) || 0);
+    const playerCurrentHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
+    if (polymorphTempHp > 0) {
+        const storedTempHp = Number(getRuntimeValue(targetName, 'tempHp', campaignName) || 0);
+        const remaining = Math.max(0, storedTempHp - polymorphTempHp);
+        setRuntimeValue(targetName, 'tempHp', remaining, campaignName);
+        setRuntimeValue(targetName, 'polymorphTempHp', 0, campaignName);
+    } else if (typeof playerCurrentHp === 'number') {
+        setRuntimeValue(targetName, 'tempHp', playerCurrentHp, campaignName);
+        setRuntimeValue(targetName, 'polymorphTempHp', 0, campaignName);
+    }
+}
+
 export function revertPolymorph(targetName, campaignName) {
     const cs = getCombatSummary(campaignName);
     let polymorphCaster = null;
@@ -161,32 +184,15 @@ export function revertPolymorph(targetName, campaignName) {
     }
 
     const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
-    const filtered = targetEffects.filter(te => {
-        const teTarget = Array.isArray(te.target) ? te.target[0] : te.target;
-        return !(teTarget === targetName && te.effect === POLYMORPH_EFFECT);
-    });
-    if (filtered.length !== targetEffects.length) {
-        setRuntimeValue('campaign', 'targetEffects', filtered, campaignName, true);
+    const kept = targetEffects.filter(te => !isPolymorphEffectOn(te, targetName));
+    if (kept.length !== targetEffects.length) {
+        setRuntimeValue('campaign', 'targetEffects', kept, campaignName, true);
         if (!polymorphCaster) {
-            const effect = targetEffects.find(te => {
-                const teTarget = Array.isArray(te.target) ? te.target[0] : te.target;
-                return teTarget === targetName && te.effect === POLYMORPH_EFFECT;
-            });
-            polymorphCaster = effect?.source || null;
+            polymorphCaster = findPolymorphEffect(targetEffects, targetName)?.source || null;
         }
     }
 
-    const polymorphTempHp = Number(getRuntimeValue(targetName, 'polymorphTempHp', campaignName) || 0);
-    const playerCurrentHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
-    if (polymorphTempHp > 0) {
-        const storedTempHp = Number(getRuntimeValue(targetName, 'tempHp', campaignName) || 0);
-        const remaining = Math.max(0, storedTempHp - polymorphTempHp);
-        setRuntimeValue(targetName, 'tempHp', remaining, campaignName);
-        setRuntimeValue(targetName, 'polymorphTempHp', 0, campaignName);
-    } else if (typeof playerCurrentHp === 'number') {
-        setRuntimeValue(targetName, 'tempHp', playerCurrentHp, campaignName);
-        setRuntimeValue(targetName, 'polymorphTempHp', 0, campaignName);
-    }
+    revertPolymorphTempHp(targetName, campaignName);
 
     if (polymorphCaster) {
         const expirations = getRuntimeValue(polymorphCaster, 'pendingExpirations', campaignName);

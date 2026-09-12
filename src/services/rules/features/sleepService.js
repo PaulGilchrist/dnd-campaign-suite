@@ -28,6 +28,10 @@ export function getSleepEffect(targetName, campaignName) {
     return findSleepEffect(targetName, campaignName);
 }
 
+function blocksSleepViaImmunities(immunities) {
+    return immunities.includes('exhaustion') || immunities.includes('magical sleep');
+}
+
 export async function isSleepImmune(campaignName, csCreature, characters) {
     if (!csCreature) return false;
 
@@ -35,7 +39,7 @@ export async function isSleepImmune(campaignName, csCreature, characters) {
     if (monsterType === 'undead' || monsterType === 'construct') return true;
 
     const csImmunities = (csCreature.immunities || []).map(lower);
-    if (csImmunities.includes('exhaustion') || csImmunities.includes('magical sleep')) return true;
+    if (blocksSleepViaImmunities(csImmunities)) return true;
 
     if (csCreature.type === 'player') {
         const character = (characters || []).find(ch => ch.name === csCreature.name);
@@ -43,7 +47,7 @@ export async function isSleepImmune(campaignName, csCreature, characters) {
         if (stats) {
             if (hasTranceTrait(stats)) return true;
             const immunities = (stats.immunities || []).map(lower);
-            if (immunities.includes('exhaustion') || immunities.includes('magical sleep')) return true;
+            if (blocksSleepViaImmunities(immunities)) return true;
         }
         return false;
     }

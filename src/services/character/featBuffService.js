@@ -22,6 +22,92 @@ const HP_FLAT_PATTERN = /Your hit point maximum increases by (\d+)/i;
 const LANGUAGE_PATTERN = /You learn (\d+) languages? of your choice/i;
 const RESISTANCE_PATTERN = /(?:You have|You gain) resistance to (\w+)/i;
 
+function getMaxAbilityValue(text) {
+  return text.toLowerCase().includes('maximum of 30') ? 30 : 20;
+}
+
+function capitalizeWords(name) {
+  return name.replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function pushAnyAbilityIncrease(match, buffs, text) {
+  buffs.abilityScoreIncreases.push({
+    name: 'any',
+    amount: parseInt(match[1], 10),
+    isChoice: true,
+    description: text,
+    max_value: getMaxAbilityValue(text),
+  });
+}
+
+function pushAbilityOrIncrease(match, buffs, text) {
+  const amount = parseInt(match[3], 10);
+  const maxValue = getMaxAbilityValue(text);
+  buffs.abilityScoreIncreases.push(
+    { name: match[1], amount, isChoice: true, max_value: maxValue },
+    { name: match[2], amount, isChoice: true, max_value: maxValue }
+  );
+}
+
+function pushAbilityIncrease(match, buffs, text) {
+  buffs.abilityScoreIncreases.push({
+    name: match[1],
+    amount: parseInt(match[2], 10),
+    isChoice: text.includes(' or '),
+    max_value: getMaxAbilityValue(text),
+  });
+}
+
+function pushProficiency(match, buffs) {
+  buffs.proficiencies.push({ name: capitalizeWords(match[1].trim()), type: 'proficiency' });
+}
+
+function pushProficiencyChoice(match, buffs) {
+  buffs.proficiencies.push({ name: capitalizeWords(match[1].trim()), type: 'proficiency', isChoice: true });
+}
+
+function pushResilientFeature(match, buffs, text) {
+  buffs.features.push({
+    name: 'Resilient',
+    description: text,
+    type: 'saving_throw',
+    automation: {
+      type: 'save_proficiency',
+      saveType: 'Strength',
+      fallbackTypes: ['Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'],
+    },
+  });
+}
+
+function pushValueFeature(match, buffs, text, rule) {
+  buffs.features.push({
+    name: rule.name,
+    description: text,
+    type: rule.type,
+    value: parseInt(match[1], 10),
+  });
+}
+
+function pushResistance(match, buffs) {
+  buffs.resistances.push(match[1]);
+}
+
+const BENEFIT_TEXT_RULES_5E = [
+  { pattern: ABILITY_OR_PATTERN, apply: pushAbilityOrIncrease },
+  { pattern: ABILITY_PATTERN, apply: pushAbilityIncrease },
+  { pattern: ABILITY_CHOOSE_PATTERN, apply: pushAnyAbilityIncrease },
+  { pattern: ABILITY_CHOSEN_PATTERN, apply: pushAnyAbilityIncrease },
+  { pattern: PROFICIENCY_PATTERN, apply: pushProficiency },
+  { pattern: PROFICIENCY_CHOICE_PATTERN, apply: pushProficiencyChoice },
+  { pattern: SAVE_PROFICIENCY_PATTERN, apply: pushResilientFeature },
+  { pattern: SPEED_PATTERN, name: 'Speed Bonus', type: 'speed', apply: pushValueFeature },
+  { pattern: INITIATIVE_PATTERN, name: 'Initiative Bonus', type: 'initiative', apply: pushValueFeature },
+  { pattern: HP_PER_LEVEL_PATTERN, name: 'Hit Point Bonus', type: 'hp_per_level', apply: pushValueFeature },
+  { pattern: HP_FLAT_PATTERN, name: 'Hit Point Bonus', type: 'hp_flat', apply: pushValueFeature },
+  { pattern: LANGUAGE_PATTERN, name: 'Language Bonus', type: 'language', apply: pushValueFeature },
+  { pattern: RESISTANCE_PATTERN, apply: pushResistance },
+];
+
 function parse5eBenefitText(text) {
   const buffs = {
     abilityScoreIncreases: [],
@@ -30,144 +116,12 @@ function parse5eBenefitText(text) {
     features: [],
   };
 
-  let match = text.match(ABILITY_OR_PATTERN);
-  if (match) {
-    const maxVal = text.toLowerCase().includes('maximum of 30') || text.toLowerCase().includes('maximum of 30.') ? 30 : 20;
-    buffs.abilityScoreIncreases.push(
-      { name: match[1], amount: parseInt(match[3], 10), isChoice: true, max_value: maxVal },
-      { name: match[2], amount: parseInt(match[3], 10), isChoice: true, max_value: maxVal }
-    );
-    return buffs;
-  }
-
-  match = text.match(ABILITY_PATTERN);
-  if (match) {
-    const maxVal = text.toLowerCase().includes('maximum of 30') || text.toLowerCase().includes('maximum of 30.') ? 30 : 20;
-    buffs.abilityScoreIncreases.push({
-      name: match[1],
-      amount: parseInt(match[2], 10),
-      isChoice: text.includes(' or '),
-      max_value: maxVal,
-    });
-    return buffs;
-  }
-
-  match = text.match(ABILITY_CHOOSE_PATTERN);
-  if (match) {
-    const maxVal = text.toLowerCase().includes('maximum of 30') || text.toLowerCase().includes('maximum of 30.') ? 30 : 20;
-    buffs.abilityScoreIncreases.push({
-      name: 'any',
-      amount: parseInt(match[1], 10),
-      isChoice: true,
-      description: text,
-      max_value: maxVal,
-    });
-    return buffs;
-  }
-
-  match = text.match(ABILITY_CHOSEN_PATTERN);
-  if (match) {
-    const maxVal = text.toLowerCase().includes('maximum of 30') || text.toLowerCase().includes('maximum of 30.') ? 30 : 20;
-    buffs.abilityScoreIncreases.push({
-      name: 'any',
-      amount: parseInt(match[1], 10),
-      isChoice: true,
-      description: text,
-      max_value: maxVal,
-    });
-    return buffs;
-  }
-
-  match = text.match(PROFICIENCY_PATTERN);
-  if (match) {
-    const name = match[1].trim();
-    const capitalized = name.replace(/\b\w/g, c => c.toUpperCase());
-    buffs.proficiencies.push({ name: capitalized, type: 'proficiency' });
-    return buffs;
-  }
-
-  match = text.match(PROFICIENCY_CHOICE_PATTERN);
-  if (match) {
-    const name = match[1].trim();
-    const capitalized = name.replace(/\b\w/g, c => c.toUpperCase());
-    buffs.proficiencies.push({ name: capitalized, type: 'proficiency', isChoice: true });
-    return buffs;
-  }
-
-  match = text.match(SAVE_PROFICIENCY_PATTERN);
-  if (match) {
-    buffs.features.push({
-      name: 'Resilient',
-      description: text,
-      type: 'saving_throw',
-      automation: {
-        type: 'save_proficiency',
-        saveType: 'Strength',
-        fallbackTypes: ['Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'],
-      },
-    });
-    return buffs;
-  }
-
-  match = text.match(SPEED_PATTERN);
-  if (match) {
-    buffs.features.push({
-      name: 'Speed Bonus',
-      description: text,
-      type: 'speed',
-      value: parseInt(match[1], 10),
-    });
-    return buffs;
-  }
-
-  match = text.match(INITIATIVE_PATTERN);
-  if (match) {
-    buffs.features.push({
-      name: 'Initiative Bonus',
-      description: text,
-      type: 'initiative',
-      value: parseInt(match[1], 10),
-    });
-    return buffs;
-  }
-
-  match = text.match(HP_PER_LEVEL_PATTERN);
-  if (match) {
-    buffs.features.push({
-      name: 'Hit Point Bonus',
-      description: text,
-      type: 'hp_per_level',
-      value: parseInt(match[1], 10),
-    });
-    return buffs;
-  }
-
-  match = text.match(HP_FLAT_PATTERN);
-  if (match) {
-    buffs.features.push({
-      name: 'Hit Point Bonus',
-      description: text,
-      type: 'hp_flat',
-      value: parseInt(match[1], 10),
-    });
-    return buffs;
-  }
-
-  match = text.match(LANGUAGE_PATTERN);
-  if (match) {
-    buffs.features.push({
-      name: 'Language Bonus',
-      description: text,
-      type: 'language',
-      value: parseInt(match[1], 10),
-    });
-    return buffs;
-  }
-
-  match = text.match(RESISTANCE_PATTERN);
-  if (match) {
-    buffs.resistances.push(match[1]);
-    return buffs;
+  for (const rule of BENEFIT_TEXT_RULES_5E) {
+    const match = text.match(rule.pattern);
+    if (match) {
+      rule.apply(match, buffs, text, rule);
+      return buffs;
+    }
   }
 
   buffs.features.push({

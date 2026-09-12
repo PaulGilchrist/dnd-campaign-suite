@@ -59,43 +59,50 @@ async function fetchClassData(className, version = '5e') {
  * @param {object} [extraOptions] - Additional class options (divineOrder, primalOrder)
  * @returns {object} - Object containing spell limits for each level
  */
+// 2024 Divine Order / Primal Order bonus cantrip grants
+const ORDER_CANTRIP_BONUSES = [
+  { optionKey: 'divineOrder', optionValue: 'Thaumaturge', className: 'Cleric' },
+  { optionKey: 'primalOrder', optionValue: 'Magician', className: 'Druid' },
+];
+
+function applyOrderCantripBonus(limits, extraOptions, className) {
+  for (const bonus of ORDER_CANTRIP_BONUSES) {
+    if (extraOptions[bonus.optionKey] === bonus.optionValue && className === bonus.className) {
+      limits.cantrip = (limits.cantrip || 0) + 1;
+    }
+  }
+}
+
 export async function getSpellLimits(className, level, version = '5e', majorName = null, extraOptions = null, abilityScores = null) {
   try {
     const classData = await fetchClassData(className, version);
-    
+
     if (!classData || !classData.class_levels) {
       return getDefaultSpellLimits(className);
     }
 
     // Find the class level entry
     const levelEntry = classData.class_levels.find(entry => entry.level === level);
-    
+
     if (!levelEntry || !levelEntry.spellcasting) {
-       // Check if class has spellcasting at higher levels (subclass feature)
+      // Check if class has spellcasting at higher levels (subclass feature)
       const spellcasting = findSpellcastingInClass(classData, level, version, majorName);
       if (spellcasting) {
         return convertSpellcastingToLimits(spellcasting, className, abilityScores, level);
       }
       return getDefaultSpellLimits(className);
-     }
-
-     // For 2024 classes, check if spellcasting requires a specific major
-    if (version === '2024' && levelEntry.spellcasting.required_major) {
-      if (levelEntry.spellcasting.required_major !== majorName) {
-        return getDefaultSpellLimits(className);
-     }
     }
 
-    let limits = convertSpellcastingToLimits(levelEntry.spellcasting, className, abilityScores, level);
+     // For 2024 classes, check if spellcasting requires a specific major
+    if (version === '2024' && levelEntry.spellcasting.required_major && levelEntry.spellcasting.required_major !== majorName) {
+      return getDefaultSpellLimits(className);
+    }
+
+    const limits = convertSpellcastingToLimits(levelEntry.spellcasting, className, abilityScores, level);
 
     // Apply 2024 Divine Order / Primal Order bonus cantrips
     if (version === '2024' && extraOptions) {
-      if (extraOptions.divineOrder === 'Thaumaturge' && className === 'Cleric') {
-        limits.cantrip = (limits.cantrip || 0) + 1;
-      }
-      if (extraOptions.primalOrder === 'Magician' && className === 'Druid') {
-        limits.cantrip = (limits.cantrip || 0) + 1;
-      }
+      applyOrderCantripBonus(limits, extraOptions, className);
     }
 
     return limits;
@@ -108,51 +115,74 @@ export async function getSpellLimits(className, level, version = '5e', majorName
 /**
  * Finds spellcasting information in class levels or subclass features
  */
+function findClassLevelSpellcasting(classData, level, version, majorName) {
+  // Try to find spellcasting in current or previous levels
+  for (let i = level - 1; i >= 0; i--) {
+    const levelEntry = classData.class_levels[i];
+    if (!levelEntry || !levelEntry.spellcasting) continue;
+    // For 2024 classes, check if spellcasting requires a specific major
+    if (version === '2024' && levelEntry.spellcasting.required_major && levelEntry.spellcasting.required_major !== majorName) {
+      continue; // Skip this level's spellcasting if major doesn't match
+    }
+    return levelEntry.spellcasting;
+  }
+  return null;
+}
+
+function findSubclassLevelSpellcasting(classData, level, majorName) {
+  // Check subclass class_levels for spellcasting (5e subclasses like Arcane Trickster)
+  if (!classData.subclasses || !Array.isArray(classData.subclasses)) return null;
+  const subclass = classData.subclasses.find(s => s.name === majorName || s.index === majorName?.toLowerCase());
+  if (!subclass || !subclass.class_levels) return null;
+  for (let i = level - 1; i >= 0; i--) {
+    const levelEntry = subclass.class_levels[i];
+    if (levelEntry && levelEntry.spellcasting) {
+      return levelEntry.spellcasting;
+    }
+  }
+  return null;
+}
+
+function findSubclassFeatureSpellcasting(classData, version, majorName) {
+  // If not found, check subclass features (for 2024)
+  if (version !== '2024' || !classData.subclass || !classData.subclass.features) return null;
+  for (const feature of classData.subclass.features) {
+    if (!feature.spellcasting) continue;
+    // For 2024 classes, check if spellcasting requires a specific major
+    if (feature.spellcasting.required_major && feature.spellcasting.required_major !== majorName) {
+      continue; // Skip this feature's spellcasting if major doesn't match
+    }
+    return feature.spellcasting;
+  }
+  return null;
+}
+
 function findSpellcastingInClass(classData, level, version, majorName = null) {
-   // First, try to find spellcasting in current or previous levels
-   for (let i = level - 1; i >= 0; i--) {
-     const levelEntry = classData.class_levels[i];
-     if (levelEntry && levelEntry.spellcasting) {
-        // For 2024 classes, check if spellcasting requires a specific major
-       if (version === '2024' && levelEntry.spellcasting.required_major) {
-         if (levelEntry.spellcasting.required_major !== majorName) {
-           continue; // Skip this level's spellcasting if major doesn't match
-         }
-       }
-       return levelEntry.spellcasting;
-     }
-   }
+  return findClassLevelSpellcasting(classData, level, version, majorName)
+    || findSubclassLevelSpellcasting(classData, level, majorName)
+    || findSubclassFeatureSpellcasting(classData, version, majorName);
+}
 
-   // Check subclass class_levels for spellcasting (5e subclasses like Arcane Trickster)
-   if (classData.subclasses && Array.isArray(classData.subclasses)) {
-     const subclass = classData.subclasses.find(s => s.name === majorName || s.index === majorName?.toLowerCase());
-     if (subclass && subclass.class_levels) {
-       for (let i = level - 1; i >= 0; i--) {
-         const levelEntry = subclass.class_levels[i];
-         if (levelEntry && levelEntry.spellcasting) {
-           return levelEntry.spellcasting;
-         }
-       }
-     }
-   }
+function resolvePreparedSpells(spellcasting, isKnown, className, abilityScores, characterLevel) {
+  if (isKnown) {
+    // Known spellcasters use spells_known for level 1
+    return null;
+  }
+  if (spellcasting.prepared_spells !== null && spellcasting.prepared_spells !== undefined) {
+    return spellcasting.prepared_spells;
+  }
+  // Compute prepared spells limit based on class rules
+  return computePreparedSpellsLimit(className, spellcasting, abilityScores, characterLevel);
+}
 
-   // If not found, check subclass features (for 2024)
-   if (version === '2024' && classData.subclass) {
-     const subclass = classData.subclass;
-     if (subclass.features) {
-       for (const feature of subclass.features) {
-         if (feature.spellcasting) {
-            // For 2024 classes, check if spellcasting requires a specific major
-           if (feature.spellcasting.required_major && feature.spellcasting.required_major !== majorName) {
-             continue; // Skip this feature's spellcasting if major doesn't match
-           }
-           return feature.spellcasting;
-         }
-       }
-     }
-   }
-
-   return null;
+function buildSlotLimits(spellcasting, isKnown) {
+  const slots = {
+    level1: isKnown && spellcasting.spells_known ? spellcasting.spells_known : (spellcasting.spell_slots_level_1 || 0),
+  };
+  for (let i = 2; i <= 9; i++) {
+    slots[`level${i}`] = spellcasting[`spell_slots_level_${i}`] || 0;
+  }
+  return slots;
 }
 
 /**
@@ -161,36 +191,16 @@ function findSpellcastingInClass(classData, level, version, majorName = null) {
 function convertSpellcastingToLimits(spellcasting, className = null, abilityScores = null, characterLevel = null) {
   if (!spellcasting) {
     return getDefaultSpellLimits(className);
-   }
+  }
 
-   const isKnown = spellcasting.spell_type !== 'prepared';
-   let preparedSpells = spellcasting.prepared_spells;
+  const isKnown = spellcasting.spell_type !== 'prepared';
 
-   // For prepared spellcasters, compute preparedSpells if not in JSON
-   if (isKnown) {
-    // Known spellcasters use spells_known for level 1
-    preparedSpells = null;
-   } else if (preparedSpells === null || preparedSpells === undefined) {
-    // Compute prepared spells limit based on class rules
-    preparedSpells = computePreparedSpellsLimit(className, spellcasting, abilityScores, characterLevel);
-   }
-
-   const limits = {
-     cantrip: spellcasting.cantrips_known || 0,
-     spellType: spellcasting.spell_type || 'known',
-     preparedSpells: preparedSpells,
-     level1: isKnown && spellcasting.spells_known ? spellcasting.spells_known : (spellcasting.spell_slots_level_1 || 0),
-     level2: spellcasting.spell_slots_level_2 || 0,
-     level3: spellcasting.spell_slots_level_3 || 0,
-     level4: spellcasting.spell_slots_level_4 || 0,
-     level5: spellcasting.spell_slots_level_5 || 0,
-     level6: spellcasting.spell_slots_level_6 || 0,
-     level7: spellcasting.spell_slots_level_7 || 0,
-     level8: spellcasting.spell_slots_level_8 || 0,
-     level9: spellcasting.spell_slots_level_9 || 0
-   };
-
-   return limits;
+  return {
+    cantrip: spellcasting.cantrips_known || 0,
+    spellType: spellcasting.spell_type || 'known',
+    preparedSpells: resolvePreparedSpells(spellcasting, isKnown, className, abilityScores, characterLevel),
+    ...buildSlotLimits(spellcasting, isKnown),
+  };
 }
 
 /**

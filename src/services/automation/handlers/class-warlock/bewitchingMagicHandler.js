@@ -2,6 +2,18 @@ import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationExpressions.js';
 
+function bewitchingRefusal(action, auto) {
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name || 'Bewitching Magic',
+            description: 'Bewitching Magic requires that your last spell cast was an enchantment or illusion spell.',
+            automation: auto,
+        },
+    };
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -14,42 +26,18 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     // Check lastAttack exists
     if (!lastAttack) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name || 'Bewitching Magic',
-                description: 'Bewitching Magic requires that your last spell cast was an enchantment or illusion spell.',
-                automation: auto,
-            },
-        };
+        return bewitchingRefusal(action, auto);
     }
 
     // Check attacker is the warlock
     if (lastAttack.attackerName !== playerName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name || 'Bewitching Magic',
-                description: 'Bewitching Magic requires that your last spell cast was an enchantment or illusion spell.',
-                automation: auto,
-            },
-        };
+        return bewitchingRefusal(action, auto);
     }
 
     // Check spell school is enchantment or illusion
     const school = (lastAttack.spellSchool || action.school || lastAttack.damageSchool || '').toLowerCase();
     if (school !== 'enchantment' && school !== 'illusion') {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name || 'Bewitching Magic',
-                description: 'Bewitching Magic requires that your last spell cast was an enchantment or illusion spell.',
-                automation: auto,
-            },
-        };
+        return bewitchingRefusal(action, auto);
     }
 
     const cs = await getCombatContext(campaignName);

@@ -152,18 +152,43 @@ function BonusActionTargetModals({ hordeBreakerTargets, setHordeBreakerTargets, 
     );
 }
 
+function sacredWeaponBonusFor(attack, playerStats, campaignName) {
+    const buffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || [];
+    if (!Array.isArray(buffs) || !buffs.some(b => b.effect === 'sacred_weapon')) return 0;
+    if (attack.weaponType !== 'melee' && attack.weaponType !== 'unarmed') return 0;
+    const cha = playerStats.abilities?.find(a => a.name === 'Charisma');
+    return Math.max(1, cha?.bonus || 0);
+}
+
+function renderWeaponMasteryCell(attack, playerStats, is2024Rules, hasWeaponMastery, getWeaponMastery, setPopupHtml) {
+    if (!is2024Rules || !hasWeaponMastery) return null;
+    const mastery = getWeaponMastery(attack.name, attack, playerStats);
+    return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>;
+}
+
+function attackPenalizedClassName(exhaustionPenalty, conditionAttackMode, cannotAct) {
+    return "clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "");
+}
+
+function renderBonusAttackHitCell({ attack, isHbRow, effectiveHit, exhaustionPenalty, conditionAttackMode, cannotAct, displaySaveDcBonus, hordeBreakerReady, hitTitle, hbClick, attackItem, onAttackClick }) {
+    if (attack.saveDc) {
+        return <div className="save-dc-display">DC {attack.saveDc + displaySaveDcBonus} {attack.saveType}</div>;
+    }
+    const className = attackPenalizedClassName(exhaustionPenalty, conditionAttackMode, cannotAct);
+    const bonusText = signFormatter.format(effectiveHit - exhaustionPenalty);
+    if (isHbRow) {
+        const title = `Attack a different creature within 5 feet of ${hordeBreakerReady?.targetName || 'the original target'} with your ${attack.weaponName || attack.name}`;
+        return <div className={className} title={title} onClick={hbClick}>{bonusText}</div>;
+    }
+    return <div className={className} title={hitTitle} onClick={() => onAttackClick(attackItem)}>{bonusText}</div>;
+}
+
 function BonusAttackRow({ attack, playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, is2024Rules, hasWeaponMastery, displaySaveDcBonus, hordeBreakerReady, onAttackClick, onResolveSpellDamage, handleSimpleDamageRoll, handleHordeBreakerClick, getWeaponMastery, setPopupHtml }) {
     const attackLevel = getAttackSpellLevel(playerStats.spellAbilities, attack.name);
     const attackItem = { ...attack };
     const isHbRow = !!attack.isHordeBreaker;
     const hbClick = () => handleHordeBreakerClick();
-    const sacredWeaponBonus = (() => {
-        const buffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || [];
-        if (!Array.isArray(buffs) || !buffs.some(b => b.effect === 'sacred_weapon')) return 0;
-        if (attack.weaponType !== 'melee' && attack.weaponType !== 'unarmed') return 0;
-        const cha = playerStats.abilities?.find(a => a.name === 'Charisma');
-        return Math.max(1, cha?.bonus || 0);
-    })();
+    const sacredWeaponBonus = sacredWeaponBonusFor(attack, playerStats, campaignName);
     const effectiveHit = attack.hitBonus + sacredWeaponBonus;
     const hitTitle = sacredWeaponBonus > 0
         ? `Base: +${attack.hitBonus}, Sacred Weapon: +${sacredWeaponBonus}`
@@ -172,11 +197,20 @@ function BonusAttackRow({ attack, playerStats, campaignName, exhaustionPenalty, 
         <div className={isHbRow ? 'left clickable' : 'left'} onClick={isHbRow ? hbClick : undefined}>{attack.name}</div>
         <div>{attackLevel != null ? (attackLevel === 0 ? 'Cantrip' : attackLevel) : ''}</div>
         <div>{formatRange(attack.range)}</div>
-        {attack.saveDc
-           ? <div className="save-dc-display">DC {attack.saveDc + displaySaveDcBonus} {attack.saveType}</div>
-         : isHbRow
-             ? <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} title={`Attack a different creature within 5 feet of ${hordeBreakerReady?.targetName || 'the original target'} with your ${attack.weaponName || attack.name}`} onClick={hbClick}>{signFormatter.format(effectiveHit - exhaustionPenalty)}</div>
-             : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} title={hitTitle} onClick={() => onAttackClick(attackItem)}>{signFormatter.format(effectiveHit - exhaustionPenalty)}</div>}
+        {renderBonusAttackHitCell({
+            attack,
+            isHbRow,
+            effectiveHit,
+            exhaustionPenalty,
+            conditionAttackMode,
+            cannotAct,
+            displaySaveDcBonus,
+            hordeBreakerReady,
+            hitTitle,
+            hbClick,
+            attackItem,
+            onAttackClick,
+        })}
         <div className={attack.damage ? "clickable" : ""} onClick={() => {
             if (cannotAct) return;
             if (isHbRow) { hbClick(); return; }
@@ -184,7 +218,7 @@ function BonusAttackRow({ attack, playerStats, campaignName, exhaustionPenalty, 
             handleSimpleDamageRoll(attackItem);
         }}>{attack.damage}</div>
         <div className='left'>{attack.damageType}</div>
-        {is2024Rules && hasWeaponMastery && (() => { const mastery = getWeaponMastery(attack.name, attack, playerStats); return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>; })()}
+        {renderWeaponMasteryCell(attack, playerStats, is2024Rules, hasWeaponMastery, getWeaponMastery, setPopupHtml)}
     </React.Fragment>;
 }
 
@@ -201,7 +235,7 @@ function bonusSpellTypeLabel(spell, isUtilityConc, damageType) {
 function BonusSpellHitCell({ isUtilityConc, autoHit, isSpellAtk, hasAttackType, spell, attackItem, playerStats, exhaustionPenalty, conditionAttackMode, cannotAct, displaySaveDcBonus, onAttackClick }) {
     if (isUtilityConc || autoHit || (isSpellAtk && !hasAttackType)) return <div></div>;
     if (isSpellAtk) {
-        return <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(attackItem)}>{signFormatter.format(playerStats.spellAbilities?.toHit - exhaustionPenalty)}</div>;
+        return <div className={attackPenalizedClassName(exhaustionPenalty, conditionAttackMode, cannotAct)} onClick={() => onAttackClick(attackItem)}>{signFormatter.format(playerStats.spellAbilities?.toHit - exhaustionPenalty)}</div>;
     }
     return <div className="save-dc-display">DC {playerStats.spellAbilities?.saveDc + displaySaveDcBonus} {spell.dc?.dc_type}</div>;
 }
@@ -403,6 +437,26 @@ function filterKnownBonusSpells(playerStats, bonusSpellNameSet) {
     return (playerStats.spellAbilities?.spells || []).filter(spell => bonusSpellNameSet.has(spell.name));
 }
 
+function BonusFeatureList({ playerStats, onAutomationAction, setPopupHtml }) {
+    return <div>
+        {((playerStats.bonusActions || []).filter(a => getCategories(playerStats.rules || '5e').featuresToIgnore.includes(a.name) === false)).map((bonusAction) => {
+            const isBonusClickable = bonusAction.details || hasAutomation(bonusAction);
+            const handleBonusClick = () => {
+                if (hasAutomation(bonusAction)) {
+                    onAutomationAction(bonusAction);
+                } else {
+                    setPopupHtml(buildFeatureDetailHtml(bonusAction));
+                }
+            };
+            return <div key={bonusAction.name}>
+                <b className={isBonusClickable ? "clickable" : ""} onClick={handleBonusClick}>{bonusAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(bonusAction.description) }}></span>
+                {hasAutomation(bonusAction) && bonusAction.automation?.type === 'healing_pool' && <span className="automation-badge"> Pool: {bonusAction.automation.pool} HP</span>}
+                {hasAutomation(bonusAction) && bonusAction.automation?.damage && <span className="automation-badge"> {bonusAction.automation.damage} {bonusAction.automation.damageType}</span>}
+            </div>;
+        })}
+    </div>;
+}
+
 function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, characters, onAttackClick, onResolveSpellDamage, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo, setModalState, modalState }) {
     const { popupHtml, setPopupHtml } = useDiceRollPopup();
     const [selectedBonusSpell, setSelectedBonusSpell] = useState(null);
@@ -536,7 +590,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
 
     const { resolvePositions: resolveBonusSpellPositions, cachedPosRef: cachedBonusCastPosRef } = useSpellPositionResolver(campaignName, mapName, playerStats.name);
 
-    const { castAction: bonusCastAction } = useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, { innateSorceryActive: !!displaySaveDcBonus }, cachedBonusCastPosRef, setModalState);
+    const { castAction: bonusCastAction } = useSpellCastExecutor({ rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, extraMeta: { innateSorceryActive: !!displaySaveDcBonus }, cachedPosRef: cachedBonusCastPosRef, setModalState });
 
     const { pendingMetamagic, pendingBarkskin, pendingHealingWord, pendingSanctuary, gateMetamagic, handleConfirm, handleSkip, handleBarkskinConfirm, handleBarkskinSkip, handleHealingWordConfirm, handleHealingWordSkip, handleSanctuaryConfirm, handleSanctuarySkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip } = useSpellMetamagicFlow(playerStats, campaignName, bonusCastAction, null, characters, setPopupHtml);
     const [pendingLesserRestorationTarget, setPendingLesserRestorationTarget] = useState(null);
@@ -686,24 +740,8 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                   handleConfirm={handleConfirm}
                   handleSkip={handleSkip}
               />
-               {(popupHtml && hasBonusActions) && <br />}
-               {hasBonusActions && <div>
-                  {((playerStats.bonusActions || []).filter(a => getCategories(playerStats.rules || '5e').featuresToIgnore.includes(a.name) === false)).map((bonusAction) => {
-                         const isBonusClickable = bonusAction.details || hasAutomation(bonusAction);
-                         const handleBonusClick = () => {
-                            if (hasAutomation(bonusAction)) {
-                                onAutomationAction(bonusAction);
-                             } else {
-                                setPopupHtml(buildFeatureDetailHtml(bonusAction));
-                             }
-                         };
-                       return <div key={bonusAction.name}>
-                            <b className={isBonusClickable ? "clickable" : ""} onClick={handleBonusClick}>{bonusAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(bonusAction.description) }}></span>
-                            {hasAutomation(bonusAction) && bonusAction.automation?.type === 'healing_pool' && <span className="automation-badge"> Pool: {bonusAction.automation.pool} HP</span>}
-                           {hasAutomation(bonusAction) && bonusAction.automation?.damage && <span className="automation-badge"> {bonusAction.automation.damage} {bonusAction.automation.damageType}</span>}
-                       </div>
-                   })}
-                </div>}
+                {(popupHtml && hasBonusActions) && <br />}
+                {hasBonusActions && <BonusFeatureList playerStats={playerStats} onAutomationAction={onAutomationAction} setPopupHtml={setPopupHtml} />}
 
                 {(() => {
                     const wrathActive = getRuntimeValue(playerStats.name, 'wrathOfTheSeaActive', campaignName);

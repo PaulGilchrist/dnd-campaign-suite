@@ -1,4 +1,27 @@
 import { getSaveDc } from '../automationExpressions.js'
+import { withAutoDefaults } from './infoDefaults.js'
+
+const WARPING_IMPLOSION_DEFAULTS = {
+    action: 'action',
+    damage: '',
+    damageType: '',
+    saveType: 'STR',
+    shape: '',
+    range: '',
+    conditionInflicted: null,
+    duration: '',
+    recharge: 'long_rest',
+    resourceCost: '',
+    restoreCost: null,
+    options: [],
+    optionDetails: {},
+    dcSuccess: null,
+}
+
+function warpingSaveDc(auto, playerStats) {
+    if (auto.saveDc !== 'ability') return auto.saveDc || 10
+    return getSaveDc(playerStats, auto.saveAbility || 'CHA', playerStats.proficiency || 0)
+}
 
 export const sorceryHandlers = {
     'sorcery_aura': (feature, _playerStats) => {
@@ -67,33 +90,18 @@ export const sorceryHandlers = {
 
     'warping_implosion': (feature, _playerStats) => {
         const auto = feature.automation
-        const prof = _playerStats.proficiency || 0
+        const uses = auto.uses ?? 1
         return {
             type: 'save_attack',
             name: feature.name,
-            action: auto.action || 'action',
-            damage: auto.damage || '',
-            damageType: auto.damageType || '',
-            saveType: auto.saveType || 'STR',
-            saveDc: auto.saveDc === 'ability'
-                ? getSaveDc(_playerStats, auto.saveAbility || 'CHA', prof)
-                : auto.saveDc || 10,
+            ...withAutoDefaults(auto, WARPING_IMPLOSION_DEFAULTS),
+            saveDc: warpingSaveDc(auto, _playerStats),
             saveAbility: auto.saveAbility || 'CHA',
-            shape: auto.shape || '',
-            range: auto.range || '',
-            conditionInflicted: auto.conditionInflicted || null,
-            duration: auto.duration || '',
-            uses: auto.uses ?? 1,
-            usesMax: auto.uses ?? 1,
-            recharge: auto.recharge || 'long_rest',
-            resourceCost: auto.resourceCost || '',
+            uses,
+            usesMax: uses,
             resourceKey: 'sorcery_points',
-            restoreCost: auto.restoreCost || null,
             hasOptions: !!auto.hasOptions,
-            options: auto.options || [],
-            optionDetails: auto.optionDetails || {},
             healExpression: null,
-            dcSuccess: auto.dcSuccess || null,
             hasAutomation: true
         }
     }

@@ -37,7 +37,7 @@ export function getAffectedCreatures(overlay, players, placedItems, combatSummar
   return affected;
 }
 
-export function processAoeNpcs(combatSummary, affected, rawDamage, damageType, saveDc, saveType, dcSuccess, campaignName, attackerName, characters, heightenTarget) {
+export function processAoeNpcs({ combatSummary, affected, rawDamage, damageType, saveDc, saveType, dcSuccess, campaignName, attackerName, characters, heightenTarget }) {
   const results = [];
   for (const { creature } of affected) {
     if (creature.type !== 'npc') continue;
@@ -69,7 +69,7 @@ export function processAoeNpcs(combatSummary, affected, rawDamage, damageType, s
     const evasionEffects = creature.evasionEffects || [];
     const hasEvasion = hasEvasionForSave(evasionEffects, normalizeSaveType(saveType));
     const finalDamage = isSoulstitchProtected ? 0 : computeDamageAfterEvasion(rawDamage, saveResult.success, dcSuccess, hasEvasion);
-    const applyResult = applyDamageToTarget(combatSummary, creature.name, finalDamage, [damageType], campaignName, characters, false, attackerName);
+    const applyResult = applyDamageToTarget(combatSummary, creature.name, finalDamage, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: attackerName });
     results.push({
       creatureName: creature.name,
       saveSuccess: isSoulstitchProtected ? true : saveResult.success,
@@ -84,7 +84,7 @@ export function processAoeNpcs(combatSummary, affected, rawDamage, damageType, s
   return results;
 }
 
-export function sendAoePlayerSaves(affected, rawDamage, damageType, saveDc, saveType, dcSuccess, campaignName, spellName, attackerName, rolls, formula, heightenTarget) {
+export function sendAoePlayerSaves({ affected, rawDamage, damageType, saveDc, saveType, dcSuccess, campaignName, spellName, attackerName, formula, heightenTarget }) {
   const pendingList = [];
   for (const { creature } of affected) {
     if (creature.type !== 'player') continue;

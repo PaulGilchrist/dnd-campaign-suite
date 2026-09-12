@@ -335,8 +335,7 @@ describe('warMagicCantripHandler', () => {
 
             // d20(15)+10=25 vs AC 11 → hit; cantrip die scales at lv18 → 4d10
             expect(rollExpression).toHaveBeenCalledWith('4d10')
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                combatSummary, 'Wight 1', 22, ['Fire'], mockCampaignName, [], false, 'TestFighter')
+            expect(applyDamageToTarget).toHaveBeenCalledWith(combatSummary, 'Wight 1', 22, ['Fire'], mockCampaignName, [], { ignoreResistance: false, attackerName: 'TestFighter' })
             const entries = addEntry.mock.calls.map(c => c[1])
             const attackLog = entries.find(e => e.rollType === 'attack')
             expect(attackLog).toBeDefined()
@@ -429,8 +428,7 @@ describe('warMagicCantripHandler', () => {
             const result = await confirmWarMagicCantrip(makeAction(), makePlayerStats({ spells: ['Sacred Flame'] }), mockCampaignName, 'Sacred Flame')
 
             // rollExpression total 22 → half 11 applied
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                combatSummary, 'Wight 1', 11, ['Radiant'], mockCampaignName, [], false, 'TestFighter')
+            expect(applyDamageToTarget).toHaveBeenCalledWith(combatSummary, 'Wight 1', 11, ['Radiant'], mockCampaignName, [], { ignoreResistance: false, attackerName: 'TestFighter' })
             expect(result.payload.description).toContain('failed the save')
         })
 

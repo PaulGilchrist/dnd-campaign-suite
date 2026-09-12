@@ -88,7 +88,7 @@ describe('processAttackAfterResult — MN-017 Riposte pending-die miss cleanup',
             return null;
         });
 
-        await processAttackAfterResult(false, false, TARGET, HOLDER, CAMPAIGN, makeContext(), null, [], vi.fn(), vi.fn(), makeState({ hit: false }));
+        await processAttackAfterResult({ hit: false, isAutoMiss: false, targetName: TARGET, characterName: HOLDER, campaignName: CAMPAIGN, context: makeContext(), combatSummary: null, characters: [], logEntry: vi.fn(), setPopupHtml: vi.fn(), state: makeState({ hit: false }) });
 
         expect(riposteClearWrites()).toEqual([[HOLDER, 'pendingRiposteDieValue', null, CAMPAIGN]]);
         const logs = addEntry.mock.calls.map(c => c[1]);
@@ -105,7 +105,7 @@ describe('processAttackAfterResult — MN-017 Riposte pending-die miss cleanup',
             return null;
         });
 
-        await processAttackAfterResult(true, false, TARGET, HOLDER, CAMPAIGN, makeContext(), null, [], vi.fn(), vi.fn(), makeState({ hit: true, effectiveD20: 19 }));
+        await processAttackAfterResult({ hit: true, isAutoMiss: false, targetName: TARGET, characterName: HOLDER, campaignName: CAMPAIGN, context: makeContext(), combatSummary: null, characters: [], logEntry: vi.fn(), setPopupHtml: vi.fn(), state: makeState({ hit: true, effectiveD20: 19 }) });
 
         expect(riposteClearWrites()).toHaveLength(0);
     });
@@ -113,7 +113,7 @@ describe('processAttackAfterResult — MN-017 Riposte pending-die miss cleanup',
     it('a miss with no armed pending die writes nothing and logs nothing', async () => {
         getRuntimeValue.mockReturnValue(null);
 
-        await processAttackAfterResult(false, false, TARGET, HOLDER, CAMPAIGN, makeContext(), null, [], vi.fn(), vi.fn(), makeState({ hit: false }));
+        await processAttackAfterResult({ hit: false, isAutoMiss: false, targetName: TARGET, characterName: HOLDER, campaignName: CAMPAIGN, context: makeContext(), combatSummary: null, characters: [], logEntry: vi.fn(), setPopupHtml: vi.fn(), state: makeState({ hit: false }) });
 
         expect(riposteClearWrites()).toHaveLength(0);
         const riposteLogs = addEntry.mock.calls.map(c => c[1]).filter(l => l.abilityName === 'Riposte');
@@ -126,7 +126,7 @@ describe('processAttackAfterResult — MN-017 Riposte pending-die miss cleanup',
             return null;
         });
 
-        await processAttackAfterResult(false, true, TARGET, HOLDER, CAMPAIGN, makeContext(), null, [], vi.fn(), vi.fn(), makeState({ hit: false, isAutoMiss: true }));
+        await processAttackAfterResult({ hit: false, isAutoMiss: true, targetName: TARGET, characterName: HOLDER, campaignName: CAMPAIGN, context: makeContext(), combatSummary: null, characters: [], logEntry: vi.fn(), setPopupHtml: vi.fn(), state: makeState({ hit: false, isAutoMiss: true }) });
 
         expect(riposteClearWrites()).toEqual([[HOLDER, 'pendingRiposteDieValue', null, CAMPAIGN]]);
     });

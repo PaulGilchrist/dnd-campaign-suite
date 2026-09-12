@@ -153,10 +153,7 @@ describe('Plain damage HP/condition effects', () => {
             });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 10, [5, 3, 2], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 10, [5, 3, 2], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'Goblin',
@@ -185,10 +182,7 @@ describe('Plain damage HP/condition effects', () => {
             });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 10, [5, 3, 2], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 10, [5, 3, 2], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const deathSaveCalls = setRuntimeValue.mock.calls.filter(
                 (call) => call[1] === 'deathSaves' || call[1] === 'deathFailures'
@@ -209,10 +203,7 @@ describe('Plain damage HP/condition effects', () => {
             });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const deathSaveCalls = setRuntimeValue.mock.calls.filter(
                 (call) => call[1] === 'deathSaves' || call[1] === 'deathFailures'
@@ -235,10 +226,7 @@ describe('Plain damage HP/condition effects', () => {
             });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 10, [5, 3, 2], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 10, [5, 3, 2], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const hpChangeCalls = addEntry.mock.calls.filter(
                 (call) => call[1]?.type === 'hp_change'
@@ -255,10 +243,7 @@ describe('Plain damage HP/condition effects', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 3, newHp: 10, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 3, [3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 3, [3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const hpChangeCalls = addEntry.mock.calls.filter(
                 (call) => call[1]?.type === 'hp_change'
@@ -280,10 +265,7 @@ describe('Plain damage HP/condition effects', () => {
             });
 
             const fn = createFn();
-            await fn('Greatclub', '1d4+3', 8, [5], 3, {
-                targetName: 'Goblin',
-                damageType: 'bludgeoning',
-            });
+            await fn('Greatclub', '1d4+3', 8, [5], 3, { targetName: 'Goblin', damageType: 'bludgeoning', });
 
             const hpChangeCalls = addEntry.mock.calls.filter(
                 (call) => call[1]?.type === 'hp_change'
@@ -311,11 +293,7 @@ describe('Plain damage HP/condition effects', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 7, damageReduced: false });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
-                targetName: 'Goblin',
-                damageType: 'fire',
-                attackerName: 'TestFighter',
-            });
+            await fn('Fire Bolt', '1d10', 8, [8], 0, { targetName: 'Goblin', damageType: 'fire', attackerName: 'TestFighter', });
 
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 type: 'ability_use',
@@ -340,11 +318,7 @@ describe('Plain damage HP/condition effects', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Acid Arrow', '2d4+1', 6, [4, 1], 1, {
-                targetName: 'Goblin',
-                damageType: 'acid',
-                attackerName: 'TestFighter',
-            });
+            await fn('Acid Arrow', '2d4+1', 6, [4, 1], 1, { targetName: 'Goblin', damageType: 'acid', attackerName: 'TestFighter', });
 
             const resistanceCalls = addEntry.mock.calls.filter(
                 (call) => call[1]?.type === 'ability_use' && call[1]?.abilityName === 'Resistance'
@@ -369,11 +343,7 @@ describe('Plain damage HP/condition effects', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
-                targetName: 'Goblin',
-                damageType: 'fire',
-                attackerName: 'TestFighter',
-            });
+            await fn('Fire Bolt', '1d10', 8, [8], 0, { targetName: 'Goblin', damageType: 'fire', attackerName: 'TestFighter', });
 
             const resistanceCalls = addEntry.mock.calls.filter(
                 (call) => call[1]?.type === 'ability_use' && call[1]?.abilityName === 'Resistance'
@@ -398,11 +368,7 @@ describe('Plain damage HP/condition effects', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 7, damageReduced: false });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
-                targetName: 'Goblin',
-                damageType: 'fire',
-                attackerName: 'TestFighter',
-            });
+            await fn('Fire Bolt', '1d10', 8, [8], 0, { targetName: 'Goblin', damageType: 'fire', attackerName: 'TestFighter', });
 
             const resistanceMarkCalls = setRuntimeValue.mock.calls.filter(
                 (call) => call[1] === 'resistanceUsedThisTurn' && call[2] === true
@@ -420,13 +386,7 @@ describe('Plain damage HP/condition effects', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
-                targetName: 'Goblin',
-                damageType: 'fire',
-                overchannelActive: true,
-                overchannelUseCount: 2,
-                overchannelSpellLevel: 3,
-            });
+            await fn('Fire Bolt', '1d10', 8, [8], 0, { targetName: 'Goblin', damageType: 'fire', overchannelActive: true, overchannelUseCount: 2, overchannelSpellLevel: 3, });
 
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 type: 'hp_change',
@@ -441,11 +401,7 @@ describe('Plain damage HP/condition effects', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
-                targetName: 'Goblin',
-                damageType: 'fire',
-                overchannelActive: false,
-            });
+            await fn('Fire Bolt', '1d10', 8, [8], 0, { targetName: 'Goblin', damageType: 'fire', overchannelActive: false, });
 
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 type: 'hp_change',

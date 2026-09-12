@@ -122,9 +122,7 @@ function stubRuntime(wrathActive) {
 }
 
 function apply(cs, damageTypes, rawDamage) {
-  return applyDamageToTarget(cs, 'Wild_Sage_Druid', rawDamage, damageTypes, 'test-campaign', [
-    createDruidCharacter('Wild_Sage_Druid'),
-  ], false, 'Air Elemental 1');
+  return applyDamageToTarget(cs, 'Wild_Sage_Druid', rawDamage, damageTypes, 'test-campaign', [ createDruidCharacter('Wild_Sage_Druid'), ], { ignoreResistance: false, attackerName: 'Air Elemental 1' });
 }
 
 // ── Integration ─────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import express from 'express';
-import request from 'supertest';
+import { request } from '../test-utils/localhostSupertest.js';
 
 // Mock fs before importing settlements
 // Stores raw strings (for invalid JSON testing) or parsed data

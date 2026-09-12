@@ -325,17 +325,17 @@ describe('useCharActionsModalHandlers - healing', () => {
       const handlers = getHandlers({}, mergedModalState);
       await handlers.handleMassCureWoundsConfirm(['Ally1', 'Ally2']);
 
-      expect(confirmMassCureWounds).toHaveBeenCalledWith(
-        mergedModalState.massCureWoundsModal.action,
-        mergedModalState.massCureWoundsModal.playerStats,
-        mergedModalState.massCureWoundsModal.campaignName,
-        ['Ally1', 'Ally2'],
-        '3d8',
-        false,
-        5,
-        'bonus',
-        5
-      );
+      expect(confirmMassCureWounds).toHaveBeenCalledWith({
+          action: mergedModalState.massCureWoundsModal.action,
+          playerStats: mergedModalState.massCureWoundsModal.playerStats,
+          campaignName: mergedModalState.massCureWoundsModal.campaignName,
+          selectedTargetNames: ['Ally1', 'Ally2'],
+          healExpression: '3d8',
+          maximize: false,
+          bonusHeal: 5,
+          bonusDetails: 'bonus',
+          slotLevel: 5,
+      });
       expect(mockSetModalState).toHaveBeenCalledWith({ massCureWoundsModal: null });
     });
 
@@ -381,18 +381,18 @@ describe('useCharActionsModalHandlers - healing', () => {
       const handlers = getHandlers({}, mergedModalState);
       await handlers.handlePrayerOfHealingConfirm(['Ally1']);
 
-      expect(confirmPrayerOfHealing).toHaveBeenCalledWith(
-        mergedModalState.prayerOfHealingModal.action,
-        mergedModalState.prayerOfHealingModal.playerStats,
-        mergedModalState.prayerOfHealingModal.campaignName,
-        ['Ally1'],
-        '2d4',
-        false,
-        3,
-        'bonus',
-        2,
-        5
-      );
+      expect(confirmPrayerOfHealing).toHaveBeenCalledWith({
+          action: mergedModalState.prayerOfHealingModal.action,
+          playerStats: mergedModalState.prayerOfHealingModal.playerStats,
+          campaignName: mergedModalState.prayerOfHealingModal.campaignName,
+          selectedTargetNames: ['Ally1'],
+          healExpression: '2d4',
+          maximize: false,
+          bonusHeal: 3,
+          bonusDetails: 'bonus',
+          slotLevel: 2,
+          currentRound: 5,
+      });
       expect(mockSetModalState).toHaveBeenCalledWith({ prayerOfHealingModal: null });
     });
 
@@ -484,17 +484,17 @@ describe('useCharActionsModalHandlers - healing', () => {
       const handlers = getHandlers({}, mergedModalState);
       await handlers.handleMassHealingWordConfirm(['Ally1', 'Ally2', 'Ally3']);
 
-      expect(confirmMassHealingWord).toHaveBeenCalledWith(
-        mergedModalState.massHealingWordModal.action,
-        mergedModalState.massHealingWordModal.playerStats,
-        mergedModalState.massHealingWordModal.campaignName,
-        ['Ally1', 'Ally2', 'Ally3'],
-        '2d4',
-        false,
-        3,
-        'bonus',
-        3
-      );
+      expect(confirmMassHealingWord).toHaveBeenCalledWith({
+          action: mergedModalState.massHealingWordModal.action,
+          playerStats: mergedModalState.massHealingWordModal.playerStats,
+          campaignName: mergedModalState.massHealingWordModal.campaignName,
+          selectedTargetNames: ['Ally1', 'Ally2', 'Ally3'],
+          healExpression: '2d4',
+          maximize: false,
+          bonusHeal: 3,
+          bonusDetails: 'bonus',
+          slotLevel: 3,
+      });
       expect(mockSetModalState).toHaveBeenCalledWith({ massHealingWordModal: null });
     });
 

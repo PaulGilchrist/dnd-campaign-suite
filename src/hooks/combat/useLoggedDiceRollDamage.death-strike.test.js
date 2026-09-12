@@ -186,16 +186,7 @@ describe('Death Strike handling', () => {
             await promise.catch(() => { });
 
             // adjustedTotal = 10, doubledTotal = 10 * 2 = 20
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.any(Object),
-                'Goblin',
-                20,
-                ['slashing'],
-                'test-campaign',
-                expect.any(Array),
-                false,
-                'TestFighter'
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 20, ['slashing'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestFighter' });
         });
 
         it('logs save-damage entry with full death strike context', async () => {

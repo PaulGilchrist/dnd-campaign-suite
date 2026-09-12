@@ -60,6 +60,26 @@ function dispatchAttackRollResult(result, rollAttack, extraOptions) {
     });
 }
 
+async function rollPrecisionAttackDamage(playerStats, campaignName, rollDamage) {
+    const la = await getRuntimeValue('campaign', 'lastAttack', campaignName);
+    if (!la?.damageFormula) return;
+    const damageResult = rollExpression(la.damageFormula);
+    if (!damageResult) return;
+    rollDamage(la.damageName || la.attackName, la.damageFormula, damageResult.total, damageResult.rolls, damageResult.modifier, {
+        damageType: la.damageType || 'Slashing',
+        targetName: la.targetName,
+        attackerName: playerStats.name,
+    });
+}
+
+function buildPrecisionRolls(lastAttackRoll, dieValue) {
+    const origBonus = lastAttackRoll.bonus || 0;
+    const newTotal = lastAttackRoll.d20 + origBonus + dieValue;
+    const newHit = newTotal >= lastAttackRoll.targetAc;
+    const wasCrit = lastAttackRoll.isCrit || lastAttackRoll.d20 === 20;
+    return { origBonus, newTotal, newHit, wasCrit };
+}
+
 // Precision Attack: add the superiority die to the last attack roll, re-resolve hit/miss,
 // and trigger damage when the amended roll now hits. Returns true when handled.
 async function handlePrecisionAttack(result, playerStats, campaignName, rollAttack, rollDamage, showPopup) {
@@ -69,25 +89,18 @@ async function handlePrecisionAttack(result, playerStats, campaignName, rollAtta
     if (!(lastAttackRoll?.d20 != null && lastAttackRoll?.targetAc != null && lastAttack?.damageFormula)) return false;
 
     const dieValue = result.dieValue;
-    const origTotal = lastAttackRoll.d20 + (lastAttackRoll.bonus || 0);
-    const newTotal = origTotal + dieValue;
-    const newHit = newTotal >= lastAttackRoll.targetAc;
-    const isNatural20 = lastAttackRoll.d20 === 20;
-    const wasCrit = lastAttackRoll.isCrit || isNatural20;
+    const { origBonus, newTotal, newHit, wasCrit } = buildPrecisionRolls(lastAttackRoll, dieValue);
 
-    const updatedRoll = {
+    await setRuntimeValue(playerStats.name, 'lastAttackRoll', {
         ...lastAttackRoll,
-        bonus: (lastAttackRoll.bonus || 0) + dieValue,
+        bonus: origBonus + dieValue,
         total: newTotal,
         hit: newHit,
         isCrit: wasCrit,
-    };
-    await setRuntimeValue(playerStats.name, 'lastAttackRoll', updatedRoll, campaignName);
+    }, campaignName);
+    await setRuntimeValue('campaign', 'lastAttack', { ...lastAttack, total: newTotal, hit: newHit, isCrit: wasCrit }, campaignName);
 
-    const updatedLastAttack = { ...lastAttack, total: newTotal, hit: newHit, isCrit: wasCrit };
-    await setRuntimeValue('campaign', 'lastAttack', updatedLastAttack, campaignName);
-
-    const desc = `Precision Attack: Added ${dieValue} to the attack roll (${lastAttackRoll.d20} + ${lastAttackRoll.bonus || 0} + ${dieValue} = ${newTotal}). ${newHit ? 'The attack now hits!' : 'The attack still misses.'}`;
+    const desc = `Precision Attack: Added ${dieValue} to the attack roll (${lastAttackRoll.d20} + ${origBonus} + ${dieValue} = ${newTotal}). ${newHit ? 'The attack now hits!' : 'The attack still misses.'}`;
 
     await addEntry(campaignName, {
         type: 'ability_use',
@@ -97,20 +110,7 @@ async function handlePrecisionAttack(result, playerStats, campaignName, rollAtta
     }).catch((e) => { console.error("[useCombatSuperiorityModal:log-error]", e); });
 
     if (newHit && rollDamage) {
-        const la = await getRuntimeValue('campaign', 'lastAttack', campaignName);
-        if (la?.damageFormula) {
-            const damageType = la.damageType || 'Slashing';
-            const damageName = la.damageName || la.attackName;
-            const damageResult = rollExpression(la.damageFormula);
-            if (damageResult) {
-                const context = {
-                    damageType,
-                    targetName: la.targetName,
-                    attackerName: playerStats.name,
-                };
-                rollDamage(damageName, la.damageFormula, damageResult.total, damageResult.rolls, damageResult.modifier, context);
-            }
-        }
+        await rollPrecisionAttackDamage(playerStats, campaignName, rollDamage);
         setRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt', null, campaignName);
         return true;
     }

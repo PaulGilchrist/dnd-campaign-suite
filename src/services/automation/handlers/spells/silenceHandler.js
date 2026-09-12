@@ -15,6 +15,51 @@ const SILENCE_KEY = 'silenceCaster';
 const SILENCE_CENTER_KEY = 'silenceCenter';
 const SILENCE_RADIUS_KEY = 'silenceRadius';
 
+// JSON string of the caster's grid position, or null when unplaced.
+function resolveSilenceCenter(combatSummary, casterName) {
+    if (!combatSummary) return null;
+    const casterPos = combatSummary.players?.find(p => p.name === casterName);
+    if (casterPos && casterPos.gridX != null && casterPos.gridY != null) {
+        return JSON.stringify({ gridX: casterPos.gridX, gridY: casterPos.gridY });
+    }
+    return null;
+}
+
+function clearSilenceZone(casterName, campaignName) {
+    setRuntimeValue(casterName, SILENCE_KEY, false, campaignName);
+    setRuntimeValue(casterName, SILENCE_CENTER_KEY, null, campaignName);
+    setRuntimeValue(casterName, SILENCE_RADIUS_KEY, null, campaignName);
+}
+
+// Strip the Deafened condition from every silenced target of this caster.
+function clearSilencedTargetConditions(silencedTargets, campaignName) {
+    for (const targetName of silencedTargets) {
+        const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+        const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+        const filtered = conditions.filter(c => String(c).toLowerCase() !== 'deafened');
+        if (filtered.length !== conditions.length) {
+            setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
+        }
+    }
+}
+
+function buildSilenceTargetList(combatSummary) {
+    const allTargets = [];
+    if (!combatSummary) return allTargets;
+    const players = combatSummary.players || [];
+    const creatures = combatSummary.creatures || [];
+    const allCreatures = [...players, ...creatures];
+    for (const creature of allCreatures) {
+        const name = creature.name;
+        const isPlayer = combatSummary.players?.some(p => p.name === name);
+        const hpInfo = !isPlayer && creature.currentHp != null && creature.maxHp != null
+            ? { currentHp: creature.currentHp, maxHp: creature.maxHp }
+            : {};
+        allTargets.push({ name, type: isPlayer ? 'player' : 'creature', ...hpInfo });
+    }
+    return allTargets;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -29,66 +74,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         campaignName
     );
 
-    if (!wasActive) {
-        const combatSummary = await getCombatContext(campaignName);
-        let centerGrid = null;
-
-        if (combatSummary) {
-            const casterPos = combatSummary.players?.find(p => p.name === playerName);
-            if (casterPos && casterPos.gridX != null && casterPos.gridY != null) {
-                centerGrid = { gridX: casterPos.gridX, gridY: casterPos.gridY };
-            }
-        }
-
-        setRuntimeValue(playerName, SILENCE_KEY, true, campaignName);
-        setRuntimeValue(playerName, SILENCE_CENTER_KEY, centerGrid ? JSON.stringify(centerGrid) : null, campaignName);
-        setRuntimeValue(playerName, SILENCE_RADIUS_KEY, aoeRadius, campaignName);
-
-        addExpiration(playerName, playerName, [
-            { type: 'remove_active_buff', buffName },
-            { type: 'clear_silence_zone', casterName: playerName },
-        ], campaignName);
-
-        const allTargets = [];
-        if (combatSummary) {
-            const players = combatSummary.players || [];
-            const creatures = combatSummary.creatures || [];
-            const allCreatures = [...players, ...creatures];
-            for (const creature of allCreatures) {
-                const name = creature.name;
-                const isPlayer = combatSummary.players?.some(p => p.name === name);
-                const hpInfo = !isPlayer && creature.currentHp != null && creature.maxHp != null
-                    ? { currentHp: creature.currentHp, maxHp: creature.maxHp }
-                    : {};
-                allTargets.push({ name, type: isPlayer ? 'player' : 'creature', ...hpInfo });
-            }
-        }
-
-        return {
-            type: 'popup',
-            payload: {
-                type: 'silence_target_selection',
-                name: buffName,
-                automationType: auto.type,
-                targets: allTargets,
-                aoeRadius,
-                automation: auto,
-            },
-        };
-    } else {
-        setRuntimeValue(playerName, SILENCE_KEY, false, campaignName);
-        setRuntimeValue(playerName, SILENCE_CENTER_KEY, null, campaignName);
-        setRuntimeValue(playerName, SILENCE_RADIUS_KEY, null, campaignName);
-
-        const silencedTargets = removeSilencedTargets(playerName, campaignName);
-        for (const targetName of silencedTargets) {
-            const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-            const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-            const filtered = conditions.filter(c => String(c).toLowerCase() !== 'deafened');
-            if (filtered.length !== conditions.length) {
-                setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
-            }
-        }
+    if (wasActive) {
+        clearSilenceZone(playerName, campaignName);
+        clearSilencedTargetConditions(removeSilencedTargets(playerName, campaignName), campaignName);
 
         return {
             type: 'popup',
@@ -101,6 +89,29 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             },
         };
     }
+
+    const combatSummary = await getCombatContext(campaignName);
+
+    setRuntimeValue(playerName, SILENCE_KEY, true, campaignName);
+    setRuntimeValue(playerName, SILENCE_CENTER_KEY, resolveSilenceCenter(combatSummary, playerName), campaignName);
+    setRuntimeValue(playerName, SILENCE_RADIUS_KEY, aoeRadius, campaignName);
+
+    addExpiration(playerName, playerName, [
+        { type: 'remove_active_buff', buffName },
+        { type: 'clear_silence_zone', casterName: playerName },
+    ], campaignName);
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'silence_target_selection',
+            name: buffName,
+            automationType: auto.type,
+            targets: buildSilenceTargetList(combatSummary),
+            aoeRadius,
+            automation: auto,
+        },
+    };
 }
 
 export async function handleTargetSelection(casterName, selectedTargets, campaignName, aoeRadius) {
@@ -108,9 +119,7 @@ export async function handleTargetSelection(casterName, selectedTargets, campaig
     const targetedNames = Array.isArray(selectedTargets) ? selectedTargets.map(t => t.name || t) : [];
 
     if (targetedNames.length === 0) {
-        setRuntimeValue(casterName, SILENCE_KEY, false, campaignName);
-        setRuntimeValue(casterName, SILENCE_CENTER_KEY, null, campaignName);
-        setRuntimeValue(casterName, SILENCE_RADIUS_KEY, null, campaignName);
+        clearSilenceZone(casterName, campaignName);
         return {
             type: 'popup',
             payload: {
@@ -124,15 +133,7 @@ export async function handleTargetSelection(casterName, selectedTargets, campaig
     setRuntimeValue(casterName, SILENCE_KEY, true, campaignName);
 
     const combatSummary = await getCombatContext(campaignName);
-    let centerGrid = null;
-    if (combatSummary) {
-        const casterPos = combatSummary.players?.find(p => p.name === casterName);
-        if (casterPos && casterPos.gridX != null && casterPos.gridY != null) {
-            centerGrid = { gridX: casterPos.gridX, gridY: casterPos.gridY };
-        }
-    }
-
-    setRuntimeValue(casterName, SILENCE_CENTER_KEY, centerGrid ? JSON.stringify(centerGrid) : null, campaignName);
+    setRuntimeValue(casterName, SILENCE_CENTER_KEY, resolveSilenceCenter(combatSummary, casterName), campaignName);
     setRuntimeValue(casterName, SILENCE_RADIUS_KEY, aoeRadius, campaignName);
 
     const results = [];

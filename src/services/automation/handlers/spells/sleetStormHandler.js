@@ -6,11 +6,11 @@ import { addEntry } from '../../../ui/logService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollback.js';
-import { addConcentration } from '../../../combat/concentration/concentrationService.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
 import storage from '../../../ui/storage.js';
 import { playerIsImmuneToCondition } from '../../../combat/automation/automationImmunities.js';
 import { breakConcentration } from '../../../combat/concentration/concentrationService.js';
+import { spellNoticePopup, resolveSelectedSpellTargets, registerSpellConcentration } from './areaSpellUtils.js';
 
 /**
  * Sleet Storm spell handler for 2024 ruleset.
@@ -29,29 +29,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const cs = await getCombatContext(campaignName);
     if (!cs?.creatures || cs.creatures.length === 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: 'No creatures in combat. Sleet Storm has no effect.',
-            },
-        };
+        return spellNoticePopup(action.name, 'No creatures in combat. Sleet Storm has no effect.');
     }
 
     // Get selected targets from metaCtx; if none, use all creatures
-    const selectedTargetNames = action.metaCtx?.targets || cs.creatures.map(c => c.name);
-    const targets = cs.creatures.filter(c => selectedTargetNames.includes(c.name));
+    const targets = resolveSelectedSpellTargets(cs, action);
 
     if (targets.length === 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: 'No creatures selected for Sleet Storm.',
-            },
-        };
+        return spellNoticePopup(action.name, 'No creatures selected for Sleet Storm.');
     }
 
     storeSpellLastAttack(campaignName, {
@@ -91,13 +76,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     // Register concentration for this spell
-    const combatSummary = getCombatSummary(campaignName);
-    if (combatSummary) {
-        const concentrationDc = playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
-        addConcentration(combatSummary, casterName, 'Sleet Storm', concentrationDc);
-        storage.set('combatSummary', combatSummary, campaignName);
-        window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-    }
+    registerSpellConcentration(campaignName, casterName, 'Sleet Storm', playerStats);
 
     let affectedCount = 0;
     let savedCount = 0;

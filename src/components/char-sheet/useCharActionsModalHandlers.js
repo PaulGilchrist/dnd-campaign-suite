@@ -182,8 +182,8 @@ export default function useCharActionsModalHandlers({
 
     async function handleMassCureWoundsConfirm(targetNames) {
         if (!targetNames || !mergedModalState.massCureWoundsModal) return;
-        const { action, playerStats, campaignName } = mergedModalState.massCureWoundsModal;
-        const result = await confirmMassCureWounds(action, playerStats, campaignName, targetNames, mergedModalState.massCureWoundsModal.healExpression, mergedModalState.massCureWoundsModal.maximize, mergedModalState.massCureWoundsModal.bonusHeal, mergedModalState.massCureWoundsModal.bonusDetails, mergedModalState.massCureWoundsModal.slotLevel);
+        const { action, playerStats, campaignName, healExpression, maximize, bonusHeal, bonusDetails, slotLevel } = mergedModalState.massCureWoundsModal;
+        const result = await confirmMassCureWounds({ action, playerStats, campaignName, selectedTargetNames: targetNames, healExpression, maximize, bonusHeal, bonusDetails, slotLevel });
         if (result?.payload) {
             setPopupHtml(result.payload);
         }
@@ -192,8 +192,8 @@ export default function useCharActionsModalHandlers({
 
     async function handlePrayerOfHealingConfirm(targetNames) {
         if (!targetNames || !mergedModalState.prayerOfHealingModal) return;
-        const { action, playerStats, campaignName } = mergedModalState.prayerOfHealingModal;
-        const result = await confirmPrayerOfHealing(action, playerStats, campaignName, targetNames, mergedModalState.prayerOfHealingModal.healExpression, mergedModalState.prayerOfHealingModal.maximize, mergedModalState.prayerOfHealingModal.bonusHeal, mergedModalState.prayerOfHealingModal.bonusDetails, mergedModalState.prayerOfHealingModal.slotLevel, mergedModalState.prayerOfHealingModal.currentRound);
+        const { action, playerStats, campaignName, healExpression, maximize, bonusHeal, bonusDetails, slotLevel, currentRound } = mergedModalState.prayerOfHealingModal;
+        const result = await confirmPrayerOfHealing({ action, playerStats, campaignName, selectedTargetNames: targetNames, healExpression, maximize, bonusHeal, bonusDetails, slotLevel, currentRound });
         if (result?.payload) {
             setPopupHtml(result.payload);
         }
@@ -212,8 +212,8 @@ export default function useCharActionsModalHandlers({
 
     async function handleMassHealingWordConfirm(targetNames) {
         if (!targetNames || !mergedModalState.massHealingWordModal) return;
-        const { action, playerStats, campaignName } = mergedModalState.massHealingWordModal;
-        const result = await confirmMassHealingWord(action, playerStats, campaignName, targetNames, mergedModalState.massHealingWordModal.healExpression, mergedModalState.massHealingWordModal.maximize, mergedModalState.massHealingWordModal.bonusHeal, mergedModalState.massHealingWordModal.bonusDetails, mergedModalState.massHealingWordModal.slotLevel);
+        const { action, playerStats, campaignName, healExpression, maximize, bonusHeal, bonusDetails, slotLevel } = mergedModalState.massHealingWordModal;
+        const result = await confirmMassHealingWord({ action, playerStats, campaignName, selectedTargetNames: targetNames, healExpression, maximize, bonusHeal, bonusDetails, slotLevel });
         if (result?.payload) {
             setPopupHtml(result.payload);
         }

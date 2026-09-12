@@ -8,7 +8,7 @@ import { normalizeSaveType, computeDamageAfterEvasion, applyDamageToTarget } fro
 import { isCircleOfPowerActive } from '../../services/automation/handlers/buffs/circleOfPowerHandler.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
 
-export async function processSaveRoll(rollType, target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml) {
+export async function processSaveRoll({ rollType, target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml }) {
     const saveDc = context?.saveDc;
     const saveType = context?.saveType;
     const attackerName = context?.attackerName || characterName;
@@ -25,29 +25,13 @@ export async function processSaveRoll(rollType, target, characterName, campaignN
     });
 
     if (!saveDc || !targetIsPlayer) {
-        return await processNpcSave(rollType, target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml, saveDc, saveType, attackerName, actionName, targetName);
+        return await processNpcSave({ rollType, target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml, saveDc, saveType, attackerName, actionName, targetName });
     }
 
-    return await processPlayerSave(target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml, saveDc, saveType, attackerName, actionName, targetName);
+    return await processPlayerSave({ target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml, saveDc, saveType, attackerName, actionName, targetName });
 }
 
-async function processPlayerSave(target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml, saveDc, saveType, attackerName, actionName, targetName) {
-    const { promise } = createSaveListener(campaignName, {
-        targetName,
-        saveType: saveType || 'CON',
-        saveDc,
-        dcSuccess: context?.dcSuccess || 'half',
-        attackerName: attackerName,
-        // CLA-324: monster-card save-based attacks are spell-like save attacks (eye rays,
-        // magical rays) — flag spell-origin so against_spell gates can discriminate.
-        isSpellDamage: true,
-    });
-
-    const saveResult = await promise;
-    const saveSuccess = saveResult.success;
-    const effectiveD20ForSave = saveResult.roll;
-    const saveTotal = saveResult.total;
-
+function stampPlayerSaveRolls({ characterName, campaignName, effectiveD20ForSave, saveResult, saveType, saveDc, actionName, targetName }) {
     setRuntimeValue(characterName, 'lastSaveRoll', {
         d20: effectiveD20ForSave,
         bonus: saveResult.saveBonus,
@@ -66,32 +50,35 @@ async function processPlayerSave(target, characterName, campaignName, context, b
         oldSuccess: saveResult.total >= saveDc,
         timestamp: Date.now(),
     }, campaignName);
+}
 
+async function stampPlayerSaveLastAttack({ target, context, campaignName, attackerName, effectiveD20ForSave, saveResult, saveSuccess, saveType, saveDc, actionName }) {
     const combatSummary = await loadCombatSummary(campaignName);
-    if (combatSummary) {
-        setRuntimeValue('campaign', 'lastAttack', {
-            attackerName,
-            targetName: target?.name || context?.targetName,
-            d20: effectiveD20ForSave,
-            d20Rolls: [saveResult.roll, ...(saveResult.rawRolls || [])],
-            bonus: saveResult.saveBonus,
-            total: saveResult.total,
-            saveType,
-            saveDc,
-            saveResult: saveSuccess ? 'success' : 'failure',
-            isNatural20: saveResult.roll === 20,
-            isNatural1: saveResult.roll === 1,
-            attackName: context?.actionName || context?.autoDamageName || context.name,
-            actionName,
-            rollType: 'save',
-            // CLA-324: spell-origin stamp for save-based attacks rolled from the monster card.
-            isSpellDamage: true,
-            saveConditions: context?.saveConditions || [],
-            timestamp: Date.now(),
-        }, campaignName);
-    }
+    if (!combatSummary) return;
+    setRuntimeValue('campaign', 'lastAttack', {
+        attackerName,
+        targetName: target?.name || context?.targetName,
+        d20: effectiveD20ForSave,
+        d20Rolls: [saveResult.roll, ...(saveResult.rawRolls || [])],
+        bonus: saveResult.saveBonus,
+        total: saveResult.total,
+        saveType,
+        saveDc,
+        saveResult: saveSuccess ? 'success' : 'failure',
+        isNatural20: saveResult.roll === 20,
+        isNatural1: saveResult.roll === 1,
+        attackName: context?.actionName || context?.autoDamageName || context.name,
+        actionName,
+        rollType: 'save',
+        // CLA-324: spell-origin stamp for save-based attacks rolled from the monster card.
+        isSpellDamage: true,
+        saveConditions: context?.saveConditions || [],
+        timestamp: Date.now(),
+    }, campaignName);
+}
 
-    logEntry({
+function buildPlayerSaveLogData({ targetName, characterName, actionName, effectiveD20ForSave, saveResult, saveSuccess, saveType, saveDc, attackerName, context }) {
+    return {
         type: 'roll',
         characterName: targetName || characterName,
         rollType: 'save',
@@ -112,11 +99,34 @@ async function processPlayerSave(target, characterName, campaignName, context, b
         dcSuccess: context?.dcSuccess,
         timestamp: Date.now(),
         id: utils.guid(),
+    };
+}
+
+async function processPlayerSave({ target, characterName, campaignName, context, logEntry, setPopupHtml, saveDc, saveType, attackerName, actionName, targetName }) {
+    const { promise } = createSaveListener(campaignName, {
+        targetName,
+        saveType: saveType || 'CON',
+        saveDc,
+        dcSuccess: context?.dcSuccess || 'half',
+        attackerName: attackerName,
+        // CLA-324: monster-card save-based attacks are spell-like save attacks (eye rays,
+        // magical rays) — flag spell-origin so against_spell gates can discriminate.
+        isSpellDamage: true,
     });
+
+    const saveResult = await promise;
+    const saveSuccess = saveResult.success;
+    const effectiveD20ForSave = saveResult.roll;
+    const saveTotal = saveResult.total;
+
+    stampPlayerSaveRolls({ characterName, campaignName, effectiveD20ForSave, saveResult, saveType, saveDc, actionName, targetName });
+    await stampPlayerSaveLastAttack({ target, context, campaignName, attackerName, effectiveD20ForSave, saveResult, saveSuccess, saveType, saveDc, actionName });
+
+    logEntry(buildPlayerSaveLogData({ targetName, characterName, actionName, effectiveD20ForSave, saveResult, saveSuccess, saveType, saveDc, attackerName, context }));
 
     // Apply save-triggered damage and conditions
     if (context?.autoDamageFormula && saveDc != null) {
-        await applySaveDamage(context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveResult.total, logEntry, setPopupHtml, context._characters);
+        await applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal: saveResult.total, logEntry, setPopupHtml, characters: context._characters });
     }
 
     return { saveSuccess, effectiveD20ForSave, saveTotal, saveResult };
@@ -226,7 +236,7 @@ function buildNpcSaveLogData({ targetName, characterName, actionName, effectiveD
     };
 }
 
-async function processNpcSave(rollType, target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml, saveDc, saveType, attackerName, actionName, targetName) {
+async function processNpcSave({ target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml, saveDc, saveType, attackerName, actionName, targetName }) {
     const effectiveD20ForSave = applyCosmicOmenToSave(context.effectiveD20, campaignName);
 
     const allTargetEffectsForSave = getRuntimeValue('campaign', 'targetEffects') || [];
@@ -266,7 +276,7 @@ async function processNpcSave(rollType, target, characterName, campaignName, con
 
     // Apply save-triggered damage and conditions
     if (context?.autoDamageFormula && saveDc != null) {
-        await applySaveDamage(context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, context._characters);
+        await applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters: context._characters });
     }
 
     return { saveSuccess, effectiveD20ForSave, saveTotal };
@@ -374,7 +384,7 @@ function buildSaveDamagePopupData({ context, damageFormula, damageResult, finalD
     };
 }
 
-async function applySaveDamage(context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters) {
+async function applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters }) {
     const damageFormula = context.autoDamageFormula;
     const damageType = context?.autoDamageDamageType || 'Slashing';
     const saveConditions = context?.saveConditions || [];
@@ -396,7 +406,7 @@ async function applySaveDamage(context, characterName, campaignName, attackerNam
     const combatSummaryForSave = await loadCombatSummary(campaignName);
     // CLA-324: save-based spell-like attack damage — flag spell-origin for categorical
     // 'Spell' resistance (Abjurer Spell Resistance).
-    const applyResult = await applyDamageToTarget(combatSummaryForSave, applyTarget, finalDamage, [damageType], campaignName, characters, ignoreResistance, attackerName, false, { isSpellDamage: true });
+    const applyResult = await applyDamageToTarget(combatSummaryForSave, applyTarget, finalDamage, [damageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: attackerName, suppressHpLog: false, ...{ isSpellDamage: true } });
 
     logEntry(buildSaveDamageLogData({ attackerName, context, damageFormula, damageResult, finalDamage, damageType, applyTarget, applyResult, saveSuccess }));
 

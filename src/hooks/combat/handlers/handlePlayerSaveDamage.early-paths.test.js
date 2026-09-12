@@ -127,59 +127,25 @@ describe('handlePlayerSaveDamage - early returns', () => {
 
     it('returns undefined when combatSummary is null', async () => {
         const handler = createPlayerSaveDamageHandler(makeDeps());
-        const result = await handler(
-            'Fire Bolt',
-            '1d10',
-            5,
-            [6],
-            0,
-            { saveDc: 11, saveType: 'DEX', dcSuccess: 'half', damageType: 'Fire', targetName: 'TestWizard' }
-        );
+        const result = await handler({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [6], modifier: 0, context: { saveDc: 11, saveType: 'DEX', dcSuccess: 'half', damageType: 'Fire', targetName: 'TestWizard' } });
         expect(result).toBeUndefined();
     });
 
     it('returns undefined when combatSummary.creatures is missing', async () => {
         const handler = createPlayerSaveDamageHandler(makeDeps());
-        const result = await handler(
-            'Fire Bolt',
-            '1d10',
-            5,
-            [6],
-            0,
-            { saveDc: 11, saveType: 'DEX', dcSuccess: 'half', damageType: 'Fire', targetName: 'TestWizard' },
-            5,
-            {}
-        );
+        const result = await handler({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [6], modifier: 0, context: { saveDc: 11, saveType: 'DEX', dcSuccess: 'half', damageType: 'Fire', targetName: 'TestWizard' }, adjustedTotal: 5, combatSummary: {} });
         expect(result).toBeUndefined();
     });
 
     it('returns undefined when target is not found in combatSummary', async () => {
         const handler = createPlayerSaveDamageHandler(makeDeps());
-        const result = await handler(
-            'Fire Bolt',
-            '1d10',
-            5,
-            [6],
-            0,
-            { saveDc: 11, saveType: 'DEX', dcSuccess: 'half', damageType: 'Fire', targetName: 'Goblin' },
-            5,
-            { creatures: [{ name: 'TestWizard', type: 'player' }] }
-        );
+        const result = await handler({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [6], modifier: 0, context: { saveDc: 11, saveType: 'DEX', dcSuccess: 'half', damageType: 'Fire', targetName: 'Goblin' }, adjustedTotal: 5, combatSummary: { creatures: [{ name: 'TestWizard', type: 'player' }] } });
         expect(result).toBeUndefined();
     });
 
     it('returns undefined when target type is not player', async () => {
         const handler = createPlayerSaveDamageHandler(makeDeps());
-        const result = await handler(
-            'Fire Bolt',
-            '1d10',
-            5,
-            [6],
-            0,
-            { saveDc: 11, saveType: 'DEX', dcSuccess: 'half', damageType: 'Fire', targetName: 'Goblin' },
-            5,
-            { creatures: [{ name: 'Goblin', type: 'npc' }] }
-        );
+        const result = await handler({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [6], modifier: 0, context: { saveDc: 11, saveType: 'DEX', dcSuccess: 'half', damageType: 'Fire', targetName: 'Goblin' }, adjustedTotal: 5, combatSummary: { creatures: [{ name: 'Goblin', type: 'npc' }] } });
         expect(result).toBeUndefined();
     });
 });
@@ -232,17 +198,7 @@ describe('handlePlayerSaveDamage - careful ally path', () => {
             metamagicCareful: true,
         };
 
-        const result = await handler(
-            'Fire Bolt',
-            '1d10',
-            5,
-            [6],
-            0,
-            context,
-            5,
-            { creatures: [{ name: 'Ally1', type: 'player' }] },
-            [6]
-        );
+        const result = await handler({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [6], modifier: 0, context: context, adjustedTotal: 5, combatSummary: { creatures: [{ name: 'Ally1', type: 'player' }] }, displayRolls: [6] });
 
         expect(result).toBeUndefined();
         expect(applyDamageToTarget).not.toHaveBeenCalled();
@@ -268,32 +224,11 @@ describe('handlePlayerSaveDamage - careful ally path', () => {
             metamagicCareful: true,
         };
 
-        const result = await handler(
-            'Fire Bolt',
-            '1d10',
-            5,
-            [6],
-            0,
-            context,
-            5,
-            { creatures: [{ name: 'Ally1', type: 'player' }] },
-            [6]
-        );
+        const result = await handler({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [6], modifier: 0, context: context, adjustedTotal: 5, combatSummary: { creatures: [{ name: 'Ally1', type: 'player' }] }, displayRolls: [6] });
 
         expect(result).toBe(true);
         expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-        expect(applyDamageToTarget).toHaveBeenCalledWith(
-            expect.any(Object),
-            'Ally1',
-            0,
-            ['Fire'],
-            'test-campaign',
-            expect.any(Array),
-            false,
-            'TestWizard',
-            false,
-            { isSpellDamage: true }
-        );
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', 0, ['Fire'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: false, ...{ isSpellDamage: true } });
         expect(logEntry).toHaveBeenCalledWith(
             expect.objectContaining({
                 type: 'roll',
@@ -333,31 +268,10 @@ describe('handlePlayerSaveDamage - careful ally path', () => {
             playerStats: { automation: { passives: [] } },
         };
 
-        await handler(
-            'Fire Bolt',
-            '1d10',
-            5,
-            [6],
-            0,
-            context,
-            5,
-            { creatures: [{ name: 'Ally1', type: 'player' }] },
-            [6]
-        );
+        await handler({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [6], modifier: 0, context: context, adjustedTotal: 5, combatSummary: { creatures: [{ name: 'Ally1', type: 'player' }] }, displayRolls: [6] });
 
         expect(hasIgnoreResistance).toHaveBeenCalledWith(context.playerStats, 'Fire');
-        expect(applyDamageToTarget).toHaveBeenCalledWith(
-            expect.any(Object),
-            'Ally1',
-            expect.any(Number),
-            ['Fire'],
-            'test-campaign',
-            expect.any(Array),
-            true,
-            'TestWizard',
-            false,
-            { isSpellDamage: true }
-        );
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', expect.any(Number), ['Fire'], 'test-campaign', expect.any(Array), { ignoreResistance: true, attackerName: 'TestWizard', suppressHpLog: false, ...{ isSpellDamage: true } });
     });
 });
 
@@ -410,17 +324,7 @@ describe('handlePlayerSaveDamage - contact patron path', () => {
             },
         };
 
-        const result = await handler(
-            'Contact Other Plane',
-            '4d6',
-            14,
-            [3, 5, 2, 4],
-            0,
-            context,
-            14,
-            { creatures: [{ name: 'TestWizard', type: 'player' }] },
-            [3, 5, 2, 4]
-        );
+        const result = await handler({ name: 'Contact Other Plane', formula: '4d6', total: 14, rolls: [3, 5, 2, 4], modifier: 0, context: context, adjustedTotal: 14, combatSummary: { creatures: [{ name: 'TestWizard', type: 'player' }] }, displayRolls: [3, 5, 2, 4] });
 
         expect(result).toBe(true);
         expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
@@ -464,17 +368,7 @@ describe('handlePlayerSaveDamage - contact patron path', () => {
             },
         };
 
-        const result = await handler(
-            'Mind Sliver',
-            '1d6',
-            3,
-            [3],
-            0,
-            context,
-            3,
-            { creatures: [{ name: 'TestWizard', type: 'player' }] },
-            [3]
-        );
+        const result = await handler({ name: 'Mind Sliver', formula: '1d6', total: 3, rolls: [3], modifier: 0, context: context, adjustedTotal: 3, combatSummary: { creatures: [{ name: 'TestWizard', type: 'player' }] }, displayRolls: [3] });
 
         expect(result).toBe(true);
         expect(pendingSaves).toHaveProperty('test-guid-1234');
@@ -511,17 +405,7 @@ describe('handlePlayerSaveDamage - contact patron path', () => {
             },
         };
 
-        const result = await handler(
-            'Contact Other Plane',
-            '4d6',
-            14,
-            [3, 5, 2, 4],
-            0,
-            context,
-            14,
-            { creatures: [{ name: 'Ally1', type: 'player' }] },
-            [3, 5, 2, 4]
-        );
+        const result = await handler({ name: 'Contact Other Plane', formula: '4d6', total: 14, rolls: [3, 5, 2, 4], modifier: 0, context: context, adjustedTotal: 14, combatSummary: { creatures: [{ name: 'Ally1', type: 'player' }] }, displayRolls: [3, 5, 2, 4] });
 
         expect(result).toBe(true);
         expect(pendingSaves).toHaveProperty('test-guid-1234');

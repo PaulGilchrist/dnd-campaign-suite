@@ -136,12 +136,7 @@ describe('handleNpcSaveDamage - basic save damage flow', () => {
     }
 
     function callHandler(fn, contextOverride = {}, combatSummaryOverride = null) {
-        return fn(
-            'Fire Bolt', '1d10', 10, [6, 4], 0,
-            { ...defaultContext, ...contextOverride },
-            10,
-            combatSummaryOverride || defaultCombatSummary
-        );
+        return fn({ name: 'Fire Bolt', formula: '1d10', total: 10, rolls: [6, 4], modifier: 0, context: { ...defaultContext, ...contextOverride }, adjustedTotal: 10, combatSummary: combatSummaryOverride || defaultCombatSummary });
     }
 
     function setupActiveConditions(conditions) {
@@ -154,13 +149,7 @@ describe('handleNpcSaveDamage - basic save damage flow', () => {
     describe('early return - no target', () => {
         it('returns early when target not found in combatSummary', async () => {
             const fn = createFn();
-            const result = await fn('Fire Bolt', '1d10', 10, [6, 4], 0, {
-                targetName: 'NonExistent',
-                saveDc: 12,
-                saveType: 'dex',
-                dcSuccess: 'none',
-                damageType: 'fire',
-            }, 10, { creatures: [] });
+            const result = await fn({ name: 'Fire Bolt', formula: '1d10', total: 10, rolls: [6, 4], modifier: 0, context: { targetName: 'NonExistent', saveDc: 12, saveType: 'dex', dcSuccess: 'none', damageType: 'fire', }, adjustedTotal: 10, combatSummary: { creatures: [] } });
 
             expect(result).toBeUndefined();
             expect(applyDamageToTarget).not.toHaveBeenCalled();
@@ -340,10 +329,7 @@ describe('handleNpcSaveDamage - basic save damage flow', () => {
 
             await callHandler(createFn());
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.anything(), 'Goblin', 0, expect.any(Array), 'test-campaign',
-                expect.any(Array), false, 'TestWizard', true
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', 0, expect.any(Array), 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
             const logCall = deps.logEntry.mock.calls[0][0];
             expect(logCall.saveResult).toBe('soulstitch_auto_success');
         });
@@ -412,10 +398,7 @@ describe('handleNpcSaveDamage - basic save damage flow', () => {
             await callHandler(fn, { dcSuccess: 'half' });
 
             // With evasion on failed save and dcSuccess='half', damage should be halved
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.anything(), 'Goblin', 5, expect.any(Array), 'test-campaign',
-                expect.any(Array), false, 'TestWizard', true
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', 5, expect.any(Array), 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
         });
 
         it('prevents evasion when target is incapacitated', async () => {
@@ -436,10 +419,7 @@ describe('handleNpcSaveDamage - basic save damage flow', () => {
             await callHandler(fn, { dcSuccess: 'half' });
 
             // Without evasion, full damage should apply
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.anything(), 'Goblin', 10, expect.any(Array), 'test-campaign',
-                expect.any(Array), false, 'TestWizard', true
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', 10, expect.any(Array), 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
         });
 
         it('logs evasion entry when evasion is active', async () => {

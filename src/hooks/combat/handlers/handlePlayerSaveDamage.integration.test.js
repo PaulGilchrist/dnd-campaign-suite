@@ -120,17 +120,17 @@ const DEFAULT_COMBAT_SUMMARY = {
     creatures: [{ name: 'TestWizard', type: 'player' }],
 };
 
-const DEFAULT_CALL_ARGS = [
-    'Acid Arrow',
-    '4d4',
-    10,
-    [3, 4, 2, 1],
-    0,
-    DEFAULT_CONTEXT,
-    10,
-    DEFAULT_COMBAT_SUMMARY,
-    [3, 4, 2, 1],
-];
+const DEFAULT_CALL_ARGS = {
+    name: 'Acid Arrow',
+    formula: '4d4',
+    total: 10,
+    rolls: [3, 4, 2, 1],
+    modifier: 0,
+    context: DEFAULT_CONTEXT,
+    adjustedTotal: 10,
+    combatSummary: DEFAULT_COMBAT_SUMMARY,
+    displayRolls: [3, 4, 2, 1],
+};
 
 function makeDeps(overrides = {}) {
     return {
@@ -171,7 +171,7 @@ describe('handlePlayerSaveDamage - complete save prompt flow', () => {
 
     it('emits all four side effects in the correct order for the main save prompt path', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
-        await handler(...DEFAULT_CALL_ARGS);
+        await handler(DEFAULT_CALL_ARGS);
 
         // Verify all four side effects fired
         expect(registerPendingSavePrompt).toHaveBeenCalledTimes(1);
@@ -192,7 +192,7 @@ describe('handlePlayerSaveDamage - complete save prompt flow', () => {
 
     it('populates pendingSaves with all expected fields', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
-        await handler(...DEFAULT_CALL_ARGS);
+        await handler(DEFAULT_CALL_ARGS);
 
         const pendingData = deps.pendingSaves['test-guid-1234'];
         expect(pendingData).toBeDefined();
@@ -221,7 +221,7 @@ describe('handlePlayerSaveDamage - complete save prompt flow', () => {
 
     it('sends save prompt with correct data to the UI', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
-        await handler(...DEFAULT_CALL_ARGS);
+        await handler(DEFAULT_CALL_ARGS);
 
         expect(sendSavePrompt).toHaveBeenCalledWith('test-campaign', {
             promptId: 'test-guid-1234',
@@ -242,7 +242,7 @@ describe('handlePlayerSaveDamage - complete save prompt flow', () => {
 
     it('registers pending save prompt with matching data', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
-        await handler(...DEFAULT_CALL_ARGS);
+        await handler(DEFAULT_CALL_ARGS);
 
         expect(registerPendingSavePrompt).toHaveBeenCalledWith('test-guid-1234', expect.objectContaining({
             targetName: 'TestWizard',
@@ -253,14 +253,14 @@ describe('handlePlayerSaveDamage - complete save prompt flow', () => {
 
     it('registers pending popup setter with the promptId', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
-        await handler(...DEFAULT_CALL_ARGS);
+        await handler(DEFAULT_CALL_ARGS);
 
         expect(registerPendingPopupSetter).toHaveBeenCalledWith('test-guid-1234', deps.setPopupHtml);
     });
 
     it('logs the save-prompt event with roll details', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
-        await handler(...DEFAULT_CALL_ARGS);
+        await handler(DEFAULT_CALL_ARGS);
 
         expect(deps.logEntry).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -285,7 +285,7 @@ describe('handlePlayerSaveDamage - complete save prompt flow', () => {
 
     it('sets popup to waiting state with all required fields', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
-        await handler(...DEFAULT_CALL_ARGS);
+        await handler(DEFAULT_CALL_ARGS);
 
         expect(deps.setPopupHtml).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -315,7 +315,7 @@ describe('handlePlayerSaveDamage - complete save prompt flow', () => {
 
     it('calls handleOverchannelSelfDamage with correct arguments', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
-        await handler(...DEFAULT_CALL_ARGS);
+        await handler(DEFAULT_CALL_ARGS);
 
         expect(handleOverchannelSelfDamage).toHaveBeenCalledWith(
             'TestWizard',
@@ -328,7 +328,7 @@ describe('handlePlayerSaveDamage - complete save prompt flow', () => {
 
     it('returns true to indicate the handler completed successfully', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
-        const result = await handler(...DEFAULT_CALL_ARGS);
+        const result = await handler(DEFAULT_CALL_ARGS);
 
         expect(result).toBe(true);
     });
@@ -347,17 +347,7 @@ describe('handlePlayerSaveDamage - save prompt with custom attacker', () => {
         const handler = createPlayerSaveDamageHandler(deps);
         const context = { ...DEFAULT_CONTEXT, attackerName: 'Goblin' };
 
-        await handler(
-            'Acid Arrow',
-            '4d4',
-            10,
-            [3, 4, 2, 1],
-            0,
-            context,
-            10,
-            DEFAULT_COMBAT_SUMMARY,
-            [3, 4, 2, 1]
-        );
+        await handler({ name: 'Acid Arrow', formula: '4d4', total: 10, rolls: [3, 4, 2, 1], modifier: 0, context: context, adjustedTotal: 10, combatSummary: DEFAULT_COMBAT_SUMMARY, displayRolls: [3, 4, 2, 1] });
 
         expect(sendSavePrompt).toHaveBeenCalledWith(
             'test-campaign',
@@ -382,7 +372,7 @@ describe('handlePlayerSaveDamage - save prompt with disadvantage/advantage', () 
         getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: true });
 
         const handler = createPlayerSaveDamageHandler(deps);
-        await handler(...DEFAULT_CALL_ARGS);
+        await handler(DEFAULT_CALL_ARGS);
 
         expect(sendSavePrompt).toHaveBeenCalledWith(
             'test-campaign',
@@ -397,7 +387,7 @@ describe('handlePlayerSaveDamage - save prompt with disadvantage/advantage', () 
         isCircleOfPowerActive.mockReturnValue(true);
 
         const handler = createPlayerSaveDamageHandler(deps);
-        await handler(...DEFAULT_CALL_ARGS);
+        await handler(DEFAULT_CALL_ARGS);
 
         expect(sendSavePrompt).toHaveBeenCalledWith(
             'test-campaign',
@@ -413,7 +403,7 @@ describe('handlePlayerSaveDamage - save prompt with disadvantage/advantage', () 
         getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: true });
 
         const handler = createPlayerSaveDamageHandler(deps);
-        await handler(...DEFAULT_CALL_ARGS);
+        await handler(DEFAULT_CALL_ARGS);
 
         expect(sendSavePrompt).toHaveBeenCalledWith(
             'test-campaign',
@@ -433,7 +423,7 @@ describe('handlePlayerSaveDamage - integration with registerPendingSavePrompt', 
 
     it('passes campaignName to registerPendingSavePrompt via pendingData', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
-        await handler(...DEFAULT_CALL_ARGS);
+        await handler(DEFAULT_CALL_ARGS);
 
         expect(registerPendingSavePrompt).toHaveBeenCalledWith(
             'test-guid-1234',
@@ -443,7 +433,7 @@ describe('handlePlayerSaveDamage - integration with registerPendingSavePrompt', 
 
     it('passes setPopupHtml to registerPendingSavePrompt via pendingData', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
-        await handler(...DEFAULT_CALL_ARGS);
+        await handler(DEFAULT_CALL_ARGS);
 
         expect(registerPendingSavePrompt).toHaveBeenCalledWith(
             'test-guid-1234',

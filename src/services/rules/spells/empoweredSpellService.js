@@ -125,16 +125,7 @@ export async function executeEmpoweredReroll({ campaignName, playerStats, lastEv
     };
 
     if (damageDifference !== 0) {
-        const applyResult = applyDamageToTarget(
-            combatSummary,
-            lastEvent.targetName,
-            damageDifference,
-            lastEvent.damageTypes ? lastEvent.damageTypes : [],
-            campaignName,
-            characters,
-            false,
-            name
-        );
+        const applyResult = applyDamageToTarget(combatSummary, lastEvent.targetName, damageDifference, lastEvent.damageTypes ? lastEvent.damageTypes : [], campaignName, characters, { ignoreResistance: false, attackerName: name });
 
         if (applyResult && applyResult.finalDamage > 0) {
             endInvisibilityOnHostileAction(name, campaignName);

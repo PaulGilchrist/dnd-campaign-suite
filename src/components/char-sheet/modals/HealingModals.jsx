@@ -6,6 +6,28 @@ import PowerWordFortifyModal from './PowerWordFortifyModal.jsx';
 import MassHealingWordModal from './MassHealingWordModal.jsx';
 import CreatureSelectionModal from './shared/CreatureSelectionModal.jsx';
 
+function hasNoHealingModalOpen({
+    massHealModal,
+    clockworkCavalcadeHealModal,
+    clockworkCavalcadeDispelModal,
+    massCureWoundsModal,
+    prayerOfHealingModal,
+    powerWordFortifyModal,
+    massHealingWordModal,
+    naturesSanctuaryCreaturesModal,
+}) {
+    return [
+        massHealModal,
+        clockworkCavalcadeHealModal,
+        clockworkCavalcadeDispelModal,
+        massCureWoundsModal,
+        prayerOfHealingModal,
+        powerWordFortifyModal,
+        massHealingWordModal,
+        naturesSanctuaryCreaturesModal,
+    ].every(m => !m);
+}
+
 export default function HealingModals({
     mergedModalState,
     setModalState,
@@ -29,7 +51,7 @@ export default function HealingModals({
         naturesSanctuaryCreaturesModal,
     } = mergedModalState;
 
-    if (!massHealModal && !clockworkCavalcadeHealModal && !clockworkCavalcadeDispelModal && !massCureWoundsModal && !prayerOfHealingModal && !powerWordFortifyModal && !massHealingWordModal && !naturesSanctuaryCreaturesModal) {
+    if (hasNoHealingModalOpen(mergedModalState)) {
         return null;
     }
 

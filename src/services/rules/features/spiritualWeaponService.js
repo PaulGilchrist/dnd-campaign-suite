@@ -29,19 +29,22 @@ export function getSpiritualWeaponForce(playerStats, campaignName) {
     return buffs.find(b => b.name === FORCE_BUFF_NAME && b.effect === FORCE_EFFECT) || null;
 }
 
+// Drop any queued expiry from a previous force so it cannot kill this one
+// (sacredWeaponHandler drop-the-queued-expiry pattern).
+function dropQueuedForceExpiry(casterName, campaignName) {
+    const expirations = getRuntimeValue(casterName, KEY, campaignName);
+    if (!Array.isArray(expirations) || !expirations.length) return;
+    const kept = expirations.filter(e => !(e.effects || []).some(ef => ef.type === 'remove_active_buff' && ef.buffName === FORCE_BUFF_NAME));
+    if (kept.length !== expirations.length) {
+        setRuntimeValue(casterName, KEY, kept, campaignName);
+    }
+}
+
 export async function activateSpiritualWeaponForce(spell, playerStats, campaignName, { slotLevel, formula } = {}) {
     const casterName = playerStats.name;
     const forceMarkerName = `${FORCE_MARKER_NAME} (${casterName})`;
 
-    // Drop any queued expiry from a previous force so it cannot kill this one
-    // (sacredWeaponHandler drop-the-queued-expiry pattern).
-    const expirations = getRuntimeValue(casterName, KEY, campaignName);
-    if (Array.isArray(expirations) && expirations.length) {
-        const kept = expirations.filter(e => !(e.effects || []).some(ef => ef.type === 'remove_active_buff' && ef.buffName === FORCE_BUFF_NAME));
-        if (kept.length !== expirations.length) {
-            setRuntimeValue(casterName, KEY, kept, campaignName);
-        }
-    }
+    dropQueuedForceExpiry(casterName, campaignName);
 
     // 60-ft appear gate: the force space itself has no token picker (grid picker
     // is unmodeled infrastructure); isWithinRange is consulted so the gate is

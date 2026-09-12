@@ -310,6 +310,45 @@ const FREE_CAST_RESTORE_OPS = {
   logPerSpell: null,
 };
 
+// Shared feature-keyed counter branch. Returns 'break' when the counter was
+// consumed, 'next' when a parsed feature level didn't match, or 'fallthrough'
+// when the entry should be checked against the per-spell branches below.
+function adjustSharedUsesCounter(entry, playerName, spellName, spellLevel, campaignName, ops) {
+  const featureLevel = parseFeatureSpellLevel(entry);
+  const spellMatches = (featureLevel !== null && featureLevel === spellLevel) ||
+    (featureLevel === null && entrySpells(entry).includes(spellName));
+  if (spellMatches) {
+    const freeCastCountKey = featureFreeCastKey(entry);
+    const next = ops.shared(featureFreeCastCount(playerName, freeCastCountKey, entry.usesMax), entry.usesMax);
+    if (next !== null) setRuntimeValue(playerName, freeCastCountKey, next, campaignName);
+    return 'break';
+  }
+  return featureLevel !== null ? 'next' : 'fallthrough';
+}
+
+// FT-070: per-spell free-cast counters (see isFreeCastAuthorized scan). Consume the
+// cast spell's own counter and log the slotless cast with its feature name.
+function adjustPerSpellCounter(entry, playerName, spellName, campaignName, ops) {
+  if (!entry.perSpellTracking) return false;
+  const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_${spellName.replace(/\s+/g, '_')}_freeCastCount`;
+  const usesMax = entry.usesMax ?? entry.uses ?? 1;
+  const stored = getRuntimeValue(playerName, freeCastCountKey, campaignName);
+  const next = ops.perSpell(entry, stored, usesMax);
+  if (next !== null) {
+    setRuntimeValue(playerName, freeCastCountKey, next, campaignName);
+    if (ops.logPerSpell) ops.logPerSpell(entry, playerName, spellName, campaignName);
+  }
+  return true;
+}
+
+function adjustRechargeCounter(entry, playerName, spellName, campaignName, ops) {
+  if (!(entry.uses != null && entry.recharge && !entry.uses_expression)) return false;
+  const freeCastCountKey = featureFreeCastKey(entry);
+  const next = ops.shared(featureFreeCastCount(playerName, freeCastCountKey, entry.uses), entry.uses);
+  if (next !== null) setRuntimeValue(playerName, freeCastCountKey, next, campaignName);
+  return true;
+}
+
 // Consumes the feature-keyed free-cast counter for the first matching automation entry
 // (free_spell/fey_reinforcements/misty_wanderer/dragon_companion). Mirrors the scan
 // order in isFreeCastAuthorized/checkFreeCastEntry — break points are rule-significant.
@@ -317,40 +356,15 @@ function adjustActionFreeCastCounters(allActions, playerName, spellName, spellLe
   for (const entry of allActions) {
     if (!isFreeCastEntryType(entry)) continue;
     if (entry.uses_expression && entry.usesMax) {
-      const featureLevel = parseFeatureSpellLevel(entry);
-      const spellMatches = (featureLevel !== null && featureLevel === spellLevel) ||
-        (featureLevel === null && entrySpells(entry).includes(spellName));
-      if (spellMatches) {
-        const freeCastCountKey = featureFreeCastKey(entry);
-        const next = ops.shared(featureFreeCastCount(playerName, freeCastCountKey, entry.usesMax), entry.usesMax);
-        if (next !== null) setRuntimeValue(playerName, freeCastCountKey, next, campaignName);
-        break;
-      }
-      if (featureLevel !== null) continue;
+      const outcome = adjustSharedUsesCounter(entry, playerName, spellName, spellLevel, campaignName, ops);
+      if (outcome === 'break') break;
+      if (outcome === 'next') continue;
     }
 
     if (!entrySpells(entry).includes(spellName)) continue;
 
-    // FT-070: per-spell free-cast counters (see isFreeCastAuthorized scan). Consume the
-    // cast spell's own counter and log the slotless cast with its feature name.
-    if (entry.perSpellTracking) {
-      const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_${spellName.replace(/\s+/g, '_')}_freeCastCount`;
-      const usesMax = entry.usesMax ?? entry.uses ?? 1;
-      const stored = getRuntimeValue(playerName, freeCastCountKey, campaignName);
-      const next = ops.perSpell(entry, stored, usesMax);
-      if (next !== null) {
-        setRuntimeValue(playerName, freeCastCountKey, next, campaignName);
-        if (ops.logPerSpell) ops.logPerSpell(entry, playerName, spellName, campaignName);
-      }
-      break;
-    }
-
-    if (entry.uses != null && entry.recharge && !entry.uses_expression) {
-      const freeCastCountKey = featureFreeCastKey(entry);
-      const next = ops.shared(featureFreeCastCount(playerName, freeCastCountKey, entry.uses), entry.uses);
-      if (next !== null) setRuntimeValue(playerName, freeCastCountKey, next, campaignName);
-      break;
-    }
+    if (adjustPerSpellCounter(entry, playerName, spellName, campaignName, ops)) break;
+    if (adjustRechargeCounter(entry, playerName, spellName, campaignName, ops)) break;
   }
 }
 
@@ -414,6 +428,20 @@ function consumeSpecialFreeCastFlags(allActions, playerName, spellName, spellLev
   }
 }
 
+// Full automation entry list (actions/bonusActions/specialActions).
+function collectAutomationActions(playerStats) {
+  return [
+    ...(playerStats?.automation?.actions || []),
+    ...(playerStats?.automation?.bonusActions || []),
+    ...(playerStats?.automation?.specialActions || []),
+  ];
+}
+
+// CLA-231: Mystic Arcanum counters are keyed by the spell's own level (6–9).
+function isMysticArcanumLevel(spellLevel) {
+  return spellLevel >= 6 && spellLevel <= 9;
+}
+
 function decrementFreeCastResource(playerName, spellName, spellLevel, playerStats, campaignName) {
   // CLA-356: Telekinetic Master's Telekinesis is an UNLIMITED slotless free cast
   // ("Cast without spell slot") — nothing to consume. Skip all counter decrements so the
@@ -429,22 +457,16 @@ function decrementFreeCastResource(playerName, spellName, spellLevel, playerStat
   consumePerSpellFreeCastCounter(findAutomationPassive(playerStats, 'shadow_arts'), playerName, spellName, 'Shadow_Arts', campaignName);
 
   const arcanums = playerStats?.class?.arcanums || [];
-  if (arcanums.includes(spellName)) {
+  if (arcanums.includes(spellName) && isMysticArcanumLevel(spellLevel)) {
     // CLA-231: decrement the counter keyed by the cast spell's own level.
-    if (spellLevel >= 6 && spellLevel <= 9) {
-      const resourceKey = `mysticArcanumLevel${spellLevel}`;
-      const count = Number(getRuntimeValue(playerName, resourceKey) ?? 1);
-      if (count > 0) {
-        setRuntimeValue(playerName, resourceKey, count - 1, campaignName);
-      }
+    const resourceKey = `mysticArcanumLevel${spellLevel}`;
+    const count = Number(getRuntimeValue(playerName, resourceKey) ?? 1);
+    if (count > 0) {
+      setRuntimeValue(playerName, resourceKey, count - 1, campaignName);
     }
   }
 
-  const allActions = [
-    ...(playerStats?.automation?.actions || []),
-    ...(playerStats?.automation?.bonusActions || []),
-    ...(playerStats?.automation?.specialActions || []),
-  ];
+  const allActions = collectAutomationActions(playerStats);
   consumeActionFreeCastCounters(allActions, playerName, spellName, spellLevel, campaignName);
   consumeSpecialFreeCastFlags(allActions, playerName, spellName, spellLevel, campaignName);
 }
@@ -495,22 +517,16 @@ function incrementFreeCastResource(playerName, spellName, spellLevel, playerStat
   restorePerSpellFreeCastCounter(findAutomationPassive(playerStats, 'shadow_arts'), playerName, spellName, 'Shadow_Arts', campaignName);
 
   const arcanums = playerStats?.class?.arcanums || [];
-  if (arcanums.includes(spellName)) {
+  if (arcanums.includes(spellName) && isMysticArcanumLevel(spellLevel)) {
     // CLA-231: increment the counter keyed by the spell's own level.
-    if (spellLevel >= 6 && spellLevel <= 9) {
-      const resourceKey = `mysticArcanumLevel${spellLevel}`;
-      const count = Number(getRuntimeValue(playerName, resourceKey) ?? 1);
-      if (count < 1) {
-        setRuntimeValue(playerName, resourceKey, count + 1, campaignName);
-      }
+    const resourceKey = `mysticArcanumLevel${spellLevel}`;
+    const count = Number(getRuntimeValue(playerName, resourceKey) ?? 1);
+    if (count < 1) {
+      setRuntimeValue(playerName, resourceKey, count + 1, campaignName);
     }
   }
 
-  const allActions = [
-    ...(playerStats?.automation?.actions || []),
-    ...(playerStats?.automation?.bonusActions || []),
-    ...(playerStats?.automation?.specialActions || []),
-  ];
+  const allActions = collectAutomationActions(playerStats);
   restoreActionFreeCastCounters(allActions, playerName, spellName, spellLevel, campaignName);
   restoreSpecialFreeCastFlags(playerName, spellName, spellLevel, campaignName);
 }

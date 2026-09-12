@@ -307,16 +307,7 @@ describe('Thought Shield — manual reaction handler', () => {
       const result = await handle(tsAction(), warlock, 'TestCampaign');
 
       expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-      expect(applyDamageToTarget).toHaveBeenCalledWith(
-        expect.objectContaining({ round: 1 }),
-        'Goblin',
-        5,
-        ['Psychic'],
-        'TestCampaign',
-        expect.any(Array),
-        true,
-        'Warlock'
-      );
+      expect(applyDamageToTarget).toHaveBeenCalledWith(expect.objectContaining({ round: 1 }), 'Goblin', 5, ['Psychic'], 'TestCampaign', expect.any(Array), { ignoreResistance: true, attackerName: 'Warlock' });
       expect(goblin.currentHp).toBe(5);
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('reflects 5 psychic damage back to Goblin');
@@ -379,9 +370,7 @@ describe('Thought Shield — manual reaction handler', () => {
 
       const result = await handle(tsAction(), warlock, 'TestCampaign');
 
-      expect(applyDamageToTarget).toHaveBeenCalledWith(
-        expect.anything(), 'Goblin', 8, ['Psychic'], 'TestCampaign', expect.any(Array), true, 'Warlock'
-      );
+      expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', 8, ['Psychic'], 'TestCampaign', expect.any(Array), { ignoreResistance: true, attackerName: 'Warlock' });
       expect(result.payload.description).toContain('reflects 8 psychic damage back to Goblin');
     });
 

@@ -6,6 +6,38 @@ import { stripSummonedFromCombatSummary } from '../../services/combat/summons/su
 import { logConcentrationSave } from '../../services/encounters/combatLoggingService.js'
 import { logConditionEvent } from '../../services/encounters/combatLoggingService.js'
 
+function findCharacterByName(characters, name) {
+    return characters.find(c => c.name === name || c.name.startsWith(name + ' ')) || null
+}
+
+function getSaveModifiers(character) {
+    return character?.saveModifiers || character?.computedStats?.saveModifiers
+}
+
+function resolveConcentrationBreaker(saveModifiers) {
+    return saveModifiers?.some(mod =>
+        mod.condition === 'concentration_breaker' && mod.effect === 'disadvantage'
+    ) ?? false
+}
+
+function collectAdvantageSources(saveModifiers) {
+    const advantageSources = []
+    if (!saveModifiers) return advantageSources
+    saveModifiers.forEach(mod => {
+        const qualifies = mod.target === 'concentration_saving_throws' ||
+            (mod.target === 'saving_throw' && mod.condition === 'concentration_spell_damage' && mod.effect === 'advantage' && mod.abilities && mod.abilities.includes('Constitution'))
+        if (mod.source && qualifies && !advantageSources.includes(mod.source)) {
+            advantageSources.push(mod.source)
+        }
+    })
+    return advantageSources
+}
+
+function resolveSaveMode(hasConcentrationBreaker, advantageSources) {
+    if (hasConcentrationBreaker) return 'disadvantage'
+    return advantageSources.length > 0 ? 'advantage' : 'normal'
+}
+
 /**
  * Creates concentration-related handlers for the initiative component.
  */
@@ -28,24 +60,9 @@ export function createConcentrationHandlers({
         const { getRuntimeValue: grv } = await import('../../hooks/runtime/useRuntimeState.js')
         const lastAttack = await grv('campaign', 'lastAttack', campaignName)
         const attackerName = lastAttack?.attackerName
-        const attacker = attackerName ? characters.find(c => c.name === attackerName || c.name.startsWith(attackerName + ' ')) : null
-        const attackerModifiers = attacker?.saveModifiers || attacker?.computedStats?.saveModifiers
-        const hasConcentrationBreaker = attackerModifiers?.some(mod =>
-            mod.condition === 'concentration_breaker' && mod.effect === 'disadvantage'
-        ) ?? false
-
-        const targetCharacter = characters.find(c => c.name === creatureName || c.name.startsWith(creatureName + ' '))
-        const targetModifiers = targetCharacter?.saveModifiers || targetCharacter?.computedStats?.saveModifiers
-        const advantageSources = []
-        if (targetModifiers) {
-            targetModifiers.forEach(mod => {
-                if (mod.source && ((mod.target === 'concentration_saving_throws') || (mod.target === 'saving_throw' && mod.condition === 'concentration_spell_damage' && mod.effect === 'advantage' && mod.abilities && mod.abilities.includes('Constitution')))) {
-                    if (!advantageSources.includes(mod.source)) {
-                        advantageSources.push(mod.source)
-                    }
-                }
-            })
-        }
+        const attacker = attackerName ? findCharacterByName(characters, attackerName) : null
+        const hasConcentrationBreaker = resolveConcentrationBreaker(getSaveModifiers(attacker))
+        const advantageSources = collectAdvantageSources(getSaveModifiers(findCharacterByName(characters, creatureName)))
 
         const { roll: r1, success, bonus, bonusDetail, starryDragonFloor, displayRolls } = await rollConcentrationSave(
             creature, concentration, characters, campaignNpcs, campaignName, mapName, (name) => name, hasConcentrationBreaker
@@ -63,7 +80,7 @@ export function createConcentrationHandlers({
 
         setConditionPopup(buildConcentrationPopup(r1, bonus, bonusDetail, concentration.spell, concentration.dc, success, starryDragonFloor, displayRolls))
 
-        const mode = hasConcentrationBreaker ? 'disadvantage' : (advantageSources.length > 0 ? 'advantage' : 'normal')
+        const mode = resolveSaveMode(hasConcentrationBreaker, advantageSources)
         logConcentrationSave(campaignName, creatureName, r1, bonus, bonusDetail, concentration.spell, concentration.dc, success, mode, advantageSources.length > 0 ? advantageSources : undefined)
 
         if (!success) {

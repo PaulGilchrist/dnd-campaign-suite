@@ -124,17 +124,17 @@ describe('confirmMassHealingWord', () => {
 
   describe('basic healing', () => {
     it('heals each target up to max HP', async () => {
-      const result = await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter', 'Rogue'],
-        '2d6 + 3',
-        false,
-        0,
-        [],
-        3,
-      );
+      const result = await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter', 'Rogue'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 3,
+      });
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('heal_multi');
@@ -151,17 +151,17 @@ describe('confirmMassHealingWord', () => {
         return null;
       });
 
-      const result = await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '2d6 + 3',
-        false,
-        0,
-        [],
-        3,
-      );
+      const result = await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 3,
+      });
 
       expect(result.payload.results[0].healAmount).toBeLessThanOrEqual(1);
     });
@@ -176,17 +176,17 @@ describe('confirmMassHealingWord', () => {
         ...makeAction(),
         automation: { type: 'mass_healing_word', maxTargets: 2 },
       };
-      const result = await confirmMassHealingWord(
-        action,
-        makePlayerStats(),
-        campaignName,
-        ['Fighter', 'Rogue', 'Barbarian'],
-        '2d6 + 3',
-        false,
-        0,
-        [],
-        3,
-      );
+      const result = await confirmMassHealingWord({
+          action,
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter', 'Rogue', 'Barbarian'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 3,
+      });
 
       expect(result.payload.results).toHaveLength(2);
       expect(result.payload.results[0].targetName).toBe('Fighter');
@@ -194,17 +194,17 @@ describe('confirmMassHealingWord', () => {
     });
 
     it('uses player name as sourceName in log entries', async () => {
-      await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '2d6 + 3',
-        false,
-        0,
-        [],
-        3,
-      );
+      await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 3,
+      });
 
       expect(addEntry).toHaveBeenCalledWith(
         campaignName,
@@ -222,17 +222,17 @@ describe('confirmMassHealingWord', () => {
       const bonusDetails = [{ name: 'Disciple of Life', amount: 5 }];
       resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 5, details: bonusDetails });
 
-      await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '2d6 + 3',
-        false,
-        5,
-        bonusDetails,
-        3,
-      );
+      await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 5,
+          bonusDetails,
+          slotLevel: 3,
+      });
 
       const logEntry = addEntry.mock.calls[0][1];
       expect(logEntry.formula).toContain('Disciple of Life');
@@ -240,17 +240,17 @@ describe('confirmMassHealingWord', () => {
     });
 
     it('logs hp_change for each target', async () => {
-      await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter', 'Rogue', 'Barbarian'],
-        '2d6 + 3',
-        false,
-        0,
-        [],
-        3,
-      );
+      await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter', 'Rogue', 'Barbarian'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 3,
+      });
 
       const hpLogs = addEntry.mock.calls.filter((call) => call[1].type === 'hp_change');
       expect(hpLogs).toHaveLength(3);
@@ -259,17 +259,17 @@ describe('confirmMassHealingWord', () => {
     it('applies healing via applyHealingToTarget for each target when actualHeal > 0', async () => {
       applyHealingToTarget.mockReturnValue({ actualHeal: 12, oldHp: 20, newHp: 32 });
 
-      await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter', 'Rogue'],
-        '2d6 + 3',
-        false,
-        0,
-        [],
-        3,
-      );
+      await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter', 'Rogue'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 3,
+      });
 
       expect(applyHealingToTarget).toHaveBeenCalledWith(
         expect.any(Object),
@@ -294,17 +294,17 @@ describe('confirmMassHealingWord', () => {
         return null;
       });
 
-      await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter', 'Rogue'],
-        '2d6 + 3',
-        false,
-        0,
-        [],
-        3,
-      );
+      await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter', 'Rogue'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 3,
+      });
 
       // Fighter should not receive healing (already at max HP)
       const fighterCalls = applyHealingToTarget.mock.calls.filter(
@@ -318,17 +318,17 @@ describe('confirmMassHealingWord', () => {
       const mockDispatch = vi.fn();
       window.dispatchEvent = mockDispatch;
 
-      await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '2d6 + 3',
-        false,
-        0,
-        [],
-        3,
-      );
+      await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 3,
+      });
 
       expect(mockDispatch).toHaveBeenCalled();
       expect(mockDispatch.mock.calls[0][0].type).toBe('combat-summary-updated');
@@ -337,33 +337,33 @@ describe('confirmMassHealingWord', () => {
     });
 
     it('includes formula in popup result', async () => {
-      const result = await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '2d6 + 3',
-        false,
-        0,
-        [],
-        3,
-      );
+      const result = await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 3,
+      });
 
       expect(result.payload.formula).toBe('2d6 + 3');
     });
 
     it('includes name "Mass Healing Word" in popup result', async () => {
-      const result = await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '2d6 + 3',
-        false,
-        0,
-        [],
-        3,
-      );
+      const result = await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 3,
+      });
 
       expect(result.payload.name).toBe('Mass Healing Word');
     });
@@ -373,17 +373,17 @@ describe('confirmMassHealingWord', () => {
 
   describe('maximization behavior', () => {
     it('uses rollExpressionMaximized when maximize is true', async () => {
-      await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '2d6 + 3',
-        true, // maximize
-        0,
-        [],
-        3,
-      );
+      await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '2d6 + 3',
+          maximize: true,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 3,
+      });
 
       expect(rollExpressionMaximized).toHaveBeenCalledWith('2d6 + 3');
       expect(rollExpression).not.toHaveBeenCalled();
@@ -392,34 +392,34 @@ describe('confirmMassHealingWord', () => {
     it('uses rollExpressionMaximized when hasHealingMaximizationForTarget is true', async () => {
       hasHealingMaximizationForTarget.mockReturnValue(true);
 
-      await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '2d6 + 3',
-        false,
-        0,
-        [],
-        3,
-      );
+      await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 3,
+      });
 
       expect(rollExpressionMaximized).toHaveBeenCalledWith('2d6 + 3');
       expect(rollExpression).not.toHaveBeenCalled();
     });
 
     it('uses normal rollExpression when neither maximization flag is set', async () => {
-      await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '2d6 + 3',
-        false,
-        0,
-        [],
-        3,
-      );
+      await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 3,
+      });
 
       expect(rollExpression).toHaveBeenCalledWith('2d6 + 3');
       expect(rollExpressionMaximized).not.toHaveBeenCalled();
@@ -429,17 +429,17 @@ describe('confirmMassHealingWord', () => {
       hasHealingMaximization.mockReturnValue(false);
       hasHealingMaximizationForTarget.mockReturnValue(true);
 
-      await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '2d6 + 3',
-        false,
-        0,
-        [],
-        3,
-      );
+      await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 3,
+      });
 
       expect(rollExpressionMaximized).toHaveBeenCalledWith('2d6 + 3');
     });
@@ -454,17 +454,17 @@ describe('confirmMassHealingWord', () => {
       const rollResult = { total: 12, rolls: [5, 4, 3] };
       rollExpression.mockReturnValue(rollResult);
 
-      await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '2d6 + 3',
-        false,
-        bonusHeal,
-        bonusDetails,
-        3,
-      );
+      await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal,
+          bonusDetails,
+          slotLevel: 3,
+      });
 
       // totalHeal = rollResult.total (12) + bonusHeal (5) = 17
       expect(applyHealingToTarget).toHaveBeenCalledWith(
@@ -479,34 +479,34 @@ describe('confirmMassHealingWord', () => {
       const bonusHeal = 5;
       const bonusDetails = [{ name: 'Disciple of Life', amount: 5 }];
 
-      const result = await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '2d6 + 3',
-        false,
-        bonusHeal,
-        bonusDetails,
-        3,
-      );
+      const result = await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal,
+          bonusDetails,
+          slotLevel: 3,
+      });
 
       expect(result.payload.bonusHeal).toBe(5);
       expect(result.payload.bonusHealDetail).toContain('Disciple of Life');
     });
 
     it('returns empty bonusHealDetail when no bonus details', async () => {
-      const result = await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '2d6 + 3',
-        false,
-        0,
-        [],
-        3,
-      );
+      const result = await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 3,
+      });
 
       expect(result.payload.bonusHealDetail).toBe('');
     });
@@ -515,17 +515,17 @@ describe('confirmMassHealingWord', () => {
       const bonusDetails = [{ name: 'Disciple of Life', amount: 5 }];
       resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 5, details: bonusDetails });
 
-      await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '2d6 + 3',
-        false,
-        5,
-        bonusDetails,
-        3,
-      );
+      await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 5,
+          bonusDetails,
+          slotLevel: 3,
+      });
 
       const logEntry = addEntry.mock.calls[0][1];
       // formula should contain the base expression + bonus details
@@ -540,17 +540,17 @@ describe('confirmMassHealingWord', () => {
     it('calls markFortifiedHealthUsed when healing occurred and Fortified Health bonus is present', async () => {
       const bonusDetails = [{ name: 'Fortified Health', amount: 5 }];
 
-      await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '2d6 + 3',
-        false,
-        5,
-        bonusDetails,
-        3,
-      );
+      await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 5,
+          bonusDetails,
+          slotLevel: 3,
+      });
 
       expect(markFortifiedHealthUsed).toHaveBeenCalledWith(
         makePlayerStats(),
@@ -567,17 +567,17 @@ describe('confirmMassHealingWord', () => {
         return null;
       });
 
-      await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '2d6 + 3',
-        false,
-        5,
-        bonusDetails,
-        3,
-      );
+      await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 5,
+          bonusDetails,
+          slotLevel: 3,
+      });
 
       expect(markFortifiedHealthUsed).not.toHaveBeenCalled();
     });
@@ -585,33 +585,33 @@ describe('confirmMassHealingWord', () => {
     it('does not call markFortifiedHealthUsed when bonus is not Fortified Health', async () => {
       const bonusDetails = [{ name: 'Disciple of Life', amount: 5 }];
 
-      await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '2d6 + 3',
-        false,
-        5,
-        bonusDetails,
-        3,
-      );
+      await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 5,
+          bonusDetails,
+          slotLevel: 3,
+      });
 
       expect(markFortifiedHealthUsed).not.toHaveBeenCalled();
     });
 
     it('does not call markFortifiedHealthUsed when no bonus details at all', async () => {
-      await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '2d6 + 3',
-        false,
-        0,
-        [],
-        3,
-      );
+      await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 3,
+      });
 
       expect(markFortifiedHealthUsed).not.toHaveBeenCalled();
     });
@@ -621,17 +621,17 @@ describe('confirmMassHealingWord', () => {
 
   describe('popup payload structure', () => {
     it('returns correct popup payload structure', async () => {
-      const result = await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter', 'Rogue'],
-        '2d6 + 3',
-        false,
-        0,
-        [],
-        3,
-      );
+      const result = await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter', 'Rogue'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 3,
+      });
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('heal_multi');
@@ -643,50 +643,50 @@ describe('confirmMassHealingWord', () => {
     });
 
     it('includes roll details in each result', async () => {
-      const result = await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '2d6 + 3',
-        false,
-        0,
-        [],
-        3,
-      );
+      const result = await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 3,
+      });
 
       expect(result.payload.results[0].targetName).toBe('Fighter');
       expect(Array.isArray(result.payload.results[0].rolls)).toBe(true);
     });
 
     it('aggregates all rolls into payload.rolls', async () => {
-      const result = await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter', 'Rogue'],
-        '2d6 + 3',
-        false,
-        0,
-        [],
-        3,
-      );
+      const result = await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter', 'Rogue'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 3,
+      });
 
       expect(result.payload.rolls.length).toBeGreaterThan(0);
     });
 
     it('excludes rawTotal from payload result (only internal)', async () => {
-      const result = await confirmMassHealingWord(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        ['Fighter'],
-        '2d6 + 3',
-        false,
-        0,
-        [],
-        3,
-      );
+      const result = await confirmMassHealingWord({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '2d6 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 3,
+      });
 
       expect(result.payload.results[0].rawTotal).toBeUndefined();
       expect(result.payload.results[0].targetName).toBe('Fighter');

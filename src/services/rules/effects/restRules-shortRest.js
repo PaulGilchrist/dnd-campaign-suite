@@ -10,6 +10,7 @@ import { setTempHp } from '../../../services/automation/handlers/buffs/tempHpSer
 import { endInvisibility, endGreaterInvisibility } from '../features/invisibilityService.js'
 import { clearHuntersMarkConcentration } from './restRules.js'
 import { getShortRestResources, computeShortRestHpNewCurrent, spellSlotLevels } from './restRules-constants.js'
+import { getCelestialResilienceSelfTempHp } from './restRules-celestialResilience.js'
 import { computeSuperiorityDiceMax } from '../trackedResources.js'
 
 // Wizard school savants: reset per-spell free cast tracking on short rest,
@@ -71,34 +72,44 @@ const SHORT_REST_NULL_FLAG_KEYS = [
   'destructiveStrideDamageType',
 ]
 
+function findClassLevel(playerStats) {
+  return (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level)
+}
+
+function addFighterResourceUpdates(name, playerStats, updates, campaignName) {
+  // FS-010: restore superiority dice to the character's ACTUAL max
+  // (Battle Master level table, or 1 for a pure Superior Technique
+  // fighter) — restoring null here armed the ??4 phantom pool.
+  const maxSD = computeSuperiorityDiceMax(playerStats)
+  if (maxSD > 0) {
+    updates.superiorityDice = maxSD
+  }
+  const maxSW = findClassLevel(playerStats)?.second_wind || 0
+  const currentSW = Number(getRuntimeValue(name, 'secondWindUses', campaignName) ?? 0)
+  if (currentSW < maxSW) {
+    updates.secondWindUses = Math.min(maxSW, currentSW + 1)
+  }
+}
+
+function addBarbarianRageUpdate(name, playerStats, updates, campaignName) {
+  const maxRage = findClassLevel(playerStats)?.rages || 0
+  const trackedRage = playerStats._trackedResources?.ragePoints
+  const storedRage = getRuntimeValue(name, 'ragePoints', campaignName)
+  const currentRage = storedRage != null ? Number(storedRage) : (trackedRage?.current ?? maxRage)
+  if (currentRage < maxRage) {
+    updates.ragePoints = Math.min(maxRage, currentRage + 1)
+  }
+}
+
 // Fighter: superiority dice to actual max (FS-010) + Second Wind recharge;
 // Barbarian 2024: Rage recharges 1 use on short rest.
 function addClassResourceUpdates(name, playerStats, updates, campaignName) {
   if (playerStats.class?.name === 'Fighter') {
-    // FS-010: restore superiority dice to the character's ACTUAL max
-    // (Battle Master level table, or 1 for a pure Superior Technique
-    // fighter) — restoring null here armed the ??4 phantom pool.
-    const maxSD = computeSuperiorityDiceMax(playerStats);
-    if (maxSD > 0) {
-      updates.superiorityDice = maxSD;
-    }
-    const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-    const maxSW = classLevel?.second_wind || 0;
-    const currentSW = Number(getRuntimeValue(name, 'secondWindUses', campaignName) ?? 0);
-    if (currentSW < maxSW) {
-      updates.secondWindUses = Math.min(maxSW, currentSW + 1);
-    }
+    addFighterResourceUpdates(name, playerStats, updates, campaignName)
   }
 
   if (playerStats.class?.name === 'Barbarian' && playerStats.rules === '2024') {
-    const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-    const maxRage = classLevel?.rages || 0;
-    const trackedRage = playerStats._trackedResources?.ragePoints;
-    const storedRage = getRuntimeValue(name, 'ragePoints', campaignName);
-    const currentRage = storedRage != null ? Number(storedRage) : (trackedRage?.current ?? maxRage);
-    if (currentRage < maxRage) {
-      updates.ragePoints = Math.min(maxRage, currentRage + 1);
-    }
+    addBarbarianRageUpdate(name, playerStats, updates, campaignName)
   }
 }
 
@@ -213,18 +224,8 @@ async function clearVowOfEnmity(name, updates, campaignName) {
 // Returns the batch tempHp value plus the modal ally-target payload when
 // allies were gifted temp HP, else null.
 async function grantCelestialResilienceOnShortRest(name, playerStats, campaignName) {
-  if (playerStats.class?.major?.name !== 'Celestial Patron' && playerStats.class?.subclass?.name !== 'Celestial Patron') return null
-  const features = playerStats.specialActions || []
-  const feature = features.find(f => f.name === 'Celestial Resilience')
-  if (!feature) return null
-  if (playerStats.level == null) {
-    console.error('[restRules] applyShortRest: playerStats.level is missing for celestial patron temp HP')
-    throw new Error('playerStats.level is required for celestial patron temp HP')
-  }
-  const warlockLevel = playerStats.level
-  const chaMod = (playerStats.abilities || []).find(a => a.name === 'Charisma')?.bonus || 0
-  const selfTempHp = warlockLevel + chaMod
-  if (selfTempHp <= 0) return null
+  const selfTempHp = getCelestialResilienceSelfTempHp(playerStats, 'applyShortRest')
+  if (selfTempHp == null) return null
 
   const tempHp = setTempHp(name, selfTempHp, campaignName)
   addEntry(campaignName, {

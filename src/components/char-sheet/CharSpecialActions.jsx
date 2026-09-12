@@ -312,6 +312,323 @@ function delegateAutomationClick(auto, h) {
     return true;
 }
 
+function usePerformanceSongHandlers({ bolsteringPerformanceModal, setBolsteringPerformanceModal, encouragingSongModal, setEncouragingSongModal, setPopupHtml }) {
+    const handleBolsteringPerformanceConfirm = useCallback(async (selectedTargets) => {
+        if (!bolsteringPerformanceModal) return;
+        const result = await confirmBolsteringPerformance(
+            bolsteringPerformanceModal.action,
+            bolsteringPerformanceModal.playerStats,
+            bolsteringPerformanceModal.campaignName,
+            selectedTargets,
+            bolsteringPerformanceModal.tempHp
+        );
+        showPayloadPopup(result, setPopupHtml);
+        setBolsteringPerformanceModal(null);
+    }, [bolsteringPerformanceModal, setPopupHtml, setBolsteringPerformanceModal]);
+    const handleEncouragingSongConfirm = useCallback(async (selectedTargets) => {
+        if (!encouragingSongModal) return;
+        const result = await confirmEncouragingSong(
+            encouragingSongModal.action,
+            encouragingSongModal.playerStats,
+            encouragingSongModal.campaignName,
+            selectedTargets
+        );
+        showPayloadPopup(result, setPopupHtml);
+        setEncouragingSongModal(null);
+    }, [encouragingSongModal, setPopupHtml, setEncouragingSongModal]);
+    const handleEncouragingSongSkip = useCallback(async () => {
+        if (!encouragingSongModal) return;
+        const result = await skipEncouragingSong(
+            encouragingSongModal.action,
+            encouragingSongModal.playerStats,
+            encouragingSongModal.campaignName
+        );
+        showPayloadPopup(result, setPopupHtml);
+        setEncouragingSongModal(null);
+    }, [encouragingSongModal, setPopupHtml, setEncouragingSongModal]);
+    return { handleBolsteringPerformanceConfirm, handleEncouragingSongConfirm, handleEncouragingSongSkip };
+}
+
+function useLineageConfirms({ elfishLineageModal, setElfisLineageModal, gnomishLineageModal, setGnomishLineageModal, setPopupHtml }) {
+    const handleElfisLineageConfirm = useCallback(async (chosenLineage, playerStats, campaignName) => {
+        if (!elfishLineageModal) return;
+        const result = await confirmElfisLineage(playerStats, chosenLineage, campaignName);
+        showPayloadPopup(result, setPopupHtml);
+        setElfisLineageModal(null);
+    }, [elfishLineageModal, setPopupHtml, setElfisLineageModal]);
+    const handleGnomishLineageConfirm = useCallback(async (chosenLineage, playerStats, campaignName) => {
+        if (!gnomishLineageModal) return;
+        const result = await confirmGnomishLineage(playerStats, chosenLineage, campaignName);
+        showPayloadPopup(result, setPopupHtml);
+        setGnomishLineageModal(null);
+    }, [gnomishLineageModal, setPopupHtml, setGnomishLineageModal]);
+    return { handleElfisLineageConfirm, handleGnomishLineageConfirm };
+}
+
+function useFeatureChoiceHandlers({ featureChoiceModal, setFeatureChoiceModal, playerStats, campaignName, setPopupHtml }) {
+    const handleFeatureChoiceConfirm = useCallback(async (choice) => {
+        if (!featureChoiceModal) return;
+        const { action, optionKey } = featureChoiceModal;
+        if (action.automation?.type === 'defensive_tactics') {
+            const result = await applyChoice(playerStats, campaignName, choice);
+            if (result?.type === 'popup') {
+                setPopupHtml(result.payload);
+            }
+            setFeatureChoiceModal(null);
+            return;
+        }
+        if (action.automation?.type === 'hunter_prey') {
+            const result = await applyHunterPreyChoice(playerStats, campaignName, choice);
+            if (result?.type === 'popup') {
+                setPopupHtml(result.payload);
+            }
+            setFeatureChoiceModal(null);
+            return;
+        }
+        setRuntimeValue(playerStats.name, optionKey, choice, campaignName);
+        setFeatureChoiceModal(null);
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: action.name,
+            description: `Chose option: ${choice}`,
+        }).catch((e) => { console.error("[charSpecialActions:log-error]", e); });
+        const restMessage = (action.automation?.type === 'defensive_tactics' || action.automation?.type === 'hunter_prey')
+            ? 'This choice can be changed on a Short Rest or Long Rest.'
+            : 'This choice can be changed by clicking the feature again.';
+        const html = `<b>${action.name}</b><br/>Option chosen: <b>${choice}</b>. ${restMessage}`;
+        setPopupHtml(html);
+    }, [featureChoiceModal, playerStats, campaignName, setPopupHtml, setFeatureChoiceModal]);
+    const handleFeatureChoiceSkip = useCallback(() => {
+        setFeatureChoiceModal(null);
+    }, [setFeatureChoiceModal]);
+    return { handleFeatureChoiceConfirm, handleFeatureChoiceSkip };
+}
+
+const ASPECT_EFFECTS = {
+    Owl: 'darkvision_aspect',
+    Panther: 'climb_speed_aspect',
+    Salmon: 'swim_speed_aspect',
+};
+
+function useAspectOfTheWildsHandlers({ setAspectOfTheWildsModal, playerStats, campaignName, setPopupHtml }) {
+    const handleAspectOfTheWildsConfirm = useCallback(async (choice) => {
+        const existingBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+        const currentBuffs = Array.isArray(existingBuffs) ? [...existingBuffs] : [];
+        const aspectBuff = {
+            name: 'Aspect of the Wilds',
+            effect: ASPECT_EFFECTS[choice] || ASPECT_EFFECTS.Salmon,
+            duration: 'infinite',
+            optionName: choice,
+        };
+        const aspectBuffIndex = currentBuffs.findIndex(b => b.name === 'Aspect of the Wilds');
+        if (aspectBuffIndex !== -1) {
+            currentBuffs[aspectBuffIndex] = aspectBuff;
+        } else {
+            currentBuffs.push(aspectBuff);
+        }
+        setRuntimeValue(playerStats.name, 'activeBuffs', currentBuffs, campaignName);
+        setRuntimeValue(playerStats.name, 'aspectOfTheWildsOption', choice, campaignName);
+        setRuntimeValue(playerStats.name, 'aspectOfTheWildsUsedThisRest', true, campaignName);
+        setAspectOfTheWildsModal(null);
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: 'Aspect of the Wilds',
+            description: `Chose ${choice} aspect`,
+        }).catch((e) => { console.error("[charSpecialActions:log-error]", e); });
+        const descriptions = {
+            Owl: 'Darkvision 60 ft.',
+            Panther: 'Climb speed equal to walking speed',
+            Salmon: 'Swim speed equal to walking speed',
+        };
+        const html = `<b>Aspect of the Wilds</b><br/>Chose <b>${choice}</b>: ${descriptions[choice]}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+        setPopupHtml(html);
+    }, [playerStats, campaignName, setPopupHtml, setAspectOfTheWildsModal]);
+    const handleAspectOfTheWildsSkip = useCallback(() => {
+        setAspectOfTheWildsModal(null);
+    }, [setAspectOfTheWildsModal]);
+    return { handleAspectOfTheWildsConfirm, handleAspectOfTheWildsSkip };
+}
+
+function useStrideMovementHandlers({ strideModal, setStrideModal, moonlightStepFallback, setMoonlightStepFallback, setPopupHtml }) {
+    const handleStrideConfirm = useCallback(async (optionName, buffEntry) => {
+        if (!strideModal) return;
+        const { action, playerStats: modalPlayerStats, campaignName: modalCampaign } = strideModal;
+        setStrideModal(null);
+        const stored = getRuntimeValue(modalPlayerStats.name, 'activeBuffs', modalCampaign);
+        const activeBuffs = Array.isArray(stored) ? stored : [];
+        const existingStride = activeBuffs.find(b => b.name === 'Stride of the Elements');
+        const newBuffs = existingStride
+            ? activeBuffs.map(b => b.name === 'Stride of the Elements' ? { ...b, ...buffEntry } : b)
+            : [...activeBuffs, { name: 'Stride of the Elements', ...buffEntry }];
+        await setRuntimeValue(modalPlayerStats.name, 'activeBuffs', newBuffs, modalCampaign);
+        const descriptions = {
+            'Ice Walk': 'You can walk across and climb icy or wet surfaces without needing to make an Ability Check. You ignore difficult terrain that is composed of ice or snow.',
+            '+10 Speed': 'Your Speed increases by 10 feet.',
+            'Fly Speed': 'You gain a Fly Speed equal to your Speed.',
+            'Teleport 30 ft': 'You can teleport up to 30 ft to an unoccupied space you can see.',
+        };
+        const description = `Chose ${optionName}: ${descriptions[optionName] || optionName}`;
+        await addEntry(modalCampaign, {
+            type: 'ability_use',
+            characterName: modalPlayerStats.name,
+            abilityName: action.name,
+            description,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[StrideOfTheElements] Error logging:', e); });
+        const html = `<b>${action.name}</b><br/>Chose <strong>${optionName}</strong>. ${descriptions[optionName] || optionName}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+        setPopupHtml(html);
+    }, [strideModal, setPopupHtml, setStrideModal]);
+    const handleMoonlightStepFallbackConfirm = useCallback(async () => {
+        if (!moonlightStepFallback) return;
+        const { action, playerStats: fallbackStats, campaignName: fallbackCampaign, slotLevel } = moonlightStepFallback;
+        setMoonlightStepFallback(null);
+        const res = await confirmTeleport(action, fallbackStats, fallbackCampaign, false, slotLevel);
+        if (res?.type === 'popup') {
+            const payload = res.payload;
+            const html = `<b>${payload.name || action.name}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+            setPopupHtml(html);
+        }
+    }, [moonlightStepFallback, setPopupHtml, setMoonlightStepFallback]);
+    return { handleStrideConfirm, handleMoonlightStepFallbackConfirm };
+}
+
+function useCelestialResilienceHandlers({ celestialResilienceModal, setCelestialResilienceModal, setPopupHtml }) {
+    const handleCelestialResilienceConfirm = useCallback(async (selectedTargets) => {
+        if (!celestialResilienceModal) return;
+        const { action, playerStats: modalPlayerStats, campaignName: modalCampaign, allyTempHp } = celestialResilienceModal;
+        if (!selectedTargets || selectedTargets.length === 0) {
+            setPopupHtml(`<b>${action.name}</b><br/>No allies selected.<br/><span class="dice-roll-hint">click to dismiss</span>`);
+            setCelestialResilienceModal(null);
+            return;
+        }
+        for (const targetName of selectedTargets) {
+            await setTempHp(targetName, allyTempHp, modalCampaign);
+        }
+        await addEntry(modalCampaign, {
+            type: 'ability_use',
+            characterName: modalPlayerStats.name,
+            abilityName: action.name,
+            description: `${modalPlayerStats.name} grants ${allyTempHp} temporary hit points to ${selectedTargets.join(', ')}.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[celestialResilience] Error logging:', e); });
+        const html = `<b>${action.name}</b><br/>Granted ${allyTempHp} temporary hit points to ${selectedTargets.join(', ')}.<br/><span class="dice-roll-hint">click to dismiss</span>`;
+        setPopupHtml(html);
+        setCelestialResilienceModal(null);
+    }, [celestialResilienceModal, setPopupHtml, setCelestialResilienceModal]);
+    const handleCelestialResilienceSkip = useCallback(() => {
+        if (!celestialResilienceModal) return;
+        const { action } = celestialResilienceModal;
+        setPopupHtml(`<b>${action.name}</b><br/>No allies selected.<br/><span class="dice-roll-hint">click to dismiss</span>`);
+        setCelestialResilienceModal(null);
+    }, [celestialResilienceModal, setPopupHtml, setCelestialResilienceModal]);
+    return { handleCelestialResilienceConfirm, handleCelestialResilienceSkip };
+}
+
+function useDestructiveStrideHandlers({ setDestructiveStrideModal, destructiveStrideTargetModal, setDestructiveStrideTargetModal, setPopupHtml }) {
+    const handleDestructiveStrideConfirm = useCallback(async (result) => {
+        setDestructiveStrideModal(null);
+        if (result?.type === 'modal' && result.modalName === 'destructiveStrideTarget') {
+            setDestructiveStrideTargetModal(result.payload);
+        } else if (result?.type === 'popup') {
+            const html = `<b>${result.payload?.name || 'Destructive Stride'}</b><br/>${result.payload?.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+            setPopupHtml(html);
+        }
+    }, [setPopupHtml, setDestructiveStrideModal, setDestructiveStrideTargetModal]);
+    const handleDestructiveStrideTargetConfirm = useCallback(async (targetName) => {
+        if (!destructiveStrideTargetModal) return;
+        const { action, playerStats: modalPlayerStats, campaignName: modalCampaign, chosenType, martialArtsDie } = destructiveStrideTargetModal;
+        setDestructiveStrideTargetModal(null);
+        const result = await applyDestructiveStrideTargetChoice(action, modalPlayerStats, modalCampaign, targetName, chosenType, martialArtsDie);
+        if (result?.type === 'popup') {
+            const html = `<b>${result.payload?.name || 'Destructive Stride'}</b><br/>${result.payload?.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+            setPopupHtml(html);
+        }
+    }, [destructiveStrideTargetModal, setPopupHtml, setDestructiveStrideTargetModal]);
+    const handleDestructiveStrideTargetSkip = useCallback(() => {
+        setDestructiveStrideTargetModal(null);
+    }, [setDestructiveStrideTargetModal]);
+    return { handleDestructiveStrideConfirm, handleDestructiveStrideTargetConfirm, handleDestructiveStrideTargetSkip };
+}
+
+function useWizardSpellConfirms({ signatureSpellsModal, setSignatureSpellsModal, spellMasteryModal, setSpellMasteryModal, savantModal, setSavantModal, playerStats, campaignName, setPopupHtml }) {
+    const handleSignatureSpellsConfirm = useCallback(async (spell1, spell2) => {
+        if (!signatureSpellsModal) return;
+        const result = await onSignatureSpellsSelected(signatureSpellsModal.action, playerStats, campaignName, spell1, spell2);
+        setSignatureSpellsModal(null);
+        if (result?.type === 'popup') {
+            const payload = result.payload;
+            const html = typeof payload === 'string'
+                ? payload
+                : `<b><i class="fa-solid fa-magic"></i> ${payload.name || 'Signature Spells'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+            setPopupHtml(html);
+        }
+    }, [signatureSpellsModal, playerStats, campaignName, setPopupHtml, setSignatureSpellsModal]);
+    const handleSpellMasteryConfirm = useCallback(async (spell1, spell2) => {
+        if (!spellMasteryModal) return;
+        const result = await onSpellMasterySelected(spellMasteryModal.action, playerStats, campaignName, spell1, spell2);
+        setSpellMasteryModal(null);
+        if (result?.type === 'popup') {
+            const payload = result.payload;
+            const html = typeof payload === 'string'
+                ? payload
+                : `<b><i class="fa-solid fa-magic"></i> ${payload.name || 'Spell Mastery'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+            setPopupHtml(html);
+        }
+    }, [spellMasteryModal, playerStats, campaignName, setPopupHtml, setSpellMasteryModal]);
+    const handleSavantConfirm = useCallback(async (spell1, spell2) => {
+        if (!savantModal) return;
+        const result = await onSavantSelected(savantModal.action, playerStats, campaignName, spell1, spell2, savantModal.school);
+        setSavantModal(null);
+        if (result?.type === 'popup') {
+            const payload = result.payload;
+            const html = typeof payload === 'string'
+                ? payload
+                : `<b><i class="fa-solid fa-magic"></i> ${payload.name || savantModal.school} Savant</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+            setPopupHtml(html);
+        }
+    }, [savantModal, playerStats, campaignName, setPopupHtml, setSavantModal]);
+    return { handleSignatureSpellsConfirm, handleSpellMasteryConfirm, handleSavantConfirm };
+}
+
+function usePortentHandlers({ portentModal, setPortentModal, setPopupHtml }) {
+    const handlePortentDieChoice = useCallback(async (chosenDie) => {
+        if (!portentModal) return;
+        const { action, playerStats: ps, campaignName: cn, targetName, eventType, eventData, context } = portentModal;
+        try {
+            const result = await applyPortentChoice(action, ps, cn, targetName, eventType, eventData, context, chosenDie);
+            setPortentModal(null);
+            if (result?.type === 'popup') {
+                const payload = result.payload;
+                const html = `<b>${payload.name || 'Portent'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+                setPopupHtml(html);
+            }
+        } catch (e) {
+            console.error('[Portent] Failed to apply die choice:', e);
+            setPortentModal(null);
+        }
+    }, [portentModal, setPopupHtml, setPortentModal]);
+    const handlePortentModalClose = useCallback(() => {
+        setPortentModal(null);
+    }, [setPortentModal]);
+    return { handlePortentDieChoice, handlePortentModalClose };
+}
+
+function useEpitomeHandlers({ epitomeModal, setEpitomeModal, setPopupHtml }) {
+    const handleEpitomeConfirm = useCallback(async (payload) => {
+        if (!epitomeModal) return;
+        const { action } = epitomeModal;
+        setEpitomeModal(null);
+        const html = `<b>${action.name}</b><br/>${payload?.description || 'Elemental Epitome activated.'}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+        setPopupHtml(html);
+    }, [epitomeModal, setPopupHtml, setEpitomeModal]);
+    const handleEpitomeClose = useCallback(() => {
+        setEpitomeModal(null);
+    }, [setEpitomeModal]);
+    return { handleEpitomeConfirm, handleEpitomeClose };
+}
+
 function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, mapName }) {
     const [teleportModal, setTeleportModal] = useState(null);
     const [moonlightStepFallback, setMoonlightStepFallback] = useState(null);
@@ -383,51 +700,15 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
         handleBolsteringTreatsConfirm,
     } = useBolsteringTreats(playerStats, campaignName, cannotAct, characters, setPopupHtml);
     const { handleBrewPoisonClick } = useBrewPoison(playerStats, campaignName, cannotAct, setPopupHtml);
-    const handleBolsteringPerformanceConfirm = useCallback(async (selectedTargets) => {
-        if (!bolsteringPerformanceModal) return;
-        const result = await confirmBolsteringPerformance(
-            bolsteringPerformanceModal.action,
-            bolsteringPerformanceModal.playerStats,
-            bolsteringPerformanceModal.campaignName,
-            selectedTargets,
-            bolsteringPerformanceModal.tempHp
-        );
-        showPayloadPopup(result, setPopupHtml);
-        setBolsteringPerformanceModal(null);
-    }, [bolsteringPerformanceModal, setPopupHtml]);
-    const handleEncouragingSongConfirm = useCallback(async (selectedTargets) => {
-        if (!encouragingSongModal) return;
-        const result = await confirmEncouragingSong(
-            encouragingSongModal.action,
-            encouragingSongModal.playerStats,
-            encouragingSongModal.campaignName,
-            selectedTargets
-        );
-        showPayloadPopup(result, setPopupHtml);
-        setEncouragingSongModal(null);
-    }, [encouragingSongModal, setPopupHtml]);
-    const handleEncouragingSongSkip = useCallback(async () => {
-        if (!encouragingSongModal) return;
-        const result = await skipEncouragingSong(
-            encouragingSongModal.action,
-            encouragingSongModal.playerStats,
-            encouragingSongModal.campaignName
-        );
-        showPayloadPopup(result, setPopupHtml);
-        setEncouragingSongModal(null);
-    }, [encouragingSongModal, setPopupHtml]);
-    const handleElfisLineageConfirm = useCallback(async (chosenLineage, playerStats, campaignName) => {
-        if (!elfishLineageModal) return;
-        const result = await confirmElfisLineage(playerStats, chosenLineage, campaignName);
-        showPayloadPopup(result, setPopupHtml);
-        setElfisLineageModal(null);
-    }, [elfishLineageModal, setPopupHtml]);
-    const handleGnomishLineageConfirm = useCallback(async (chosenLineage, playerStats, campaignName) => {
-        if (!gnomishLineageModal) return;
-        const result = await confirmGnomishLineage(playerStats, chosenLineage, campaignName);
-        showPayloadPopup(result, setPopupHtml);
-        setGnomishLineageModal(null);
-    }, [gnomishLineageModal, setPopupHtml]);
+    const {
+        handleBolsteringPerformanceConfirm,
+        handleEncouragingSongConfirm,
+        handleEncouragingSongSkip,
+    } = usePerformanceSongHandlers({ bolsteringPerformanceModal, setBolsteringPerformanceModal, encouragingSongModal, setEncouragingSongModal, setPopupHtml });
+    const {
+        handleElfisLineageConfirm,
+        handleGnomishLineageConfirm,
+    } = useLineageConfirms({ elfishLineageModal, setElfisLineageModal, gnomishLineageModal, setGnomishLineageModal, setPopupHtml });
     useEffect(() => {
         let cancelled = false;
         loadFightingStyles().then(styles => {
@@ -438,82 +719,14 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
         });
         return () => { cancelled = true; };
     }, []);
-    const handleFeatureChoiceConfirm = useCallback(async (choice) => {
-        if (!featureChoiceModal) return;
-        const { action, optionKey } = featureChoiceModal;
-        if (action.automation?.type === 'defensive_tactics') {
-            const result = await applyChoice(playerStats, campaignName, choice);
-            if (result?.type === 'popup') {
-                setPopupHtml(result.payload);
-            }
-            setFeatureChoiceModal(null);
-            return;
-        }
-        if (action.automation?.type === 'hunter_prey') {
-            const result = await applyHunterPreyChoice(playerStats, campaignName, choice);
-            if (result?.type === 'popup') {
-                setPopupHtml(result.payload);
-            }
-            setFeatureChoiceModal(null);
-            return;
-        }
-        setRuntimeValue(playerStats.name, optionKey, choice, campaignName);
-        setFeatureChoiceModal(null);
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: action.name,
-            description: `Chose option: ${choice}`,
-        }).catch((e) => { console.error("[charSpecialActions:log-error]", e); });
-        const restMessage = (action.automation?.type === 'defensive_tactics' || action.automation?.type === 'hunter_prey')
-            ? 'This choice can be changed on a Short Rest or Long Rest.'
-            : 'This choice can be changed by clicking the feature again.';
-        const html = `<b>${action.name}</b><br/>Option chosen: <b>${choice}</b>. ${restMessage}`;
-        setPopupHtml(html);
-    }, [featureChoiceModal, playerStats, campaignName, setPopupHtml]);
-    const handleFeatureChoiceSkip = useCallback(() => {
-        setFeatureChoiceModal(null);
-    }, []);
-    const handleAspectOfTheWildsConfirm = useCallback(async (choice) => {
-        const existingBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
-        const currentBuffs = Array.isArray(existingBuffs) ? [...existingBuffs] : [];
-        const aspectBuffIndex = currentBuffs.findIndex(b => b.name === 'Aspect of the Wilds');
-        if (aspectBuffIndex !== -1) {
-            currentBuffs[aspectBuffIndex] = {
-                name: 'Aspect of the Wilds',
-                effect: choice === 'Owl' ? 'darkvision_aspect' : choice === 'Panther' ? 'climb_speed_aspect' : 'swim_speed_aspect',
-                duration: 'infinite',
-                optionName: choice,
-            };
-        } else {
-            currentBuffs.push({
-                name: 'Aspect of the Wilds',
-                effect: choice === 'Owl' ? 'darkvision_aspect' : choice === 'Panther' ? 'climb_speed_aspect' : 'swim_speed_aspect',
-                duration: 'infinite',
-                optionName: choice,
-            });
-        }
-        setRuntimeValue(playerStats.name, 'activeBuffs', currentBuffs, campaignName);
-        setRuntimeValue(playerStats.name, 'aspectOfTheWildsOption', choice, campaignName);
-        setRuntimeValue(playerStats.name, 'aspectOfTheWildsUsedThisRest', true, campaignName);
-        setAspectOfTheWildsModal(null);
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: 'Aspect of the Wilds',
-            description: `Chose ${choice} aspect`,
-        }).catch((e) => { console.error("[charSpecialActions:log-error]", e); });
-        const effects = {
-            Owl: 'Darkvision 60 ft.',
-            Panther: 'Climb speed equal to walking speed',
-            Salmon: 'Swim speed equal to walking speed',
-        };
-        const html = `<b>Aspect of the Wilds</b><br/>Chose <b>${choice}</b>: ${effects[choice]}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-        setPopupHtml(html);
-    }, [playerStats, campaignName, setPopupHtml]);
-    const handleAspectOfTheWildsSkip = useCallback(() => {
-        setAspectOfTheWildsModal(null);
-    }, []);
+    const {
+        handleFeatureChoiceConfirm,
+        handleFeatureChoiceSkip,
+    } = useFeatureChoiceHandlers({ featureChoiceModal, setFeatureChoiceModal, playerStats, campaignName, setPopupHtml });
+    const {
+        handleAspectOfTheWildsConfirm,
+        handleAspectOfTheWildsSkip,
+    } = useAspectOfTheWildsHandlers({ setAspectOfTheWildsModal, playerStats, campaignName, setPopupHtml });
     const handleAutomationClick = useCallback(async (action) => {
         if (cannotAct) return;
         const auto = action.automation;
@@ -539,160 +752,32 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
             setPopupHtml(buildAutomationPopupHtml(result.payload, action));
         }
     }, [playerStats, campaignName, cannotAct, mapName, characters, setCombatSuperiorityModal, setPopupHtml, handleReplenishingMealClick, handleBolsteringTreatsClick, handleBrewPoisonClick, setFeyReinforcementsModal, setGnomishLineageModal]);
-    const handleStrideConfirm = useCallback(async (optionName, buffEntry) => {
-        if (!strideModal) return;
-        const { action, playerStats: modalPlayerStats, campaignName: modalCampaign } = strideModal;
-        setStrideModal(null);
-        const stored = getRuntimeValue(modalPlayerStats.name, 'activeBuffs', modalCampaign);
-        const activeBuffs = Array.isArray(stored) ? stored : [];
-        const existingStride = activeBuffs.find(b => b.name === 'Stride of the Elements');
-        const newBuffs = existingStride
-            ? activeBuffs.map(b => b.name === 'Stride of the Elements' ? { ...b, ...buffEntry } : b)
-            : [...activeBuffs, { name: 'Stride of the Elements', ...buffEntry }];
-        await setRuntimeValue(modalPlayerStats.name, 'activeBuffs', newBuffs, modalCampaign);
-        const descriptions = {
-            'Ice Walk': 'You can walk across and climb icy or wet surfaces without needing to make an Ability Check. You ignore difficult terrain that is composed of ice or snow.',
-            '+10 Speed': 'Your Speed increases by 10 feet.',
-            'Fly Speed': 'You gain a Fly Speed equal to your Speed.',
-            'Teleport 30 ft': 'You can teleport up to 30 ft to an unoccupied space you can see.',
-        };
-        const description = `Chose ${optionName}: ${descriptions[optionName] || optionName}`;
-        await addEntry(modalCampaign, {
-            type: 'ability_use',
-            characterName: modalPlayerStats.name,
-            abilityName: action.name,
-            description,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error('[StrideOfTheElements] Error logging:', e); });
-        const html = `<b>${action.name}</b><br/>Chose <strong>${optionName}</strong>. ${descriptions[optionName] || optionName}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-        setPopupHtml(html);
-    }, [strideModal, setPopupHtml]);
-    const handleCelestialResilienceConfirm = useCallback(async (selectedTargets) => {
-        if (!celestialResilienceModal) return;
-        const { action, playerStats: modalPlayerStats, campaignName: modalCampaign, allyTempHp } = celestialResilienceModal;
-        if (!selectedTargets || selectedTargets.length === 0) {
-            setPopupHtml(`<b>${action.name}</b><br/>No allies selected.<br/><span class="dice-roll-hint">click to dismiss</span>`);
-            setCelestialResilienceModal(null);
-            return;
-        }
-        for (const targetName of selectedTargets) {
-            await setTempHp(targetName, allyTempHp, modalCampaign);
-        }
-        await addEntry(modalCampaign, {
-            type: 'ability_use',
-            characterName: modalPlayerStats.name,
-            abilityName: action.name,
-            description: `${modalPlayerStats.name} grants ${allyTempHp} temporary hit points to ${selectedTargets.join(', ')}.`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error('[celestialResilience] Error logging:', e); });
-        const html = `<b>${action.name}</b><br/>Granted ${allyTempHp} temporary hit points to ${selectedTargets.join(', ')}.<br/><span class="dice-roll-hint">click to dismiss</span>`;
-        setPopupHtml(html);
-        setCelestialResilienceModal(null);
-    }, [celestialResilienceModal, setPopupHtml]);
-    const handleCelestialResilienceSkip = useCallback(() => {
-        if (!celestialResilienceModal) return;
-        const { action } = celestialResilienceModal;
-        setPopupHtml(`<b>${action.name}</b><br/>No allies selected.<br/><span class="dice-roll-hint">click to dismiss</span>`);
-        setCelestialResilienceModal(null);
-    }, [celestialResilienceModal, setPopupHtml]);
-    const handleEpitomeConfirm = useCallback(async (payload) => {
-        if (!epitomeModal) return;
-        const { action } = epitomeModal;
-        setEpitomeModal(null);
-        const html = `<b>${action.name}</b><br/>${payload?.description || 'Elemental Epitome activated.'}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-        setPopupHtml(html);
-    }, [epitomeModal, setPopupHtml]);
-    const handleEpitomeClose = useCallback(() => {
-        setEpitomeModal(null);
-    }, []);
-    const handleDestructiveStrideConfirm = useCallback(async (result) => {
-        setDestructiveStrideModal(null);
-        if (result?.type === 'modal' && result.modalName === 'destructiveStrideTarget') {
-            setDestructiveStrideTargetModal(result.payload);
-        } else if (result?.type === 'popup') {
-            const html = `<b>${result.payload?.name || 'Destructive Stride'}</b><br/>${result.payload?.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-            setPopupHtml(html);
-        }
-    }, [setPopupHtml]);
-    const handleDestructiveStrideTargetConfirm = useCallback(async (targetName) => {
-        if (!destructiveStrideTargetModal) return;
-        const { action, playerStats: modalPlayerStats, campaignName: modalCampaign, chosenType, martialArtsDie } = destructiveStrideTargetModal;
-        setDestructiveStrideTargetModal(null);
-        const result = await applyDestructiveStrideTargetChoice(action, modalPlayerStats, modalCampaign, targetName, chosenType, martialArtsDie);
-        if (result?.type === 'popup') {
-            const html = `<b>${result.payload?.name || 'Destructive Stride'}</b><br/>${result.payload?.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-            setPopupHtml(html);
-        }
-    }, [destructiveStrideTargetModal, setPopupHtml]);
-    const handleDestructiveStrideTargetSkip = useCallback(() => {
-        setDestructiveStrideTargetModal(null);
-    }, []);
-    const handleMoonlightStepFallbackConfirm = useCallback(async () => {
-        if (!moonlightStepFallback) return;
-        const { action, playerStats: fallbackStats, campaignName: fallbackCampaign, slotLevel } = moonlightStepFallback;
-        setMoonlightStepFallback(null);
-        const res = await confirmTeleport(action, fallbackStats, fallbackCampaign, false, slotLevel);
-        if (res?.type === 'popup') {
-            const payload = res.payload;
-            const html = `<b>${payload.name || action.name}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-            setPopupHtml(html);
-        }
-    }, [moonlightStepFallback, setPopupHtml]);
-    const handleSignatureSpellsConfirm = useCallback(async (spell1, spell2) => {
-        if (!signatureSpellsModal) return;
-        const result = await onSignatureSpellsSelected(signatureSpellsModal.action, playerStats, campaignName, spell1, spell2);
-        setSignatureSpellsModal(null);
-        if (result?.type === 'popup') {
-            const payload = result.payload;
-            const html = typeof payload === 'string'
-                ? payload
-                : `<b><i class="fa-solid fa-magic"></i> ${payload.name || 'Signature Spells'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-            setPopupHtml(html);
-        }
-    }, [signatureSpellsModal, playerStats, campaignName, setPopupHtml]);
-    const handleSpellMasteryConfirm = useCallback(async (spell1, spell2) => {
-        if (!spellMasteryModal) return;
-        const result = await onSpellMasterySelected(spellMasteryModal.action, playerStats, campaignName, spell1, spell2);
-        setSpellMasteryModal(null);
-        if (result?.type === 'popup') {
-            const payload = result.payload;
-            const html = typeof payload === 'string'
-                ? payload
-                : `<b><i class="fa-solid fa-magic"></i> ${payload.name || 'Spell Mastery'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-            setPopupHtml(html);
-        }
-    }, [spellMasteryModal, playerStats, campaignName, setPopupHtml]);
-    const handleSavantConfirm = useCallback(async (spell1, spell2) => {
-        if (!savantModal) return;
-        const result = await onSavantSelected(savantModal.action, playerStats, campaignName, spell1, spell2, savantModal.school);
-        setSavantModal(null);
-        if (result?.type === 'popup') {
-            const payload = result.payload;
-            const html = typeof payload === 'string'
-                ? payload
-                : `<b><i class="fa-solid fa-magic"></i> ${payload.name || savantModal.school} Savant</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-            setPopupHtml(html);
-        }
-    }, [savantModal, playerStats, campaignName, setPopupHtml]);
-    const handlePortentDieChoice = useCallback(async (chosenDie) => {
-        if (!portentModal) return;
-        const { action, playerStats: ps, campaignName: cn, targetName, eventType, eventData, context } = portentModal;
-        try {
-            const result = await applyPortentChoice(action, ps, cn, targetName, eventType, eventData, context, chosenDie);
-            setPortentModal(null);
-            if (result?.type === 'popup') {
-                const payload = result.payload;
-                const html = `<b>${payload.name || 'Portent'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-                setPopupHtml(html);
-            }
-        } catch (e) {
-            console.error('[Portent] Failed to apply die choice:', e);
-            setPortentModal(null);
-        }
-    }, [portentModal, setPopupHtml]);
-    const handlePortentModalClose = useCallback(() => {
-        setPortentModal(null);
-    }, []);
+    const {
+        handleStrideConfirm,
+        handleMoonlightStepFallbackConfirm,
+    } = useStrideMovementHandlers({ strideModal, setStrideModal, moonlightStepFallback, setMoonlightStepFallback, setPopupHtml });
+    const {
+        handleCelestialResilienceConfirm,
+        handleCelestialResilienceSkip,
+    } = useCelestialResilienceHandlers({ celestialResilienceModal, setCelestialResilienceModal, setPopupHtml });
+    const {
+        handleEpitomeConfirm,
+        handleEpitomeClose,
+    } = useEpitomeHandlers({ epitomeModal, setEpitomeModal, setPopupHtml });
+    const {
+        handleDestructiveStrideConfirm,
+        handleDestructiveStrideTargetConfirm,
+        handleDestructiveStrideTargetSkip,
+    } = useDestructiveStrideHandlers({ setDestructiveStrideModal, destructiveStrideTargetModal, setDestructiveStrideTargetModal, setPopupHtml });
+    const {
+        handleSignatureSpellsConfirm,
+        handleSpellMasteryConfirm,
+        handleSavantConfirm,
+    } = useWizardSpellConfirms({ signatureSpellsModal, setSignatureSpellsModal, spellMasteryModal, setSpellMasteryModal, savantModal, setSavantModal, playerStats, campaignName, setPopupHtml });
+    const {
+        handlePortentDieChoice,
+        handlePortentModalClose,
+    } = usePortentHandlers({ portentModal, setPortentModal, setPopupHtml });
     const uniqueActions = buildUniqueSpecialActions(playerStats, fightingStylesMap);
     return (
             <div className='char-special-actions'>

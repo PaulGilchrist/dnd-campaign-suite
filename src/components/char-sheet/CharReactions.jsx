@@ -304,6 +304,45 @@ function ReactionModals({ modalState, playerStats, campaignName, mapName, charac
     );
 }
 
+function renderReactionSpellHitCell({ spell, playerStats, cannotAct, autoHit, isSpellAtk, hasAttackType, resolvedDamage, damageType, rollAttack }) {
+    if (autoHit) return <div></div>;
+    if (isSpellAtk) {
+        if (!hasAttackType) return <div></div>;
+        return <div className={"clickable" + (cannotAct ? " disabled-attack" : "")} onClick={() => {
+            const attackItem = { ...spell, type: 'Reaction', hitBonus: playerStats.spellAbilities?.toHit, saveDc: null, saveType: null, saveSuccess: null, damage: resolvedDamage, damageType };
+            rollAttack(attackItem.name, attackItem.hitBonus, { forcedMode: undefined });
+        }}>{signFormatter.format(playerStats.spellAbilities?.toHit)}</div>;
+    }
+    return <div className="save-dc-display">DC {playerStats.spellAbilities?.saveDc} {spell.dc?.dc_type}</div>;
+}
+
+function ReactionSpellRow({ spell, playerStats, cannotAct, rollAttack, gateMetamagic, getReactionSpellDamageDisplay, isSlowed, refuseSlowedReaction, setSelectedSpell }) {
+    const damageType = typeof spell.damage === 'string' ? '' : (spell.damage?.damage_type || '');
+    const resolvedDamage = spell.heal_at_slot_level
+        ? resolveHealExpression(spell, playerStats.level, playerStats.spellAbilities?.modifier || 0)
+        : resolveSpellDamageAtLevel(spell, playerStats.level);
+    const autoHit = isAutoHitSpell(spell);
+    const isSpellAtk = !spell.dc;
+    const hasAttackType = spell.attack_type != null && spell.attack_type !== '';
+    return <React.Fragment>
+        <div className='left clickable' onClick={() => {
+            if (isSlowed()) { refuseSlowedReaction(spell.name); return; }
+            setSelectedSpell(spell);
+        }}>{spell.name}</div>
+        <div>{spell.level === 0 ? 'Cantrip' : spell.level}</div>
+        <div>{spell.range}</div>
+        {renderReactionSpellHitCell({ spell, playerStats, cannotAct, autoHit, isSpellAtk, hasAttackType, resolvedDamage, damageType, rollAttack })}
+        <div className={resolvedDamage ? "clickable" : ""} onClick={() => {
+            if (cannotAct) return;
+            // SINGLE ENTRY POINT for reaction spell casting:
+            // gateMetamagic is the single entry point (calls prepareSpellCast → spell slots, concentration)
+            // NEVER call reactionCastAction, castAction, or executeSpellCast directly from JSX onClick handlers.
+            gateMetamagic(spell, {});
+        }}>{getReactionSpellDamageDisplay(spell)}</div>
+        <div className='left'>{damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility')}</div>
+    </React.Fragment>;
+}
+
 function CharReactions({ playerStats, campaignName, cannotAct, mapName, characters }) {
     const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, { characters, autoDamageSource: 'char-reactions', autoDamageRoll: async (autoDamage, isCrit) => {
@@ -584,7 +623,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
 
     const { resolvePositions: resolveReactionSpellPositions, cachedPosRef: cachedReactionCastPosRef } = useSpellPositionResolver(campaignName, mapName, playerStats.name);
 
-    const { castAction: reactionCastAction } = useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, {}, cachedReactionCastPosRef, setModalState);
+    const { castAction: reactionCastAction } = useSpellCastExecutor({ rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, extraMeta: {}, cachedPosRef: cachedReactionCastPosRef, setModalState });
 
     const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, reactionCastAction, null, characters, setPopupHtml);
     const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
@@ -769,41 +808,20 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                 <div><b>Hit</b></div>
                 <div><b>Damage</b></div>
                 <div className='left'><b>Type</b></div>
-                {reactionSpells.map((spell) => {
-                    const damageType = typeof spell.damage === 'string' ? '' : (spell.damage?.damage_type || '');
-                    const resolvedDamage = spell.heal_at_slot_level
-                        ? resolveHealExpression(spell, playerStats.level, playerStats.spellAbilities?.modifier || 0)
-                        : resolveSpellDamageAtLevel(spell, playerStats.level);
-                    const autoHit = isAutoHitSpell(spell);
-                    const isSpellAtk = !spell.dc;
-                    const hasAttackType = spell.attack_type != null && spell.attack_type !== '';
-                    return <React.Fragment key={spell.name}>
-                        <div className='left clickable' onClick={() => {
-                            if (isSlowed()) { refuseSlowedReaction(spell.name); return; }
-                            setSelectedSpell(spell);
-                        }}>{spell.name}</div>
-                        <div>{spell.level === 0 ? 'Cantrip' : spell.level}</div>
-                        <div>{spell.range}</div>
-                        {autoHit
-                            ? <div></div>
-                            : isSpellAtk && hasAttackType
-                                ? <div className={"clickable" + (cannotAct ? " disabled-attack" : "")} onClick={() => {
-                                    const attackItem = { ...spell, type: 'Reaction', hitBonus: playerStats.spellAbilities?.toHit, saveDc: null, saveType: null, saveSuccess: null, damage: resolvedDamage, damageType };
-                                    rollAttack(attackItem.name, attackItem.hitBonus, { forcedMode: undefined });
-                                }}>{signFormatter.format(playerStats.spellAbilities?.toHit)}</div>
-                                : isSpellAtk && !hasAttackType
-                                    ? <div></div>
-                                    : <div className="save-dc-display">DC {playerStats.spellAbilities?.saveDc} {spell.dc?.dc_type}</div>}
-                        <div className={resolvedDamage ? "clickable" : ""} onClick={() => {
-                            if (cannotAct) return;
-                            // SINGLE ENTRY POINT for reaction spell casting:
-                            // gateMetamagic is the single entry point (calls prepareSpellCast → spell slots, concentration)
-                            // NEVER call reactionCastAction, castAction, or executeSpellCast directly from JSX onClick handlers.
-                            gateMetamagic(spell, {});
-                        }}>{getReactionSpellDamageDisplay(spell)}</div>
-                        <div className='left'>{damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility')}</div>
-                    </React.Fragment>;
-                })}<div className='half-line'></div>
+                {reactionSpells.map((spell) => (
+                    <ReactionSpellRow
+                        key={spell.name}
+                        spell={spell}
+                        playerStats={playerStats}
+                        cannotAct={cannotAct}
+                        rollAttack={rollAttack}
+                        gateMetamagic={gateMetamagic}
+                        getReactionSpellDamageDisplay={getReactionSpellDamageDisplay}
+                        isSlowed={isSlowed}
+                        refuseSlowedReaction={refuseSlowedReaction}
+                        setSelectedSpell={setSelectedSpell}
+                    />
+                ))}<div className='half-line'></div>
             </div>}
             <ReactionModals
                 modalState={modalState}

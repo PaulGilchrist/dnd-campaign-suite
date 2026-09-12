@@ -906,10 +906,7 @@ describe('wrathOfTheSeaHandler', () => {
 
             await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.anything(), 'Thug 1', 12, ['cold'], campaignName,
-                expect.anything(), false, playerName, false
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Thug 1', 12, ['cold'], campaignName, expect.anything(), { ignoreResistance: false, attackerName: playerName, suppressHpLog: false });
         });
 
         it('manifest leg registers the 10-minute expiration clock (rounds 100)', async () => {

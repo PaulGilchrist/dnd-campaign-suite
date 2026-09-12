@@ -36,6 +36,35 @@ export function findEquippedWeapons(allEquipment, equipped, weaponRange) {
  * @param {Object} opts
  * @returns {Object} attack
  */
+function computeTotalDamageModifier({ abilityBonus, magicBonus, includeAbilityBonusInDamage, extraDamage }) {
+    let totalDamageModifier = 0;
+    if (includeAbilityBonusInDamage) {
+        totalDamageModifier += abilityBonus;
+    }
+    if (magicBonus) {
+        totalDamageModifier += magicBonus;
+    }
+    if (extraDamage) {
+        const extraMatch = extraDamage.match(/([+-]?\d+)$/);
+        if (extraMatch) {
+            totalDamageModifier += parseInt(extraMatch[1], 10);
+        }
+    }
+    return totalDamageModifier;
+}
+
+function appendAbilityToDamageFormula(damageFormula, abilityName, abilityBonus, magicBonus, includeAbilityBonusInDamage) {
+    if (magicBonus) {
+        if (includeAbilityBonusInDamage) {
+            damageFormula += ` + ${abilityName} Bonus (${abilityBonus})`;
+        }
+        damageFormula += ` + Weapon Magic Bonus (${magicBonus})`;
+    } else if (includeAbilityBonusInDamage) {
+        damageFormula += ` + ${abilityName} Bonus (${abilityBonus})`;
+    }
+    return damageFormula;
+}
+
 export function buildWeaponAttack(opts) {
     const {
         weapon,
@@ -65,37 +94,21 @@ export function buildWeaponAttack(opts) {
     let hitBonusFormula = `To Hit Bonus Formula = ${abilityName} Bonus (${abilityBonus}) + Proficiency (${proficiency})`;
 
     // Calculate the total numeric modifier for display (combines ability, magic, and extra damage)
-    let totalDamageModifier = 0;
-    if (includeAbilityBonusInDamage) {
-        totalDamageModifier += abilityBonus;
-    }
-    if (magicBonus) {
-        totalDamageModifier += magicBonus;
-        toHitBonus += magicBonus;
-        hitBonusFormula += ` + Weapon Magic Bonus (${magicBonus})`;
-    }
-    if (extraDamage) {
-        const extraMatch = extraDamage.match(/([+-]?\d+)$/);
-        if (extraMatch) {
-            totalDamageModifier += parseInt(extraMatch[1], 10);
-        }
-    }
+    const totalDamageModifier = computeTotalDamageModifier({ abilityBonus, magicBonus, includeAbilityBonusInDamage, extraDamage });
 
     if (magicBonus || includeAbilityBonusInDamage || extraDamage) {
         damage += totalDamageModifier >= 0 ? `+${totalDamageModifier}` : `${totalDamageModifier}`;
     }
 
-    if (magicBonus) {
-        if (includeAbilityBonusInDamage) {
-            damageFormula += ` + ${abilityName} Bonus (${abilityBonus})`;
-        }
-        damageFormula += ` + Weapon Magic Bonus (${magicBonus})`;
-    } else if (includeAbilityBonusInDamage) {
-        damageFormula += ` + ${abilityName} Bonus (${abilityBonus})`;
-    }
+    damageFormula = appendAbilityToDamageFormula(damageFormula, abilityName, abilityBonus, magicBonus, includeAbilityBonusInDamage);
 
     if (extraDamage) {
         damageFormula += ` + ${extraDamageLabel}`;
+    }
+
+    if (magicBonus) {
+        toHitBonus += magicBonus;
+        hitBonusFormula += ` + Weapon Magic Bonus (${magicBonus})`;
     }
 
     if (extraHitBonus) {
@@ -369,6 +382,69 @@ function resolveOffHandActionType(offBaseName, playerStats) {
 }
 
 /**
+ * Detect an equipped Shield among the player's equipped items.
+ * @param {Object} playerStats
+ * @returns {boolean}
+ */
+function hasEquippedShield(playerStats) {
+    const equippedItems = playerStats.inventory?.equipped || [];
+    return equippedItems.some(name => {
+        const parsedName = name.includes('(') ? name.substring(0, name.indexOf('(')).trim() : name;
+        return parsedName === 'Shield';
+    });
+}
+
+/**
+ * Build one off-hand light melee attack (Nick mastery + Two-Weapon Fighting).
+ * @param {Array} allEquipment
+ * @param {string} weaponName
+ * @param {Object} offCtx
+ * @returns {Object|null} attack or null when the weapon cannot be resolved
+ */
+function buildLightMeleeOffHandAttack(allEquipment, weaponName, offCtx) {
+    const { baseName: offBaseName, weapon: offHandWeapon } = resolveWeapon(allEquipment, weaponName);
+    if (!offHandWeapon) return null;
+    const appliesTwoWeapon = offCtx.isTwoWeapon && offCtx.mainHandIsLight && !offCtx.hasShield;
+    const extraHitBonus = offCtx.hasBlessedWarrior ? 2 : 0;
+    return buildWeaponAttack({
+        weapon: offHandWeapon,
+        weaponName,
+        abilityBonus: offCtx.bonus,
+        abilityName: offCtx.abilityName,
+        proficiency: offCtx.proficiency,
+        actionType: resolveOffHandActionType(offBaseName, offCtx.playerStats),
+        weaponType: 'melee',
+        includeAbilityBonusInDamage: false,
+        extraDamage: [appliesTwoWeapon ? `+${offCtx.bonus}` : '', offCtx.hasDruidicWarrior ? '+2' : ''].filter(Boolean).join(' + '),
+        extraDamageLabel: [appliesTwoWeapon ? `Two-Weapon Fighting Style (${offCtx.bonus})` : '', offCtx.hasDruidicWarrior ? 'Druidic Warrior (2)' : ''].filter(Boolean).join(' + ') || '',
+        extraHitBonus,
+        extraHitBonusLabel: extraHitBonus ? 'Blessed Warrior (2)' : '',
+    });
+}
+
+/**
+ * Build the off-hand attacks for the light melee weapons beyond the main hand.
+ * @param {Array} allEquipment
+ * @param {string[]} lightMelee
+ * @param {Object|null} bestWeapon the weapon already used as main hand
+ * @param {Object} offCtx
+ * @returns {Object[]}
+ */
+function buildLightOffHandAttacks(allEquipment, lightMelee, bestWeapon, offCtx) {
+    const attacks = [];
+    let bestSkipped = false;
+    for (const meleeWeaponName of lightMelee) {
+        if (meleeWeaponName === bestWeapon.name && !bestSkipped) {
+            bestSkipped = true;
+            continue;
+        }
+        const attack = buildLightMeleeOffHandAttack(allEquipment, meleeWeaponName, offCtx);
+        if (attack) attacks.push(attack);
+    }
+    return attacks;
+}
+
+/**
  * Build all melee weapon attacks (5e).
  * @param {Object} ctx
  * @returns {Object[]}
@@ -383,6 +459,7 @@ function buildMeleeAttacks(ctx) {
     const abilityName = ctx.strength.bonus > ctx.dexterity.bonus ? 'Strength' : 'Dexterity';
     const duelCtx = { ...ctx, bonus, abilityName };
     const isDueling = fightingStyles.includes('Dueling') && meleeWeaponNames.length === 1 && rangedCount === 0;
+    const mainHandBuilder = (weapon, name) => buildMeleeMainHandAttack(weapon, name, duelCtx, isDueling);
 
     // Separate non-light and light melee weapons
     const nonLightMelee = meleeWeaponNames.filter(name => {
@@ -392,61 +469,35 @@ function buildMeleeAttacks(ctx) {
     const lightMelee = meleeWeaponNames.filter(name => weaponHasLight(resolveWeapon(allEquipment, name).weapon));
 
     // All non-light melee weapons → Action
-    pushWeaponAttacks(attacks, allEquipment, nonLightMelee,
-        (weapon, name) => buildMeleeMainHandAttack(weapon, name, duelCtx, isDueling));
+    pushWeaponAttacks(attacks, allEquipment, nonLightMelee, mainHandBuilder);
 
     if (lightMelee.length === 0) return attacks;
 
     // < 2 light melee → all Action
     if (lightMelee.length < 2) {
-        pushWeaponAttacks(attacks, allEquipment, lightMelee,
-            (weapon, name) => buildMeleeMainHandAttack(weapon, name, duelCtx, isDueling));
+        pushWeaponAttacks(attacks, allEquipment, lightMelee, mainHandBuilder);
         return attacks;
     }
 
     // >= 2 light melee → highest damage Action, rest Bonus Action with Nick + Two-Weapon Fighting
     const bestWeapon = pickHighestDamageWeapon(allEquipment, lightMelee);
     if (bestWeapon) {
-        attacks.push(buildMeleeMainHandAttack(bestWeapon.weapon, bestWeapon.name, duelCtx, isDueling));
+        attacks.push(mainHandBuilder(bestWeapon.weapon, bestWeapon.name));
     }
 
-    const isTwoWeapon = fightingStyles.includes('Two-Weapon Fighting');
-    const equippedItems = playerStats.inventory?.equipped || [];
-    const hasShield = equippedItems.some(name => {
-        const parsedName = name.includes('(') ? name.substring(0, name.indexOf('(')).trim() : name;
-        return parsedName === 'Shield';
-    });
     // Use the highest damage light weapon as "main hand" for TWF check
-    const mainHandIsLight = weaponHasLight(bestWeapon?.weapon);
-
-    let bestSkipped = false;
-    for (const meleeWeaponName of lightMelee) {
-        if (meleeWeaponName === bestWeapon.name && !bestSkipped) {
-            bestSkipped = true;
-            continue;
-        }
-        const { baseName: offBaseName, weapon: offHandWeapon } = resolveWeapon(allEquipment, meleeWeaponName);
-        if (offHandWeapon) {
-            const actionType = resolveOffHandActionType(offBaseName, playerStats);
-            const appliesTwoWeapon = isTwoWeapon && mainHandIsLight && !hasShield;
-            const blessedWarriorOffHandHitBonus = ctx.hasBlessedWarrior ? 2 : 0;
-            const druidicWarriorOffHandLabel = ctx.hasDruidicWarrior ? 'Druidic Warrior (2)' : '';
-            attacks.push(buildWeaponAttack({
-                weapon: offHandWeapon,
-                weaponName: meleeWeaponName,
-                abilityBonus: bonus,
-                abilityName,
-                proficiency: ctx.proficiency,
-                actionType,
-                weaponType: 'melee',
-                includeAbilityBonusInDamage: false,
-                extraDamage: [appliesTwoWeapon ? `+${bonus}` : '', ctx.hasDruidicWarrior ? '+2' : ''].filter(Boolean).join(' + '),
-                extraDamageLabel: [appliesTwoWeapon ? `Two-Weapon Fighting Style (${bonus})` : '', druidicWarriorOffHandLabel].filter(Boolean).join(' + ') || '',
-                extraHitBonus: blessedWarriorOffHandHitBonus,
-                extraHitBonusLabel: blessedWarriorOffHandHitBonus ? 'Blessed Warrior (2)' : '',
-            }));
-        }
-    }
+    const offCtx = {
+        bonus,
+        abilityName,
+        playerStats,
+        proficiency: ctx.proficiency,
+        hasBlessedWarrior: ctx.hasBlessedWarrior,
+        hasDruidicWarrior: ctx.hasDruidicWarrior,
+        isTwoWeapon: fightingStyles.includes('Two-Weapon Fighting'),
+        mainHandIsLight: weaponHasLight(bestWeapon?.weapon),
+        hasShield: hasEquippedShield(playerStats),
+    };
+    attacks.push(...buildLightOffHandAttacks(allEquipment, lightMelee, bestWeapon, offCtx));
     return attacks;
 }
 

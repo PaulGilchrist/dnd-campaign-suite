@@ -82,10 +82,7 @@ function resolveNpcDamageResult({ combatSummary, characters, target, targetName,
     );
     const finalDamage = resResult.finalDamage;
 
-    applyDamageToTarget(
-        combatSummary, targetName, finalDamage, [elementData.damageType],
-        campaignName, characters, false, playerStatsName, false
-    );
+    applyDamageToTarget(combatSummary, targetName, finalDamage, [elementData.damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerStatsName, suppressHpLog: false });
 
     logEntry.formula = elementData.damage;
     logEntry.rolls = damageRoll?.rolls ?? [];
@@ -170,10 +167,7 @@ function resolveNpcPushResult({ combatSummary, characters, target, targetName, s
     );
     const finalDamage = resResult.finalDamage;
 
-    applyDamageToTarget(
-        combatSummary, targetName, finalDamage, [elementData.damageType],
-        campaignName, characters, false, playerStatsName, false
-    );
+    applyDamageToTarget(combatSummary, targetName, finalDamage, [elementData.damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerStatsName, suppressHpLog: false });
 
     if (!success) {
         const pushDistance = elementData.effectValue;
@@ -258,10 +252,7 @@ function applyAttunementSaveDamage({ detail, targetName, success, saveBonus, raw
     const finalDamage = resResult.finalDamage;
 
     const characters = combatSummary.creatures.filter(c => c.type === 'player') || [];
-    applyDamageToTarget(
-        combatSummary, targetName, finalDamage, [elementData.damageType],
-        campaignName, characters, false, playerName, false
-    );
+    applyDamageToTarget(combatSummary, targetName, finalDamage, [elementData.damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerName, suppressHpLog: false });
 
     logEntry.formula = elementData.damage;
     logEntry.rolls = damageRoll?.rolls ?? [];

@@ -61,7 +61,7 @@ export const superiorHuntersPrey = {
 
         const cs2 = await loadCombatSummary(ctx.campaignName);
         const characters = getRuntimeValue('characters', 'characters', ctx.campaignName) || [];
-        const app = cs2 ? applyDamageToTarget(cs2, targetName, r.total, ['Force'], ctx.campaignName, characters, false, ctx.playerStats.name) : null;
+        const app = cs2 ? applyDamageToTarget(cs2, targetName, r.total, ['Force'], ctx.campaignName, characters, { ignoreResistance: false, attackerName: ctx.playerStats.name }) : null;
         addEntry(ctx.campaignName, { type: 'roll', characterName: ctx.playerStats.name, rollType: 'damage', name: "Superior Hunter's Prey", formula: `${die} [Superior Hunters Prey]`, rolls: r.rolls, total: r.total, modifier: 0, damageType: 'Force', targetName, finalDamage: app?.finalDamage }).catch((e) => { console.error("[superiorHuntersPrey:log-error]", e); });
         if (app && ctx.setPopupHtml) {
           const target = cs.creatures?.find(c => c.name === targetName);

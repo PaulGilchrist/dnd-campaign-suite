@@ -106,16 +106,7 @@ function HurlThroughHellModal({ action, playerStats, campaignName, targetName, s
 
                 if (!isFiend) {
                     const characters = (combatSummary?.creatures || []).filter(c => c.type === 'player');
-                    const dmgResult = applyDamageToTarget(
-                        combatSummary,
-                        targetName,
-                        actualDamageTotal,
-                        [damageType],
-                        campaignName,
-                        characters,
-                        false,
-                        playerName
-                    );
+                    const dmgResult = applyDamageToTarget(combatSummary, targetName, actualDamageTotal, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
                     actualDamage = dmgResult?.finalDamage ?? actualDamageTotal;
 
                     await addEntry(campaignName, {

@@ -5,6 +5,16 @@ import { mergeCategorizedFeatures, addFeatures } from './featureCategorizationUt
 
 const featureCategories = getCategories('5e');
 
+const MYSTIC_ARCANUM_LEVELS = ['level_6', 'level_7', 'level_8', 'level_9'];
+
+function getWarlockArcanumLevels(classSpecific) {
+    const levels = {};
+    MYSTIC_ARCANUM_LEVELS.forEach((suffix, index) => {
+        levels[`level${index + 6}`] = classSpecific?.[`mystic_arcanum_${suffix}`] || 0;
+    });
+    return levels;
+}
+
 const classRules = {
     getClass: (allClasses, playerSummary) => {
          // Dependencies: None
@@ -141,25 +151,15 @@ const classRules = {
                    creatingSpellSlotCosts
                 };
             },
-           getWarlockFeatures: (playerStats) => {
-               const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
-              const classSpecific = classLevel?.class_specific;
-              const invocationsKnown = classSpecific?.invocations_known || 0;
-              const hasArcanum = playerStats.level > 10;
-              const arcanumLevels = hasArcanum ? {
-                  level6: classSpecific?.mystic_arcanum_level_6 || 0,
-                  level7: classSpecific?.mystic_arcanum_level_7 || 0,
-                  level8: classSpecific?.mystic_arcanum_level_8 || 0,
-                  level9: classSpecific?.mystic_arcanum_level_9 || 0
-              } : {
-                  level6: 0,
-                  level7: 0,
-                  level8: 0,
-                  level9: 0
-              };
-              const arcanums = playerStats.class?.arcanums || [];
-               const pactBoon = playerStats.class?.pactBoon || null;
-               const invocations = playerStats.class?.invocations || [];
+            getWarlockFeatures: (playerStats) => {
+                const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
+               const classSpecific = classLevel?.class_specific;
+               const invocationsKnown = classSpecific?.invocations_known || 0;
+               const hasArcanum = playerStats.level > 10;
+               const arcanumLevels = hasArcanum ? getWarlockArcanumLevels(classSpecific) : { level6: 0, level7: 0, level8: 0, level9: 0 };
+               const arcanums = playerStats.class?.arcanums || [];
+                const pactBoon = playerStats.class?.pactBoon || null;
+                const invocations = playerStats.class?.invocations || [];
 
                return {
                    invocationsKnown,

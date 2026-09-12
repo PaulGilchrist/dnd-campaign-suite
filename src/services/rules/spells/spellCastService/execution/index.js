@@ -228,9 +228,35 @@ async function logGenericSpellCast(spell, fullSpell, playerStats, campaignName, 
     }).catch((e) => { console.error("[index:log-error]", e); });
 }
 
+// Status effects fallback: route a DC-bearing spell through rollDamage.
+async function runStatusEffectsFallback({ spell, fullSpell, metaCtx, playerStats, getTargetInfo, spellSaveDc, innateSorceryActive, hasInvisible, rollDamage }) {
+    if (!(spell.dc && spell.status_effects && spell.status_effects.length > 0 && !fullSpell.area_of_effect)) return;
+    const target = await getTargetInfo();
+    const context = {
+        targetName: target?.name, attackerName: playerStats.name, ...metaCtx,
+        saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
+        saveType: spell.dc.dc_type, dcSuccess: spell.dc.dc_success,
+        metamagicHeighten: hasInvisible || metaCtx?.metamagicHeighten,
+        isCantrip: spell.baseLevel === 0 || spell.level === 0,
+        statusEffects: spell.status_effects,
+    };
+    rollDamage(spell.name, '0', 0, [], 0, context);
+}
+
+// CLA-322: ability check resolves inside triggerDispelMagic — it logs
+// the check, dispatches `spell-result` with `checkFailed`, and refunds
+// the slot inline (keyed by cast slot level) when Spell Breaker is held.
+async function runDispelMagicFallback(spell, metaCtx, playerStats, campaignName, mapName, getTargetInfo) {
+    const isDispelMagic = spell.name && spell.name.toLowerCase() === 'dispel magic';
+    if (!isDispelMagic) return;
+    const dispelTarget = await getTargetInfo();
+    if (!dispelTarget) return;
+    await triggerDispelMagic({ ...metaCtx, targetName: dispelTarget.name }, spell, playerStats, campaignName, mapName);
+}
+
 // --- NO DAMAGE PATH: handled-trigger chain in exact original order.
 // Returns { handled, value } — value is what executeSpellCast must return.
-async function runNoDamagePath(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, spellSaveDc, innateSorceryActive, hasInvisible, spellCastingMod, rollDamage) {
+async function runNoDamagePath(spell, { fullSpell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, spellSaveDc, innateSorceryActive, hasInvisible, spellCastingMod, rollDamage }) {
     const noDamageTriggers = [
         async () => passThrough(await handleRegenerate(spell, getTargetInfo, applyRegenerateSpell, playerStats, campaignName)),
         () => passThrough(handleFear(spell, spellSaveDc, playerStats, campaignName, metaCtx, innateSorceryActive)),
@@ -280,20 +306,7 @@ async function runNoDamagePath(spell, fullSpell, metaCtx, playerStats, campaignN
     if (earlyOutcome) return { handled: true, value: earlyOutcome.value };
 
     // Status effects fallback
-    if (spell.dc && spell.status_effects && spell.status_effects.length > 0 && !fullSpell.area_of_effect) {
-        const target = await getTargetInfo();
-        const context = {
-            targetName: target?.name, attackerName: playerStats.name, ...metaCtx,
-            saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
-            saveType: spell.dc.dc_type, dcSuccess: spell.dc.dc_success,
-            metamagicHeighten: hasInvisible || metaCtx?.metamagicHeighten,
-            isCantrip: spell.baseLevel === 0 || spell.level === 0,
-        };
-        if (spell.status_effects && spell.status_effects.length > 0) {
-            context.statusEffects = spell.status_effects;
-        }
-        rollDamage(spell.name, '0', 0, [], 0, context);
-    }
+    await runStatusEffectsFallback({ spell, fullSpell, metaCtx, playerStats, getTargetInfo, spellSaveDc, innateSorceryActive, hasInvisible, rollDamage });
 
     const massHealingOutcome = await runTriggerChain([
         async () => swallow(await handleMassCureWoundsTrigger(spell, metaCtx, playerStats, campaignName, mapName)),
@@ -320,25 +333,11 @@ async function runNoDamagePath(spell, fullSpell, metaCtx, playerStats, campaignN
 
     const removeCurseResult = await handleRemoveCurseTrigger(spell, metaCtx, playerStats, campaignName, mapName);
     if (removeCurseResult.handled) {
-        if (spell.name && spell.name.toLowerCase() === 'dispel magic') {
-            const dispelTarget = await getTargetInfo();
-            if (dispelTarget) {
-                const dispelMetaCtx = { ...metaCtx, targetName: dispelTarget.name };
-                await triggerDispelMagic(dispelMetaCtx, spell, playerStats, campaignName, mapName);
-            }
-        }
+        await runDispelMagicFallback(spell, metaCtx, playerStats, campaignName, mapName, getTargetInfo);
         return { handled: true };
     }
 
-    if (spell.name && spell.name.toLowerCase() === 'dispel magic') {
-        const dispelTarget = await getTargetInfo();
-        if (dispelTarget) {
-            // CLA-322: ability check resolves inside triggerDispelMagic — it logs
-            // the check, dispatches `spell-result` with `checkFailed`, and refunds
-            // the slot inline (keyed by cast slot level) when Spell Breaker is held.
-            await triggerDispelMagic({ ...metaCtx, targetName: dispelTarget.name }, spell, playerStats, campaignName, mapName);
-        }
-    }
+    await runDispelMagicFallback(spell, metaCtx, playerStats, campaignName, mapName, getTargetInfo);
 
     const resistanceResult = await handleResistance(spell, playerStats, campaignName, mapName, characters, executeHandler, metaCtx);
     if (resistanceResult.handled) return { handled: true };
@@ -565,6 +564,16 @@ async function runAutoMissPath({ spell, fullSpell, metaCtx, playerStats, campaig
     return null;
 }
 
+// Hunter's Mark / Hex handled entirely by their own paths; returns true when consumed.
+async function runMarkedTargetSpell(spell, metaCtx, playerStats, campaignName, getTargetInfo) {
+    if (spell.name === "Hunter's Mark") return true;
+    if (spell.name === 'Hex') {
+        await castHex(spell, metaCtx, playerStats, campaignName, getTargetInfo);
+        return true;
+    }
+    return false;
+}
+
 export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, featEffects, campaignName, mapName, characters }) {
     // --- Block checks ---
     const buffBlock = await checkBlockedBySpellcastingBuff(spell, playerStats, campaignName);
@@ -618,16 +627,12 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
 
     // --- NO DAMAGE PATH ---
     if (!formula) {
-        const noDamage = await runNoDamagePath(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, spellSaveDc, innateSorceryActive, hasInvisible, spellCastingMod, rollDamage);
+        const noDamage = await runNoDamagePath(spell, { fullSpell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, spellSaveDc, innateSorceryActive, hasInvisible, spellCastingMod, rollDamage });
         if (noDamage.handled) return noDamage.value;
     }
 
     // --- Hunter's Mark / Hex ---
-    if (spell.name === "Hunter's Mark") return;
-    if (spell.name === 'Hex') {
-        await castHex(spell, metaCtx, playerStats, campaignName, getTargetInfo);
-        return;
-    }
+    if (await runMarkedTargetSpell(spell, metaCtx, playerStats, campaignName, getTargetInfo)) return;
 
     // --- Damage path ---
     const rangeResult = computeRange(spell, metaCtx, attackerPos, targetPos, featEffects);
@@ -654,8 +659,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         // handleNoSavePath only ever resolves null/undefined, and the dc/no-dc
         // branches are mutually exclusive, so the gated post-cast triggers
         // (Inspiring Smite, Wild Magic Surge, Sanctuary break, etc.) run exactly once.
-        await handleNoSavePath(spell, metaCtx, playerStats, campaignName, mapName, characters,
-            getTargetInfo, rollAttack, spellToHit, effectiveDamageType);
+        await handleNoSavePath({ spell: spell, metaCtx: metaCtx, playerStats: playerStats, campaignName: campaignName, mapName: mapName, characters: characters, getTargetInfo: getTargetInfo, rollAttack: rollAttack, spellToHit: spellToHit, damageType: effectiveDamageType });
     }
 
     // --- Post-cast triggers ---

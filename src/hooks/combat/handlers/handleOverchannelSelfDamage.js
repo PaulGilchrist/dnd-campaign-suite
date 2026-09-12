@@ -12,7 +12,7 @@ export async function handleOverchannelSelfDamage(characterName, campaignName, c
             const necroticResult = rollExpression(necroticFormula);
             if (necroticResult) {
                 const casterCombatSummary = getCombatSummary(campaignName);
-                const casterApplyResult = await applyDamageToTarget(casterCombatSummary, characterName, necroticResult.total, ['Necrotic'], campaignName, characters, true, characterName);
+                const casterApplyResult = await applyDamageToTarget(casterCombatSummary, characterName, necroticResult.total, ['Necrotic'], campaignName, characters, { ignoreResistance: true, attackerName: characterName });
                 logEntry({
                     type: 'roll',
                     characterName,

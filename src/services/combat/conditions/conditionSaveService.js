@@ -147,7 +147,7 @@ function addCondition(combatSummary, creatureName, conditionDef, dc, ability, ge
     }
 }
 
-function buildConditionPopup(roll, bonus, bonusDetail, abilityLabel, conditionLabel, dc, success, rolls, advantage, starryDragonFloor) {
+function buildConditionPopup({ roll, bonus, bonusDetail, abilityLabel, conditionLabel, dc, success, rolls, advantage, starryDragonFloor }) {
     return {
         type: 'd20',
         rollType: 'condition-save',

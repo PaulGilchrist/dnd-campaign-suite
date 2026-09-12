@@ -194,17 +194,7 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
                 6,
             );
 
-            expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-                combatSummaryWithTargets,
-                'Goblin',
-                3,
-                ['thunder'],
-                campaignName,
-                expect.any(Array),
-                false,
-                'TestMonk',
-                false,
-            );
+            expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(combatSummaryWithTargets, 'Goblin', 3, ['thunder'], campaignName, expect.any(Array), { ignoreResistance: false, attackerName: 'TestMonk', suppressHpLog: false },);
         });
 
         it('passes damage type as lowercase array to applyDamageToTarget', async () => {

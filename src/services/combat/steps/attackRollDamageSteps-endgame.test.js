@@ -270,16 +270,7 @@ describe('buildAttackRollDamageSteps - overchannel, proceedToDamage', () => {
         });
         await steps[16].handler(ctx);
 
-        expect(applyDamageToTarget).toHaveBeenCalledWith(
-          expect.anything(),
-          'TestChar',
-          expect.any(Number),
-          ['Necrotic'],
-          'test-campaign',
-          null,
-          true,
-          'TestChar',
-        );
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'TestChar', expect.any(Number), ['Necrotic'], 'test-campaign', null, { ignoreResistance: true, attackerName: 'TestChar' },);
       });
 
       it('handles null rollExpression gracefully', async () => {

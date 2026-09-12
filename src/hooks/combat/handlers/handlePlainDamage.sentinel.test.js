@@ -299,10 +299,7 @@ describe('Plain damage sentinel', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const targetEffectsCalls = setRuntimeValue.mock.calls.filter(
                 (call) => call[1] === 'targetEffects'

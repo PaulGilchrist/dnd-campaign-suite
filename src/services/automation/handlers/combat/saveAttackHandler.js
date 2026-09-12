@@ -29,30 +29,35 @@ function getEmanationRange(auto, playerStats, playerName, campaignName) {
 }
 
 
-export function isExhausted(action, playerStats, campaignName) {
-    const auto = action.automation;
-    if (!auto) return false;
+function isChannelDivinityExhausted(playerStats) {
+    const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
+    const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
+    const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
+    const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
+    return currentCharges <= 0;
+}
 
-    if (auto.resourceCost === 'channel_divinity') {
-        const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
-        const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
-        const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
-        const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
-        return currentCharges <= 0;
-    }
+function isWildShapeExhausted(playerStats, campaignName) {
+    const maxWS = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0;
+    const currentWS = getRuntimeValue(playerStats.name, 'wildShapeUses', campaignName);
+    const resolvedWS = currentWS != null ? Number(currentWS) : maxWS;
+    return resolvedWS <= 0;
+}
 
-    if (auto.resourceCost === 'wild_shape') {
-        const maxWS = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0;
-        const currentWS = getRuntimeValue(playerStats.name, 'wildShapeUses', campaignName);
-        const resolvedWS = currentWS != null ? Number(currentWS) : maxWS;
-        return resolvedWS <= 0;
-    }
-
+function isTrackedUsesExhausted(action, auto, playerStats, campaignName) {
     if (auto.uses === undefined && auto.usesMax === undefined) return false;
     const maxUses = auto.usesMax ?? resolveUses(playerStats, auto.uses) ?? 1;
     const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
     const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? maxUses);
     return currentUses <= 0;
+}
+
+export function isExhausted(action, playerStats, campaignName) {
+    const auto = action.automation;
+    if (!auto) return false;
+    if (auto.resourceCost === 'channel_divinity') return isChannelDivinityExhausted(playerStats);
+    if (auto.resourceCost === 'wild_shape') return isWildShapeExhausted(playerStats, campaignName);
+    return isTrackedUsesExhausted(action, auto, playerStats, campaignName);
 }
 
 function getRiderDescription(effect, effectValue) {
@@ -329,9 +334,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const costPopup = await consumeSaveAttackCost(action, auto, playerStats, campaignName, resolvedShape);
     if (costPopup) return costPopup;
 
-    const dcSuccess = auto.dcSuccess !== undefined && auto.dcSuccess !== null
-        ? auto.dcSuccess
-        : (resolvedShape === 'cone' ? 0.5 : 0);
+    const dcSuccess = auto.dcSuccess ?? (resolvedShape === 'cone' ? 0.5 : 0);
 
     const saveDcValue = buildSaveDc(auto, playerStats);
 
@@ -344,30 +347,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         if (isAreaShape(resolvedShape)) {
             return buildConditionModal(action, auto, playerStats, campaignName, _mapName, resolvedShape, saveDcValue);
         }
-
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${action.name} — ${auto.saveType || 'WIS'} save DC ${saveDcValue}. On a failed save, target has the ${auto.conditionInflicted} condition.`,
-                automation: auto,
-            },
-        };
+        return conditionInflictedPopup(action, auto, saveDcValue);
     }
 
     // Handle effect-only (no damage) case, e.g. Cold's speed reduction
     if (!auto.damage && auto.effect) {
-        const riderDesc = getRiderDescription(auto.effect, auto.effectValue);
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${action.name} — ${auto.saveType || 'DEX'} save DC ${saveDcValue}. On a failed save, ${riderDesc}.`,
-                automation: auto,
-            },
-        };
+        return effectOnlyPopup(action, auto, saveDcValue);
     }
 
     // Handle AoE damage (not heal, not condition-only)
@@ -376,6 +361,31 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     return buildSaveAttackRollResult(action, auto, playerStats, resolvedShape, resolvedDamageType, saveDcValue, dcSuccess);
+}
+
+function conditionInflictedPopup(action, auto, saveDcValue) {
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            description: `${action.name} — ${auto.saveType || 'WIS'} save DC ${saveDcValue}. On a failed save, target has the ${auto.conditionInflicted} condition.`,
+            automation: auto,
+        },
+    };
+}
+
+function effectOnlyPopup(action, auto, saveDcValue) {
+    const riderDesc = getRiderDescription(auto.effect, auto.effectValue);
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            description: `${action.name} — ${auto.saveType || 'DEX'} save DC ${saveDcValue}. On a failed save, ${riderDesc}.`,
+            automation: auto,
+        },
+    };
 }
 
 function resolveSaveAttackDamageType(auto, playerStats) {

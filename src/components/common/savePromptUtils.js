@@ -24,33 +24,29 @@ export function getHolyAuraSaveAdvantage(current, campaignName) {
   return targetEffects.some(te => te.target === current.targetName && te.effect === 'holy_aura');
 }
 
+function nimbusCoversTarget(grantorName, targetName, campaignName) {
+  if (!getRuntimeValue(grantorName, 'holyNimbusActive', campaignName)) return false;
+  const allyList = getAllyList(grantorName);
+  return allyList.includes(targetName) || allyList.length === 1;
+}
+
 // Source-restricted save advantage (e.g. Holy Nimbus: advantage against Fiends/Undead for allies)
 export function getHolyNimbusSaveAdvantage(current, characters, campaignName) {
-  if (!current || !current.attackerName) return false;
+  if (!current?.attackerName) return false;
   const targetName = current.targetName;
-  const attackerName = current.attackerName;
   const combatSummary = getCombatSummary(campaignName);
-  const attackerCreature = combatSummary?.creatures?.find(c => utils.getName(c.name) === utils.getName(attackerName));
+  const creatures = combatSummary?.creatures || [];
+  const attackerCreature = creatures.find(c => utils.getName(c.name) === utils.getName(current.attackerName));
   if (!attackerCreature) return false;
   const attackerType = (attackerCreature.monsterType || '').toLowerCase();
   if (attackerType !== 'fiend' && attackerType !== 'undead') return false;
   for (const character of (characters || [])) {
-    const charName = character.name;
-    const holyNimbusActive = getRuntimeValue(charName, 'holyNimbusActive', campaignName);
-    if (!holyNimbusActive) continue;
-    const allyList = getAllyList(charName);
-    if (allyList.includes(targetName)) return true;
-    if (allyList.length === 1) return true;
+    if (nimbusCoversTarget(character.name, targetName, campaignName)) return true;
   }
   // Also check NPCs with Holy Nimbus
-  for (const creature of (combatSummary?.creatures || [])) {
-    const creatureName = utils.getName(creature.name);
+  for (const creature of creatures) {
     if (creature.type === 'player') continue;
-    const holyNimbusActive = getRuntimeValue(creatureName, 'holyNimbusActive', campaignName);
-    if (!holyNimbusActive) continue;
-    const allyList = getAllyList(creatureName);
-    if (allyList.includes(targetName)) return true;
-    if (allyList.length === 1) return true;
+    if (nimbusCoversTarget(utils.getName(creature.name), targetName, campaignName)) return true;
   }
   return false;
 }

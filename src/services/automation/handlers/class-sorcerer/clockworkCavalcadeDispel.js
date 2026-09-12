@@ -59,17 +59,20 @@ export async function dispelSpellsOnTarget(targetName, campaignName) {
             .map(c => String(c).toLowerCase())
     );
     if (conditionKeys.size > 0) {
-        const conds = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-        const keptConds = conds.filter(c => !conditionKeys.has(String(c).toLowerCase()));
-        if (keptConds.length !== conds.length) {
-            setRuntimeValue(targetName, 'activeConditions', keptConds, campaignName);
-            removed.conditions = conds.filter(c => conditionKeys.has(String(c).toLowerCase()));
-            const meta = getRuntimeValue(targetName, 'activeConditionMeta', campaignName) || {};
-            const keptMeta = { ...meta };
-            for (const key of conditionKeys) delete keptMeta[key];
-            setRuntimeValue(targetName, 'activeConditionMeta', keptMeta, campaignName);
-        }
+        removed.conditions = removeConditionsByKeys(targetName, campaignName, conditionKeys);
     }
 
     return removed;
+}
+
+function removeConditionsByKeys(targetName, campaignName, conditionKeys) {
+    const conds = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const keptConds = conds.filter(c => !conditionKeys.has(String(c).toLowerCase()));
+    if (keptConds.length === conds.length) return [];
+    setRuntimeValue(targetName, 'activeConditions', keptConds, campaignName);
+    const meta = getRuntimeValue(targetName, 'activeConditionMeta', campaignName) || {};
+    const keptMeta = { ...meta };
+    for (const key of conditionKeys) delete keptMeta[key];
+    setRuntimeValue(targetName, 'activeConditionMeta', keptMeta, campaignName);
+    return conds.filter(c => conditionKeys.has(String(c).toLowerCase()));
 }

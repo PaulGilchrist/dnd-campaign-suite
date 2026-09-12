@@ -1,5 +1,6 @@
 import { getSaveDc, resolveUses, resolveDiceExpression, resolveScaling } from '../automationExpressions.js'
 import { normalizeCastingTime } from '../../../shared/castingTimeUtils.js'
+import { withAutoDefaults } from './infoDefaults.js'
 
 const ACTION_BY_CASTING_TIME = {
     '1 bonus action': 'bonus_action',
@@ -32,52 +33,55 @@ function resolveHealExpression(auto, playerStats) {
     return healExpression
 }
 
+const SAVE_ATTACK_DEFAULTS = {
+    damageType: '',
+    saveType: 'DEX',
+    saveAbility: 'CON',
+    shape: '',
+    range: '',
+    conditionInflicted: null,
+    duration: '',
+    recharge: 'long_rest',
+    resourceCost: '',
+    options: [],
+    optionDetails: {},
+    dcSuccess: null,
+}
+
+function resolveSaveAttackDamage(auto, playerStats) {
+    const scaling = resolveScaling(playerStats, auto.scaling)
+    return resolveDiceExpression(scaling?.damage || auto.damage || '', playerStats)
+}
+
+function resolveSaveAttackUses(auto, playerStats) {
+    if (auto.resourceCost !== 'wild_shape') return resolveUses(playerStats, auto.uses)
+    return playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0
+}
+
 export const saveHandlers = {
     'save_attack': (feature, playerStats) => {
         const auto = feature.automation
-        const scaling = resolveScaling(playerStats, auto.scaling)
-        const rawDamage = scaling?.damage || auto.damage || ''
-        const damage = resolveDiceExpression(rawDamage, playerStats)
-        let uses = resolveUses(playerStats, auto.uses)
-        if (auto.resourceCost === 'wild_shape') {
-            uses = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0
-        }
-        const saveDc = resolveAbilitySaveDc(auto, playerStats, 'CON')
-        const healExpression = resolveHealExpression(auto, playerStats)
+        const uses = resolveSaveAttackUses(auto, playerStats)
         const castingTime = auto.casting_time || ''
-        const action = resolveCastingAction(auto, castingTime)
         return {
             type: 'save_attack',
             name: feature.name,
-            action: action || 'action',
-            damage,
-            damageType: auto.damageType || '',
-            saveType: auto.saveType || 'DEX',
-            saveDc,
-            saveAbility: auto.saveAbility || 'CON',
-            shape: auto.shape || '',
-            range: auto.range || '',
-            conditionInflicted: auto.conditionInflicted || null,
-            duration: auto.duration || '',
+            action: resolveCastingAction(auto, castingTime) || 'action',
+            damage: resolveSaveAttackDamage(auto, playerStats),
+            saveDc: resolveAbilitySaveDc(auto, playerStats, 'CON'),
             uses,
             usesMax: uses,
-            recharge: auto.recharge || 'long_rest',
-            resourceCost: auto.resourceCost || '',
             hasOptions: !!auto.hasOptions,
-            options: auto.options || [],
-            optionDetails: auto.optionDetails || {},
-            healExpression,
-            dcSuccess: auto.dcSuccess || null,
+            healExpression: resolveHealExpression(auto, playerStats),
             casting_time: castingTime,
+            ...withAutoDefaults(auto, SAVE_ATTACK_DEFAULTS),
             hasAutomation: true
         }
     },
 
     'elemental_burst': (feature, playerStats) => {
         const auto = feature.automation
-        const scaling = resolveScaling(playerStats, auto.scaling)
-        const rawDamage = scaling?.damage || auto.damage || ''
-        const damage = resolveDiceExpression(rawDamage, playerStats)
+        const damage = resolveSaveAttackDamage(auto, playerStats)
         const saveDc = resolveAbilitySaveDc(auto, playerStats, 'CON')
         const castingTime = auto.casting_time || ''
         const action = resolveCastingAction(auto, castingTime)

@@ -19,30 +19,19 @@ import {
 
 // ── Bonus Action Maneuvers ──────────────────────────────────────────────
 
-export async function executeBonusActionManeuver(action, playerStats, campaignName, maneuverName) {
-    const maneuver = await findManeuver(maneuverName, playerStats.rules);
+// Effects whose popup description omits the resolved target name.
+const BONUS_TARGETLESS_EFFECTS = new Set(['ac_bonus_disengage', 'dash_and_damage']);
 
-    if (!maneuver) {
-        return buildManeuverNotFoundPopup(maneuverName, maneuverName);
-    }
-
-    const { superiorityDice, hasDiceRemaining } = checkSuperiorityDice(playerStats, campaignName);
-
-    if (!hasDiceRemaining) {
-        return buildNoDiceRemainingPopup(maneuver.name);
-    }
-
-    const targetInfo = await resolveTarget(campaignName, playerStats.name);
-    const targetName = targetInfo?.target?.name || null;
-
-    // MN-016: Rally resolves its ally picker in a modal — gate on ally availability
-    // BEFORE roll/expend so a no-allies click neither rolls nor spends a die.
-    let rallyAllies = [];
-    if (maneuver.effect === 'temp_hp') {
-        const cs = await getCombatContext(campaignName);
-        rallyAllies = cs?.creatures?.filter(c => c.name !== playerStats.name) || [];
-        if (rallyAllies.length === 0) {
-            return {
+// MN-016: Rally resolves its ally picker in a modal — gate on ally availability
+// BEFORE roll/expend so a no-allies click neither rolls nor spends a die.
+async function gateRallyAllies(maneuver, playerStats, campaignName) {
+    if (maneuver.effect !== 'temp_hp') return { rallyAllies: [] };
+    const cs = await getCombatContext(campaignName);
+    const creatures = cs && cs.creatures ? cs.creatures : [];
+    const rallyAllies = creatures.filter(c => c.name !== playerStats.name);
+    if (rallyAllies.length === 0) {
+        return {
+            popup: {
                 type: 'popup',
                 payload: {
                     type: 'automation_info',
@@ -55,72 +44,60 @@ export async function executeBonusActionManeuver(action, playerStats, campaignNa
                     abilityName: maneuver.name,
                     description: `${maneuver.name}: No allies available to receive Rally.`,
                 }],
-            };
-        }
+            },
+        };
     }
+    return { rallyAllies };
+}
 
-    const { dieValue, dieDescription, expendedDie } = rollManeuverDie(maneuver, playerStats, campaignName);
-    await expendSuperiorityDie(playerStats, campaignName, expendedDie, superiorityDice);
+function computeRallyExtraHp(maneuver, playerStats) {
+    const fighterLevel = playerStats.level || 1;
+    const fallback = Math.floor(fighterLevel / 2);
+    const extraHpRaw = maneuver.extraHpExpression
+        ? evaluateAutoExpression(maneuver.extraHpExpression, playerStats)
+        : fallback;
+    return typeof extraHpRaw === 'number' ? Math.floor(extraHpRaw) : fallback;
+}
 
+function buildRallyModal(maneuver, playerStats, campaignName, dieValue, rallyAllies, description) {
+    const extraHp = computeRallyExtraHp(maneuver, playerStats);
+    const totalHp = dieValue + extraHp;
+    const allyOptions = rallyAllies.map(a => ({ label: a.name, value: a.name }));
     const logEntry = {
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: maneuver.name,
-        description: `Used ${maneuver.name} as a bonus action. ${dieDescription} ${maneuver.description}`,
+        description: `${maneuver.name}: Choose an ally to gain temporary hit points.`,
     };
+    return {
+        type: 'modal',
+        modalName: 'rallyChoice',
+        payload: {
+            playerStats,
+            campaignName,
+            dieValue,
+            maneuverName: maneuver.name,
+            allyOptions,
+            totalHp,
+            extraHp,
+            description,
+        },
+        logEntries: [logEntry],
+    };
+}
 
-    let description = `<b>${maneuver.name}</b> (Bonus Action)<br/>${dieDescription}`;
-
-    if (targetName && maneuver.effect !== 'ac_bonus_disengage' && maneuver.effect !== 'dash_and_damage') {
-        description += ` Target: ${targetName}.`;
-    }
-
-    if (maneuver.saveType) {
-        description += ` Target must make a ${maneuver.saveType} save or suffer the effect.`;
-    }
-
-    if (maneuver.effect === 'temp_hp') {
-        const fighterLevel = playerStats.level || 1;
-        const extraHpRaw = maneuver.extraHpExpression
-            ? evaluateAutoExpression(maneuver.extraHpExpression, playerStats)
-            : Math.floor(fighterLevel / 2);
-        const extraHp = typeof extraHpRaw === 'number' ? Math.floor(extraHpRaw) : Math.floor(fighterLevel / 2);
-        const totalHp = dieValue + extraHp;
-        const allyOptions = rallyAllies.map(a => ({ label: a.name, value: a.name }));
-        const logEntry = {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: maneuver.name,
-            description: `${maneuver.name}: Choose an ally to gain temporary hit points.`,
-        };
-        return {
-            type: 'modal',
-            modalName: 'rallyChoice',
-            payload: {
-                playerStats,
-                campaignName,
-                dieValue,
-                maneuverName: maneuver.name,
-                allyOptions,
-                totalHp,
-                extraHp,
-                description,
-            },
-            logEntries: [logEntry],
-        };
-    }
-
-    if (maneuver.effect === 'ac_bonus_disengage') {
-        description += ` You take the Disengage action and gain +${dieValue} AC until the start of your next turn.`;
+// Bonus-action maneuver effect side effects → appended description text.
+const BONUS_EFFECT_APPLIERS = {
+    ac_bonus_disengage: async ({ maneuver, playerStats, campaignName, dieValue }) => {
         await setRuntimeValue(playerStats.name, 'baitAndSwitchActive', true, campaignName);
         await setRuntimeValue(playerStats.name, 'baitAndSwitchBonus', dieValue, campaignName);
         await setRuntimeValue(playerStats.name, 'baitAndSwitchSource', maneuver.name, campaignName);
         await addExpiration(playerStats.name, playerStats.name, [
             { type: 'bait_and_switch_clear' }
         ], campaignName, undefined, playerStats.name);
-    }
-
-    if (maneuver.effect === 'advantage_and_damage') {
+        return ` You take the Disengage action and gain +${dieValue} AC until the start of your next turn.`;
+    },
+    advantage_and_damage: async ({ maneuver, playerStats, campaignName, dieValue, targetName }) => {
         await setRuntimeValue(playerStats.name, 'feintingAttackDieValue', dieValue, campaignName);
         const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
         const currentRound = getCurrentCombatRound();
@@ -137,12 +114,61 @@ export async function executeBonusActionManeuver(action, playerStats, campaignNa
         addExpiration(playerStats.name, playerStats.name, [
             { type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: maneuver.name, target: playerStats.name }
         ], campaignName, 2);
-        description += ` You have Advantage on your next attack roll against the target. If it hits, add ${dieValue} to the damage roll.`;
+        return ` You have Advantage on your next attack roll against the target. If it hits, add ${dieValue} to the damage roll.`;
+    },
+    dash_and_damage: async ({ playerStats, campaignName, dieValue }) => {
+        await setRuntimeValue(playerStats.name, 'lungingAttackDieValue', dieValue, campaignName);
+        return ` You take the Dash action. Add ${dieValue} to the damage roll of your next melee hit this turn.`;
+    },
+};
+
+export async function executeBonusActionManeuver(action, playerStats, campaignName, maneuverName) {
+    const maneuver = await findManeuver(maneuverName, playerStats.rules);
+
+    if (!maneuver) {
+        return buildManeuverNotFoundPopup(maneuverName, maneuverName);
     }
 
-    if (maneuver.effect === 'dash_and_damage') {
-        await setRuntimeValue(playerStats.name, 'lungingAttackDieValue', dieValue, campaignName);
-        description += ` You take the Dash action. Add ${dieValue} to the damage roll of your next melee hit this turn.`;
+    const { superiorityDice, hasDiceRemaining } = checkSuperiorityDice(playerStats, campaignName);
+
+    if (!hasDiceRemaining) {
+        return buildNoDiceRemainingPopup(maneuver.name);
+    }
+
+    const targetInfo = await resolveTarget(campaignName, playerStats.name);
+    const target = targetInfo && targetInfo.target;
+    const targetName = target ? target.name : null;
+
+    const rallyGate = await gateRallyAllies(maneuver, playerStats, campaignName);
+    if (rallyGate.popup) return rallyGate.popup;
+
+    const { dieValue, dieDescription, expendedDie } = rollManeuverDie(maneuver, playerStats, campaignName);
+    await expendSuperiorityDie(playerStats, campaignName, expendedDie, superiorityDice);
+
+    const logEntry = {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: maneuver.name,
+        description: `Used ${maneuver.name} as a bonus action. ${dieDescription} ${maneuver.description}`,
+    };
+
+    let description = `<b>${maneuver.name}</b> (Bonus Action)<br/>${dieDescription}`;
+
+    if (targetName && !BONUS_TARGETLESS_EFFECTS.has(maneuver.effect)) {
+        description += ` Target: ${targetName}.`;
+    }
+
+    if (maneuver.saveType) {
+        description += ` Target must make a ${maneuver.saveType} save or suffer the effect.`;
+    }
+
+    if (maneuver.effect === 'temp_hp') {
+        return buildRallyModal(maneuver, playerStats, campaignName, dieValue, rallyGate.rallyAllies, description);
+    }
+
+    const applyEffect = BONUS_EFFECT_APPLIERS[maneuver.effect];
+    if (applyEffect) {
+        description += await applyEffect({ maneuver, playerStats, campaignName, dieValue, targetName });
     }
 
     return {
@@ -401,6 +427,68 @@ async function gateRiposteReaction(maneuver, playerStats, campaignName) {
     return { attackerName, identity, currentRound };
 }
 
+// MN-017: Riposte — trigger-gated reaction. Attack the creature that just
+// missed the holder with a melee attack, never resolveTarget.
+async function executeRiposteReaction(maneuver, playerStats, campaignName, superiorityDice) {
+    const gate = await gateRiposteReaction(maneuver, playerStats, campaignName);
+    if (gate.refusal) return gate.refusal;
+
+    const meleeAttacks = filterMeleeAttacks(playerStats.attacks);
+    const attack = meleeAttacks.length > 0 ? meleeAttacks[0] : (playerStats.attacks || [])[0];
+
+    if (!attack) {
+        return buildRiposteRefusalPopup(maneuver.name, `${maneuver.name}: No melee attack available.`);
+    }
+
+    const { dieValue, dieDescription, expendedDie } = rollManeuverDie(maneuver, playerStats, campaignName);
+    await expendSuperiorityDie(playerStats, campaignName, expendedDie, superiorityDice);
+
+    // Reaction consumed: arm the die and stamp both latches — sequential
+    // awaits (pitfall 21: concurrent full-store POSTs race).
+    await setRuntimeValue(playerStats.name, 'pendingRiposteDieValue', dieValue, campaignName);
+    await setRuntimeValue(playerStats.name, RIPOSTE_APPLIED_ATTACK_KEY, gate.identity, campaignName);
+    await setRuntimeValue(playerStats.name, RIPOSTE_USED_ROUND_KEY, gate.currentRound, campaignName);
+
+    const logEntry = {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: maneuver.name,
+        description: `${playerStats.name} used ${maneuver.name} (Reaction) — melee attack against ${gate.attackerName} after their melee attack missed. ${dieDescription} Superiority Die expended.`,
+        targetName: gate.attackerName,
+        timestamp: Date.now(),
+    };
+
+    return {
+        type: 'attack_roll',
+        payload: {
+            attack,
+            targetName: gate.attackerName,
+        },
+        logEntries: [logEntry],
+    };
+}
+
+// Parry ("damage_reduction"): reduce damage by die + best STR/DEX modifier,
+// heal the difference back up, and return the appended description text.
+async function applyManeuverDamageReduction(playerStats, campaignName, dieValue) {
+    const abilities = playerStats.abilities || [];
+    const strMod = (abilities.find(a => a.name === 'Strength') || {}).bonus || 0;
+    const dexMod = (abilities.find(a => a.name === 'Dexterity') || {}).bonus || 0;
+    const mod = Math.max(strMod, dexMod);
+    const reduction = dieValue + mod;
+    let description = ` Damage reduced by ${reduction} (${dieValue} + ${mod} from STR/DEX modifier).`;
+    const storedMaxHp = getRuntimeValue(playerStats.name, 'hitPoints', campaignName);
+    const storedCurrentHp = getRuntimeValue(playerStats.name, 'currentHitPoints', campaignName);
+    const maxHp = storedMaxHp != null ? Number(storedMaxHp) : (storedCurrentHp || 10);
+    const currentHp = storedCurrentHp != null ? Number(storedCurrentHp) : 10;
+    const newHp = Math.min(maxHp, currentHp + reduction);
+    if (newHp !== currentHp) {
+        await setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
+    }
+    description += ` HP restored: ${currentHp} → ${newHp}.`;
+    return description;
+}
+
 export async function executeReactionManeuver(action, playerStats, campaignName, maneuverName) {
     const maneuver = await findManeuver(maneuverName, playerStats.rules);
 
@@ -414,49 +502,13 @@ export async function executeReactionManeuver(action, playerStats, campaignName,
         return buildNoDiceRemainingPopup(maneuver.name);
     }
 
-    // MN-017: Riposte — trigger-gated reaction. Attack the creature that just
-    // missed the holder with a melee attack, never resolveTarget.
     if (maneuver.effect === 'melee_attack_reaction') {
-        const gate = await gateRiposteReaction(maneuver, playerStats, campaignName);
-        if (gate.refusal) return gate.refusal;
-
-        const meleeAttacks = filterMeleeAttacks(playerStats.attacks);
-        const attack = meleeAttacks.length > 0 ? meleeAttacks[0] : (playerStats.attacks || [])[0];
-
-        if (!attack) {
-            return buildRiposteRefusalPopup(maneuver.name, `${maneuver.name}: No melee attack available.`);
-        }
-
-        const { dieValue, dieDescription, expendedDie } = rollManeuverDie(maneuver, playerStats, campaignName);
-        await expendSuperiorityDie(playerStats, campaignName, expendedDie, superiorityDice);
-
-        // Reaction consumed: arm the die and stamp both latches — sequential
-        // awaits (pitfall 21: concurrent full-store POSTs race).
-        await setRuntimeValue(playerStats.name, 'pendingRiposteDieValue', dieValue, campaignName);
-        await setRuntimeValue(playerStats.name, RIPOSTE_APPLIED_ATTACK_KEY, gate.identity, campaignName);
-        await setRuntimeValue(playerStats.name, RIPOSTE_USED_ROUND_KEY, gate.currentRound, campaignName);
-
-        const logEntry = {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: maneuver.name,
-            description: `${playerStats.name} used ${maneuver.name} (Reaction) — melee attack against ${gate.attackerName} after their melee attack missed. ${dieDescription} Superiority Die expended.`,
-            targetName: gate.attackerName,
-            timestamp: Date.now(),
-        };
-
-        return {
-            type: 'attack_roll',
-            payload: {
-                attack,
-                targetName: gate.attackerName,
-            },
-            logEntries: [logEntry],
-        };
+        return executeRiposteReaction(maneuver, playerStats, campaignName, superiorityDice);
     }
 
     const targetInfo = await resolveTarget(campaignName, playerStats.name);
-    const targetName = targetInfo?.target?.name || null;
+    const target = targetInfo && targetInfo.target;
+    const targetName = target ? target.name : null;
 
     const { dieValue, dieDescription, expendedDie } = rollManeuverDie(maneuver, playerStats, campaignName);
     await expendSuperiorityDie(playerStats, campaignName, expendedDie, superiorityDice);
@@ -475,20 +527,7 @@ export async function executeReactionManeuver(action, playerStats, campaignName,
     }
 
     if (maneuver.effect === 'damage_reduction') {
-        const strMod = (playerStats.abilities || []).find(a => a.name === 'Strength')?.bonus || 0;
-        const dexMod = (playerStats.abilities || []).find(a => a.name === 'Dexterity')?.bonus || 0;
-        const mod = Math.max(strMod, dexMod);
-        const reduction = dieValue + mod;
-        description += ` Damage reduced by ${reduction} (${dieValue} + ${mod} from STR/DEX modifier).`;
-        const storedMaxHp = getRuntimeValue(playerStats.name, 'hitPoints', campaignName);
-        const storedCurrentHp = getRuntimeValue(playerStats.name, 'currentHitPoints', campaignName);
-        const maxHp = storedMaxHp != null ? Number(storedMaxHp) : (storedCurrentHp || 10);
-        const currentHp = storedCurrentHp != null ? Number(storedCurrentHp) : 10;
-        const newHp = Math.min(maxHp, currentHp + reduction);
-        if (newHp !== currentHp) {
-            await setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
-        }
-        description += ` HP restored: ${currentHp} → ${newHp}.`;
+        description += await applyManeuverDamageReduction(playerStats, campaignName, dieValue);
     }
 
     return {
@@ -525,6 +564,86 @@ async function collectCommandingPresenceTargets(cs, playerStats, campaignName, r
     return validTargets;
 }
 
+async function buildCommandingPresenceTargetModal(action, auto, maneuver, playerStats, campaignName, maneuverName) {
+    const cs = await getCombatContext(campaignName);
+    if (!cs || !cs.creatures || cs.creatures.length === 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: maneuver.name,
+                description: `${maneuver.name}: No creatures available to target.`,
+            },
+        };
+    }
+
+    const rangeFt = auto.reactionRange === '30_ft' ? 30 : 30;
+    const validTargets = await collectCommandingPresenceTargets(cs, playerStats, campaignName, rangeFt);
+
+    if (validTargets.length === 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: maneuver.name,
+                description: `${maneuver.name}: No creatures within 30 feet to target.`,
+            },
+        };
+    }
+
+    const saveDc = auto.saveDc === 'ability' ? playerStats.abilityDc || 8 : (auto.saveDc || 8);
+    const saveType = auto.saveType || auto.reactionSaveType || 'WIS';
+
+    return {
+        type: 'modal',
+        modalName: 'commandingPresenceReaction',
+        payload: {
+            title: `${maneuver.name} — Choose Target`,
+            targets: validTargets,
+            confirmLabel: 'Force Save',
+            confirmIcon: 'fa-wand-sparkles',
+            featureDescription: `Target must make a ${saveType} save (DC ${saveDc}) or have Disadvantage on their next attack roll.`,
+            description: `You use your Reaction to intimidate a creature within 30 feet.`,
+            action: action,
+            playerStats: playerStats,
+            campaignName: campaignName,
+            maneuverName: maneuverName,
+            onTargetSelected: async (selectedTargetName) => {
+                const result = await executeCommandingPresenceReaction({ ...action, automation: { ...auto, targetName: selectedTargetName } }, playerStats, campaignName, maneuverName);
+                return result;
+            },
+            onSkip: async () => {
+                await addEntry(campaignName, {
+                    type: 'ability_use',
+                    characterName: playerStats.name,
+                    abilityName: maneuver.name,
+                    description: `${playerStats.name} used ${maneuver.name} as a reaction but chose not to target a creature.`,
+                }).catch((e) => { console.error("[executeActionManeuvers:log-error]", e); });
+            },
+        },
+    };
+}
+
+async function applyCommandingPresenceDisadvantage(reactionEffect, reactionDuration, playerStats, targetName, campaignName) {
+    if (reactionEffect === 'disadvantage_next_attack' || reactionEffect === 'attack_roll_disadvantage') {
+        const durationInTurns = reactionDuration === 'until_end_of_next_turn' ? 2 : 1;
+        const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+        const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+        const hasDisadvantage = conditions.some(c => String(c).toLowerCase() === 'disadvantage');
+        if (!hasDisadvantage) {
+            await setRuntimeValue(targetName, 'activeConditions', [...conditions, 'disadvantage'], campaignName);
+        }
+        await addExpiration(playerStats.name, targetName, [
+            { type: 'condition', condition: 'disadvantage' },
+        ], campaignName, durationInTurns);
+        return ` ${targetName} has Disadvantage on their next attack roll.`;
+    }
+    if (reactionEffect === 'save_disadvantage') {
+        return ` ${targetName} has Disadvantage on their next saving throw.`;
+    }
+    return '';
+}
+
 export async function executeCommandingPresenceReaction(action, playerStats, campaignName, maneuverName) {
     const maneuver = await findManeuver(maneuverName, playerStats.rules);
 
@@ -545,63 +664,7 @@ export async function executeCommandingPresenceReaction(action, playerStats, cam
 
     // If no target is pre-set, show a modal to select one
     if (!targetName) {
-        const cs = await getCombatContext(campaignName);
-        if (!cs || !cs.creatures || cs.creatures.length === 0) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: maneuver.name,
-                    description: `${maneuver.name}: No creatures available to target.`,
-                },
-            };
-        }
-
-        const rangeFt = auto.reactionRange === '30_ft' ? 30 : 30;
-        const validTargets = await collectCommandingPresenceTargets(cs, playerStats, campaignName, rangeFt);
-
-        if (validTargets.length === 0) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: maneuver.name,
-                    description: `${maneuver.name}: No creatures within 30 feet to target.`,
-                },
-            };
-        }
-
-        const saveDc = auto.saveDc === 'ability' ? playerStats.abilityDc || 8 : (auto.saveDc || 8);
-        const saveType = auto.saveType || auto.reactionSaveType || 'WIS';
-
-        return {
-            type: 'modal',
-            modalName: 'commandingPresenceReaction',
-            payload: {
-                title: `${maneuver.name} — Choose Target`,
-                targets: validTargets,
-                confirmLabel: 'Force Save',
-                confirmIcon: 'fa-wand-sparkles',
-                featureDescription: `Target must make a ${saveType} save (DC ${saveDc}) or have Disadvantage on their next attack roll.`,
-                description: `You use your Reaction to intimidate a creature within 30 feet.`,
-                action: action,
-                playerStats: playerStats,
-                campaignName: campaignName,
-                maneuverName: maneuverName,
-                onTargetSelected: async (selectedTargetName) => {
-                    const result = await executeCommandingPresenceReaction({ ...action, automation: { ...auto, targetName: selectedTargetName } }, playerStats, campaignName, maneuverName);
-                    return result;
-                },
-                onSkip: async () => {
-                    await addEntry(campaignName, {
-                        type: 'ability_use',
-                        characterName: playerStats.name,
-                        abilityName: maneuver.name,
-                        description: `${playerStats.name} used ${maneuver.name} as a reaction but chose not to target a creature.`,
-                    }).catch((e) => { console.error("[executeActionManeuvers:log-error]", e); });
-                },
-            },
-        };
+        return buildCommandingPresenceTargetModal(action, auto, maneuver, playerStats, campaignName, maneuverName);
     }
 
     const { dieDescription, expendedDie } = rollManeuverDie(maneuver, playerStats, campaignName);
@@ -615,22 +678,7 @@ export async function executeCommandingPresenceReaction(action, playerStats, cam
     };
 
     let description = `<b>${maneuver.name}</b> (Reaction)<br/>${dieDescription}<br/>Target: ${targetName}.`;
-
-    if (reactionEffect === 'disadvantage_next_attack' || reactionEffect === 'attack_roll_disadvantage') {
-        const durationInTurns = reactionDuration === 'until_end_of_next_turn' ? 2 : 1;
-        description += ` ${targetName} has Disadvantage on their next attack roll.`;
-        const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-        const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-        const hasDisadvantage = conditions.some(c => String(c).toLowerCase() === 'disadvantage');
-        if (!hasDisadvantage) {
-            await setRuntimeValue(targetName, 'activeConditions', [...conditions, 'disadvantage'], campaignName);
-        }
-        await addExpiration(playerStats.name, targetName, [
-            { type: 'condition', condition: 'disadvantage' },
-        ], campaignName, durationInTurns);
-    } else if (reactionEffect === 'save_disadvantage') {
-        description += ` ${targetName} has Disadvantage on their next saving throw.`;
-    }
+    description += await applyCommandingPresenceDisadvantage(reactionEffect, reactionDuration, playerStats, targetName, campaignName);
 
     return {
         type: 'popup',

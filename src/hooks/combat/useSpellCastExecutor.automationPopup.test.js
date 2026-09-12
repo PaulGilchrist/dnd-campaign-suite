@@ -53,16 +53,7 @@ describe('useSpellCastExecutor', () => {
       });
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
+        useSpellCastExecutor(props)
       );
 
       await act(async () => {
@@ -80,16 +71,7 @@ describe('useSpellCastExecutor', () => {
       });
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
+        useSpellCastExecutor(props)
       );
 
       await act(async () => {
@@ -106,16 +88,7 @@ describe('useSpellCastExecutor', () => {
       });
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
+        useSpellCastExecutor(props)
       );
 
       await act(async () => {
@@ -136,16 +109,7 @@ describe('useSpellCastExecutor', () => {
       });
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
+        useSpellCastExecutor(props)
       );
 
       await act(async () => {
@@ -169,19 +133,7 @@ describe('useSpellCastExecutor', () => {
       });
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-          props.extraMeta,
-          undefined,
-          setModalState,
-        )
+        useSpellCastExecutor({ ...props, setModalState })
       );
 
       await act(async () => {
@@ -205,16 +157,7 @@ describe('useSpellCastExecutor', () => {
       });
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
+        useSpellCastExecutor(props)
       );
 
       await act(async () => {
@@ -233,16 +176,7 @@ describe('useSpellCastExecutor', () => {
       });
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
+        useSpellCastExecutor(props)
       );
 
       await act(async () => {
@@ -261,16 +195,7 @@ describe('useSpellCastExecutor', () => {
       });
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
+        useSpellCastExecutor(props)
       );
 
       await act(async () => {
@@ -288,18 +213,7 @@ describe('useSpellCastExecutor', () => {
       });
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-          props.extraMeta,
-          ref,
-        )
+        useSpellCastExecutor({ ...props, cachedPosRef: ref })
       );
 
       await act(async () => {
@@ -314,16 +228,7 @@ describe('useSpellCastExecutor', () => {
       executeSpellCast.mockResolvedValue(null);
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
+        useSpellCastExecutor(props)
       );
 
       await act(async () => {
@@ -338,16 +243,7 @@ describe('useSpellCastExecutor', () => {
       executeSpellCast.mockResolvedValue(undefined);
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
+        useSpellCastExecutor(props)
       );
 
       await act(async () => {
@@ -363,16 +259,7 @@ describe('useSpellCastExecutor', () => {
       executeSpellCast.mockRejectedValue(new Error('Cast failed'));
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
+        useSpellCastExecutor(props)
       );
 
       await act(async () => {

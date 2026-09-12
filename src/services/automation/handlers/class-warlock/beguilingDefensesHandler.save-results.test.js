@@ -150,16 +150,7 @@ describe('beguilingDefensesHandler - save results', () => {
                 expect(applyDamageToTarget).toHaveBeenCalled();
             }, { timeout: 100 });
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.any(Object),
-                'Goblin',
-                10,
-                ['Psychic'],
-                campaignName,
-                ['Goblin'],
-                false,
-                playerName
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 10, ['Psychic'], campaignName, ['Goblin'], { ignoreResistance: false, attackerName: playerName });
             expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 type: 'roll',
                 rollType: 'damage',
@@ -432,16 +423,7 @@ describe('beguilingDefensesHandler - save results', () => {
             });
 
             await vi.waitFor(() => {
-                expect(applyDamageToTarget).toHaveBeenCalledWith(
-                    expect.any(Object),
-                    'Goblin',
-                    10,
-                    ['Psychic'],
-                    campaignName,
-                    [],
-                    false,
-                    playerName
-                );
+                expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 10, ['Psychic'], campaignName, [], { ignoreResistance: false, attackerName: playerName });
             }, { timeout: 100 });
         });
 

@@ -1,7 +1,7 @@
 import express from 'express';
 import { subscribers, characterChangeData, spellOverlayData } from '../utils/changeData.js';
 import sseRoutes from './sse.js';
-import request from 'supertest';
+import { request } from '../test-utils/localhostSupertest.js';
 
 // Create a test app with the routes
 function createTestApp() {

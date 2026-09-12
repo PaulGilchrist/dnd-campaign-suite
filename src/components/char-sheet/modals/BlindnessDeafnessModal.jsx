@@ -95,7 +95,7 @@ function BlindnessDeafnessModal({ combatSummary, attackerName, attackerPos, save
 
             const npcResults = [{ targetName, success, roll: roll1, total, saveBonus }];
 
-            logSaveEntry(campaignName, featureName, attackerName, targetName, saveDc, 'CON', success, total, [roll1], saveBonus, `1d20${saveBonus !== 0 ? '+' + saveBonus : ''}`);
+            logSaveEntry({ campaignName, featureName, attackerName, targetName, saveDc, saveType: 'CON', success, total, rolls: [roll1], bonus: saveBonus, formula: `1d20${saveBonus !== 0 ? '+' + saveBonus : ''}` });
 
             persistAndNotify(ctx.combatSummary, campaignName);
 
@@ -113,7 +113,7 @@ function BlindnessDeafnessModal({ combatSummary, attackerName, attackerPos, save
             sourceName: attackerName,
         });
 
-        logSaveEntry(campaignName, featureName, attackerName, targetName, saveDc, 'CON', false, 0, [], 0, '1d20 (waiting)');
+        logSaveEntry({ campaignName, featureName, attackerName, targetName, saveDc, saveType: 'CON', success: false, total: 0, rolls: [], bonus: 0, formula: '1d20 (waiting)' });
 
         persistAndNotify(ctx.combatSummary, campaignName);
 
@@ -136,7 +136,7 @@ function BlindnessDeafnessModal({ combatSummary, attackerName, attackerPos, save
             addConditionToCreature(targetName, saveDc, selectedEffect, ctx);
         }
 
-        logSaveEntry(campaignName, featureName, attackerName, targetName, saveDc, 'CON', success, detail.total ?? 0, [detail.roll ?? 0], detail.saveBonus ?? 0, `1d20${detail.saveBonus !== 0 ? '+' + detail.saveBonus : ''}`);
+        logSaveEntry({ campaignName, featureName, attackerName, targetName, saveDc, saveType: 'CON', success, total: detail.total ?? 0, rolls: [detail.roll ?? 0], bonus: detail.saveBonus ?? 0, formula: `1d20${detail.saveBonus !== 0 ? '+' + detail.saveBonus : ''}` });
 
         persistAndNotify(ctx.combatSummary, campaignName);
 

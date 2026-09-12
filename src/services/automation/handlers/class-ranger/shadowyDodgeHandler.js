@@ -40,22 +40,9 @@ function attackIdentity(attackEvent, attackerName) {
     return `d20:${attackEvent?.d20 ?? '?'}+${attackEvent?.bonus ?? 0}:${attackerName ?? ''}`;
 }
 
-export async function handle(action, playerStats, campaignName, _mapName) {
-    const auto = action.automation;
-    const playerName = playerStats.name;
-    const featureName = action.name || 'Shadowy Dodge';
-
-    // Get the last attack roll against the player
-    const lastAttack = await findLastAttack(campaignName);
-    const attackEvent = lastAttack?.attackEvent;
-    if (!attackEvent || lastAttack?.targetName !== playerName) {
-        return infoPopup(featureName, `No recent attack roll against you found. ${featureName} can only be used shortly after an attack roll.`, auto);
-    }
-
-    const { d20, bonus, targetAc, hit, effectiveAc } = attackEvent;
-    const ac = effectiveAc ?? targetAc;
-    const attackerName = lastAttack.attackerName || 'Unknown creature';
-
+// Reaction-economy gates: self-attack, range, attack-instance latch, round
+// latch. Returns a refusal popup, or { currentRound } when the dodge may proceed.
+async function gateShadowyDodgeReaction({ auto, featureName, playerName, attackerName, identity, campaignName }) {
     if (attackerName === playerName) {
         return infoPopup(featureName, `${featureName}: you cannot attack yourself — the triggering attack must come from another creature.`, auto);
     }
@@ -66,7 +53,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return infoPopup(featureName, `${attackerName} is not within ${rangeFt} feet of you. ${featureName} requires the attacker to be in range.`, auto);
     }
 
-    const identity = attackIdentity(attackEvent, attackerName);
     const appliedIdentity = getRuntimeValue(playerName, APPLIED_ATTACK_KEY, campaignName);
     if (appliedIdentity === identity) {
         return infoPopup(featureName, `Reaction already used — you have already dodged this attack roll with ${featureName}. Your Reaction is spent until your next turn.`, auto);
@@ -79,6 +65,40 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return infoPopup(featureName, `You have already used ${featureName} this round — your Reaction is spent until your next turn.`, auto);
     }
 
+    return { currentRound };
+}
+
+function buildDodgeDescription({ featureName, attackerName, d20, bonus, ac, hit, secondD20, finalD20, finalHit }) {
+    const acText = ac == null ? '—' : ac;
+    let description = `<b>${featureName}</b><br/>`;
+    description += `Attacker: ${attackerName}<br/>`;
+    description += `Original roll: d20(${d20}) + ${bonus} = ${d20 + bonus} vs AC ${acText} → <b>${hit ? 'HIT' : 'MISS'}</b><br/>`;
+    description += `Disadvantage (second d20: ${secondD20}): d20(${finalD20}) + ${bonus} = ${finalD20 + bonus} vs AC ${acText} → <b>${finalHit == null ? 'N/A' : finalHit ? 'HIT' : 'MISS'}</b><br/>`;
+    return description;
+}
+
+export async function handle(action, playerStats, campaignName, _mapName) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+    const featureName = action.name || 'Shadowy Dodge';
+
+    // Get the last attack roll against the player
+    const lastAttack = (await findLastAttack(campaignName)) || {};
+    const attackEvent = lastAttack.attackEvent;
+    if (!attackEvent || lastAttack.targetName !== playerName) {
+        return infoPopup(featureName, `No recent attack roll against you found. ${featureName} can only be used shortly after an attack roll.`, auto);
+    }
+
+    const { d20, bonus, targetAc, hit, effectiveAc } = attackEvent;
+    const ac = effectiveAc ?? targetAc;
+    const attackerName = lastAttack.attackerName || 'Unknown creature';
+
+    const identity = attackIdentity(attackEvent, attackerName);
+    const gate = await gateShadowyDodgeReaction({ auto, featureName, playerName, attackerName, identity, campaignName });
+    if (gate.currentRound == null) return gate;
+
+    const currentRound = gate.currentRound;
+
     // Consume the reaction: stamp the dodged attack instance + round (sequential
     // awaits — pitfall 21: concurrent full-store POSTs race).
     await setRuntimeValue(playerName, APPLIED_ATTACK_KEY, identity, campaignName);
@@ -89,10 +109,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const finalD20 = Math.min(d20, secondD20);
     const finalHit = ac != null ? (finalD20 + bonus >= ac) : null;
 
-    let description = `<b>${featureName}</b><br/>`;
-    description += `Attacker: ${attackerName}<br/>`;
-    description += `Original roll: d20(${d20}) + ${bonus} = ${d20 + bonus} vs AC ${ac != null ? ac : '—'} → <b>${hit ? 'HIT' : 'MISS'}</b><br/>`;
-    description += `Disadvantage (second d20: ${secondD20}): d20(${finalD20}) + ${bonus} = ${finalD20 + bonus} vs AC ${ac != null ? ac : '—'} → <b>${finalHit == null ? 'N/A' : finalHit ? 'HIT' : 'MISS'}</b><br/>`;
+    let description = buildDodgeDescription({ featureName, attackerName, d20, bonus, ac, hit, secondD20, finalD20, finalHit });
 
     const outcome = await appendDodgeOutcome(hit, finalHit, attackerName, playerName, campaignName, featureName);
     description += outcome.text;

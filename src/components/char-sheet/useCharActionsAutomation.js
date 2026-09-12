@@ -156,6 +156,38 @@ function finalizeAutomationOutcome(result, auto, addEntry, campaignName, onBuffs
     }
 }
 
+function applyCastTriggerResult(tr, spell, setModalState, setPopupHtml) {
+    if (tr.type === 'modal') {
+        if (tr.modalName === 'wildMagicSurge') {
+            setModalState({ wildMagicSurgeModal: tr.payload });
+        }
+    } else if (tr.type === 'popup') {
+        const name = tr.payload?.name || spell.name || 'Automation';
+        const description = tr.payload?.description || '';
+        setPopupHtml({ type: 'automation_info', name, description });
+    }
+}
+
+function buildCastHealPopup(healResult, spell) {
+    const bonusHealDetail = healResult.bonusDetails?.length > 0
+        ? healResult.bonusDetails.map(d => `${d.amount} ${d.name}`).join(', ')
+        : '';
+    const rawTotal = healResult.rawTotal ?? healResult.healAmount;
+    return {
+        type: 'heal',
+        name: spell.name,
+        formula: healResult.formula,
+        rolls: healResult.rolls || [],
+        total: rawTotal,
+        targetName: healResult.targetName,
+        finalHeal: healResult.healAmount,
+        bonusHeal: healResult.bonusHeal || 0,
+        bonusHealDetail,
+        healingRerollOriginalRolls: healResult.healingRerollOriginalRolls || null,
+        healingRerollDisplayRolls: healResult.healingRerollDisplayRolls || null,
+    };
+}
+
 export default function useCharActionsAutomation({
     cannotAct,
     playerStats,
@@ -373,40 +405,10 @@ export default function useCharActionsAutomation({
                 characters,
             }).then((healResult) => {
                 if (healResult?.triggerResult) {
-                    const tr = healResult.triggerResult;
-                    if (tr.type === 'modal') {
-                        if (tr.modalName === 'wildMagicSurge') {
-                            setModalState({ wildMagicSurgeModal: tr.payload });
-                        }
-                    } else if (tr.type === 'popup') {
-                        const payload = tr.payload;
-                        const name = payload?.name || spell.name || 'Automation';
-                        const description = payload?.description || '';
-                        setPopupHtml({
-                            type: 'automation_info',
-                            name,
-                            description,
-                        });
-                    }
+                    applyCastTriggerResult(healResult.triggerResult, spell, setModalState, setPopupHtml);
                 }
                 if (healResult && healResult.healAmount > 0) {
-                    const bonusHealDetail = healResult.bonusDetails?.length > 0
-                        ? healResult.bonusDetails.map(d => `${d.amount} ${d.name}`).join(', ')
-                        : '';
-                    const rawTotal = healResult.rawTotal ?? healResult.healAmount;
-                    setPopupHtml({
-                        type: 'heal',
-                        name: spell.name,
-                        formula: healResult.formula,
-                        rolls: healResult.rolls || [],
-                        total: rawTotal,
-                        targetName: healResult.targetName,
-                        finalHeal: healResult.healAmount,
-                        bonusHeal: healResult.bonusHeal || 0,
-                        bonusHealDetail,
-                        healingRerollOriginalRolls: healResult.healingRerollOriginalRolls || null,
-                        healingRerollDisplayRolls: healResult.healingRerollDisplayRolls || null,
-                    });
+                    setPopupHtml(buildCastHealPopup(healResult, spell));
                 }
             }).catch((e) => { console.error('[CharActions] executeSpellCast error:', e); });
 

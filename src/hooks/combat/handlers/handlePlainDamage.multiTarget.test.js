@@ -156,40 +156,15 @@ describe('Plain damage multi/twin target', () => {
             });
 
             const fn = createFn();
-            await fn('Words of Creation', '2d6', 7, [3, 4], 0, {
-                targetName: 'Goblin',
-                damageType: 'force',
-                multiTarget: 'Orc',
-            });
+            await fn('Words of Creation', '2d6', 7, [3, 4], 0, { targetName: 'Goblin', damageType: 'force', multiTarget: 'Orc', });
 
             expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
 
             // First call: primary target (Goblin) with adjusted total
-            expect(applyDamageToTarget).toHaveBeenNthCalledWith(
-                1,
-                expect.any(Object),
-                'Goblin',
-                7,
-                ['force'],
-                'test-campaign',
-                expect.any(Array),
-                false,
-                'TestFighter',
-                true,
-            );
+            expect(applyDamageToTarget).toHaveBeenNthCalledWith(1, expect.any(Object), 'Goblin', 7, ['force'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestFighter', suppressHpLog: true });
 
             // Second call: multi target (Orc) with adjusted total
-            expect(applyDamageToTarget).toHaveBeenNthCalledWith(
-                2,
-                expect.any(Object),
-                'Orc',
-                7,
-                ['force'],
-                'test-campaign',
-                null,
-                false,
-                'TestFighter',
-            );
+            expect(applyDamageToTarget).toHaveBeenNthCalledWith(2, expect.any(Object), 'Orc', 7, ['force'], 'test-campaign', null, { ignoreResistance: false, attackerName: 'TestFighter' });
         });
 
         it('logs damage entries for both primary and multi targets', async () => {
@@ -208,11 +183,7 @@ describe('Plain damage multi/twin target', () => {
             });
 
             const fn = createFn();
-            await fn('Words of Creation', '2d6', 7, [3, 4], 0, {
-                targetName: 'Goblin',
-                damageType: 'force',
-                multiTarget: 'Orc',
-            });
+            await fn('Words of Creation', '2d6', 7, [3, 4], 0, { targetName: 'Goblin', damageType: 'force', multiTarget: 'Orc', });
 
             const logCalls = deps.logEntry.mock.calls.map((call) => call[0]);
             expect(logCalls).toHaveLength(2);
@@ -237,11 +208,7 @@ describe('Plain damage multi/twin target', () => {
             });
 
             const fn = createFn();
-            await fn('Words of Creation', '2d6', 7, [3, 4], 0, {
-                targetName: 'Goblin',
-                damageType: 'force',
-                multiTarget: 'Orc',
-            });
+            await fn('Words of Creation', '2d6', 7, [3, 4], 0, { targetName: 'Goblin', damageType: 'force', multiTarget: 'Orc', });
 
             // setPopupHtml is called multiple times: first with popup object, then with updater function for multi-target
             const popupCalls = deps.setPopupHtml.mock.calls;
@@ -269,25 +236,10 @@ describe('Plain damage multi/twin target', () => {
             });
 
             const fn = createFn();
-            await fn('Magic Missile', '4d4+2', 10, [3, 2, 3, 2], 2, {
-                targetName: 'Goblin',
-                damageType: 'force',
-                metamagicTwinTarget: 'Goblin',
-            });
+            await fn('Magic Missile', '4d4+2', 10, [3, 2, 3, 2], 2, { targetName: 'Goblin', damageType: 'force', metamagicTwinTarget: 'Goblin', });
 
             expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-            expect(applyDamageToTarget).toHaveBeenNthCalledWith(
-                1,
-                expect.any(Object),
-                'Goblin',
-                10,
-                ['force'],
-                'test-campaign',
-                expect.any(Array),
-                false,
-                'TestFighter',
-                true,
-            );
+            expect(applyDamageToTarget).toHaveBeenNthCalledWith(1, expect.any(Object), 'Goblin', 10, ['force'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestFighter', suppressHpLog: true });
         });
     });
 
@@ -303,11 +255,7 @@ describe('Plain damage multi/twin target', () => {
             });
 
             const fn = createFn();
-            await fn('Words of Creation', '2d6', 7, [3, 4], 0, {
-                targetName: 'Goblin',
-                damageType: 'force',
-                multiTarget: 'Goblin',
-            });
+            await fn('Words of Creation', '2d6', 7, [3, 4], 0, { targetName: 'Goblin', damageType: 'force', multiTarget: 'Goblin', });
 
             expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
         });
@@ -325,11 +273,7 @@ describe('Plain damage multi/twin target', () => {
             });
 
             const fn = createFn();
-            await fn('Words of Creation', '2d6', 7, [3, 4], 0, {
-                targetName: 'Goblin',
-                damageType: 'force',
-                multiTarget: 'NonExistent',
-            });
+            await fn('Words of Creation', '2d6', 7, [3, 4], 0, { targetName: 'Goblin', damageType: 'force', multiTarget: 'NonExistent', });
 
             expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
             expect(deps.logEntry).toHaveBeenCalledTimes(1);
@@ -348,11 +292,7 @@ describe('Plain damage multi/twin target', () => {
             });
 
             const fn = createFn();
-            await fn('Magic Missile', '4d4+2', 10, [3, 2, 3, 2], 2, {
-                targetName: 'Goblin',
-                damageType: 'force',
-                metamagicTwinTarget: 'NonExistent',
-            });
+            await fn('Magic Missile', '4d4+2', 10, [3, 2, 3, 2], 2, { targetName: 'Goblin', damageType: 'force', metamagicTwinTarget: 'NonExistent', });
 
             expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
             expect(deps.logEntry).toHaveBeenCalledTimes(1);
@@ -378,12 +318,7 @@ describe('Plain damage multi/twin target', () => {
             });
 
             const fn = createFn();
-            await fn('Magic Missile', '4d4+2', 10, [3, 2, 3, 2], 2, {
-                targetName: 'Goblin',
-                damageType: 'force',
-                metamagicTwinTarget: 'Orc',
-                multiTarget: 'Skeleton',
-            });
+            await fn('Magic Missile', '4d4+2', 10, [3, 2, 3, 2], 2, { targetName: 'Goblin', damageType: 'force', metamagicTwinTarget: 'Orc', multiTarget: 'Skeleton', });
 
             expect(applyDamageToTarget).toHaveBeenCalledTimes(3);
 
@@ -412,12 +347,7 @@ describe('Plain damage multi/twin target', () => {
             });
 
             const fn = createFn();
-            await fn('Magic Missile', '4d4+2', 10, [3, 2, 3, 2], 2, {
-                targetName: 'Goblin',
-                damageType: 'force',
-                metamagicTwinTarget: 'Orc',
-                multiTarget: 'Goblin',
-            });
+            await fn('Magic Missile', '4d4+2', 10, [3, 2, 3, 2], 2, { targetName: 'Goblin', damageType: 'force', metamagicTwinTarget: 'Orc', multiTarget: 'Goblin', });
 
             expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
         });
@@ -438,12 +368,7 @@ describe('Plain damage multi/twin target', () => {
             });
 
             const fn = createFn();
-            await fn('Words of Creation', '2d6', 7, [3, 4], 0, {
-                targetName: 'Goblin',
-                damageType: 'force',
-                metamagicTwinTarget: 'Goblin',
-                multiTarget: 'Orc',
-            });
+            await fn('Words of Creation', '2d6', 7, [3, 4], 0, { targetName: 'Goblin', damageType: 'force', metamagicTwinTarget: 'Goblin', multiTarget: 'Orc', });
 
             expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
         });

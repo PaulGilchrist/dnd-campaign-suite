@@ -4,7 +4,8 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
 import { addEntry } from '../../ui/logService.js';
 import { getDistanceFeet, rangeToFeet } from '../combat/rangeValidation.js';
 import { isDistanceInRange } from '../combat/rangeCheck.js';
-import { resolveHealingBonusesWithDetails, markFortifiedHealthUsed } from '../../combat/automation/automationService.js';
+import { resolveHealingBonusesWithDetails } from '../../combat/automation/automationService.js';
+import { resolveCurrentHp, markFortifiedHealthIfApplied } from './healingWordService.js';
 
 const MASS_HEAL_NAME = 'Mass Heal';
 const CONDITIONS_TO_REMOVE = ['blinded', 'deafened', 'poisoned'];
@@ -110,6 +111,48 @@ function buildHealFormula(totalPool, bonusDetails, targetCount) {
     return formulaParts.join(' + ');
 }
 
+function resolveMassHealSlotLevel(metaCtx, spell) {
+    if (metaCtx?.slotLevel == null && spell.level == null) {
+        console.error('[massHealService] triggerMassHeal: slot level is missing (metaCtx.slotLevel and spell.level)');
+        throw new Error('slot level is required for mass heal');
+    }
+    return metaCtx?.slotLevel || spell.level;
+}
+
+// Heal one target from the shared pool and log the hp_change entry.
+// Returns the amount actually healed (the pool drain for this target).
+async function healMassHealTarget({ combatSummary, target, playerStats, totalPool, remainingPool, bonusHeal, bonusDetails, targetCount, spell, campaignName }) {
+    const targetName = target.name;
+    const maxHp = target.maxHp || playerStats.hitPoints || 0;
+    const currentHp = resolveCurrentHp(targetName, maxHp, campaignName);
+    const healAmount = Math.min(totalPool - (totalPool - remainingPool) + bonusHeal, maxHp - currentHp);
+    const actualHeal = Math.min(healAmount, remainingPool);
+
+    if (actualHeal > 0) {
+        applyHealingToTarget(combatSummary, targetName, actualHeal, campaignName);
+    }
+
+    const newHp = Math.min(maxHp, currentHp + actualHeal);
+
+    addEntry(campaignName, {
+        type: 'hp_change',
+        targetName,
+        delta: actualHeal,
+        currentHp: newHp,
+        maxHp,
+        isHealing: true,
+        sourceName: playerStats.name,
+        note: 'Mass Heal',
+        formula: buildHealFormula(totalPool, bonusDetails, targetCount),
+        bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[massHeal] Error:", e); });
+
+    await removeConditionsOnTarget(targetName, campaignName, spell, 'Mass Heal');
+
+    return actualHeal;
+}
+
 export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName, _mapName) {
     if (!isMassHeal(spell)) {
         return null;
@@ -129,56 +172,24 @@ export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName,
         return { noTargets: true };
     }
 
-    const results = [];
-    if (metaCtx?.slotLevel == null && spell.level == null) {
-        console.error('[massHealService] triggerMassHeal: slot level is missing (metaCtx.slotLevel and spell.level)')
-        throw new Error('slot level is required for mass heal')
-      }
-      const slotLevel = metaCtx?.slotLevel || spell.level;
-      const totalPool = resolveTotalPool(spell, slotLevel);
+    const slotLevel = resolveMassHealSlotLevel(metaCtx, spell);
+    const totalPool = resolveTotalPool(spell, slotLevel);
     let remainingPool = totalPool;
     const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName);
     if (bonusHeal > 0) {
         remainingPool += bonusHeal * targets.length;
     }
 
+    const results = [];
     for (const target of targets) {
-        const targetName = target.name;
-        const maxHp = target.maxHp || playerStats.hitPoints || 0;
-        const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
-        const currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
-        const healAmount = Math.min(totalPool - (totalPool - remainingPool) + bonusHeal, maxHp - currentHp);
-        const actualHeal = Math.min(healAmount, remainingPool);
-
+        const actualHeal = await healMassHealTarget({ combatSummary, target, playerStats, totalPool, remainingPool, bonusHeal, bonusDetails, targetCount: targets.length, spell, campaignName });
         if (actualHeal > 0) {
-            applyHealingToTarget(combatSummary, targetName, actualHeal, campaignName);
             remainingPool -= actualHeal;
         }
-
-        const newHp = Math.min(maxHp, currentHp + actualHeal);
-
-        addEntry(campaignName, {
-            type: 'hp_change',
-            targetName,
-            delta: actualHeal,
-            currentHp: newHp,
-            maxHp,
-            isHealing: true,
-            sourceName: casterName,
-            note: 'Mass Heal',
-            formula: buildHealFormula(totalPool, bonusDetails, targets.length),
-            bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[massHeal] Error:", e); });
-
-        await removeConditionsOnTarget(targetName, campaignName, spell, 'Mass Heal');
-
-        results.push({ targetName, healAmount: actualHeal });
+        results.push({ targetName: target.name, healAmount: actualHeal });
     }
 
-    if (results.some(r => r.healAmount > 0) && bonusDetails?.some(d => d.name === 'Fortified Health')) {
-        await markFortifiedHealthUsed(playerStats, campaignName);
-    }
+    await markFortifiedHealthIfApplied(playerStats, campaignName, results.some(r => r.healAmount > 0), bonusDetails);
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 

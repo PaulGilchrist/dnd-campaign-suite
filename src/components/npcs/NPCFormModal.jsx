@@ -48,6 +48,8 @@ function NPCFormModal({
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const avatarPath = formData.image || formData.imagePath;
+
   return (
     <>
       <div className="ct-modal-overlay">
@@ -66,10 +68,10 @@ function NPCFormModal({
           <div className="npcs-avatar-section no-print">
             <AvatarImage
               name={formData.name}
-              imagePath={formData.image || formData.imagePath}
+              imagePath={avatarPath}
               campaignName={campaignName}
               size={80}
-              onClick={(formData.image || formData.imagePath) ? () => setShowNpcAvatarModal(true) : undefined}
+              onClick={avatarPath ? () => setShowNpcAvatarModal(true) : undefined}
             />
             <div className="npcs-avatar-controls">
               <label className="ct-btn ct-btn-sm">
@@ -81,7 +83,7 @@ function NPCFormModal({
                   onChange={handleImageUpload}
                 />
               </label>
-              {(formData.image || formData.imagePath) && (
+              {avatarPath && (
                 <button className="ct-btn ct-btn-sm ct-btn-danger" onClick={handleRemoveImage}>
                   <i className="fa-solid fa-trash-can" /> Remove
                 </button>
@@ -170,10 +172,10 @@ function NPCFormModal({
           </div>
         </div>
       </div>
-      {showNpcAvatarModal && (formData.image || formData.imagePath) && (
+      {showNpcAvatarModal && avatarPath && (
         <AvatarModal
           name={formData.name}
-          imagePath={formData.image || formData.imagePath}
+          imagePath={avatarPath}
           campaignName={campaignName}
           onClose={() => setShowNpcAvatarModal(false)}
         />

@@ -128,16 +128,7 @@ describe('createSaves (useLoggedDiceRollSaves) - Evasion & Shields', () => {
             const { quickRollPlayerSave } = createFn();
             await quickRollPlayerSave('prompt-1', 'ElfRogue', 'DEX', 15);
             expect(computeDamageAfterEvasion).toHaveBeenCalledWith(20, true, 'half', true);
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.any(Object),
-                'ElfRogue',
-                0,
-                ['fire'],
-                'test-campaign',
-                expect.any(Array),
-                false,
-                'TestWizard'
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'ElfRogue', 0, ['fire'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard' });
 
             deps.pendingSaves['prompt-2'] = { ...basePending };
             computeDamageAfterEvasion.mockReturnValue(10);
@@ -256,16 +247,7 @@ describe('createSaves (useLoggedDiceRollSaves) - Evasion & Shields', () => {
             computeDamageAfterEvasion.mockReturnValue(7);
             await quickRollPlayerSave('prompt-2', 'Ally', 'DEX', 15);
             expect(computeDamageAfterEvasion).toHaveBeenCalledWith(15, true, 'half', false);
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.any(Object),
-                'Ally',
-                7,
-                ['fire'],
-                'test-campaign',
-                expect.any(Array),
-                false,
-                'TestWizard'
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally', 7, ['fire'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard' });
         });
 
         it('does not auto-apply intervene shield in save pipeline (now a manual reaction)', async () => {
@@ -299,16 +281,7 @@ describe('createSaves (useLoggedDiceRollSaves) - Evasion & Shields', () => {
             const { quickRollPlayerSave } = createFn();
             await quickRollPlayerSave('prompt-1', 'Ally', 'DEX', 15);
             // Damage should be halved (10), not set to 0 by intervene shield
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.any(Object),
-                'Ally',
-                10,
-                ['lightning'],
-                'test-campaign',
-                expect.any(Array),
-                false,
-                'TestWizard'
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally', 10, ['lightning'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard' });
             // interveneShieldActive should NOT be consumed here anymore
             expect(setRuntimeValue).not.toHaveBeenCalledWith('Ally', 'interveneShieldActive', null, 'test-campaign');
         });

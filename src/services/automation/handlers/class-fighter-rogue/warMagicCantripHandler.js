@@ -153,7 +153,7 @@ async function resolveSpellAttackOutcome({ campaignName, playerStats, playerName
 
 async function applyCantripDamage({ cs, campaignName, playerName, targetName, spellDamage, spellRolls, spellDamageType, formula, characters, selectedSpellName }) {
     if (spellDamage <= 0) return spellDamage;
-    const applyResult = await applyDamageToTarget(cs, targetName, spellDamage, [spellDamageType], campaignName, characters, false, playerName);
+    const applyResult = await applyDamageToTarget(cs, targetName, spellDamage, [spellDamageType], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
     const finalDamage = applyResult?.finalDamage ?? spellDamage;
     if (finalDamage > 0) {
         endInvisibilityOnHostileAction(playerName, campaignName);
@@ -196,6 +196,28 @@ async function resolveCantripRollOutcome(ctx) {
 // slot payment — arms the card target, range-checks, rolls the cantrip
 // (spell attack or save), applies damage (lastAttack + hp_change via
 // applyDamageToTarget), and latches once per turn.
+function resolveCantripCardTarget(cs, playerName) {
+    // Target: the creature set on the caster's initiative card.
+    if (!cs) return null;
+    const target = getTargetFromAttacker(cs, playerName);
+    return target && target.name ? target.name : null;
+}
+
+function resolveCantripDamageContext(cs, spell, playerStats, targetName, campaignName) {
+    const spellDamageType = (spell.damage && spell.damage.damage_type) || 'Force';
+    const formula = resolveSpellDamageAtLevel(spell, playerStats.level || 1);
+    const creatures = cs && cs.creatures ? cs.creatures : [];
+    const targetCreature = creatures.find(c => c.name === targetName);
+    const targetAc = (targetCreature && targetCreature.ac) || 10;
+    const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
+    return { spellDamageType, formula, targetAc, characters };
+}
+
+function buildCantripDamageLine(spellDamage, spellDamageType, spell) {
+    if (spellDamage > 0) return ` Dealt <b>${spellDamage}</b> ${spellDamageType} damage.`;
+    return spell.damage ? ' No damage dealt.' : '';
+}
+
 export async function confirmWarMagicCantrip(action, playerStats, campaignName, selectedSpellName) {
     if (!selectedSpellName) {
         return {
@@ -234,9 +256,8 @@ export async function confirmWarMagicCantrip(action, playerStats, campaignName, 
         return refusal(action, playerName, campaignName, 'Once per turn — attack already replaced with a cantrip this turn.');
     }
 
-    // Target: the creature set on the caster's initiative card.
     const cs = getCombatSummary(campaignName);
-    const targetName = cs ? getTargetFromAttacker(cs, playerName)?.name || null : null;
+    const targetName = resolveCantripCardTarget(cs, playerName);
     if (!targetName) {
         return refusal(action, playerName, campaignName, 'requires a target — set the Target dropdown on your initiative card first.');
     }
@@ -257,16 +278,13 @@ export async function confirmWarMagicCantrip(action, playerStats, campaignName, 
         description: `${action.name}: Replaced attack with cantrip "${selectedSpellName}"`,
     }).catch((e) => { console.error("[warMagicCantripHandler:log-error]", e); });
 
-    const spellDamageType = spell.damage?.damage_type || 'Force';
-    const formula = resolveSpellDamageAtLevel(spell, playerStats.level || 1);
-    const targetAc = cs?.creatures?.find(c => c.name === targetName)?.ac || 10;
-    const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
+    const { spellDamageType, formula, targetAc, characters } = resolveCantripDamageContext(cs, spell, playerStats, targetName, campaignName);
 
     const { spellDamage, outcomeLine } = await resolveCantripRollOutcome({
         cs, campaignName, action, playerStats, playerName, targetName, targetAc, spell, formula, spellDamageType, characters, selectedSpellName,
     });
 
-    const damageLine = spellDamage > 0 ? ` Dealt <b>${spellDamage}</b> ${spellDamageType} damage.` : (spell.damage ? ' No damage dealt.' : '');
+    const damageLine = buildCantripDamageLine(spellDamage, spellDamageType, spell);
     const popupDescription =
         `<b>${action.name}</b>: Cast <b>${selectedSpellName}</b> at <b>${targetName}</b>. ` +
         outcomeLine +

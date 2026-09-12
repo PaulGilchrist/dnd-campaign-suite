@@ -663,6 +663,33 @@ export { confirmSearingVengeance, skipSearingVengeance } from './handlers/class-
 export { confirmCelestialResilience, skipCelestialResilience } from './handlers/class-warlock/celestialResilienceHandler.js';
 export { confirmAnimateDead } from './handlers/spells/animateDeadHandler.js';
 export { confirmSummonSpirit } from './handlers/spells/summonSpiritHandler.js';
+function resolveHandler(auto) {
+    if (auto.type === 'passive_rule' && PASSIVE_RULE_EFFECTS[auto.effect]) {
+        return PASSIVE_RULE_EFFECTS[auto.effect];
+    }
+    if (auto.type === 'auto_effect' && auto.effect === 'wild_magic_surge_table') {
+        return handleWildMagicSurge;
+    }
+    if (auto.type === 'auto_effect' && auto.effect === 'wild_magic_double_roll') {
+        // Controlled Chaos — just set the flag, no handler needed
+        return null;
+    }
+    if (auto.type === 'auto_effect' && auto.effect === 'psychic_teleportation') {
+        // CLA-320: Soul Blades' Psychic Teleportation declares type 'auto_effect'
+        // (no type-level handler) — route by effect to its registered handler so
+        // the Bonus Actions row expends the Psionic Energy die and logs.
+        return handlePsychicTeleportation;
+    }
+    if (auto.type === 'save_attack' && auto.resourceCost === 'sorcery_points' && auto.restoreCost) {
+        // CLA-384: Warping Implosion ships type 'save_attack' in classes.json, so
+        // the generic save_attack handler always beat its dedicated warping_implosion
+        // entry — route on the sorcery_points+restoreCost fingerprint (unique across
+        // both ruleset data files) so the teleport chooser and 5 SP restore are live.
+        return handleWarpingImplosion;
+    }
+    return HANDLER_MAP[auto.type];
+}
+
 export async function executeHandler(action, playerStats, campaignName, mapName, characters) {
     if (!action?.automation) {
         return null;
@@ -697,29 +724,7 @@ export async function executeHandler(action, playerStats, campaignName, mapName,
         auto = selected;
     }
 
-    let handler;
-
-    if (auto.type === 'passive_rule' && PASSIVE_RULE_EFFECTS[auto.effect]) {
-        handler = PASSIVE_RULE_EFFECTS[auto.effect];
-    } else if (auto.type === 'auto_effect' && auto.effect === 'wild_magic_surge_table') {
-        handler = handleWildMagicSurge;
-    } else if (auto.type === 'auto_effect' && auto.effect === 'wild_magic_double_roll') {
-        // Controlled Chaos — just set the flag, no handler needed
-        return null;
-    } else if (auto.type === 'auto_effect' && auto.effect === 'psychic_teleportation') {
-        // CLA-320: Soul Blades' Psychic Teleportation declares type 'auto_effect'
-        // (no type-level handler) — route by effect to its registered handler so
-        // the Bonus Actions row expends the Psionic Energy die and logs.
-        handler = handlePsychicTeleportation;
-    } else if (auto.type === 'save_attack' && auto.resourceCost === 'sorcery_points' && auto.restoreCost) {
-        // CLA-384: Warping Implosion ships type 'save_attack' in classes.json, so
-        // the generic save_attack handler always beat its dedicated warping_implosion
-        // entry — route on the sorcery_points+restoreCost fingerprint (unique across
-        // both ruleset data files) so the teleport chooser and 5 SP restore are live.
-        handler = handleWarpingImplosion;
-    } else {
-        handler = HANDLER_MAP[auto.type];
-    }
+    const handler = resolveHandler(auto);
 
     if (!handler) {
         return null;

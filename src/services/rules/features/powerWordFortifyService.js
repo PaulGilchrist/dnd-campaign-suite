@@ -26,6 +26,50 @@ function resolveTempHpExpression(spell, slotLevel) {
     return expression;
 }
 
+function requireCreatures(combatSummary) {
+    const x = combatSummary.creatures;
+    if (x == null) { console.error('[powerWordFortifyService] Missing array:', x); throw new Error('Expected array, got ' + x); }
+    return x;
+}
+
+function creatureGridPos(combatSummary, name) {
+    const targetPlayer = combatSummary.players?.find(p => p.name === name);
+    const targetNpc = combatSummary.placedItems?.find(i => i.name === name);
+    const gridX = targetPlayer?.gridX ?? targetNpc?.gridX;
+    const gridY = targetPlayer?.gridY ?? targetNpc?.gridY;
+    if (gridX == null || gridY == null) return null;
+    return { gridX, gridY };
+}
+
+function selectTargetsInRange(combatSummary, casterName, casterGridPos, rangeFt, maxTargets) {
+    return [...requireCreatures(combatSummary)]
+        .filter(c => c.name !== casterName)
+        .map(c => {
+            const targetPos = creatureGridPos(combatSummary, c.name);
+            const dist = targetPos ? getDistanceFeet(casterGridPos, targetPos) : null;
+            return { creature: c, dist };
+        })
+        .filter(item => isDistanceInRange(item.dist, rangeFt))
+        .sort((a, b) => a.dist - b.dist)
+        .slice(0, maxTargets)
+        .map(item => item.creature);
+}
+
+function selectDefaultTargets(combatSummary, casterName, maxTargets) {
+    return requireCreatures(combatSummary)
+        .filter(c => c.name !== casterName)
+        .slice(0, maxTargets);
+}
+
+function resolveTargets(combatSummary, casterName, rangeFt, maxTargets) {
+    const casterPos = combatSummary.players?.find(p => p.name === casterName);
+    const casterGridPos = casterPos ? { gridX: casterPos.gridX, gridY: casterPos.gridY } : null;
+    if (rangeFt != null && casterGridPos) {
+        return selectTargetsInRange(combatSummary, casterName, casterGridPos, rangeFt, maxTargets);
+    }
+    return selectDefaultTargets(combatSummary, casterName, maxTargets);
+}
+
 export async function triggerPowerWordFortify(spell, metaCtx, playerStats, campaignName, _mapName) {
     if (!isPowerWordFortify(spell)) {
         return null;
@@ -49,39 +93,7 @@ export async function triggerPowerWordFortify(spell, metaCtx, playerStats, campa
     const maxTargets = spell.automation?.maxTargets || 6;
     const rangeFt = rangeToFeet(spell.automation?.range || spell.range || '60 feet');
 
-    let targets;
-
-    if (rangeFt != null) {
-        const casterPos = combatSummary.players?.find(p => p.name === casterName);
-        const casterGridPos = casterPos ? { gridX: casterPos.gridX, gridY: casterPos.gridY } : null;
-
-        if (casterGridPos) {
-            targets = [...(() => { const x = combatSummary.creatures; if (x == null) { console.error('[powerWordFortifyService] Missing array:', x); throw new Error('Expected array, got ' + x); } return x; })()]
-                .filter(c => c.name !== casterName)
-                .map(c => {
-                    const targetPlayer = combatSummary.players?.find(p => p.name === c.name);
-                    const targetNpc = combatSummary.placedItems?.find(i => i.name === c.name);
-                    const targetGridX = targetPlayer?.gridX ?? targetNpc?.gridX;
-                    const targetGridY = targetPlayer?.gridY ?? targetNpc?.gridY;
-                    const dist = (targetGridX != null && targetGridY != null)
-                        ? getDistanceFeet(casterGridPos, { gridX: targetGridX, gridY: targetGridY })
-                        : null;
-                    return { creature: c, dist };
-                })
-                .filter(item => isDistanceInRange(item.dist, rangeFt))
-                .sort((a, b) => a.dist - b.dist)
-                .slice(0, maxTargets)
-                .map(item => item.creature);
-        } else {
-            targets = (() => { const x = combatSummary.creatures; if (x == null) { console.error('[powerWordFortifyService] Missing array:', x); throw new Error('Expected array, got ' + x); } return x; })()
-                .filter(c => c.name !== casterName)
-                .slice(0, maxTargets);
-        }
-    } else {
-        targets = (() => { const x = combatSummary.creatures; if (x == null) { console.error('[powerWordFortifyService] Missing array:', x); throw new Error('Expected array, got ' + x); } return x; })()
-            .filter(c => c.name !== casterName)
-            .slice(0, maxTargets);
-    }
+    const targets = resolveTargets(combatSummary, casterName, rangeFt, maxTargets);
 
     if (targets.length === 0) {
         return { noTargets: true };

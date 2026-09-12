@@ -289,6 +289,57 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
+// Rider option effect descriptions (CLA: multi-choice apply popup).
+const RIDER_OPTION_DESCRIPTIONS = {
+    next_attack_advantage: (opt, targetName) => ` — the next attack against ${targetName || 'target'} gains +${opt.value || '5'}`,
+    push_15ft: () => ' — target pushed 15 ft away',
+    speed_reduction: () => ' — target Speed reduced by 15 ft',
+    sudden_strike: () => ' — make another attack against a different creature within 5 ft',
+    mass_fear: () => ' — target and creatures within 10 ft make WIS save or be Frightened',
+    prone: () => ' — target has Prone condition',
+    poisoned: () => ' — target has Poisoned condition (1 min, repeating CON save)',
+    daze: () => ' — target on next turn can only do one of: move, action, or Bonus Action',
+    unconscious: () => ' — target has Unconscious condition (1 min, repeating CON save)',
+    blinded: () => ' — target has Blinded condition (until end of its next turn)',
+    damage_bonus: (opt) => ` — ${opt.damageExpression || '1d6'} extra damage`,
+};
+
+function describeRiderOption(opt, targetName) {
+    let desc = opt.name;
+    if (opt.effect === 'disadvantage_on_next_save') desc += ' — target has Disadvantage on the next saving throw it makes';
+    if (opt.noOpportunityAttacks) desc += ' — target cannot make Opportunity Attacks until the start of your next turn';
+    const describe = RIDER_OPTION_DESCRIPTIONS[opt.effect];
+    if (describe) desc += describe(opt, targetName);
+    if (opt.effect === 'no_opportunity_attacks' && opt.movement) desc += ' — move up to half Speed without provoking Opportunity Attacks';
+    if (opt.effect === 'ally_movement' && opt.movement) desc += ' — ally moves up to half Speed without provoking Opportunity Attacks';
+    return desc;
+}
+
+// If Trip was applied and Versatile Trickster is available, find secondary targets.
+async function scanVersatileSecondaryTarget(chosen, hasVersatileTricksterPassive, targetName, campaignName) {
+    if (!(chosen.effect === 'prone' && hasVersatileTricksterPassive && targetName)) return null;
+    const secondaryTargets = await scanNearbySecondaryTargets(campaignName, targetName);
+    return secondaryTargets.length > 0 ? secondaryTargets : null;
+}
+
+// If Versatile Trickster found secondary Trip targets, set runtime value for modal to pick up.
+function stampVersatileTricksterTargets(playerStats, campaignName, secondaryTargets, targetName) {
+    setRuntimeValue(playerStats.name, 'versatileTricksterSecondaryTargets', secondaryTargets, campaignName);
+    setRuntimeValue(playerStats.name, 'versatileTricksterPrimaryTarget', targetName, campaignName);
+    setRuntimeValue(playerStats.name, 'versatileTricksterAction', { type: 'versatile_trickster', automation: { type: 'versatile_trickster', casting_time: 'passive' } }, campaignName);
+}
+
+// Stalker's Flurry secondary targets — CLA-326: store the combatant objects
+// directly (like versatileTrickster secondary targets) — cs creatures have no
+// `.creature` field, so the old `.map(t => t.creature)` produced undefined rows
+// that crashed the picker and left the featureRiders pause unresolved (stranded
+// trigger-hit damage).
+function stampStalkersFlurryTargets(playerStats, campaignName, chosenOptions, stalkersFlurrySecondaryTarget, targetName) {
+    setRuntimeValue(playerStats.name, 'stalkersFlurrySecondaryTargets', stalkersFlurrySecondaryTarget, campaignName);
+    setRuntimeValue(playerStats.name, 'stalkersFlurryPrimaryTarget', targetName, campaignName);
+    setRuntimeValue(playerStats.name, 'stalkersFlurryOptions', chosenOptions.map(o => o.name), campaignName);
+}
+
 export async function applyRiderOption(action, playerStats, campaignName, targetName, optionNames) {
     const auto = action.automation || action;
     const options = auto.options || [];
@@ -313,7 +364,6 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     // Store the chosen option for features that read it from runtime state (e.g., Stalker's Flurry)
     const optKey = `_${action.name.replace(/\s+/g, '_')}_option`;
     if (chosenOptions.length === 1) {
-            // Storing option in chosenOptions
         await setRuntimeValue(playerStats.name, optKey, chosenOptions[0].name, campaignName);
     }
 
@@ -341,7 +391,8 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     let versatileTricksterSecondaryTarget = null;
 
     // Check if Versatile Trickster is available (Arcane Trickster level 13+)
-    const hasVersatileTricksterPassive = (playerStats.automation?.passives || []).some(
+    const passives = playerStats.automation?.passives || [];
+    const hasVersatileTricksterPassive = passives.some(
         p => p.type === 'passive_rule' && p.effect === 'versatile_trickster'
     );
 
@@ -349,72 +400,30 @@ export async function applyRiderOption(action, playerStats, campaignName, target
         const res = await applyRiderEffect(action, playerStats, campaignName, targetName, chosen, undefined);
         results.push(res);
 
-        // If Trip was applied and Versatile Trickster is available, find secondary targets
-        if (chosen.effect === 'prone' && hasVersatileTricksterPassive && targetName) {
-            const secondaryTargets = await scanNearbySecondaryTargets(campaignName, targetName);
-            if (secondaryTargets.length > 0) {
-                versatileTricksterSecondaryTarget = secondaryTargets;
-            }
-        }
+        const secondaryTargets = await scanVersatileSecondaryTarget(chosen, hasVersatileTricksterPassive, targetName, campaignName);
+        if (secondaryTargets) versatileTricksterSecondaryTarget = secondaryTargets;
     }
 
-    // If Versatile Trickster found secondary Trip targets, set runtime value for modal to pick up
-    if (versatileTricksterSecondaryTarget && versatileTricksterSecondaryTarget.length > 0) {
-        setRuntimeValue(playerStats.name, 'versatileTricksterSecondaryTargets', versatileTricksterSecondaryTarget, campaignName);
-        setRuntimeValue(playerStats.name, 'versatileTricksterPrimaryTarget', targetName, campaignName);
-        setRuntimeValue(playerStats.name, 'versatileTricksterAction', { type: 'versatile_trickster', automation: { type: 'versatile_trickster', casting_time: 'passive' } }, campaignName);
+    if (versatileTricksterSecondaryTarget) {
+        stampVersatileTricksterTargets(playerStats, campaignName, versatileTricksterSecondaryTarget, targetName);
     }
 
     // If Sudden Strike or Mass Fear was applied, find secondary targets for the effect
     const stalkersFlurrySecondaryTarget = await resolveStalkersFlurrySecondaryTargets(chosenOptions, targetName, campaignName);
 
     if (stalkersFlurrySecondaryTarget && stalkersFlurrySecondaryTarget.length > 0) {
-        const stalkerFlurryOptions = chosenOptions.map(o => o.name);
-        // CLA-326: store the combatant objects directly (like versatileTrickster
-        // secondary targets) — cs creatures have no `.creature` field, so the old
-        // `.map(t => t.creature)` produced undefined rows that crashed the picker
-        // and left the featureRiders pause unresolved (stranded trigger-hit damage).
-        setRuntimeValue(playerStats.name, 'stalkersFlurrySecondaryTargets', stalkersFlurrySecondaryTarget, campaignName);
-        setRuntimeValue(playerStats.name, 'stalkersFlurryPrimaryTarget', targetName, campaignName);
-        setRuntimeValue(playerStats.name, 'stalkersFlurryOptions', stalkerFlurryOptions, campaignName);
+        stampStalkersFlurryTargets(playerStats, campaignName, chosenOptions, stalkersFlurrySecondaryTarget, targetName);
     }
 
     if (results.length === 1) {
         return results[0];
     }
 
-    const effectDescriptions = chosenOptions.map(opt => {
-        let desc = opt.name;
-        if (opt.effect === 'disadvantage_on_next_save') desc += ' — target has Disadvantage on the next saving throw it makes';
-        if (opt.noOpportunityAttacks) desc += ' — target cannot make Opportunity Attacks until the start of your next turn';
-        if (opt.effect === 'next_attack_advantage') desc += ` — the next attack against ${targetName || 'target'} gains +${opt.value || '5'}`;
-        if (opt.effect === 'push_15ft') desc += ' — target pushed 15 ft away';
-        if (opt.effect === 'speed_reduction') desc += ' — target Speed reduced by 15 ft';
-        if (opt.effect === 'sudden_strike') desc += ' — make another attack against a different creature within 5 ft';
-        if (opt.effect === 'mass_fear') desc += ' — target and creatures within 10 ft make WIS save or be Frightened';
-        if (opt.effect === 'prone') desc += ' — target has Prone condition';
-        if (opt.effect === 'poisoned') desc += ' — target has Poisoned condition (1 min, repeating CON save)';
-        if (opt.effect === 'daze') desc += ' — target on next turn can only do one of: move, action, or Bonus Action';
-        if (opt.effect === 'unconscious') desc += ' — target has Unconscious condition (1 min, repeating CON save)';
-        if (opt.effect === 'blinded') desc += ' — target has Blinded condition (until end of its next turn)';
-        if (opt.effect === 'no_opportunity_attacks' && opt.movement) desc += ' — move up to half Speed without provoking Opportunity Attacks';
-        if (opt.effect === 'ally_movement' && opt.movement) desc += ' — ally moves up to half Speed without provoking Opportunity Attacks';
-        if (opt.effect === 'damage_bonus') desc += ` — ${opt.damageExpression || '1d6'} extra damage`;
-        return desc;
-    });
+    const effectDescriptions = chosenOptions.map(opt => describeRiderOption(opt, targetName));
 
     const costNote = totalCostD6 > 0 ? `<br/><em>(Forgoing ${totalCostD6}d6 Sneak Attack damage dice)</em>` : '';
 
-    return {
-        type: 'popup',
-        payload: {
-            type: 'automation_info',
-            name: action.name,
-            automationType: auto.type,
-            description: `Applied to ${targetName || 'target'}:<br/>• ${effectDescriptions.join('<br/>• ')}${costNote}`,
-            automation: auto,
-        },
-    };
+    return riderNotice(action.name, auto, `Applied to ${targetName || 'target'}:<br/>• ${effectDescriptions.join('<br/>• ')}${costNote}`);
 }
 
 async function gateRiderOncePerTurn(action, auto, playerStats, campaignName) {
@@ -570,16 +579,7 @@ async function applyEnvenomWeapons(playerStats, campaignName, targetName) {
     if (!combatSummary) return;
 
     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-    await applyDamageToTarget(
-        combatSummary,
-        targetName,
-        poisonDamage,
-        [envenomPassive.automation?.damageType || 'Poison'],
-        campaignName,
-        characters,
-        true,
-        playerStats.name
-    );
+    await applyDamageToTarget(combatSummary, targetName, poisonDamage, [envenomPassive.automation?.damageType || 'Poison'], campaignName, characters, { ignoreResistance: true, attackerName: playerStats.name });
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,

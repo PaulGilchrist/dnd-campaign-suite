@@ -128,6 +128,29 @@ export async function confirmShapechangeTransform({ targetName, form, casterName
     return { ok: true };
 }
 
+function isShapechangeEffectOn(te, targetName) {
+    const teTarget = Array.isArray(te.target) ? te.target[0] : te.target;
+    return teTarget === targetName && te.effect === SHAPECHANGE_EFFECT;
+}
+
+function findShapechangeEffect(targetEffects, targetName) {
+    return targetEffects.find(te => isShapechangeEffectOn(te, targetName)) || null;
+}
+
+function revertShapechangeTempHp(targetName, campaignName) {
+    const shapechangeTempHp = Number(getRuntimeValue(targetName, 'shapechangeTempHp', campaignName) || 0);
+    const playerCurrentHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
+    if (shapechangeTempHp > 0) {
+        const storedTempHp = Number(getRuntimeValue(targetName, 'tempHp', campaignName) || 0);
+        const remaining = Math.max(0, storedTempHp - shapechangeTempHp);
+        setRuntimeValue(targetName, 'tempHp', remaining, campaignName);
+        setRuntimeValue(targetName, 'shapechangeTempHp', 0, campaignName);
+    } else if (typeof playerCurrentHp === 'number') {
+        setRuntimeValue(targetName, 'tempHp', playerCurrentHp, campaignName);
+        setRuntimeValue(targetName, 'shapechangeTempHp', 0, campaignName);
+    }
+}
+
 export function revertShapechange(targetName, campaignName) {
     const cs = getCombatSummary(campaignName);
     let shapechangeCaster = null;
@@ -154,32 +177,15 @@ export function revertShapechange(targetName, campaignName) {
     }
 
     const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
-    const filtered = targetEffects.filter(te => {
-        const teTarget = Array.isArray(te.target) ? te.target[0] : te.target;
-        return !(teTarget === targetName && te.effect === SHAPECHANGE_EFFECT);
-    });
-    if (filtered.length !== targetEffects.length) {
-        setRuntimeValue('campaign', 'targetEffects', filtered, campaignName, true);
+    const kept = targetEffects.filter(te => !isShapechangeEffectOn(te, targetName));
+    if (kept.length !== targetEffects.length) {
+        setRuntimeValue('campaign', 'targetEffects', kept, campaignName, true);
         if (!shapechangeCaster) {
-            const effect = targetEffects.find(te => {
-                const teTarget = Array.isArray(te.target) ? te.target[0] : te.target;
-                return teTarget === targetName && te.effect === SHAPECHANGE_EFFECT;
-            });
-            shapechangeCaster = effect?.source || null;
+            shapechangeCaster = findShapechangeEffect(targetEffects, targetName)?.source || null;
         }
     }
 
-    const shapechangeTempHp = Number(getRuntimeValue(targetName, 'shapechangeTempHp', campaignName) || 0);
-    const playerCurrentHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
-    if (shapechangeTempHp > 0) {
-        const storedTempHp = Number(getRuntimeValue(targetName, 'tempHp', campaignName) || 0);
-        const remaining = Math.max(0, storedTempHp - shapechangeTempHp);
-        setRuntimeValue(targetName, 'tempHp', remaining, campaignName);
-        setRuntimeValue(targetName, 'shapechangeTempHp', 0, campaignName);
-    } else if (typeof playerCurrentHp === 'number') {
-        setRuntimeValue(targetName, 'tempHp', playerCurrentHp, campaignName);
-        setRuntimeValue(targetName, 'shapechangeTempHp', 0, campaignName);
-    }
+    revertShapechangeTempHp(targetName, campaignName);
 
     if (shapechangeCaster) {
         const expirations = getRuntimeValue(shapechangeCaster, 'pendingExpirations', campaignName);

@@ -48,19 +48,7 @@ describe('useSpellCastExecutor', () => {
       executeSpellCast.mockRejectedValue(new Error('Cast failed'));
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-          props.extraMeta,
-          undefined,
-          setModalState,
-        )
+        useSpellCastExecutor({ ...props, setModalState })
       );
 
       await act(async () => {
@@ -78,16 +66,7 @@ describe('useSpellCastExecutor', () => {
         .mockResolvedValueOnce(null);
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
+        useSpellCastExecutor(props)
       );
 
       await act(async () => {
@@ -109,16 +88,7 @@ describe('useSpellCastExecutor', () => {
       executeSpellCast.mockRejectedValue('string error');
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
+        useSpellCastExecutor(props)
       );
 
       await act(async () => {
@@ -141,16 +111,7 @@ describe('useSpellCastExecutor', () => {
       executeSpellCast.mockRejectedValue(undefined);
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
+        useSpellCastExecutor(props)
       );
 
       await act(async () => {
@@ -173,16 +134,7 @@ describe('useSpellCastExecutor', () => {
       executeSpellCast.mockRejectedValue(null);
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
+        useSpellCastExecutor(props)
       );
 
       await act(async () => {

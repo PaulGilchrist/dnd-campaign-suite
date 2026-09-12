@@ -162,28 +162,29 @@ function resolveSaveForcedMode(conditionEffects, abbr, autoFail) {
     return forcedMode;
 }
 
+function buildStrSaveReplaceExtras(_ce, playerStats) {
+    const abilities = playerStats?.abilities || [];
+    const strAbility = abilities.find(a => a.name === 'Strength');
+    return { strSaveReplace: true, strScore: strAbility?.totalScore || 10 };
+}
+
+const SAVE_FEATURE_EXTRA_BUILDERS = [
+    [ce => !!ce.autoRerollForSaves, ce => ({ autoReroll: true, autoRerollCondition: ce.autoRerollCondition, autoRerollBonus: ce.autoRerollBonus || null })],
+    [ce => !!ce.strokeOfLuck, () => ({ strokeOfLuck: true })],
+    [ce => !!ce.luckyAdvantage, () => ({ luckyAdvantage: true })],
+    [ce => !!ce.luckyDisadvantage, () => ({ luckyDisadvantage: true })],
+    [ce => !!ce.strSaveReplace, buildStrSaveReplaceExtras],
+    [ce => !!ce.d20Floor10, () => ({ d20Floor10: true })],
+    [ce => !!ce.darkOnesLuck, () => ({ darkOnesLuck: true })],
+];
+
 function buildSaveFeatureExtras(conditionEffects, playerStats, luckyDisadvantageActive) {
-    if (conditionEffects?.autoRerollForSaves) {
-        return { autoReroll: true, autoRerollCondition: conditionEffects.autoRerollCondition, autoRerollBonus: conditionEffects.autoRerollBonus || null };
-    }
-    if (conditionEffects?.strokeOfLuck) {
-        return { strokeOfLuck: true };
-    }
-    if (conditionEffects?.luckyAdvantage) {
-        return { luckyAdvantage: true };
-    }
-    if (conditionEffects?.luckyDisadvantage || luckyDisadvantageActive) {
-        return { luckyDisadvantage: true };
-    }
-    if (conditionEffects?.strSaveReplace) {
-        const strAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
-        return { strSaveReplace: true, strScore: strAbility?.totalScore || 10 };
-    }
-    if (conditionEffects?.d20Floor10) {
-        return { d20Floor10: true };
-    }
-    if (conditionEffects?.darkOnesLuck) {
-        return { darkOnesLuck: true };
+    const ce = {
+        ...(conditionEffects || {}),
+        luckyDisadvantage: !!(conditionEffects?.luckyDisadvantage || luckyDisadvantageActive),
+    };
+    for (const [matches, build] of SAVE_FEATURE_EXTRA_BUILDERS) {
+        if (matches(ce)) return build(ce, playerStats);
     }
     return {};
 }
@@ -216,6 +217,34 @@ function computeRageSkillBonus(playerStats, skill, exhaustionPenalty) {
         strengthBonus += proficiency;
     }
     return strengthBonus - exhaustionPenalty;
+}
+
+function buildToolsByAbility(allInventoryItems, toolMap, proficiencySet, abilitiesByName, proficiency) {
+    const toolsByAbility = {};
+    for (const itemName of allInventoryItems) {
+        const tool = toolMap[itemName];
+        if (!tool) continue;
+        const abilityName = tool.ability;
+        const ability = abilitiesByName[abilityName];
+        if (!ability) continue;
+        const isProficient = proficiencySet.has(itemName);
+        const bonus = isProficient
+            ? ability.bonus + proficiency
+            : ability.bonus;
+        if (!toolsByAbility[abilityName]) {
+            toolsByAbility[abilityName] = [];
+        }
+        if (!toolsByAbility[abilityName].some(t => t.name === itemName)) {
+            toolsByAbility[abilityName].push({
+                name: itemName,
+                ability: abilityName,
+                bonus,
+                isProficient,
+                utilize: tool.utilize,
+            });
+        }
+    }
+    return toolsByAbility;
 }
 
 function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustionPenalty = 0, conditionEffects, isRaging = false, _onReroll, _onStrokeOfLuck, characters, luckyDisadvantageActive }) {
@@ -294,49 +323,26 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
          const [toolEntries, setToolEntries] = useState([]);
          const [equipmentLoaded, setEquipmentLoaded] = useState(false);
 
-          useEffect(() => {
-              const loadTools = async () => {
-                  const equipment = await loadEquipment();
-                  const toolMap = {};
-                  for (const item of equipment) {
-                      if (item.equipment_category === 'Tools' && item.ability) {
-                          toolMap[item.name] = item;
-                      }
-                  }
-                  const proficiencySet = new Set(playerStats.toolProficiencies || []);
-                  const allInventoryItems = [
-                      ...(playerStats.inventory?.equipped || []),
-                      ...(playerStats.inventory?.backpack || []),
-                  ];
-                  const abilitiesByName = {};
-                  for (const ab of playerStats.abilities || []) {
-                      abilitiesByName[ab.name] = ab;
-                  }
-                  const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
-                  const toolsByAbility = {};
-                  for (const itemName of allInventoryItems) {
-                      const tool = toolMap[itemName];
-                      if (!tool) continue;
-                      const abilityName = tool.ability;
-                      const ability = abilitiesByName[abilityName];
-                      if (!ability) continue;
-                      const isProficient = proficiencySet.has(itemName);
-                      const bonus = isProficient
-                          ? ability.bonus + proficiency
-                          : ability.bonus;
-                      if (!toolsByAbility[abilityName]) {
-                          toolsByAbility[abilityName] = [];
-                      }
-                      if (!toolsByAbility[abilityName].some(t => t.name === itemName)) {
-                          toolsByAbility[abilityName].push({
-                              name: itemName,
-                              ability: abilityName,
-                              bonus,
-                              isProficient,
-                              utilize: tool.utilize,
-                          });
-                      }
-                  }
+           useEffect(() => {
+               const loadTools = async () => {
+                   const equipment = await loadEquipment();
+                   const toolMap = {};
+                   for (const item of equipment) {
+                       if (item.equipment_category === 'Tools' && item.ability) {
+                           toolMap[item.name] = item;
+                       }
+                   }
+                   const proficiencySet = new Set(playerStats.toolProficiencies || []);
+                   const allInventoryItems = [
+                       ...(playerStats.inventory?.equipped || []),
+                       ...(playerStats.inventory?.backpack || []),
+                   ];
+                   const abilitiesByName = {};
+                   for (const ab of playerStats.abilities || []) {
+                       abilitiesByName[ab.name] = ab;
+                   }
+                   const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
+                   const toolsByAbility = buildToolsByAbility(allInventoryItems, toolMap, proficiencySet, abilitiesByName, proficiency);
                   const entries = [];
                   for (const ability of playerStats.abilities || []) {
                       if (toolsByAbility[ability.name]) {

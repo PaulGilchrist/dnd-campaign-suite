@@ -173,7 +173,7 @@ describe('Dark One\'s Blessing', () => {
     const warlock = createFiendWarlock('FiendWarlock', 5, 16, 5);
 
     stubPlayerRuntime(0);
-    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')], false, null, false);
+    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')], { ignoreResistance: false, attackerName: null, suppressHpLog: false });
 
     expect(setRuntimeValue).toHaveBeenCalledWith('FiendWarlock', 'tempHp', 8, 'TestCampaign');
   });
@@ -186,7 +186,7 @@ describe('Dark One\'s Blessing', () => {
     const warlock = createFiendWarlock('LowStatWarlock', 1, 1, 1);
 
     stubPlayerRuntime(0);
-    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')], false, null, false);
+    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')], { ignoreResistance: false, attackerName: null, suppressHpLog: false });
 
     expect(setRuntimeValue).toHaveBeenCalledWith('LowStatWarlock', 'tempHp', 1, 'TestCampaign');
   });
@@ -199,7 +199,7 @@ describe('Dark One\'s Blessing', () => {
     const warlock2 = createFiendWarlock('FiendWarlock2', 5, 16, 5); // 3 + 5 = 8
 
     stubPlayerRuntime(0, [], { tempHp: 3 }); // already has 3 temp HP
-    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, warlock2, createMinimalCharacter('Goblin')], false, null, false);
+    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, warlock2, createMinimalCharacter('Goblin')], { ignoreResistance: false, attackerName: null, suppressHpLog: false });
 
     // Math.max(3, 8) = 8
     expect(setRuntimeValue).toHaveBeenCalledWith('FiendWarlock', 'tempHp', 8, 'TestCampaign');
@@ -213,7 +213,7 @@ describe('Dark One\'s Blessing', () => {
     const warlock = createNonFiendWarlock('OtherWarlock', 5, 16, 'Great Old One Patron');
 
     stubPlayerRuntime(0);
-    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')], false, null, false);
+    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')], { ignoreResistance: false, attackerName: null, suppressHpLog: false });
 
     const tempHpCalls = setRuntimeValue.mock.calls.filter(
       (call) => call[1] === 'tempHp'
@@ -235,7 +235,7 @@ describe('Dark One\'s Blessing', () => {
       },
     };
     stubPlayerRuntime(0);
-    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlockNoFeature, createMinimalCharacter('Goblin')], false, null, false);
+    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlockNoFeature, createMinimalCharacter('Goblin')], { ignoreResistance: false, attackerName: null, suppressHpLog: false });
 
     let tempHpCalls = setRuntimeValue.mock.calls.filter((call) => call[1] === 'tempHp');
     expect(tempHpCalls).toHaveLength(0);
@@ -252,7 +252,7 @@ describe('Dark One\'s Blessing', () => {
       },
     };
     setRuntimeValue.mockClear();
-    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlockNoAutomation, createMinimalCharacter('Goblin')], false, null, false);
+    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlockNoAutomation, createMinimalCharacter('Goblin')], { ignoreResistance: false, attackerName: null, suppressHpLog: false });
 
     tempHpCalls = setRuntimeValue.mock.calls.filter((call) => call[1] === 'tempHp');
     expect(tempHpCalls).toHaveLength(0);
@@ -265,7 +265,7 @@ describe('Dark One\'s Blessing', () => {
     const warlock = createFiendWarlock('FiendWarlock', 5, 16, 5);
 
     stubPlayerRuntime(10);
-    await applyDamageToTarget(cs, 'Skeleton', 15, ['Necrotic'], 'TestCampaign', [warlock, createMinimalCharacter('Skeleton')], false, null, false);
+    await applyDamageToTarget(cs, 'Skeleton', 15, ['Necrotic'], 'TestCampaign', [warlock, createMinimalCharacter('Skeleton')], { ignoreResistance: false, attackerName: null, suppressHpLog: false });
 
     const tempHpCalls = setRuntimeValue.mock.calls.filter(
       (call) => call[1] === 'tempHp'
@@ -280,7 +280,7 @@ describe('Dark One\'s Blessing', () => {
     const warlock = createFiendWarlock('FiendWarlock', 5, 16, 5);
 
     stubPlayerRuntime(0);
-    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')], false, null, false);
+    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')], { ignoreResistance: false, attackerName: null, suppressHpLog: false });
 
     const tempHpCalls = setRuntimeValue.mock.calls.filter(
       (call) => call[1] === 'tempHp'
@@ -298,7 +298,7 @@ describe('Dark One\'s Blessing', () => {
     const warlock = createFiendWarlock('FiendWarlock', 5, 16, 3);
 
     stubPlayerRuntime(0);
-    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')], false, null, false);
+    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')], { ignoreResistance: false, attackerName: null, suppressHpLog: false });
 
     expect(setRuntimeValue).toHaveBeenCalledWith('FiendWarlock', 'tempHp', 8, 'TestCampaign');
   });
@@ -311,7 +311,7 @@ describe('Dark One\'s Blessing', () => {
     const warlock2 = createFiendWarlock('FiendWarlock2', 3, 20, 3); // 5 + 3 = 8
 
     stubPlayerRuntime(0);
-    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock1, warlock2, createMinimalCharacter('Goblin')], false, null, false);
+    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock1, warlock2, createMinimalCharacter('Goblin')], { ignoreResistance: false, attackerName: null, suppressHpLog: false });
 
     expect(setRuntimeValue).toHaveBeenCalledWith('FiendWarlock1', 'tempHp', 8, 'TestCampaign');
     expect(setRuntimeValue).toHaveBeenCalledWith('FiendWarlock2', 'tempHp', 8, 'TestCampaign');
@@ -324,7 +324,7 @@ describe('Dark One\'s Blessing', () => {
     const warlock = createFiendWarlock('FiendWarlock', 5, 16, 5);
 
     stubPlayerRuntime(0);
-    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')], false, null, false);
+    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')], { ignoreResistance: false, attackerName: null, suppressHpLog: false });
 
     const tempHpCalls = setRuntimeValue.mock.calls.filter(
       (call) => call[1] === 'tempHp'
@@ -339,7 +339,7 @@ describe('Dark One\'s Blessing', () => {
     const warlock = createFiendWarlock('FiendWarlock', 5, 16, 5);
 
     stubPlayerRuntime(0);
-    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')], false, null, false);
+    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')], { ignoreResistance: false, attackerName: null, suppressHpLog: false });
 
     expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
       type: 'ability_use',

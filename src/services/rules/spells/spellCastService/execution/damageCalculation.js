@@ -45,37 +45,33 @@ function computeEmpoweredEvocation(playerStats, spell, formula) {
     return { empEvocFormula, empEvocIntMod };
 }
 
+function blessedStrikesApplies(potentFeature, chosen) {
+    if (potentFeature.options.length > 1 && !chosen) return false; // multi-option feature with no choice yet — skip
+    if (chosen && chosen.toLowerCase().includes('spellcasting')) return true;
+    return potentFeature.options.length === 1;
+}
+
 function computeBlessedStrikes(spell, empEvocFormula, playerStats, campaignName, getRuntimeValue) {
     const isCantrip = spell.baseLevel === 0 || spell.level === 0;
-    let finalFormula = empEvocFormula;
-    let potentFeature = null;
-
-    if (isCantrip && spell.damage && playerStats.automation?.actions) {
-        potentFeature = playerStats.automation.actions.find(
-            a => a.type === 'damage_bonus' && !a.upgrades && a.options?.some(o => o.toLowerCase().includes('spellcasting'))
-        );
-        if (potentFeature) {
-            const optKey = `_${(potentFeature.name || 'PotentSpellcasting').replace(/\s+/g, '_')}_option`;
-            const chosen = getRuntimeValue(playerStats.name, optKey, campaignName);
-            if (potentFeature.options.length > 1 && !chosen) {
-                // multi-option feature with no choice yet — skip
-            } else if (chosen && chosen.toLowerCase().includes('spellcasting')) {
-                const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
-                const wisMod = Math.max(0, wis?.bonus || 0);
-                if (wisMod > 0) {
-                    finalFormula = `${empEvocFormula} + ${wisMod} [Blessed Strikes]`;
-                }
-            } else if (potentFeature.options.length === 1) {
-                const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
-                const wisMod = Math.max(0, wis?.bonus || 0);
-                if (wisMod > 0) {
-                    finalFormula = `${empEvocFormula} + ${wisMod} [Blessed Strikes]`;
-                }
-            }
-        }
+    if (!isCantrip || !spell.damage || !playerStats.automation?.actions) {
+        return empEvocFormula;
     }
 
-    return finalFormula;
+    const potentFeature = playerStats.automation.actions.find(
+        a => a.type === 'damage_bonus' && !a.upgrades && a.options?.some(o => o.toLowerCase().includes('spellcasting'))
+    );
+    if (!potentFeature) return empEvocFormula;
+
+    const optKey = `_${(potentFeature.name || 'PotentSpellcasting').replace(/\s+/g, '_')}_option`;
+    const chosen = getRuntimeValue(playerStats.name, optKey, campaignName);
+    if (!blessedStrikesApplies(potentFeature, chosen)) return empEvocFormula;
+
+    const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
+    const wisMod = Math.max(0, wis?.bonus || 0);
+    if (wisMod > 0) {
+        return `${empEvocFormula} + ${wisMod} [Blessed Strikes]`;
+    }
+    return empEvocFormula;
 }
 
 function computeRadiantSoul(spell, playerStats, campaignName, getRuntimeValue, empEvocFormula) {

@@ -139,16 +139,7 @@ describe('quiveringPalmHandler.applyShockwave — edge cases', () => {
 
     expect(result.payload.rawDamage).toBe(55);
     expect(result.payload.finalDamage).toBe(55);
-    expect(applyDamageToTarget).toHaveBeenCalledWith(
-      expect.objectContaining({ creatures: expect.any(Array) }),
-      'Goblin',
-      55,
-      ['Force'],
-      campaignName,
-      [{ name: 'TestMonk' }],
-      false,
-      'TestMonk'
-    );
+    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.objectContaining({ creatures: expect.any(Array) }), 'Goblin', 55, ['Force'], campaignName, [{ name: 'TestMonk' }], { ignoreResistance: false, attackerName: 'TestMonk' });
   });
 
   it('handles null combatSummary (skips damage application)', async () => {

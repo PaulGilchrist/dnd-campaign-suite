@@ -7,6 +7,7 @@ import { storeSpellLastAttack, addTargetResult } from '../../../../services/auto
 import { addExpiration } from '../../../../services/rules/effects/expirations.js';
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
+import { logConditionApplied, logSaveResultEntry } from './saveResultLogging.js';
 
 function MassSuggestionModal({
     action,
@@ -191,29 +192,15 @@ function MassSuggestionModal({
                 { type: 'charmed', condition: 'charmed' },
             ], campaignName);
 
-            await addEntry(campaignName, {
-                type: 'condition',
-                action: 'applied',
-                characterName: targetName,
+            await logConditionApplied(campaignName, {
+                targetName,
                 condition: 'Charmed',
                 reason: 'Mass Suggestion spell',
                 note: `${targetName} is Charmed by Mass Suggestion and pursues the suggested course of activity. The spell ends if ${casterName} or allies deal damage to the target.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[MassSuggestionModal] Error logging condition:', e); });
+                logPrefix: '[MassSuggestionModal]',
+            });
 
-            await addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                targetName,
-                saveDc,
-                saveType,
-                success: false,
-                roll: detail.roll ?? 0,
-                total: detail.total ?? 0,
-                saveBonus: detail.saveBonus ?? 0,
-                description: `${targetName} failed ${saveType} save (DC ${saveDc}, rolled ${detail.roll ?? 0}${detail.saveBonus !== 0 ? ' + ' + detail.saveBonus : ''} = ${detail.total ?? 0})`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[MassSuggestionModal] Error logging save result:', e); });
+            await logSaveResultEntry(campaignName, { casterName, targetName, saveDc, saveType, success: false, detail, logPrefix: '[MassSuggestionModal]' });
 
             addTargetResult(campaignName, {
                 targetName,
@@ -224,19 +211,7 @@ function MassSuggestionModal({
                 appliedDamage: 0,
             });
         } else {
-            await addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                targetName,
-                saveDc,
-                saveType,
-                success: true,
-                roll: detail.roll ?? 0,
-                total: detail.total ?? 0,
-                saveBonus: detail.saveBonus ?? 0,
-                description: `${targetName} succeeded on ${saveType} save (DC ${saveDc}, rolled ${detail.roll ?? 0}${detail.saveBonus !== 0 ? ' + ' + detail.saveBonus : ''} = ${detail.total ?? 0})`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[MassSuggestionModal] Error logging save result:', e); });
+            await logSaveResultEntry(campaignName, { casterName, targetName, saveDc, saveType, success: true, detail, logPrefix: '[MassSuggestionModal]' });
 
             addTargetResult(campaignName, {
                 targetName,

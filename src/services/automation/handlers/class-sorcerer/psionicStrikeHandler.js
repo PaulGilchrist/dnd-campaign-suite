@@ -114,17 +114,7 @@ async function resolveThrustChain(action, playerStats, campaignName, targetName)
     }
 
     const cs = await getCombatContext(campaignName);
-    if (cs?.creatures) {
-        const targetCreature = cs.creatures.find(c => c.name === targetName);
-        if (targetCreature) {
-            const proneAlready = targetCreature.conditions?.some(c => c.key === 'prone');
-            if (!proneAlready) {
-                const conditionDef = { key: 'prone', label: 'Prone' };
-                addCondition(cs, targetName, conditionDef, saveDc, saveType, getRuntimeValue, setRuntimeValue, campaignName, playerStats);
-                storage.set('combatSummary', cs, campaignName);
-            }
-        }
-    }
+    await knockThrustTargetProne(cs, campaignName, targetName, saveDc, saveType, playerStats);
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,
@@ -136,6 +126,45 @@ async function resolveThrustChain(action, playerStats, campaignName, targetName)
     return `${targetName} failed the ${saveType} save (DC ${saveDc}) — Prone + pushed 10ft.`;
 }
 
+async function knockThrustTargetProne(cs, campaignName, targetName, saveDc, saveType, playerStats) {
+    if (!cs?.creatures) return;
+    const targetCreature = cs.creatures.find(c => c.name === targetName);
+    if (!targetCreature) return;
+    const proneAlready = targetCreature.conditions?.some(c => c.key === 'prone');
+    if (proneAlready) return;
+    const conditionDef = { key: 'prone', label: 'Prone' };
+    addCondition(cs, targetName, conditionDef, saveDc, saveType, getRuntimeValue, setRuntimeValue, campaignName, playerStats);
+    storage.set('combatSummary', cs, campaignName);
+}
+
+// Resource + once-per-turn gates. Returns a refusal popup, or null when clear.
+function gatePsionicStrikeUse({ auto, action, playerName, campaignName, currentRound, currentUses }) {
+    if (currentUses <= 0) {
+        return infoPopup(action.name, `${action.name}: No Psionic Energy remaining. Recharges on a Short or Long Rest.`, auto);
+    }
+
+    // CLA-273: round-keyed once-per-turn latch (CLA-109 pattern) — replaces the
+    // never-written 'currentTurn'/'unknown' sentinel so later turns re-arm properly.
+    if (auto.oncePerTurn) {
+        const usedRound = getRuntimeValue(playerName, 'psionicStrikeUsedThisTurn', campaignName);
+        if (usedRound != null && Number(usedRound) === currentRound) {
+            return infoPopup(action.name, `${action.name}: Already used this turn. Once per turn.`, auto);
+        }
+    }
+
+    return null;
+}
+
+function rollPsionicDamage(playerStats) {
+    const psionicDieSize = evaluateAutoExpression('psionic_energy_die', playerStats);
+    const dieRoll = rollExpression(`1d${psionicDieSize}`);
+    const dieValue = dieRoll?.total || psionicDieSize;
+    const abilities = playerStats.abilities || [];
+    const intAbility = abilities.find(a => a.name === 'Intelligence');
+    const intMod = (intAbility && intAbility.bonus) || 0;
+    return { psionicDieSize, dieValue, intMod };
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -143,19 +172,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const defaultMax = playerStats._trackedResources?.[usesKey]?.max || 6;
     const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? defaultMax);
 
-    if (currentUses <= 0) {
-        return infoPopup(action.name, `${action.name}: No Psionic Energy remaining. Recharges on a Short or Long Rest.`, auto);
-    }
-
-    // CLA-273: round-keyed once-per-turn latch (CLA-109 pattern) — replaces the
-    // never-written 'currentTurn'/'unknown' sentinel so later turns re-arm properly.
     const currentRound = getCurrentCombatRound(campaignName);
-    if (auto.oncePerTurn) {
-        const usedRound = getRuntimeValue(playerName, 'psionicStrikeUsedThisTurn', campaignName);
-        if (usedRound != null && Number(usedRound) === currentRound) {
-            return infoPopup(action.name, `${action.name}: Already used this turn. Once per turn.`, auto);
-        }
-    }
+    const useRefusal = gatePsionicStrikeUse({ auto, action, playerName, campaignName, currentRound, currentUses });
+    if (useRefusal) return useRefusal;
 
     const cs = await getCombatContext(campaignName);
     const target = cs ? getTargetFromAttacker(cs, playerName) : null;
@@ -168,15 +187,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const gateRefusal = await checkTriggerGate(action, playerName, campaignName, targetName);
     if (gateRefusal) return gateRefusal;
 
-    const psionicDieSize = evaluateAutoExpression('psionic_energy_die', playerStats);
-    const dieRoll = rollExpression(`1d${psionicDieSize}`);
-    const dieValue = dieRoll?.total || psionicDieSize;
-    const intMod = playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus || 0;
+    const { psionicDieSize, dieValue, intMod } = rollPsionicDamage(playerStats);
     const totalDamage = dieValue + intMod;
 
     const combatSummary = await loadCombatSummary(campaignName);
     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-    await applyDamageToTarget(combatSummary, targetName, totalDamage, ['Force'], campaignName, characters, false, playerName);
+    await applyDamageToTarget(combatSummary, targetName, totalDamage, ['Force'], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
 
     await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
 

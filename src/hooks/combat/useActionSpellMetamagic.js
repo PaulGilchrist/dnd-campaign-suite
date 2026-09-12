@@ -31,6 +31,41 @@ function showSaveAttackAoeModal(attack, playerStats, campaignName, setModalState
     return true
 }
 
+function addMetamagicSpellEntry(campaignName, playerStats, pending, metamagicOptions, totalCost) {
+    addEntry(campaignName, {
+        type: 'spell',
+        characterName: playerStats.name,
+        spellName: pending.spellName,
+        spellLevel: pending.spellLevel || 0,
+        castingTime: pending.castingTime || 'Action',
+        metamagic: metamagicOptions,
+        spCost: totalCost,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[useActionSpellMetamagic:log-error]", e); });
+}
+
+function computeMetamagicPayment(result, pending) {
+    const totalMetamagicCost = result?.totalCost || 0;
+    // CLA-271: the Psionic Sorcery cost counts only when its checkbox was selected.
+    const psionicCost = result?.psionicActive ? (pending.psionicCost || 0) : 0;
+    const totalCost = totalMetamagicCost + psionicCost;
+    const metamagicOptions = result?.options || [];
+    if (psionicCost > 0 && !metamagicOptions.includes('Psionic Sorcery')) {
+        metamagicOptions.push('Psionic Sorcery');
+    }
+    return { metamagicOptions, psionicCost, totalCost };
+}
+
+function buildMetamagicCtx(metamagicOptions, result, psionicCost) {
+    const metaCtx = {};
+    if (metamagicOptions.includes('Heightened Spell')) metaCtx.metamagicHeighten = true;
+    if (metamagicOptions.includes('Careful Spell')) metaCtx.metamagicCareful = true;
+    if (metamagicOptions.includes('Twinned Spell') && result.twinTarget) metaCtx.metamagicTwinTarget = result.twinTarget;
+    if (metamagicOptions.includes('Distant Spell')) metaCtx.metamagicDistant = true;
+    if (psionicCost > 0) metaCtx.psionicSpell = true;
+    return metaCtx;
+}
+
 export function useActionSpellMetamagic({
     playerStats,
     campaignName,
@@ -54,45 +89,15 @@ export function useActionSpellMetamagic({
 
         // CLA-271: the popup confirms Metamagic-options cost only; add the Psionic
         // Sorcery cost once, and only when its checkbox was actually selected.
-        const totalMetamagicCost = result?.totalCost || 0;
-        const psionicCost = result?.psionicActive ? (pending.psionicCost || 0) : 0;
-        const totalCost = totalMetamagicCost + psionicCost;
+        const { metamagicOptions, psionicCost, totalCost } = computeMetamagicPayment(result, pending);
         if (totalCost > 0) {
             spendSorceryPoints(playerStats.name, totalCost, campaignName, getMaxSorceryPoints(playerStats));
-        }
-
-        const metamagicOptions = result?.options || [];
-        if (psionicCost > 0 && !metamagicOptions.includes('Psionic Sorcery')) {
-            metamagicOptions.push('Psionic Sorcery');
-        }
-
-        if (totalCost > 0) {
             logMetamagicUse(campaignName, playerStats.name, pending.spellName, metamagicOptions, totalCost);
         }
 
-        addEntry(campaignName, {
-            type: 'spell',
-            characterName: playerStats.name,
-            spellName: pending.spellName,
-            spellLevel: pending.spellLevel || 0,
-            castingTime: pending.castingTime || 'Action',
-            metamagic: metamagicOptions,
-            spCost: totalCost,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[useActionSpellMetamagic:log-error]", e); });
+        addMetamagicSpellEntry(campaignName, playerStats, pending, metamagicOptions, totalCost);
 
-        const metaCtx = {};
-        if (result?.options) {
-            if (result.options.includes('Heightened Spell')) metaCtx.metamagicHeighten = true;
-            if (result.options.includes('Careful Spell')) metaCtx.metamagicCareful = true;
-            if (result.options.includes('Twinned Spell') && result.twinTarget) metaCtx.metamagicTwinTarget = result.twinTarget;
-            if (result.options.includes('Distant Spell')) metaCtx.metamagicDistant = true;
-        }
-        if (psionicCost > 0) {
-            metaCtx.psionicSpell = true;
-        }
-
-        pending.action(metaCtx);
+        pending.action(buildMetamagicCtx(metamagicOptions, result, psionicCost));
     }, [pendingActionMetamagic, playerStats, campaignName]);
 
     const handleActionMetamagicSkip = useCallback(() => {
@@ -236,54 +241,41 @@ export function useActionSpellMetamagic({
         });
     };
 
-    const handleSpellAttackClick = async (attack) => {
-        if (cannotAct) return;
-        const spell = playerStats.spellAbilities?.spells?.find(s => s.name === attack.name);
-        if (!spell) {
-            handleAttackClick(attack);
-            return;
-        }
-        if (!isBonusSorcerer) {
-            const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, attack.name, attack.spellLevel || 0, playerStats, campaignName);
-            const metaCtx = {};
-            const result = await prepareSpellCast({ ...spell, name: attack.name, level: attack.spellLevel || 0 }, metaCtx, {
-                playerName: playerStats.name,
-                playerStats,
-                campaignName,
-                isUpcast: false,
-                freeCastAuthorized,
-            });
-            // CLA-230: thread ctx.forcedMode (conditionAttackMode advantage/disadvantage,
-            // e.g. Moonlight Step next-attack advantage) into the spell attack roll —
-            // previously only getTargetInfo().name survived, so spell attacks never saw it.
-            // handleNoSavePath spreads metaCtx into the attack roll ctx.
-            const attackCtx = await buildCtx(attack);
-            const castMetaCtx = attackCtx?.forcedMode && result.metaCtx?.forcedMode == null
-                ? { ...result.metaCtx, forcedMode: attackCtx.forcedMode }
-                : result.metaCtx;
-            const castResult = await executeSpellCast({ ...spell, name: attack.name, level: attack.spellLevel || 0 }, castMetaCtx, {
-                rollAttack,
-                rollDamage,
-                playerStats,
-                getTargetInfo: async () => {
-                    const cs = await buildCtx(attack);
-                    return cs?.targetName ? { name: cs.targetName } : null;
-                },
-                campaignName,
-                mapName,
-                characters,
-            });
-            if (castResult?.automationPopup) {
-                const popup = castResult.automationPopup;
-                if (popup.type === 'modal' && setModalState) {
-                    // handled by useSpellCastExecutor pattern
-                } else {
-                    setPopupHtml(popup.payload);
-                }
-            }
-            return;
-        }
+    const castSpellAttackWithoutMetamagic = async (attack, spell) => {
+        const spellLevel = attack.spellLevel || 0;
+        const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, attack.name, spellLevel, playerStats, campaignName);
+        const metaCtx = {};
+        const result = await prepareSpellCast({ ...spell, name: attack.name, level: spellLevel }, metaCtx, {
+            playerName: playerStats.name,
+            playerStats,
+            campaignName,
+            isUpcast: false,
+            freeCastAuthorized,
+        });
+        // CLA-230: thread ctx.forcedMode (conditionAttackMode advantage/disadvantage,
+        // e.g. Moonlight Step next-attack advantage) into the spell attack roll —
+        // previously only getTargetInfo().name survived, so spell attacks never saw it.
+        // handleNoSavePath spreads metaCtx into the attack roll ctx.
+        const attackCtx = await buildCtx(attack);
+        const castMetaCtx = attackCtx?.forcedMode && result.metaCtx?.forcedMode == null
+            ? { ...result.metaCtx, forcedMode: attackCtx.forcedMode }
+            : result.metaCtx;
+        const castResult = await executeSpellCast({ ...spell, name: attack.name, level: spellLevel }, castMetaCtx, {
+            rollAttack,
+            rollDamage,
+            playerStats,
+            getTargetInfo: async () => {
+                const cs = await buildCtx(attack);
+                return cs?.targetName ? { name: cs.targetName } : null;
+            },
+            campaignName,
+            mapName,
+            characters,
+        });
+        showCastPopup(castResult)
+    };
 
+    const queueSpellAttackMetamagic = (attack, spell) => {
         const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
         const isPsionic = isPsionicSpell(playerStats, spell.name);
         const hasPsionic = hasPsionicSorcery(playerStats);
@@ -318,6 +310,20 @@ export function useActionSpellMetamagic({
                 showCastPopup(castResult)
             },
         });
+    };
+
+    const handleSpellAttackClick = async (attack) => {
+        if (cannotAct) return;
+        const spell = playerStats.spellAbilities?.spells?.find(s => s.name === attack.name);
+        if (!spell) {
+            handleAttackClick(attack);
+            return;
+        }
+        if (!isBonusSorcerer) {
+            await castSpellAttackWithoutMetamagic(attack, spell);
+            return;
+        }
+        queueSpellAttackMetamagic(attack, spell);
     };
 
 

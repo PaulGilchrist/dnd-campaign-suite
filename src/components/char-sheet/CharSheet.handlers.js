@@ -129,7 +129,7 @@ export async function handleBardicInspirationOffense(playerStats, campaignName, 
     const damageType = la?.damageType || 'Bludgeoning';
     const damageTypes = Array.isArray(damageType) ? damageType : [damageType];
     if (targetName) {
-        const applyResult = applyDamageToTarget(cs, targetName, dieValue, damageTypes, campaignName, characters, false, playerName);
+        const applyResult = applyDamageToTarget(cs, targetName, dieValue, damageTypes, campaignName, characters, { ignoreResistance: false, attackerName: playerName });
         if (applyResult) {
             storageService.default.set('combatSummary', cs, campaignName);
         }
@@ -178,16 +178,7 @@ export async function handlePuncture(playerStats, campaignName, characters, popu
     const damageDifference = newRolls.reduce((sum, r) => sum + r, 0) + (popupHtml?.modifier || 0) - rawDamage;
     
     if (damageDifference !== 0) {
-        applyDamageToTarget(
-            combatSummary,
-            targetName,
-            damageDifference,
-            damageTypes || [popupHtml?.damageType || 'Piercing'],
-            campaignName,
-            characters,
-            false,
-            playerName
-        );
+        applyDamageToTarget(combatSummary, targetName, damageDifference, damageTypes || [popupHtml?.damageType || 'Piercing'], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
     }
     
     await setRuntimeValue(playerName, usedKey, true, campaignName);
@@ -272,16 +263,7 @@ export async function handleSavageAttackerChoice(playerStats, campaignName, char
 
         const damageDifference = (newTotal + (modifier || 0)) - rawDamage;
         if (damageDifference > 0) {
-            applyDamageToTarget(
-                combatSummary,
-                targetName,
-                damageDifference,
-                damageTypes || [popupHtml?.damageType || 'Slashing'],
-                campaignName,
-                characters,
-                false,
-                playerName
-            );
+            applyDamageToTarget(combatSummary, targetName, damageDifference, damageTypes || [popupHtml?.damageType || 'Slashing'], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
         }
 
         await addEntry(campaignName, {
@@ -393,10 +375,22 @@ export async function handleDarkOnesLuck(playerStats, campaignName, popupHtml) {
     });
 }
 
+async function adjustInitiativeTrackerForManeuver(campaignName, playerName, newTotal) {
+    const cs = await loadCombatSummary(campaignName);
+    if (!cs) return;
+    const creature = cs.creatures.find(
+        c => c.type === 'player' && c.name === playerName
+    );
+    if (!creature) return;
+    creature.initiative = String(newTotal);
+    cs.creatures.sort((a, b) => b.initiative - a.initiative);
+    console.error('[CharSheet initiative adjust] set activeCreatureName:', cs.creatures[0]?.name);
+    storageService.default.set('combatSummary', cs, campaignName);
+}
+
 export async function handleSuperiorityManeuver(playerStats, campaignName, setPopupHtml, popupHtml, maneuverName, dieValue) {
     if (!playerStats) return;
     try {
-        await getManeuversForRules(playerStats.rules || '2024');
         const allManeuvers = await getManeuversForRules(playerStats.rules || '2024');
         const maneuver = allManeuvers.find(m => m.name === maneuverName);
         if (!maneuver) return;
@@ -412,18 +406,7 @@ export async function handleSuperiorityManeuver(playerStats, campaignName, setPo
 
         // Update initiative tracker if this was an initiative roll
         if (skillName === 'Initiative' || popupHtml?.rollType === 'initiative') {
-            const cs = await loadCombatSummary(campaignName);
-            if (cs) {
-                const creature = cs.creatures.find(
-                    c => c.type === 'player' && c.name === playerStats.name
-                );
-                if (creature) {
-                    creature.initiative = String(newTotal);
-                    cs.creatures.sort((a, b) => b.initiative - a.initiative);
-                    console.error('[CharSheet initiative adjust] set activeCreatureName:', cs.creatures[0]?.name);
-                    storageService.default.set('combatSummary', cs, campaignName);
-                }
-            }
+            await adjustInitiativeTrackerForManeuver(campaignName, playerStats.name, newTotal);
             window.dispatchEvent(new CustomEvent('initiative-rolled', {
                 detail: { characterName: playerStats.name, roll: newTotal },
             }));
@@ -455,6 +438,32 @@ export async function handleSuperiorityManeuver(playerStats, campaignName, setPo
     }
 }
 
+function refusePsiBolsteredKnack(campaignName, name, popupName, popupHtml, setPopupHtml) {
+    console.error('[CharSheet] Psi-Bolstered Knack refused in ineligible context:', { checkName: popupHtml?.name, rollType: popupHtml?.rollType, success: popupHtml?.success });
+    if (setPopupHtml) {
+        setPopupHtml({
+            type: 'automation_info',
+            name: 'Psi-Bolstered Knack',
+            description: '<b>Psi-Bolstered Knack</b><br/>Psi-Bolstered Knack only applies when you fail a proficient skill or tool check.',
+        });
+    }
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: name,
+        abilityName: 'Psi-Bolstered Knack',
+        description: `${name} attempted Psi-Bolstered Knack on ${popupName} — refused: Psi-Bolstered Knack only applies when you fail a proficient skill or tool check.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[CharSheet] Error logging Psi-Bolstered Knack refusal:', e); });
+}
+
+async function expendPsiEnergyOnSuccess(campaignName, name, success) {
+    if (!success) return;
+    const currentEnergy = Number(getRuntimeValue(name, 'psionicEnergy', campaignName) ?? 0);
+    if (currentEnergy > 0) {
+        await setRuntimeValue(name, 'psionicEnergy', currentEnergy - 1, campaignName);
+    }
+}
+
 export async function handlePsiBolsteredKnack(playerStats, campaignName, popupHtml, dieValue, dieSize, success, setPopupHtml) {
     if (!playerStats) return;
     const name = playerStats.name;
@@ -463,21 +472,7 @@ export async function handlePsiBolsteredKnack(playerStats, campaignName, popupHt
     const isIneligibleContext = popupHtml?.success === true
         || !isProficientSkillOrToolCheck(playerStats, popupHtml?.name);
     if (isIneligibleContext) {
-        console.error('[CharSheet] Psi-Bolstered Knack refused in ineligible context:', { checkName: popupHtml?.name, rollType: popupHtml?.rollType, success: popupHtml?.success });
-        if (setPopupHtml) {
-            setPopupHtml({
-                type: 'automation_info',
-                name: 'Psi-Bolstered Knack',
-                description: '<b>Psi-Bolstered Knack</b><br/>Psi-Bolstered Knack only applies when you fail a proficient skill or tool check.',
-            });
-        }
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: name,
-            abilityName: 'Psi-Bolstered Knack',
-            description: `${name} attempted Psi-Bolstered Knack on ${popupName} — refused: Psi-Bolstered Knack only applies when you fail a proficient skill or tool check.`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error('[CharSheet] Error logging Psi-Bolstered Knack refusal:', e); });
+        refusePsiBolsteredKnack(campaignName, name, popupName, popupHtml, setPopupHtml);
         return;
     }
 
@@ -486,12 +481,7 @@ export async function handlePsiBolsteredKnack(playerStats, campaignName, popupHt
     const oldTotal = oldRoll + bonus;
     const newTotal = oldTotal + dieValue;
 
-    if (success) {
-        const currentEnergy = Number(getRuntimeValue(name, 'psionicEnergy', campaignName) ?? 0);
-        if (currentEnergy > 0) {
-            await setRuntimeValue(name, 'psionicEnergy', currentEnergy - 1, campaignName);
-        }
-    }
+    await expendPsiEnergyOnSuccess(campaignName, name, success);
 
     const desc = `<b>Psi-Bolstered Knack</b><br/>Rolled d${dieSize} for ${dieValue}.<br/>${popupName}: ${oldTotal} → <b>${newTotal}</b> (+${dieValue})${success ? ' — Succeeded, energy expended' : ' — Still failed, energy not expended'}`;
     addEntry(campaignName, {

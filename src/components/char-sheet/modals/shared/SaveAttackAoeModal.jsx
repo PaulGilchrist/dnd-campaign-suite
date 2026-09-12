@@ -126,7 +126,7 @@ function resolveNpcTarget(ctx) {
     }
 
     if (finalDamage > 0) {
-        applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], campaignName, characters, true, playerStats.name, false);
+        applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], campaignName, characters, { ignoreResistance: true, attackerName: playerStats.name, suppressHpLog: false });
         if (isRadiantSoulTarget) {
             setRuntimeValue(playerStats.name, radiantSoulFlagKey, true, campaignName);
             setRuntimeValue(playerStats.name, 'pendingRadiantSoulTarget', null, campaignName);
@@ -178,7 +178,7 @@ function resolvePcTarget(ctx) {
 
     if (isSoulstitchProtected) {
         // CLA-321: chosen creature auto-succeeds its save — no prompt, no damage.
-        applyDamageToTarget(combatSummary, targetName, 0, [damageType], campaignName, characters, true, playerStats.name, false);
+        applyDamageToTarget(combatSummary, targetName, 0, [damageType], campaignName, characters, { ignoreResistance: true, attackerName: playerStats.name, suppressHpLog: false });
         addEntry(campaignName, {
             type: 'roll',
             characterName: playerStats.name,
@@ -198,7 +198,7 @@ function resolvePcTarget(ctx) {
     }
 
     if (carefulSpellProtected) {
-        applyDamageToTarget(combatSummary, targetName, 0, [damageType], campaignName, characters, true, playerStats.name, false);
+        applyDamageToTarget(combatSummary, targetName, 0, [damageType], campaignName, characters, { ignoreResistance: true, attackerName: playerStats.name, suppressHpLog: false });
         return { result: { targetName, success: true, roll: null, total: 0, saveBonus: 0, rawDamage: 0, finalDamage: 0 } };
     }
 
@@ -274,6 +274,18 @@ function isTargetExcludedByTraps(c, attackerName) {
     if (!attackerName || !c.name) return false;
     const effects = getRuntimeValue('campaign', 'targetEffects') || [];
     return TRAP_BLOCKING_EFFECTS.some(name => trapEffectBlocksAttack(effects, name, attackerName, c.name));
+}
+
+// CLA-279: if this PC is the stamped Radiant Soul recipient, its damage roll carries the CHA adder.
+function resolveRadiantSoulDamageRoll({ playerStats, action, damage, campaignName, radiantSoulChaMod, overchannelActive, targetName }) {
+    const scalingEntry = resolveScaling(playerStats, action.automation?.scaling);
+    const resolvedDamage = scalingEntry?.damage || damage;
+    const radiantSoulFlagKey = `_radiantSoul_${playerStats.name.replace(/\s+/g, '_')}_oncePerTurn`;
+    const radiantSoulPending = getRuntimeValue(playerStats.name, 'pendingRadiantSoulTarget', campaignName);
+    const isRadiantSoulTarget = radiantSoulChaMod > 0 && radiantSoulPending === targetName;
+    const targetDamageFormula = isRadiantSoulTarget ? `${resolvedDamage} + ${radiantSoulChaMod} [Radiant Soul]` : resolvedDamage;
+    const damageRoll = overchannelActive ? rollExpressionMaximized(targetDamageFormula) : rollExpression(targetDamageFormula);
+    return { resolvedDamage, radiantSoulFlagKey, isRadiantSoulTarget, targetDamageFormula, damageRoll };
 }
 
 function SaveAttackAoeModal({
@@ -423,10 +435,7 @@ function SaveAttackAoeModal({
         }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging player save:', e); });
 
         const characters = combatSummary?.creatures?.filter(c => c.type === 'player') || [];
-        applyDamageToTarget(
-            combatSummary, targetName, finalDamage, [damageType],
-            campaignName, characters, false, playerStats.name, false
-        );
+        applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerStats.name, suppressHpLog: false });
 
         if (isRadiantSoulTarget) {
             setRuntimeValue(playerStats.name, radiantSoulFlagKey, true, campaignName);
@@ -502,14 +511,7 @@ function SaveAttackAoeModal({
             logSoulstitchAutoSave({ campaignName, playerStats, actionName: action.name, targetName, detail, saveBonus });
         }
 
-        const scalingEntry = resolveScaling(playerStats, action.automation?.scaling);
-        const resolvedDamage = scalingEntry?.damage || damage;
-        // CLA-279: if this PC is the stamped Radiant Soul recipient, its damage roll carries the CHA adder.
-        const radiantSoulFlagKey = `_radiantSoul_${playerStats.name.replace(/\s+/g, '_')}_oncePerTurn`;
-        const radiantSoulPending = getRuntimeValue(playerStats.name, 'pendingRadiantSoulTarget', campaignName);
-        const isRadiantSoulTarget = radiantSoulChaMod > 0 && radiantSoulPending === targetName;
-        const targetDamageFormula = isRadiantSoulTarget ? `${resolvedDamage} + ${radiantSoulChaMod} [Radiant Soul]` : resolvedDamage;
-        const damageRoll = overchannelActive ? rollExpressionMaximized(targetDamageFormula) : rollExpression(targetDamageFormula);
+        const { radiantSoulFlagKey, isRadiantSoulTarget, targetDamageFormula, damageRoll } = resolveRadiantSoulDamageRoll({ playerStats, action, damage, campaignName, radiantSoulChaMod, overchannelActive, targetName });
 
         if (finalDamage > 0) {
             applyPlayerSaveDamage({ campaignName, combatSummary, playerStats, actionName: action.name, targetName, detail, success, saveBonus, saveDc, saveType, dcSuccess, damageType, rawDamage, targetDamageFormula, damageRoll, finalDamage, isRadiantSoulTarget, radiantSoulChaMod, radiantSoulFlagKey });
@@ -547,7 +549,7 @@ function SaveAttackAoeModal({
         };
         const setters = ctx || { setResults, setPendingPrompts };
         appendPromptTargetResult(setters.setResults, setters.setPendingPrompts, targetResult, detail.promptId);
-    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action.name, action.automation?.scaling, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess]);
+    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess]);
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;

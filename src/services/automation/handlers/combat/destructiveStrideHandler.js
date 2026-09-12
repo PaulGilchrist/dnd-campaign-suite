@@ -79,10 +79,7 @@ export async function applyTargetChoice(action, playerStats, campaignName, targe
     const damage = rollResult?.total || martialArtsDie;
 
     const characters = combatSummary.creatures.filter(c => c.type === 'player') || [];
-    applyDamageToTarget(
-        combatSummary, targetName, damage, [chosenType.toLowerCase()],
-        campaignName, characters, false, playerStats.name, false
-    );
+    applyDamageToTarget(combatSummary, targetName, damage, [chosenType.toLowerCase()], campaignName, characters, { ignoreResistance: false, attackerName: playerStats.name, suppressHpLog: false });
 
     await addEntry(campaignName, {
         type: 'ability_use',

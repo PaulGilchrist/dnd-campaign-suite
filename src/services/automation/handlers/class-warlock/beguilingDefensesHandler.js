@@ -40,41 +40,8 @@ async function gateBeguilingUses(auto, playerName, featureName, campaignName) {
     return { currentUses: 0, maxUses };
 }
 
-export async function handle(action, playerStats, campaignName, _mapName, _characters) {
-    const auto = action.automation;
-    const playerName = playerStats.name;
-    const featureName = action.name || 'Beguiling Defenses';
-
-    // 1. Get the last attack roll against the player
-    const attackResult = await findLastAttack(campaignName);
-    const attackEvent = attackResult.attackEvent;
-    if (!attackEvent || attackResult.targetName !== playerName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `No recent attack roll against you found. ${featureName} can only be used as a Reaction shortly after an attack roll.`,
-                automation: auto,
-            },
-        };
-    }
-
-    const attackerName = attackResult.attackerName || 'Attacker';
-    const totalDamage = attackResult.totalDamage || 0;
-    const halfDamage = Math.floor(totalDamage / 2);
-    const damageTypesLabel = (attackEvent.damageTypes || []).length > 0 ? attackEvent.damageTypes.join(', ') : 'unknown';
-
-    // 2. Check uses remaining (1 per Long Rest)
-    const useGate = await gateBeguilingUses(auto, playerName, featureName, campaignName);
-    if (useGate.popup) return useGate.popup;
-    const { currentUses, maxUses } = useGate;
-
-    // 3. Increment use counter
-    await setRuntimeValue(playerName, USES_KEY, currentUses + 1, campaignName);
-
-    // 4. Heal warlock for half the attack damage
-    const cs = await getCombatContext(campaignName);
+// 4. Heal warlock for half the attack damage; logs the hp_change entry.
+async function applyBeguilingHeal({ cs, halfDamage, playerName, playerStats, campaignName, featureName, attackerName }) {
     let healedAmount = 0;
     if (cs && halfDamage > 0) {
         const healResult = await applyHealingToTarget(cs, playerName, halfDamage, campaignName);
@@ -95,38 +62,21 @@ export async function handle(action, playerStats, campaignName, _mapName, _chara
             timestamp: Date.now(),
         }).catch((e) => { console.error("[beguilingDefenses] Error:", e); });
     }
+    return healedAmount;
+}
 
-    // 5. Resolve attacker from combat context
-    let targetName = attackerName;
-    if (cs) {
-        const attackerCreature = cs.creatures?.find(c =>
-            c.targetName === playerName || c.name === attackerName
-        );
-        if (attackerCreature) {
-            targetName = attackerCreature.name;
-        }
-    }
+// 5. Resolve attacker from combat context
+function resolveBeguilingAttackerName(cs, playerName, attackerName) {
+    if (!cs) return attackerName;
+    const attackerCreature = cs.creatures?.find(c =>
+        c.targetName === playerName || c.name === attackerName
+    );
+    return attackerCreature ? attackerCreature.name : attackerName;
+}
 
-    // 6. Build save DC and create save listener for the attacker
-    const saveDc = buildSaveDc(auto, playerStats);
-    const saveType = auto.saveType || 'WIS';
-
-    const { promptId } = createSaveListener(campaignName, {
-        targetName,
-        saveType,
-        saveDc,
-    });
-
-    await addEntry(campaignName, {
-        type: 'ability_use',
-        characterName: playerName,
-        abilityName: featureName,
-        description: `${playerName} activated ${featureName} against ${attackerName}. Attack dealt ${totalDamage} damage (${damageTypesLabel}). Damage halved — ${playerName} healed for ${healedAmount} HP. ${targetName} must make ${saveType} save (DC ${saveDc}) or take ${halfDamage} Psychic damage.`,
-        targetName,
-        promptId,
-        timestamp: Date.now(),
-    }).catch((e) => { console.error("[beguilingDefenses] Error:", e); });
-
+// Save-result listener: stamps lastAttack with the save outcome, then applies
+// psychic retaliation (failed) or logs the success.
+function buildBeguilingSaveHandler({ promptId, cs, halfDamage, campaignName, playerName, targetName, saveDc, saveType, featureName, characters }) {
     const handleSaveResult = async (event) => {
         if (event.detail.promptId !== promptId) return;
         window.removeEventListener('save-result', handleSaveResult);
@@ -151,7 +101,7 @@ export async function handle(action, playerStats, campaignName, _mapName, _chara
             // Apply psychic damage to attacker equal to halved damage
             let psychicDamage = 0;
             if (cs && halfDamage > 0) {
-                await applyDamageToTarget(cs, targetName, halfDamage, ['Psychic'], campaignName, _characters || [], false, playerName);
+                await applyDamageToTarget(cs, targetName, halfDamage, ['Psychic'], campaignName, characters || [], { ignoreResistance: false, attackerName: playerName });
                 psychicDamage = halfDamage;
             }
             addEntry(campaignName, {
@@ -186,6 +136,60 @@ export async function handle(action, playerStats, campaignName, _mapName, _chara
             }).catch((e) => { console.error("[beguilingDefenses] Error:", e); });
         }
     };
+    return handleSaveResult;
+}
+
+export async function handle(action, playerStats, campaignName, _mapName, _characters) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+    const featureName = action.name || 'Beguiling Defenses';
+
+    // 1. Get the last attack roll against the player
+    const attackResult = await findLastAttack(campaignName);
+    const attackEvent = attackResult.attackEvent;
+    if (!attackEvent || attackResult.targetName !== playerName) {
+        return infoPopup(featureName, `No recent attack roll against you found. ${featureName} can only be used as a Reaction shortly after an attack roll.`, auto);
+    }
+
+    const attackerName = attackResult.attackerName || 'Attacker';
+    const totalDamage = attackResult.totalDamage || 0;
+    const halfDamage = Math.floor(totalDamage / 2);
+    const damageTypesLabel = (attackEvent.damageTypes || []).length > 0 ? attackEvent.damageTypes.join(', ') : 'unknown';
+
+    // 2. Check uses remaining (1 per Long Rest)
+    const useGate = await gateBeguilingUses(auto, playerName, featureName, campaignName);
+    if (useGate.popup) return useGate.popup;
+    const { currentUses, maxUses } = useGate;
+
+    // 3. Increment use counter
+    await setRuntimeValue(playerName, USES_KEY, currentUses + 1, campaignName);
+
+    const cs = await getCombatContext(campaignName);
+    const healedAmount = await applyBeguilingHeal({ cs, halfDamage, playerName, playerStats, campaignName, featureName, attackerName });
+
+    const targetName = resolveBeguilingAttackerName(cs, playerName, attackerName);
+
+    // 6. Build save DC and create save listener for the attacker
+    const saveDc = buildSaveDc(auto, playerStats);
+    const saveType = auto.saveType || 'WIS';
+
+    const { promptId } = createSaveListener(campaignName, {
+        targetName,
+        saveType,
+        saveDc,
+    });
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: featureName,
+        description: `${playerName} activated ${featureName} against ${attackerName}. Attack dealt ${totalDamage} damage (${damageTypesLabel}). Damage halved — ${playerName} healed for ${healedAmount} HP. ${targetName} must make ${saveType} save (DC ${saveDc}) or take ${halfDamage} Psychic damage.`,
+        targetName,
+        promptId,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[beguilingDefenses] Error:", e); });
+
+    const handleSaveResult = buildBeguilingSaveHandler({ promptId, cs, halfDamage, campaignName, playerName, targetName, saveDc, saveType, featureName, characters: _characters });
 
     window.addEventListener('save-result', handleSaveResult);
 

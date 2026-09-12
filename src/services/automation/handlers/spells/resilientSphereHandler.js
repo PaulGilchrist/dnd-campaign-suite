@@ -57,31 +57,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const allyList = getAllyList(casterName);
     const isAlly = allyList.includes(targetName);
 
-    let saveResult;
-
-    if (isAlly) {
-        // Ally auto-fails the save — no prompt needed
-        saveResult = { success: false, roll: 0, total: 0 };
-    } else {
-        // Normal save prompt for non-allies
-        const { promptId, promise } = createSaveListener(campaignName, {
-            targetName,
-            saveType: 'DEX',
-            saveDc: dc,
-            dcSuccess: 'none',
-            disadvantage: !!action.metaCtx?.metamagicHeighten,
-        });
-
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: casterName,
-            abilityName: action.name,
-            description: `${casterName} casts ${action.name} on ${targetName}! ${targetName} must make a DEX save (DC ${dc}) or be enclosed in a Resilient Sphere.`,
-            promptId,
-        }).catch((e) => { console.error("[resilientSphere] Error:", e); });
-
-        saveResult = await promise;
-    }
+    // Ally auto-fails the save — no prompt needed
+    const saveResult = isAlly
+        ? { success: false, roll: 0, total: 0 }
+        : await promptResilientSphereSave(action, auto, campaignName, casterName, targetName, dc);
 
     if (saveResult.success) {
         await addTargetResult(campaignName, {
@@ -177,6 +156,26 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             description: `${targetName} failed DEX save and is enclosed in a Resilient Sphere. Nothing passes through the barrier. The sphere is immune to all damage. Inside can't be damaged from outside; inside can't damage outside. Creature can use action to roll sphere at half speed. Others can move it. Disintegrate destroys it.`,
         },
     };
+}
+
+async function promptResilientSphereSave(action, auto, campaignName, casterName, targetName, dc) {
+    const { promptId, promise } = createSaveListener(campaignName, {
+        targetName,
+        saveType: 'DEX',
+        saveDc: dc,
+        dcSuccess: 'none',
+        disadvantage: !!action.metaCtx?.metamagicHeighten,
+    });
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: casterName,
+        abilityName: action.name,
+        description: `${casterName} casts ${action.name} on ${targetName}! ${targetName} must make a DEX save (DC ${dc}) or be enclosed in a Resilient Sphere.`,
+        promptId,
+    }).catch((e) => { console.error("[resilientSphere] Error:", e); });
+
+    return await promise;
 }
 
 function toggleResilientSphere(targetName, buffName, casterName, duration, campaignName) {

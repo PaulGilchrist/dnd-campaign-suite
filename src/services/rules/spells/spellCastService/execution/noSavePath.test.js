@@ -52,8 +52,7 @@ describe('handleNoSavePath', () => {
 
   it('rolls the attack with the provided damageType in context', async () => {
     const { getTargetInfo, rollAttack, spellToHit } = makeDeps();
-    await handleNoSavePath(makeSpell(), { finalFormula: '1d12' }, { name: 'Mage' }, 'campaign', null, null,
-      getTargetInfo, rollAttack, spellToHit, 'Acid');
+    await handleNoSavePath({ spell: makeSpell(), metaCtx: { finalFormula: '1d12' }, playerStats: { name: 'Mage' }, campaignName: 'campaign', mapName: null, characters: null, getTargetInfo: getTargetInfo, rollAttack: rollAttack, spellToHit: spellToHit, damageType: 'Acid' });
     expect(rollAttack).toHaveBeenCalledWith('Acid Arrow', 5, expect.objectContaining({
       attackName: 'Acid Arrow',
       targetName: 'Orc',
@@ -68,8 +67,7 @@ describe('handleNoSavePath', () => {
 
   it('falls back to the spell data damage_type when the damageType parameter is empty', async () => {
     const { getTargetInfo, rollAttack, spellToHit } = makeDeps();
-    await handleNoSavePath(makeSpell(), {}, { name: 'Mage' }, 'campaign', null, null,
-      getTargetInfo, rollAttack, spellToHit, '');
+    await handleNoSavePath({ spell: makeSpell(), metaCtx: {}, playerStats: { name: 'Mage' }, campaignName: 'campaign', mapName: null, characters: null, getTargetInfo: getTargetInfo, rollAttack: rollAttack, spellToHit: spellToHit, damageType: '' });
     expect(rollAttack).toHaveBeenCalledWith('Acid Arrow', 5, expect.objectContaining({
       damageType: 'Acid',
     }));
@@ -78,8 +76,7 @@ describe('handleNoSavePath', () => {
   it('applies the finalFormula from metaCtx and overchannel info to autoDamageFormula', async () => {
     const { getTargetInfo, rollAttack, spellToHit } = makeDeps();
     const metaCtx = { finalFormula: '1d12 + 2', overchannelActive: true, overchannelUseCount: 1, slotLevel: 3 };
-    await handleNoSavePath(makeSpell(), metaCtx, { name: 'Mage' }, 'campaign', null, null,
-      getTargetInfo, rollAttack, spellToHit, 'Acid');
+    await handleNoSavePath({ spell: makeSpell(), metaCtx: metaCtx, playerStats: { name: 'Mage' }, campaignName: 'campaign', mapName: null, characters: null, getTargetInfo: getTargetInfo, rollAttack: rollAttack, spellToHit: spellToHit, damageType: 'Acid' });
     expect(rollAttack).toHaveBeenCalledWith('Acid Arrow', 5, expect.objectContaining({
       autoDamageFormula: '1d12 + 2',
       overchannelActive: true,
@@ -90,31 +87,27 @@ describe('handleNoSavePath', () => {
 
   it('marks the attack as a cantrip for level 0 spells', async () => {
     const { getTargetInfo, rollAttack, spellToHit } = makeDeps();
-    await handleNoSavePath(makeSpell({ level: 0, baseLevel: 0 }), {}, { name: 'Mage' }, 'campaign', null, null,
-      getTargetInfo, rollAttack, spellToHit, 'Acid');
+    await handleNoSavePath({ spell: makeSpell({ level: 0, baseLevel: 0 }), metaCtx: {}, playerStats: { name: 'Mage' }, campaignName: 'campaign', mapName: null, characters: null, getTargetInfo: getTargetInfo, rollAttack: rollAttack, spellToHit: spellToHit, damageType: 'Acid' });
     expect(rollAttack).toHaveBeenCalledWith('Acid Arrow', 5, expect.objectContaining({ isCantrip: true }));
   });
 
   it('grants advantage when innate sorcery is active and not in forced mode', async () => {
     vi.mocked(isInnateSorceryActive).mockReturnValue(true);
     const { getTargetInfo, rollAttack, spellToHit } = makeDeps();
-    await handleNoSavePath(makeSpell(), {}, { name: 'Mage' }, 'campaign', null, null,
-      getTargetInfo, rollAttack, spellToHit, 'Acid');
+    await handleNoSavePath({ spell: makeSpell(), metaCtx: {}, playerStats: { name: 'Mage' }, campaignName: 'campaign', mapName: null, characters: null, getTargetInfo: getTargetInfo, rollAttack: rollAttack, spellToHit: spellToHit, damageType: 'Acid' });
     expect(rollAttack).toHaveBeenCalledWith('Acid Arrow', 5, expect.objectContaining({ forcedMode: 'advantage' }));
   });
 
   it('does not override an existing forcedMode from metaCtx', async () => {
     vi.mocked(isInnateSorceryActive).mockReturnValue(true);
     const { getTargetInfo, rollAttack, spellToHit } = makeDeps();
-    await handleNoSavePath(makeSpell(), { forcedMode: 'disadvantage' }, { name: 'Mage' }, 'campaign', null, null,
-      getTargetInfo, rollAttack, spellToHit, 'Acid');
+    await handleNoSavePath({ spell: makeSpell(), metaCtx: { forcedMode: 'disadvantage' }, playerStats: { name: 'Mage' }, campaignName: 'campaign', mapName: null, characters: null, getTargetInfo: getTargetInfo, rollAttack: rollAttack, spellToHit: spellToHit, damageType: 'Acid' });
     expect(rollAttack).toHaveBeenCalledWith('Acid Arrow', 5, expect.objectContaining({ forcedMode: 'disadvantage' }));
   });
 
   it('returns null without rolling when there is no attack_type and no damage', async () => {
     const { getTargetInfo, rollAttack, spellToHit } = makeDeps();
-    const result = await handleNoSavePath(makeSpell({ attack_type: undefined, damage: undefined }), {}, { name: 'Mage' }, 'campaign', null, null,
-      getTargetInfo, rollAttack, spellToHit, 'Acid');
+    const result = await handleNoSavePath({ spell: makeSpell({ attack_type: undefined, damage: undefined }), metaCtx: {}, playerStats: { name: 'Mage' }, campaignName: 'campaign', mapName: null, characters: null, getTargetInfo: getTargetInfo, rollAttack: rollAttack, spellToHit: spellToHit, damageType: 'Acid' });
     expect(result).toBeUndefined();
     expect(rollAttack).not.toHaveBeenCalled();
     expect(getTargetInfo).not.toHaveBeenCalled();
@@ -123,8 +116,7 @@ describe('handleNoSavePath', () => {
   it('delegates to executeMagicMissile for Magic Missile', async () => {
     vi.mocked(isMagicMissile).mockReturnValue(true);
     const { getTargetInfo, rollAttack, spellToHit } = makeDeps();
-    await handleNoSavePath(makeSpell({ name: 'Magic Missile' }), {}, { name: 'Mage' }, 'campaign', null, null,
-      getTargetInfo, rollAttack, spellToHit, 'Force');
+    await handleNoSavePath({ spell: makeSpell({ name: 'Magic Missile' }), metaCtx: {}, playerStats: { name: 'Mage' }, campaignName: 'campaign', mapName: null, characters: null, getTargetInfo: getTargetInfo, rollAttack: rollAttack, spellToHit: spellToHit, damageType: 'Force' });
     expect(executeMagicMissile).toHaveBeenCalled();
     expect(rollAttack).not.toHaveBeenCalled();
   });
@@ -137,8 +129,7 @@ describe('handleNoSavePath', () => {
       baseLevel: 0,
       damage: { damage_type: 'Fire', damage_at_character_level: { 1: '1d10', 5: '2d10' } },
     });
-    await handleNoSavePath(fireBolt, {}, { name: 'Mage', level: 6 }, 'campaign', null, null,
-      getTargetInfo, rollAttack, spellToHit, '');
+    await handleNoSavePath({ spell: fireBolt, metaCtx: {}, playerStats: { name: 'Mage', level: 6 }, campaignName: 'campaign', mapName: null, characters: null, getTargetInfo: getTargetInfo, rollAttack: rollAttack, spellToHit: spellToHit, damageType: '' });
     expect(rollAttack).toHaveBeenCalledWith('Fire Bolt', 5, expect.objectContaining({
       autoDamageFormula: '2d10',
       damageType: 'Fire',
@@ -153,8 +144,7 @@ describe('handleNoSavePath', () => {
       level: 1,
       damage: { damage_type: 'Acid', damage_at_slot_level: { 1: '1d12' } },
     });
-    await handleNoSavePath(acidArrow, {}, { name: 'Mage', level: 1 }, 'campaign', null, null,
-      getTargetInfo, rollAttack, spellToHit, '');
+    await handleNoSavePath({ spell: acidArrow, metaCtx: {}, playerStats: { name: 'Mage', level: 1 }, campaignName: 'campaign', mapName: null, characters: null, getTargetInfo: getTargetInfo, rollAttack: rollAttack, spellToHit: spellToHit, damageType: '' });
     expect(rollAttack).toHaveBeenCalledWith('Acid Arrow', 5, expect.objectContaining({
       autoDamageFormula: '1d12',
     }));

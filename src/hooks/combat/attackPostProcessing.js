@@ -7,7 +7,7 @@ import { hasPotentCantrip, applyMinDamageAdjustment } from './loggedDiceRollUtil
 import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
 import { addEntry } from '../../services/ui/logService.js';
 
-export async function processAttackAfterResult(hit, isAutoMiss, targetName, characterName, campaignName, context, combatSummary, characters, logEntry, setPopupHtml, state) {
+export async function processAttackAfterResult({ hit, isAutoMiss: _isAutoMiss, targetName, characterName, campaignName, context, combatSummary, characters, logEntry, setPopupHtml, state }) {
     if (context?.rollType !== 'attack') return;
     const { effectiveD20, r1, r2, bonus, effectiveD20Roll, isCrit, targetAc, effectiveAc, homingStrikesUsed, homingStrikesBonus, homingStrikesAttempted, hit: finalHit, isAutoMiss: finalAutoMiss } = state;
 
@@ -268,7 +268,7 @@ async function processGrazeDamage(context, targetName, characterName, campaignNa
         const grazeFormula = `${grazeDamageAmount} [Graze]`;
         const combatSummary2 = await loadCombatSummary(campaignName);
         const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, grazeDamageType)) || false;
-        const applyResult = await applyDamageToTarget(combatSummary2, targetName, grazeDamageAmount, [grazeDamageType], campaignName, characters, ignoreResistance, characterName);
+        const applyResult = await applyDamageToTarget(combatSummary2, targetName, grazeDamageAmount, [grazeDamageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: characterName });
         const grazeTargetMaxHp = context._target?.type === 'player'
             ? (getRuntimeValue(targetName, 'hitPoints') ?? 0)
             : context._target?.maxHp ?? 0;
@@ -312,7 +312,7 @@ async function processGrazeDamage(context, targetName, characterName, campaignNa
     }
 }
 
-export async function processPotentCantrip(hit, isAutoMiss, targetName, characterName, campaignName, context, combatSummary, characters, logEntry, setPopupHtml) {
+export async function processPotentCantrip({ hit, isAutoMiss, targetName, characterName, campaignName, context, characters, logEntry, setPopupHtml }) {
     const potentPlayerStats = context?.playerStats;
     const hasPotentCantripFlag = hasPotentCantrip(potentPlayerStats);
     if (!hasPotentCantripFlag) return;
@@ -323,9 +323,9 @@ export async function processPotentCantrip(hit, isAutoMiss, targetName, characte
     const storedDamageResult = context?.autoDamageRollResult;
 
     if (!isAutoMiss) {
-        await processPotentCantripMissDamage(potentFormula, storedDamageResult, hit, isAutoMiss, targetName, characterName, campaignName, context, combatSummary, characters, logEntry, setPopupHtml, 'miss');
+        await processPotentCantripMissDamage({ potentFormula, storedDamageResult, targetName, characterName, campaignName, context, characters, logEntry, setPopupHtml, missType: 'miss' });
     } else if (context?.saveDc) {
-        await processPotentCantripMissDamage(potentFormula, storedDamageResult, hit, isAutoMiss, targetName, characterName, campaignName, context, combatSummary, characters, logEntry, setPopupHtml, 'autoMiss');
+        await processPotentCantripMissDamage({ potentFormula, storedDamageResult, targetName, characterName, campaignName, context, characters, logEntry, setPopupHtml, missType: 'autoMiss' });
     }
 }
 
@@ -349,6 +349,14 @@ function resolvePotentMissTotal(storedDamageResult, missType, finalFormula, cont
     return { damageResult, adjustedTotal: applyMinDamageAdjustment(damageResult.total, damageResult.rolls, context?.playerStats, context?.damageType) };
 }
 
+function resolvePotentRolls(damageResult, storedDamageResult) {
+    return damageResult?.rolls || storedDamageResult?.rolls || [];
+}
+
+function resolvePotentModifier(damageResult, storedDamageResult) {
+    return damageResult?.modifier ?? storedDamageResult?.modifier ?? 0;
+}
+
 function buildPotentMissLogData({ characterName, context, targetName, finalFormula, damageResult, storedDamageResult, halfDamage }) {
     return {
         type: 'roll',
@@ -356,9 +364,9 @@ function buildPotentMissLogData({ characterName, context, targetName, finalFormu
         rollType: 'cantrip-miss-half-damage',
         name: context.name,
         formula: finalFormula,
-        rolls: damageResult?.rolls || storedDamageResult?.rolls || [],
+        rolls: resolvePotentRolls(damageResult, storedDamageResult),
         total: halfDamage,
-        modifier: damageResult?.modifier ?? storedDamageResult?.modifier ?? 0,
+        modifier: resolvePotentModifier(damageResult, storedDamageResult),
         damageType: context?.damageType,
         targetName: targetName,
         isPotentCantrip: true,
@@ -366,14 +374,15 @@ function buildPotentMissLogData({ characterName, context, targetName, finalFormu
 }
 
 function buildPotentMissPopupData({ context, targetName, finalFormula, damageResult, storedDamageResult, applyResult, missTargetMaxHp }) {
+    const potentModifier = resolvePotentModifier(damageResult, storedDamageResult);
     return {
         type: 'save-damage',
         name: context.name,
         formula: finalFormula,
-        rolls: damageResult?.rolls || storedDamageResult?.rolls || [],
+        rolls: resolvePotentRolls(damageResult, storedDamageResult),
         total: applyResult?.finalDamage,
-        bonus: damageResult?.modifier ?? storedDamageResult?.modifier ?? 0,
-        modifier: damageResult?.modifier ?? storedDamageResult?.modifier ?? 0,
+        bonus: potentModifier,
+        modifier: potentModifier,
         damageType: context?.damageType,
         targetName: targetName,
         targetCurrentHp: applyResult?.newHp,
@@ -388,7 +397,7 @@ function buildPotentMissPopupData({ context, targetName, finalFormula, damageRes
     };
 }
 
-async function processPotentCantripMissDamage(potentFormula, storedDamageResult, hit, isAutoMiss, targetName, characterName, campaignName, context, combatSummary, characters, logEntry, setPopupHtml, missType) {
+async function processPotentCantripMissDamage({ potentFormula, storedDamageResult, targetName, characterName, campaignName, context, characters, logEntry, setPopupHtml, missType }) {
     const potentPlayerStats = context?.playerStats;
     const finalFormula = buildPotentMissFormula(potentFormula, potentPlayerStats, context);
 
@@ -398,7 +407,7 @@ async function processPotentCantripMissDamage(potentFormula, storedDamageResult,
     const halfDamage = Math.floor(adjustedTotal / 2);
     const combatSummary2 = await loadCombatSummary(campaignName);
     const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, context?.damageType)) || false;
-    const applyResult = await applyDamageToTarget(combatSummary2, targetName, halfDamage, [context?.damageType], campaignName, characters, ignoreResistance, context.attackerName || characterName);
+    const applyResult = await applyDamageToTarget(combatSummary2, targetName, halfDamage, [context?.damageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: context.attackerName || characterName });
     const missTargetMaxHp = context._target?.type === 'player'
         ? (getRuntimeValue(targetName, 'hitPoints') ?? 0)
         : context._target?.maxHp ?? 0;

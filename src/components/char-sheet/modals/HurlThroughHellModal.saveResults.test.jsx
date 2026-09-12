@@ -175,16 +175,7 @@ describe('HurlThroughHellModal', () => {
       });
 
       await waitFor(() => {
-        expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-          expect.any(Object),
-          'Goblin1',
-          22,
-          ['Psychic'],
-          'test-campaign',
-          expect.any(Array),
-          false,
-          'Throg'
-        );
+        expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin1', 22, ['Psychic'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'Throg' });
       });
 
       await waitFor(() => {

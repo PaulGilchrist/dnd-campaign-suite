@@ -167,9 +167,7 @@ describe('applyDamageToTarget — CLA-324 Spell Resistance halving', () => {
     const cs = makeCombatSummary([player]);
     stubRuntime(82);
 
-    const result = await applyDamageToTarget(cs, 'DivinationWizard', 14, ['Cold'], 'test-campaign', [
-      createHolderCharacter('DivinationWizard'),
-    ], false, 'Gazer 1', false, { isSpellDamage: true });
+    const result = await applyDamageToTarget(cs, 'DivinationWizard', 14, ['Cold'], 'test-campaign', [ createHolderCharacter('DivinationWizard'), ], { ignoreResistance: false, attackerName: 'Gazer 1', suppressHpLog: false, ...{ isSpellDamage: true } });
 
     expect(result.finalDamage).toBe(7);
     expect(result.damageReduced).toBe(true);
@@ -192,9 +190,7 @@ describe('applyDamageToTarget — CLA-324 Spell Resistance halving', () => {
     const cs = makeCombatSummary([player]);
     stubRuntime(82);
 
-    const result = await applyDamageToTarget(cs, 'DivinationWizard', 14, ['Cold'], 'test-campaign', [
-      createHolderCharacter('DivinationWizard'),
-    ], false, 'Thug 1');
+    const result = await applyDamageToTarget(cs, 'DivinationWizard', 14, ['Cold'], 'test-campaign', [ createHolderCharacter('DivinationWizard'), ], { ignoreResistance: false, attackerName: 'Thug 1' });
 
     expect(result.finalDamage).toBe(14);
     expect(result.resistanceDetails).toEqual([]);
@@ -208,9 +204,7 @@ describe('applyDamageToTarget — CLA-324 Spell Resistance halving', () => {
     const cs = makeCombatSummary([player]);
     stubRuntime(44);
 
-    const result = await applyDamageToTarget(cs, 'AberrantSorcerer', 11, ['Cold'], 'test-campaign', [
-      createNonHolderCharacter('AberrantSorcerer'),
-    ], false, 'Gazer 1', false, { isSpellDamage: true });
+    const result = await applyDamageToTarget(cs, 'AberrantSorcerer', 11, ['Cold'], 'test-campaign', [ createNonHolderCharacter('AberrantSorcerer'), ], { ignoreResistance: false, attackerName: 'Gazer 1', suppressHpLog: false, ...{ isSpellDamage: true } });
 
     expect(result.finalDamage).toBe(11);
     expect(result.resistanceDetails).toEqual([]);
@@ -224,9 +218,7 @@ describe('applyDamageToTarget — CLA-324 Spell Resistance halving', () => {
     const cs = makeCombatSummary([player]);
     stubRuntime(82, { rollType: 'spell-save', attackerName: 'Archmage', attackName: 'Fireball' });
 
-    const result = await applyDamageToTarget(cs, 'DivinationWizard', 20, ['Fire'], 'test-campaign', [
-      createHolderCharacter('DivinationWizard'),
-    ], false, 'Archmage');
+    const result = await applyDamageToTarget(cs, 'DivinationWizard', 20, ['Fire'], 'test-campaign', [ createHolderCharacter('DivinationWizard'), ], { ignoreResistance: false, attackerName: 'Archmage' });
 
     expect(result.finalDamage).toBe(10);
     expect(result.resistanceDetails).toEqual([{ damageType: 'Spell', status: 'resistant' }]);
@@ -241,9 +233,7 @@ describe('applyDamageToTarget — CLA-324 Spell Resistance halving', () => {
     // Monster melee attack stamp — NOT spell-origin.
     stubRuntime(82, { rollType: 'attack', attackerName: 'Knight 1', attackName: 'Greatsword' });
 
-    const result = await applyDamageToTarget(cs, 'DivinationWizard', 14, ['Slashing'], 'test-campaign', [
-      createHolderCharacter('DivinationWizard'),
-    ], false, 'Knight 1');
+    const result = await applyDamageToTarget(cs, 'DivinationWizard', 14, ['Slashing'], 'test-campaign', [ createHolderCharacter('DivinationWizard'), ], { ignoreResistance: false, attackerName: 'Knight 1' });
 
     expect(result.finalDamage).toBe(14);
   });

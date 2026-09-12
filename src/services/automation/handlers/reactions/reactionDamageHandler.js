@@ -201,7 +201,7 @@ export async function handle(action, playerStats, campaignName, _mapName, charac
 
                 const cs = await getCombatContext(campaignName);
                 if (cs) {
-                    await applyDamageToTarget(cs, targetName, damageResult.total, [auto.damageType || 'Necrotic'], campaignName, characters, false, playerStats.name);
+                    await applyDamageToTarget(cs, targetName, damageResult.total, [auto.damageType || 'Necrotic'], campaignName, characters, { ignoreResistance: false, attackerName: playerStats.name });
                 } else {
                     console.error('[reactionDamage] No combat context — damage not applied:', { actionName: action.name, targetName });
                 }
@@ -315,29 +315,87 @@ async function handleMeleeReactionAttack(action, auto, playerStats, campaignName
     };
 }
 
-async function handleThoughtShield(action, playerStats, campaignName) {
-    const warlockName = playerStats.name;
-
-    // CLA-361: every gate refusal now writes a thought_shield_refused log line
-    // (CLA-337 storms_thunder_refused shape) — popup-only refusals were the §7 gap.
-    const tsRefuse = (description) => {
-        addEntry(campaignName, {
-            type: 'automation',
-            characterName: warlockName,
-            automationType: 'thought_shield_refused',
+// CLA-361: every gate refusal now writes a thought_shield_refused log line
+// (CLA-337 storms_thunder_refused shape) — popup-only refusals were the §7 gap.
+function thoughtShieldRefuse(action, warlockName, campaignName, description) {
+    addEntry(campaignName, {
+        type: 'automation',
+        characterName: warlockName,
+        automationType: 'thought_shield_refused',
+        name: action.name,
+        description,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[thoughtShield] Error logging refusal:', e); });
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
             name: action.name,
             description,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error('[thoughtShield] Error logging refusal:', e); });
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description,
-            },
-        };
+        },
     };
+}
+
+// CLA-361: once-per-round reaction latch (CLA-335 recipe — round read from the
+// FRESH cs, never a stale mirror). Checked BEFORE the lastAttack identity gates
+// because the persisted reflect re-stamps lastAttack with the warlock as attacker
+// (CLA-337 caveat), so the latch is the authoritative guard that a spent Reaction
+// cannot refire — refuses spend nothing.
+async function gateThoughtShieldTrigger(action, cs, warlockName, campaignName) {
+    const refuse = (description) => thoughtShieldRefuse(action, warlockName, campaignName, description);
+
+    const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
+    if (!lastAttack) {
+        return { refusal: refuse('No recent attack found. Thought Shield requires a creature to have dealt psychic damage to you.') };
+    }
+
+    const currentRound = cs.round || 1;
+    const usedRound = Number(getRuntimeValue(warlockName, THOUGHT_SHIELD_ROUND_KEY, campaignName) ?? 0);
+    if (usedRound === currentRound) {
+        return { refusal: refuse(`You have already used ${action.name} this round — your Reaction is spent until your next turn.`) };
+    }
+
+    if (lastAttack.targetName !== warlockName) {
+        return { refusal: refuse(`You were not the target of the last attack (${lastAttack.targetName} was). Thought Shield only works when you take psychic damage.`) };
+    }
+
+    if (!lastAttack.damageTypes?.some(d => d.toLowerCase() === 'psychic')) {
+        return { refusal: refuse(`The last attack dealt ${lastAttack.damageTypes?.join(', ') || 'unknown'} damage, not psychic damage. Thought Shield only reflects psychic damage.`) };
+    }
+
+    const actualWarlockDamage = lastAttack.actualDamage || lastAttack.rawDamage || 0;
+    if (actualWarlockDamage <= 0) {
+        return { refusal: refuse('The attacker dealt no damage to you (immune/resistant). Thought Shield reflects the damage you took, which was 0.') };
+    }
+
+    const attackerCreatureName = lastAttack.attackerName;
+    if (!attackerCreatureName) {
+        return { refusal: refuse('No attacker found to reflect damage to.') };
+    }
+
+    const attackerCreature = cs.creatures.find(c => c.name === attackerCreatureName);
+    if (!attackerCreature) {
+        return { refusal: refuse(`Attacker "${attackerCreatureName}" not found in combat.`) };
+    }
+
+    if (attackerCreature.currentHp <= 0) {
+        return { refusal: refuse(`${attackerCreatureName} is already defeated. Cannot reflect damage to a creature that's already down.`) };
+    }
+
+    // CLA-361: range gate — the feature's data declares range 5_ft. Canonical
+    // isWithinRange (CLA-337 recipe): strict token distances on a mapped rig,
+    // lenient true when gridless/unpositioned.
+    const rangeFt = rangeToFeet(action.automation?.range) ?? 5;
+    const inRange = await isWithinRange(attackerCreatureName, warlockName, rangeFt);
+    if (!inRange) {
+        return { refusal: refuse(`${attackerCreatureName} is not within ${rangeFt} feet of you. Thought Shield requires the attacker to be within ${rangeFt} feet.`) };
+    }
+
+    return { currentRound, actualWarlockDamage, attackerCreatureName };
+}
+
+async function handleThoughtShield(action, playerStats, campaignName) {
+    const warlockName = playerStats.name;
 
     const allFeatures = [
         ...(playerStats.characterAdvancement || []),
@@ -367,57 +425,9 @@ async function handleThoughtShield(action, playerStats, campaignName) {
         };
     }
 
-    const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
-    if (!lastAttack) {
-        return tsRefuse('No recent attack found. Thought Shield requires a creature to have dealt psychic damage to you.');
-    }
-
-    // CLA-361: once-per-round reaction latch (CLA-335 recipe — round read from the
-    // FRESH cs above, never a stale mirror). Checked BEFORE the lastAttack identity
-    // gates because the persisted reflect below re-stamps lastAttack with the warlock
-    // as attacker (CLA-337 caveat), so the latch is the authoritative guard that a
-    // spent Reaction cannot refire — refuses spend nothing.
-    const currentRound = cs.round || 1;
-    const usedRound = Number(getRuntimeValue(warlockName, THOUGHT_SHIELD_ROUND_KEY, campaignName) ?? 0);
-    if (usedRound === currentRound) {
-        return tsRefuse(`You have already used ${action.name} this round — your Reaction is spent until your next turn.`);
-    }
-
-    if (lastAttack.targetName !== warlockName) {
-        return tsRefuse(`You were not the target of the last attack (${lastAttack.targetName} was). Thought Shield only works when you take psychic damage.`);
-    }
-
-    if (!lastAttack.damageTypes?.some(d => d.toLowerCase() === 'psychic')) {
-        return tsRefuse(`The last attack dealt ${lastAttack.damageTypes?.join(', ') || 'unknown'} damage, not psychic damage. Thought Shield only reflects psychic damage.`);
-    }
-
-    const actualWarlockDamage = lastAttack.actualDamage || lastAttack.rawDamage || 0;
-    if (actualWarlockDamage <= 0) {
-        return tsRefuse('The attacker dealt no damage to you (immune/resistant). Thought Shield reflects the damage you took, which was 0.');
-    }
-
-    const attackerCreatureName = lastAttack.attackerName;
-    if (!attackerCreatureName) {
-        return tsRefuse('No attacker found to reflect damage to.');
-    }
-
-    const attackerCreature = cs.creatures.find(c => c.name === attackerCreatureName);
-    if (!attackerCreature) {
-        return tsRefuse(`Attacker "${attackerCreatureName}" not found in combat.`);
-    }
-
-    if (attackerCreature.currentHp <= 0) {
-        return tsRefuse(`${attackerCreatureName} is already defeated. Cannot reflect damage to a creature that's already down.`);
-    }
-
-    // CLA-361: range gate — the feature's data declares range 5_ft. Canonical
-    // isWithinRange (CLA-337 recipe): strict token distances on a mapped rig,
-    // lenient true when gridless/unpositioned.
-    const rangeFt = rangeToFeet(action.automation?.range) ?? 5;
-    const inRange = await isWithinRange(attackerCreatureName, warlockName, rangeFt);
-    if (!inRange) {
-        return tsRefuse(`${attackerCreatureName} is not within ${rangeFt} feet of you. Thought Shield requires the attacker to be within ${rangeFt} feet.`);
-    }
+    const gate = await gateThoughtShieldTrigger(action, cs, warlockName, campaignName);
+    if (gate.refusal) return gate.refusal;
+    const { currentRound, actualWarlockDamage, attackerCreatureName } = gate;
 
     // Stamp the latch before applying so a thrown apply cannot leave the
     // Reaction refirable within the same round.
@@ -430,11 +440,11 @@ async function handleThoughtShield(action, playerStats, campaignName) {
     // warlock actually took, so ignoreResistance=true ("same amount" — RAW).
     const reflectedDamage = actualWarlockDamage;
     const characters = cs.creatures.filter(c => c.type === 'player');
-    const applyResult = await applyDamageToTarget(cs, attackerCreatureName, reflectedDamage, ['Psychic'], campaignName, characters, true, warlockName);
+    const applyResult = await applyDamageToTarget(cs, attackerCreatureName, reflectedDamage, ['Psychic'], campaignName, characters, { ignoreResistance: true, attackerName: warlockName });
 
     if (!applyResult) {
         console.error('[thoughtShield] applyDamageToTarget failed — reflected damage not applied:', { warlockName, attackerCreatureName, reflectedDamage });
-        return tsRefuse(`Reflected damage could not be applied to ${attackerCreatureName}.`);
+        return thoughtShieldRefuse(action, warlockName, campaignName, `Reflected damage could not be applied to ${attackerCreatureName}.`);
     }
 
     await addEntry(campaignName, {
@@ -574,7 +584,7 @@ async function handleEnergyRedirection(action, playerStats, campaignName) {
                 const damageOnSave = computeDamageAfterSave(redirectDamage, saveResult.success, null);
                 if (damageOnSave > 0) {
                     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-                    await applyDamageToTarget(cs, targetName, damageOnSave, [matchingTypes[0]], campaignName, characters, false, playerName);
+                    await applyDamageToTarget(cs, targetName, damageOnSave, [matchingTypes[0]], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
                 }
 
                 await addEntry(campaignName, {

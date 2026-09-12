@@ -44,6 +44,30 @@ function buildIravLines(irvInfo) {
     return text;
 }
 
+function buildUserDescription(action, auto, targetName, irvInfo, iravLines, usedRelentless, dieValue) {
+    let description = `${action.name}: Expend 1 Superiority Die to discern enemy strengths and weaknesses.\n`;
+    if (usedRelentless) {
+        description += `Rolled d${dieValue} for ${dieValue} (Relentless).\n`;
+    }
+    description += `Target: ${targetName || 'None (not in combat)'}.\n`;
+    description += `Range: ${auto.range || '30 ft'}.\n\n`;
+    description += irvInfo ? iravLines : `No monster data found for target. The target may be a player character or a custom NPC.\n`;
+    return description;
+}
+
+function buildLogDescription(playerName, auto, targetName, usedRelentless, dieValue, iravLines) {
+    let logDescription = `Know Your Enemy used by ${playerName}`;
+    if (targetName) {
+        logDescription += ` against ${targetName}`;
+    }
+    if (usedRelentless) {
+        logDescription += ` (Relentless - free d${dieValue} die)`;
+    }
+    logDescription += `.\nRange: ${auto.range || '30 ft'}.\n`;
+    logDescription += iravLines;
+    return logDescription;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const usesKey = 'superiorityDice';
@@ -57,8 +81,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const currentRound = getCurrentCombatRound(campaignName);
     // CLA-286: round-keyed self-re-arming latch (CLA-109 pattern).
     const relentlessUsed = hasRelentless && storedRound != null && Number(storedRound) >= Number(currentRound);
+    const relentlessAvailable = hasRelentless && !relentlessUsed;
 
-    if (currentUses <= 0 && !(hasRelentless && !relentlessUsed)) {
+    if (currentUses <= 0 && !relentlessAvailable) {
         return {
             type: 'popup',
             payload: {
@@ -73,7 +98,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     let dieValue = 0;
     let usedRelentless = false;
 
-    if (hasRelentless && !relentlessUsed && currentUses <= 0) {
+    if (relentlessAvailable && currentUses <= 0) {
         const superiorityDieSize = evaluateAutoExpression(auto.dieExpression || 'superiority_die', playerStats);
         const relentlessRoll = rollExpression(`1d${superiorityDieSize}`);
         dieValue = relentlessRoll?.total || superiorityDieSize;
@@ -90,23 +115,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const irvInfo = await resolveTargetIRV(targetName);
     const iravLines = irvInfo ? buildIravLines(irvInfo) : '';
 
-    let description = `${action.name}: Expend 1 Superiority Die to discern enemy strengths and weaknesses.\n`;
-    if (usedRelentless) {
-        description += `Rolled d${dieValue} for ${dieValue} (Relentless).\n`;
-    }
-    description += `Target: ${targetName || 'None (not in combat)'}.\n`;
-    description += `Range: ${auto.range || '30 ft'}.\n\n`;
-    description += irvInfo ? iravLines : `No monster data found for target. The target may be a player character or a custom NPC.\n`;
-
-    let logDescription = `Know Your Enemy used by ${playerStats.name}`;
-    if (targetName) {
-        logDescription += ` against ${targetName}`;
-    }
-    if (usedRelentless) {
-        logDescription += ` (Relentless - free d${dieValue} die)`;
-    }
-    logDescription += `.\nRange: ${auto.range || '30 ft'}.\n`;
-    logDescription += iravLines;
+    const description = buildUserDescription(action, auto, targetName, irvInfo, iravLines, usedRelentless, dieValue);
+    const logDescription = buildLogDescription(playerStats.name, auto, targetName, usedRelentless, dieValue, iravLines);
 
     addEntry(campaignName, {
         type: 'ability_use',

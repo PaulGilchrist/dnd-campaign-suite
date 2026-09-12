@@ -231,17 +231,8 @@ describe('Resistance damage reduction', () => {
                 damageType: 'fire',
             });
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.any(Object),
-                'Goblin',
-                5, // 8 adjusted - 3 resistance
-                ['fire'],
-                'test-campaign',
-                expect.any(Array),
-                false,
-                'TestWizard',
-                true,
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 5, // 8 adjusted - 3 resistance
+                ['fire'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true },);
         });
 
         it('includes resistanceReduction and resistanceRoll in the popup', async () => {
@@ -303,17 +294,8 @@ describe('Resistance damage reduction', () => {
 
             const popup = getFirstPopupCall();
             expect(popup.resistanceReduction).toBe(1);
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.any(Object),
-                'Goblin',
-                7, // 8 - 1
-                ['fire'],
-                expect.any(String),
-                expect.any(Array),
-                false,
-                'TestWizard',
-                true,
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 7, // 8 - 1
+                ['fire'], expect.any(String), expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true },);
         });
     });
 
@@ -513,17 +495,8 @@ describe('Resistance damage reduction', () => {
                 damageType: 'fire',
             });
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.any(Object),
-                'Goblin',
-                0, // max(0, 2 - 4) = 0
-                ['fire'],
-                expect.any(String),
-                expect.any(Array),
-                false,
-                'TestWizard',
-                true,
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 0, // max(0, 2 - 4) = 0
+                ['fire'], expect.any(String), expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true },);
         });
     });
 

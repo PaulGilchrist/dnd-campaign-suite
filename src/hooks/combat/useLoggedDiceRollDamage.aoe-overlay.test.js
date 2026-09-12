@@ -266,16 +266,7 @@ describe('AoE overlay path', () => {
         });
 
         expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
-        expect(applyDamageToTarget).toHaveBeenCalledWith(
-            expect.any(Object),
-            'Goblin',
-            20,
-            ['fire'],
-            'test-campaign',
-            expect.any(Array),
-            false,
-            'TestWizard'
-        );
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 20, ['fire'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard' });
         expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('TestWizard', 'test-campaign');
         expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
             rollType: 'aoe-damage',
@@ -368,16 +359,7 @@ describe('AoE overlay path', () => {
         expect(hasSoulstitchProtection).toHaveBeenCalledWith('Ally1', 'TestWizard', 'test-campaign');
         expect(sendAoePlayerSaves).not.toHaveBeenCalled();
         expect(deps.pendingSaves).toEqual({});
-        expect(applyDamageToTarget).toHaveBeenCalledWith(
-            expect.any(Object),
-            'Ally1',
-            0,
-            ['fire'],
-            'test-campaign',
-            expect.any(Array),
-            false,
-            'TestWizard'
-        );
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', 0, ['fire'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard' });
     });
 
     it('applies correct overlay label from overlay context', async () => {

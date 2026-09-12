@@ -22,7 +22,7 @@ function reducedAllyResult(creatureName, applyResult, extra) {
 
 async function applyZeroDamageResults({ combatSummary, creatures, damageType, campaignName, characters, casterName, results, extra }) {
     for (const { creature } of creatures) {
-        const applyResult = await applyDamageToTarget(combatSummary, creature.name, 0, [damageType], campaignName, characters, false, casterName);
+        const applyResult = await applyDamageToTarget(combatSummary, creature.name, 0, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: casterName });
         results.push(reducedAllyResult(creature.name, applyResult, extra));
     }
 }
@@ -39,7 +39,7 @@ async function processNonSaveCreatures({ combatSummary, affected, isCarefulAlly,
     const carefulAffected = affected.filter(a => isCarefulAlly(a.creature.name));
 
     for (const { creature } of nonCarefulAffected) {
-        const applyResult = await applyDamageToTarget(combatSummary, creature.name, adjustedTotal, [damageType], campaignName, characters, false, casterName);
+        const applyResult = await applyDamageToTarget(combatSummary, creature.name, adjustedTotal, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: casterName });
         if (applyResult && applyResult.finalDamage > 0) {
             endInvisibilityOnHostileAction(casterName, campaignName);
         }
@@ -102,13 +102,42 @@ function buildAoeLastAttackData({ casterName, overlayLabel, saveType, saveDc, fo
     };
 }
 
+async function resolveOverlayContext(context, campaignName) {
+    const overlayId = context?.targetName?.startsWith('overlay-') ? context.targetName.slice('overlay-'.length) : null;
+    return overlayId ? readAoeContext(campaignName, overlayId) : null;
+}
+
+function queuePlayerSavePrompts({ playersNeedingSave, saveDc, saveType, adjustedTotal, damageType, dcSuccess, campaignName, name, casterName, rolls, formula, heightenTarget, modifier, context, pendingSaves, setPopupHtml }) {
+    if (!playersNeedingSave.length || !saveDc || !saveType) return;
+    const playerPrompts = sendAoePlayerSaves({ affected: playersNeedingSave, rawDamage: adjustedTotal, damageType, saveDc, saveType, dcSuccess, campaignName, spellName: name, attackerName: casterName, formula, heightenTarget });
+    for (const pp of playerPrompts) {
+        pendingSaves[pp.promptId] = buildPendingSaveEntry({ pp, name, formula, modifier, rolls, context, adjustedTotal, saveDc, saveType, dcSuccess, damageType, casterName, campaignName, setPopupHtml });
+    }
+}
+
+function buildAoeLogEntry({ characterName, name, formula, adjustedTotal, modifier, displayRolls, damageType, overlayLabel, affected, allResults, saveType, saveDc, dcSuccess, gwfBaseRolls, gwfDisplayRolls }) {
+    return {
+        type: 'aoe-damage',
+        characterName,
+        rollType: 'aoe-damage',
+        name,
+        formula, rolls: displayRolls, total: adjustedTotal, modifier, damageType,
+        targetName: overlayLabel,
+        affectedCount: affected.length,
+        npcResults: allResults.map(r => r.creatureName),
+        saveType, saveDc, dcSuccess,
+        gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
+        gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
+        gwfDisplayRolls: gwfDisplayRolls,
+    };
+}
+
 export function createAoeDamageHandler(deps) {
     const { characterName, campaignName, characters, setPopupHtml, logEntry, pendingSaves } = deps;
 
-    return async function handleAoeDamage(name, formula, total, rolls, modifier, context, adjustedTotal, displayRolls, gwfBaseRolls, gwfDisplayRolls) {
+    return async function handleAoeDamage({ name, formula, total, rolls, modifier, context, adjustedTotal, displayRolls, gwfBaseRolls, gwfDisplayRolls }) {
         const { saveDc, saveType, dcSuccess, damageType, attackerName } = context || {};
-        const overlayId = context?.targetName?.startsWith('overlay-') ? context.targetName.slice('overlay-'.length) : null;
-        const aoeCtx = overlayId ? await readAoeContext(campaignName, overlayId) : null;
+        const aoeCtx = await resolveOverlayContext(context, campaignName);
         const combatSummary = await loadCombatSummary(campaignName);
         if (!aoeCtx || !combatSummary) return;
 
@@ -142,29 +171,11 @@ export function createAoeDamageHandler(deps) {
         await applyZeroDamageResults({ combatSummary, creatures: soulstitchProtectedPlayers, damageType, campaignName, characters, casterName, results: carefulAllyResults, extra: { soulstitchProtected: true } });
         await applyZeroDamageResults({ combatSummary, creatures: carefulSpellPlayers, damageType, campaignName, characters, casterName, results: carefulAllyResults, extra: { carefulSpell: true } });
 
-        if (playersNeedingSave.length && saveDc && saveType) {
-            const playerPrompts = sendAoePlayerSaves(playersNeedingSave, adjustedTotal, damageType, saveDc, saveType, dcSuccess, campaignName, name, casterName, rolls, formula, heightenTarget);
-            for (const pp of playerPrompts) {
-                pendingSaves[pp.promptId] = buildPendingSaveEntry({ pp, name, formula, modifier, rolls, context, adjustedTotal, saveDc, saveType, dcSuccess, damageType, casterName, campaignName, setPopupHtml });
-            }
-        }
+        queuePlayerSavePrompts({ playersNeedingSave, saveDc, saveType, adjustedTotal, damageType, dcSuccess, campaignName, name, casterName, rolls, formula, heightenTarget, modifier, context, pendingSaves, setPopupHtml });
         const overlayLabel = overlay.label || overlay.shape || 'AoE';
         const allResults = [...npcResults, ...carefulAllyResults];
         const html = buildAoeSummaryHtml({ overlayLabel, name, formula, adjustedTotal, total, damageType, saveDc, saveType, allResults, playersNeedingSave });
-        logEntry({
-            type: 'aoe-damage',
-            characterName,
-            rollType: 'aoe-damage',
-            name,
-            formula, rolls: displayRolls, total: adjustedTotal, modifier, damageType,
-            targetName: overlayLabel,
-            affectedCount: affected.length,
-            npcResults: allResults.map(r => r.creatureName),
-            saveType, saveDc, dcSuccess,
-            gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
-            gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
-            gwfDisplayRolls: gwfDisplayRolls,
-        });
+        logEntry(buildAoeLogEntry({ characterName, name, formula, adjustedTotal, modifier, displayRolls, damageType, overlayLabel, affected, allResults, saveType, saveDc, dcSuccess, gwfBaseRolls, gwfDisplayRolls }));
         setPopupHtml(html);
 
         // Write lastAttack for AoE — coverspell needs this for rollback

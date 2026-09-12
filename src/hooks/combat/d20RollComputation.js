@@ -142,22 +142,50 @@ function resolveResilientSphereAutoMiss(context, campaignName, isResilientSphere
     return true;
 }
 
+function applyD20Floor(r1, context, starryDragonFloor) {
+    return ((context?.d20Floor10 || starryDragonFloor) && r1 <= 9) ? 10 : r1;
+}
+
+// Advantage/disadvantage resolution → target Lucky overrides → Halfling Lucky
+// auto-reroll, in the exact original order so the reroll value is never clobbered.
+function resolveAttackRoll({ rollType, forcedMode, context, campaignName, r1, r2, effectiveD20 }) {
+    let effectiveD20Roll;
+    let luckyRerolled = false;
+    let luckyRerollValue = null;
+
+    if (forcedMode === 'advantage') {
+        effectiveD20Roll = Math.max(r1, r2);
+    } else if (forcedMode === 'disadvantage') {
+        effectiveD20Roll = Math.min(r1, r2);
+    } else {
+        effectiveD20Roll = effectiveD20;
+    }
+
+    const luckyFeat = applyTargetLuckyFeat(rollType, forcedMode, context, campaignName, r1, r2);
+    const resolvedForcedMode = luckyFeat.forcedMode;
+    if (luckyFeat.effectiveD20Roll !== null) {
+        effectiveD20Roll = luckyFeat.effectiveD20Roll;
+    }
+
+    // Halfling Lucky (auto_reroll / roll_equals_1): reroll the natural 1 and use the new roll.
+    if (context?.autoReroll && context?.autoRerollCondition === 'roll_equals_1' && effectiveD20Roll === 1) {
+        luckyRerollValue = rollD20();
+        effectiveD20Roll = luckyRerollValue;
+        luckyRerolled = true;
+    }
+
+    return { forcedMode: resolvedForcedMode, effectiveD20Roll, luckyRerolled, luckyRerollValue };
+}
+
 export function computeD20Roll(characterName, campaignName, name, rollType, context, bonus, isResilientSphereActive) {
     const r1 = rollD20();
     const r2 = rollD20();
 
     const starryDragonFloor = computeStarryDragonFloor(characterName, campaignName, name, rollType);
 
-    const effectiveD20 = ((context?.d20Floor10 || starryDragonFloor) && r1 <= 9) ? 10 : r1;
+    const effectiveD20 = applyD20Floor(r1, context, starryDragonFloor);
 
-    let effectiveD20Roll;
     let forcedMode = context?.forcedMode || 'normal';
-
-    // Halfling Lucky: automatic reroll when the FINAL resolved d20 shows a natural 1.
-    // Applied after all advantage/disadvantage resolution (forcedMode block + FT-049 target
-    // overrides) so the reroll value is never clobbered.
-    let luckyRerolled = false;
-    let luckyRerollValue = null;
 
     const cosmicOmen = applyCosmicOmen(rollType, campaignName);
     const cosmicOmenAppliedBonus = cosmicOmen.bonus;
@@ -186,26 +214,11 @@ export function computeD20Roll(characterName, campaignName, name, rollType, cont
 
     const sunderingBlowBonus = computeSunderingBlowBonus(context, rollType);
 
-    if (forcedMode === 'advantage') {
-        effectiveD20Roll = Math.max(r1, r2);
-    } else if (forcedMode === 'disadvantage') {
-        effectiveD20Roll = Math.min(r1, r2);
-    } else {
-        effectiveD20Roll = effectiveD20;
-    }
-
-    const luckyFeat = applyTargetLuckyFeat(rollType, forcedMode, context, campaignName, r1, r2);
-    forcedMode = luckyFeat.forcedMode;
-    if (luckyFeat.effectiveD20Roll !== null) {
-        effectiveD20Roll = luckyFeat.effectiveD20Roll;
-    }
-
-    // Halfling Lucky (auto_reroll / roll_equals_1): reroll the natural 1 and use the new roll.
-    if (context?.autoReroll && context?.autoRerollCondition === 'roll_equals_1' && effectiveD20Roll === 1) {
-        luckyRerollValue = rollD20();
-        effectiveD20Roll = luckyRerollValue;
-        luckyRerolled = true;
-    }
+    const rollResolution = resolveAttackRoll({ rollType, forcedMode, context, campaignName, r1, r2, effectiveD20 });
+    const forcedModeResolved = rollResolution.forcedMode;
+    const effectiveD20Roll = rollResolution.effectiveD20Roll;
+    const luckyRerolled = rollResolution.luckyRerolled;
+    const luckyRerollValue = rollResolution.luckyRerollValue;
 
     const effectiveBonus = bonus + cosmicOmenAppliedBonus + pendingSkillCheckAppliedBonus + sunderingBlowBonus + baneAttackPenalty + blessAttackBonus;
 
@@ -231,7 +244,7 @@ export function computeD20Roll(characterName, campaignName, name, rollType, cont
         r1, r2,
         effectiveD20Roll,
         effectiveBonus,
-        forcedMode,
+        forcedMode: forcedModeResolved,
         luckyRerolled,
         luckyRerollValue,
         cosmicOmenAppliedBonus,

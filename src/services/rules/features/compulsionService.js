@@ -6,17 +6,20 @@ import { addEntry } from '../../ui/logService.js';
 import { addExpiration } from '../effects/expirations.js';
 import { addCondition } from '../../combat/conditions/conditionSaveService.js';
 
+async function resolveCompulsionTarget(metaCtx, campaignName) {
+    if (metaCtx?.targetName) return metaCtx.targetName;
+    const cs = await getCombatContext(campaignName);
+    if (cs?.creatures && cs.creatures.length > 0) {
+        return cs.creatures[0].name;
+    }
+    return null;
+}
+
 export async function triggerCompulsion(spell, metaCtx, playerStats, campaignName, mapName) {
     const isCompulsion = (spell.name || '').toLowerCase() === 'compulsion';
     if (!isCompulsion) return null;
 
-    let targetName = metaCtx?.targetName;
-    if (!targetName) {
-        const cs = await getCombatContext(campaignName);
-        if (cs?.creatures && cs.creatures.length > 0) {
-            targetName = cs.creatures[0].name;
-        }
-    }
+    const targetName = await resolveCompulsionTarget(metaCtx, campaignName);
     if (!targetName) {
         return { type: 'popup', payload: { type: 'automation_info', name: 'Compulsion', description: 'No target selected for Compulsion.' } };
     }

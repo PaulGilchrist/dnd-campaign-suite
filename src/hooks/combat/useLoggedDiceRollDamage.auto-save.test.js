@@ -229,18 +229,7 @@ describe('Contact Other Plane auto-save', () => {
             })
         );
 
-        expect(applyDamageToTarget).toHaveBeenCalledWith(
-            expect.any(Object),
-            'Warlock1',
-            7,
-            ['psychic'],
-            'test-campaign',
-            null,
-            false,
-            'Warlock1',
-            false,
-            { isSpellDamage: true }
-        );
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Warlock1', 7, ['psychic'], 'test-campaign', null, { ignoreResistance: false, attackerName: 'Warlock1', suppressHpLog: false, ...{ isSpellDamage: true } });
 
         expect(deps.setPopupHtml).toHaveBeenCalledWith(
             expect.objectContaining({

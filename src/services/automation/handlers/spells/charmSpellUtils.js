@@ -9,6 +9,7 @@ import { rollSaveForCreature } from '../../../rules/combat/applyDamage.js';
 import { rollD20 } from '../../../dice/diceRoller.js';
 import { sendSaveResult } from '../../../combat/conditions/savePromptService.js';
 import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollback.js';
+import { spellNoticePopup } from './areaSpellUtils.js';
 
 function dispatchSaveResult(campaignName, promptId, targetName, saveType, saveDc, saveResult) {
     sendSaveResult(campaignName, targetName, {
@@ -120,43 +121,75 @@ async function applyCharmFailure({ campaignName, casterName, action, targetName,
     }).catch((e) => { console.error(logPrefix, e); });
 }
 
+// Target names from metaCtx (multi-target) or single targetName.
+// Returns { targetNames } to proceed, or { popup } to refuse.
+function resolveCharmTargetNames(action, auto, config) {
+    const metaTargets = action.metaCtx?.[config.targetsKey];
+    if (metaTargets && Array.isArray(metaTargets) && metaTargets.length > 0) {
+        return { targetNames: metaTargets };
+    }
+    const providedTargetName = auto.targetName || action.targetName;
+    if (!providedTargetName) {
+        return { popup: spellNoticePopup(action.name, config.noTargetDescription) };
+    }
+    return { targetNames: [providedTargetName] };
+}
+
+// One target's cast-time WIS save: prompt, NPC auto-roll, outcome legs.
+// Returns 'saved' or 'charmed'.
+async function charmOneTarget({ campaignName, casterName, action, auto, config, cs, dc, targetName, charmAdvantages }) {
+    const targetCreature = cs.creatures.find(c => c.name === targetName);
+    const isTargetNpc = targetCreature && targetCreature.type !== 'player';
+    const targetAdvantage = charmAdvantages[targetName] || auto.advantage || false;
+
+    const { promptId, promise } = createSaveListener(campaignName, {
+        targetName,
+        attackerName: casterName,
+        saveType: 'WIS',
+        saveDc: dc,
+        dcSuccess: 'none',
+        advantage: targetAdvantage,
+        disadvantage: !!action.metaCtx?.metamagicHeighten,
+        condition: 'charmed',
+        ...(config.saveConditions ? { saveConditions: config.saveConditions } : {}),
+    });
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: casterName,
+        abilityName: action.name,
+        description: `${casterName} casts ${action.name} on ${targetName}! ${targetName} must make a WIS save (DC ${dc})${targetAdvantage ? ' with Advantage' : ''} or become Charmed.`,
+        promptId,
+    }).catch((e) => { console.error(config.logPrefix, e); });
+
+    if (isTargetNpc) {
+        dispatchSaveResult(campaignName, promptId, targetName, 'WIS', dc, rollNpcSave(targetCreature, dc, targetAdvantage));
+    }
+
+    const saveResult = await promise;
+
+    if (saveResult.success) {
+        await logSaveSuccess(campaignName, casterName, action, targetName, dc, saveResult, config.rollType, config.logPrefix);
+        return 'saved';
+    }
+    await applyCharmFailure({ campaignName, casterName, action, targetName, dc, saveResult, rollType: config.rollType, logPrefix: config.logPrefix });
+    return 'charmed';
+}
+
 export async function handleCharmSpell(action, playerStats, campaignName, config) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
 
     const cs = await getCombatContext(campaignName);
     if (!cs?.creatures || cs.creatures.length === 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `No creatures in combat. ${action.name} has no effect.`,
-            },
-        };
+        return spellNoticePopup(action.name, `No creatures in combat. ${action.name} has no effect.`);
     }
 
     const casterName = playerStats.name;
 
-    // Get target names from metaCtx (multi-target) or single targetName
-    const metaTargets = action.metaCtx?.[config.targetsKey];
-    let targetNames;
-    if (metaTargets && Array.isArray(metaTargets) && metaTargets.length > 0) {
-        targetNames = metaTargets;
-    } else {
-        const providedTargetName = auto.targetName || action.targetName;
-        if (!providedTargetName) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    description: config.noTargetDescription,
-                },
-            };
-        }
-        targetNames = [providedTargetName];
-    }
+    const targetResolution = resolveCharmTargetNames(action, auto, config);
+    if (targetResolution.popup) return targetResolution.popup;
+    const targetNames = targetResolution.targetNames;
 
     storeSpellLastAttack(campaignName, {
         casterName,
@@ -174,44 +207,13 @@ export async function handleCharmSpell(action, playerStats, campaignName, config
     const charmAdvantages = action.metaCtx?.[config.advantagesKey] || {};
 
     for (const targetName of targetNames) {
-        const targetCreature = cs.creatures.find(c => c.name === targetName);
-        const isTargetNpc = targetCreature && targetCreature.type !== 'player';
-        const targetAdvantage = charmAdvantages[targetName] || auto.advantage || false;
-
-        const { promptId, promise } = createSaveListener(campaignName, {
-            targetName,
-            attackerName: casterName,
-            saveType: 'WIS',
-            saveDc: dc,
-            dcSuccess: 'none',
-            advantage: targetAdvantage,
-            disadvantage: !!action.metaCtx?.metamagicHeighten,
-            condition: 'charmed',
-            ...(config.saveConditions ? { saveConditions: config.saveConditions } : {}),
-        });
-
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: casterName,
-            abilityName: action.name,
-            description: `${casterName} casts ${action.name} on ${targetName}! ${targetName} must make a WIS save (DC ${dc})${targetAdvantage ? ' with Advantage' : ''} or become Charmed.`,
-            promptId,
-        }).catch((e) => { console.error(config.logPrefix, e); });
-
-        if (isTargetNpc) {
-            dispatchSaveResult(campaignName, promptId, targetName, 'WIS', dc, rollNpcSave(targetCreature, dc, targetAdvantage));
-        }
-
-        const saveResult = await promise;
-
-        if (saveResult.success) {
-            savedCount++;
-            await logSaveSuccess(campaignName, casterName, action, targetName, dc, saveResult, config.rollType, config.logPrefix);
-            savedTargets.push(targetName);
-        } else {
+        const outcome = await charmOneTarget({ campaignName, casterName, action, auto, config, cs, dc, targetName, charmAdvantages });
+        if (outcome === 'charmed') {
             charmedCount++;
-            await applyCharmFailure({ campaignName, casterName, action, targetName, dc, saveResult, rollType: config.rollType, logPrefix: config.logPrefix });
             charmedTargets.push(targetName);
+        } else {
+            savedCount++;
+            savedTargets.push(targetName);
         }
     }
 
@@ -219,12 +221,5 @@ export async function handleCharmSpell(action, playerStats, campaignName, config
         ? `${charmedCount} creature(s) charmed: ${charmedTargets.join(', ')}. ${savedCount} creature(s) saved: ${savedTargets.join(', ')}.`
         : `No creatures charmed. ${savedCount} creature(s) saved: ${savedTargets.join(', ')}.`;
 
-    return {
-        type: 'popup',
-        payload: {
-            type: 'automation_info',
-            name: action.name,
-            description: summary,
-        },
-    };
+    return spellNoticePopup(action.name, summary);
 }

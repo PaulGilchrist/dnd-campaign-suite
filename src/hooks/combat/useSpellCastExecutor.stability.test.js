@@ -44,18 +44,7 @@ describe('useSpellCastExecutor', () => {
 
       const { result, rerender } = renderHook(
         ({ p, em, r }) =>
-          useSpellCastExecutor(
-            p.rollAttack,
-            p.rollDamage,
-            p.playerStats,
-            p.getTargetInfo,
-            p.campaignName,
-            p.mapName,
-            p.characters,
-            p.setPopupHtml,
-            em,
-            r,
-          ),
+          useSpellCastExecutor({ ...p, extraMeta: em, cachedPosRef: r }),
         { initialProps: { p: props, em: extraMeta, r: ref } },
       );
 
@@ -67,18 +56,7 @@ describe('useSpellCastExecutor', () => {
     it('returns a new castAction when rollAttack changes', () => {
       const { result, rerender } = renderHook(
         ({ p, em, r }) =>
-          useSpellCastExecutor(
-            p.rollAttack,
-            p.rollDamage,
-            p.playerStats,
-            p.getTargetInfo,
-            p.campaignName,
-            p.mapName,
-            p.characters,
-            p.setPopupHtml,
-            em,
-            r,
-          ),
+          useSpellCastExecutor({ ...p, extraMeta: em, cachedPosRef: r }),
         { initialProps: { p: makeProps(), em: {}, r: { current: null } } },
       );
 
@@ -94,18 +72,7 @@ describe('useSpellCastExecutor', () => {
     it('returns a new castAction when rollDamage changes', () => {
       const { result, rerender } = renderHook(
         ({ p, em, r }) =>
-          useSpellCastExecutor(
-            p.rollAttack,
-            p.rollDamage,
-            p.playerStats,
-            p.getTargetInfo,
-            p.campaignName,
-            p.mapName,
-            p.characters,
-            p.setPopupHtml,
-            em,
-            r,
-          ),
+          useSpellCastExecutor({ ...p, extraMeta: em, cachedPosRef: r }),
         { initialProps: { p: makeProps(), em: {}, r: { current: null } } },
       );
 
@@ -121,18 +88,7 @@ describe('useSpellCastExecutor', () => {
     it('returns a new castAction when playerStats changes', () => {
       const { result, rerender } = renderHook(
         ({ p, em, r }) =>
-          useSpellCastExecutor(
-            p.rollAttack,
-            p.rollDamage,
-            p.playerStats,
-            p.getTargetInfo,
-            p.campaignName,
-            p.mapName,
-            p.characters,
-            p.setPopupHtml,
-            em,
-            r,
-          ),
+          useSpellCastExecutor({ ...p, extraMeta: em, cachedPosRef: r }),
         { initialProps: { p: makeProps(), em: {}, r: { current: null } } },
       );
 
@@ -148,18 +104,7 @@ describe('useSpellCastExecutor', () => {
     it('returns a new castAction when campaignName changes', () => {
       const { result, rerender } = renderHook(
         ({ p, em, r }) =>
-          useSpellCastExecutor(
-            p.rollAttack,
-            p.rollDamage,
-            p.playerStats,
-            p.getTargetInfo,
-            p.campaignName,
-            p.mapName,
-            p.characters,
-            p.setPopupHtml,
-            em,
-            r,
-          ),
+          useSpellCastExecutor({ ...p, extraMeta: em, cachedPosRef: r }),
         { initialProps: { p: makeProps(), em: {}, r: { current: null } } },
       );
 
@@ -175,18 +120,7 @@ describe('useSpellCastExecutor', () => {
     it('returns a new castAction when mapName changes', () => {
       const { result, rerender } = renderHook(
         ({ p, em, r }) =>
-          useSpellCastExecutor(
-            p.rollAttack,
-            p.rollDamage,
-            p.playerStats,
-            p.getTargetInfo,
-            p.campaignName,
-            p.mapName,
-            p.characters,
-            p.setPopupHtml,
-            em,
-            r,
-          ),
+          useSpellCastExecutor({ ...p, extraMeta: em, cachedPosRef: r }),
         { initialProps: { p: makeProps(), em: {}, r: { current: null } } },
       );
 
@@ -202,18 +136,7 @@ describe('useSpellCastExecutor', () => {
     it('returns a new castAction when characters array changes', () => {
       const { result, rerender } = renderHook(
         ({ p, em, r }) =>
-          useSpellCastExecutor(
-            p.rollAttack,
-            p.rollDamage,
-            p.playerStats,
-            p.getTargetInfo,
-            p.campaignName,
-            p.mapName,
-            p.characters,
-            p.setPopupHtml,
-            em,
-            r,
-          ),
+          useSpellCastExecutor({ ...p, extraMeta: em, cachedPosRef: r }),
         { initialProps: { p: makeProps(), em: {}, r: { current: null } } },
       );
 
@@ -229,18 +152,7 @@ describe('useSpellCastExecutor', () => {
     it('returns a new castAction when setPopupHtml changes', () => {
       const { result, rerender } = renderHook(
         ({ p, em, r }) =>
-          useSpellCastExecutor(
-            p.rollAttack,
-            p.rollDamage,
-            p.playerStats,
-            p.getTargetInfo,
-            p.campaignName,
-            p.mapName,
-            p.characters,
-            p.setPopupHtml,
-            em,
-            r,
-          ),
+          useSpellCastExecutor({ ...p, extraMeta: em, cachedPosRef: r }),
         { initialProps: { p: makeProps(), em: {}, r: { current: null } } },
       );
 
@@ -256,18 +168,7 @@ describe('useSpellCastExecutor', () => {
     it('returns a new castAction when extraMeta object changes', () => {
       const { result, rerender } = renderHook(
         ({ p, em, r }) =>
-          useSpellCastExecutor(
-            p.rollAttack,
-            p.rollDamage,
-            p.playerStats,
-            p.getTargetInfo,
-            p.campaignName,
-            p.mapName,
-            p.characters,
-            p.setPopupHtml,
-            em,
-            r,
-          ),
+          useSpellCastExecutor({ ...p, extraMeta: em, cachedPosRef: r }),
         { initialProps: { p: makeProps(), em: {}, r: { current: null } } },
       );
 
@@ -283,18 +184,7 @@ describe('useSpellCastExecutor', () => {
     it('returns a new castAction when cachedPosRef changes', () => {
       const { result, rerender } = renderHook(
         ({ p, em, r }) =>
-          useSpellCastExecutor(
-            p.rollAttack,
-            p.rollDamage,
-            p.playerStats,
-            p.getTargetInfo,
-            p.campaignName,
-            p.mapName,
-            p.characters,
-            p.setPopupHtml,
-            em,
-            r,
-          ),
+          useSpellCastExecutor({ ...p, extraMeta: em, cachedPosRef: r }),
         { initialProps: { p: makeProps(), em: {}, r: { current: null } } },
       );
 
@@ -310,19 +200,7 @@ describe('useSpellCastExecutor', () => {
     it('returns a new castAction when setModalState changes', () => {
       const { result, rerender } = renderHook(
         ({ p, em, r, ms }) =>
-          useSpellCastExecutor(
-            p.rollAttack,
-            p.rollDamage,
-            p.playerStats,
-            p.getTargetInfo,
-            p.campaignName,
-            p.mapName,
-            p.characters,
-            p.setPopupHtml,
-            em,
-            r,
-            ms,
-          ),
+          useSpellCastExecutor({ ...p, extraMeta: em, cachedPosRef: r, setModalState: ms }),
         { initialProps: { p: makeProps(), em: {}, r: { current: null }, ms: vi.fn() } },
       );
 

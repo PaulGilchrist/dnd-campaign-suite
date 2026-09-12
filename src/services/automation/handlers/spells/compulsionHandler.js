@@ -34,6 +34,18 @@ function dispatchSaveResult(campaignName, promptId, targetName, saveType, saveDc
     }));
 }
 
+function rollNpcCompulsionSave(targetInfo, targetName, dc, saveAdvantage) {
+    const cs = targetInfo.cs;
+    const creature = cs?.creatures?.find(c => c.name === targetName);
+    if (creature) return rollSaveForCreature(creature, 'WIS', dc, false, saveAdvantage);
+    const r1 = rollD20();
+    const r2 = rollD20();
+    const roll = saveAdvantage ? Math.max(r1, r2) : r1;
+    const total = roll;
+    const success = total >= dc;
+    return { roll, total, bonus: 0, success, rawRolls: [r1, r2] };
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
@@ -83,19 +95,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }).catch((e) => { console.error("[compulsion] Error:", e); });
 
     if (targetInfo?.target?.type === 'npc') {
-        const cs = targetInfo.cs;
-        const creature = cs?.creatures?.find(c => c.name === targetName);
-        const saveResult = creature
-            ? rollSaveForCreature(creature, 'WIS', dc, false, saveAdvantage)
-            : (() => {
-                const r1 = rollD20();
-                const r2 = rollD20();
-                const roll = saveAdvantage ? Math.max(r1, r2) : r1;
-                const total = roll;
-                const success = total >= dc;
-                return { roll, total, bonus: 0, success, rawRolls: [r1, r2] };
-            })();
-
+        const saveResult = rollNpcCompulsionSave(targetInfo, targetName, dc, saveAdvantage);
         dispatchSaveResult(campaignName, promptId, targetName, 'WIS', dc, saveResult);
     }
 

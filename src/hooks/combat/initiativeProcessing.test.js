@@ -48,7 +48,7 @@ describe('processInitiativeRoll — CLA-372 once-per-Long-Rest latch', () => {
   it('does not clear uncannyMetabolismUsed on initiative roll', async () => {
     const setPopupHtml = vi.fn();
 
-    await processInitiativeRoll('Disciplined_Monk', campaignName, {}, 3, 12, 9, 3, setPopupHtml, [], 0, []);
+    await processInitiativeRoll({ characterName: 'Disciplined_Monk', campaignName: campaignName, context: {}, bonus: 3, effectiveD20Roll: 12, r1: 9, r2: 3, setPopupHtml: setPopupHtml, availableSuperiorityManeuvers: [], cosmicOmenAppliedBonus: 0, characters: [] });
 
     expect(setRuntimeValue).not.toHaveBeenCalledWith(
       'Disciplined_Monk',
@@ -66,7 +66,7 @@ describe('processInitiativeRoll — CLA-372 once-per-Long-Rest latch', () => {
     const dispatched = [];
     window.addEventListener('initiative-rolled', (e) => dispatched.push(e.detail));
 
-    await processInitiativeRoll('Disciplined_Monk', campaignName, {}, 3, 12, 9, 3, setPopupHtml, [], 0, []);
+    await processInitiativeRoll({ characterName: 'Disciplined_Monk', campaignName: campaignName, context: {}, bonus: 3, effectiveD20Roll: 12, r1: 9, r2: 3, setPopupHtml: setPopupHtml, availableSuperiorityManeuvers: [], cosmicOmenAppliedBonus: 0, characters: [] });
 
     expect(combatSummary.creatures[0].initiative).toBe('15');
     expect(dispatched).toEqual([{ characterName: 'Disciplined_Monk', roll: 15 }]);

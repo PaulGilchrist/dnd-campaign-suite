@@ -76,6 +76,25 @@ function buildGroupedChoices(choices) {
   return grouped;
 }
 
+function defaultSingleAbility(saved, group) {
+  return saved.assignments?.single || group?.options?.single?.abilityNames[0] || 'Strength';
+}
+
+function defaultDualAbilities(saved, group, mode) {
+  if (saved.assignments?.dual) return saved.assignments.dual;
+  if (mode !== 'single') {
+    return [group?.options?.dual?.abilityNames[0] || '', ''];
+  }
+  return ['', ''];
+}
+
+function buildModeAssignments(saved, group, mode) {
+  return {
+    single: defaultSingleAbility(saved, group),
+    dual: defaultDualAbilities(saved, group, mode),
+  };
+}
+
 function useWizardFeatAbilityChoices(formData, allFeats, setFormData) {
   const [featAbilityChoices, setFeatAbilityChoices] = useState([]);
   const allFeatsRef = useRef(allFeats);
@@ -252,18 +271,7 @@ function useWizardFeatAbilityChoices(formData, allFeats, setFormData) {
     const group = currentGrouped.find(g => g.id === id);
 
     saved.mode = mode;
-
-    if (mode === 'single') {
-      saved.assignments = {
-        single: saved.assignments?.single || group?.options?.single?.abilityNames[0] || 'Strength',
-        dual: saved.assignments?.dual || ['', ''],
-      };
-    } else {
-      saved.assignments = {
-        single: saved.assignments?.single || group?.options?.single?.abilityNames[0] || 'Strength',
-        dual: saved.assignments?.dual || [group?.options?.dual?.abilityNames[0] || '', ''],
-      };
-    }
+    saved.assignments = buildModeAssignments(saved, group, mode);
 
     savedChoices[id] = saved;
 

@@ -61,7 +61,7 @@ async function applyBrutalStrikeRider(maneuver, targetName, playerStats, campaig
     const cs = await getCombatContext(campaignName);
     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
     if (cs && targetName) {
-        const result = applyDamageToTarget(cs, targetName, dieValue, [maneuver.damageType || 'force'], campaignName, characters, false, playerStats.name);
+        const result = applyDamageToTarget(cs, targetName, dieValue, [maneuver.damageType || 'force'], campaignName, characters, { ignoreResistance: false, attackerName: playerStats.name });
         if (result.finalDamage > 0) {
             description += ` ${targetName} takes ${result.finalDamage} ${maneuver.damageType || 'force'} damage.`;
         }
@@ -89,13 +89,20 @@ async function applyBrutalStrikeRider(maneuver, targetName, playerStats, campaig
 // real chooser gated to creatures within 5 feet of the original target; carry
 // the REAL original damageType (was hardcoded 'slashing'); stash RAW combatants
 // into pendingSweepingAttack (CLA-326 shape) so the confirm applies real damage.
-async function resolveSweepingAttack(maneuver, auto, targetName, playerStats, campaignName, attackInfo, dieValue, dieDescription) {
-    const cs = await getCombatContext(campaignName);
-    const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
+// MN-018: carry the REAL original attack roll/damage onto the sweep —
+// prefer the live attackInfo, then the stashed lastAttack, then the maneuver.
+function resolveOriginalAttackRoll(attackInfo, lastAttack, maneuver) {
     const damageType = attackInfo?.damageType || lastAttack?.damageType || maneuver.damageType || (console.error('[MN-018] Sweeping Attack: no original attack damageType'), 'Slashing');
     const attackBonus = lastAttack?.bonus || 0;
     const originalTotal = lastAttack?.total ?? attackBonus;
     const originalD20Roll = lastAttack?.d20Roll ?? (originalTotal - attackBonus);
+    return { damageType, attackBonus, originalTotal, originalD20Roll };
+}
+
+async function resolveSweepingAttack(maneuver, auto, targetName, playerStats, campaignName, attackInfo, dieValue, dieDescription) {
+    const cs = await getCombatContext(campaignName);
+    const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
+    const { damageType, attackBonus, originalTotal, originalD20Roll } = resolveOriginalAttackRoll(attackInfo, lastAttack, maneuver);
 
     const candidates = (cs?.creatures || []).filter(c =>
         c.name !== targetName && c.name !== playerStats.name
@@ -151,6 +158,35 @@ async function resolveSweepingAttack(maneuver, auto, targetName, playerStats, ca
     };
 }
 
+// MN-015: size gate runs BEFORE the die roll so a refusal never expends a die
+// and never rides the maneuver die onto damage. Returns a refusal popup or null.
+async function checkManeuverSizeGate(maneuver, targetName, playerStats, campaignName) {
+    if (!targetName || !maneuver.sizeLimit) return null;
+    const sizeCheck = await validateSizeLimit(maneuver, targetName, campaignName, playerStats);
+    if (sizeCheck.valid) return null;
+    return {
+        type: 'popup',
+        refused: true,
+        payload: {
+            type: 'automation_info',
+            name: maneuver.name,
+            description: sizeCheck.description,
+        },
+        logEntries: [{
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: maneuver.name,
+            description: sizeCheck.description,
+        }],
+    };
+}
+
+// Handle attack_rider maneuvers with options (Brutal Strike)
+function isBrutalStrikeRider(maneuver) {
+    const riderOptions = maneuver.automation?.options || [];
+    return riderOptions.length > 0 && maneuver.automation?.type === 'attack_rider';
+}
+
 export async function executeAttackRiderManeuver(action, playerStats, campaignName, maneuverName, attackInfo) {
     const auto = action.automation || {};
     const allManeuvers = await getManeuversForRules(playerStats.rules);
@@ -171,26 +207,8 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
 
     // MN-015: size gate runs BEFORE the die roll so a refusal never expends a die
     // and never rides the maneuver die onto damage.
-    if (targetName && maneuver.sizeLimit) {
-        const sizeCheck = await validateSizeLimit(maneuver, targetName, campaignName, playerStats);
-        if (!sizeCheck.valid) {
-            return {
-                type: 'popup',
-                refused: true,
-                payload: {
-                    type: 'automation_info',
-                    name: maneuver.name,
-                    description: sizeCheck.description,
-                },
-                logEntries: [{
-                    type: 'ability_use',
-                    characterName: playerStats.name,
-                    abilityName: maneuver.name,
-                    description: sizeCheck.description,
-                }],
-            };
-        }
-    }
+    const sizeRefusal = await checkManeuverSizeGate(maneuver, targetName, playerStats, campaignName);
+    if (sizeRefusal) return sizeRefusal;
 
     const { dieValue, dieDescription, expendedDie } = rollManeuverDie(maneuver, playerStats, campaignName, auto.dieExpression);
     await expendSuperiorityDie(playerStats, campaignName, expendedDie, superiorityDice);
@@ -202,8 +220,7 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
     }
 
     // Handle attack_rider maneuvers with options (Brutal Strike)
-    const riderOptions = maneuver.automation?.options || [];
-    if (riderOptions.length > 0 && maneuver.automation?.type === 'attack_rider') {
+    if (isBrutalStrikeRider(maneuver)) {
         return applyBrutalStrikeRider(maneuver, targetName, playerStats, campaignName, dieValue, dieDescription, description);
     }
 

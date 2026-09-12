@@ -10,7 +10,7 @@ import { hasEmpoweredSpell } from '../../../services/rules/spells/empoweredSpell
 import { getChaModifier } from '../../../services/rules/spells/metamagicRules.js';
 import { sendSavePrompt } from '../../../services/combat/conditions/savePromptService.js';
 import { handleOverchannelSelfDamage } from './handleOverchannelSelfDamage.js';
-import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry, computeGwfAdjustedSecondaryTotal } from './damageHandlerUtils.js';
+import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry, computeGwfAdjustedSecondaryTotal, findTargetByContext, resolveTargetMaxHp, resolveAppliedDamage } from './damageHandlerUtils.js';
 
 const SECONDARY_LOG_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage'];
 const SECONDARY_POPUP_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage'];
@@ -67,7 +67,7 @@ function withRayReduction(applyResult, rayReduction) {
 
 async function rollAndApplySecondaryPlainDamage({ context, combatSummary, target, reducedTotal, damageType, ignoreResistance, rayReduction, characters, campaignName, characterName, name }) {
     if (!context?.autoDamageSecondaryFormula) {
-        const primaryApplyResult = await applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, characters, ignoreResistance, characterName, true);
+        const primaryApplyResult = await applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: characterName, suppressHpLog: true });
         return { applyResult: withRayReduction(primaryApplyResult, rayReduction), secondaryResult: null, secondaryFinalDamage: 0 };
     }
     const secondaryFormula = context.autoDamageSecondaryFormula;
@@ -81,7 +81,7 @@ async function rollAndApplySecondaryPlainDamage({ context, combatSummary, target
     const secondaryIgnoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, secondaryDamageType)) || false;
     const damageSequenceId = `seq_${Date.now()}_${Math.random()}`;
     const multiAttackOptions = { damageSequenceId };
-    const secondaryApplyResultData = await applyDamageToTarget(combatSummary, target.name, secondaryRawDamage, [secondaryDamageType], campaignName, characters, secondaryIgnoreResistance, characterName, true, { ...multiAttackOptions, skipConcentration: true });
+    const secondaryApplyResultData = await applyDamageToTarget(combatSummary, target.name, secondaryRawDamage, [secondaryDamageType], campaignName, characters, { ignoreResistance: secondaryIgnoreResistance, attackerName: characterName, suppressHpLog: true, ...{ ...multiAttackOptions, skipConcentration: true } });
     const secondaryFinalDamage = secondaryApplyResultData?.finalDamage ?? secondaryRawDamage;
     if (secondaryApplyResultData && secondaryApplyResultData.finalDamage > 0) {
         endInvisibilityOnHostileAction(characterName, campaignName);
@@ -98,7 +98,7 @@ async function rollAndApplySecondaryPlainDamage({ context, combatSummary, target
     };
 
     const totalConcentrationDamage = reducedTotal + secondaryRawDamage;
-    const primaryApplyResult = await applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, characters, ignoreResistance, characterName, true, { ...multiAttackOptions, concentrationTotalDamage: totalConcentrationDamage });
+    const primaryApplyResult = await applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: characterName, suppressHpLog: true, ...{ ...multiAttackOptions, concentrationTotalDamage: totalConcentrationDamage } });
     clearReTriggeredSequence(damageSequenceId);
     return { applyResult: withRayReduction(primaryApplyResult, rayReduction), secondaryResult, secondaryFinalDamage };
 }
@@ -159,7 +159,7 @@ async function resolveDeathStrike({ applyResult, context, combatSummary, target,
                 note: 'death_strike_damage_roll_before_apply',
             });
 
-            dsApplyResult = await applyDamageToTarget(combatSummary, target.name, doubledTotal, [damageType], campaignName, characters, ignoreResistance || false, characterName);
+            dsApplyResult = await applyDamageToTarget(combatSummary, target.name, doubledTotal, [damageType], campaignName, characters, { ignoreResistance: ignoreResistance || false, attackerName: characterName });
             if (!applyResult) {
                 applyResult = dsApplyResult;
             }
@@ -379,7 +379,7 @@ async function handleTwinPlainTarget({ combatSummary, context, target, campaignN
         gwfDisplayRolls: gwfDisplayRolls,
     });
 
-    const twinApplyResult = await applyDamageToTarget(combatSummary, twinTarget.name, adjustedTotal, [damageType], campaignName, characters, false, characterName);
+    const twinApplyResult = await applyDamageToTarget(combatSummary, twinTarget.name, adjustedTotal, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: characterName });
 
     if (twinApplyResult && twinApplyResult.finalDamage > 0) {
         endInvisibilityOnHostileAction(characterName, campaignName);
@@ -417,7 +417,7 @@ async function handleMultiPlainTarget({ combatSummary, context, target, campaign
         gwfDisplayRolls: gwfDisplayRolls,
     });
 
-    const multiApplyResult = await applyDamageToTarget(combatSummary, multiTarget.name, adjustedTotal, [damageType], campaignName, null, false, characterName);
+    const multiApplyResult = await applyDamageToTarget(combatSummary, multiTarget.name, adjustedTotal, [damageType], campaignName, null, { ignoreResistance: false, attackerName: characterName });
 
     setPopupHtml(prev => ({
         ...prev,
@@ -465,6 +465,14 @@ function writePlainHpResults({ campaignName, target, totalDamageDealt, hpAfterDa
     }
 }
 
+function buildDamageBreakdown(applyResult, secondaryResult, damageType, appliedDamage, reducedTotal) {
+    const damageBreakdown = [buildDamageBreakdownEntry(applyResult, damageType, appliedDamage || reducedTotal)];
+    if (secondaryResult) {
+        damageBreakdown.push(buildDamageBreakdownEntry(secondaryResult, secondaryResult.damageType, secondaryResult.finalDamage));
+    }
+    return damageBreakdown;
+}
+
 async function runFollowupTargets({ context, combatSummary, target, campaignName, characterName, characters, name, formula, modifier, damageType, adjustedTotal, displayRolls, gwfBaseRolls, gwfDisplayRolls, setPopupHtml, logEntry }) {
     if (!target) return;
     if (context?.metamagicTwinTarget) {
@@ -491,12 +499,10 @@ function computeDamageOutcome({ applyResult, isIntercepted, appliedDamage, secon
 export function createPlainDamageHandler(deps) {
     const { characterName, campaignName, characters, setPopupHtml, logEntry } = deps;
 
-    return async function handlePlainDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls, gwfBaseRolls, gwfDisplayRolls) {
+    return async function handlePlainDamage({ name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls, gwfBaseRolls, gwfDisplayRolls }) {
         const { damageType, attackerName } = context || {};
-        const target = combatSummary?.creatures?.find(c => c.name === context?.targetName) || null;
-        const targetMaxHp = target?.type === 'player'
-            ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
-            : target?.maxHp ?? 0;
+        const target = findTargetByContext(combatSummary, context);
+        const targetMaxHp = resolveTargetMaxHp(target);
 
         let applyResult = null;
         let secondaryResult = null;
@@ -514,7 +520,7 @@ export function createPlainDamageHandler(deps) {
         }
 
         const isIntercepted = applyResult?.intercepted;
-        const appliedDamage = isIntercepted ? (applyResult.damageDealt ?? 0) : (applyResult?.finalDamage ?? 0);
+        const appliedDamage = resolveAppliedDamage(applyResult, isIntercepted);
 
         if (appliedDamage > 0) {
             endInvisibilityOnHostileAction(characterName, campaignName);
@@ -528,10 +534,7 @@ export function createPlainDamageHandler(deps) {
         assignSecondaryFields(logEntryData, secondaryResult, SECONDARY_LOG_SUFFIXES);
         logEntry(logEntryData);
 
-        const damageBreakdown = [buildDamageBreakdownEntry(applyResult, damageType, appliedDamage || reducedTotal)];
-        if (secondaryResult) {
-            damageBreakdown.push(buildDamageBreakdownEntry(secondaryResult, secondaryResult.damageType, secondaryResult.finalDamage));
-        }
+        const damageBreakdown = buildDamageBreakdown(applyResult, secondaryResult, damageType, appliedDamage, reducedTotal);
 
         writePlainHpResults({ campaignName, target, totalDamageDealt, hpAfterDamage, maxHp, isUnconscious, threshold, damageBreakdown, newHp, oldHp });
 

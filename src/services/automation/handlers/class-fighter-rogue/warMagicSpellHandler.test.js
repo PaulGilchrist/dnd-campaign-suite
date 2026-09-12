@@ -362,8 +362,7 @@ describe('warMagicSpellHandler', () => {
             const result = await confirmWarMagicSpell(makeAction({ name: 'Improved War Magic' }), makePlayerStats(), mockCampaignName, 'Magic Missile')
 
             // 3 darts × (1d4+1 → 5) = 15 raw spell damage applied to the card target
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                combatSummary, 'Wight 1', 15, ['Force'], mockCampaignName, [], false, 'TestFighter')
+            expect(applyDamageToTarget).toHaveBeenCalledWith(combatSummary, 'Wight 1', 15, ['Force'], mockCampaignName, [], { ignoreResistance: false, attackerName: 'TestFighter' })
             expect(result.payload.description).toContain('15')
             expect(result.payload.description).toContain('Force')
         })
@@ -375,8 +374,7 @@ describe('warMagicSpellHandler', () => {
             const result = await confirmWarMagicSpell(makeAction({ name: 'Improved War Magic' }), stats, mockCampaignName, 'Magic Missile')
 
             // d20(15) + 5 = 20 vs AC 12 → hit, weapon damage 5 applied
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                combatSummary, 'Wight 1', 5, ['Piercing'], mockCampaignName, [], false, 'TestFighter')
+            expect(applyDamageToTarget).toHaveBeenCalledWith(combatSummary, 'Wight 1', 5, ['Piercing'], mockCampaignName, [], { ignoreResistance: false, attackerName: 'TestFighter' })
             expect(result.payload.description).toContain('Weapon attack: Hit')
             expect(result.payload.description).toContain('20 vs AC 12')
             const attackLog = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'roll' && e.rollType === 'attack')

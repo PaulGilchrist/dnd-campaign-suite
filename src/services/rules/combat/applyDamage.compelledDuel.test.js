@@ -116,7 +116,7 @@ describe('Compelled Duel — damage expiry in applyDamageToTarget', () => {
     const goblin = createNpcCreature('Goblin');
     const cs = makeCombatSummary([goblin]);
 
-    const result = await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [], false, 'Orc');
+    const result = await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [], { ignoreResistance: false, attackerName: 'Orc' });
 
     expect(result.finalDamage).toBe(10);
     expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -142,7 +142,7 @@ describe('Compelled Duel — damage expiry in applyDamageToTarget', () => {
     const goblin = createNpcCreature('Goblin');
     const cs = makeCombatSummary([goblin]);
 
-    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [], false, 'Paladin');
+    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [], { ignoreResistance: false, attackerName: 'Paladin' });
 
     expect(setRuntimeValue).not.toHaveBeenCalledWith(
       'campaign',
@@ -164,7 +164,7 @@ describe('Compelled Duel — damage expiry in applyDamageToTarget', () => {
     const goblin = createNpcCreature('Goblin');
     const cs = makeCombatSummary([goblin]);
 
-    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [], false, 'Orc');
+    await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [], { ignoreResistance: false, attackerName: 'Orc' });
 
     expect(setRuntimeValue).not.toHaveBeenCalledWith(
       'campaign',

@@ -1,5 +1,5 @@
 import express from 'express';
-import request from 'supertest';
+import { request } from '../test-utils/localhostSupertest.js';
 import { createJsonEntityRouter } from '../utils/jsonEntityCrud.js';
 
 // ---------------------------------------------------------------------------

@@ -69,6 +69,85 @@ function renderActionSpellHitCell({ autoHit, isSpellAtk, hasAttackType, cannotAc
     return <div className="save-dc-display">DC {saveDc + displaySaveDcBonus} {dcType}</div>;
 }
 
+function renderActionSpellTypeCell(spell, damageType) {
+    return <div className='left'>{damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility')}</div>;
+}
+
+function renderAutomationBadges(action, badgeSaveDc) {
+    if (!hasAutomation(action)) return null;
+    const auto = action.automation || {};
+    const badges = [];
+    if (auto.type === 'save_attack' && badgeSaveDc) badges.push(<span key="save-dc" className="automation-badge"> DC {badgeSaveDc} {auto.saveType}</span>);
+    if (auto.type === 'healing_pool') badges.push(<span key="pool" className="automation-badge"> Pool: {auto.pool} HP</span>);
+    if (auto.damage) badges.push(<span key="damage" className="automation-badge"> {auto.damage} {auto.damageType}</span>);
+    return badges;
+}
+
+function renderFeatureActionRow(action, playerStats, handleAutomationAction, setPopupHtml) {
+    const auto = action.automation;
+    const isMetamagic = action.name === 'Metamagic' && auto?.type === 'spell_modifier';
+    const isClickable = action.details || hasAutomation(action);
+    const handleClick = () => {
+        if (hasAutomation(action)) {
+            handleAutomationAction(action);
+        } else {
+            setPopupHtml(buildFeatureDetailHtml(action));
+        }
+    };
+    const displayName = isMetamagic ? 'Empowered Spell' : action.name;
+    const displayDesc = isMetamagic ? getEmpoweredSpellDescription(action) : action.description;
+    // Resolve 'ability' save DC placeholder to the caster's numeric spell save DC
+    const badgeSaveDc = auto?.saveDc === 'ability' ? playerStats.spellAbilities?.saveDc : auto?.saveDc;
+    return <div key={action.name}>
+        <b className={isClickable ? "clickable" : ""} onClick={handleClick}>{displayName}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayDesc) }}></span>
+        {renderAutomationBadges(action, badgeSaveDc)}
+    </div>;
+}
+
+function PendingActionModalsHost({
+    showCleaveTargetSelection, cleaveSecondTargets, handleCleaveAttack, setShowCleaveTargetSelection, setCleaveSecondTargets,
+    tacticalMasterModal, handleTacticalMasterConfirm, handleTacticalMasterDismiss, resumeAttackPipeline,
+    playerStats, campaignName, modalState,
+}) {
+    return (
+        <>
+            {showCleaveTargetSelection && (
+                <SecondaryTargetModal
+                    title="Cleave — Choose Second Target"
+                    targets={cleaveSecondTargets}
+                    onTargetSelected={handleCleaveAttack}
+                    onSkip={() => { setShowCleaveTargetSelection(false); setCleaveSecondTargets([]); }}
+                    featureDescription="On a hit, the second creature takes weapon damage (no ability modifier to damage unless negative). Once per turn."
+                />
+            )}
+            {tacticalMasterModal && (
+                <TacticalMasterModal
+                    attackName={tacticalMasterModal.attackName}
+                    baseMastery={tacticalMasterModal.baseMastery}
+                    replaceOptions={tacticalMasterModal.replaceOptions}
+                    targetName={tacticalMasterModal.targetName}
+                    isChoiceMode={tacticalMasterModal.isChoiceMode}
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    onConfirm={async (chosenMastery) => { await handleTacticalMasterConfirm(chosenMastery); await resumeAttackPipeline(); }}
+                    onClose={async () => { handleTacticalMasterDismiss(); await resumeAttackPipeline(); }}
+                />
+            )}
+            {modalState.secondaryTargetModal && (
+                <SecondaryTargetModal
+                    title={modalState.secondaryTargetModal.title}
+                    targets={modalState.secondaryTargetModal.targets}
+                    onTargetSelected={modalState.secondaryTargetModal.onTargetSelected}
+                    onSkip={modalState.secondaryTargetModal.onSkip}
+                    featureDescription={modalState.secondaryTargetModal.featureDescription}
+                    description={modalState.secondaryTargetModal.description}
+                    confirmLabel={modalState.secondaryTargetModal.confirmLabel}
+                />
+            )}
+        </>
+    );
+}
+
 function handleActionSpellDamageClick({ attackItem, spell, isSpellAtk, resolvedDamage, cannotAct, resolveSpellDamage, actionGateMetamagic }) {
     if (cannotAct) return;
     // SINGLE ENTRY POINT for action spell casting:
@@ -402,7 +481,7 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
 
     const { resolvePositions: resolveActionSpellPositions, cachedPosRef: cachedActionCastPosRef } = useSpellPositionResolver(campaignName, mapName, playerStats.name);
 
-    const { castAction: actionCastAction } = useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, { featEffects: featRangeEffects }, cachedActionCastPosRef, setModalState);
+    const { castAction: actionCastAction } = useSpellCastExecutor({ rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, extraMeta: { featEffects: featRangeEffects }, cachedPosRef: cachedActionCastPosRef, setModalState });
 
     const { pendingMetamagic: actionPendingMetamagic, gateMetamagic: actionGateMetamagic, handleConfirm: actionHandleConfirm, handleSkip: actionHandleSkip, pendingAid: actionPendingAid, handleAidConfirm: actionHandleAidConfirm, handleAidSkip: actionHandleAidSkip, pendingBane: actionPendingBane, handleBaneConfirm: actionHandleBaneConfirm, handleBaneSkip: actionHandleBaneSkip, pendingBless: actionPendingBless, handleBlessConfirm: actionHandleBlessConfirm, handleBlessSkip: actionHandleBlessSkip, pendingFaerieFire: actionPendingFaerieFire, handleFaerieFireConfirm: actionHandleFaerieFireConfirm, handleFaerieFireSkip: actionHandleFaerieFireSkip, pendingBeaconOfHope: actionPendingBeaconOfHope, handleBeaconOfHopeConfirm: actionHandleBeaconOfHopeConfirm, handleBeaconOfHopeSkip: actionHandleBeaconOfHopeSkip, pendingPassWithoutTrace: actionPendingPassWithoutTrace, handlePassWithoutTraceConfirm: actionHandlePassWithoutTraceConfirm, handlePassWithoutTraceSkip: actionHandlePassWithoutTraceSkip, pendingHaste: actionPendingHaste, handleHasteConfirm: actionHandleHasteConfirm, handleHasteSkip: actionHandleHasteSkip, pendingBarkskin: actionPendingBarkskin, handleBarkskinConfirm: actionHandleBarkskinConfirm, handleBarkskinSkip: actionHandleBarkskinSkip, pendingHeal: actionPendingHeal, handleHealConfirm: actionHandleHealConfirm, handleHealSkip: actionHandleHealSkip, pendingGreaterRestoration: actionPendingGreaterRestoration, handleGreaterRestorationConfirm: actionHandleGreaterRestorationConfirm, handleGreaterRestorationSkip: actionHandleGreaterRestorationSkip, handleGreaterRestorationNoEffects: actionHandleGreaterRestorationNoEffects, pendingRemoveCurse: actionPendingRemoveCurse, handleRemoveCurseConfirm: actionHandleRemoveCurseConfirm, handleRemoveCurseSkip: actionHandleRemoveCurseSkip, pendingMagicMissile: actionPendingMagicMissile, handleMagicMissileConfirm: actionHandleMagicMissileConfirm, handleMagicMissileSkip: actionHandleMagicMissileSkip, pendingMageArmor: actionPendingMageArmor, handleMageArmorConfirm: actionHandleMageArmorConfirm, handleMageArmorSkip: actionHandleMageArmorSkip, pendingCureWounds: actionPendingCureWounds, handleCureWoundsConfirm: actionHandleCureWoundsConfirm, handleCureWoundsSkip: actionHandleCureWoundsSkip, pendingRevivify: actionPendingRevivify, handleRevivifyConfirm: actionHandleRevivifyConfirm, handleRevivifySkip: actionHandleRevivifySkip } = useSpellMetamagicFlow(playerStats, campaignName, actionCastAction, setModalState, characters, setPopupHtml);
 
@@ -480,7 +559,7 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
                             <div>{formatRange(spell.range)}</div>
                             {renderActionSpellHitCell({ autoHit, isSpellAtk, hasAttackType, cannotAct, conditionAttackMode, toHit: playerStats.spellAbilities?.toHit, exhaustionPenalty, saveDc: playerStats.spellAbilities?.saveDc, displaySaveDcBonus, dcType: spell.dc?.dc_type, attackItem, handleSpellAttackClick })}
                             <div className={resolvedDamage ? "clickable" : ""} onClick={() => handleActionSpellDamageClick({ attackItem, spell, isSpellAtk, resolvedDamage, cannotAct, resolveSpellDamage, actionGateMetamagic })}>{getSpellDamageDisplay(spell)}</div>
-                            <div className='left'>{damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility')}</div>
+                            {renderActionSpellTypeCell(spell, damageType)}
                             {is2024Rules && hasWeaponMastery && <div></div>}
                         </React.Fragment>;
                     })}
@@ -618,28 +697,7 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
                     handleActionMetamagicConfirm={handleActionMetamagicConfirm}
                     handleActionMetamagicSkip={handleActionMetamagicSkip}
                 />
-                {(playerStats.actions || []).filter(a => !categories.featuresToIgnore.includes(a.name)).map((action) => {
-                    const auto = action.automation;
-                    const isMetamagic = action.name === 'Metamagic' && auto?.type === 'spell_modifier';
-                    const isClickable = action.details || hasAutomation(action);
-                    const handleClick = () => {
-                        if (hasAutomation(action)) {
-                            handleAutomationAction(action);
-                        } else {
-                            setPopupHtml(buildFeatureDetailHtml(action));
-                        }
-                    };
-                    const displayName = isMetamagic ? 'Empowered Spell' : action.name;
-                    const displayDesc = isMetamagic ? getEmpoweredSpellDescription(action) : action.description;
-                    // Resolve 'ability' save DC placeholder to the caster's numeric spell save DC
-                    const badgeSaveDc = auto?.saveDc === 'ability' ? playerStats.spellAbilities?.saveDc : auto?.saveDc;
-                    return <div key={action.name}>
-                        <b className={isClickable ? "clickable" : ""} onClick={handleClick}>{displayName}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayDesc) }}></span>
-                        {hasAutomation(action) && auto?.type === 'save_attack' && badgeSaveDc && <span className="automation-badge"> DC {badgeSaveDc} {auto.saveType}</span>}
-                        {hasAutomation(action) && auto?.type === 'healing_pool' && <span className="automation-badge"> Pool: {auto.pool} HP</span>}
-                        {hasAutomation(action) && auto?.damage && <span className="automation-badge"> {auto.damage} {auto.damageType}</span>}
-                    </div>
-                })}
+                {(playerStats.actions || []).filter(a => !categories.featuresToIgnore.includes(a.name)).map((action) => renderFeatureActionRow(action, playerStats, handleAutomationAction, setPopupHtml))}
                 <div><b>Base Actions:</b> {actions.map((actionName, idx) => {
                     if (actionName === 'Hide') {
                         return <React.Fragment key={idx}>{idx > 0 && ', '}<span className="base-action-clickable" onClick={handleHideAction}>{actionName}</span></React.Fragment>;
@@ -672,39 +730,20 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
                 modalState={modalState}
                 setModalState={setModalState}
             />
-            {showCleaveTargetSelection && (
-                <SecondaryTargetModal
-                    title="Cleave — Choose Second Target"
-                    targets={cleaveSecondTargets}
-                    onTargetSelected={handleCleaveAttack}
-                    onSkip={() => { setShowCleaveTargetSelection(false); setCleaveSecondTargets([]); }}
-                    featureDescription="On a hit, the second creature takes weapon damage (no ability modifier to damage unless negative). Once per turn."
-                />
-            )}
-            {tacticalMasterModal && (
-                <TacticalMasterModal
-                    attackName={tacticalMasterModal.attackName}
-                    baseMastery={tacticalMasterModal.baseMastery}
-                    replaceOptions={tacticalMasterModal.replaceOptions}
-                    targetName={tacticalMasterModal.targetName}
-                    isChoiceMode={tacticalMasterModal.isChoiceMode}
-                    playerStats={playerStats}
-                    campaignName={campaignName}
-                    onConfirm={async (chosenMastery) => { await handleTacticalMasterConfirm(chosenMastery); await resumeAttackPipeline(); }}
-                    onClose={async () => { handleTacticalMasterDismiss(); await resumeAttackPipeline(); }}
-                />
-            )}
-            {modalState.secondaryTargetModal && (
-                <SecondaryTargetModal
-                    title={modalState.secondaryTargetModal.title}
-                    targets={modalState.secondaryTargetModal.targets}
-                    onTargetSelected={modalState.secondaryTargetModal.onTargetSelected}
-                    onSkip={modalState.secondaryTargetModal.onSkip}
-                    featureDescription={modalState.secondaryTargetModal.featureDescription}
-                    description={modalState.secondaryTargetModal.description}
-                    confirmLabel={modalState.secondaryTargetModal.confirmLabel}
-                />
-            )}
+            <PendingActionModalsHost
+                showCleaveTargetSelection={showCleaveTargetSelection}
+                cleaveSecondTargets={cleaveSecondTargets}
+                handleCleaveAttack={handleCleaveAttack}
+                setShowCleaveTargetSelection={setShowCleaveTargetSelection}
+                setCleaveSecondTargets={setCleaveSecondTargets}
+                tacticalMasterModal={tacticalMasterModal}
+                handleTacticalMasterConfirm={handleTacticalMasterConfirm}
+                handleTacticalMasterDismiss={handleTacticalMasterDismiss}
+                resumeAttackPipeline={resumeAttackPipeline}
+                playerStats={playerStats}
+                campaignName={campaignName}
+                modalState={modalState}
+            />
         </div>
     )
 }

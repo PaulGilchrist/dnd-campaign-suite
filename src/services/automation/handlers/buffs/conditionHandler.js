@@ -7,9 +7,7 @@ import { buildSaveDc } from '../../../automation/common/savePrompt.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 import { loadMonsters } from '../../../ui/dataLoader.js';
 
-export async function handle(action, playerStats, campaignName, _mapName) {
-    const auto = action.automation;
-
+function buildConditionAutoDefaults(auto) {
     const isChannelDivinity = auto.resourceCost === 'channel_divinity' || /channel divinity/i.test(String(auto.cost || ''));
     const gatedByChannelDivinityCharges = isChannelDivinity || auto.type === 'channel_divinity';
     const autoWithDefaults = {
@@ -17,6 +15,28 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         saveDc: auto.saveDc || 'ability',
         saveAbility: auto.saveAbility || (isChannelDivinity ? 'CHA' : 'WIS'),
     };
+    return { gatedByChannelDivinityCharges, autoWithDefaults };
+}
+
+async function resolveAttackerMapPosition(campaignName, _mapName, playerName) {
+    if (!_mapName) return { mapData: null, attackerPos: null };
+    try {
+        const mapData = await mapsService.loadMapData(campaignName, _mapName);
+        const attackerPlayer = mapData?.players?.find(p => p.name === playerName);
+        return {
+            mapData,
+            attackerPos: attackerPlayer ? { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY } : null,
+        };
+    } catch (error) {
+        console.warn('[conditionHandler] Attacker position unavailable:', error);
+        return { mapData: null, attackerPos: null };
+    }
+}
+
+export async function handle(action, playerStats, campaignName, _mapName) {
+    const auto = action.automation;
+
+    const { gatedByChannelDivinityCharges, autoWithDefaults } = buildConditionAutoDefaults(auto);
     const saveDc = buildSaveDc(autoWithDefaults, playerStats);
     const conditionName = auto.condition || 'frightened';
     const additionalCondition = auto.additionalCondition || null;
@@ -46,17 +66,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const cs = await getCombatContext(campaignName);
 
-    let attackerPos = null;
-    let mapData = null;
-    if (_mapName) {
-        try {
-            mapData = await mapsService.loadMapData(campaignName, _mapName);
-            const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
-            if (attackerPlayer) {
-                attackerPos = { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY };
-             }
-           } catch (error) { console.warn('[conditionHandler] Attacker position unavailable:', error); }
-     }
+    const { mapData, attackerPos } = await resolveAttackerMapPosition(campaignName, _mapName, playerStats.name);
 
     let monsters = [];
     try {

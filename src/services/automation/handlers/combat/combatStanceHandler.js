@@ -116,6 +116,37 @@ export async function applyStanceOption(action, playerStats, campaignName, optio
     return activateStance(action, playerStats, campaignName, chosenOption);
 }
 
+function hasEnhancedDistraction(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    return passives.some(p => p.effect === 'enhanced_distraction_and_healing');
+}
+
+function logWildHeartFormChoice(isWildHeart, chosenOption, playerName, campaignName) {
+    if (!isWildHeart || !chosenOption) return;
+    addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'Rage of the Wilds',
+        creatureName: playerName,
+        description: `Selected ${chosenOption.name} wild form`,
+    }).catch((e) => { console.error("[combatStanceHandler:log-error]", e); });
+}
+
+function buildStanceDescription(action, auto, maxUses, currentUses, chosenOption, playerStats, playerName, campaignName) {
+    if (chosenOption) {
+        return describeChosenOption(chosenOption, playerStats, playerName, campaignName);
+    }
+    let description = maxUses > 0
+        ? `${action.name} activated (${currentUses - 1}/${maxUses} uses remaining)`
+        : `${action.name} activated`;
+    if (auto._instinctivePounce) {
+        description += `\n\n${auto._instinctivePounce}`;
+    }
+    if (auto.effect === 'create_illusion') {
+        description += ' While active, you can cast spells as though you were in the illusion\'s space.';
+    }
+    return description;
+}
+
 async function activateStance(action, playerStats, campaignName, chosenOption) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -131,7 +162,7 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
         ? resolveResistanceTypes(getOptionProperty(chosenOption, 'resistanceTypes', []))
         : (auto.resistanceTypes || []);
 
-    const isImprovedDuplicity = auto.effect === 'create_illusion' && playerStats.automation?.passives?.some(p => p.effect === 'enhanced_distraction_and_healing');
+    const isImprovedDuplicity = auto.effect === 'create_illusion' && hasEnhancedDistraction(playerStats);
 
     const buff = buildStanceBuff(action, auto, chosenOption, playerStats, resistanceTypes, isImprovedDuplicity);
 
@@ -144,14 +175,7 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
         await setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
     }
 
-    if (isWildHeart && chosenOption) {
-        addEntry(campaignName, {
-            type: 'automation',
-            automationType: 'Rage of the Wilds',
-            creatureName: playerName,
-            description: `Selected ${chosenOption.name} wild form`,
-        }).catch((e) => { console.error("[combatStanceHandler:log-error]", e); });
-    }
+    logWildHeartFormChoice(isWildHeart, chosenOption, playerName, campaignName);
 
     const specialActions = playerStats.automation?.specialActions || [];
 
@@ -171,18 +195,7 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
         };
     }
 
-    let description = maxUses > 0
-        ? `${action.name} activated (${currentUses - 1}/${maxUses} uses remaining)`
-        : `${action.name} activated`;
-    if (auto._instinctivePounce) {
-        description += `\n\n${auto._instinctivePounce}`;
-    }
-    if (auto.effect === 'create_illusion') {
-        description += ' While active, you can cast spells as though you were in the illusion\'s space.';
-    }
-    if (chosenOption) {
-        description = describeChosenOption(chosenOption, playerStats, playerName, campaignName);
-    }
+    const description = buildStanceDescription(action, auto, maxUses, currentUses, chosenOption, playerStats, playerName, campaignName);
 
     return {
         type: 'popup',

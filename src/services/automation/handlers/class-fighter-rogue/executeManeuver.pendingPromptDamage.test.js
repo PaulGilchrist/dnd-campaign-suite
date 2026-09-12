@@ -98,7 +98,7 @@ describe('executeManeuver — MN-012 pending-prompt rider die lands in damage', 
         expect(call[2]).toBe(4);
         expect(call[3]).toEqual(['slashing']);
         expect(call[4]).toBe('test-campaign');
-        expect(call[7]).toBe('TestFighter');
+        expect(call[6].attackerName).toBe('TestFighter');
         expect(result.payload.description).toContain('Added 4 to the damage roll');
         expect(result.payload.description).toContain('Goblin takes 4 slashing damage');
         expect(result.logEntries[0].description).toContain('Added 4 to the damage roll');

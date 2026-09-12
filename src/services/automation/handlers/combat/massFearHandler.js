@@ -13,6 +13,18 @@ export async function handle(action, playerStats, campaignName, _mapName, _chara
     return resolveMassFear(campaignName, playerStats.name, targetName, auto, playerStats, _mapName);
 }
 
+async function collectFearTargets(cs, casterName, primaryTargetName, primaryTarget, range) {
+    const targets = [];
+    for (const c of cs.creatures) {
+        if (c.name === casterName) continue;
+        if (c.name === primaryTargetName) { targets.push(c); continue; }
+        if (!primaryTarget) { targets.push(c); continue; }
+        const inRange = await isWithinRange(primaryTargetName, c.name, range);
+        if (inRange) targets.push(c);
+    }
+    return targets;
+}
+
 export async function resolveMassFear(campaignName, casterName, primaryTargetName, option, playerStats, _mapName) {
     const auto = { ...option, saveDc: option.saveDc || 'ability', saveAbility: option.saveAbility || 'WIS' };
     const saveType = option.saveType || 'WIS';
@@ -36,14 +48,7 @@ export async function resolveMassFear(campaignName, casterName, primaryTargetNam
 
     const primaryTarget = cs.creatures.find(c => c.name === primaryTargetName);
 
-    const targets = [];
-    for (const c of cs.creatures) {
-        if (c.name === casterName) continue;
-        if (c.name === primaryTargetName) { targets.push(c); continue; }
-        if (!primaryTarget) { targets.push(c); continue; }
-        const inRange = await isWithinRange(primaryTargetName, c.name, range);
-        if (inRange) targets.push(c);
-    }
+    const targets = await collectFearTargets(cs, casterName, primaryTargetName, primaryTarget, range);
 
     if (targets.length === 0) {
         return {

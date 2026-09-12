@@ -9,16 +9,17 @@ function getRuntimeUsesKey(featureName) {
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
 }
 
+function barbarianLevelOf(playerStats) {
+    return playerStats.class?.class_levels?.find(cl => cl.name === 'Barbarian')?.level || playerStats.level || 1;
+}
+
 function evaluateHealExpression(expression, playerStats) {
     if (typeof expression === 'number') return expression;
     if (!expression) return playerStats.barbarianLevel || playerStats.level || 1;
 
     const match = String(expression).match(/2\s*\*\s*barbarian_level/i);
     if (match) {
-        const barbarianLevel = playerStats.class?.class_levels?.find(
-            cl => cl.name === 'Barbarian'
-        )?.level || playerStats.level || 1;
-        return 2 * barbarianLevel;
+        return 2 * barbarianLevelOf(playerStats);
     }
 
     const numericMatch = String(expression).match(/^(\d+)\s*\*\s*(\w+)$/);
@@ -27,9 +28,7 @@ function evaluateHealExpression(expression, playerStats) {
         const field = numericMatch[2].toLowerCase();
         let value = 0;
         if (field === 'barbarian_level') {
-            value = playerStats.class?.class_levels?.find(
-                cl => cl.name === 'Barbarian'
-            )?.level || playerStats.level || 1;
+            value = barbarianLevelOf(playerStats);
         } else if (field === 'level') {
             value = playerStats.level || 1;
         }
@@ -43,6 +42,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
     const featureName = action.name || 'Relentless Rage';
+    const saveType = auto.saveType || 'CON';
 
     const rawBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName);
     const activeBuffs = Array.isArray(rawBuffs) ? rawBuffs : [];
@@ -113,7 +113,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const { promptId } = createSaveListener(campaignName, {
         targetName: playerName,
-        saveType: auto.saveType || 'CON',
+        saveType: saveType,
         saveDc,
     });
 
@@ -121,7 +121,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         type: 'ability_use',
         characterName: playerName,
         abilityName: featureName,
-        description: `${featureName} triggered — ${playerName} must make ${auto.saveType || 'CON'} save (DC ${saveDc})`,
+        description: `${featureName} triggered — ${playerName} must make ${saveType} save (DC ${saveDc})`,
         source: featureName,
         promptId,
     }).catch((e) => { console.error("[reactionSaveHeal] Error:", e); });
@@ -141,7 +141,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 type: 'ability_use',
                 characterName: playerName,
                 abilityName: featureName,
-                description: `${playerName} succeeded on ${auto.saveType || 'CON'} save. ${featureName} sets Hit Points to ${healAmount}.`,
+                description: `${playerName} succeeded on ${saveType} save. ${featureName} sets Hit Points to ${healAmount}.`,
                 saveRoll,
                 saveBonus,
                 saveTotal,
@@ -157,7 +157,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 type: 'ability_use',
                 characterName: playerName,
                 abilityName: featureName,
-                description: `${playerName} failed ${auto.saveType || 'CON'} save. ${featureName} did not activate.`,
+                description: `${playerName} failed ${saveType} save. ${featureName} did not activate.`,
                 saveRoll,
                 saveBonus,
                 saveTotal,
@@ -230,7 +230,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             type: 'automation_info',
             name: featureName,
             targetName: playerName,
-            description: `${playerName} must make a ${auto.saveType || 'CON'} saving throw (DC ${saveDc}).`,
+            description: `${playerName} must make a ${saveType} saving throw (DC ${saveDc}).`,
             automation: auto,
         },
     };

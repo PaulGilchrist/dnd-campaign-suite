@@ -64,7 +64,7 @@ export function resolveAncestryUses(playerStats, optName, campaignName) {
 
 export function applyAncestryDamage(cs, targetName, damageResult, damageType, campaignName, playerStats) {
     const characters = cs?.creatures?.filter(c => c.type === 'player') || [];
-    const applyResult = applyDamageToTarget(cs, targetName, damageResult?.total ?? 0, [damageType], campaignName, characters, false, playerStats.name);
+    const applyResult = applyDamageToTarget(cs, targetName, damageResult?.total ?? 0, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerStats.name });
     return { actualDamage: applyResult?.finalDamage ?? damageResult?.total ?? 0, newHp: applyResult?.newHp };
 }
 

@@ -201,18 +201,18 @@ describe('prayerOfHealingHandler', () => {
 
     describe('confirmPrayerOfHealing', () => {
         it('applies healing to each selected target', async () => {
-            const result = await confirmPrayerOfHealing(
-                baseAction,
-                casterStats,
+            const result = await confirmPrayerOfHealing({
+                action: baseAction,
+                playerStats: casterStats,
                 campaignName,
-                ['Fighter', 'Rogue'],
-                '2d8 + 3',
-                false,
-                0,
-                [],
-                2,
-                1,
-            );
+                selectedTargetNames: ['Fighter', 'Rogue'],
+                healExpression: '2d8 + 3',
+                maximize: false,
+                bonusHeal: 0,
+                bonusDetails: [],
+                slotLevel: 2,
+                currentRound: 1,
+            });
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('heal_multi');
@@ -220,18 +220,18 @@ describe('prayerOfHealingHandler', () => {
         });
 
         it('returns heal_multi popup with per-target results', async () => {
-            const result = await confirmPrayerOfHealing(
-                baseAction,
-                casterStats,
+            const result = await confirmPrayerOfHealing({
+                action: baseAction,
+                playerStats: casterStats,
                 campaignName,
-                ['Fighter', 'Rogue'],
-                '2d8 + 3',
-                false,
-                0,
-                [],
-                2,
-                1,
-            );
+                selectedTargetNames: ['Fighter', 'Rogue'],
+                healExpression: '2d8 + 3',
+                maximize: false,
+                bonusHeal: 0,
+                bonusDetails: [],
+                slotLevel: 2,
+                currentRound: 1,
+            });
 
             expect(result.payload).toEqual(expect.objectContaining({
                 type: 'heal_multi',
@@ -247,35 +247,35 @@ describe('prayerOfHealingHandler', () => {
         it('rolls separately for each target', async () => {
             rollExpression.mockReturnValue({ total: 8, rolls: [5, 3], modifier: 3 });
 
-            await confirmPrayerOfHealing(
-                baseAction,
-                casterStats,
+            await confirmPrayerOfHealing({
+                action: baseAction,
+                playerStats: casterStats,
                 campaignName,
-                ['Fighter', 'Rogue', 'Barbarian'],
-                '2d8 + 3',
-                false,
-                0,
-                [],
-                2,
-                1,
-            );
+                selectedTargetNames: ['Fighter', 'Rogue', 'Barbarian'],
+                healExpression: '2d8 + 3',
+                maximize: false,
+                bonusHeal: 0,
+                bonusDetails: [],
+                slotLevel: 2,
+                currentRound: 1,
+            });
 
             expect(rollExpression).toHaveBeenCalledTimes(3);
         });
 
         it('respects maxTargets limit', async () => {
-            const result = await confirmPrayerOfHealing(
-                baseAction,
-                casterStats,
+            const result = await confirmPrayerOfHealing({
+                action: baseAction,
+                playerStats: casterStats,
                 campaignName,
-                ['Fighter', 'Rogue', 'Barbarian', 'Extra1', 'Extra2', 'Extra3'],
-                '2d8 + 3',
-                false,
-                0,
-                [],
-                2,
-                1,
-            );
+                selectedTargetNames: ['Fighter', 'Rogue', 'Barbarian', 'Extra1', 'Extra2', 'Extra3'],
+                healExpression: '2d8 + 3',
+                maximize: false,
+                bonusHeal: 0,
+                bonusDetails: [],
+                slotLevel: 2,
+                currentRound: 1,
+            });
 
             // Only 5 targets max, even though 6 were passed
             expect(result.payload.results.length).toBe(5);
@@ -291,18 +291,18 @@ describe('prayerOfHealingHandler', () => {
                 return null;
             });
 
-            const result = await confirmPrayerOfHealing(
-                baseAction,
-                casterStats,
+            const result = await confirmPrayerOfHealing({
+                action: baseAction,
+                playerStats: casterStats,
                 campaignName,
-                ['Fighter', 'Rogue'],
-                '2d8 + 3',
-                false,
-                0,
-                [],
-                2,
-                1,
-            );
+                selectedTargetNames: ['Fighter', 'Rogue'],
+                healExpression: '2d8 + 3',
+                maximize: false,
+                bonusHeal: 0,
+                bonusDetails: [],
+                slotLevel: 2,
+                currentRound: 1,
+            });
 
             // Only Rogue should be healed, not Fighter
             expect(result.payload.results.length).toBe(1);
@@ -310,36 +310,36 @@ describe('prayerOfHealingHandler', () => {
         });
 
         it('uses maximized rolls when hasHealingMaximization', async () => {
-            await confirmPrayerOfHealing(
-                baseAction,
-                casterStats,
+            await confirmPrayerOfHealing({
+                action: baseAction,
+                playerStats: casterStats,
                 campaignName,
-                ['Fighter'],
-                '2d8 + 3',
-                true,
-                0,
-                [],
-                2,
-                1,
-            );
+                selectedTargetNames: ['Fighter'],
+                healExpression: '2d8 + 3',
+                maximize: true,
+                bonusHeal: 0,
+                bonusDetails: [],
+                slotLevel: 2,
+                currentRound: 1,
+            });
 
             expect(rollExpressionMaximized).toHaveBeenCalledWith('2d8 + 3');
             expect(rollExpression).not.toHaveBeenCalled();
         });
 
         it('posts hp_change log entry for each target', async () => {
-            await confirmPrayerOfHealing(
-                baseAction,
-                casterStats,
+            await confirmPrayerOfHealing({
+                action: baseAction,
+                playerStats: casterStats,
                 campaignName,
-                ['Fighter'],
-                '2d8 + 3',
-                false,
-                0,
-                [],
-                2,
-                1,
-            );
+                selectedTargetNames: ['Fighter'],
+                healExpression: '2d8 + 3',
+                maximize: false,
+                bonusHeal: 0,
+                bonusDetails: [],
+                slotLevel: 2,
+                currentRound: 1,
+            });
 
             expect(addEntry).toHaveBeenCalledWith(
                 campaignName,
@@ -355,18 +355,18 @@ describe('prayerOfHealingHandler', () => {
         it('dispatches combat-summary-updated event', async () => {
             const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
 
-            await confirmPrayerOfHealing(
-                baseAction,
-                casterStats,
+            await confirmPrayerOfHealing({
+                action: baseAction,
+                playerStats: casterStats,
                 campaignName,
-                ['Fighter'],
-                '2d8 + 3',
-                false,
-                0,
-                [],
-                2,
-                1,
-            );
+                selectedTargetNames: ['Fighter'],
+                healExpression: '2d8 + 3',
+                maximize: false,
+                bonusHeal: 0,
+                bonusDetails: [],
+                slotLevel: 2,
+                currentRound: 1,
+            });
 
             expect(dispatchEventSpy).toHaveBeenCalledWith(expect.objectContaining({
                 type: 'combat-summary-updated',
@@ -375,18 +375,18 @@ describe('prayerOfHealingHandler', () => {
         });
 
         it('marks target as affected after healing', async () => {
-            await confirmPrayerOfHealing(
-                baseAction,
-                casterStats,
+            await confirmPrayerOfHealing({
+                action: baseAction,
+                playerStats: casterStats,
                 campaignName,
-                ['Fighter'],
-                '2d8 + 3',
-                false,
-                0,
-                [],
-                2,
-                1,
-            );
+                selectedTargetNames: ['Fighter'],
+                healExpression: '2d8 + 3',
+                maximize: false,
+                bonusHeal: 0,
+                bonusDetails: [],
+                slotLevel: 2,
+                currentRound: 1,
+            });
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'Fighter',
@@ -410,18 +410,18 @@ describe('prayerOfHealingHandler', () => {
                 return null;
             });
 
-            const result = await confirmPrayerOfHealing(
-                baseAction,
-                casterStats,
+            const result = await confirmPrayerOfHealing({
+                action: baseAction,
+                playerStats: casterStats,
                 campaignName,
-                ['Fighter'],
-                '2d8 + 3',
-                false,
-                0,
-                [],
-                2,
-                1,
-            );
+                selectedTargetNames: ['Fighter'],
+                healExpression: '2d8 + 3',
+                maximize: false,
+                bonusHeal: 0,
+                bonusDetails: [],
+                slotLevel: 2,
+                currentRound: 1,
+            });
 
             // Max heal is 50 - 5 = 45
             expect(result.payload.results[0].healAmount).toBeLessThanOrEqual(45);
@@ -433,18 +433,18 @@ describe('prayerOfHealingHandler', () => {
                 details: [{ name: 'Disciple of Life', amount: 2 }],
             });
 
-            const result = await confirmPrayerOfHealing(
-                baseAction,
-                casterStats,
+            const result = await confirmPrayerOfHealing({
+                action: baseAction,
+                playerStats: casterStats,
                 campaignName,
-                ['Fighter'],
-                '2d8 + 3',
-                false,
-                2,
-                [{ name: 'Disciple of Life', amount: 2 }],
-                2,
-                1,
-            );
+                selectedTargetNames: ['Fighter'],
+                healExpression: '2d8 + 3',
+                maximize: false,
+                bonusHeal: 2,
+                bonusDetails: [{ name: 'Disciple of Life', amount: 2 }],
+                slotLevel: 2,
+                currentRound: 1,
+            });
 
             expect(result.payload.bonusHeal).toBe(2);
             expect(result.payload.bonusHealDetail).toContain('Disciple of Life');
@@ -456,18 +456,18 @@ describe('prayerOfHealingHandler', () => {
                 details: [{ name: 'Fortified Health', amount: 5 }],
             });
 
-            await confirmPrayerOfHealing(
-                baseAction,
-                casterStats,
+            await confirmPrayerOfHealing({
+                action: baseAction,
+                playerStats: casterStats,
                 campaignName,
-                ['Fighter'],
-                '2d8 + 3',
-                false,
-                5,
-                [{ name: 'Fortified Health', amount: 5 }],
-                2,
-                1,
-            );
+                selectedTargetNames: ['Fighter'],
+                healExpression: '2d8 + 3',
+                maximize: false,
+                bonusHeal: 5,
+                bonusDetails: [{ name: 'Fortified Health', amount: 5 }],
+                slotLevel: 2,
+                currentRound: 1,
+            });
 
             expect(markFortifiedHealthUsed).toHaveBeenCalledWith(casterStats, campaignName);
         });

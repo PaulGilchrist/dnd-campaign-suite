@@ -134,19 +134,20 @@ function makeDeps(overrides = {}) {
     };
 }
 
-function invokeHandler(handler, context = BASE_CONTEXT, combatSummary = BASE_COMBAT_SUMMARY, ...extraArgs) {
-    return handler(
-        'Acid Arrow',
-        '4d4',
-        10,
-        [3, 4, 2, 1],
-        0,
+function invokeHandler(handler, context = BASE_CONTEXT, combatSummary = BASE_COMBAT_SUMMARY, gwfBaseRolls, gwfDisplayRolls) {
+    return handler({
+        name: 'Acid Arrow',
+        formula: '4d4',
+        total: 10,
+        rolls: [3, 4, 2, 1],
+        modifier: 0,
         context,
-        10,
+        adjustedTotal: 10,
         combatSummary,
-        [3, 4, 2, 1],
-        ...extraArgs
-    );
+        displayRolls: [3, 4, 2, 1],
+        gwfBaseRolls,
+        gwfDisplayRolls,
+    });
 }
 
 function extractConditionEffectsCall() {

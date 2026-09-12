@@ -122,7 +122,7 @@ describe('CLA-141 Fire Burn regression (real findLastAttack parser)', () => {
         expect(result.payload.damageType).toBe('Fire');
         expect(result.payload.formula).toBe('1d10');
         expect(result.payload.targetName).toBe(TARGET);
-        expect(applyDamageToTarget).toHaveBeenCalledWith(null, TARGET, 5, ['Fire'], 'test-campaign', [], false, PLAYER);
+        expect(applyDamageToTarget).toHaveBeenCalledWith(null, TARGET, 5, ['Fire'], 'test-campaign', [], { ignoreResistance: false, attackerName: PLAYER });
         expect(setRuntimeValue).toHaveBeenCalledWith(PLAYER, 'firesBurnUses', 2, 'test-campaign');
         expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
             type: 'roll',

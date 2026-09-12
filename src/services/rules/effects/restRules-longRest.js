@@ -10,6 +10,7 @@ import { setTempHp } from '../../../services/automation/handlers/buffs/tempHpSer
 import { endInvisibility, endGreaterInvisibility } from '../features/invisibilityService.js'
 import { clearHuntersMarkConcentration } from './restRules.js'
 import { getLongRestResources, spellSlotLevels, getLevelAfterLongRest } from './restRules-constants.js'
+import { getCelestialResilienceSelfTempHp } from './restRules-celestialResilience.js'
 
 // Campaign targetEffect keys cleared on long rest, in original evaluation order.
 // Each entry is a list of effect keys removed by one read/filter/write cycle.
@@ -320,18 +321,8 @@ function resetSignatureSpells(name, campaignName) {
 // Celestial Resilience: Grant temp HP on long rest for Celestial Patron.
 // Returns the modal ally-target payload when allies were gifted temp HP, else null.
 async function grantCelestialResilienceOnLongRest(name, playerStats, campaignName) {
-  if (playerStats.class?.major?.name !== 'Celestial Patron' && playerStats.class?.subclass?.name !== 'Celestial Patron') return null
-  const features = playerStats.specialActions || []
-  const feature = features.find(f => f.name === 'Celestial Resilience')
-  if (!feature) return null
-  if (playerStats.level == null) {
-    console.error('[restRules] applyLongRest: playerStats.level is missing for celestial patron temp HP')
-    throw new Error('playerStats.level is required for celestial patron temp HP')
-  }
-  const warlockLevel = playerStats.level
-  const chaMod = (playerStats.abilities || []).find(a => a.name === 'Charisma')?.bonus || 0
-  const selfTempHp = warlockLevel + chaMod
-  if (selfTempHp <= 0) return null
+  const selfTempHp = getCelestialResilienceSelfTempHp(playerStats, 'applyLongRest')
+  if (selfTempHp == null) return null
 
   setTempHp(name, selfTempHp, campaignName)
   addEntry(campaignName, {

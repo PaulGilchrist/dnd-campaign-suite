@@ -92,56 +92,42 @@ function removeAdjacentDuplicates(uniqueDoors) {
   return uniqueDoors.filter(d => !toRemove.has(d.x + ',' + d.y));
 }
 
-function findRoomDoorSpans(room, gridSize, corridorCells) {
+function scanHorizontalSpans(room, side, y, corridorCells) {
   const spans = [];
-  const ny = room.rect.y - 1;
   let spanStart = null;
   for (let x = room.rect.x; x < room.rect.x + room.rect.w; x++) {
-    if (corridorCells[x + ',' + ny]) {
+    if (corridorCells[x + ',' + y]) {
       if (spanStart == null) spanStart = x;
     } else if (spanStart != null) {
-      spans.push({ side: 'n', x1: spanStart, x2: x - 1, y: ny });
+      spans.push({ side, x1: spanStart, x2: x - 1, y });
       spanStart = null;
     }
   }
-  if (spanStart != null) spans.push({ side: 'n', x1: spanStart, x2: room.rect.x + room.rect.w - 1, y: ny });
+  if (spanStart != null) spans.push({ side, x1: spanStart, x2: room.rect.x + room.rect.w - 1, y });
+  return spans;
+}
 
-  const sy = room.rect.y + room.rect.h;
-  spanStart = null;
-  for (let x = room.rect.x; x < room.rect.x + room.rect.w; x++) {
-    if (corridorCells[x + ',' + sy]) {
-      if (spanStart == null) spanStart = x;
-    } else if (spanStart != null) {
-      spans.push({ side: 's', x1: spanStart, x2: x - 1, y: sy });
-      spanStart = null;
-    }
-  }
-  if (spanStart != null) spans.push({ side: 's', x1: spanStart, x2: room.rect.x + room.rect.w - 1, y: sy });
-
-  const wx = room.rect.x - 1;
-  spanStart = null;
+function scanVerticalSpans(room, side, x, corridorCells) {
+  const spans = [];
+  let spanStart = null;
   for (let y = room.rect.y; y < room.rect.y + room.rect.h; y++) {
-    if (corridorCells[wx + ',' + y]) {
+    if (corridorCells[x + ',' + y]) {
       if (spanStart == null) spanStart = y;
     } else if (spanStart != null) {
-      spans.push({ side: 'w', x: wx, y1: spanStart, y2: y - 1 });
+      spans.push({ side, x, y1: spanStart, y2: y - 1 });
       spanStart = null;
     }
   }
-  if (spanStart != null) spans.push({ side: 'w', x: wx, y1: spanStart, y2: room.rect.y + room.rect.h - 1 });
+  if (spanStart != null) spans.push({ side, x, y1: spanStart, y2: room.rect.y + room.rect.h - 1 });
+  return spans;
+}
 
-  const ex = room.rect.x + room.rect.w;
-  spanStart = null;
-  for (let y = room.rect.y; y < room.rect.y + room.rect.h; y++) {
-    if (corridorCells[ex + ',' + y]) {
-      if (spanStart == null) spanStart = y;
-    } else if (spanStart != null) {
-      spans.push({ side: 'e', x: ex, y1: spanStart, y2: y - 1 });
-      spanStart = null;
-    }
-  }
-  if (spanStart != null) spans.push({ side: 'e', x: ex, y1: spanStart, y2: room.rect.y + room.rect.h - 1 });
-
+function findRoomDoorSpans(room, gridSize, corridorCells) {
+  const spans = [];
+  spans.push(...scanHorizontalSpans(room, 'n', room.rect.y - 1, corridorCells));
+  spans.push(...scanHorizontalSpans(room, 's', room.rect.y + room.rect.h, corridorCells));
+  spans.push(...scanVerticalSpans(room, 'w', room.rect.x - 1, corridorCells));
+  spans.push(...scanVerticalSpans(room, 'e', room.rect.x + room.rect.w, corridorCells));
   return spans;
 }
 

@@ -1,5 +1,5 @@
-import request from 'supertest';
 import express from 'express';
+import { request } from '../test-utils/localhostSupertest.js';
 import logRouter from './log.js';
 import * as logModule from './log.js';
 

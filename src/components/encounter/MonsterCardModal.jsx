@@ -178,12 +178,43 @@ function computeCoverState(isAutoMiss, target, characters, mapData, campaignName
   return NO_COVER;
 }
 
+function resolveForcedMode(forcedMode, rangeForcedMode) {
+  if (rangeForcedMode) return rangeForcedMode;
+  return forcedMode !== 'normal' ? forcedMode : undefined;
+}
+
+function buildAutoDamageOptions(action, name) {
+  return {
+    autoDamageFormula: extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary) || null,
+    autoDamageName: name,
+    autoDamageSecondaryFormula: action?.damage_dice_secondary || null,
+    autoDamageSecondaryName: name,
+    autoDamageSecondaryDamageType: action?.damage_type_secondary ? formatDamageTypes([action.damage_type_secondary]) : null,
+  };
+}
+
+function buildSaveOptions(action) {
+  return {
+    saveDc: action?.save_dc || null,
+    saveType: action?.save_type ? toAbbr(action.save_type) : null,
+    dcSuccess: action?.save_dc != null ? 'half' : null,
+    saveConditions: extractConditionsFromSaveEffect(action?.save_effect),
+  };
+}
+
+// CLA-324: spell-origin marker for monster spell attacks (against_spell gates).
+function isSpellOriginAction(action) {
+  return action?.spell_attack_bonus != null
+    || action?.spell_save_dc != null
+    || /spell attack/i.test(action?.description || '');
+}
+
 function buildAttackRollOptions(v) {
   return {
     damageType: formatDamageTypes(v.primaryDamageType),
     damageTypeChoices: getDamageTypeChoices(v.action),
     resistanceNotice: v.resistanceNotice,
-    forcedMode: v.rangeForcedMode || (v.forcedMode !== 'normal' ? v.forcedMode : undefined),
+    forcedMode: resolveForcedMode(v.forcedMode, v.rangeForcedMode),
     isMelee: v.isMelee,
     isAutoCrit: v.isAutoCrit,
     isAutoMiss: v.isAutoMiss,
@@ -191,23 +222,47 @@ function buildAttackRollOptions(v) {
     coverAcBonus: v.coverAcBonus,
     coverLevel: v.coverLevel,
     coverReason: v.coverReason,
-    autoDamageFormula: extractDamageDiceFromDescription(v.action?.description, v.action?.damage_dice_primary) || null,
-    autoDamageName: v.name,
-    autoDamageSecondaryFormula: v.action?.damage_dice_secondary || null,
-    autoDamageSecondaryName: v.name,
-    autoDamageSecondaryDamageType: v.action?.damage_type_secondary ? formatDamageTypes([v.action.damage_type_secondary]) : null,
+    ...buildAutoDamageOptions(v.action, v.name),
     targetName: v.target?.name,
     attackerName: v.monsterName,
     grazeDamage: v.grazeDamage,
     grazeAbilityMod: v.grazeAbilityMod,
     grazeAbilityName: 'STR',
-    saveDc: v.action?.save_dc || null,
-    saveType: v.action?.save_type ? toAbbr(v.action.save_type) : null,
-    dcSuccess: v.action?.save_dc != null ? 'half' : null,
-    saveConditions: extractConditionsFromSaveEffect(v.action?.save_effect),
-    // CLA-324: spell-origin marker for monster spell attacks (against_spell gates).
-    isSpellDamage: v.action?.spell_attack_bonus != null || v.action?.spell_save_dc != null || /spell attack/i.test(v.action?.description || ''),
+    ...buildSaveOptions(v.action),
+    isSpellDamage: isSpellOriginAction(v.action),
   };
+}
+
+function resolveAttackRange(action) {
+  if (action?.reach) return rangeToFeet(action.reach);
+  if (action?.range) return rangeToFeet(action.range);
+  return 30;
+}
+
+function extractConditionKeys(creature) {
+  return (creature?.conditions || []).map(c => c.key);
+}
+
+function resolveTargetSaveModifiers(target, targetComputed) {
+  if (target?.type === 'player') return targetComputed?.saveModifiers;
+  return target?.saveModifiers || [];
+}
+
+function resolveAttackerActionBlock(attackerConditions, monsterTargetEffects, campaignName, monsterName, actionName) {
+  const cloudActionBlock = monsterTargetEffects.some(te => te.effect === 'no_action_and_bonus_action');
+  if (!attackerConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c)) && !cloudActionBlock) return false;
+  if (cloudActionBlock) {
+    blockStinkingCloudAction(campaignName, monsterName, actionName);
+  }
+  return true;
+}
+
+function buildTargetEffectData(target, targetComputed, targetConditions, targetSaveModifiers, allTargetEffects, campaignName, getAttackerCreature) {
+  const targetRiderForTarget = allTargetEffects.filter(te => te.target === target?.name);
+  const targetEffectData = computeConditionEffects({ conditions: targetConditions, saveModifiers: targetSaveModifiers, targetEffects: targetRiderForTarget });
+  applyElusive(targetEffectData, target, targetComputed, targetConditions);
+  applyProtectionFromEvilPenalty(targetEffectData, target, campaignName, getAttackerCreature);
+  return targetEffectData;
 }
 
 function hasPassiveRule(computedStats, effect) {
@@ -399,36 +454,23 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     if (psychicStrikePreconditionFailed(name, target, allTargetEffects)) return;
 
     const primaryDamageType = action?.damage_type_primary ? [action.damage_type_primary] : [];
-    const attackRange = action?.reach ? rangeToFeet(action.reach) : (action?.range ? rangeToFeet(action.range) : 30);
+    const attackRange = resolveAttackRange(action);
     const isMeleeAttack = attackRange <= 5;
 
     const { grazeDamage, grazeAbilityMod } = computeGrazeSettings(isMeleeAttack, monsterCharacter);
     const { targetComputed, resistanceNotice } = resolveTargetDefense(target, creatures, primaryDamageType);
 
-    const attacker = getAttackerCreature();
-    const attackerConditions = (attacker?.conditions || []).map(c => c.key)
-    const targetConditions = (target?.conditions || []).map(c => c.key)
+    const attackerConditions = extractConditionKeys(getAttackerCreature());
+    const targetConditions = extractConditionKeys(target);
 
-    const targetSaveModifiers = target?.type === 'player' ? targetComputed?.saveModifiers : (target?.saveModifiers || []);
+    const targetSaveModifiers = resolveTargetSaveModifiers(target, targetComputed);
 
     const attackerEffects = computeConditionEffects({ conditions: attackerConditions, saveModifiers: targetSaveModifiers, targetEffects: monsterTargetEffects, attackerSenses: monsterSensesArray })
-    const cloudActionBlock = monsterTargetEffects.some(te => te.effect === 'no_action_and_bonus_action')
-    const attackerCannotAct = attackerConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c)) || cloudActionBlock
-    if (attackerCannotAct) {
-        if (cloudActionBlock) {
-            blockStinkingCloudAction(campaignName, monsterName, name);
-        }
-        return
-    }
+    if (resolveAttackerActionBlock(attackerConditions, monsterTargetEffects, campaignName, monsterName, name)) return;
 
-    const targetRiderForTarget = allTargetEffects.filter(te => te.target === target?.name)
-    const targetEffectData = computeConditionEffects({ conditions: targetConditions, saveModifiers: targetSaveModifiers, targetEffects: targetRiderForTarget })
+    const targetEffectData = buildTargetEffectData(target, targetComputed, targetConditions, targetSaveModifiers, allTargetEffects, campaignName, getAttackerCreature);
 
-    const riderAttackBonus = targetEffectData.riderAttackBonus || 0;
-    const effectiveBonus = bonus + riderAttackBonus;
-
-    applyElusive(targetEffectData, target, targetComputed, targetConditions);
-    applyProtectionFromEvilPenalty(targetEffectData, target, campaignName, getAttackerCreature);
+    const effectiveBonus = bonus + (targetEffectData.riderAttackBonus || 0);
 
     const forcedMode = combineAttackModes(attackerEffects, targetEffectData, attackRange, target?.name);
 

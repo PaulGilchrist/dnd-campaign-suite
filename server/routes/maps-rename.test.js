@@ -1,4 +1,4 @@
-import request from 'supertest';
+import { request } from '../test-utils/localhostSupertest.js';
 import express from 'express';
 import maps from './maps.js';
 import * as changeData from '../utils/changeData.js';

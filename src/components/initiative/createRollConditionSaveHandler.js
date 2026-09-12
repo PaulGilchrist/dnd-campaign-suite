@@ -265,7 +265,18 @@ export function createRollConditionSaveHandler({
         storage.set('combatSummary', combatSummary, campaignName)
         setCombatSummary(cloneDeep(combatSummary))
 
-        setConditionPopup(buildConditionPopup(r1, bonus, bonusDetail, getAbilityLabel(condition.ability), condition.label, condition.dc, success, rolls, rolls && rolls.length > 1, starryDragonFloor))
+        setConditionPopup(buildConditionPopup({
+            roll: r1,
+            bonus,
+            bonusDetail,
+            abilityLabel: getAbilityLabel(condition.ability),
+            conditionLabel: condition.label,
+            dc: condition.dc,
+            success,
+            rolls,
+            advantage: rolls && rolls.length > 1,
+            starryDragonFloor,
+        }))
 
         // Pass the full dice array so advantage rolls log both dice + mode 'advantage' (CLA-209)
         logConditionSave(campaignName, creatureName, Array.isArray(rolls) && rolls.length > 1 ? rolls : r1, bonus, bonusDetail, condition.label, getAbilityLabel(condition.ability), condition.dc, success)

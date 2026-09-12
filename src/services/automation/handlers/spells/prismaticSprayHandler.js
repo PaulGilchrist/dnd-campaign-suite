@@ -128,7 +128,7 @@ async function applyRayDamage(cs, campaignName, characters, casterName, targetNa
     if (!dmgResult) return;
     const finalDamage = computeDamageAfterSave(dmgResult.total, succeeded, 'half');
     if (finalDamage > 0) {
-        await applyDamageToTarget(cs, targetName, finalDamage, [ray.type], campaignName, characters, false, casterName);
+        await applyDamageToTarget(cs, targetName, finalDamage, [ray.type], campaignName, characters, { ignoreResistance: false, attackerName: casterName });
     }
 }
 
@@ -339,6 +339,21 @@ export function isPrismaticSprayBlocked(attackerName, targetName, _campaignName)
     return true;
 }
 
+async function processSpraySaves({ campaignName, casterName, cs, characters, dc, savePromises, saveResults, results, creaturesThatSaved, creaturesThatFailed }) {
+    let saveIndex = 0;
+    for (const promise of savePromises) {
+        const saveResult = await promise;
+        const info = saveResults[saveIndex];
+        if (saveResult.success) {
+            creaturesThatSaved.add(info.targetName);
+        } else {
+            creaturesThatFailed.add(info.targetName);
+        }
+        await resolveSpraySaveOutcome({ campaignName, casterName, cs, characters, dc, info, saveResult, results });
+        saveIndex++;
+    }
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
@@ -403,18 +418,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     // Process all save results
-    let saveIndex = 0;
-    for (const promise of savePromises) {
-        const saveResult = await promise;
-        const info = saveResults[saveIndex];
-        if (saveResult.success) {
-            creaturesThatSaved.add(info.targetName);
-        } else {
-            creaturesThatFailed.add(info.targetName);
-        }
-        await resolveSpraySaveOutcome({ campaignName, casterName, cs, characters, dc, info, saveResult, results });
-        saveIndex++;
-    }
+    await processSpraySaves({ campaignName, casterName, cs, characters, dc, savePromises, saveResults, results, creaturesThatSaved, creaturesThatFailed });
 
     const affectedCreatures = creaturesThatFailed.size;
     const savedCreatures = creaturesThatSaved.size;

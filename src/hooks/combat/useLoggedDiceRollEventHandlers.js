@@ -21,7 +21,7 @@ import { isCircleOfPowerActive } from '../../services/automation/handlers/buffs/
 import { cleanupConcentrationEffects } from '../../services/combat/concentration/concentrationService.js';
 import { isResilientSphereActive } from '../../services/combat/automation/automationPassives.js';
 import { triggerViciousMockeryForGeneric } from '../../services/rules/features/viciousMockeryService.js';
-import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry } from './handlers/damageHandlerUtils.js';
+import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry, resolveAppliedDamage } from './handlers/damageHandlerUtils.js';
 
 const SECONDARY_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage'];
 
@@ -69,7 +69,7 @@ function computeSecondaryRoll(pending) {
 }
 
 async function applySecondaryDamage({ combatSummary, pendingTargetName, secondaryData, campaignName, charactersRef, attacker }) {
-    const secondaryApplyResultData = await applyDamageToTarget(combatSummary, pendingTargetName, secondaryData.total, [secondaryData.damageType], campaignName, charactersRef.current, secondaryData.ignoreResistance, attacker, true, { skipConcentration: true });
+    const secondaryApplyResultData = await applyDamageToTarget(combatSummary, pendingTargetName, secondaryData.total, [secondaryData.damageType], campaignName, charactersRef.current, { ignoreResistance: secondaryData.ignoreResistance, attackerName: attacker, suppressHpLog: true, ...{ skipConcentration: true } });
     const secondaryFinalDamage = secondaryApplyResultData?.finalDamage ?? secondaryData.total;
     if (secondaryApplyResultData && secondaryApplyResultData.finalDamage > 0) {
         endInvisibilityOnHostileAction(attacker, campaignName);
@@ -129,7 +129,7 @@ async function applyOverchannelSelfDamage({ pending, characterName, campaignName
     const necroticResult = rollExpression(necroticFormula);
     if (!necroticResult) return;
     const casterCombatSummary = getCombatSummary(campaignName);
-    const casterApplyResult = await applyDamageToTarget(casterCombatSummary, characterName, necroticResult.total, ['Necrotic'], campaignName, charactersRef.current, true, characterName);
+    const casterApplyResult = await applyDamageToTarget(casterCombatSummary, characterName, necroticResult.total, ['Necrotic'], campaignName, charactersRef.current, { ignoreResistance: true, attackerName: characterName });
     logEntry({
         type: 'roll',
         characterName,
@@ -235,7 +235,7 @@ function logEvasionIfNeeded({ detail, targetName, normalizedSaveType, hasEvasion
 
 function computeSaveDamageOutcome({ applyResult, isIntercepted, appliedDamage, secondaryFinalDamage, combatSummary, pendingTargetName, targetMaxHp }) {
     const totalDamageDealt = appliedDamage + secondaryFinalDamage;
-    const newHp = applyResult?.newHp ?? (combatSummary?.creatures?.find(c => c.name === pendingTargetName)?.currentHp ?? 0);
+    const newHp = applyResult?.newHp ?? findCreatureCurrentHp(combatSummary, pendingTargetName);
     const maxHp = targetMaxHp;
     const hpAfterDamage = isIntercepted ? 0 : newHp;
     const oldHp = isIntercepted ? applyResult.oldHp : (newHp + totalDamageDealt);
@@ -367,6 +367,14 @@ function spellHandlerOwnsLastAttack(checkLastAttack, pending) {
     return checkLastAttack?.rollType === 'spell-save' && (pending.name || pending.sourceName) === checkLastAttack.attackName;
 }
 
+function findTargetCharacter(charactersRef, targetName) {
+    return (charactersRef.current || []).find(c => c.name === targetName);
+}
+
+function findCreatureCurrentHp(combatSummary, targetName) {
+    return combatSummary?.creatures?.find(c => c.name === targetName)?.currentHp ?? 0;
+}
+
 async function handleSaveResult(detail, { characterName, campaignName, logEntry, charactersRef }) {
     const pending = getPendingSavePrompt(detail.promptId);
     syncListenerPromptFilters(detail, pending, campaignName);
@@ -382,7 +390,7 @@ async function handleSaveResult(detail, { characterName, campaignName, logEntry,
     }
 
     const normalizedSaveType = normalizeSaveType(detail.saveType || pending.saveType);
-    const targetChar = (charactersRef.current || []).find(c => c.name === detail.targetName);
+    const targetChar = findTargetCharacter(charactersRef, detail.targetName);
     const targetConditions = getRuntimeValue(detail.targetName, 'activeConditions', pending.campaignName) || [];
     const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
 
@@ -408,10 +416,10 @@ async function handleSaveResult(detail, { characterName, campaignName, logEntry,
     // Apply primary damage with combined concentration total (if secondary exists).
     // CLA-324: carry spell-origin from the pending prompt flag.
     const isSpellDamage = pending.isSpellDamage === true;
-    const applyResult = await applyDamageToTarget(combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, charactersRef.current, ignoreResistance, attacker, true, buildApplyDamageOptions(secondaryData, finalDamage, isSpellDamage));
+    const applyResult = await applyDamageToTarget(combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, charactersRef.current, { ignoreResistance: ignoreResistance, attackerName: attacker, suppressHpLog: true, ...buildApplyDamageOptions(secondaryData, finalDamage, isSpellDamage) });
 
     const isIntercepted = applyResult?.intercepted;
-    const appliedDamage = isIntercepted ? (applyResult.damageDealt ?? 0) : (applyResult?.finalDamage ?? 0);
+    const appliedDamage = resolveAppliedDamage(applyResult, isIntercepted);
 
     if (appliedDamage > 0) {
         endInvisibilityOnHostileAction(attacker, pending.campaignName);

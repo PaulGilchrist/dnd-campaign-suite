@@ -6,6 +6,7 @@ import { getCombatSummary } from '../../../../services/encounters/combatData.js'
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
+import { logSaveResultEntry } from './saveResultLogging.js';
 import { applyCalmEmotionsImmunity, applyCalmEmotionsCharmed } from '../../../../services/automation/handlers/spells/calmEmotionsHandler.js';
 
 function CalmEmotionsModal({
@@ -182,19 +183,7 @@ function CalmEmotionsModal({
                 appliedDamage: 0,
             });
 
-            await addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                targetName,
-                saveDc,
-                saveType,
-                success: false,
-                roll: detail.roll ?? 0,
-                total: detail.total ?? 0,
-                saveBonus: detail.saveBonus ?? 0,
-                description: `${targetName} failed ${saveType} save (DC ${saveDc}, rolled ${detail.roll ?? 0}${detail.saveBonus !== 0 ? ' + ' + detail.saveBonus : ''} = ${detail.total ?? 0})`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[calmEmotions] Error logging save result:', e); });
+            await logSaveResultEntry(campaignName, { casterName, targetName, saveDc, saveType, success: false, detail, logPrefix: '[calmEmotions]' });
         } else {
             await addTargetResult(campaignName, {
                 targetName,
@@ -205,19 +194,7 @@ function CalmEmotionsModal({
                 appliedDamage: 0,
             });
 
-            await addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                targetName,
-                saveDc,
-                saveType,
-                success: true,
-                roll: detail.roll ?? 0,
-                total: detail.total ?? 0,
-                saveBonus: detail.saveBonus ?? 0,
-                description: `${targetName} succeeded on ${saveType} save (DC ${saveDc}, rolled ${detail.roll ?? 0}${detail.saveBonus !== 0 ? ' + ' + detail.saveBonus : ''} = ${detail.total ?? 0})`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[calmEmotions] Error logging save result:', e); });
+            await logSaveResultEntry(campaignName, { casterName, targetName, saveDc, saveType, success: true, detail, logPrefix: '[calmEmotions]' });
         }
 
         persistAndNotify(getCombatSummary(campaignName), campaignName);

@@ -250,21 +250,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     if (mode === 'object_into_creature') {
-        const characters = action.metaCtx?.characters || [];
-        return {
-            type: 'popup',
-            payload: {
-                type: 'true_polymorph_select',
-                targetName: null,
-                maxCR: 9,
-                casterName,
-                campaignName,
-                spell: action.spell,
-                spellLevel: action.spellSlotLevel,
-                mode: 'object_into_creature',
-                characters,
-            },
-        };
+        return buildObjectIntoCreaturePopup(action, casterName, campaignName);
     }
 
     return {
@@ -273,6 +259,24 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             type: 'automation_info',
             name: action.name,
             description: `No valid target for ${action.name}.`,
+        },
+    };
+}
+
+function buildObjectIntoCreaturePopup(action, casterName, campaignName) {
+    const characters = action.metaCtx?.characters || [];
+    return {
+        type: 'popup',
+        payload: {
+            type: 'true_polymorph_select',
+            targetName: null,
+            maxCR: 9,
+            casterName,
+            campaignName,
+            spell: action.spell,
+            spellLevel: action.spellSlotLevel,
+            mode: 'object_into_creature',
+            characters,
         },
     };
 }

@@ -118,6 +118,41 @@ function describeBendFateEvent(lastAttack, attackerName, isAttack, isCheck, isSa
     return { eventLabel, hitStatus, saveStatus };
 }
 
+// Hit→Miss reversal: undo the original damage (if any) via healing.
+async function undoHitDamage(cs, lastAttack, campaignName) {
+    const rawDamage = lastAttack.primaryDamage || lastAttack.rawDamage || 0;
+    if (rawDamage > 0) {
+        const healResult = applyHealingToTarget(cs, lastAttack.targetName, rawDamage, campaignName);
+        if (healResult) {
+            return ` → The attack now misses! Undid ${healResult.actualHeal} damage.`;
+        }
+    }
+    return ' → The attack now misses!';
+}
+
+// Miss→Hit reversal: roll and apply the original damage formula.
+async function applyNewHitDamage(cs, action, lastAttack, playerName, attackerName, campaignName) {
+    let outcomeNote = ' → The attack now hits!';
+    const damageFormula = lastAttack.damageFormula;
+    if (damageFormula) {
+        const dmgResult = rollExpression(damageFormula);
+        if (dmgResult && dmgResult.total > 0) {
+            const characters = [action._playerStats || { name: playerName }];
+            const appliedDmg = applyDamageToTarget(cs, lastAttack.targetName, dmgResult.total, [lastAttack.damageType || 'unknown'], campaignName, characters, { ignoreResistance: false, attackerName: attackerName });
+            if (appliedDmg) {
+                outcomeNote += ` Rolled ${appliedDmg.finalDamage} damage.`;
+            }
+        }
+    }
+    return outcomeNote;
+}
+
+function attackOutcomeTail(oldHit, newHit) {
+    if (oldHit && newHit) return ' → The attack still hits.';
+    if (oldHit !== null && newHit !== null) return ' → The attack still misses.';
+    return ' → No change in outcome.';
+}
+
 async function shiftAttackOutcome(action, cs, lastAttack, playerName, attackerName, shift, campaignName) {
     const { originalTotal, newTotal, modifier, diceValue, mode } = shift;
     const targetAc = lastAttack.targetAc || lastAttack.effectiveAc;
@@ -136,36 +171,9 @@ async function shiftAttackOutcome(action, cs, lastAttack, playerName, attackerNa
     };
     await setRuntimeValue('campaign', 'lastAttack', updatedLastAttack, campaignName);
 
-    if (oldHit && !newHit) {
-        const rawDamage = lastAttack.primaryDamage || lastAttack.rawDamage || 0;
-        if (rawDamage > 0) {
-            const healResult = applyHealingToTarget(cs, lastAttack.targetName, rawDamage, campaignName);
-            if (healResult) {
-                return ` → The attack now misses! Undid ${healResult.actualHeal} damage.`;
-            }
-        }
-        return ' → The attack now misses!';
-    }
-
-    if (!oldHit && newHit) {
-        const damageFormula = lastAttack.damageFormula;
-        let outcomeNote = ' → The attack now hits!';
-        if (damageFormula) {
-            const dmgResult = rollExpression(damageFormula);
-            if (dmgResult && dmgResult.total > 0) {
-                const characters = [action._playerStats || { name: playerName }];
-                const appliedDmg = applyDamageToTarget(cs, lastAttack.targetName, dmgResult.total, [lastAttack.damageType || 'unknown'], campaignName, characters, false, attackerName);
-                if (appliedDmg) {
-                    outcomeNote += ` Rolled ${appliedDmg.finalDamage} damage.`;
-                }
-            }
-        }
-        return outcomeNote;
-    }
-
-    if (oldHit && newHit) return ' → The attack still hits.';
-    if (oldHit !== null && newHit !== null) return ' → The attack still misses.';
-    return ' → No change in outcome.';
+    if (oldHit && !newHit) return await undoHitDamage(cs, lastAttack, campaignName);
+    if (!oldHit && newHit) return await applyNewHitDamage(cs, action, lastAttack, playerName, attackerName, campaignName);
+    return attackOutcomeTail(oldHit, newHit);
 }
 
 async function shiftSaveOutcome(lastAttack, shift, campaignName) {
@@ -670,36 +678,70 @@ async function handleInspiringMovement(action, playerStats, campaignName, _mapNa
     };
 }
 
+// Expends one tracked Bardic Inspiration use when available.
+async function consumeInspiringMovementUse(usesMax, usesKey, playerStats, campaignName) {
+    if (usesMax <= 0) return '';
+    const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
+    if (currentUses <= 0) return '';
+    await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+    return ` Expended 1 Bardic Inspiration (${currentUses - 1} remaining).`;
+}
+
+function stampInspiringMovementAlly(allyName, noOAs, playerStats, campaignName) {
+    if (!allyName) return;
+    setRuntimeValue(allyName, 'inspiringMovementGranted', true, campaignName);
+    if (noOAs) {
+        setRuntimeValue(allyName, 'inspiringMovementNoOA', true, campaignName);
+        addExpiration(playerStats.name, allyName, [
+            { type: 'inspiring_movement_no_oa' }
+        ], campaignName, undefined, playerStats.name);
+    }
+    addExpiration(playerStats.name, allyName, [
+        { type: 'inspiring_movement_granted' }
+    ], campaignName, undefined, playerStats.name);
+}
+
+// Agile Strikes is an enemy-hit-triggered unarmed strike — only chain it
+// when the bard has a legitimately resolved enemy target. Its popup is
+// appended so it can never shadow the Inspiring Movement result popup.
+async function appendAgileStrikes(description, playerStats, campaignName) {
+    const passives = playerStats.automation?.passives || [];
+    if (!passives.some(p => p.type === 'passive_rule' && p.effect === 'agile_strike')) {
+        return description;
+    }
+    const cs = await getCombatContext(campaignName);
+    const strikeTarget = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+    if (!strikeTarget || !strikeTarget.name) return description;
+
+    const classLevels = (playerStats.class?.class_levels ?? []);
+    const classLevel = classLevels.find(cl => cl.level === playerStats.level);
+    const bardicDie = (classLevel && classLevel.bardic_die) || 6;
+    const agileStrikeAction = {
+        name: 'Agile Strikes',
+        automation: {
+            type: 'agile_strike',
+            bardicDie: bardicDie,
+        },
+    };
+    const strikeResult = await executeHandler(agileStrikeAction, playerStats, campaignName, null);
+    if (strikeResult && strikeResult.type === 'popup' && strikeResult.payload?.description) {
+        description += `<br/><br/>Agile Strikes: ${strikeResult.payload.description}`;
+    }
+    return description;
+}
+
 export async function applyInspiringMovement(action, playerStats, campaignName, allyName, halfSpeed, noOAs) {
     const auto = action.automation;
     const { usesMax, usesKey } = resolveInspiringMovementUses(auto, playerStats);
 
-    let expenditureNote = '';
-    if (usesMax > 0) {
-        const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
-        if (currentUses > 0) {
-            await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
-            expenditureNote = ` Expended 1 Bardic Inspiration (${currentUses - 1} remaining).`;
-        }
-    }
+    const expenditureNote = await consumeInspiringMovementUse(usesMax, usesKey, playerStats, campaignName);
 
     setRuntimeValue(playerStats.name, 'inspiringMovementNoOA', true, campaignName);
     addExpiration(playerStats.name, playerStats.name, [
         { type: 'inspiring_movement_no_oa' }
     ], campaignName, undefined, playerStats.name);
 
-    if (allyName) {
-        setRuntimeValue(allyName, 'inspiringMovementGranted', true, campaignName);
-        if (noOAs) {
-            setRuntimeValue(allyName, 'inspiringMovementNoOA', true, campaignName);
-            addExpiration(playerStats.name, allyName, [
-                { type: 'inspiring_movement_no_oa' }
-            ], campaignName, undefined, playerStats.name);
-        }
-        addExpiration(playerStats.name, allyName, [
-            { type: 'inspiring_movement_granted' }
-        ], campaignName, undefined, playerStats.name);
-    }
+    stampInspiringMovementAlly(allyName, noOAs, playerStats, campaignName);
 
     let description = `${playerStats.name} used ${action.name} (Dance). `;
     description += `You move up to ${halfSpeed} ft (half your Speed) as a Reaction. `;
@@ -720,32 +762,7 @@ export async function applyInspiringMovement(action, playerStats, campaignName, 
         description: `${playerStats.name} used ${action.name}.` + (allyName ? ` Ally: ${allyName}. Movement does not provoke Opportunity Attacks.` : ' Movement does not provoke Opportunity Attacks.') + expenditureNote,
     }).catch((e) => { console.error("[reactionBonusHandler:log-error]", e); });
 
-    const hasAgileStrikes = (playerStats.automation?.passives || []).some(
-        p => p.type === 'passive_rule' && p.effect === 'agile_strike'
-    );
-
-    if (hasAgileStrikes) {
-        // Agile Strikes is an enemy-hit-triggered unarmed strike — only chain it
-        // when the bard has a legitimately resolved enemy target. Its popup is
-        // appended so it can never shadow the Inspiring Movement result popup.
-        const cs = await getCombatContext(campaignName);
-        const strikeTarget = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
-        if (strikeTarget?.name) {
-            const classLevel = (playerStats.class?.class_levels ?? []).find(cl => cl.level === playerStats.level);
-            const bardicDie = classLevel?.bardic_die || 6;
-            const agileStrikeAction = {
-                name: 'Agile Strikes',
-                automation: {
-                    type: 'agile_strike',
-                    bardicDie: bardicDie,
-                },
-            };
-            const strikeResult = await executeHandler(agileStrikeAction, playerStats, campaignName, null);
-            if (strikeResult && strikeResult.type === 'popup' && strikeResult.payload?.description) {
-                description += `<br/><br/>Agile Strikes: ${strikeResult.payload.description}`;
-            }
-        }
-    }
+    description = await appendAgileStrikes(description, playerStats, campaignName);
 
     return {
         type: 'popup',

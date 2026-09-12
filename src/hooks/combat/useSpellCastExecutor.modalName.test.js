@@ -52,19 +52,7 @@ describe('useSpellCastExecutor', () => {
       });
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-          props.extraMeta,
-          undefined,
-          setModalState,
-        )
+        useSpellCastExecutor({ ...props, setModalState })
       );
 
       await act(async () => {
@@ -84,16 +72,7 @@ describe('useSpellCastExecutor', () => {
       });
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
+        useSpellCastExecutor(props)
       );
 
       await act(async () => {
@@ -115,19 +94,7 @@ describe('useSpellCastExecutor', () => {
       });
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-          props.extraMeta,
-          undefined,
-          setModalState,
-        )
+        useSpellCastExecutor({ ...props, setModalState })
       );
 
       await act(async () => {
@@ -152,16 +119,7 @@ describe('useSpellCastExecutor', () => {
       });
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
+        useSpellCastExecutor(props)
       );
 
       await act(async () => {
@@ -184,19 +142,7 @@ describe('useSpellCastExecutor', () => {
       });
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-          props.extraMeta,
-          undefined,
-          setModalState,
-        )
+        useSpellCastExecutor({ ...props, setModalState })
       );
 
       await act(async () => {
@@ -219,19 +165,7 @@ describe('useSpellCastExecutor', () => {
       });
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-          props.extraMeta,
-          undefined,
-          setModalState,
-        )
+        useSpellCastExecutor({ ...props, setModalState })
       );
 
       await act(async () => {
@@ -251,19 +185,7 @@ describe('useSpellCastExecutor', () => {
       });
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-          props.extraMeta,
-          undefined,
-          setModalState,
-        )
+        useSpellCastExecutor({ ...props, setModalState })
       );
 
       await act(async () => {
@@ -282,19 +204,7 @@ describe('useSpellCastExecutor', () => {
       });
 
       const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-          props.extraMeta,
-          undefined,
-          setModalState,
-        )
+        useSpellCastExecutor({ ...props, setModalState })
       );
 
       await act(async () => {

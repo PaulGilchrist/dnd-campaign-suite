@@ -345,16 +345,7 @@ describe('dreadAmbushHandler', () => {
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
             expect(result.payload.description).toContain('Psychic');
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.anything(),
-                'Goblin',
-                expect.any(Number),
-                ['Psychic'],
-                expect.any(String),
-                expect.any(Array),
-                false,
-                playerName,
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', expect.any(Number), ['Psychic'], expect.any(String), expect.any(Array), { ignoreResistance: false, attackerName: playerName },);
         });
 
         it('uses custom damageType from automation', async () => {
@@ -365,16 +356,7 @@ describe('dreadAmbushHandler', () => {
             const result = await handle(action, makePlayerStats(), campaignName, null);
 
             expect(result.payload.description).toContain('Force');
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.anything(),
-                'Goblin',
-                expect.any(Number),
-                ['Force'],
-                expect.any(String),
-                expect.any(Array),
-                false,
-                playerName,
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', expect.any(Number), ['Force'], expect.any(String), expect.any(Array), { ignoreResistance: false, attackerName: playerName },);
         });
     });
 
@@ -396,16 +378,7 @@ describe('dreadAmbushHandler', () => {
         it('calls applyDamageToTarget with correct arguments', async () => {
             await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.any(Object),
-                'Goblin',
-                7,
-                ['Psychic'],
-                campaignName,
-                [],
-                false,
-                playerName,
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 7, ['Psychic'], campaignName, [], { ignoreResistance: false, attackerName: playerName },);
         });
 
         it('uses targetName from findLastAttack result', async () => {
@@ -413,16 +386,7 @@ describe('dreadAmbushHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.anything(),
-                'Orc',
-                expect.any(Number),
-                expect.any(Array),
-                expect.any(String),
-                expect.any(Array),
-                false,
-                playerName,
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Orc', expect.any(Number), expect.any(Array), expect.any(String), expect.any(Array), { ignoreResistance: false, attackerName: playerName },);
         });
 
         it('returns automation_info popup with correct structure', async () => {
@@ -621,16 +585,7 @@ describe('dreadAmbushHandler', () => {
         it('passes campaignName to applyDamageToTarget', async () => {
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.anything(),
-                expect.any(String),
-                expect.any(Number),
-                expect.any(Array),
-                'test-campaign',
-                expect.any(Array),
-                false,
-                expect.any(String),
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), expect.any(String), expect.any(Number), expect.any(Array), 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: expect.any(String) },);
         });
 
         it('passes campaignName to setRuntimeValue for uses', async () => {

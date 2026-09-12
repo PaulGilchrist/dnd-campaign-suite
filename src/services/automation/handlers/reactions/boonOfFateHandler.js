@@ -6,6 +6,19 @@ import { infoPopup } from '../../common/infoPopup.js';
 
 const RANGE_FT = 60;
 
+function buildEventLabel(lastAttack, attackerName, isAttack, isCheck) {
+    if (isAttack) return `Attack by ${attackerName}`;
+    if (isCheck) return `${lastAttack.checkName || 'Ability check'} by ${attackerName}`;
+    const saveLabel = lastAttack.saveType ? lastAttack.saveType.toUpperCase() : 'Save';
+    return `${saveLabel} by ${attackerName}`;
+}
+
+// null when no DC/AC applies; otherwise the thresholded outcome label.
+function rollStatus(originalTotal, threshold, successLabel, failureLabel) {
+    if (threshold == null) return null;
+    return originalTotal >= threshold ? successLabel : failureLabel;
+}
+
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -42,23 +55,11 @@ export async function handle(action, playerStats, campaignName) {
     const isSave = rollType === 'save' || (rollType === 'attack' && lastAttack.saveDc != null && lastAttack.saveResult != null);
     const isCheck = rollType === 'check' || rollType === 'skill';
 
-    let eventLabel;
-    if (isAttack) {
-        eventLabel = `Attack by ${attackerName}`;
-    } else if (isCheck) {
-        eventLabel = `${lastAttack.checkName || 'Ability check'} by ${attackerName}`;
-    } else {
-        const saveLabel = lastAttack.saveType ? lastAttack.saveType.toUpperCase() : 'Save';
-        eventLabel = `${saveLabel} by ${attackerName}`;
-    }
+    const eventLabel = buildEventLabel(lastAttack, attackerName, isAttack, isCheck);
 
     const originalTotal = (lastAttack.d20 || 0) + (lastAttack.bonus || 0);
-    const hitStatus = isAttack && lastAttack.targetAc != null
-        ? (originalTotal >= lastAttack.targetAc ? 'Hit' : 'Miss')
-        : null;
-    const saveStatus = isSave && lastAttack.saveDc != null
-        ? (originalTotal >= lastAttack.saveDc ? 'Success' : 'Failure')
-        : null;
+    const hitStatus = rollStatus(originalTotal, isAttack ? lastAttack.targetAc : null, 'Hit', 'Miss');
+    const saveStatus = rollStatus(originalTotal, isSave ? lastAttack.saveDc : null, 'Success', 'Failure');
 
     return {
         type: 'modal',

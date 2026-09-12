@@ -117,17 +117,7 @@ const BASE_COMBAT_SUMMARY = {
 };
 
 function invokeHandler(handler, context = BASE_CONTEXT, combatSummary = BASE_COMBAT_SUMMARY) {
-    return handler(
-        'Fire Bolt',
-        '1d10',
-        5,
-        [6],
-        0,
-        context,
-        5,
-        combatSummary,
-        [6],
-    );
+    return handler({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [6], modifier: 0, context: context, adjustedTotal: 5, combatSummary: combatSummary, displayRolls: [6] });
 }
 
 describe('handlePlayerSaveDamage - advantage/disadvantage calculation', () => {

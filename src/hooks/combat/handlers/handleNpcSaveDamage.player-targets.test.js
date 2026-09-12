@@ -136,12 +136,7 @@ describe('handleNpcSaveDamage - player targets', () => {
     }
 
     function callHandler(fn, contextOverride = {}, combatSummaryOverride = null) {
-        return fn(
-            'Fire Bolt', '1d10', 10, [6, 4], 0,
-            { ...defaultContext, ...contextOverride },
-            10,
-            combatSummaryOverride || defaultCombatSummary
-        );
+        return fn({ name: 'Fire Bolt', formula: '1d10', total: 10, rolls: [6, 4], modifier: 0, context: { ...defaultContext, ...contextOverride }, adjustedTotal: 10, combatSummary: combatSummaryOverride || defaultCombatSummary });
     }
 
     function setupPlayerActiveConditions(conditions) {
@@ -203,10 +198,7 @@ describe('handleNpcSaveDamage - player targets', () => {
                 creatures: [{ name: 'Goblin', type: 'npc', currentHp: 10, maxHp: 10 }],
             };
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 10, [6, 4], 0, {
-                ...defaultContext,
-                targetName: 'Goblin',
-            }, 10, combatSummary);
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 10, rolls: [6, 4], modifier: 0, context: { ...defaultContext, targetName: 'Goblin', }, adjustedTotal: 10, combatSummary: combatSummary });
 
             expect(getSetRuntimeValueCalls('deathSaves')).toHaveLength(0);
             expect(getSetRuntimeValueCalls('deathFailures')).toHaveLength(0);
@@ -265,9 +257,9 @@ describe('handleNpcSaveDamage - player targets', () => {
                 playerStats: { name: 'TestWizard' },
             });
 
-            // First call is secondary damage — should have ignoreResistance=true at position 6
+            // First call is secondary damage — options should carry ignoreResistance=true
             const secondaryCall = applyDamageToTarget.mock.calls[0];
-            expect(secondaryCall[6]).toBe(true);
+            expect(secondaryCall[6].ignoreResistance).toBe(true);
         });
 
         it('passes ignoreResistance=false to secondary damage when player lacks the feat', async () => {
@@ -284,7 +276,7 @@ describe('handleNpcSaveDamage - player targets', () => {
             });
 
             const secondaryCall = applyDamageToTarget.mock.calls[0];
-            expect(secondaryCall[6]).toBe(false);
+            expect(secondaryCall[6].ignoreResistance).toBe(false);
         });
     });
 
@@ -311,7 +303,7 @@ describe('handleNpcSaveDamage - player targets', () => {
             const secondaryCall = applyDamageToTarget.mock.calls[0];
             expect(secondaryCall[2]).toBe(4);
             // Secondary should skip concentration tracking
-            expect(secondaryCall[9]).toEqual(expect.objectContaining({ skipConcentration: true }));
+            expect(secondaryCall[6]).toEqual(expect.objectContaining({ skipConcentration: true }));
         });
 
         it('does not halve secondary damage on save failure when potent cantrip is active', async () => {
@@ -348,7 +340,7 @@ describe('handleNpcSaveDamage - player targets', () => {
             await callHandler(fn, { playerStats: { name: 'TestWizard' } });
 
             const primaryCall = applyDamageToTarget.mock.calls[0];
-            expect(primaryCall[6]).toBe(true);
+            expect(primaryCall[6].ignoreResistance).toBe(true);
         });
 
         it('passes ignoreResistance=false to primary damage when player lacks the feat', async () => {
@@ -360,7 +352,7 @@ describe('handleNpcSaveDamage - player targets', () => {
             await callHandler(fn, { playerStats: { name: 'TestWizard' } });
 
             const primaryCall = applyDamageToTarget.mock.calls[0];
-            expect(primaryCall[6]).toBe(false);
+            expect(primaryCall[6].ignoreResistance).toBe(false);
         });
     });
 
@@ -380,7 +372,7 @@ describe('handleNpcSaveDamage - player targets', () => {
 
             // Second call is primary damage — should include concentrationTotalDamage
             const primaryCall = applyDamageToTarget.mock.calls[1];
-            expect(primaryCall[9]).toEqual(expect.objectContaining({ concentrationTotalDamage: 15 }));
+            expect(primaryCall[6]).toEqual(expect.objectContaining({ concentrationTotalDamage: 15 }));
         });
 
         it('does not pass concentrationTotalDamage when there is no secondary damage', async () => {
@@ -391,7 +383,7 @@ describe('handleNpcSaveDamage - player targets', () => {
             await callHandler(fn);
 
             const primaryCall = applyDamageToTarget.mock.calls[0];
-            expect(primaryCall[9]).toBeUndefined();
+            expect(primaryCall[6].concentrationTotalDamage).toBeUndefined();
         });
     });
 
@@ -404,10 +396,7 @@ describe('handleNpcSaveDamage - player targets', () => {
             const fn = createFn();
             await callHandler(fn, { dcSuccess: 'half' });
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.anything(), 'PlayerTarget', 10, expect.any(Array), 'test-campaign',
-                expect.any(Array), false, 'TestWizard', true
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'PlayerTarget', 10, expect.any(Array), 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
         });
 
         it('applies zero damage on successful save when dcSuccess is half', async () => {
@@ -418,10 +407,7 @@ describe('handleNpcSaveDamage - player targets', () => {
             const fn = createFn();
             await callHandler(fn, { dcSuccess: 'half' });
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.anything(), 'PlayerTarget', 0, expect.any(Array), 'test-campaign',
-                expect.any(Array), false, 'TestWizard', true
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'PlayerTarget', 0, expect.any(Array), 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
         });
     });
 });

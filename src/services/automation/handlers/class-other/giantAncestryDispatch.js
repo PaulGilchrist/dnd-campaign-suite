@@ -3,10 +3,9 @@ import { rollExpression } from '../../../dice/diceRoller.js';
 import { addEntry } from '../../../ui/logService.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { getRuntimeUsesKey } from './giantAncestryOptions.js';
-import { ancestryNoUsesPopup, frostsChillAttackerGate, stormsThunderTargetGate, attackerRollGate, resolveAncestryUses, applyAncestryDamage, logAncestryDamageRoll, ancestryDamagePopup, applySpeedReductionEffect, logSpeedReductionCondition, stonesEnduranceDamageGate, stonesEnduranceRoundRefusal, stonesEnduranceCapNote } from './giantAncestryUtils.js';
+import { ancestryNoUsesPopup, frostsChillAttackerGate, stormsThunderTargetGate, attackerRollGate, resolveAncestryUses, applyAncestryDamage, logAncestryDamageRoll, ancestryDamagePopup, applySpeedReductionEffect, logSpeedReductionCondition, stonesEnduranceDamageGate, stonesEnduranceRoundRefusal, stonesEnduranceCapNote, stormsThunderRangeRefusal } from './giantAncestryUtils.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
@@ -299,11 +298,9 @@ export async function handleStonesEndurance(action, playerStats, campaignName, o
 }
 
 export async function handleStormsThunder(action, playerStats, campaignName, _mapName, option) {
-    const optName = (option?.name || action.name || "Storm's Thunder");
+    const optName = ((option && option.name) || action.name || "Storm's Thunder");
     const opt = option || action.automation;
-    const usesKey = getRuntimeUsesKey(optName);
-    const usesMax = playerStats.proficiency || 0;
-    const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
+    const { usesKey, currentUses } = resolveAncestryUses(playerStats, optName, campaignName);
 
     const noUses = ancestryNoUsesPopup(optName, action.automation, currentUses);
     if (noUses) return noUses;
@@ -320,37 +317,18 @@ export async function handleStormsThunder(action, playerStats, campaignName, _ma
     const rangeFt = rangeToFeet(opt.range) ?? 60;
     const inRange = await isWithinRange(attackerName, playerStats.name, rangeFt);
     if (!inRange) {
-        const refusalText = `${optName} requires the attacker to be within ${rangeFt} feet of you. ${attackerName} is out of range.`;
-        addEntry(campaignName, {
-            type: 'automation',
-            characterName: playerStats.name,
-            automationType: 'storms_thunder_refused',
-            name: optName,
-            description: refusalText,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[giantAncestry] Error:", e); });
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: refusalText,
-                automation: action.automation,
-            },
-        };
+        return stormsThunderRangeRefusal(campaignName, playerStats, optName, action.automation, attackerName, rangeFt);
     }
 
     // Consume the use
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
-    const damageResult = rollExpression(opt.damage);
+    const formula = opt.damage;
+    const damageResult = rollExpression(formula);
     const damageType = opt.damageType || 'Thunder';
 
     const cs = await getCombatContext(campaignName);
-    const characters = cs?.creatures?.filter(c => c.type === 'player') || [];
-    const applyResult = applyDamageToTarget(cs, attackerName, damageResult?.total ?? 0, [damageType], campaignName, characters, false, playerStats.name);
-    const actualDamage = applyResult?.finalDamage ?? damageResult?.total ?? 0;
-    const newHp = applyResult?.newHp;
+    const { actualDamage, newHp } = applyAncestryDamage(cs, attackerName, damageResult, damageType, campaignName, playerStats);
 
     await addEntry(campaignName, {
         type: 'ability_use',
@@ -359,32 +337,7 @@ export async function handleStormsThunder(action, playerStats, campaignName, _ma
         description: `${playerStats.name} used ${optName} against ${attackerName} (${currentUses - 1} uses remaining), dealing ${actualDamage} ${damageType} damage.`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
-    await addEntry(campaignName, {
-        type: 'roll',
-        characterName: playerStats.name,
-        rollType: 'damage',
-        name: optName + ' Damage',
-        targetName: attackerName,
-        damageType,
-        total: actualDamage,
-        formula: opt.damage,
-        rolls: damageResult?.rolls,
-        description: `${playerStats.name} used ${optName} to deal ${actualDamage} ${damageType} damage to ${attackerName}.`,
-    }).catch((e) => { console.error("[giantAncestry] Error:", e); });
+    await logAncestryDamageRoll(campaignName, playerStats, optName, attackerName, damageType, actualDamage, formula, damageResult);
 
-    return {
-        type: 'popup',
-        payload: {
-            type: 'damage',
-            name: optName,
-            formula: opt.damage,
-            rolls: damageResult?.rolls,
-            total: actualDamage,
-            finalDamage: actualDamage,
-            damageApplied: true,
-            targetName: attackerName,
-            targetCurrentHp: newHp,
-            damageType,
-        },
-    };
+    return ancestryDamagePopup(optName, formula, damageResult, actualDamage, attackerName, newHp, damageType);
 }

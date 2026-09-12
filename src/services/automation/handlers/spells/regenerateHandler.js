@@ -45,6 +45,28 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
+function resolveInitialHealExpression(spell) {
+    const slotLevel = spell.level || 7;
+    const healAtSlotLevel = spell.heal_at_slot_level;
+    if (!healAtSlotLevel) return '4d8 + 15';
+    const expression = healAtSlotLevel[slotLevel] || healAtSlotLevel[Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b).pop()];
+    return expression || '4d8 + 15';
+}
+
+function stampRegenerateEffect(targetName, casterName, campaignName) {
+    // Register target effect badge
+    const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+    const effects = Array.isArray(targetEffects) ? [...targetEffects] : [];
+    // Remove any existing regenerate effect on this target
+    const filtered = effects.filter(te => !(te.target === targetName && te.effect === REGEN_EFFECT_KEY));
+    filtered.push({
+        target: targetName,
+        effect: REGEN_EFFECT_KEY,
+        source: casterName,
+    });
+    setRuntimeValue('campaign', 'targetEffects', filtered, campaignName);
+}
+
 export async function applyRegenerateEffect(action, playerStats, campaignName, mapName, targetName) {
     if (!targetName) {
         return null;
@@ -54,15 +76,7 @@ export async function applyRegenerateEffect(action, playerStats, campaignName, m
     const spell = action.spell || {};
 
     // Calculate initial heal: 4d8 + 15
-    const slotLevel = spell.level || 7;
-    const healAtSlotLevel = spell.heal_at_slot_level;
-    let initialHealExpression = '4d8 + 15';
-    if (healAtSlotLevel) {
-        const expression = healAtSlotLevel[slotLevel] || healAtSlotLevel[Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b).pop()];
-        if (expression) {
-            initialHealExpression = expression;
-        }
-    }
+    const initialHealExpression = resolveInitialHealExpression(spell);
 
     const initialRoll = evaluateAutoExpression(initialHealExpression, playerStats);
     const healAmount = typeof initialRoll === 'number' && initialRoll > 0 ? initialRoll : 33;
@@ -99,17 +113,7 @@ export async function applyRegenerateEffect(action, playerStats, campaignName, m
     // Set regenerateActive on target to trigger turn-start healing
     setRuntimeValue(targetName, 'regenerateActive', true, campaignName);
 
-    // Register target effect badge
-    const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
-    const effects = Array.isArray(targetEffects) ? [...targetEffects] : [];
-    // Remove any existing regenerate effect on this target
-    const filtered = effects.filter(te => !(te.target === targetName && te.effect === REGEN_EFFECT_KEY));
-    filtered.push({
-        target: targetName,
-        effect: REGEN_EFFECT_KEY,
-        source: casterName,
-    });
-    setRuntimeValue('campaign', 'targetEffects', filtered, campaignName);
+    stampRegenerateEffect(targetName, casterName, campaignName);
 
     // Log ability use
     const popupText = `Regenerate on ${targetName}: Regained ${actualHeal} HP. Target gains 1 HP per turn and is restored to full HP when the effect ends.`;

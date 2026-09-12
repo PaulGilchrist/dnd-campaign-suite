@@ -203,8 +203,6 @@ describe('useCharActionsCleave', () => {
             const pending = { baseMastery: 'Piercing', attackName: 'Longsword', targetName: 'Goblin' };
             testDeps.getRuntimeValue
                 .mockReturnValueOnce(pending)
-                .mockReturnValueOnce(pending)
-                .mockReturnValueOnce(pending)
                 .mockReturnValueOnce({ targetName: null });
             const applyMasteryEffect = vi.fn();
             const { handleTacticalMasterConfirm } = useCharActionsCleave({
@@ -221,8 +219,6 @@ describe('useCharActionsCleave', () => {
             const pending = { baseMastery: 'Piercing', attackName: 'Greataxe', targetName: 'Orc' };
             const lastAttack = { targetName: 'Orc' };
             deps.getRuntimeValue
-                .mockReturnValueOnce(pending)
-                .mockReturnValueOnce(pending)
                 .mockReturnValueOnce(pending)
                 .mockReturnValueOnce(lastAttack)
                 .mockReturnValueOnce([]);
@@ -257,8 +253,6 @@ describe('useCharActionsCleave', () => {
             const lastAttack = { targetName: 'Orc' };
             deps.getRuntimeValue
                 .mockReturnValueOnce(pending)
-                .mockReturnValueOnce(pending)
-                .mockReturnValueOnce(pending)
                 .mockReturnValueOnce(lastAttack)
                 .mockReturnValueOnce(['prone']);
 
@@ -285,8 +279,6 @@ describe('useCharActionsCleave', () => {
             const pending = { baseMastery: 'Piercing', attackName: 'Greataxe', targetName: 'Orc' };
             const lastAttack = { targetName: 'Orc' };
             deps.getRuntimeValue
-                .mockReturnValueOnce(pending)
-                .mockReturnValueOnce(pending)
                 .mockReturnValueOnce(pending)
                 .mockReturnValueOnce(lastAttack)
                 .mockReturnValueOnce([]);
@@ -318,8 +310,6 @@ describe('useCharActionsCleave', () => {
             const lastAttack = { targetName: 'Goblin' };
             testDeps.getRuntimeValue
                 .mockReturnValueOnce(pending)
-                .mockReturnValueOnce(pending)
-                .mockReturnValueOnce(pending)
                 .mockReturnValueOnce(lastAttack);
 
             const applyMasteryEffect = vi.fn();
@@ -342,8 +332,6 @@ describe('useCharActionsCleave', () => {
             const pending = { baseMastery: 'Piercing', attackName: 'NonexistentWeapon', targetName: 'Orc' };
             const lastAttack = { targetName: 'Orc' };
             deps.getRuntimeValue
-                .mockReturnValueOnce(pending)
-                .mockReturnValueOnce(pending)
                 .mockReturnValueOnce(pending)
                 .mockReturnValueOnce(lastAttack)
                 .mockReturnValueOnce([]);
@@ -375,8 +363,6 @@ describe('useCharActionsCleave', () => {
             const pending = { baseMastery: 'Piercing', attackName: 'Greataxe', targetName: 'Orc' };
             const lastAttack = { targetName: 'Orc' };
             deps.getRuntimeValue
-                .mockReturnValueOnce(pending)
-                .mockReturnValueOnce(pending)
                 .mockReturnValueOnce(pending)
                 .mockReturnValueOnce(lastAttack)
                 .mockReturnValueOnce([]);

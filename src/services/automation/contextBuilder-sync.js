@@ -454,20 +454,25 @@ function buildHitBonusFormula(attack, sacredWeaponBonus, blessedWarriorBonus, su
     return hitBonusFormulaParts.join(' + ');
 }
 
+// 2024 rules: sneak_attack_num_d6 directly on class level
+// 5e rules: class_specific.sneak_attack.dice_count
+function sneakAttackDiceCount(playerStats) {
+    const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
+    return classLevel?.sneak_attack_num_d6 || classLevel?.class_specific?.sneak_attack?.dice_count || 0;
+}
+
+function isSneakAttackWeapon(attack) {
+    const weaponProperties = attack.properties || [];
+    const hasFinesse = weaponProperties.some(p => p.toLowerCase() === 'finesse');
+    return hasFinesse || attack.weaponType === 'ranged';
+}
+
 // Determine sneak attack eligibility
 async function computeSneakAttackDice(playerStats, attack, targetName, forcedMode, campaignName) {
     if (playerStats.class?.name !== 'Rogue') return 0;
-    const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
-    // 2024 rules: sneak_attack_num_d6 directly on class level
-    // 5e rules: class_specific.sneak_attack.dice_count
-    const sneakAttackNumD6 = classLevel?.sneak_attack_num_d6 || classLevel?.class_specific?.sneak_attack?.dice_count || 0;
+    const sneakAttackNumD6 = sneakAttackDiceCount(playerStats);
     if (sneakAttackNumD6 <= 0) return 0;
-    const weaponProperties = attack.properties || [];
-    const hasFinesse = weaponProperties.some(p => p.toLowerCase() === 'finesse');
-    const hasRanged = attack.weaponType === 'ranged';
-    const isSneakAttackWeapon = hasFinesse || hasRanged;
-    const hasDisadvantage = forcedMode === 'disadvantage';
-    if (!isSneakAttackWeapon || hasDisadvantage) return 0;
+    if (!isSneakAttackWeapon(attack) || forcedMode === 'disadvantage') return 0;
     const sneakUsedRound = getRuntimeValue(playerStats.name, '_SneakAttack_usedRound', campaignName);
     if (sneakUsedRound === getCurrentCombatRound(campaignName)) return 0;
     if (forcedMode === 'advantage') return sneakAttackNumD6;

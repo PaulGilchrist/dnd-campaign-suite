@@ -315,19 +315,19 @@ describe('logSaveEntry', () => {
   });
 
   it('calls addEntry with all correct fields for failure', () => {
-    logSaveEntry(
-      'TestCampaign',
-      'Fireball',
-      'Wizard',
-      'Goblin',
-      15,
-      'DEX',
-      false,
-      8,
-      [7],
-      1,
-      '1d20+1',
-    );
+    logSaveEntry({
+      campaignName: 'TestCampaign',
+      featureName: 'Fireball',
+      attackerName: 'Wizard',
+      targetName: 'Goblin',
+      saveDc: 15,
+      saveType: 'DEX',
+      success: false,
+      total: 8,
+      rolls: [7],
+      bonus: 1,
+      formula: '1d20+1',
+    });
 
     expect(logService.addEntry).toHaveBeenCalledWith('TestCampaign', {
       type: 'roll',
@@ -349,19 +349,19 @@ describe('logSaveEntry', () => {
   it('calls addEntry with success result when success is true', () => {
     const fixedTime = 1700000000000;
     const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(fixedTime);
-    logSaveEntry(
-      'TestCampaign',
-      'Fireball',
-      'Wizard',
-      'Goblin',
-      15,
-      'DEX',
-      true,
-      18,
-      [17],
-      1,
-      '1d20+1',
-    );
+    logSaveEntry({
+      campaignName: 'TestCampaign',
+      featureName: 'Fireball',
+      attackerName: 'Wizard',
+      targetName: 'Goblin',
+      saveDc: 15,
+      saveType: 'DEX',
+      success: true,
+      total: 18,
+      rolls: [17],
+      bonus: 1,
+      formula: '1d20+1',
+    });
     nowSpy.mockRestore();
 
     const call = logService.addEntry.mock.calls[0][1];
@@ -371,19 +371,19 @@ describe('logSaveEntry', () => {
   });
 
   it('handles empty rolls array', () => {
-    logSaveEntry(
-      'TestCampaign',
-      'Test Spell',
-      'Caster',
-      'Target',
-      10,
-      'STR',
-      false,
-      0,
-      [],
-      0,
-      '1d20 (waiting)',
-    );
+    logSaveEntry({
+      campaignName: 'TestCampaign',
+      featureName: 'Test Spell',
+      attackerName: 'Caster',
+      targetName: 'Target',
+      saveDc: 10,
+      saveType: 'STR',
+      success: false,
+      total: 0,
+      rolls: [],
+      bonus: 0,
+      formula: '1d20 (waiting)',
+    });
 
     const call = logService.addEntry.mock.calls[0][1];
     expect(call.rolls).toEqual([]);
@@ -392,19 +392,19 @@ describe('logSaveEntry', () => {
   it('catches and logs addEntry errors without throwing', async () => {
     logService.addEntry.mockRejectedValueOnce(new Error('network error'));
 
-    logSaveEntry(
-      'TestCampaign',
-      'Test Spell',
-      'Caster',
-      'Target',
-      10,
-      'DEX',
-      false,
-      0,
-      [],
-      0,
-      '1d20',
-    );
+    logSaveEntry({
+      campaignName: 'TestCampaign',
+      featureName: 'Test Spell',
+      attackerName: 'Caster',
+      targetName: 'Target',
+      saveDc: 10,
+      saveType: 'DEX',
+      success: false,
+      total: 0,
+      rolls: [],
+      bonus: 0,
+      formula: '1d20',
+    });
 
     await vi.waitFor(() => {
       expect(consoleErrorSpy).toHaveBeenCalledWith(

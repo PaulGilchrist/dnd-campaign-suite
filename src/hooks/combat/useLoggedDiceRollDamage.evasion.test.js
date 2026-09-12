@@ -246,17 +246,7 @@ describe('createLogDamageAndShow - NPC save damage with evasion', () => {
                 'half',
                 true
             );
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.any(Object),
-                'Goblin',
-                0,
-                expect.any(Array),
-                'test-campaign',
-                expect.any(Array),
-                false,
-                'TestWizard',
-                true
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 0, expect.any(Array), 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
         });
 
         it('applies half damage when save fails with evasion', async () => {
@@ -309,17 +299,7 @@ describe('createLogDamageAndShow - NPC save damage with evasion', () => {
 
             await callDamageHandler(createFn());
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.any(Object),
-                'Goblin',
-                expect.any(Number),
-                ['fire'],
-                'test-campaign',
-                expect.any(Array),
-                false,
-                'TestWizard',
-                true
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', expect.any(Number), ['fire'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
         });
 
         it('does not apply damage when soulstitch protection is active', async () => {

@@ -389,15 +389,7 @@ describe('applyDamageToTarget — Relentless Endurance (Orc race trait)', () => 
         hitPoints: 100,
       }));
 
-      const result = await applyDamageToTarget(
-        cs, 'OrcSeqId', 10, ['Slashing'], campaignName,
-        [makeCharacter('OrcSeqId', {
-          level: 1, maxHp: 100,
-          features: [{ name: 'Relentless Endurance' }],
-          className: 'Rogue', classLevel: 1,
-        })],
-        false, null, false, { damageSequenceId: 'seq-123' },
-      );
+      const result = await applyDamageToTarget(cs, 'OrcSeqId', 10, ['Slashing'], campaignName, [makeCharacter('OrcSeqId', { level: 1, maxHp: 100, features: [{ name: 'Relentless Endurance' }], className: 'Rogue', classLevel: 1, })], { ignoreResistance: false, attackerName: null, suppressHpLog: false, ...{ damageSequenceId: 'seq-123' } },);
 
       expect(result.intercepted).toBe(true);
       expect(result.newHp).toBe(1);

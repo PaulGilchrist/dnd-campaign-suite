@@ -243,6 +243,20 @@ function addFeatFeatures(playerStats, playerSummary, featFeatures, allFeatures) 
     }
 }
 
+// Load feat data, apply ability-score/proficiency feat buffs, and merge feat
+// features into allFeatures (mutated in place). See FT-047 idempotency note
+// in applyAbilityScoreFeatIncreases.
+async function applyFeatBuffs(playerStats, playerSummary, allFeatures) {
+    const featData = await loadFeatData(is2024(playerStats, playerSummary) ? '2024' : '5e');
+    const featBuffs = computeAllFeatBuffs(playerStats, featData);
+
+    applyAbilityScoreFeatIncreases(playerStats, featBuffs);
+    await applyProficiencyFeatBuffs(playerStats, featBuffs);
+
+    const featFeatures = featBuffs.features;
+    addFeatFeatures(playerStats, playerSummary, featFeatures, allFeatures);
+}
+
 function freeSpellAlreadyAdded(playerStats, predicate) {
     return (playerStats.automation?.specialActions || []).some(predicate);
 }
@@ -491,14 +505,7 @@ const rules = {
       // stored value and the total computed from feats[], so re-loading a
       // saved character applies an ASI exactly once while characters whose
       // JSON predates feat persistence still receive their computed increases.
-      const featData = await loadFeatData(is2024(playerStats, playerSummary) ? '2024' : '5e');
-      const featBuffs = computeAllFeatBuffs(playerStats, featData);
-
-      applyAbilityScoreFeatIncreases(playerStats, featBuffs);
-      await applyProficiencyFeatBuffs(playerStats, featBuffs);
-
-      const featFeatures = featBuffs.features;
-      addFeatFeatures(playerStats, playerSummary, featFeatures, allFeatures);
+      await applyFeatBuffs(playerStats, playerSummary, allFeatures);
 
       // CLA-396: Recompute save proficiencies unconditionally — allFeatures is
       // complete (class/subclass/racial/background pushed earlier, feat features

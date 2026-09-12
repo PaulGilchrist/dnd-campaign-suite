@@ -6,151 +6,30 @@
 // since npm run lint runs with --max-warnings 0.
 export default [
   {
-    files: ['src/hooks/combat/**'],
+    files: ['src/components/campaign-admin/**'],
     rules: {
-      'complexity': ['warn', 25],
-      'max-params': ['warn', 15],
-    },
-  },
-  {
-    files: ['src/hooks/wizard/**'],
-    rules: {
-      'complexity': ['warn', 25],
-    },
-  },
-  {
-    files: ['src/components/character-creation/**'],
-    rules: {
-      'complexity': ['warn', 24],
-    },
-  },
-  {
-    files: ['src/components/encounter/**'],
-    rules: {
-      'complexity': ['warn', 24],
-      'max-params': ['warn', 10],
-    },
-  },
-  {
-    files: ['src/services/automation/**'],
-    rules: {
-      'complexity': ['warn', 24],
-      'max-depth': ['warn', 6],
-      'max-params': ['warn', 10],
-    },
-  },
-  {
-    files: ['src/services/rules/**'],
-    rules: {
-      'complexity': ['warn', 24],
-      'max-depth': ['warn', 6],
-      'max-statements': ['warn', 65],
-      'max-params': ['warn', 13],
-    },
-  },
-  {
-    files: ['src/App.jsx'],
-    rules: {
-      'complexity': ['warn', 23],
-      'max-statements': ['warn', 61],
-    },
-  },
-  {
-    files: ['src/components/common/**'],
-    rules: {
-      'complexity': ['warn', 23],
-      'max-params': ['warn', 7],
-    },
-  },
-  {
-    files: ['src/components/log/**'],
-    rules: {
-      'complexity': ['warn', 23],
-    },
-  },
-  {
-    files: ['src/services/combat/**'],
-    rules: {
-      'complexity': ['warn', 23],
-      'max-depth': ['warn', 6],
-      'max-params': ['warn', 10],
+      'complexity': ['warn', 19],
     },
   },
   {
     files: ['src/components/char-sheet/**'],
     rules: {
-      'complexity': ['warn', 22],
+      'complexity': ['warn', 19],
       'max-depth': ['warn', 6],
-      'max-statements': ['warn', 68],
-      'max-params': ['warn', 11],
-    },
-  },
-  {
-    files: ['src/components/initiative/**'],
-    rules: {
-      'complexity': ['warn', 22],
-      'max-depth': ['warn', 6],
-      'max-statements': ['warn', 64],
-    },
-  },
-  {
-    files: ['src/components/map/**'],
-    rules: {
-      'complexity': ['warn', 22],
-      'max-depth': ['warn', 5],
-      'max-params': ['warn', 6],
-    },
-  },
-  {
-    files: ['src/services/campaign/**'],
-    rules: {
-      'complexity': ['warn', 22],
-      'max-params': ['warn', 6],
-    },
-  },
-  {
-    files: ['src/services/character/**'],
-    rules: {
-      'complexity': ['warn', 22],
-      'max-statements': ['warn', 63],
-    },
-  },
-  {
-    files: ['src/services/maps/**'],
-    rules: {
-      'complexity': ['warn', 22],
-      'max-depth': ['warn', 5],
       'max-params': ['warn', 8],
     },
   },
   {
-    files: ['src/components/settlements/**'],
-    rules: {
-      'complexity': ['warn', 21],
-    },
-  },
-  {
-    files: ['src/services/items/**'],
-    rules: {
-      'complexity': ['warn', 21],
-    },
-  },
-  {
-    files: ['src/components/npcs/**'],
-    rules: {
-      'complexity': ['warn', 20],
-    },
-  },
-  {
-    files: ['src/services/shared/**'],
-    rules: {
-      'complexity': ['warn', 20],
-    },
-  },
-  {
-    files: ['src/components/campaign-admin/**'],
+    files: ['src/components/character-creation/**'],
     rules: {
       'complexity': ['warn', 19],
+    },
+  },
+  {
+    files: ['src/components/common/**'],
+    rules: {
+      'complexity': ['warn', 19],
+      'max-params': ['warn', 7],
     },
   },
   {
@@ -161,9 +40,68 @@ export default [
     },
   },
   {
+    files: ['src/components/initiative/**'],
+    rules: {
+      'complexity': ['warn', 19],
+      'max-depth': ['warn', 6],
+      'max-statements': ['warn', 64],
+    },
+  },
+  {
     files: ['src/components/maps-manager/**'],
     rules: {
       'complexity': ['warn', 19],
+    },
+  },
+  {
+    files: ['src/hooks/combat/**'],
+    rules: {
+      'complexity': ['warn', 19],
+      'max-params': ['warn', 9],
+    },
+  },
+  {
+    files: ['src/services/automation/**'],
+    rules: {
+      'complexity': ['warn', 19],
+      'max-depth': ['warn', 6],
+      'max-params': ['warn', 9],
+    },
+  },
+  {
+    files: ['src/services/character/**'],
+    rules: {
+      'complexity': ['warn', 19],
+    },
+  },
+  {
+    files: ['src/services/combat/**'],
+    rules: {
+      'complexity': ['warn', 19],
+      'max-params': ['warn', 9],
+    },
+  },
+  {
+    files: ['src/services/items/**'],
+    rules: {
+      'complexity': ['warn', 19],
+    },
+  },
+  {
+    files: ['src/services/maps/**'],
+    rules: {
+      'complexity': ['warn', 19],
+      'max-depth': ['warn', 5],
+      'max-params': ['warn', 8],
+    },
+  },
+  {
+    files: ['src/services/rules/**'],
+    rules: {
+      'complexity': ['warn', 19],
+      'max-depth': ['warn', 6],
+      'max-statements': ['warn', 61],
+      'max-params': ['warn', 9],
     },
   },
   {
@@ -176,6 +114,26 @@ export default [
     files: ['server/routes/maps.js'],
     rules: {
       'complexity': ['warn', 18],
+    },
+  },
+  {
+    files: ['src/components/encounter/**'],
+    rules: {
+      'complexity': ['warn', 18],
+      'max-params': ['warn', 7],
+    },
+  },
+  {
+    files: ['src/components/log/**'],
+    rules: {
+      'complexity': ['warn', 18],
+    },
+  },
+  {
+    files: ['src/components/map/**'],
+    rules: {
+      'complexity': ['warn', 18],
+      'max-params': ['warn', 6],
     },
   },
   {
@@ -219,6 +177,12 @@ export default [
     },
   },
   {
+    files: ['src/components/npcs/**'],
+    rules: {
+      'complexity': ['warn', 16],
+    },
+  },
+  {
     files: ['src/components/quests/**'],
     rules: {
       'complexity': ['warn', 16],
@@ -234,6 +198,12 @@ export default [
     files: ['src/hooks/runtime/**'],
     rules: {
       'max-params': ['warn', 7],
+    },
+  },
+  {
+    files: ['src/services/campaign/**'],
+    rules: {
+      'max-params': ['warn', 6],
     },
   },
   {

@@ -114,6 +114,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     // Failed save: apply Charmed + speed_zero conditions
+    return await processOttoDanceFailedSave(casterName, targetName, action, dc, saveResult, campaignName);
+}
+
+/**
+ * Process the failed save: Charmed + speed_zero conditions, condition meta,
+ * concentration badge targetEffect, and log entries.
+ */
+async function processOttoDanceFailedSave(casterName, targetName, action, dc, saveResult, campaignName) {
     const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
     const conditions = Array.isArray(storedConditions) ? storedConditions : [];
     const filtered = conditions.filter(c =>

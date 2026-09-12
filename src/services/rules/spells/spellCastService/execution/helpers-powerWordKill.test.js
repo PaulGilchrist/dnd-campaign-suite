@@ -125,16 +125,7 @@ describe('helpers.js — applyPowerWordKillToTarget', () => {
     const playerStats = makePlayerStats();
     await applyPowerWordKillToTarget('Goblin', playerStats, 'test-campaign');
 
-    expect(applyDamageToTarget).toHaveBeenCalledWith(
-      expect.anything(),
-      'Goblin',
-      80,
-      ['Psychic'],
-      'test-campaign',
-      [],
-      false,
-      'TestWizard',
-    );
+    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', 80, ['Psychic'], 'test-campaign', [], { ignoreResistance: false, attackerName: 'TestWizard' },);
     expect(addEntry).toHaveBeenCalledWith(
       'test-campaign',
       expect.objectContaining({
@@ -155,16 +146,7 @@ describe('helpers.js — applyPowerWordKillToTarget', () => {
     await applyPowerWordKillToTarget('Dragon', playerStats, 'test-campaign');
 
     expect(rollExpression).toHaveBeenCalledWith('12d12');
-    expect(applyDamageToTarget).toHaveBeenCalledWith(
-      expect.anything(),
-      'Dragon',
-      expect.any(Number),
-      ['Psychic'],
-      'test-campaign',
-      [],
-      false,
-      'TestWizard',
-    );
+    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Dragon', expect.any(Number), ['Psychic'], 'test-campaign', [], { ignoreResistance: false, attackerName: 'TestWizard' },);
   });
 
   it('returns early when combat context is null', async () => {

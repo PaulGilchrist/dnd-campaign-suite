@@ -367,6 +367,18 @@ export default function useAttackDamageResolution({
      * Run the attack damage pipeline. For manual damage clicks, context comes from popupHtml.
      * For auto-damage (after an attack roll), pass ctxOverrides from normalizeAutoDamage().
      */
+    const resolveDamageContextFlags = (ctxOverrides, popupHtmlData, attackData) => ({
+        hit: ctxOverrides.hit ?? (popupHtmlData?.hit === true || popupHtmlData?.isCrit === true),
+        isCrit: ctxOverrides.isCrit ?? (popupHtmlData?.isCrit === true),
+        isNatural20: ctxOverrides.isNatural20 ?? (popupHtmlData?.isNatural20 === true),
+        targetName: ctxOverrides.targetName ?? (popupHtmlData?.targetName || null),
+        isBonusActionAttack: ctxOverrides.isBonusActionAttack ?? (attackData?.type === 'Bonus Action'),
+        overchannelActive: ctxOverrides.overchannelActive ?? false,
+        overchannelUseCount: ctxOverrides.overchannelUseCount ?? 0,
+        overchannelSpellLevel: ctxOverrides.overchannelSpellLevel ?? 1,
+        empoweredEvocationModifier: ctxOverrides.empoweredEvocationModifier ?? 0,
+    });
+
     const resolveAttackDamage = async (attack, ctxOverrides = {}) => {
         pendingCtxOverrides = ctxOverrides;
         const ctx = {
@@ -375,11 +387,7 @@ export default function useAttackDamageResolution({
             campaignName,
             mapName,
             popupHtml,
-            hit: ctxOverrides.hit ?? (popupHtml?.hit === true || popupHtml?.isCrit === true),
-            isCrit: ctxOverrides.isCrit ?? (popupHtml?.isCrit === true),
-            isNatural20: ctxOverrides.isNatural20 ?? (popupHtml?.isNatural20 === true),
-            targetName: ctxOverrides.targetName ?? (popupHtml?.targetName || null),
-            isBonusActionAttack: ctxOverrides.isBonusActionAttack ?? (attack?.type === 'Bonus Action'),
+            ...resolveDamageContextFlags(ctxOverrides, popupHtml, attack),
             formula: null,
             total: 0,
             rolls: [],
@@ -389,11 +397,7 @@ export default function useAttackDamageResolution({
             isMeleeOrUnarmed: false,
             buildCtxResult: null,
             autoFormulaOverride: null,
-            overchannelActive: ctxOverrides.overchannelActive ?? false,
-            overchannelUseCount: ctxOverrides.overchannelUseCount ?? 0,
-            overchannelSpellLevel: ctxOverrides.overchannelSpellLevel ?? 1,
             autoDamageSaveDc: null,
-            empoweredEvocationModifier: ctxOverrides.empoweredEvocationModifier ?? 0,
             setPopupHtml,
             setDamageTypeChoice: (v) => setModalState({ damageTypeChoice: v }),
             setDivineFuryChoice: (v) => setModalState({ divineFuryChoice: v }),

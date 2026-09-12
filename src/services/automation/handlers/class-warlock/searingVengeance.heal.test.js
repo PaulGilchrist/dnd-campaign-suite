@@ -194,9 +194,7 @@ describe('searingVengeance CLA-304 heal math', () => {
     );
 
     expect(diceRoller.rollExpression).toHaveBeenCalledWith('2d8+3');
-    expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-      expect.anything(), 'Thug 1', 18, ['Radiant'], campaignName, [], false, 'HexWarlock'
-    );
+    expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Thug 1', 18, ['Radiant'], campaignName, [], { ignoreResistance: false, attackerName: 'HexWarlock' });
   });
 
   it('blinded expiration is one round (until end of current turn)', async () => {

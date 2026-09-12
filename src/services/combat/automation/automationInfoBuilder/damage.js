@@ -1,47 +1,59 @@
 import { evaluateAutoExpression } from '../automationExpressions.js'
+import { withAutoDefaults } from './infoDefaults.js'
+
+const DAMAGE_BONUS_DEFAULTS = {
+    trigger: '',
+    damageType: '',
+    maxDamage: '',
+    extraVs: null,
+    extraDamage: '',
+    extraDamageExpression: '',
+    extraDamageType: '',
+    resourceType: 'spell_slot',
+    options: [],
+    tempHpExpression: '',
+    upgrades: '',
+    rangeBonusCantrip: '',
+    uses_expression: '',
+    recharge: '',
+    abilityIncreased: '',
+}
+
+function resolveScaledExpression(auto, playerStats) {
+    let resolvedExpr = auto.damageExpression || '';
+    if (!auto.scaling) return resolvedExpr;
+    const entries = Object.entries(auto.scaling)
+        .map(([k, v]) => ({ level: parseInt(k, 10), expr: String(v) }))
+        .filter(e => !isNaN(e.level))
+        .sort((a, b) => a.level - b.level);
+    for (const entry of entries) {
+        if (playerStats.level >= entry.level) {
+            resolvedExpr = entry.expr;
+        }
+    }
+    return resolvedExpr;
+}
+
+function resolveDamageBonusUsesMax(auto, playerStats) {
+    if (auto.uses_expression) {
+        return evaluateAutoExpression(auto.uses_expression, playerStats) || 1;
+    }
+    if (auto.uses) {
+        return auto.uses;
+    }
+    return 0;
+}
 
 export const damageHandlers = {
     'damage_bonus': (feature, playerStats) => {
         const auto = feature.automation
-        let resolvedExpr = auto.damageExpression || '';
-        if (auto.scaling) {
-            const entries = Object.entries(auto.scaling)
-                .map(([k, v]) => ({ level: parseInt(k, 10), expr: String(v) }))
-                .filter(e => !isNaN(e.level))
-                .sort((a, b) => a.level - b.level);
-            for (const entry of entries) {
-                if (playerStats.level >= entry.level) {
-                    resolvedExpr = entry.expr;
-                }
-            }
-        }
-        let usesMax = 0;
-        if (auto.uses_expression) {
-            usesMax = evaluateAutoExpression(auto.uses_expression, playerStats) || 1;
-        } else if (auto.uses) {
-            usesMax = auto.uses;
-        }
         return {
             type: 'damage_bonus',
             name: feature.name,
-            trigger: auto.trigger || '',
-            damageExpression: resolvedExpr,
-            damageType: auto.damageType || '',
-            maxDamage: auto.maxDamage || '',
-            extraVs: auto.extraVs || null,
-            extraDamage: auto.extraDamage || '',
-            extraDamageExpression: auto.extraDamageExpression || '',
-            extraDamageType: auto.extraDamageType || '',
-            resourceType: auto.resourceType || 'spell_slot',
+            ...withAutoDefaults(auto, DAMAGE_BONUS_DEFAULTS),
+            damageExpression: resolveScaledExpression(auto, playerStats),
             oncePerTurn: !!auto.oncePerTurn,
-            options: auto.options || [],
-            tempHpExpression: auto.tempHpExpression || '',
-            upgrades: auto.upgrades || '',
-            rangeBonusCantrip: auto.rangeBonusCantrip || '',
-            uses_expression: auto.uses_expression || '',
-            usesMax,
-            recharge: auto.recharge || '',
-            abilityIncreased: auto.abilityIncreased || '',
+            usesMax: resolveDamageBonusUsesMax(auto, playerStats),
             hasAutomation: true
         }
     },

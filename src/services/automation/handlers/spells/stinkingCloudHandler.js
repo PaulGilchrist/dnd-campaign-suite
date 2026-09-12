@@ -6,11 +6,9 @@ import { addEntry } from '../../../ui/logService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollback.js';
-import { addConcentration } from '../../../combat/concentration/concentrationService.js';
-import { getCombatSummary } from '../../../encounters/combatData.js';
-import storage from '../../../ui/storage.js';
 import { playerIsImmuneToCondition } from '../../../combat/automation/automationImmunities.js';
 import { getEffectDefinition, registerTargetEffect } from '../../../combat/conditions/targetEffectDefinitions.js';
+import { spellNoticePopup, resolveSelectedSpellTargets, registerSpellConcentration } from './areaSpellUtils.js';
 
 /**
  * Stinking Cloud spell handler.
@@ -74,6 +72,24 @@ export async function applyStinkingCloudTurnEnd(campaignName, targetName) {
  * Stinking Cloud zone (SP-108 sleetStorm processSleetStormAreaSave mirror).
  * Called from expireStaleEffects Phase 4 at each creature's turn start.
  */
+// Poison immunity (or no need to breathe) = automatic success.
+async function stinkingCloudTargetImmune(targetCreature, targetName, campaignName) {
+    const targetImmunities = targetCreature?.weaknessesAndResistivities?.immunities || [];
+    if (Array.isArray(targetImmunities) && targetImmunities.some(imm => String(imm).toLowerCase() === 'poison')) {
+        return true;
+    }
+    if (targetCreature?.type !== 'player') return false;
+    const targetStats = {
+        computedStats: getRuntimeValue(targetName, 'computedStats', campaignName),
+    };
+    return playerIsImmuneToCondition({
+        conditionKey: 'poisoned',
+        playerStats: targetStats,
+        getRuntimeValue,
+        campaignName,
+    });
+}
+
 export async function processStinkingCloudAreaSave(casterName, targetName, campaignName, _mapName) {
     const trackingKey = `_stinkingCloud_${casterName.replace(/\s+/g, '_')}`;
     const tracking = getRuntimeValue(casterName, trackingKey, campaignName);
@@ -94,24 +110,8 @@ export async function processStinkingCloudAreaSave(casterName, targetName, campa
 
     const targetCreature = (await getCombatContext(campaignName))?.creatures?.find(c => c.name === targetName);
 
-    // Poison immunity (or no need to breathe) = automatic success.
-    const targetImmunities = targetCreature?.weaknessesAndResistivities?.immunities || [];
-    if (Array.isArray(targetImmunities) && targetImmunities.some(imm => String(imm).toLowerCase() === 'poison')) {
+    if (await stinkingCloudTargetImmune(targetCreature, targetName, campaignName)) {
         return null;
-    }
-
-    if (targetCreature?.type === 'player') {
-        const targetStats = {
-            computedStats: getRuntimeValue(targetName, 'computedStats', campaignName),
-        };
-        if (playerIsImmuneToCondition({
-            conditionKey: 'poisoned',
-            playerStats: targetStats,
-            getRuntimeValue,
-            campaignName,
-        })) {
-            return null;
-        }
     }
 
     const { promptId, promise } = createSaveListener(campaignName, {
@@ -253,29 +253,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const cs = await getCombatContext(campaignName);
     if (!cs?.creatures || cs.creatures.length === 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: 'No creatures in combat. Stinking Cloud has no effect.',
-            },
-        };
+        return spellNoticePopup(action.name, 'No creatures in combat. Stinking Cloud has no effect.');
     }
 
     // Get selected targets from metaCtx; if none, use all creatures
-    const selectedTargetNames = action.metaCtx?.targets || cs.creatures.map(c => c.name);
-    const targets = cs.creatures.filter(c => selectedTargetNames.includes(c.name));
+    const targets = resolveSelectedSpellTargets(cs, action);
 
     if (targets.length === 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: 'No creatures selected for Stinking Cloud.',
-            },
-        };
+        return spellNoticePopup(action.name, 'No creatures selected for Stinking Cloud.');
     }
 
     storeSpellLastAttack(campaignName, {
@@ -304,14 +289,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // sustained concentration — mirrors sleetStorm's 1_minute→10 mapping and
     // the CLA-334 minutes-as-rounds encoding. Concentration loss sweeps the
     // 'concentration' tes separately via cleanupConcentrationEffects.
-    const durationRounds = (() => {
-        const lower = (auto.duration || action.spell?.duration || 'Concentration, up to 1 minute').toLowerCase();
-        const minuteMatch = lower.match(/(\d+)\s*_?minute/);
-        if (minuteMatch) return parseInt(minuteMatch[1], 10) * 10;
-        const roundMatch = lower.match(/(\d+)\s*_?round/);
-        if (roundMatch) return parseInt(roundMatch[1], 10);
-        return undefined;
-    })();
+    const durationRounds = resolveStinkingCloudDurationRounds(auto, action);
 
     if (durationRounds) {
         addExpiration(casterName, casterName, [
@@ -321,14 +299,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         ], campaignName, durationRounds);
     }
 
-    // Register concentration for this spell
-    const combatSummary = getCombatSummary(campaignName);
-    if (combatSummary) {
-        const concentrationDc = playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
-        addConcentration(combatSummary, casterName, 'Stinking Cloud', concentrationDc);
-        storage.set('combatSummary', combatSummary, campaignName);
-        window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-    }
+    registerSpellConcentration(campaignName, casterName, 'Stinking Cloud', playerStats);
 
     let affectedCount = 0;
     let savedCount = 0;
@@ -396,18 +367,27 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         }
     }
 
-    const summary = affectedCount > 0
-        ? `Stinking Cloud affects ${affectedCount} creature(s). ${results.join(' ')} ${savedCount} creature(s) saved. ${immuneCount > 0 ? `${immuneCount} creature(s) immune.` : ''} Affected creatures are Poisoned (can't take Actions or Bonus Actions) until the end of their current turn.`
-        : `No creatures affected by Stinking Cloud. ${savedCount} creature(s) saved. ${immuneCount > 0 ? `${immuneCount} creature(s) immune.` : ''}`;
+    return spellNoticePopup(action.name, buildStinkingCloudSummary(affectedCount, savedCount, immuneCount, results));
+}
 
-    return {
-        type: 'popup',
-        payload: {
-            type: 'automation_info',
-            name: action.name,
-            description: summary,
-        },
-    };
+// Expiration: the spell lasts at most 1 minute (10 rounds) even with
+// sustained concentration — mirrors sleetStorm's 1_minute→10 mapping and the
+// CLA-334 minutes-as-rounds encoding.
+function resolveStinkingCloudDurationRounds(auto, action) {
+    const lower = (auto.duration || action.spell?.duration || 'Concentration, up to 1 minute').toLowerCase();
+    const minuteMatch = lower.match(/(\d+)\s*_?minute/);
+    if (minuteMatch) return parseInt(minuteMatch[1], 10) * 10;
+    const roundMatch = lower.match(/(\d+)\s*_?round/);
+    if (roundMatch) return parseInt(roundMatch[1], 10);
+    return undefined;
+}
+
+function buildStinkingCloudSummary(affectedCount, savedCount, immuneCount, results) {
+    const immuneNote = immuneCount > 0 ? `${immuneCount} creature(s) immune.` : '';
+    if (affectedCount > 0) {
+        return `Stinking Cloud affects ${affectedCount} creature(s). ${results.join(' ')} ${savedCount} creature(s) saved. ${immuneNote} Affected creatures are Poisoned (can't take Actions or Bonus Actions) until the end of their current turn.`;
+    }
+    return `No creatures affected by Stinking Cloud. ${savedCount} creature(s) saved. ${immuneNote}`;
 }
 
 function isPoisonImmune(target) {

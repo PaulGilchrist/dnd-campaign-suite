@@ -97,9 +97,7 @@ describe('concentrationBonusAttackHandler — CLA-356', () => {
         const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
         expect(rollD20).toHaveBeenCalled();
-        expect(applyDamageToTarget).toHaveBeenCalledWith(
-            expect.any(Object), 'Thug 1', 8, ['Slashing'], campaignName, expect.any(Array), false, 'EvasiveFighter'
-        );
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Thug 1', 8, ['Slashing'], campaignName, expect.any(Array), { ignoreResistance: false, attackerName: 'EvasiveFighter' });
         // once-per-turn latch stamped on the player.
         expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', '_Telekinetic_Master_attack_usedRound', { round: 1, activeCreature: 'EvasiveFighter' }, campaignName);
         // ability_use log records the applied attack bonus result.

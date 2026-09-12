@@ -6,6 +6,63 @@ import Subscriber from './Subscriber.jsx';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import './DeathSavePromptModal.css';
 
+function isSuccessResult(result) {
+  return result.result === 'success' || result.result === 'nat20' || result.result === 'stable';
+}
+
+function buildDeathSaveOutcome(current, result) {
+  return {
+    promptId: current.promptId,
+    targetName: current.targetName,
+    roll: result.roll,
+    isNat20: result.isNat20,
+    isNat1: result.isNat1,
+    success: isSuccessResult(result),
+    result: result.result,
+    newSaves: result.newSaves,
+    newFailures: result.newFailures,
+    restoredToHp: result.restoredToHp,
+  };
+}
+
+function readDeathSaveState(targetName) {
+  let currentSaves = [false, false, false];
+  let currentFailures = [false, false, false];
+  try {
+    const savedSaves = getRuntimeValue(targetName, 'deathSaves');
+    const savedFailures = getRuntimeValue(targetName, 'deathFailures');
+    if (savedSaves) currentSaves = savedSaves;
+    if (savedFailures) currentFailures = savedFailures;
+  } catch { /* ignore */ }
+  return { currentSaves, currentFailures };
+}
+
+function resultLabel(result) {
+  if (result.isNat20) return 'NATURAL 20 — STABILIZED!';
+  if (result.isNat1) return 'NATURAL 1 — DOUBLE FAILURE';
+  if (result.result === 'stable') return 'STABILIZED!';
+  if (result.result === 'success') return 'DEATH SAVE SUCCESS';
+  if (result.result === 'dead') return 'DEAD';
+  return 'DEATH SAVE FAILURE';
+}
+
+function resultCssClass(result) {
+  if (result.isNat20) return 'dsp-result-nat20';
+  if (result.isNat1) return 'dsp-result-nat1';
+  if (isSuccessResult(result)) return 'dsp-result-success';
+  return 'dsp-result-fail';
+}
+
+function DeathSaveResult({ result }) {
+  return (
+    <div className={`dsp-result ${resultCssClass(result)}`}>
+      <p className="dsp-result-label">{resultLabel(result)}</p>
+      <p className="dsp-result-total">Roll: <strong>{result.roll}</strong></p>
+      {result.restoredToHp !== null && <p className="dsp-result-hp">Restored to {result.restoredToHp} HP</p>}
+    </div>
+  );
+}
+
 function DeathSavePromptModal({ campaignName }) {
   const [prompts, setPrompts] = useState([]);
 
@@ -31,43 +88,15 @@ function DeathSavePromptModal({ campaignName }) {
   const handleRoll = useCallback(() => {
     if (!current) return;
 
-    let currentSaves = [false, false, false];
-    let currentFailures = [false, false, false];
-    try {
-      const savedSaves = getRuntimeValue(current.targetName, 'deathSaves');
-      const savedFailures = getRuntimeValue(current.targetName, 'deathFailures');
-      if (savedSaves) currentSaves = savedSaves;
-      if (savedFailures) currentFailures = savedFailures;
-    } catch { /* ignore */ }
-
+    const { currentSaves, currentFailures } = readDeathSaveState(current.targetName);
     const result = deathSaveRules.rollDeathSave(currentSaves, currentFailures);
+    const { targetName, ...sendPayload } = buildDeathSaveOutcome(current, result);
 
-    sendDeathSaveResult(campaignName, current.targetName, {
-      promptId: current.promptId,
-      roll: result.roll,
-      isNat20: result.isNat20,
-      isNat1: result.isNat1,
-      success: result.result === 'success' || result.result === 'nat20' || result.result === 'stable',
-      result: result.result,
-      newSaves: result.newSaves,
-      newFailures: result.newFailures,
-      restoredToHp: result.restoredToHp,
-    });
+    sendDeathSaveResult(campaignName, current.targetName, sendPayload);
 
     window.dispatchEvent(new CustomEvent('death-save-result', {
-      detail: {
-        promptId: current.promptId,
-        targetName: current.targetName,
-        roll: result.roll,
-        isNat20: result.isNat20,
-        isNat1: result.isNat1,
-        success: result.result === 'success' || result.result === 'nat20' || result.result === 'stable',
-        result: result.result,
-        newSaves: result.newSaves,
-        newFailures: result.newFailures,
-        restoredToHp: result.restoredToHp,
-       },
-     }));
+      detail: { ...sendPayload, targetName },
+    }));
 
     setRuntimeValue(current.targetName, 'deathSaves', result.newSaves, campaignName);
     setRuntimeValue(current.targetName, 'deathFailures', result.newFailures, campaignName);
@@ -118,17 +147,7 @@ function DeathSavePromptModal({ campaignName }) {
             </div>
             <div className="dsp-body">
               <p><strong>{current.targetName}</strong> must make a <strong>Death Saving Throw</strong>.</p>
-              {hasResult && (
-                <div className={`dsp-result ${current.result.isNat20 ? 'dsp-result-nat20' : current.result.isNat1 ? 'dsp-result-nat1' : current.result.result === 'success' || current.result.result === 'stable' ? 'dsp-result-success' : 'dsp-result-fail'}`}>
-                  <p className="dsp-result-label">
-                    {current.result.isNat20 && 'NATURAL 20 — STABILIZED!'}
-                    {current.result.isNat1 && 'NATURAL 1 — DOUBLE FAILURE'}
-                    {!current.result.isNat20 && !current.result.isNat1 && (current.result.result === 'stable' ? 'STABILIZED!' : current.result.result === 'success' ? 'DEATH SAVE SUCCESS' : current.result.result === 'dead' ? 'DEAD' : 'DEATH SAVE FAILURE')}
-                  </p>
-                  <p className="dsp-result-total">Roll: <strong>{current.result.roll}</strong></p>
-                  {current.result.restoredToHp !== null && <p className="dsp-result-hp">Restored to {current.result.restoredToHp} HP</p>}
-                </div>
-              )}
+              {hasResult && <DeathSaveResult result={current.result} />}
             </div>
             <div className="dsp-actions">
               {!hasResult ? (

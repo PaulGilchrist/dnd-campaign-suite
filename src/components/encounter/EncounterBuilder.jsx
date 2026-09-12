@@ -46,28 +46,34 @@ function crToNumber(cr) {
   return isNaN(num) ? NaN : num;
 }
 
-function filterMonsters(monsters, searchQuery, playerLevels, difficultyIndex, totalThreshold, environmentFilter, typeFilter, sizeFilter, crMin, crMax) {
+function matchesCrRange(m, crMinNum, crMaxNum) {
+  if (crMinNum === null && crMaxNum === null) return true;
+  const cr = crToNumber(m.challenge_rating);
+  if (isNaN(cr)) return false;
+  if (crMinNum !== null && cr < crMinNum) return false;
+  if (crMaxNum !== null && cr > crMaxNum) return false;
+  return true;
+}
+
+function matchesSearchQuery(m, q) {
+  return m.name.toLowerCase().includes(q)
+     || (m.type && m.type.toLowerCase().includes(q))
+     || (m.subtype && m.subtype.toLowerCase().includes(q));
+}
+
+function filterMonsters(monsters, filter = {}) {
   if (!monsters) return [];
+  const { searchQuery = '', environmentFilter = '', typeFilter = '', sizeFilter = '', crMin = '', crMax = '' } = filter;
+  const crMinNum = !crMin ? null : parseFloat(crMin);
+  const crMaxNum = !crMax ? null : parseFloat(crMax);
+  const q = searchQuery ? searchQuery.toLowerCase() : '';
   return monsters.filter(m => {
     if (environmentFilter && m.environments && !m.environments.includes(environmentFilter)) return false;
     if (typeFilter && m.type && m.type.toLowerCase() !== typeFilter.toLowerCase()) return false;
     if (sizeFilter && m.size && m.size.toLowerCase() !== sizeFilter.toLowerCase()) return false;
-    const crMinNum = !crMin ? null : parseFloat(crMin);
-    const crMaxNum = !crMax ? null : parseFloat(crMax);
-    if (crMinNum !== null || crMaxNum !== null) {
-      const cr = crToNumber(m.challenge_rating);
-      if (!isNaN(cr)) {
-        if (crMinNum !== null && cr < crMinNum) return false;
-        if (crMaxNum !== null && cr > crMaxNum) return false;
-      } else {
-        return false;
-      }
-    }
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return m.name.toLowerCase().includes(q)
-       || (m.type && m.type.toLowerCase().includes(q))
-       || (m.subtype && m.subtype.toLowerCase().includes(q));
+    if (!matchesCrRange(m, crMinNum, crMaxNum)) return false;
+    if (!q) return true;
+    return matchesSearchQuery(m, q);
   });
 }
 
@@ -231,7 +237,14 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
     const filteredMonsters = useMemo(
         () => {
          // Ensure selected monsters always appear in the table, even if they don't match current filters
-        const result = filterMonsters(monsters, searchQuery, filter.playerLevels, filter.difficulty, totalThreshold, filter.environment, filter.type, filter.size, filter.crMin, filter.crMax);
+        const result = filterMonsters(monsters, {
+          searchQuery,
+          environmentFilter: filter.environment,
+          typeFilter: filter.type,
+          sizeFilter: filter.size,
+          crMin: filter.crMin,
+          crMax: filter.crMax,
+        });
         for (const sm of selectedMonsters) {
           if (!result.some(m => m.index === sm.index)) {
             const full = (monsters || []).find(m => m.index === sm.index);
@@ -272,7 +285,7 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
            });
         return result;
         },
-        [monsters, searchQuery, filter.playerLevels, filter.difficulty, totalThreshold, filter.environment, filter.type, filter.size, filter.crMin, filter.crMax, selectedMonsters, sortField, sortDirection]
+        [monsters, searchQuery, filter.environment, filter.type, filter.size, filter.crMin, filter.crMax, selectedMonsters, sortField, sortDirection]
     );
 
   // --- Handlers ---

@@ -136,28 +136,34 @@ describe('filterMonsters', () => {
     return isNaN(num) ? NaN : num;
   }
 
-  function filterMonsters(monsters, searchQuery, playerLevels, difficultyIndex, totalThreshold, environmentFilter, typeFilter, sizeFilter, crMin, crMax) {
+  function matchesCrRange(m, crMinNum, crMaxNum) {
+    if (crMinNum === null && crMaxNum === null) return true;
+    const cr = crToNumber(m.challenge_rating);
+    if (isNaN(cr)) return false;
+    if (crMinNum !== null && cr < crMinNum) return false;
+    if (crMaxNum !== null && cr > crMaxNum) return false;
+    return true;
+  }
+
+  function matchesSearchQuery(m, q) {
+    return m.name.toLowerCase().includes(q)
+      || (m.type && m.type.toLowerCase().includes(q))
+      || (m.subtype && m.subtype.toLowerCase().includes(q));
+  }
+
+  function filterMonsters(monsters, filter = {}) {
     if (!monsters) return [];
+    const { searchQuery = '', environmentFilter = '', typeFilter = '', sizeFilter = '', crMin = '', crMax = '' } = filter;
+    const crMinNum = !crMin ? null : parseFloat(crMin);
+    const crMaxNum = !crMax ? null : parseFloat(crMax);
+    const q = searchQuery ? searchQuery.toLowerCase() : '';
     return monsters.filter(m => {
       if (environmentFilter && m.environments && !m.environments.includes(environmentFilter)) return false;
       if (typeFilter && m.type && m.type.toLowerCase() !== typeFilter.toLowerCase()) return false;
       if (sizeFilter && m.size && m.size.toLowerCase() !== sizeFilter.toLowerCase()) return false;
-      const crMinNum = !crMin ? null : parseFloat(crMin);
-      const crMaxNum = !crMax ? null : parseFloat(crMax);
-      if (crMinNum !== null || crMaxNum !== null) {
-        const cr = crToNumber(m.challenge_rating);
-        if (!isNaN(cr)) {
-          if (crMinNum !== null && cr < crMinNum) return false;
-          if (crMaxNum !== null && cr > crMaxNum) return false;
-        } else {
-          return false;
-        }
-      }
-      if (!searchQuery) return true;
-      const q = searchQuery.toLowerCase();
-      return m.name.toLowerCase().includes(q)
-        || (m.type && m.type.toLowerCase().includes(q))
-        || (m.subtype && m.subtype.toLowerCase().includes(q));
+      if (!matchesCrRange(m, crMinNum, crMaxNum)) return false;
+      if (!q) return true;
+      return matchesSearchQuery(m, q);
     });
   }
 
@@ -172,22 +178,22 @@ describe('filterMonsters', () => {
   ];
 
   it('filters by search query matching name, type, or subtype (case-insensitive)', () => {
-    expect(filterMonsters(monsters, 'goblin', [1, 1, 1], 1, 150, '', '', '', '', '' ).map(m => m.index)).toEqual(['goblin']);
-    expect(filterMonsters(monsters, 'dragon', [15, 15, 15], 1, 8400, '', '', '', '', '' ).map(m => m.index)).toContain('dragon');
-    expect(filterMonsters(monsters, 'tribe', [1, 1, 1], 1, 150, '', '', '', '', '' ).map(m => m.index)).toEqual(['goblin']);
-    expect(filterMonsters(monsters, 'GOBLIN', [1, 1, 1], 1, 150, '', '', '', '', '' ).map(m => m.index)).toEqual(['goblin']);
+    expect(filterMonsters(monsters, { searchQuery: 'goblin' }).map(m => m.index)).toEqual(['goblin']);
+    expect(filterMonsters(monsters, { searchQuery: 'dragon' }).map(m => m.index)).toContain('dragon');
+    expect(filterMonsters(monsters, { searchQuery: 'tribe' }).map(m => m.index)).toEqual(['goblin']);
+    expect(filterMonsters(monsters, { searchQuery: 'GOBLIN' }).map(m => m.index)).toEqual(['goblin']);
   });
 
   it('filters by environment only', () => {
-    expect(filterMonsters(monsters, '', [15, 15, 15], 1, 8400, 'underdark', '', '', '', '' ).map(m => m.index)).toEqual(['slime', 'shadow']);
-    expect(filterMonsters(monsters, '', [1, 1, 1], 1, 150, '', '', '', '', '' ).map(m => m.index)).toEqual(['goblin', 'orc', 'dragon', 'slime', 'tiger', 'flaming-sphere', 'shadow']);
-    expect(filterMonsters(monsters, '', [15, 15, 15], 1, 0, '', '', '', '', '' ).map(m => m.index)).toEqual(['goblin', 'orc', 'dragon', 'slime', 'tiger', 'flaming-sphere', 'shadow']);
+    expect(filterMonsters(monsters, { environmentFilter: 'underdark' }).map(m => m.index)).toEqual(['slime', 'shadow']);
+    expect(filterMonsters(monsters, {}).map(m => m.index)).toEqual(['goblin', 'orc', 'dragon', 'slime', 'tiger', 'flaming-sphere', 'shadow']);
+    expect(filterMonsters(monsters, {}).map(m => m.index)).toEqual(['goblin', 'orc', 'dragon', 'slime', 'tiger', 'flaming-sphere', 'shadow']);
   });
 
   it('filters by type', () => {
-    expect(filterMonsters(monsters, '', [1, 1, 1], 1, 150, '', 'humanoid', '', '', '' ).map(m => m.index)).toEqual(['goblin', 'orc']);
-    expect(filterMonsters(monsters, '', [1, 1, 1], 1, 150, '', 'dragon', '', '', '' ).map(m => m.index)).toEqual(['dragon']);
-    expect(filterMonsters(monsters, '', [1, 1, 1], 1, 150, '', 'beast', '', '', '' ).map(m => m.index)).toEqual(['tiger']);
+    expect(filterMonsters(monsters, { typeFilter: 'humanoid' }).map(m => m.index)).toEqual(['goblin', 'orc']);
+    expect(filterMonsters(monsters, { typeFilter: 'dragon' }).map(m => m.index)).toEqual(['dragon']);
+    expect(filterMonsters(monsters, { typeFilter: 'beast' }).map(m => m.index)).toEqual(['tiger']);
   });
 
   it('filters by size', () => {
@@ -196,16 +202,16 @@ describe('filterMonsters', () => {
       { index: 'orc', name: 'Orc', type: 'humanoid', size: 'medium', environments: ['hill'], challenge_rating: 0.5 },
       { index: 'ogre', name: 'Ogre', type: 'giant', size: 'huge', environments: ['hill'], challenge_rating: 3 },
     ];
-    expect(filterMonsters(sizedMonsters, '', [1, 1, 1], 1, 150, '', '', 'medium', '', '' ).map(m => m.index)).toEqual(['orc']);
-    expect(filterMonsters(sizedMonsters, '', [1, 1, 1], 1, 150, '', '', 'huge', '', '' ).map(m => m.index)).toEqual(['ogre']);
-    expect(filterMonsters(sizedMonsters, '', [1, 1, 1], 1, 150, '', '', 'small', '', '' ).map(m => m.index)).toEqual(['goblin']);
+    expect(filterMonsters(sizedMonsters, { sizeFilter: 'medium' }).map(m => m.index)).toEqual(['orc']);
+    expect(filterMonsters(sizedMonsters, { sizeFilter: 'huge' }).map(m => m.index)).toEqual(['ogre']);
+    expect(filterMonsters(sizedMonsters, { sizeFilter: 'small' }).map(m => m.index)).toEqual(['goblin']);
   });
 
   it('filters by CR range', () => {
-    expect(filterMonsters(monsters, '', [1, 1, 1], 1, 150, '', '', '', 0, 0.5).map(m => m.index)).toEqual(['goblin', 'orc', 'shadow']);
-    expect(filterMonsters(monsters, '', [1, 1, 1], 1, 150, '', '', '', 1, 2).map(m => m.index)).toContain('dragon');
-    expect(filterMonsters(monsters, '', [1, 1, 1], 1, 150, '', '', '', '', 0.5).map(m => m.index)).toEqual(['goblin', 'orc', 'shadow']);
-    expect(filterMonsters(monsters, '', [1, 1, 1], 1, 150, '', '', '', 2, '' ).map(m => m.index)).toEqual(['dragon']);
+    expect(filterMonsters(monsters, { crMin: 0, crMax: 0.5 }).map(m => m.index)).toEqual(['goblin', 'orc', 'shadow']);
+    expect(filterMonsters(monsters, { crMin: 1, crMax: 2 }).map(m => m.index)).toContain('dragon');
+    expect(filterMonsters(monsters, { crMax: 0.5 }).map(m => m.index)).toEqual(['goblin', 'orc', 'shadow']);
+    expect(filterMonsters(monsters, { crMin: 2 }).map(m => m.index)).toEqual(['dragon']);
   });
 
   it('filters by CR range with fraction notation', () => {
@@ -214,7 +220,7 @@ describe('filterMonsters', () => {
       { index: 'rat', name: 'Rat', type: 'beast', size: 'tiny', environments: ['forest'], challenge_rating: '1/4' },
       { index: 'wolf', name: 'Wolf', type: 'beast', size: 'medium', environments: ['forest'], challenge_rating: '1/4' },
     ];
-    expect(filterMonsters(fractionMonsters, '', [1, 1, 1], 1, 150, '', '', '', 0.125, 0.25).map(m => m.index)).toEqual(['mold', 'rat', 'wolf']);
+    expect(filterMonsters(fractionMonsters, { crMin: 0.125, crMax: 0.25 }).map(m => m.index)).toEqual(['mold', 'rat', 'wolf']);
   });
 
   it('excludes monsters with no CR when CR range is specified', () => {
@@ -222,7 +228,7 @@ describe('filterMonsters', () => {
       { index: 'cloud', name: 'Cloud', type: 'elemental', size: 'large', environments: ['sky'], challenge_rating: 'None' },
       { index: 'goblin', name: 'Goblin', type: 'humanoid', size: 'small', environments: ['forest'], challenge_rating: 0.25 },
     ];
-    expect(filterMonsters(noCRMonsters, '', [1, 1, 1], 1, 150, '', '', '', 0, 1).map(m => m.index)).toEqual(['goblin']);
+    expect(filterMonsters(noCRMonsters, { crMin: 0, crMax: 1 }).map(m => m.index)).toEqual(['goblin']);
   });
 
   it('combines type and size filters', () => {
@@ -231,7 +237,7 @@ describe('filterMonsters', () => {
       { index: 'orc', name: 'Orc', type: 'humanoid', size: 'medium', environments: ['hill'], challenge_rating: 0.5 },
       { index: 'ogre', name: 'Ogre', type: 'giant', size: 'huge', environments: ['hill'], challenge_rating: 3 },
     ];
-    expect(filterMonsters(combinedMonsters, '', [1, 1, 1], 1, 150, '', 'humanoid', 'small', '', '' ).map(m => m.index)).toEqual(['goblin']);
+    expect(filterMonsters(combinedMonsters, { typeFilter: 'humanoid', sizeFilter: 'small' }).map(m => m.index)).toEqual(['goblin']);
   });
 
   it('combines type, size, and CR filters', () => {
@@ -240,13 +246,13 @@ describe('filterMonsters', () => {
       { index: 'orc', name: 'Orc', type: 'humanoid', size: 'medium', environments: ['hill'], challenge_rating: 0.5 },
       { index: 'ogre', name: 'Ogre', type: 'giant', size: 'huge', environments: ['hill'], challenge_rating: 3 },
     ];
-    expect(filterMonsters(combinedMonsters, '', [1, 1, 1], 1, 150, '', 'humanoid', '', 0, 0.5).map(m => m.index)).toEqual(['goblin', 'orc']);
-    expect(filterMonsters(combinedMonsters, '', [1, 1, 1], 1, 150, '', '', 'medium', 0, 1).map(m => m.index)).toEqual(['orc']);
+    expect(filterMonsters(combinedMonsters, { typeFilter: 'humanoid', crMin: 0, crMax: 0.5 }).map(m => m.index)).toEqual(['goblin', 'orc']);
+    expect(filterMonsters(combinedMonsters, { sizeFilter: 'medium', crMin: 0, crMax: 1 }).map(m => m.index)).toEqual(['orc']);
   });
 
   it('returns empty array when monsters is null or no monsters match', () => {
-    expect(filterMonsters(null, '', [1], 1, 50, '', '', '', '', '' )).toEqual([]);
-    expect(filterMonsters(monsters, 'unicorn', [1, 1, 1], 1, 150, '', '', '', '', '' )).toEqual([]);
+    expect(filterMonsters(null, {})).toEqual([]);
+    expect(filterMonsters(monsters, { searchQuery: 'unicorn' })).toEqual([]);
   });
 });
 

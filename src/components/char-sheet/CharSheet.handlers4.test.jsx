@@ -178,16 +178,7 @@ describe('handlePuncture', () => {
       punctureData
     );
 
-    expect(applyDamageToTarget).toHaveBeenCalledWith(
-      expect.anything(),
-      'Zombie 1',
-      4,
-      ['Piercing'],
-      mockCampaignName,
-      [],
-      false,
-      'Test Character'
-    );
+    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Zombie 1', 4, ['Piercing'], mockCampaignName, [], { ignoreResistance: false, attackerName: 'Test Character' });
     expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'piercerPunctureUsedThisTurn', true, mockCampaignName);
     expect(addEntry).toHaveBeenCalled();
     expect(addEntry.mock.calls[0][1].abilityName).toBe('Piercer - Puncture');
@@ -304,16 +295,7 @@ describe('handleSavageAttacker', () => {
       }
     );
 
-    expect(applyDamageToTarget).toHaveBeenCalledWith(
-      expect.anything(),
-      'Orc',
-      2,
-      ['Slashing'],
-      mockCampaignName,
-      [],
-      false,
-      'Test Character'
-    );
+    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Orc', 2, ['Slashing'], mockCampaignName, [], { ignoreResistance: false, attackerName: 'Test Character' });
     expect(setPopupHtml).toHaveBeenCalled();
     expect(setPopupHtml.mock.calls[0][0].rolls).toEqual([6, 6]);
     expect(setPopupHtml.mock.calls[0][0].total).toBe(12);

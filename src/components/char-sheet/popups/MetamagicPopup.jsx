@@ -58,6 +58,22 @@ function TwinTargetSelector({ twinTarget, creatureTargets, onChange }) {
   );
 }
 
+function computePsionicState({ psionicActive, psionicCost, totalCost, currentSP }) {
+  const psionicTotalCost = psionicActive ? psionicCost : 0;
+  const grandTotalCost = totalCost + psionicTotalCost;
+  const remainingAfter = currentSP - grandTotalCost;
+  return {
+    grandTotalCost,
+    remainingAfter,
+    canAffordGrand: remainingAfter >= 0,
+    psionicAffordable: !psionicActive && (currentSP - totalCost) >= psionicCost,
+  };
+}
+
+function computeNeedsTwinTarget(hasTwinned, creatureTargets, twinTarget) {
+  return hasTwinned && creatureTargets.length > 0 && !twinTarget;
+}
+
 export default function MetamagicPopup({ spell, playerStats, campaignName, onConfirm, onSkip }) {
   const spellLevel = spell?.level || 0;
   const currentSP = Number(playerStats._metamagicCurrentSP) || 0;
@@ -74,14 +90,11 @@ export default function MetamagicPopup({ spell, playerStats, campaignName, onCon
   const apotheosisActive = hasArcaneApotheosis(playerStats, playerStats?.name);
   const { totalCost, waivedName } = computeMetamagicCost(selected, options, playerStats, playerStats?.name);
 
-  const psionicTotalCost = psionicActive ? psionicCost : 0;
-  const grandTotalCost = totalCost + psionicTotalCost;
-  const remainingAfter = currentSP - grandTotalCost;
-  const canAffordGrand = remainingAfter >= 0;
+  const { grandTotalCost, remainingAfter, canAffordGrand, psionicAffordable } = computePsionicState({ psionicActive, psionicCost, totalCost, currentSP });
   const canSelectMore = selected.length < maxPerSpell;
 
   const hasTwinned = selected.includes('Twinned Spell');
-  const needsTwinTarget = hasTwinned && creatureTargets.length > 0 && !twinTarget;
+  const needsTwinTarget = computeNeedsTwinTarget(hasTwinned, creatureTargets, twinTarget);
 
   const toggleOption = useCallback((name, affordable) => {
     if (!affordable) return;
@@ -145,7 +158,6 @@ export default function MetamagicPopup({ spell, playerStats, campaignName, onCon
     return (currentSP - costSoFar - (psionicActive ? psionicCost : 0)) >= opt.resolvedCost;
    };
 
-   const psionicAffordable = !psionicActive && (currentSP - totalCost) >= psionicCost;
 
    return (
       <div className="popup-overlay" onClick={(e) => {

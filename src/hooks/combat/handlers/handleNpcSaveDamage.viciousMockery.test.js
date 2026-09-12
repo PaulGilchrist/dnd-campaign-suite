@@ -134,8 +134,7 @@ describe('handleNpcSaveDamage — Vicious Mockery save gate (CLA-377)', () => {
 
     function call(contextOverride = {}) {
         const fn = createNpcSaveDamageHandler(deps);
-        return fn('Vicious Mockery', '4d6', 13, [3, 3, 1, 6], 0,
-            { ...vmContext, ...contextOverride }, 13, combatSummary);
+        return fn({ name: 'Vicious Mockery', formula: '4d6', total: 13, rolls: [3, 3, 1, 6], modifier: 0, context: { ...vmContext, ...contextOverride }, adjustedTotal: 13, combatSummary: combatSummary });
     }
 
     it('triggers Vicious Mockery on a FAILED save with spell, target and caster', async () => {

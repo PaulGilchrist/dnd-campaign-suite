@@ -163,7 +163,9 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
     })
 
     if (success) {
-      setActiveConditions(prev => prev.filter(c => c !== conditionKey))
+      const remaining = activeConditions.filter(c => c !== conditionKey)
+      setActiveConditions(remaining)
+      saveConditions(playerStats.name, campaignName, remaining)
       const existingMeta = { ...conditionMeta }
       delete existingMeta[conditionKey]
       setConditionMeta(existingMeta)

@@ -68,9 +68,50 @@ function TeleportSwapView({ action, auto, handleConfirm, onClose }) {
     );
 }
 
+function TeleportRangeOptions({ useExtended, extendedAvailable, setUseExtended, standardDistance, extendedDistance }) {
+    return (
+        <div style={{ textAlign: 'left', marginTop: '12px' }}>
+            <label style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: 'pointer', background: !useExtended ? 'rgba(255,255,255,0.15)' : 'transparent', border: !useExtended ? '1px solid var(--color-link)' : '1px solid transparent' }}>
+                <input
+                    type="radio"
+                    name="teleportRange"
+                    checked={!useExtended}
+                    onChange={() => setUseExtended(false)}
+                    style={{ marginRight: '8px' }}
+                />
+                <strong>{standardDistance}</strong>
+                <span style={{ opacity: 0.8, marginLeft: '8px' }}>— Standard teleport</span>
+            </label>
+            <label style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: extendedAvailable ? 'pointer' : 'not-allowed', background: useExtended ? 'rgba(255,255,255,0.15)' : 'transparent', border: useExtended ? '1px solid var(--color-link)' : '1px solid transparent', opacity: extendedAvailable ? 1 : 0.5 }}>
+                <input
+                    type="radio"
+                    name="teleportRange"
+                    checked={useExtended}
+                    onChange={() => extendedAvailable && setUseExtended(true)}
+                    disabled={!extendedAvailable}
+                    style={{ marginRight: '8px' }}
+                />
+                <strong>{extendedDistance}</strong>
+                <span style={{ opacity: 0.8, marginLeft: '8px' }}>
+                    {extendedAvailable ? '— Once per Rage' : '— Already used this Rage'}
+                </span>
+            </label>
+        </div>
+    );
+}
+
+function BringAlliesNote({ auto }) {
+    return (
+        <p style={{ marginTop: '12px', opacity: 0.8 }}>
+            <i className="fa-solid fa-users"></i> When using the extended teleport, you can bring up to {auto.allyCount} willing creatures within 10 ft of you. Each appears within {(auto && auto.teleportRange) || '10 ft'} of your destination.
+        </p>
+    );
+}
+
 function TeleportStandardView({ action, auto, isMoonlightStep, useExtended, extendedAvailable, setUseExtended, handleConfirm, onClose }) {
     const standardDistance = (auto && auto.distance) || '60 ft';
     const extendedDistance = (auto && auto.extendedDistance) || '150 ft';
+    const showBringAllies = !isMoonlightStep && !!auto && !!auto.bringAllies && auto.allyCount > 0;
     return (
         <TeleportShell onClose={onClose}>
             <div className="sp-header">
@@ -83,39 +124,15 @@ function TeleportStandardView({ action, auto, isMoonlightStep, useExtended, exte
                         Gains Advantage on next attack roll.
                     </p>
                 ) : (
-                    <div style={{ textAlign: 'left', marginTop: '12px' }}>
-                        <label style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: 'pointer', background: !useExtended ? 'rgba(255,255,255,0.15)' : 'transparent', border: !useExtended ? '1px solid var(--color-link)' : '1px solid transparent' }}>
-                            <input
-                                type="radio"
-                                name="teleportRange"
-                                checked={!useExtended}
-                                onChange={() => setUseExtended(false)}
-                                style={{ marginRight: '8px' }}
-                            />
-                            <strong>{standardDistance}</strong>
-                            <span style={{ opacity: 0.8, marginLeft: '8px' }}>— Standard teleport</span>
-                        </label>
-                        <label style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: extendedAvailable ? 'pointer' : 'not-allowed', background: useExtended ? 'rgba(255,255,255,0.15)' : 'transparent', border: useExtended ? '1px solid var(--color-link)' : '1px solid transparent', opacity: extendedAvailable ? 1 : 0.5 }}>
-                            <input
-                                type="radio"
-                                name="teleportRange"
-                                checked={useExtended}
-                                onChange={() => extendedAvailable && setUseExtended(true)}
-                                disabled={!extendedAvailable}
-                                style={{ marginRight: '8px' }}
-                            />
-                            <strong>{extendedDistance}</strong>
-                            <span style={{ opacity: 0.8, marginLeft: '8px' }}>
-                                {extendedAvailable ? '— Once per Rage' : '— Already used this Rage'}
-                            </span>
-                        </label>
-                    </div>
+                    <TeleportRangeOptions
+                        useExtended={useExtended}
+                        extendedAvailable={extendedAvailable}
+                        setUseExtended={setUseExtended}
+                        standardDistance={standardDistance}
+                        extendedDistance={extendedDistance}
+                    />
                 )}
-                {!isMoonlightStep && (auto && auto.bringAllies && auto.allyCount > 0) && (
-                    <p style={{ marginTop: '12px', opacity: 0.8 }}>
-                        <i className="fa-solid fa-users"></i> When using the extended teleport, you can bring up to {auto.allyCount} willing creatures within 10 ft of you. Each appears within {(auto && auto.teleportRange) || '10 ft'} of your destination.
-                    </p>
-                )}
+                {showBringAllies && <BringAlliesNote auto={auto} />}
             </div>
             <div className="sp-actions">
                 <button className="sp-roll-btn" onClick={handleConfirm}>

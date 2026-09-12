@@ -7,20 +7,26 @@ import { applyDamageToTarget } from '../combat/applyDamage.js';
 import { getCombatSummary, loadCombatSummary, setCombatSummaryCache } from '../../encounters/combatData.js';
 import { getAllyList } from '../../../hooks/useAllySelection.js';
 
+const HOLY_NIMBUS_RANGE = 10;
+
+// Load the combat summary and return a detached copy so mutations never
+// alias the live React state object. Returns null when no summary exists.
+async function loadDetachedCombatSummary(campaignName) {
+    let cachedSummary = getCombatSummary(campaignName);
+    if (!cachedSummary) {
+        cachedSummary = await loadCombatSummary(campaignName);
+    }
+    return cachedSummary ? cloneDeep(cachedSummary) : null;
+}
+
 export async function applyAuraDamage(activeName, playerStats, campaignName, characters = [], options = {}) {
     const { activeKey, damageValue, range, damageType = 'Radiant', targetFilter, allyFilter } = options;
 
     const isActive = getRuntimeValue(activeName, activeKey, campaignName);
     if (!isActive) return;
 
-    let cachedSummary = getCombatSummary(campaignName);
-    if (!cachedSummary) {
-        cachedSummary = await loadCombatSummary(campaignName);
-    }
-    if (!cachedSummary) return;
-
-    // Work on a detached copy so mutations never alias the live React state object
-    const combatSummary = cloneDeep(cachedSummary);
+    const combatSummary = await loadDetachedCombatSummary(campaignName);
+    if (!combatSummary) return;
 
     const creatures = combatSummary.creatures;
     if (!Array.isArray(creatures)) {
@@ -30,8 +36,7 @@ export async function applyAuraDamage(activeName, playerStats, campaignName, cha
 
     if (typeof damageValue !== 'number' || isNaN(damageValue) || damageValue <= 0) return;
 
-    const storedAllies = allyFilter ? getAllyList(activeName) : null;
-    const allyList = Array.isArray(storedAllies) && storedAllies.length > 0 ? storedAllies : null;
+    const allyList = allyFilter ? getStoredAllyList(activeName) : null;
 
     for (const creature of creatures) {
         const creatureName = utils.getName(creature.name);
@@ -45,7 +50,7 @@ export async function applyAuraDamage(activeName, playerStats, campaignName, cha
         if (!inRange) continue;
 
         try {
-            applyDamageToTarget(combatSummary, creatureName, damageValue, [damageType], campaignName, characters, false, activeName);
+            applyDamageToTarget(combatSummary, creatureName, damageValue, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: activeName });
         } catch (error) { console.error(`[auraDamage] Failed to apply damage to ${creatureName}:`, error); }
     }
 
@@ -54,37 +59,42 @@ export async function applyAuraDamage(activeName, playerStats, campaignName, cha
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 }
 
-export async function applyHolyNimbusDamage(activeName, characters, campaignName) {
-    let cachedSummary = getCombatSummary(campaignName);
-    if (!cachedSummary) {
-        cachedSummary = await loadCombatSummary(campaignName);
-    }
-    if (!cachedSummary) return;
+// The caster's stored ally list, or null when none is recorded.
+function getStoredAllyList(name) {
+    const storedAllies = getAllyList(name);
+    return Array.isArray(storedAllies) && storedAllies.length > 0 ? storedAllies : null;
+}
 
-    // Work on a detached copy so mutations never alias the live React state object
-    const summary = cloneDeep(cachedSummary);
+// Holy Nimbus radiant damage: proficiency + Charisma modifier.
+function resolveHolyNimbusDamage(character) {
+    const chaMod = character.computedStats?.abilities?.find(a => a.name === 'Charisma')?.bonus
+        ?? character.abilities?.find(a => a.name === 'Charisma')?.bonus
+        ?? 0;
+    const prof = character.computedStats?.proficiency ?? character.proficiency ?? 0;
+    return prof + chaMod;
+}
+
+export async function applyHolyNimbusDamage(activeName, characters, campaignName) {
+    const summary = await loadDetachedCombatSummary(campaignName);
+    if (!summary) return;
+
     let damageApplied = false;
 
     for (const character of characters) {
         const charName = utils.getName(character.name);
-        const holyNimbusActive = getRuntimeValue(charName, 'holyNimbusActive', campaignName);
-        if (!holyNimbusActive) continue;
+        if (!getRuntimeValue(charName, 'holyNimbusActive', campaignName)) continue;
 
-        const storedAllies = getAllyList(charName);
-        const allyList = Array.isArray(storedAllies) && storedAllies.length > 0 ? storedAllies : null;
+        const allyList = getStoredAllyList(charName);
         if (allyList && allyList.includes(activeName)) continue;
 
-        const chaMod = character.computedStats?.abilities?.find(a => a.name === 'Charisma')?.bonus ?? character.abilities?.find(a => a.name === 'Charisma')?.bonus ?? 0;
-        const prof = character.computedStats?.proficiency ?? character.proficiency ?? 0;
-        const damageValue = prof + chaMod;
+        const damageValue = resolveHolyNimbusDamage(character);
         if (damageValue <= 0) continue;
 
-        const range = 10;
-        const inRange = await isWithinRange(charName, activeName, range);
+        const inRange = await isWithinRange(charName, activeName, HOLY_NIMBUS_RANGE);
         if (!inRange) continue;
 
         try {
-            applyDamageToTarget(summary, activeName, damageValue, ['Radiant'], campaignName, characters, false, charName);
+            applyDamageToTarget(summary, activeName, damageValue, ['Radiant'], campaignName, characters, { ignoreResistance: false, attackerName: charName });
             damageApplied = true;
         } catch (error) { console.error(`[HolyNimbus] Failed to apply radiant damage to ${activeName}:`, error); }
     }

@@ -16,6 +16,7 @@ import utils from '../../../services/ui/utils.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { getHolyAuraTargets } from '../../../services/automation/handlers/buffs/holyAuraHandler.js';
 import { handleOverchannelSelfDamage } from './handleOverchannelSelfDamage.js';
+import { findTargetByContext } from './damageHandlerUtils.js';
 
 function computeIndomitableMax(level) {
     return level >= 17 ? 3 : level >= 13 ? 2 : 1;
@@ -69,7 +70,7 @@ async function applyForcedSuccessSave({ context, combatSummary, target, characte
         gwfDisplayRolls: gwfDisplayRolls,
     });
 
-    const applyResult = await applyDamageToTarget(combatSummary, target.name, autoSuccessDamage, [damageType], campaignName, characters, ignoreResistance, characterName, false, { isSpellDamage: true });
+    const applyResult = await applyDamageToTarget(combatSummary, target.name, autoSuccessDamage, [damageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: characterName, suppressHpLog: false, ...{ isSpellDamage: true } });
 
     if (applyResult && applyResult.finalDamage > 0) {
         endInvisibilityOnHostileAction(characterName, campaignName);
@@ -195,12 +196,66 @@ function resolveTargetSaveContext({ charactersRef, campaignName, target, attacke
     return { targetEffects, targetConditionEffects, autoRerollForSaves, autoRerollBonus };
 }
 
+function hasContactPatronAutoSave(context) {
+    return (context?.playerStats?.automation?.passives || []).some(
+        p => p.type === 'passive_rule' && p.effect === 'contact_patron_auto_save'
+    );
+}
+
+function buildSavePromptLogData({ characterName, name, formula, modifier, displayRolls, adjustedTotal, damageType, target, saveType, saveDc, dcSuccess, context, gwfBaseRolls, gwfDisplayRolls }) {
+    return {
+        type: 'roll',
+        characterName,
+        rollType: 'save-prompt',
+        name,
+        formula,
+        rolls: displayRolls,
+        total: adjustedTotal,
+        modifier,
+        bonus: modifier,
+        damageType,
+        targetName: target.name,
+        saveType,
+        saveDc,
+        dcSuccess,
+        forcedMode: context?.metamagicHeighten ? 'disadvantage' : 'normal',
+        gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
+        gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
+    };
+}
+
+function buildWaitingSavePopupData({ name, formula, rolls, modifier, adjustedTotal, damageType, target, saveType, saveDc, dcSuccess, promptId, attackerName, characterName, gwfBaseRolls, gwfDisplayRolls, autoRerollForSaves, autoRerollBonus, autoRerollCondition }) {
+    return {
+        type: 'save-damage',
+        name,
+        formula,
+        rolls,
+        total: adjustedTotal,
+        bonus: 0,
+        modifier,
+        damageType,
+        targetName: target.name,
+        saveDc,
+        saveType,
+        dcSuccess,
+        waitingForPlayerSave: true,
+        promptId,
+        rawDamage: adjustedTotal,
+        attackerName: attackerName || characterName,
+        gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
+        gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
+        autoReroll: autoRerollForSaves,
+        autoRerollBonus: autoRerollBonus,
+        autoRerollCondition,
+    };
+}
+
 export function createPlayerSaveDamageHandler(deps) {
     const { characterName, campaignName, characters, charactersRef, setPopupHtml, logEntry, pendingSaves } = deps;
 
-    return async function handlePlayerSaveDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls, gwfBaseRolls, gwfDisplayRolls) {
+    return async function handlePlayerSaveDamage({ name, formula, total: _total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls, gwfBaseRolls, gwfDisplayRolls }) {
         const { saveDc, saveType, dcSuccess, damageType, attackerName } = context || {};
-        const target = combatSummary?.creatures?.find(c => c.name === context?.targetName) || null;
+        const target = findTargetByContext(combatSummary, context);
         if (!target || target.type !== 'player') return;
         const targetMaxHp = getRuntimeValue(target.name, 'hitPoints') ?? 0;
 
@@ -213,10 +268,7 @@ export function createPlayerSaveDamageHandler(deps) {
             return await applyForcedSuccessSave({ context, combatSummary, target, characters, campaignName, characterName, name, formula, modifier, adjustedTotal, displayRolls, saveDc, saveType, dcSuccess, damageType, targetMaxHp, gwfBaseRolls, gwfDisplayRolls, setPopupHtml, logEntry, note: 'careful_spell_damage_roll_before_apply', popupFlag: 'carefulSpell' });
         }
 
-        const hasContactPatron = (context?.playerStats?.automation?.passives || []).some(
-            p => p.type === 'passive_rule' && p.effect === 'contact_patron_auto_save'
-        );
-        if (hasContactPatron && name === 'Contact Other Plane' && target.name === characterName) {
+        if (hasContactPatronAutoSave(context) && name === 'Contact Other Plane' && target.name === characterName) {
             return await applyForcedSuccessSave({ context, combatSummary, target, characters: null, campaignName, characterName, name, formula, modifier, adjustedTotal, displayRolls, saveDc, saveType, dcSuccess, damageType, targetMaxHp, gwfBaseRolls, gwfDisplayRolls, setPopupHtml, logEntry, note: 'contact_patron_damage_roll_before_apply', popupFlag: 'contactPatron' });
         }
 
@@ -246,49 +298,9 @@ export function createPlayerSaveDamageHandler(deps) {
             isSpellDamage: true,
         });
 
-        logEntry({
-            type: 'roll',
-            characterName,
-            rollType: 'save-prompt',
-            name,
-            formula,
-            rolls: displayRolls,
-            total: adjustedTotal,
-            modifier,
-            bonus: modifier,
-            damageType,
-            targetName: target.name,
-            saveType,
-            saveDc,
-            dcSuccess,
-            forcedMode: context?.metamagicHeighten ? 'disadvantage' : 'normal',
-            gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
-            gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
-        });
+        logEntry(buildSavePromptLogData({ characterName, name, formula, modifier, displayRolls, adjustedTotal, damageType, target, saveType, saveDc, dcSuccess, context, gwfBaseRolls, gwfDisplayRolls }));
 
-        setPopupHtml({
-            type: 'save-damage',
-            name,
-            formula,
-            rolls,
-            total: adjustedTotal,
-            bonus: 0,
-            modifier,
-            damageType,
-            targetName: target.name,
-            saveDc,
-            saveType,
-            dcSuccess,
-            waitingForPlayerSave: true,
-            promptId,
-            rawDamage: adjustedTotal,
-            attackerName: attackerName || characterName,
-            gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
-            gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
-            autoReroll: autoRerollForSaves,
-            autoRerollBonus: autoRerollBonus,
-            autoRerollCondition: targetConditionEffects.autoRerollCondition,
-        });
+        setPopupHtml(buildWaitingSavePopupData({ name, formula, rolls, modifier, adjustedTotal, damageType, target, saveType, saveDc, dcSuccess, promptId, attackerName, characterName, gwfBaseRolls, gwfDisplayRolls, autoRerollForSaves, autoRerollBonus, autoRerollCondition: targetConditionEffects.autoRerollCondition }));
 
         handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);
 

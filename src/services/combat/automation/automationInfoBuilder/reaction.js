@@ -1,5 +1,31 @@
 import { evaluateAutoExpression, getSaveDc } from '../automationExpressions.js'
 
+function resolveScaledExpr(auto, playerStats, fallback) {
+    let resolvedExpr = auto.damageExpression || fallback
+    if (!auto.scaling) return resolvedExpr
+    const entries = Object.entries(auto.scaling)
+        .map(([k, v]) => ({ level: parseInt(k, 10), expr: String(v) }))
+        .filter(e => !isNaN(e.level))
+        .sort((a, b) => a.level - b.level)
+    for (const entry of entries) {
+        if (playerStats.level >= entry.level) {
+            resolvedExpr = entry.expr
+        }
+    }
+    return resolvedExpr
+}
+
+function resolveReactionSaveDc(auto, playerStats, prof) {
+    if (auto.saveDc === 'ability') {
+        return getSaveDc(playerStats, auto.saveAbility || 'WIS', prof)
+    }
+    let saveDc = auto.saveDc
+    if (auto.saveDcExpression && !saveDc) {
+        saveDc = evaluateAutoExpression(auto.saveDcExpression, playerStats)
+    }
+    return saveDc || null
+}
+
 export const reactionHandlers = {
     'reaction_bonus': (feature, _playerStats) => {
         const auto = feature.automation
@@ -26,32 +52,14 @@ export const reactionHandlers = {
     'reaction_damage': (feature, playerStats) => {
         const auto = feature.automation
         const prof = playerStats.proficiency || 0
-        let resolvedExpr = auto.damageExpression || ''
-        if (auto.scaling) {
-            const entries = Object.entries(auto.scaling)
-                .map(([k, v]) => ({ level: parseInt(k, 10), expr: String(v) }))
-                .filter(e => !isNaN(e.level))
-                .sort((a, b) => a.level - b.level)
-            for (const entry of entries) {
-                if (playerStats.level >= entry.level) {
-                    resolvedExpr = entry.expr
-                }
-            }
-        }
-        let saveDc = auto.saveDc
-        if (auto.saveDcExpression && !saveDc) {
-            saveDc = evaluateAutoExpression(auto.saveDcExpression, playerStats)
-        }
         return {
             type: 'reaction_damage',
             name: feature.name,
             trigger: auto.trigger || '',
-            damageExpression: resolvedExpr,
+            damageExpression: resolveScaledExpr(auto, playerStats, ''),
             damageType: auto.damageType || '',
             saveType: auto.saveType || null,
-            saveDc: auto.saveDc === 'ability'
-                ? getSaveDc(playerStats, auto.saveAbility || 'WIS', prof)
-                : saveDc || null,
+            saveDc: resolveReactionSaveDc(auto, playerStats, prof),
             saveAbility: auto.saveAbility || 'WIS',
             alsoInflicts: auto.alsoInflicts || null,
             resourceCost: auto.resourceCost || null,
@@ -280,18 +288,7 @@ export const reactionHandlers = {
 
     'dread_ambush_damage': (feature, playerStats) => {
         const auto = feature.automation
-        let resolvedExpr = auto.damageExpression || '2d6'
-        if (auto.scaling) {
-            const entries = Object.entries(auto.scaling)
-                .map(([k, v]) => ({ level: parseInt(k, 10), expr: String(v) }))
-                .filter(e => !isNaN(e.level))
-                .sort((a, b) => a.level - b.level)
-            for (const entry of entries) {
-                if (playerStats.level >= entry.level) {
-                    resolvedExpr = entry.expr
-                }
-            }
-        }
+        const resolvedExpr = resolveScaledExpr(auto, playerStats, '2d6')
         const usesMax = auto.uses_expression
             ? evaluateAutoExpression(auto.uses_expression, playerStats)
             : 1

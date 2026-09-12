@@ -27,19 +27,7 @@ function makeProps(overrides = {}) {
 
 function renderWith(props) {
   return renderHook(() =>
-    useSpellCastExecutor(
-      props.rollAttack,
-      props.rollDamage,
-      props.playerStats,
-      props.getTargetInfo,
-      props.campaignName,
-      props.mapName,
-      props.characters,
-      props.setPopupHtml,
-      props.extraMeta,
-      undefined,
-      props.setModalState,
-    )
+    useSpellCastExecutor(props)
   );
 }
 

@@ -194,17 +194,24 @@ function logHomingStrikesCheck(state, { characterName, campaignName, ps, isSoulk
     }).catch((e) => { console.error('[homingStrikes] Log error:', e); });
 }
 
-function runHomingStrikes(state, { characterName, campaignName, context, ps, targetAc, effectiveAc, effectiveD20Roll }) {
-    const result = { homingStrikesUsed: false, homingStrikesBonus: 0, homingStrikesAttempted: false };
+function resolveHomingStrikesFlags(ps, context, state, effectiveAc, targetAc) {
     const isSoulknife = ps?.class?.name === 'Rogue' && ps?.class?.major?.name === 'Soulknife';
     const hasSoulBlades = isSoulknife && ps?.level >= 9;
     const isPsychicBlade = context?.isPsychicBlade === true;
-    const homingAc = effectiveAc != null ? effectiveAc : targetAc;
     const missToResolve = state.hit === false && !state.isAutoMiss;
-    if (hasSoulBlades && isPsychicBlade && missToResolve && effectiveD20Roll === 1) {
-        logHomingNatOneMiss(characterName, campaignName);
-    } else if (hasSoulBlades && isPsychicBlade && missToResolve) {
-        attemptHomingStrike(state, result, { characterName, campaignName, context, ps, homingAc, effectiveD20Roll });
+    const homingAc = effectiveAc != null ? effectiveAc : targetAc;
+    return { isSoulknife, hasSoulBlades, isPsychicBlade, missToResolve, homingAc };
+}
+
+function runHomingStrikes(state, { characterName, campaignName, context, ps, targetAc, effectiveAc, effectiveD20Roll }) {
+    const result = { homingStrikesUsed: false, homingStrikesBonus: 0, homingStrikesAttempted: false };
+    const { isSoulknife, hasSoulBlades, isPsychicBlade, missToResolve, homingAc } = resolveHomingStrikesFlags(ps, context, state, effectiveAc, targetAc);
+    if (hasSoulBlades && isPsychicBlade && missToResolve) {
+        if (effectiveD20Roll === 1) {
+            logHomingNatOneMiss(characterName, campaignName);
+        } else {
+            attemptHomingStrike(state, result, { characterName, campaignName, context, ps, homingAc, effectiveD20Roll });
+        }
     } else if (isPsychicBlade && missToResolve) {
         logHomingStrikesCheck(state, { characterName, campaignName, ps, isSoulknife, hasSoulBlades, isPsychicBlade });
     }
@@ -305,7 +312,7 @@ function computeIsCrit(state, context, effectiveD20Roll, rollsInCriticalRange) {
     return !state.isAutoMiss && (utils.DEBUG_FORCE_CRIT || effectiveD20Roll === 20 || context?.isAutoCrit || rollsInCriticalRange) && (state.hit || rollsInCriticalRange);
 }
 
-export async function resolveHit(characterName, campaignName, context, bonus, effectiveD20Roll, target, combatSummary, characters, logEntry, _setPopupHtml) {
+export async function resolveHit({ characterName, campaignName, context, bonus: _bonus, effectiveD20Roll, target, combatSummary, characters, logEntry }) {
     const attackerName = context?.attackerName || characterName;
     const targetName = (context?.rollType === 'attack' || context?.rollType === 'save') ? (target?.name || context?.targetName) : undefined;
 

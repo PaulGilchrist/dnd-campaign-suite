@@ -177,18 +177,7 @@ describe('Careful Spell — player save damage with ally protection', () => {
         });
 
         expect(computeDamageAfterSave).toHaveBeenCalledWith(20, true, 'half');
-        expect(applyDamageToTarget).toHaveBeenCalledWith(
-            expect.any(Object),
-            'Ally1',
-            10,
-            ['fire'],
-            'test-campaign',
-            expect.any(Array),
-            false,
-            'Wizard1',
-            false,
-            { isSpellDamage: true }
-        );
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', 10, ['fire'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'Wizard1', suppressHpLog: false, ...{ isSpellDamage: true } });
         expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('Wizard1', 'test-campaign');
         expect(deps.logEntry).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -313,17 +302,6 @@ describe('Careful Spell — player save damage with ally protection', () => {
             playerStats: { automation: { passives: [] } },
         });
 
-        expect(applyDamageToTarget).toHaveBeenCalledWith(
-            expect.any(Object),
-            'Ally1',
-            10,
-            ['fire'],
-            'test-campaign',
-            expect.any(Array),
-            true,
-            'Wizard1',
-            false,
-            { isSpellDamage: true }
-        );
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', 10, ['fire'], 'test-campaign', expect.any(Array), { ignoreResistance: true, attackerName: 'Wizard1', suppressHpLog: false, ...{ isSpellDamage: true } });
     });
 });

@@ -34,6 +34,26 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
+function resolveHealExpression(auto, action) {
+    const healAtSlotLevel = action.spell?.heal_at_slot_level;
+    const spellLevel = auto.slotLevel || action.spellSlotLevel || 3;
+    if (healAtSlotLevel?.[spellLevel]) return healAtSlotLevel[spellLevel];
+    if (healAtSlotLevel) {
+        const levels = Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b);
+        const highestBelow = levels.filter(l => l <= spellLevel).pop();
+        if (highestBelow) return healAtSlotLevel[highestBelow];
+    }
+    return auto.healExpression || '2d6';
+}
+
+function targetHpValues(creature, targetName, campaignName) {
+    const isPlayer = creature.type === 'player';
+    return {
+        maxHp: isPlayer ? getRuntimeValue(targetName, 'hitPoints') : creature.maxHp,
+        currentHp: isPlayer ? getRuntimeValue(targetName, 'currentHitPoints', campaignName) : creature.currentHp,
+    };
+}
+
 export async function applyAuraOfVitality(action, playerStats, campaignName, mapName, targetNames) {
     if (!targetNames || !Array.isArray(targetNames) || targetNames.length === 0) {
         return null;
@@ -67,19 +87,7 @@ export async function applyAuraOfVitality(action, playerStats, campaignName, map
         };
     }
 
-    const healExpression = auto.healExpression || '2d6';
-    const spellLevel = auto.slotLevel || action.spellSlotLevel || 3;
-    const healAtSlotLevel = action.spell?.heal_at_slot_level;
-    let expression = healExpression;
-    if (healAtSlotLevel && healAtSlotLevel[spellLevel]) {
-        expression = healAtSlotLevel[spellLevel];
-    } else if (healAtSlotLevel) {
-        const levels = Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b);
-        const highestBelow = levels.filter(l => l <= spellLevel).pop();
-        if (highestBelow) {
-            expression = healAtSlotLevel[highestBelow];
-        }
-    }
+    const expression = resolveHealExpression(auto, action);
 
     const result = rollExpression(expression);
     if (!result) {
@@ -93,13 +101,7 @@ export async function applyAuraOfVitality(action, playerStats, campaignName, map
         };
     }
 
-    const isPlayer = creature.type === 'player';
-    const maxHp = isPlayer
-        ? getRuntimeValue(targetName, 'hitPoints')
-        : creature.maxHp;
-    const currentHp = isPlayer
-        ? getRuntimeValue(targetName, 'currentHitPoints', campaignName)
-        : creature.currentHp;
+    const { maxHp, currentHp } = targetHpValues(creature, targetName, campaignName);
 
     if (maxHp == null) {
         console.error(`[auraOfVitality] Cannot determine maxHp for ${targetName} (creature.maxHp=${creature.maxHp}, hitPoints=${getRuntimeValue(targetName, 'hitPoints')})`);

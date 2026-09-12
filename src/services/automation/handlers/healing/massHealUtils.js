@@ -83,7 +83,7 @@ export function createMassHealHandler(config) {
         }
 
         if (eligible.length <= maxTargets) {
-            return confirmFn(action, playerStats, campaignName, eligible.map(c => c.name), healExpression, maximize, bonusHeal, bonusDetails, slotLevel, currentRound);
+            return confirmFn({ action, playerStats, campaignName, selectedTargetNames: eligible.map(c => c.name), healExpression, maximize, bonusHeal, bonusDetails, slotLevel, currentRound });
         }
 
         const creatureTargets = eligible.map(c => c.name);
@@ -107,7 +107,7 @@ export function createMassHealHandler(config) {
         };
     }
 
-    async function confirmFn(action, playerStats, campaignName, selectedTargetNames, healExpression, maximize, bonusHeal, bonusDetails, _slotLevel, currentRound) {
+    async function confirmFn({ action, playerStats, campaignName, selectedTargetNames, healExpression, maximize, bonusHeal, bonusDetails, slotLevel: _slotLevel, currentRound }) {
         const playerName = playerStats.name;
         const maxTargets = action.automation?.maxTargets || defaultMaxTargets;
         const finalTargets = selectedTargetNames.slice(0, maxTargets);

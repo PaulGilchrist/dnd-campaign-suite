@@ -120,16 +120,7 @@ async function applyWeaponHitDamage(playerName, targetName, damageFormula, damag
     const rollResult = isCrit ? rollExpressionDoubled(damageFormula) : rollExpression(damageFormula);
     const rawDamage = rollResult?.total || 0;
     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-    const applyResult = await applyDamageToTarget(
-        getCombatSummary(campaignName),
-        targetName,
-        rawDamage,
-        [damageType],
-        campaignName,
-        characters,
-        false,
-        playerName
-    );
+    const applyResult = await applyDamageToTarget(getCombatSummary(campaignName), targetName, rawDamage, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
     const finalDamage = applyResult?.finalDamage || 0;
     if (finalDamage > 0) {
         endInvisibilityOnHostileAction(playerName, campaignName);
@@ -238,7 +229,7 @@ async function resolveWarMagicSpellDamage(action, spell, selectedSpellName, play
         return { spellDamage, spellFormula, spellRolls };
     }
 
-    const applyResult = await applyDamageToTarget(cs, targetName, spellDamage, [spell.damage?.damage_type || 'Force'], campaignName, characters, false, playerName);
+    const applyResult = await applyDamageToTarget(cs, targetName, spellDamage, [spell.damage?.damage_type || 'Force'], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
     const finalDamage = applyResult?.finalDamage ?? spellDamage;
     if (finalDamage > 0) {
         endInvisibilityOnHostileAction(playerName, campaignName);
@@ -306,6 +297,12 @@ function resolveSpellAttackDamage(spell, playerName, playerStats, cs, targetName
     }
     const spellFormula = hit ? `${formula} (spell attack hit)` : `${formula} (spell attack missed)`;
     return { spellRolls, spellDamage, spellFormula };
+}
+
+function buildWeaponLine(weapon) {
+    const outcome = weapon.hit ? (weapon.isCrit ? 'CRITICAL HIT' : 'Hit') : 'Miss';
+    const damagePart = weapon.hit ? `, ${weapon.finalDamage} ${weapon.damageType} damage` : '';
+    return `${outcome} — d20(${weapon.d20Roll}) + ${weapon.totalAttack - weapon.d20Roll} = ${weapon.totalAttack} vs AC ${weapon.ac}${damagePart}`;
 }
 
 export async function confirmWarMagicSpell(action, playerStats, campaignName, selectedSpellName) {
@@ -392,7 +389,7 @@ export async function confirmWarMagicSpell(action, playerStats, campaignName, se
     const targetCreature = cs?.creatures?.find(c => c.name === targetName);
     const weapon = await rollWeaponAttack(action, playerStats, campaignName, targetName, targetCreature?.ac || 10);
 
-    const weaponLine = `${weapon.hit ? (weapon.isCrit ? 'CRITICAL HIT' : 'Hit') : 'Miss'} — d20(${weapon.d20Roll}) + ${weapon.totalAttack - weapon.d20Roll} = ${weapon.totalAttack} vs AC ${weapon.ac}${weapon.hit ? `, ${weapon.finalDamage} ${weapon.damageType} damage` : ''}`;
+    const weaponLine = buildWeaponLine(weapon);
 
     const popupDescription =
         `<b>${action.name}</b>: Cast <b>${selectedSpellName}</b> (level ${spell.level} spell slot expended) at <b>${targetName}</b>.` +

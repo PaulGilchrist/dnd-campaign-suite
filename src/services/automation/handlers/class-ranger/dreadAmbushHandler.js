@@ -9,6 +9,22 @@ import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 const DREAD_AMBUSH_USED_THIS_TURN_KEY = 'dreadAmbushUsedThisTurn';
 const DREAD_AMBUSH_USES_KEY = 'dreadambushUses';
 
+// Resolve damage expression with scaling
+function resolveDreadAmbushDamageExpr(auto, playerStats) {
+    let damageExpr = auto.damageExpression || '2d6';
+    if (!auto.scaling) return damageExpr;
+    const entries = Object.entries(auto.scaling)
+        .map(([k, v]) => ({ level: parseInt(k, 10), expr: String(v) }))
+        .filter(e => !isNaN(e.level))
+        .sort((a, b) => a.level - b.level);
+    for (const entry of entries) {
+        if (playerStats.level >= entry.level) {
+            damageExpr = entry.expr;
+        }
+    }
+    return damageExpr;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -95,18 +111,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     // Resolve damage expression with scaling
-    let damageExpr = auto.damageExpression || '2d6';
-    if (auto.scaling) {
-        const entries = Object.entries(auto.scaling)
-            .map(([k, v]) => ({ level: parseInt(k, 10), expr: String(v) }))
-            .filter(e => !isNaN(e.level))
-            .sort((a, b) => a.level - b.level);
-        for (const entry of entries) {
-            if (playerStats.level >= entry.level) {
-                damageExpr = entry.expr;
-            }
-        }
-    }
+    const damageExpr = resolveDreadAmbushDamageExpr(auto, playerStats);
 
     const targetName = attackResult.targetName;
     const damageType = auto.damageType || 'Psychic';
@@ -117,7 +122,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const combatSummary = await loadCombatSummary(campaignName);
     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-    applyDamageToTarget(combatSummary, targetName, damageTotal, [damageType], campaignName, characters, false, playerName);
+    applyDamageToTarget(combatSummary, targetName, damageTotal, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
 
     // Decrement uses
     if (auto.uses_expression) {

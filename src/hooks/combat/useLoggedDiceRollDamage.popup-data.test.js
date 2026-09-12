@@ -710,13 +710,13 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
             });
 
             expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-            const [, target, damage, damageTypes, campaign, , , attacker] =
+            const [, target, damage, damageTypes, campaign, , options] =
                 applyDamageToTarget.mock.calls[0];
             expect(target).toBe('Goblin');
             expect(damage).toBe(8);
             expect(damageTypes).toEqual(['slashing']);
             expect(campaign).toBe('test-campaign');
-            expect(attacker).toBe('TestFighter');
+            expect(options.attackerName).toBe('TestFighter');
         });
 
         it('calls applyDamageToTarget with adjusted total when elemental adept modifies damage', async () => {
@@ -728,17 +728,7 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
                 damageType: 'fire',
             });
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.objectContaining({ creatures: expect.any(Array) }),
-                'Goblin',
-                10,
-                ['fire'],
-                'test-campaign',
-                expect.any(Array),
-                false,
-                'TestFighter',
-                true
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.objectContaining({ creatures: expect.any(Array) }), 'Goblin', 10, ['fire'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestFighter', suppressHpLog: true });
         });
     });
 
@@ -913,17 +903,7 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
                 damageType: 'fire',
             });
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(
-                expect.objectContaining({ creatures: expect.any(Array) }),
-                'Goblin',
-                10,
-                ['fire'],
-                'test-campaign',
-                expect.any(Array),
-                false,
-                'TestFighter',
-                true
-            );
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.objectContaining({ creatures: expect.any(Array) }), 'Goblin', 10, ['fire'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestFighter', suppressHpLog: true });
 
             const popup = getFirstPopupCall();
             expect(popup.total).toBe(10);

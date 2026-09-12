@@ -228,21 +228,25 @@ function closestRoomPair(c1, c2, rooms) {
   return { bestA, bestB };
 }
 
+function carveRow(grid, gridSize, y, x1, x2) {
+  for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) {
+    if (x >= 0 && x < gridSize && y >= 0 && y < gridSize) grid[y][x] = false;
+  }
+}
+
+function carveColumn(grid, gridSize, x, y1, y2) {
+  for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
+    if (x >= 0 && x < gridSize && y >= 0 && y < gridSize) grid[y][x] = false;
+  }
+}
+
 function carveCorridor(grid, gridSize, ca, cb, horizontalFirst) {
   if (horizontalFirst) {
-    for (let x = Math.min(ca[0], cb[0]); x <= Math.max(ca[0], cb[0]); x++) {
-      if (x >= 0 && x < gridSize && ca[1] >= 0 && ca[1] < gridSize) grid[ca[1]][x] = false;
-    }
-    for (let y = Math.min(ca[1], cb[1]); y <= Math.max(ca[1], cb[1]); y++) {
-      if (cb[0] >= 0 && cb[0] < gridSize && y >= 0 && y < gridSize) grid[y][cb[0]] = false;
-    }
+    carveRow(grid, gridSize, ca[1], ca[0], cb[0]);
+    carveColumn(grid, gridSize, cb[0], ca[1], cb[1]);
   } else {
-    for (let y = Math.min(ca[1], cb[1]); y <= Math.max(ca[1], cb[1]); y++) {
-      if (ca[0] >= 0 && ca[0] < gridSize && y >= 0 && y < gridSize) grid[y][ca[0]] = false;
-    }
-    for (let x = Math.min(ca[0], cb[0]); x <= Math.max(ca[0], cb[0]); x++) {
-      if (x >= 0 && x < gridSize && cb[1] >= 0 && cb[1] < gridSize) grid[cb[1]][x] = false;
-    }
+    carveColumn(grid, gridSize, ca[0], ca[1], cb[1]);
+    carveRow(grid, gridSize, cb[1], ca[0], cb[0]);
   }
 }
 

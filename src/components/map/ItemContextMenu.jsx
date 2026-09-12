@@ -1,4 +1,44 @@
 
+function menuHeightFor(isNpc, isDoor, showViewStats) {
+    if (isDoor) return 116;
+    const hasExtra = isNpc || showViewStats;
+    if (!hasExtra) return 76;
+    return showViewStats ? 138 : 120;
+}
+
+function rotateOffsetFor(showViewStats, showRenameOption, isDoor) {
+    if (showViewStats) return 108;
+    if (showRenameOption || isDoor) return 86;
+    return 64;
+}
+
+function buildMenuModel(item, monsterFound, menuY) {
+    const isNpc = item && item.type === 'npc';
+    const isDoor = item && item.type === 'door';
+    const showRenameOption = isNpc;
+    const showViewStats = isNpc && monsterFound;
+
+    const effectiveHeight = menuHeightFor(isNpc, isDoor, showViewStats);
+    const yRotate = rotateOffsetFor(showViewStats, showRenameOption, isDoor);
+
+    const entries = [
+        { id: 'visibility', y: menuY + 20, label: item?.visible !== false ? 'Hide' : 'Show' },
+        { id: 'delete', y: menuY + 42, label: 'Delete' },
+    ];
+    if (isDoor) {
+        entries.push({ id: 'door', y: menuY + 64, label: item?.open ? 'Close Door' : 'Open Door' });
+    }
+    if (showRenameOption) {
+        entries.push({ id: 'rename', y: menuY + 64, label: 'Rename' });
+    }
+    if (showViewStats) {
+        entries.push({ id: 'stats', y: menuY + 86, label: 'View Stats' });
+    }
+    entries.push({ id: 'rotate', y: menuY + yRotate, label: 'Rotate' });
+
+    return { entries, effectiveHeight, yRotate };
+}
+
 function ItemContextMenu({
     selectedItem,
     placedItems,
@@ -18,48 +58,27 @@ function ItemContextMenu({
     const menuX = gridCenterX(selectedItem.gridX) + 10;
     const menuY = gridCenterY(selectedItem.gridY) + 10;
     const item = placedItems.find(i => i.id === selectedItem.id);
-    const isNpc = item && item.type === 'npc';
-    const isDoor = item && item.type === 'door';
-    const showRenameOption = isNpc;
-    const showViewStats = isNpc && monsterFound;
-    const hasExtra = showRenameOption || showViewStats || isDoor;
-    const menuHeight = hasExtra ? (showViewStats ? 138 : 120) : 76;
-    const doorMenuHeight = isDoor ? 116 : 0;
+    const { entries, effectiveHeight } = buildMenuModel(item, monsterFound, menuY);
 
-    const effectiveHeight = isDoor ? doorMenuHeight : menuHeight;
-
-    const yRotate = showViewStats ? 108 : showRenameOption ? 86 : isDoor ? 86 : 64;
-    const yClose = menuY + 12;
+    const handlers = {
+        visibility: () => handleToggleItemVisibility(selectedItem.id),
+        delete: () => handleDeleteItem(selectedItem.id),
+        door: () => handleToggleDoor(selectedItem.id),
+        rename: (e) => onRenameClicked(e, selectedItem, item?.name || 'NPC'),
+        stats: () => handleViewStats(selectedItem.id),
+        rotate: () => handleRotate(selectedItem.id),
+    };
 
     return (
           <g className="item-context-menu" onClick={(e) => e.stopPropagation()}>
               <g>
                   <rect x={menuX} y={menuY} width="120" height={effectiveHeight} rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
-                  <text x={menuX + 8} y={menuY + 20} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleToggleItemVisibility(selectedItem.id)}>
-                      {item?.visible !== false ? 'Hide' : 'Show'}
-                  </text>
-                  <text x={menuX + 8} y={menuY + 42} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleDeleteItem(selectedItem.id)}>Delete</text>
-                  {isDoor && (
-                      <text x={menuX + 8} y={menuY + 64} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleToggleDoor(selectedItem.id)}>
-                          {item?.open ? 'Close Door' : 'Open Door'}
+                  {entries.map(entry => (
+                      <text key={entry.id} x={menuX + 8} y={entry.y} fill="#ccc" fontSize="11" className="menu-option" onClick={handlers[entry.id]}>
+                          {entry.label}
                       </text>
-                  )}
-                  {showRenameOption && (
-                      <>
-                        <text x={menuX + 8} y={menuY + 64} fill="#ccc" fontSize="11" className="menu-option" onClick={(e) => onRenameClicked(e, selectedItem, item?.name || 'NPC')}>
-                         Rename
-                        </text>
-                          {showViewStats && (
-                              <text x={menuX + 8} y={menuY + 86} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleViewStats(selectedItem.id)}>
-                                View Stats
-                              </text>
-                          )}
-                      </>
-                  )}
-                  <text x={menuX + 8} y={menuY + yRotate} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleRotate(selectedItem.id)}>
-                    Rotate
-                  </text>
-                  <text x={menuX + 108} y={yClose} fill="#999" fontSize="10" className="menu-close" onClick={() => onClose(menuX, menuY)}>✕</text>
+                  ))}
+                  <text x={menuX + 108} y={menuY + 12} fill="#999" fontSize="10" className="menu-close" onClick={() => onClose(menuX, menuY)}>✕</text>
               </g>
           </g>
       );

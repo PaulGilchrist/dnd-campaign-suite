@@ -156,37 +156,148 @@ function placeAlongWall(room, wall, rng, inset) {
   return { x, y, rotation: rot };
 }
 
-function placeAgainstWall(room, wall, rng, finalDoors, gridSize, grid) {
-  const rot = wallRotation(wall);
-  const isHorizontal = (wall === 'n' || wall === 's');
-
+function buildDoorCellSet(finalDoors) {
   const doorCells = {};
   for (let d = 0; d < finalDoors.length; d++) {
     doorCells[finalDoors[d].x + ',' + finalDoors[d].y] = true;
   }
+  return doorCells;
+}
 
-  let candidates = [];
-  if (isHorizontal) {
-    const y = wall === 'n' ? room.rect.y : room.rect.y + room.rect.h - 1;
-    const wy = wall === 'n' ? room.rect.y - 1 : room.rect.y + room.rect.h;
-    for (let x = room.rect.x; x < room.rect.x + room.rect.w - 1; x++) {
-      if (wy >= 0 && wy < gridSize && grid[wy][x] &&
-          !doorCells[x + ',' + y] && !doorCells[(x + 1) + ',' + y]) {
-        candidates.push({ x, y, rotation: rot });
-      }
-    }
-  } else {
-    const x = wall === 'w' ? room.rect.x : room.rect.x + room.rect.w - 1;
-    const wx = wall === 'w' ? room.rect.x - 1 : room.rect.x + room.rect.w;
-    for (let y = room.rect.y; y < room.rect.y + room.rect.h - 1; y++) {
-      if (wx >= 0 && wx < gridSize && grid[y][wx] &&
-          !doorCells[x + ',' + y] && !doorCells[x + ',' + (y + 1)]) {
-        candidates.push({ x, y, rotation: rot });
-      }
+function horizontalWallCandidates(room, wall, rot, doorCells, gridSize, grid) {
+  const y = wall === 'n' ? room.rect.y : room.rect.y + room.rect.h - 1;
+  const wy = wall === 'n' ? room.rect.y - 1 : room.rect.y + room.rect.h;
+  const candidates = [];
+  for (let x = room.rect.x; x < room.rect.x + room.rect.w - 1; x++) {
+    if (wy >= 0 && wy < gridSize && grid[wy][x] &&
+        !doorCells[x + ',' + y] && !doorCells[(x + 1) + ',' + y]) {
+      candidates.push({ x, y, rotation: rot });
     }
   }
+  return candidates;
+}
+
+function verticalWallCandidates(room, wall, rot, doorCells, gridSize, grid) {
+  const x = wall === 'w' ? room.rect.x : room.rect.x + room.rect.w - 1;
+  const wx = wall === 'w' ? room.rect.x - 1 : room.rect.x + room.rect.w;
+  const candidates = [];
+  for (let y = room.rect.y; y < room.rect.y + room.rect.h - 1; y++) {
+    if (wx >= 0 && wx < gridSize && grid[y][wx] &&
+        !doorCells[x + ',' + y] && !doorCells[x + ',' + (y + 1)]) {
+      candidates.push({ x, y, rotation: rot });
+    }
+  }
+  return candidates;
+}
+
+function placeAgainstWall(room, wall, rng, finalDoors, gridSize, grid) {
+  const rot = wallRotation(wall);
+  const doorCells = buildDoorCellSet(finalDoors);
+  const candidates = (wall === 'n' || wall === 's')
+    ? horizontalWallCandidates(room, wall, rot, doorCells, gridSize, grid)
+    : verticalWallCandidates(room, wall, rot, doorCells, gridSize, grid);
   if (candidates.length > 0) return pick(candidates, rng);
   return null;
+}
+
+function addLargeRoomPillars(room, placedItems, c) {
+  const offsets = [[-2, -2], [2, -2], [-2, 2], [2, 2]];
+  for (let i = 0; i < offsets.length; i++) {
+    const px = c[0] + offsets[i][0], py = c[1] + offsets[i][1];
+    if (rectContains(room.rect, px, py)) {
+      placedItems.push({
+        id: 'pillar-' + room.id + '-' + px + '-' + py,
+        gridX: px, gridY: py,
+        type: 'pillar',
+        visible: true,
+      });
+    }
+  }
+}
+
+function addLargeRoomTableChairs(room, placedItems, c, rng) {
+  const tableX = c[0] - 1;
+  const tableY = c[1];
+  if (!(tableX >= room.rect.x && tableX + 1 < room.rect.x + room.rect.w)) return;
+  placedItems.push({
+    id: 'table-' + room.id,
+    gridX: tableX, gridY: tableY,
+    type: 'table',
+    visible: true,
+    rotation: 0,
+  });
+  const chairDefs = [
+    { dx: 0, dy: -1, rot: 0 },
+    { dx: 1, dy: -1, rot: 0 },
+    { dx: 0, dy: 1, rot: 180 },
+    { dx: 1, dy: 1, rot: 180 },
+    { dx: -1, dy: 0, rot: 90 },
+    { dx: 2, dy: 0, rot: 270 },
+  ];
+  const numChairs = 2 + Math.floor(rng() * 3);
+  const shuffled = chairDefs.slice().sort(function () { return rng() - 0.5; });
+  for (let i = 0; i < numChairs; i++) {
+    const ch = shuffled[i];
+    const chx = tableX + ch.dx, chy = tableY + ch.dy;
+    if (rectContains(room.rect, chx, chy)) {
+      placedItems.push({
+        id: 'chair-' + room.id + '-' + i,
+        gridX: chx, gridY: chy,
+        type: 'chair',
+        visible: true,
+        rotation: ch.rot,
+      });
+    }
+  }
+}
+
+function bedAgainstWallPosition(room, wall, rng) {
+  if (wall === 'n') {
+    return { x: room.rect.x + 1 + Math.floor(rng() * Math.max(1, room.rect.w - 2)), y: room.rect.y + 1, rotation: 0 };
+  }
+  if (wall === 's') {
+    return { x: room.rect.x + 1 + Math.floor(rng() * Math.max(1, room.rect.w - 2)), y: room.rect.y + room.rect.h - 2, rotation: 0 };
+  }
+  if (wall === 'w') {
+    return { x: room.rect.x + 1, y: room.rect.y + 1 + Math.floor(rng() * Math.max(1, room.rect.h - 2)), rotation: 90 };
+  }
+  return { x: room.rect.x + room.rect.w - 2, y: room.rect.y + 1 + Math.floor(rng() * Math.max(1, room.rect.h - 2)), rotation: 90 };
+}
+
+function addLargeRoomBed(room, placedItems, rng, gridSize, usedWalls) {
+  const wall = pickWall(room, gridSize, rng, usedWalls);
+  const pos = bedAgainstWallPosition(room, wall, rng);
+  placedItems.push({
+    id: 'bed-' + room.id,
+    gridX: pos.x, gridY: pos.y,
+    type: 'bed',
+    visible: true,
+    rotation: pos.rotation,
+  });
+  usedWalls.push(wall);
+}
+
+function addLargeRoomBookshelf(room, placedItems, rng, gridSize, grid, finalDoors, usedWalls) {
+  const walls = ['n', 's', 'w', 'e'].filter(function (w) {
+    return !usedWalls.includes(w);
+  });
+  let placed = false;
+  for (let wi = 0; wi < walls.length && !placed; wi++) {
+    const idx = Math.floor(rng() * walls.length);
+    const w = walls.splice(idx, 1)[0];
+    const pos = placeAgainstWall(room, w, rng, finalDoors, gridSize, grid);
+    if (pos) {
+      placedItems.push({
+        id: 'bookshelf-' + room.id,
+        gridX: pos.x, gridY: pos.y,
+        type: 'bookshelf',
+        visible: true,
+        rotation: pos.rotation,
+      });
+      usedWalls.push(w);
+      placed = true;
+    }
+  }
 }
 
 function addLargeRoomFurniture(room, placedItems, rng, gridSize, grid, finalDoors) {
@@ -205,55 +316,11 @@ function addLargeRoomFurniture(room, placedItems, rng, gridSize, grid, finalDoor
   }
 
   if (room.rect.w >= 6 && room.rect.h >= 6 && rng() < 0.5) {
-    const offsets = [[-2, -2], [2, -2], [-2, 2], [2, 2]];
-    for (let i = 0; i < offsets.length; i++) {
-      const px = c[0] + offsets[i][0], py = c[1] + offsets[i][1];
-      if (rectContains(room.rect, px, py)) {
-        placedItems.push({
-          id: 'pillar-' + room.id + '-' + px + '-' + py,
-          gridX: px, gridY: py,
-          type: 'pillar',
-          visible: true,
-        });
-      }
-    }
+    addLargeRoomPillars(room, placedItems, c);
   }
 
   if (rng() < 0.5) {
-    const tableX = c[0] - 1;
-    const tableY = c[1];
-    if (tableX >= room.rect.x && tableX + 1 < room.rect.x + room.rect.w) {
-      placedItems.push({
-        id: 'table-' + room.id,
-        gridX: tableX, gridY: tableY,
-        type: 'table',
-        visible: true,
-        rotation: 0,
-      });
-      const chairDefs = [
-        { dx: 0, dy: -1, rot: 0 },
-        { dx: 1, dy: -1, rot: 0 },
-        { dx: 0, dy: 1, rot: 180 },
-        { dx: 1, dy: 1, rot: 180 },
-        { dx: -1, dy: 0, rot: 90 },
-        { dx: 2, dy: 0, rot: 270 },
-      ];
-      const numChairs = 2 + Math.floor(rng() * 3);
-      const shuffled = chairDefs.slice().sort(function () { return rng() - 0.5; });
-      for (let i = 0; i < numChairs; i++) {
-        const ch = shuffled[i];
-        const chx = tableX + ch.dx, chy = tableY + ch.dy;
-        if (rectContains(room.rect, chx, chy)) {
-          placedItems.push({
-            id: 'chair-' + room.id + '-' + i,
-            gridX: chx, gridY: chy,
-            type: 'chair',
-            visible: true,
-            rotation: ch.rot,
-          });
-        }
-      }
-    }
+    addLargeRoomTableChairs(room, placedItems, c, rng);
   }
 
   if (rng() < 0.6) {
@@ -270,56 +337,11 @@ function addLargeRoomFurniture(room, placedItems, rng, gridSize, grid, finalDoor
   }
 
   if (rng() < 0.4) {
-    const wall = pickWall(room, gridSize, rng, usedWalls);
-    let bx, by, rotation;
-    if (wall === 'n') {
-      bx = room.rect.x + 1 + Math.floor(rng() * Math.max(1, room.rect.w - 2));
-      by = room.rect.y + 1;
-      rotation = 0;
-    } else if (wall === 's') {
-      bx = room.rect.x + 1 + Math.floor(rng() * Math.max(1, room.rect.w - 2));
-      by = room.rect.y + room.rect.h - 2;
-      rotation = 0;
-    } else if (wall === 'w') {
-      bx = room.rect.x + 1;
-      by = room.rect.y + 1 + Math.floor(rng() * Math.max(1, room.rect.h - 2));
-      rotation = 90;
-    } else {
-      bx = room.rect.x + room.rect.w - 2;
-      by = room.rect.y + 1 + Math.floor(rng() * Math.max(1, room.rect.h - 2));
-      rotation = 90;
-    }
-    placedItems.push({
-      id: 'bed-' + room.id,
-      gridX: bx, gridY: by,
-      type: 'bed',
-      visible: true,
-      rotation: rotation,
-    });
-    usedWalls.push(wall);
+    addLargeRoomBed(room, placedItems, rng, gridSize, usedWalls);
   }
 
   if (rng() < 0.3) {
-    const walls = ['n', 's', 'w', 'e'].filter(function (w) {
-      return !usedWalls.includes(w);
-    });
-    let placed = false;
-    for (let wi = 0; wi < walls.length && !placed; wi++) {
-      const idx = Math.floor(rng() * walls.length);
-      const w = walls.splice(idx, 1)[0];
-      const pos = placeAgainstWall(room, w, rng, finalDoors, gridSize, grid);
-      if (pos) {
-        placedItems.push({
-          id: 'bookshelf-' + room.id,
-          gridX: pos.x, gridY: pos.y,
-          type: 'bookshelf',
-          visible: true,
-          rotation: pos.rotation,
-        });
-        usedWalls.push(w);
-        placed = true;
-      }
-    }
+    addLargeRoomBookshelf(room, placedItems, rng, gridSize, grid, finalDoors, usedWalls);
   }
 
   placeRoomTrap(room, placedItems, rng, grid, gridSize);

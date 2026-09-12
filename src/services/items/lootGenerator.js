@@ -269,6 +269,44 @@ async function loadJSONData(file) {
   }
 }
 
+function rollMonsterEntries(tier, numEntries, equipmentData, magicItemsData, accum) {
+  const roll = Math.random();
+
+  if (roll < 0.65) {
+    const share = totalValueForTier(tier) / numEntries;
+    const entry = generateCurrencyEntry(tier, share);
+    if (typeof entry === 'number' && entry > 0) accum.currencyGP.push(entry);
+  } else if (roll < 0.82) {
+    const entry = generateGemEntry(tier);
+    if (entry) accum.otherEntries.push(entry);
+  } else if (roll < 0.94) {
+    const entry = generateEquipmentEntry(equipmentData, tier);
+    if (entry) accum.otherEntries.push(entry);
+  } else {
+    const entry = generateMagicItemEntry(magicItemsData);
+    if (entry) accum.otherEntries.push(entry);
+  }
+}
+
+function buildLootEntries(currencyGP, otherEntries) {
+  const lootEntries = [];
+  if (currencyGP.length > 0) {
+    const totalCurrencyGP = currencyGP.reduce((s, v) => s + v, 0);
+    const formatted = formatCurrencyString(normalizeCurrency(totalCurrencyGP));
+    if (formatted && formatted !== '0 platinum pieces') lootEntries.push(formatted);
+  }
+
+  for (const entry of otherEntries) {
+    lootEntries.push(entry);
+  }
+
+  if (lootEntries.length === 0) {
+    lootEntries.push('No loot for these monsters');
+  }
+
+  return lootEntries;
+}
+
 export async function generateLootSuggestions(selectedMonsters) {
   if (!selectedMonsters || !selectedMonsters.length) {
     return { lootEntries: [], totalEncounterXp: 0 };
@@ -277,10 +315,9 @@ export async function generateLootSuggestions(selectedMonsters) {
   const [magicItemsData, equipmentData] = await Promise.all([
     loadJSONData('magic-items.json'),
     loadJSONData('equipment.json'),
-    ]);
+  ]);
 
-  const currencyGP = [];
-  const otherEntries = [];
+  const accum = { currencyGP: [], otherEntries: [] };
 
   for (const monster of selectedMonsters) {
     const qty = monster.qty || 1;
@@ -288,52 +325,19 @@ export async function generateLootSuggestions(selectedMonsters) {
     const tier = getTreasureTier(cr);
 
     if (tier.tier === 'none') continue;
-
-    const treasureFrequency = getTreasureFrequency(cr);
-    if (Math.random() > treasureFrequency) continue;
+    if (Math.random() > getTreasureFrequency(cr)) continue;
 
     const numEntries = randInt(1, Math.min(qty + 2, 4));
 
     for (let i = 0; i < numEntries; i++) {
-      let entry;
-      const roll = Math.random();
-
-      if (roll < 0.65) {
-        const share = totalValueForTier(tier) / numEntries;
-        entry = generateCurrencyEntry(tier, share);
-        if (typeof entry === 'number' && entry > 0) currencyGP.push(entry);
-        } else if (roll < 0.82) {
-        entry = generateGemEntry(tier);
-        if (entry) otherEntries.push(entry);
-        } else if (roll < 0.94) {
-        entry = generateEquipmentEntry(equipmentData, tier);
-        if (entry) otherEntries.push(entry);
-          } else {
-         entry = generateMagicItemEntry(magicItemsData);
-         if (entry) otherEntries.push(entry);
-         }
-        }
-      }
-
-   const lootEntries = [];
-   if (currencyGP.length > 0) {
-     const totalCurrencyGP = currencyGP.reduce((s, v) => s + v, 0);
-     const normalized = normalizeCurrency(totalCurrencyGP);
-     const formatted = formatCurrencyString(normalized);
-     if (formatted && formatted !== '0 platinum pieces') lootEntries.push(formatted);
+      rollMonsterEntries(tier, numEntries, equipmentData, magicItemsData, accum);
     }
+  }
 
-   for (const entry of otherEntries) {
-     lootEntries.push(entry);
-    }
-
-   if (lootEntries.length === 0) {
-     lootEntries.push('No loot for these monsters');
-    }
-
-   const totalEncounterXp = calculateEncounterXp(selectedMonsters);
-
-   return { lootEntries, totalEncounterXp };
+  return {
+    lootEntries: buildLootEntries(accum.currencyGP, accum.otherEntries),
+    totalEncounterXp: calculateEncounterXp(selectedMonsters),
+  };
 }
 
 function getTreasureFrequency(cr) {

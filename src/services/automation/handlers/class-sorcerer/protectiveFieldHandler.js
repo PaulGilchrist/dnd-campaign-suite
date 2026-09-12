@@ -6,6 +6,13 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 
+function rollProtectiveFieldDie(psionicDieSize, playerStats) {
+    const dieRoll = rollExpression(`1d${psionicDieSize}`);
+    const dieValue = dieRoll?.total || psionicDieSize;
+    const intMod = playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus || 0;
+    return { dieValue, intMod };
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -30,9 +37,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const defenderName = attackResult?.attackEvent?.targetName || null;
 
     const psionicDieSize = evaluateAutoExpression('psionic_energy_die', playerStats);
-    const dieRoll = rollExpression(`1d${psionicDieSize}`);
-    const dieValue = dieRoll?.total || psionicDieSize;
-    const intMod = playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus || 0;
+    const { dieValue, intMod } = rollProtectiveFieldDie(psionicDieSize, playerStats);
     const reduction = dieValue + intMod;
 
     await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);

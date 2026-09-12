@@ -148,10 +148,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.type).toBe('damage');
@@ -178,11 +175,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-                isAutoCrit: true,
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', isAutoCrit: true, });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.isCrit).toBe(true);
@@ -196,10 +189,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
-                targetName: 'Goblin',
-                damageType: 'fire',
-            });
+            await fn('Fire Bolt', '1d10', 8, [8], 0, { targetName: 'Goblin', damageType: 'fire', });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.elementalAdeptBonus).toBe(0);
@@ -215,12 +205,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-                bardicInspirationOffense: true,
-                bardicInspirationOffenseDieSize: 6,
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', bardicInspirationOffense: true, bardicInspirationOffenseDieSize: 6, });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.bardicInspirationOffense).toBe(true);
@@ -235,12 +220,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
-                targetName: 'Goblin',
-                damageType: 'fire',
-                empoweredSpell: true,
-                empoweredSpellChaMod: 2,
-            });
+            await fn('Fire Bolt', '1d10', 8, [8], 0, { targetName: 'Goblin', damageType: 'fire', empoweredSpell: true, empoweredSpellChaMod: 2, });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.empoweredSpell).toBe(true);
@@ -264,11 +244,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Rapier', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'piercing',
-                playerStats: makePiercerStats(),
-            });
+            await fn('Rapier', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'piercing', playerStats: makePiercerStats(), });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.piercerPuncture).toBe(true);
@@ -283,11 +259,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
-                targetName: 'Goblin',
-                damageType: 'fire',
-                playerStats: makePiercerStats(),
-            });
+            await fn('Fire Bolt', '1d10', 8, [8], 0, { targetName: 'Goblin', damageType: 'fire', playerStats: makePiercerStats(), });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.piercerPuncture).toBe(false);
@@ -302,11 +274,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Rapier', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'piercing',
-                playerStats: makePiercerStats(),
-            });
+            await fn('Rapier', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'piercing', playerStats: makePiercerStats(), });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.piercerPuncture).toBe(false);
@@ -320,11 +288,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Rapier', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'piercing',
-                playerStats: {},
-            });
+            await fn('Rapier', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'piercing', playerStats: {}, });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.piercerPuncture).toBe(false);
@@ -349,12 +313,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-                isMelee: true,
-                playerStats: makeSavageStats(),
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', isMelee: true, playerStats: makeSavageStats(), });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.savageAttacker).toBe(true);
@@ -369,12 +328,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Unarmed Strike', '1d4', 4, [4], 0, {
-                targetName: 'Goblin',
-                damageType: 'bludgeoning',
-                isUnarmedStrike: true,
-                playerStats: makeSavageStats(),
-            });
+            await fn('Unarmed Strike', '1d4', 4, [4], 0, { targetName: 'Goblin', damageType: 'bludgeoning', isUnarmedStrike: true, playerStats: makeSavageStats(), });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.savageAttacker).toBe(true);
@@ -389,12 +343,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
-                targetName: 'Goblin',
-                damageType: 'fire',
-                isMelee: false,
-                playerStats: makeSavageStats(),
-            });
+            await fn('Fire Bolt', '1d10', 8, [8], 0, { targetName: 'Goblin', damageType: 'fire', isMelee: false, playerStats: makeSavageStats(), });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.savageAttacker).toBe(false);
@@ -409,12 +358,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-                isMelee: true,
-                playerStats: makeSavageStats(),
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', isMelee: true, playerStats: makeSavageStats(), });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.savageAttacker).toBe(false);
@@ -428,12 +372,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-                isMelee: true,
-                playerStats: {},
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', isMelee: true, playerStats: {}, });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.savageAttacker).toBe(false);
@@ -449,11 +388,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Unarmed Strike', '1d4', 4, [4], 0, {
-                targetName: 'Goblin',
-                damageType: 'bludgeoning',
-                isUnarmedStrike: true,
-            });
+            await fn('Unarmed Strike', '1d4', 4, [4], 0, { targetName: 'Goblin', damageType: 'bludgeoning', isUnarmedStrike: true, });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.weaponType).toBe('unarmed');
@@ -467,11 +402,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-                isMelee: true,
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', isMelee: true, });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.weaponType).toBe('melee');
@@ -485,11 +416,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
-                targetName: 'Goblin',
-                damageType: 'fire',
-                isMelee: false,
-            });
+            await fn('Fire Bolt', '1d10', 8, [8], 0, { targetName: 'Goblin', damageType: 'fire', isMelee: false, });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.weaponType).toBe('ranged');
@@ -503,10 +430,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.weaponType).toBe('melee');
@@ -522,10 +446,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.gwfApplied).toBe(false);
@@ -548,10 +469,7 @@ describe('Plain damage popup data', () => {
             });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.holyAuraSaveResult).toEqual({ success: true, saveType: 'wisdom' });
@@ -567,13 +485,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-                dc: 15,
-                dcType: 'strength',
-                dcSuccess: false,
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', dc: 15, dcType: 'strength', dcSuccess: false, });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.dc).toBe(15);
@@ -591,11 +503,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-                tavernBrawlerRerolls: [1, 2],
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', tavernBrawlerRerolls: [1, 2], });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.tavernBrawlerRerolls).toEqual([1, 2]);
@@ -609,10 +517,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.tavernBrawlerRerolls).toBeNull();
@@ -628,11 +533,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
-                targetName: 'Goblin',
-                damageType: 'fire',
-                spellName: 'Fire Bolt',
-            });
+            await fn('Fire Bolt', '1d10', 8, [8], 0, { targetName: 'Goblin', damageType: 'fire', spellName: 'Fire Bolt', });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.spellName).toBe('Fire Bolt');
@@ -646,10 +547,7 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.spellName).toBe('');
@@ -673,10 +571,7 @@ describe('Plain damage popup data', () => {
             });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             const call = deps.setPopupHtml.mock.calls[0][0];
             expect(call.interceptedFeature).toBe('Shield Boy');
@@ -693,19 +588,16 @@ describe('Plain damage popup data', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
+            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
 
             expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-            const [, target, damage, damageTypes, campaign, , , attacker] =
+            const [, target, damage, damageTypes, campaign, , options] =
                 applyDamageToTarget.mock.calls[0];
             expect(target).toBe('Goblin');
             expect(damage).toBe(8);
             expect(damageTypes).toEqual(['slashing']);
             expect(campaign).toBe('test-campaign');
-            expect(attacker).toBe('TestFighter');
+            expect(options.attackerName).toBe('TestFighter');
         });
     });
 });

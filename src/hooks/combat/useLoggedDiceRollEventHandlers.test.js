@@ -267,7 +267,7 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
             testPendingSaves = { [pid]: createSavePrompt(pid, { targetName: 'ShieldedAlly', name: 'Magic Missile', damageType: 'force' }) };
             window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'ShieldedAlly', success: true, roll: 18, total: 21, saveBonus: 3 } }));
             await flushPromises();
-            expect(applyDamageToTarget).toHaveBeenCalledWith(null, 'ShieldedAlly', 0, ['force'], 'test-campaign', expect.any(Array), false, 'TestWizard', true, { isSpellDamage: false });
+            expect(applyDamageToTarget).toHaveBeenCalledWith(null, 'ShieldedAlly', 0, ['force'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true, ...{ isSpellDamage: false } });
         });
 
         it('does not apply shield immunity for non-magic missile spells', async () => {
